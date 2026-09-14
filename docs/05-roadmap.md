@@ -62,11 +62,9 @@ Timelines below are honest, not aspirational — see the timeline note after the
 ### M0 — Skeleton (≈2 days)
 Monorepo, Docker Compose, FastAPI hello, SvelteKit hello, WS echo with the `{v,t,seq,id,ts,d}`
 envelope, pydantic→JSON Schema→TS codegen wired into `make proto`. Also: `git init`, a remote,
-and a minimal CI workflow (even just `pytest` + the protocol-diff check) — see §3; the repo is
-initialized but has no CI despite this doc and `02-protocol.md` both
-promising "CI fails if stale."
+and a minimal CI workflow (even just `pytest` + the protocol-diff check) — see §3.
 **Done when:** a Svelte button sends a typed message and renders a typed reply, and a push to the
-remote runs the CI workflow.
+remote runs the CI workflow. **Met** — `.github/workflows/ci.yml`, see [07-infra.md §9](07-infra.md).
 
 ### M1 — Pure engine (3–4 weeks, critical path)
 Tiles, seeded wall, deal, flower replacement, melds, full turn state machine, claim priority
@@ -167,11 +165,10 @@ top of it.
 | Bots | Arena: candidate must beat incumbent over 20k seeded games to merge. |
 | Load | Replay bot sessions as real WS clients; target 200 concurrent tables on one node. |
 
-**Reality check:** there is no CI configured anywhere in this project, and it is not currently a
-git repository — `git init` hasn't happened. The "CI fails if stale" language above and the
-identical promise in [02-protocol.md](02-protocol.md) both describe a pipeline that doesn't exist
-yet. Fix this in M0 (added to that milestone's scope above), not as an M6 afterthought — every
-week spent without it is a week where "stale generated TS" can merge silently.
+`.github/workflows/ci.yml` runs on push/PR to `main`: `pytest -m "not slow"`, the web test suite
+(vitest + Playwright), and `proto-check` (`git diff --exit-code` after regenerating) — see
+[07-infra.md §9](07-infra.md). The "CI fails if stale" promise here and in
+[02-protocol.md](02-protocol.md) is now enforced, not aspirational.
 
 Build the self-play harness in M1. It finds deadlocks, illegal states, and rules gaps, and
 becomes the bot evaluation harness later.

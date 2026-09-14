@@ -260,9 +260,8 @@ so a new Envelope subclass added to those unions is picked up without touching t
 - `shared/protocol.schema.json` is still emitted (`TypeAdapter(AnyMessage).json_schema()`), but as
   a secondary, informational artifact only — nothing generates TS from it anymore.
 
-Wire it into the build (`make proto`); `make proto-check` (`git diff --exit-code` after
-regenerating) is the CI gate for "fails if the generated TS is stale" — see `docs/07-infra.md §9`
-for why there's no CI running it yet.
+Wired into the build (`make proto`); `proto-check` (`git diff --exit-code` after regenerating) is
+the CI gate for "fails if the generated TS is stale" — see `docs/07-infra.md §9`.
 
 ## 7. Example exchange
 

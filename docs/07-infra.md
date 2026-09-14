@@ -20,7 +20,7 @@ mahjong/
 `shared/` holds one generated artifact: `protocol.schema.json`. `make proto` regenerates it
 from `server/app/protocol.py` and, in the same step, generates the TS types straight into
 `web/src/lib/net/protocol.d.ts` ([02-protocol §6](02-protocol.md)). Neither file is hand-edited.
-There is no CI to enforce that yet — see §9.
+CI enforces that — see §9.
 
 Matchmaking, presence, rate limiting and session state are in-process structures for now.
 Deferred — see [99-deferred.md](99-deferred.md).
@@ -132,8 +132,16 @@ the asset is actually vendored in.
 
 ## 9. CI
 
-There is no CI, and this isn't a git repository yet. `02-protocol.md §6` and `05-roadmap.md §3`
-both describe "CI fails if stale" for generated protocol types — that's the intent, not the
-current state. `make proto` regenerates; `make proto-check` (same regeneration, plus
-`git diff --exit-code`) is the gate to wire into CI once there's a repo and a workflow file to
-wire it into. Don't rely on `proto-check` today; it will only pass if `proto` was already run.
+`.github/workflows/ci.yml`, on push and PR to `main`. Three jobs, all native tooling (`uv`,
+`pnpm`) rather than `docker compose run` — nothing here touches Postgres, so the containers buy
+nothing but slower cold starts:
+
+| Job | Runs |
+| --- | --- |
+| `test-server` | `uv sync --locked` + `uv run pytest -q -m "not slow"` |
+| `test-web` | `pnpm install --frozen-lockfile`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
+| `proto-check` | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
+
+`docker compose`-based `make test` / `make proto-check` stay the local dev path; CI reimplements
+their commands directly against the toolchain instead of shelling through Compose. Revisit if a
+job ever needs Postgres.
