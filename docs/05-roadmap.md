@@ -26,7 +26,7 @@ mahjong/
 │   │   ├── ws.py               # WebSocket endpoint, Session
 │   │   ├── room.py             # Room actor: task loop, timers, claim windows, seq/ring
 │   │   ├── registry.py         # RoomRegistry, matchmaking
-│   │   ├── views.py            # view_for(seat, state, event) — redaction
+│   │   ├── views.py            # seat_view() + redact_event() — redaction
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── infra/              # ports.py + memory.py (KV / Queue / Bus)
 │   │   └── db/                 # SQLAlchemy models, migrations
@@ -43,11 +43,11 @@ mahjong/
 │       └── lib/
 │           ├── net/            # socket.ts, reducer.ts, protocol.d.ts (GENERATED)
 │           ├── game/           # store.svelte.ts
-│           ├── table/          # pixi/ scene, layout, sprites, tweens, hit-test
+│           ├── table/          # DOM/CSS table scene: layout, tile positioning, transitions, hit-test
 │           └── ui/             # Svelte components
 ├── shared/protocol.schema.json # GENERATED from pydantic
 ├── server/tools/gen_protocol.py
-├── docker-compose.yml          # postgres + api + web; profiles: scale, ml, tools
+├── docker-compose.yml          # postgres + api + web; profiles: ml, tools
 ├── docker-compose.prod.yml     # prod overlay
 ├── pnpm-workspace.yaml
 └── Makefile                    # make up / test / proto / arena — see `make help`
@@ -56,27 +56,35 @@ mahjong/
 ## 2. Milestones
 
 Each milestone ends in something demonstrable. Don't move on until the previous one's tests pass.
+Timelines below are honest, not aspirational — see the timeline note after the table.
 
 ### M0 — Skeleton (≈2 days)
 Monorepo, Docker Compose, FastAPI hello, SvelteKit hello, WS echo with the `{v,t,seq,id,ts,d}`
-envelope, pydantic→JSON Schema→TS codegen wired into `make proto` and enforced in CI.
-**Done when:** a Svelte button sends a typed message and renders a typed reply.
+envelope, pydantic→JSON Schema→TS codegen wired into `make proto`. Also: `git init`, a remote,
+and a minimal CI workflow (even just `pytest` + the protocol-diff check) — see §3; the repo is
+initialized but has no CI despite this doc and `02-protocol.md` both
+promising "CI fails if stale."
+**Done when:** a Svelte button sends a typed message and renders a typed reply, and a push to the
+remote runs the CI workflow.
 
-### M1 — Pure engine (≈1 week, critical path)
+### M1 — Pure engine (3–4 weeks, critical path)
 Tiles, seeded wall, deal, flower replacement, melds, full turn state machine, claim priority
-resolution, `legal_actions`, `reduce`.
+resolution, `legal_actions`, `reduce`. This is the milestone most underestimated by an earlier
+draft of this doc — see the timeline note below for why 3–4 weeks, not 1.
 **Done when:** `pytest -k selfplay` runs 10,000 complete games with four `RandomBot`s — no
 illegal states, no deadlocks, every game terminates. Run under `hypothesis` too.
-Also: persist `GameRecord = (ruleset_hash, seed, action_log)` for every game, bot-only included
-(~2h; future training set — [06-ml §1](06-ml.md)).
+Also: persist `GameRecord` (`engine_version`, full `ruleset` body, `seed`, `actions`, `outcome`)
+for every game, bot-only included (~2h; full definition and the replay-invalidation policy in
+[06-ml §2](06-ml.md)).
 
-### M2 — Scoring (≈4 days)
-All faan patterns for `CLASSIC + NEW_6`, decomposition maximisation, limit hands, caps, the
-`min_faan` gate, points tables, payment splits.
+### M2 — Scoring (2–3 weeks)
+All faan patterns for `CLASSIC + NEW_6` (~35 patterns), decomposition maximisation, limit hands,
+caps, the `min_faan` gate, points tables, payment splits.
 **Done when:** a golden-fixture suite of ~120 hands (hand, context, ruleset → expected faan and
-payments) passes, including every edge case in [01-rules-spec §11](01-rules-spec.md).
-Also: the fixed 109-action space + `legal_mask` + round-trip property test
-([06-ml §3](06-ml.md)) — ~1 day, painful to retrofit; the bots share the mask.
+payments) passes, including every edge case in [01-rules-spec §11](01-rules-spec.md). Hand-authoring
+those 120 fixtures is itself days of work, not an afternoon — budget for it explicitly.
+Also: the fixed 109-action space + `legal_mask` + type-level round-trip property test
+([06-ml §1](06-ml.md)) — ~1 day, painful to retrofit; the bots share the mask.
 
 ### M3 — Server (≈1 week)
 Room actor + task loop, sessions, claim windows with early exit, per-seat redaction, timers with
@@ -86,22 +94,63 @@ persistence of finished games.
 resumes correctly from `last_seq`; `test_redaction` proves no seat ever receives a tile identity
 it isn't entitled to.
 
-### M4 — Playable client (≈2 weeks)
-Lobby, table route, Pixi scene, tile atlas, hand/pool/meld rendering, draw-discard-claim
-animations, claim buttons, timer ring, hand-end faan breakdown, score sheet. T1 `EfficiencyBot`
-in all three opponent seats.
-**Done when:** you can play a full game against three bots in a browser and it feels good.
+### M4 — Playable client + bots (6–10 weeks)
+Lobby, table route, DOM/CSS table scene, tile atlas/sprites, hand/pool/meld rendering,
+draw-discard-claim animations, claim buttons, timer ring, hand-end faan breakdown, score sheet.
+T1 `EfficiencyBot` **and T2 `FaanBot`** in the opponent seats — `FaanBot` is pulled forward from
+M6 here, not left until later, because it's load-bearing for M4.5's done gate (next section):
+three `EfficiencyBot`s under `min_faan=3` reach tenpai constantly and then can never legally
+declare ([04-bots §4](04-bots.md)), so an all-`EfficiencyBot` table produces endless exhaustive
+draws, not finished games. `EfficiencyBot` alone is not sufficient to make M4.5 playable.
+**Done when:** the client renders a full hand correctly end to end, and `FaanBot` beats
+`EfficiencyBot` over an arena run ([04-bots §8](04-bots.md)). The player-facing "does this feel
+like a game" gate lives in M4.5, not here.
 
-### M5 — Real multiplayer (≈1 week)
-Auth (magic-link or OAuth; no passwords), matchmaking, private rooms with invite codes, mid-game
-bot takeover for disconnects, spectating, chat with canned phrases.
+### M4.5 — Single-player is shippable
+No new engine or client work — this is a checkpoint milestone, not a build phase. Play the M4
+client against a table of three `FaanBot`s end to end (not `EfficiencyBot`s — see M4), fix
+whatever that reveals (pacing, animation edge cases, mobile layout per §4 risks), and cut a build.
+**Done when:** you can play a full game solo against three bots in a browser, hands end in real
+wins at a normal rate rather than perpetual exhaustive draws, and it feels good. This is the last
+point at which shipping single-player-only is a live, cheap option — given the M5 cost below,
+treat it as a real decision point, not a formality.
+
+### M5 — Real multiplayer (3–4 weeks)
+Auth (magic-link; this means standing up email infrastructure and deliverability — SPF/DKIM, a
+transactional-email provider, bounce handling — not just a token scheme), matchmaking, private
+rooms with invite codes, mid-game bot takeover for disconnects, spectating, chat with canned
+phrases.
 **Done when:** four browsers on four devices finish a game with one deliberate disconnect.
 
 ### M6 — Depth (ongoing)
-T2 `FaanBot` + arena harness. Replay viewer (reusing the client reducer). Sound. Ruleset presets.
-Stats, rating, hand history. i18n (zh-Hant/en). Mobile layout pass.
+Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
+(reusing the client reducer). Sound. Ruleset presets. Stats, rating, hand history. i18n
+(zh-Hant/en). Mobile layout pass. M6 has no done gate by design — see §7 for what actually has to
+ship before that's okay.
 
-**Rough total to M5: 6–7 weeks of focused work.** M1+M2 are ~40% of it.
+### Timeline, honestly
+
+**Total to M5 (real multiplayer): roughly 5–6 months full-time, or 12–18 months on evenings and
+weekends.** An earlier draft of this doc estimated "6–7 weeks of focused work" to the same
+milestone — that was off by roughly 4×, and 4× is exactly the kind of miss that kills a solo
+project around month three, when the actual pace becomes undeniable and there's no plan B.
+Per-milestone reality:
+
+- **M1 engine — 3–4 weeks, not 1.** Flower chains, kong-robbing interleaved with claim windows,
+  concealed-kong re-wait, frozen dataclasses kept honest under `mypy --strict`, and *then* the
+  10,000-game self-play clean run plus `hypothesis` properties on top — each of those is a
+  multi-day task on its own, not a subtask that fits inside a single week alongside the rest.
+- **M2 scoring — 2–3 weeks, not 4 days.** Maximizing over all valid decompositions across ~35
+  patterns is the tractable part; hand-authoring 120 golden fixtures — correct faan, correct
+  payments, per documented edge case — is by itself days of work.
+- **M4 client — 6–10 weeks, not 2.** This is a full turn-based UI with animation timing, claim
+  windows, and a faan breakdown at hand end — a real client application, not a rendering demo.
+- **M5 multiplayer — 3–4 weeks.** Magic-link auth alone pulls in email infrastructure and
+  deliverability, which is a different kind of work than anything in M0–M4.
+
+If this is evenings-and-weekends work rather than full-time, the 12–18 month figure already
+accounts for that at roughly 8–10 hours/week — don't also apply a separate part-time discount on
+top of it.
 
 ## 3. Testing strategy
 
@@ -112,10 +161,16 @@ Stats, rating, hand history. i18n (zh-Hant/en). Mobile layout pass.
 | Claim windows | Deterministic tests with injected arrival ordering — assert a slow high-priority win beats a fast chow, stale `window_id`s are dropped, and early exit fires when it should. |
 | Redaction | Schema-walking test: render every event type for every seat and assert no unauthorised `tile_id`/`tile` ever appears. Fails loudly on new message fields. |
 | Server | `httpx` + WS test client, four scripted clients, scripted disconnect/reconnect. |
-| Protocol | CI fails if generated TS differs from committed TS. |
-| Client | Vitest on the reducer (pure, so this is easy). Pixi screenshot tests against golden PNGs for scene layout. Playwright for a full game vs. bots. |
+| Protocol | Intended: CI fails if generated TS differs from committed TS. See the reality check below. |
+| Client | Vitest on the reducer (pure, so this is easy). Playwright for a full game vs. bots. (Pixi golden-PNG screenshot tests are cut along with Pixi itself — deferred, see [99-deferred.md](99-deferred.md).) |
 | Bots | Arena: candidate must beat incumbent over 20k seeded games to merge. |
 | Load | Replay bot sessions as real WS clients; target 200 concurrent tables on one node. |
+
+**Reality check:** there is no CI configured anywhere in this project, and it is not currently a
+git repository — `git init` hasn't happened. The "CI fails if stale" language above and the
+identical promise in [02-protocol.md](02-protocol.md) both describe a pipeline that doesn't exist
+yet. Fix this in M0 (added to that milestone's scope above), not as an M6 afterthought — every
+week spent without it is a week where "stale generated TS" can merge silently.
 
 Build the self-play harness in M1. It finds deadlocks, illegal states, and rules gaps, and
 becomes the bot evaluation harness later.
@@ -126,27 +181,101 @@ becomes the bot evaluation harness later.
 | --- | --- | --- |
 | **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer room loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
 | **Scoring disputes** — HK house rules differ from what you implemented | High | `RuleSet` from day one; show a per-pattern faan breakdown at hand end so players can see *why*; ship named presets |
-| **Efficiency bots can't win under 3-faan minimum** | Certain if unaddressed | [04-bots §4](04-bots.md); track "tenpai on sub-minimum hand" as an explicit arena metric |
+| **Efficiency bots can't win under 3-faan minimum** | Certain if unaddressed | [04-bots §4](04-bots.md); `FaanBot` moved into M4 specifically to fix this before the M4.5 solo-play gate — see §2; track "tenpai on sub-minimum hand" as an explicit arena metric |
 | Rules scope creep (pao, aborts, regional variants) | High | Ship `CLASSIC + NEW_6` + `min_faan=3` only. Everything else is a config flag behind a flag. |
-| Canvas rewrite because the rendering choice was wrong | Medium | Keep the Pixi layer a pure function of the game store with a narrow interface; swapping renderers then touches `lib/table/` only |
 | Mobile ergonomics (13 tiles on a 390px screen) | Medium | Design the mobile layout in M4, not M6. Test on a real phone early. |
-| Information leak via message size/timing | Low | Redact server-side (already); pad `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer if you care |
-| Python perf | Low | Turn-based, ~5 msg/s/room. Profile before optimising. |
+| Information leak via message size/timing | Low | Redact server-side (already). The obvious further mitigation — padding `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer — is **not done**: it's incompatible with the early-exit claim window that [00-architecture.md §4](00-architecture.md) requires for UX, since early exit necessarily reveals timing. Accepted as a known, low-severity leak rather than mitigated. |
+| **Python perf — server** | Low | Turn-based, ~5 msg/s/room; I/O-bound, not CPU-bound. |
+| **Python perf — bots** | Medium–High | Bots run in-process, not gated by network I/O the way the server's message rate is: each decision is roughly 470 pure-Python shanten evaluations, against a stated target of 200 concurrent tables × 3 bot seats. That's a CPU-bound hot loop at real concurrency, not "turn-based so it's fine" — the server row above does not cover it. Profile `mahjong_core.shanten` early; consider vectorizing ukeire/shanten or capping bot think-time before this becomes a scaling wall. |
 | Someone "uses all the cores" by raising `--workers`, silently splitting rooms across processes | Medium | Comment in Compose + Dockerfile, and a startup assertion in `main.py` ([07-infra §2](07-infra.md)) |
-| ML retrofit turns into an engine rewrite | Low, if M1/M2 items land | [06-ml §6](06-ml.md) checklist — ~1.5 days total, all of it useful for heuristic bots anyway |
+| ML retrofit turns into an engine rewrite | Low, if M1/M2 items land | [06-ml §5](06-ml.md) checklist — ~1 day total, all of it useful for heuristic bots anyway |
+| **Cold start — nobody's online at the same time** | High | No current mitigation beyond "bring your own group" via M5's invite-code private rooms. See §6; this is the primary product risk for a 4-player realtime game and was missing from this table entirely before this revision. |
+| **Silent room failure** — a wedged room destroys a game with no signal to anyone | Unrated — there is currently no way to detect it, which is the problem | See §8; minimum viable fix is per-room structured logs plus a liveness check, not just process-level `/healthz`. |
 
-## 5. Open questions
+## 5. Resolved decisions
 
-Defaults in use; confirm or override each.
+Previously open questions; now decided. Where the decision's source of truth lives in another
+doc, this section just records the answer and points there.
 
-1. **Rendering.** Default Pixi ([03-frontend §2](03-frontend.md)).
-2. **Scale target.** Default single node; thousands of tables moves stage-2 routing into M3.
-3. **Ruleset defaults.** `min_faan=3`, `faan_cap=10`, `half_spicy`, `discarder_pays_all`, `CLASSIC+NEW_6`, `EAST_SOUTH`.
-4. **Money/stakes.** Cosmetic points, or real stakes (pulls in commit scheme, audit logs, tighter bug tolerance)?
-5. **Accounts.** Guest-only, or persistent accounts with rating? Affects M5 scope.
-6. **3D.** A genuinely 3D table changes the asset pipeline; decide now.
+1. **Rendering.** DOM/CSS, not Pixi/canvas. Source of truth: [03-frontend.md](03-frontend.md).
+2. **Scale target.** Single node, ~200 concurrent tables ([04. Risks](#4-risks) above,
+   [07-infra.md](07-infra.md)). Thousands-of-tables routing is out of scope, not a numbered
+   future milestone.
+3. **Ruleset defaults.** `min_faan=3`, `faan_cap=10`, `half_spicy`, `discarder_pays_all`,
+   `CLASSIC+NEW_6`, `EAST_SOUTH`.
+4. **Money/stakes.** Cosmetic points only, never real stakes. Real-stakes mahjong is a licensing
+   question in most jurisdictions; deciding this in writing now is free, and revisiting it after
+   launch is not.
+5. **Accounts.** Guest-first, with an optional upgrade to a persistent account for rating/history.
+   No forced signup before playing. Affects M5 scope: the upgrade path is the new work, not guest
+   support itself, which needs no auth at all.
+6. **3D/2.5D rendering.** Cut, not deferred as a live decision — DOM/CSS (see #1) makes a 3D asset
+   pipeline out of scope entirely. Deferred — see [99-deferred.md](99-deferred.md).
 
-## 6. Sources
+## 6. Who plays this, and how do they find it
+
+For a 4-player realtime game, the cold-start problem — finding three other humans online at the
+same time — is the primary product risk, and an earlier draft of this roadmap didn't mention it
+anywhere. Bots cover it partially (M4.5 ships single-player against bots as a real, shippable
+artifact), but M5's "real multiplayer" done gate ("four browsers on four devices finish a game")
+says nothing about how those four humans found each other or why they were online at once.
+
+Minimum viable answer for v1: private rooms with invite codes (already in M5 scope), aimed at
+existing friend groups who already coordinate a real-world game time — this sidesteps needing a
+public lobby with real matchmaking density. Public-lobby matchmaking (a queue, skill-based
+pairing, always-on presence of strangers online at the same time) is a distinct, harder problem
+and is explicitly **not** v1 scope. See the cold-start risk row in §4 — it's tracked now instead
+of assumed away.
+
+## 7. What "done" means for v1
+
+Every milestone above has a "Done when" gate, but nothing in this doc said what actually ships as
+v1 — M6 is explicitly open-ended ("ongoing"), which is fine for a backlog and useless as a launch
+target.
+
+**v1 = M0 through M5**, plus whichever M6 items are load-bearing for the M5 done gate to mean
+anything in front of real users — at minimum, reconnect/bot-takeover actually holding up under a
+real disconnect (already M3/M5 scope) and the ruleset defaults being right, since there's no UI to
+change them yet ([04-bots.md](04-bots.md)). Everything else in M6 — replay viewer, sound, stats,
+rating, i18n, mobile pass — is post-launch by definition: ship v1 without it, then triage M6
+against what real usage actually asks for instead of guessing now.
+
+## 8. Observability
+
+There is none, anywhere in this doc set. The server is a single stateful process where each room
+is an in-memory actor ([00-architecture.md](00-architecture.md); `docker-compose.yml` runs the
+API with `--workers 1`) — one wedged room silently destroys a game in progress, and nothing
+currently described here would tell anyone it happened. Minimum for v1, not something to push to
+M6:
+
+- Structured logs per room (`room_id`, `seq`, phase transitions) shipped somewhere off-box.
+- A liveness check per room, not just the process-level `/healthz` compose already has — a
+  process can be up while one specific room's task loop is stuck.
+- An alert, even a crude one, on "room hasn't advanced `seq` in N minutes while players are
+  connected."
+- Basic visibility into crash recovery: when a room dies, does anyone find out before the players
+  do?
+
+See the "Silent room failure" risk row in §4.
+
+## 9. Deployment target and cost
+
+Not specified anywhere in this doc set. Needed before M5, since M5's done gate requires four real
+browsers on the open internet, not four local `docker-compose` clients:
+
+- **Host.** Pick one. A single VM is consistent with the `--workers 1` single-process design in
+  `docker-compose.yml`; don't reach for anything that implies horizontally scaling the room
+  registry, since the architecture doesn't support that ([07-infra.md](07-infra.md)).
+- **TLS + domain.** WebSocket over `wss://` needs a real certificate; decide the domain before M5,
+  not during it.
+- **Postgres backups.** Finished games (`GameRecord`s, per [06-ml §2](06-ml.md)) are the only
+  durable asset this system produces, and no backup plan exists anywhere in this doc set. At
+  minimum: automated daily snapshots with a tested restore, in place before real users' finished
+  games depend on it.
+- **Cost.** Even a rough monthly figure (VM + Postgres + domain) belongs in this doc before M5, so
+  "ship multiplayer" doesn't also quietly mean "commit to an unbudgeted recurring cost."
+
+## 10. Sources
 
 - [Hong Kong mahjong scoring rules — Wikipedia](https://en.wikipedia.org/wiki/Hong_Kong_mahjong_scoring_rules) — faan tables, spicy conversion, payments, penalties
 - [Complete Faan Guide — TileBuddy](https://tilebuddy.app/blog/complete-faan-guide/) — Classic / New 6 / New 18 hand sets
@@ -155,8 +284,6 @@ Defaults in use; confirm or override each.
 - [MahjongRepository/mahjong](https://github.com/MahjongRepository/mahjong) — shanten reference implementation
 - [A Fast Algorithm for Computing the Deficiency Number of a Mahjong Hand — arXiv:2108.06832](https://arxiv.org/pdf/2108.06832)
 - [Constructing AI Players with MDP Abstraction in Mahjong — arXiv:1904.07491](https://arxiv.org/pdf/1904.07491)
-- [Phaser vs PixiJS (2026)](https://generalistprogrammer.com/comparisons/phaser-vs-pixijs) — bundle/perf comparison
 - [FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles) — public-domain tile vectors
-- [libreriichi-assets](https://codeberg.org/davidgomez/libreriichi-assets) — CC0 3D tile textures
 - [Networking of a turn-based game — Longwelwind](https://longwelwind.net/blog/networking-turn-based-game/) — reducer/event pattern, seq resync
 - [Server-Authoritative Game Logic — AccelByte](https://accelbyte.io/blog/server-authoritative-logic-to-prevent-cheating)
