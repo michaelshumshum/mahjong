@@ -1,0 +1,102 @@
+name: mahjong
+
+x-pg-env: &pg-env
+  POSTGRES_USER: ${POSTGRES_USER:-mahjong}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mahjong}
+  POSTGRES_DB: ${POSTGRES_DB:-mahjong}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment: *pg-env
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mahjong} -d ${POSTGRES_DB:-mahjong}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+      target: dev
+    # one worker only: rooms are in-memory, owned by one process. docs/07-infra.md §2
+    command: >
+      uv run uvicorn app.main:app
+      --host 0.0.0.0 --port 8000 --workers 1
+      --reload --reload-dir /app/app --reload-dir /app/mahjong_core
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mahjong}:${POSTGRES_PASSWORD:-mahjong}@postgres:5432/${POSTGRES_DB:-mahjong}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-not-a-secret}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-5173}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PYTHONPATH: /app
+    ports: ["${API_PORT:-8000}:8000"]
+    volumes:
+      - ./server:/app
+      - ./shared:/shared
+      - server-venv:/app/.venv        # keeps the container venv off the host mount
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: ./web
+      target: dev
+    command: pnpm dev --host 0.0.0.0 --port 5173
+    environment:
+      PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+      PUBLIC_WS_URL: ws://localhost:${API_PORT:-8000}/ws
+    ports: ["${WEB_PORT:-5173}:5173"]
+    volumes:
+      - ./web:/app
+      - ./shared:/shared
+      - web-modules:/app/node_modules
+    depends_on: [api]
+
+  # torch lives in this image, not in api
+  trainer:
+    profiles: ["ml"]
+    build:
+      context: ./server
+      target: ml
+    command: uv run python -m ml.train --config ml/configs/bc.yaml
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mahjong}:${POSTGRES_PASSWORD:-mahjong}@postgres:5432/${POSTGRES_DB:-mahjong}
+      PYTHONPATH: /app
+    volumes:
+      - ./server:/app
+      - ./data:/data                  # game record shards, checkpoints
+      - server-venv-ml:/app/.venv
+    depends_on:
+      postgres: {condition: service_healthy}
+    # gpu:
+    # deploy:
+    #   resources: {reservations: {devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]}}
+
+  arena:
+    profiles: ["tools"]
+    build:
+      context: ./server
+      target: ml
+    command: uv run python -m bots.arena --a FaanBot --b EfficiencyBot --games 20000 --parallel 8
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./server:/app
+      - ./data:/data
+      - server-venv-ml:/app/.venv
+
+volumes:
+  pgdata:
+  server-venv:
+  server-venv-ml:
+  web-modules:

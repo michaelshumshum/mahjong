@@ -1,0 +1,343 @@
+# 01 — Hong Kong Mahjong rules specification
+
+All rules live behind a `RuleSet` config object; HK house rules vary widely.
+
+## 1. Tiles — 144
+
+| Group | Types | Copies | Total |
+| --- | --- | --- | --- |
+| Characters 萬 (m) 1–9 | 9 | 4 | 36 |
+| Bamboo 索 (s) 1–9 | 9 | 4 | 36 |
+| Dots 筒 (p) 1–9 | 9 | 4 | 36 |
+| Winds 風 E S W N (z1–z4) | 4 | 4 | 16 |
+| Dragons 箭 中 發 白 (z5–z7) | 3 | 4 | 12 |
+| **Playable subtotal** | **34** | | **136** |
+| Flowers 花 (f1–f4) + Seasons 季 (f5–f8) | 8 | 1 | 8 |
+| **Total** | | | **144** |
+
+**Representation.** `34`-length count array in the hot path (shanten, ukeire, pattern
+matching). Ordered list only for UI tile ordering and animation identity.
+
+```python
+TileId = int          # 0..135, opaque per-hand identifier (see below)
+TileType = int        # 0..33, suit/rank
+Flower = int          # 0..7
+```
+
+**`TileId` is not a wall slot.** Assign it via a permutation independent of wall/shuffle
+order (e.g. a per-hand random relabeling applied after the deal), so a `TileId` value never
+reveals where in the wall a tile was drawn from. A naive implementation that numbers tiles in
+shuffled-wall order leaks wall position through a field redaction tests would never flag —
+don't do that.
+Index layout: `0–8` = 1m–9m, `9–17` = 1p–9p, `18–26` = 1s–9s, `27–30` = E S W N,
+`31–33` = 中 發 白. (Matches the layout used by most open-source shanten implementations, so
+you can cross-validate against them.)
+
+## 2. Seating and rounds
+
+- Four seats: East 東, South 南, West 西, North 北, proceeding **counter-clockwise**
+  (East → South → West → North) — opposite the visual clockwise order.
+- **Seat frame (canonical, used everywhere in this spec):** seats are numbered `0..3` in
+  turn order (East=0, South=1, West=2, North=3). "Next seat" always means
+  `(seat + 1) % 4` — i.e. the player who plays immediately *after* you in turn order. This
+  is the only axis used for chow eligibility (§5) and claim priority (§6); the terms
+  "upstream"/"downstream" are not used in this spec.
+- **Prevailing wind** (圈風) starts East. **Seat wind** (門風) is the player's position.
+- Dealer is East. Dealer **repeats** (連莊) on a dealer win or, by config, on an exhaustive
+  draw. Otherwise the deal passes counter-clockwise; after a full rotation the prevailing
+  wind advances.
+- Game length config: `EAST_ONLY` (一圈, default — East round only), `EAST_SOUTH` (半莊 —
+  a riichi/Japanese convention, offered for players who want it, not the HK norm), `FULL`
+  (四圈 — four full rounds, the traditional long-session HK length).
+
+## 3. Deal
+
+1. Shuffle 144 tiles with the seeded PRNG. Conceptually four walls of 18 stacks × 2.
+2. Roll dice → break point. Cosmetic; derive the dice from the same seed.
+3. Deal 13 tiles to each player, 14 to the dealer.
+4. **Flower replacement**, in seat order starting from the dealer: each player reveals any
+   flowers/seasons and draws replacements from the **back end** of the wall, repeating until
+   they hold none. Order matters — it changes who gets which tile.
+5. Dealer discards.
+
+## 4. Turn state machine
+
+```
+                    ┌─────────────┐
+       ┌───────────►│  AWAIT_DRAW │◄────────────┐
+       │            └──────┬──────┘             │
+       │                   │ draw (or kong      │
+       │                   │ replacement)       │
+       │                   ▼                    │
+       │          ┌──────────────────┐          │
+       │          │ flower? -> reveal│          │
+       │          │ + redraw, loop   │          │
+       │          └────────┬─────────┘          │
+       │                   ▼                    │
+       │        ┌─────────────────────┐         │
+       │        │   AWAIT_ACTION      │  self-draw win (自摸)
+       │        │  discard | concealed│──────────────────────► SCORING
+       │        │  kong | add-to-pung │
+       │        │  | declare win      │
+       │        └──────────┬──────────┘
+       │                   │ discard
+       │                   ▼
+       │        ┌─────────────────────┐   no legal claims
+       │        │   AWAIT_CLAIMS      │──────────────────────┘
+       │        │  window_id, deadline│
+       │        └──────────┬──────────┘
+       │                   │ claim resolved
+       │      ┌────────────┼────────────┐
+       │      ▼            ▼            ▼
+       │   win (食糊)   pung/kong      chow
+       │      │            │            │
+       │      ▼            └─────┬──────┘
+       │   SCORING               ▼
+       │                  ┌─────────────┐
+       └──────────────────┤ AWAIT_ACTION│  (claimer now discards;
+                          └─────────────┘   kong draws a replacement first)
+
+   wall exhausted (`wall_reserve` tiles left, default 0, config) -> EXHAUSTIVE_DRAW (流局) -> next hand
+```
+
+Explicitly named phases: `AWAIT_DRAW`, `AWAIT_ACTION`, `AWAIT_CLAIMS`, `AWAIT_KONG_ROB`,
+`SCORING`, `HAND_OVER`, `GAME_OVER`.
+
+## 5. Melds
+
+| Meld | Cantonese | From | Notes |
+| --- | --- | --- | --- |
+| Chow 順子 | 上 | discard only, `claimer_seat == (discarder_seat + 1) % 4` | three consecutive, same suit |
+| Pung 刻子 | 碰 | discard, any player | three identical |
+| Exposed kong 明槓 | 槓 | discard, any player | four identical; draw replacement from back of wall |
+| Added kong 加槓 | 加槓 | own draw added to an exposed pung | **opens a robbing-the-kong window** |
+| Concealed kong 暗槓 | 暗槓 | four drawn by self | laid face down; identity hidden until hand end; cannot be undone; draw replacement |
+
+Kong replacements come from the **live wall** (§9) — HK play has no separate dead wall. Each
+kong replacement shrinks the live wall by one tile, so each kong brings the exhaustive draw one
+tile closer.
+
+## 6. Claim priority
+
+**Canonical home.** This section is the single source of truth for claim priority,
+including the kong-vs-pung tiebreak. Other docs (e.g.
+[00-architecture.md §4](00-architecture.md)) link here rather than restating the rule —
+if they conflict with this section, this section wins.
+
+Seat frame: as defined in §2, `claimer_seat == (discarder_seat + 1) % 4` for chow eligibility.
+
+```
+Win  >  Kong / Pung  >  Chow
+```
+
+1. **Win (食糊)** beats every other claim on the same discard.
+2. **Kong (槓) and Pung (碰)** beat Chow. Both require the claiming tile to complete the
+   meld; either can come from any seat.
+   - **Kong-vs-Pung tiebreak, same tile:** if two players could claim the same discard, one
+     as a pung and one as a kong (i.e. one already holds a concealed pair and the other
+     holds a concealed triple), **kong wins**. Only one such claim is possible per discard
+     since a kong claim strictly dominates — there's no seat-order tiebreak needed here.
+3. **Chow (上)** is only legal for `claimer_seat == (discarder_seat + 1) % 4` — i.e. the
+   next seat in turn order. No other seat may claim a chow on this discard, regardless of
+   priority; a chow claim from any other seat is illegal and must be rejected.
+4. **Win-vs-Win tie** (two or more players can win off the same discard): resolve by seat
+   order starting from the discarder and going in turn-order — i.e. the smallest
+   `(claimer_seat - discarder_seat) % 4` wins. v1 is **always single-winner** (一炮多響 /
+   `multi_win` is deferred — see [99-deferred.md](99-deferred.md)).
+5. **Pung/Kong-vs-Pung/Kong tie** (two players can both pung/kong the same discard): cannot
+   happen — a discard has exactly one copy of a given tile type available to claim as
+   pung/kong material beyond what's already in hands, so at most one player can hold the
+   concealed pair/triple needed. Not a real tiebreak case; listed for completeness of the
+   resolution algorithm.
+
+**Resolution algorithm:** collect all legal claims on a discard during the `AWAIT_CLAIMS`
+window; pick the highest-priority claim type present (win > kong/pung > chow); if multiple
+claims tie within that type, apply the tiebreak rule for that type above.
+
+## 7. Faan table
+
+Grouped into `CLASSIC`, `NEW_6`, `NEW_18` sets, each toggleable.
+
+### Classic
+
+| Faan | Hand | Chinese |
+| --- | --- | --- |
+| 1 | All Sequences | 平糊 |
+| 1 | Seat Wind pung/kong | 門風 |
+| 1 | Prevailing Wind pung/kong | 圈風 |
+| 1 | Dragon pung/kong (each) | 箭刻 / 番牌 |
+| 1 | No Flowers | 無花 |
+| 1 | Self-Draw | 自摸 |
+| 1 | Fully Concealed (win on discard, no open melds) | 門前清 |
+| 2 | Voided Suit (one suit entirely absent) | 缺一門 |
+| 3 | All Pungs | 對對糊 |
+| 3 | Half Flush (one suit + honors) | 混一色 |
+| 3 | Small Three Dragons | 小三元 |
+| 3 | All four Flowers *or* all four Seasons (as a set) | 正花 (flower set) |
+| 5 | Small Four Winds | 小四喜 |
+| 6 | Full Flush (one suit, no honors) | 清一色 |
+| 7 | Big Three Dragons | 大三元 |
+| 8 | Big Four Winds | 大四喜 |
+| **Limit** | Thirteen Orphans | 十三么 |
+| **Limit** | All Honors | 字一色 |
+| **Limit** | All Terminals | 清么九 |
+| **Limit** | Nine Gates | 九蓮寶燈 |
+| **Limit** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
+| **Limit** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
+
+### New 6 (新六番)
+
+| Faan | Hand | Chinese |
+| --- | --- | --- |
+| 3 | Mixed Terminals (terminals + honors only) | 混么九 |
+| 1 | Chicken Hand (zero other faan)¹ | 雞糊 |
+| 1 | Win on last wall tile | 海底撈月 |
+| 1 | Win on last discard | 河底撈魚 |
+| 1 | Win on kong replacement | 槓上開花 |
+| 1 | Robbing the Kong | 搶槓 |
+
+¹ **Conditional, not dead config:** 雞糊 is only reachable when `min_faan == 0` — at
+`min_faan >= 1` a zero-other-faan hand is already blocked from winning by the `min_faan`
+check itself, so 雞糊 never fires and the entry is inert. This mirrors real HK play, where
+雞糊 exists specifically for no-minimum tables. Servers should skip evaluating this pattern
+entirely when `min_faan >= 1`.
+
+### New 18 (新十八番) — subset most commonly used
+
+**On by default** (see `hand_sets` in §10) — Seven Pairs (七對子) is not an optional extra:
+the bot's shanten parser treats it as one of three mandatory hand-shape parses (see
+[04-bots.md §2, §4](04-bots.md)), so a `RuleSet` without `NEW_18` makes documented bot
+behavior illegal. Unlike `NEW_18` as a whole, individual patterns in this set may still be
+toggled off via `faan_overrides` (§10) if a table wants to disable a specific one.
+
+| Faan | Hand | Chinese |
+| --- | --- | --- |
+| 4 | Seven Pairs | 七對子 |
+| 2 | Three Concealed Pungs | 三暗刻 |
+| 2 | All Revealed (only the pair concealed) | 全求人 |
+| 2 | Two Dragon pungs | 雙箭 |
+| 1 | Two Identical Sequences | 一般高 |
+| 6 | Three Identical Sequences | 三般高 |
+| 2 | Three Step Sequences | 三步高 |
+| 6 | Four Step Sequences | 四步高 |
+
+### Flower faan
+
+`1` per flower matching the player's seat — 座位花 ("seat flower," a single matching tile,
+not to be confused with 正花 in the Classic table above, which is a complete set of all four
+flowers *or* all four seasons) — plus the `無花` entry above.
+Config: `flowers_score`, `seven_flowers_instant_win` (3 faan), `eight_flowers_instant_win`
+(limit).
+
+### Stacking and caps
+
+- Faan **stack**: Full Flush (6) + All Pungs (3) = 9.
+- **Limit hands do not stack** with wind/dragon/flower faan. If a hand qualifies for more than
+  one limit hand, take the highest.
+- `faan_cap` config: `10` (HK Mahjong Association) or `13` (common casual). Total is clamped.
+- `min_faan` config: `0 | 1 | 3 | 5`, default **3**. **A hand below the minimum cannot be
+  declared a win.** Changes bot strategy fundamentally — see [04-bots.md §4](04-bots.md).
+
+## 8. Faan → points → payment
+
+Two conversion tables, config-selectable.
+
+```python
+def points(faan: int, table: Literal["full_spicy", "half_spicy"]) -> int:
+    if table == "full_spicy":            # 全辣
+        return 2 ** faan
+    # 半辣: same through 4 faan, then doubles every two faan; odd faan above 4 is 1.5x
+    # the previous. 3->8, 4->16, 5->24, 6->32, 7->48, 8->64, 9->96, 10->128
+```
+
+Payment, where `P = points(faan, table)`:
+
+| Win type | Config | Who pays what |
+| --- | --- | --- |
+| **Self-draw** 自摸 | — | Award is `1.5 × P` (keeps it divisible by three). Each of the three losers pays `0.5 × P`. |
+| **Win on discard** 出銃 | `discarder_pays_all` (default) | Discarder pays `P`. Others pay nothing. |
+| **Win on discard** | `discarder_pays_half` | Discarder pays `P/2`; the other two pay `P/4` each. |
+
+Worked example: 3 faan, full spicy → `P = 8`.
+- Discard win, pays-all: discarder −8, winner +8.
+- Self-draw: each loser −4, winner +12.
+
+### Penalty / responsibility rules (包) — defer to v2
+
+Applicable under `discarder_pays_half`.
+
+| Rule | Chinese | Trigger |
+| --- | --- | --- |
+| 9-Piece Penalty | 九張包 | Discarder feeds a full-flush hand that already has 3 melds in one suit |
+| 12-Piece Penalty | 十二張包自摸 | Same, allowing a 4th meld, winner then self-draws |
+| Fifth-Tile Penalty | 五子包生 | Discarding a fresh tile with ≤5 wall tiles left, feeding the win |
+| Great Dragons/Winds feeder | 大三元/大四喜包 | Discarder completes the third dragon or fourth wind pung |
+
+## 9. Exhaustive draw (流局)
+
+HK play has no dead wall: the wall is drawn down to nothing, kong replacements come off the
+same live wall (§5), and the literal last drawable tile is 海底 (see §7 New 6, 海底撈月).
+`wall_reserve` is configurable for tables that want to hold some tiles back (e.g. importing a
+riichi-style dead wall), but **defaults to `0`** — the HK norm. Wall exhausted with
+`wall_reserve` tiles remaining → no winner, no payment (config: `tenpai_payments`, off by
+default). Dealer repeats or passes per `dealer_repeat_on_draw`.
+
+Also config: `four_kong_abort`, `nine_terminals_abort` (九種九牌) — both off by default.
+
+## 10. `RuleSet`
+
+```python
+@dataclass(frozen=True)
+class RuleSet:
+    # scoring
+    min_faan: int = 3
+    faan_cap: int = 10
+    score_table: Literal["full_spicy", "half_spicy"] = "half_spicy"
+    hand_sets: frozenset[str] = frozenset({"CLASSIC", "NEW_6", "NEW_18"})
+    faan_overrides: dict[str, int] = field(default_factory=dict)
+        # per-pattern faan overrides, keyed by the Chinese name in §7 (e.g. {"雞糊": 0} to
+        # disable, {"清一色": 7}) — applied after hand_sets selection, before stacking/caps.
+        # This is the knob for "same pattern, different table value" without toggling a
+        # whole set; hand_sets stays the coarse on/off switch per §7 group.
+    discard_payment: Literal["all", "half"] = "all"
+    self_draw_multiplier: float = 1.5
+
+    # flow
+    game_length: Literal["EAST_ONLY", "EAST_SOUTH", "FULL"] = "EAST_ONLY"  # 一圈; see §2
+    dealer_repeat_on_win: bool = True
+    dealer_repeat_on_draw: bool = True
+    wall_reserve: int = 0                   # HK default: no dead wall, see §9
+
+    # variants
+    flowers_enabled: bool = True
+    multi_win: bool = False                 # 一炮多響 — deferred (see 99-deferred.md);
+                                             # field reserved, always False in v1
+    kong_rob_enabled: bool = True
+    concealed_kong_robbable: bool = False   # only for 十三么, some tables
+    pao_rules: bool = False                 # 包 responsibility, v2
+
+    # timing (server-enforced)
+    turn_seconds: int = 15                  # AWAIT_ACTION timeout
+    claim_seconds: int = 5                  # AWAIT_CLAIMS window
+    bonus_seconds: int = 20                 # per-game reserve bank
+    turn_timeout_strikes: int = 3           # timeouts before seat flips to AUTOPLAY,
+                                             # see 00-architecture.md §8
+```
+
+## 11. Edge cases
+
+Write a named test for every one.
+
+1. Flower drawn as a kong replacement → another replacement; can chain.
+2. Winning on a flower replacement = 槓上開花.
+3. Robbing an **added** kong (加槓); robbing a **concealed** kong only for 十三么 and only if `concealed_kong_robbable`.
+4. Concealed kong that changes an already-tenpai hand's wait — legal in HK.
+5. Four kongs on the table across different players → `four_kong_abort` if enabled.
+6. Last-tile draw and last-discard win scoring, and their interaction with the wall reserve count after kongs shorten the wall.
+7. Multi-win on one discard — deferred with `multi_win`, see
+   [99-deferred.md](99-deferred.md); not required for v1 launch.
+8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just hidden client-side.
+9. Seven Pairs vs. standard parse of the same 14 tiles → since `NEW_18` (and therefore Seven
+   Pairs) is on by default (§7, §10), this collision is a default-path case, not an opt-in
+   one — scoring must maximize over *all* valid decompositions, not the first found.
+10. Thirteen Orphans 13-way wait vs. single wait (config: some tables double the latter).

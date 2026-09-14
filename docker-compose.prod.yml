@@ -1,0 +1,32 @@
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
+name: mahjong
+
+services:
+  api:
+    build:
+      target: prod
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      --workers 1 --proxy-headers --forwarded-allow-ips '*'
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
+      LOG_LEVEL: ${LOG_LEVEL:-warning}
+    volumes: []
+    restart: unless-stopped
+
+  web:
+    build:
+      target: prod
+    command: node build
+    environment:
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL must be set}
+      PUBLIC_WS_URL: ${PUBLIC_WS_URL:?PUBLIC_WS_URL must be set}
+      PORT: 3000
+    ports: ["${WEB_PORT:-3000}:3000"]
+    volumes: []
+    restart: unless-stopped
+
+  postgres:
+    ports: []
+    restart: unless-stopped

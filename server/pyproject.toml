@@ -1,0 +1,52 @@
+[project]
+name = "mahjong-server"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pyjwt>=2.10",
+    "numpy>=2.1",                     # torch stays in the ml extra
+]
+
+[project.optional-dependencies]
+# ml image target only
+ml = [
+    "torch>=2.5",
+    "pettingzoo>=1.24",
+    "pyarrow>=18.0",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "hypothesis>=6.115",
+    "httpx>=0.28",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "mahjong>=1.2",                   # shanten test oracle, not a runtime dep
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["slow: long-running self-play / arena runs"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["mahjong_core", "app", "bots"]
+
+[tool.uv]
+package = false
