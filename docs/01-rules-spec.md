@@ -319,7 +319,6 @@ class RuleSet:
     # timing (server-enforced)
     turn_seconds: int = 15                  # AWAIT_ACTION timeout
     claim_seconds: int = 5                  # AWAIT_CLAIMS window
-    bonus_seconds: int = 20                 # per-game reserve bank
     turn_timeout_strikes: int = 3           # timeouts before seat flips to AUTOPLAY,
                                              # see 00-architecture.md §8
 ```
