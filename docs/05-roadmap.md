@@ -30,7 +30,7 @@ mahjong/
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── infra/              # in-process dicts (ports layer deferred, see 99-deferred.md)
 │   │   └── db/                 # SQLAlchemy models, migrations
-│   ├── tools/gen_protocol.py   # pydantic → JSON Schema → TS
+│   ├── tools/gen_protocol.py   # pydantic → TS directly (+ informational JSON Schema), 02-protocol §6
 │   ├── bots/
 │   │   ├── base.py  random.py  efficiency.py  faan.py  safety.py
 │   │   └── arena.py            # self-play evaluation harness

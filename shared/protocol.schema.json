@@ -1,0 +1,328 @@
+{
+  "$defs": {
+    "Error": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "error",
+          "default": "error",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ErrorPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Error",
+      "type": "object"
+    },
+    "ErrorPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorPayload",
+      "type": "object"
+    },
+    "Hello": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "hello",
+          "default": "hello",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/HelloPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Hello",
+      "type": "object"
+    },
+    "HelloPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "last_seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Seq"
+        },
+        "client_version": {
+          "title": "Client Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "client_version"
+      ],
+      "title": "HelloPayload",
+      "type": "object"
+    },
+    "Ping": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "ping",
+          "default": "ping",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/PingPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Ping",
+      "type": "object"
+    },
+    "PingPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "t0": {
+          "title": "T0",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "t0"
+      ],
+      "title": "PingPayload",
+      "type": "object"
+    },
+    "Pong": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "pong",
+          "default": "pong",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/PongPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Pong",
+      "type": "object"
+    },
+    "PongPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "t0": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "T0"
+        },
+        "t1": {
+          "title": "T1",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "t1"
+      ],
+      "title": "PongPayload",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "error": "#/$defs/Error",
+      "hello": "#/$defs/Hello",
+      "ping": "#/$defs/Ping",
+      "pong": "#/$defs/Pong"
+    },
+    "propertyName": "t"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Hello"
+    },
+    {
+      "$ref": "#/$defs/Ping"
+    },
+    {
+      "$ref": "#/$defs/Pong"
+    },
+    {
+      "$ref": "#/$defs/Error"
+    }
+  ]
+}

@@ -70,9 +70,14 @@ class Error(Envelope):
     d: ErrorPayload
 
 
-# One union for both directions: a discriminator needs >=2 members, and each
-# direction currently has too few message types of its own for a standalone
-# union (server has only `pong`/`error` so far). Split into
-# ClientMessage/ServerMessage once both sides have enough members — every
-# future sub-task just adds its Envelope subclass to this Union.
+# Both directions now have >=2 members, so split by direction for typing/codegen
+# (docs/02-protocol.md §2 vs §3) — every future sub-task adds its Envelope
+# subclass to ClientMessage or ServerMessage, whichever it belongs to.
+ClientMessage = Annotated[Hello | Ping, Field(discriminator="t")]
+ServerMessage = Annotated[Pong | Error, Field(discriminator="t")]
+
+# ws.py validates incoming frames against the full union, not ClientMessage
+# alone: a client sending a server-direction message (e.g. `pong`) is ignored,
+# not rejected as malformed (see the comment in ws.py) — that needs Pong/Error
+# to parse successfully, just not to be acted on.
 AnyMessage = Annotated[Hello | Ping | Pong | Error, Field(discriminator="t")]

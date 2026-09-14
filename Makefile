@@ -61,14 +61,14 @@ train: ## Training run: make train CONFIG=ml/configs/bc.yaml
 		uv run python -m ml.train --config $${CONFIG:-ml/configs/bc.yaml}
 
 # ── codegen / db ──────────────────────────────────────────────────────────────
-proto: ## Regenerate shared/protocol.schema.json + web protocol types
-	$(COMPOSE) run --rm --no-deps api uv run python tools/gen_protocol.py \
-		--out /shared/protocol.schema.json
-	$(COMPOSE) run --rm --no-deps web pnpm exec json-schema-to-typescript \
-		/shared/protocol.schema.json -o src/lib/net/protocol.d.ts
+proto: ## Regenerate web protocol types (+ shared/protocol.schema.json, informational)
+	$(COMPOSE) run --rm --no-deps api uv run python -m tools.gen_protocol \
+		--ts-out /web-net/protocol.d.ts --schema-out /shared/protocol.schema.json
+	$(COMPOSE) run --rm --no-deps web pnpm exec oxfmt \
+		src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts
 
 proto-check: proto ## Fail if regenerating changes the committed output (CI gate; see docs/07-infra.md)
-	@git diff --exit-code shared/ web/src/lib/net/protocol.d.ts \
+	@git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts \
 		|| (echo "\n  Protocol types changed — run 'make proto' and commit them.\n" && exit 1)
 
 migrate: ## Apply database migrations

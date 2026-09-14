@@ -223,13 +223,22 @@ That silently voids the one guarantee this pipeline exists for — "TypeScript f
 event at compile time" — so skip the JSON Schema hop:
 
 ```
-protocol.py  ──(datamodel-code-generator, or a small custom emitter walking the
-                pydantic model graph)──►  web/src/lib/net/protocol.d.ts
+protocol.py  ──(server/tools/gen_protocol.py: a small custom emitter walking
+                the pydantic model graph)──►  web/src/lib/net/protocol.d.ts
 ```
 
-- Each event `t` becomes a distinct interface with a literal `t` field, unioned into one
-  `ServerEvent` type.
-- Ship a compile-time exhaustiveness fixture alongside the generated file:
+`gen_protocol.py` discovers message types generically from `protocol.py`'s `ClientMessage` /
+`ServerMessage` / `AnyMessage` unions via `typing.get_args` — it doesn't hardcode message names,
+so a new Envelope subclass added to those unions is picked up without touching the generator.
+
+- Each message `t` becomes a distinct interface with a literal `t` field. `Error` is emitted as
+  `ErrorEvent` so importing it doesn't shadow the global `Error` constructor.
+- `ClientMessage` and `ServerEvent` are unioned per direction (§2 vs §3); `AnyMessage` unions both,
+  mirroring `protocol.py`'s `AnyMessage` — `ws.py` validates incoming frames against the full
+  union so a wrong-direction message (e.g. a client sending `pong`) parses and is ignored rather
+  than rejected as malformed, rather than against `ClientMessage` alone.
+- `gen_protocol.py` also emits `web/src/lib/net/protocol.assertNever.ts`, a compile-time
+  exhaustiveness fixture over `ServerEvent`:
 
   ```ts
   function assertNever(x: never): never { throw new Error(`unhandled: ${JSON.stringify(x)}`); }
@@ -243,11 +252,17 @@ protocol.py  ──(datamodel-code-generator, or a small custom emitter walking 
   }
   ```
 
-  This fixture is what actually delivers "CI fails if a new event type isn't handled" — the
-  generator only has to preserve the discriminated union correctly, not round-trip through JSON
-  Schema.
+  Regenerating this fixture alongside the types (rather than hand-maintaining it) means it can
+  only fail to compile for one reason: the generated `ServerEvent` stopped being a genuinely
+  narrowable discriminated union (e.g. codegen regressed `t` from a literal to `string`) — the
+  exact failure mode the JSON-Schema hop had. `web/src/lib/net/reducer.ts` carries the same
+  pattern in real production code, over the same type.
+- `shared/protocol.schema.json` is still emitted (`TypeAdapter(AnyMessage).json_schema()`), but as
+  a secondary, informational artifact only — nothing generates TS from it anymore.
 
-Wire it into the build (`make proto`); CI fails if the generated TS is stale.
+Wire it into the build (`make proto`); `make proto-check` (`git diff --exit-code` after
+regenerating) is the CI gate for "fails if the generated TS is stale" — see `docs/07-infra.md §9`
+for why there's no CI running it yet.
 
 ## 7. Example exchange
 
