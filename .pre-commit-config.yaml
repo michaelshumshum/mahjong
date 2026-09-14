@@ -1,0 +1,10 @@
+# invoked by lefthook (web/lefthook.yml), not self-installed — do not run
+# `pre-commit install`, it would fight lefthook for ownership of .git/hooks/pre-commit.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7
+    hooks:
+      - id: ruff-format
+        files: ^server/
+      - id: ruff-check
+        files: ^server/
