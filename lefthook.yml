@@ -1,0 +1,22 @@
+# the single installed git hook manager for this repo (see .pre-commit-config.yaml —
+# that file is invoked by the "server" job below, never installed on its own).
+pre-commit:
+  parallel: true
+  jobs:
+    # oxlint only understands JS/TS/Svelte(-script); oxfmt covers a much wider set
+    # (json/scss/css/md included) — kept as separate jobs so a JSON-only change
+    # doesn't make oxlint fail with "no files found to lint".
+    - name: web-lint
+      root: "web/"
+      glob: "*.{js,ts,svelte}"
+      run: pnpm exec oxlint {staged_files}
+
+    - name: web-format
+      root: "web/"
+      glob: "*.{js,ts,svelte,json,scss,css,md}"
+      exclude: "AGENTS.md"
+      run: pnpm exec oxfmt --check {staged_files}
+
+    - name: server
+      glob: "server/**"
+      run: uv run --project server pre-commit run --config .pre-commit-config.yaml --files {staged_files}

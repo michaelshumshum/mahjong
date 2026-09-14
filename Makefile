@@ -80,7 +80,7 @@ revision: ## Create a migration: make revision M="add games table"
 # ── quality ───────────────────────────────────────────────────────────────────
 fmt: ## Format both sides
 	$(COMPOSE) run --rm --no-deps api uv run ruff format .
-	$(COMPOSE) run --rm --no-deps web pnpm exec prettier --write .
+	$(COMPOSE) run --rm --no-deps web pnpm exec oxfmt .
 
 lint: ## Lint both sides
 	$(COMPOSE) run --rm --no-deps api uv run ruff check .
