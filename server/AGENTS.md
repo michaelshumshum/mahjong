@@ -15,7 +15,7 @@ bots/           bot tiers + arena harness
 - `mahjong_core` stays pure: `reduce(state, action) -> (state, events)`. Needing a clock,
   socket or random value there means the code belongs in `app/`.
 - One room = one `asyncio.Task` = one writer. Never mutate `GameState` from outside it.
-- `view_for(seat, ...)` is the only path to seat-visible state. Bots included.
+- `seat_view(state, seat)` and `redact_event(state, seat, event)` are the only paths to seat-visible state. Bots included.
 - The server computes the legal-action set. Never trust a client-supplied one.
 - `--workers 1` (`docs/07-infra.md §2`).
 
