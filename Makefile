@@ -5,7 +5,7 @@ DC_PROD := docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart logs build ps sh-api sh-web test test-server test-web \
-        selfplay arena train proto migrate revision fmt lint typecheck clean prod-build prod-up
+        selfplay arena train proto proto-check migrate revision fmt lint typecheck clean prod-build prod-up
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -61,13 +61,15 @@ train: ## Training run: make train CONFIG=ml/configs/bc.yaml
 		uv run python -m ml.train --config $${CONFIG:-ml/configs/bc.yaml}
 
 # ── codegen / db ──────────────────────────────────────────────────────────────
-proto: ## Regenerate shared/protocol.schema.json + web protocol types (CI fails if stale)
+proto: ## Regenerate shared/protocol.schema.json + web protocol types
 	$(COMPOSE) run --rm --no-deps api uv run python tools/gen_protocol.py \
 		--out /shared/protocol.schema.json
 	$(COMPOSE) run --rm --no-deps web pnpm exec json-schema-to-typescript \
 		/shared/protocol.schema.json -o src/lib/net/protocol.d.ts
+
+proto-check: proto ## Fail if regenerating changes the committed output (CI gate; see docs/07-infra.md)
 	@git diff --exit-code shared/ web/src/lib/net/protocol.d.ts \
-		|| (echo "\n  Protocol types changed — review and commit them.\n" && exit 1)
+		|| (echo "\n  Protocol types changed — run 'make proto' and commit them.\n" && exit 1)
 
 migrate: ## Apply database migrations
 	$(COMPOSE) exec api uv run alembic upgrade head
