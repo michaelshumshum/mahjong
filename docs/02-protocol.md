@@ -88,7 +88,7 @@ filled the room waits for `ready` from each before dealing.
 
 `auto` has no `auto_win` toggle. Declining a winning claim is a real strategic choice under
 `min_faan` rulesets — chasing a bigger hand, avoiding revealing information, waiting for a
-better payout — and is called out explicitly in [06-ml.md §3](06-ml.md) ("`PASS` covers
+better payout — and is called out explicitly in [06-ml.md §1](06-ml.md) ("`PASS` covers
 declining a win"). A pre-arm that silently auto-accepted every offered win would remove that
 choice. So a win-eligible claim is never auto-resolved by a pre-arm: it always opens a real
 `claim_offer` to the eligible seat(s), and — consistent with every other claim — times out to
@@ -105,7 +105,7 @@ PASS, not to WIN, if the player doesn't respond.
 | `draw` | `{seat, tile_id?}` — `tile_id` present **only** for the drawing player |
 | `discard` | `{seat, tile_id, tile, pool_index}` |
 | `claim_offer` | `{window_id, options: [...], deadline_ts}` — **unicast**, only to eligible seats |
-| `claim_resolved` | `{window_id, seat?, kind, meld?, from_seat?}` — v1 is single-winner; `seat` is always singular (一炮多響 deferred — D16, see [_deferred_parts/02-protocol.md](_deferred_parts/02-protocol.md)) |
+| `claim_resolved` | `{window_id, seat?, kind, meld?, from_seat?}` — v1 is single-winner; `seat` is always singular (一炮多響 deferred, D16) |
 | `meld` | `{seat, kind, tiles, from_seat?}` — except `concealed_kong`, which has a redacted per-seat form (see Redaction below) |
 | `kong_replace` | `{seat, tile_id?}` |
 | `turn` | `{seat, phase, deadline_ts, legal: [...]}` — `legal` unicast to the acting seat |
@@ -183,10 +183,7 @@ The server is the only clock that matters.
 - On expiry the server acts: tsumogiri on turn timeout, PASS on claim timeout. It emits the
   resulting event normally.
 
-Deferred — see [99-deferred.md](99-deferred.md). (Chess-clock bonus bank: a bank means the
-deadline extends mid-prompt, but no message here pushes a revised `deadline_ts` — that needs a
-new event type and client handling this doc doesn't yet specify. The absolute-`deadline_ts` +
-measured-offset design above is unaffected and stays as-is.)
+Deferred — see [99-deferred.md](99-deferred.md).
 
 ## 5. Reconnect and resync
 
@@ -304,4 +301,43 @@ unicast `claim_offer` at 91) and been forced to full-resync on every claim windo
 existence of the gap itself would have told her a claim was offered, defeating redaction (§3).
 Per-seat `seq` makes that structurally impossible: Carol's stream was never going to contain
 event 101, so there's nothing for her to detect.
-```
+
+## 8. Liveness
+
+A mobile browser's WebSocket can sit open for minutes after the network actually dies without
+firing `onclose` — TCP keepalive defaults to minutes-to-hours, and carrier NATs silently drop
+idle mappings. `ping`/`pong` (§4) is specified only as a clock-offset measurement; it also has
+to be the heartbeat, or a dead socket looks identical to an idle one:
+
+- **Client → server:** the client sends `ping` at least every `heartbeat_interval` (default
+  15s) regardless of whether it needs a fresh offset reading.
+- **Server → client:** if no frame has gone out to a client in `heartbeat_interval`, the server
+  sends an unsolicited `pong{t0: null, t1: now}` as a keepalive — harmless to a client that's
+  only using real `ping`/`pong` pairs for offset.
+- **Dead-socket detection:** if the server hasn't heard anything from a connection in
+  `heartbeat_timeout` (default 45s — three missed intervals), it treats the socket as dead:
+  closes it, marks the seat `DISCONNECTED`, and starts the normal grace-period/bot-takeover
+  clock ([00-architecture.md §8](00-architecture.md)).
+- **Client reconnect backoff:** on an unexpected close, reconnect with exponential backoff and
+  jitter — `min(250ms * 2^attempt, 10s)` ± 20% — for as long as the seat is plausibly still
+  reclaimable (through the disconnect grace period, and beyond it while the seat shows
+  `AUTOPLAY` rather than `bot`-owned in `seat_state`).
+
+## 9. Backpressure
+
+The Session pumps an outbound queue per connection ([00-architecture.md §2](00-architecture.md));
+that queue must be **bounded** (default 256 frames), not left to grow — an unbounded queue
+behind a stalled TCP connection (dead peer, congested mobile network) is a memory leak that
+scales with however long the peer stays half-open.
+
+Policy when the queue is full:
+
+- Drop the oldest *non-critical* queued frames first — `draw`, `discard`, `turn`, and similar
+  state-deltas are superseded by a fresh snapshot anyway. Keep `ack`/`error` if still queued.
+- The instant anything is dropped, stop trying to catch the stream up: clear the queue and
+  enqueue a single `state_sync` instead. The client's reducer already treats `state_sync` as an
+  idempotent full replace (§5), so a torn-out middle of the stream is harmless once the snapshot
+  lands — this reuses the reconnect-with-gap code path rather than adding a second one.
+- If the queue is still full after that (socket is dead, not just slow), the Session closes the
+  connection; the room marks the seat `DISCONNECTED` and normal grace-period/bot-takeover
+  ([00-architecture.md §8](00-architecture.md)) applies.
