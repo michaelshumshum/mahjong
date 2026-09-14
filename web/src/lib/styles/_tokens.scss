@@ -1,0 +1,47 @@
+// design tokens (docs/03-frontend.md §7.1). placeholder values — nothing here reflects real
+// visual design yet, revisit once M4 (component styling) starts.
+//
+// all runtime-consumable, so custom properties on :root rather than scss variables: a scss
+// variable is only visible in files that @use this partial, a custom property is visible to
+// every component's scoped <style> block with no import at all. seat colours and theme are
+// also the kind of thing that gets toggled at runtime later.
+
+:root {
+	// colour
+	--color-bg: #0f1a13;
+	--color-surface: #16281d;
+	--color-surface-raised: #1e3a28;
+	--color-text: #f2f2ee;
+	--color-text-muted: #a8b6ac;
+	--color-accent: #d4af37;
+	--color-border: #2c4433;
+
+	// seat colours (self/right/across/left, clockwise from you)
+	--color-seat-self: #d4af37;
+	--color-seat-right: #4a90d9;
+	--color-seat-across: #c96a4a;
+	--color-seat-left: #6aa84f;
+
+	// spacing scale, 4px base
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+	--space-8: 3rem;
+
+	// type scale
+	--font-family-base: system-ui, sans-serif;
+	--font-size-sm: 0.875rem;
+	--font-size-base: 1rem;
+	--font-size-lg: 1.25rem;
+	--font-size-xl: 1.75rem;
+
+	// z-layers
+	--z-table: 0;
+	--z-tiles: 10;
+	--z-hud: 20;
+	--z-overlay: 30;
+	--z-modal: 40;
+}

@@ -55,3 +55,18 @@
 		<p data-testid="pong-result">pong: t0={lastPong.t0} t1={lastPong.t1}</p>
 	{/if}
 </section>
+
+<style lang="scss">
+	// proves the styles/ partials are usable from a page — not real component styling (M4).
+	@use '$lib/styles/layout';
+
+	section {
+		border: 1px solid var(--color-border);
+		border-radius: 4px;
+		padding: var(--space-3);
+
+		@include layout.tablet-up {
+			padding: var(--space-5);
+		}
+	}
+</style>

@@ -1,0 +1,18 @@
+// entry point: forwards the token and layout partials, plus a minimal global reset.
+// _tile.scss and _a11y.scss (docs/03-frontend.md §7.1) aren't scaffolded yet — tile geometry is
+// M4, a11y hooks land whenever accessibility work starts.
+
+@use 'tokens';
+@use 'layout';
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-family-base);
+	font-size: var(--font-size-base);
+}

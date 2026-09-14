@@ -1,0 +1,39 @@
+// layout mixins (docs/03-frontend.md §7.1): breakpoint set and the four seat rotations.
+//
+// seat-region-grid below stubs the grid-template-areas pattern from §3 only to prove the
+// partial/mixin plumbing works end to end — the real table layout (seat sizing, discard pools,
+// centre HUD) is M4, not this sub-task.
+
+$breakpoint-tablet: 768px;
+
+@mixin tablet-up {
+	@media (min-width: $breakpoint-tablet) {
+		@content;
+	}
+}
+
+@mixin phone-only {
+	@media (max-width: $breakpoint-tablet - 1) {
+		@content;
+	}
+}
+
+@mixin seat-rotation($seat) {
+	@if $seat == left {
+		transform: rotate(90deg);
+	} @else if $seat == right {
+		transform: rotate(-90deg);
+	} @else if $seat == across {
+		transform: rotate(180deg);
+	} @else {
+		transform: none;
+	}
+}
+
+@mixin seat-region-grid {
+	display: grid;
+	grid-template-areas:
+		'. across .'
+		'left center right'
+		'. self .';
+}

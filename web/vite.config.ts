@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
 	plugins: [
@@ -10,7 +11,10 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			adapter: adapter(),
+			// passing options here (vs. a svelte.config.js) means this is also where <style
+			// lang="scss"> preprocessing gets wired up — see web/AGENTS.md's SCSS convention.
+			preprocess: vitePreprocess()
 		})
 	],
 	test: {
