@@ -11,13 +11,14 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "pyjwt>=2.10",
-    "numpy>=2.1",                     # torch stays in the ml extra
 ]
+# mahjong_core is stdlib-only — no numpy, no torch in base deps. See server/AGENTS.md.
 
 [project.optional-dependencies]
 # ml image target only
 ml = [
-    "torch>=2.5",
+    "torch>=2.6",                     # first release with official cp313 wheels
+    "numpy>=2.1",
     "pettingzoo>=1.24",
     "pyarrow>=18.0",
     "pyyaml>=6.0",
