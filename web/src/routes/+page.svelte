@@ -3,6 +3,8 @@
 	import { MahjongSocket } from '$lib/net/socket';
 	import { reduce } from '$lib/net/reducer';
 	import type { Pong } from '$lib/net/protocol';
+	import TileFace from '$lib/table/TileFace.svelte';
+	import type { TileCode } from '$lib/table/tile-code';
 
 	let status = $state<'idle' | 'connecting' | 'connected'>('idle');
 	let lastPong = $state<Pong['d'] | null>(null);
@@ -42,6 +44,10 @@
 		unsubscribe?.();
 		socket?.disconnect();
 	});
+
+	// M4 slice demo (this sub-task): proves TileFace renders vendored art per code plus a
+	// back for concealed/unrendered codes. Not the real hand/table layout.
+	const demoCodes: (TileCode | null)[] = ['1m', '9m', '5p', '1s', 'z1', 'z5', 'z7', 'f1', null];
 </script>
 
 <h1>Welcome to SvelteKit</h1>
@@ -56,6 +62,18 @@
 	{/if}
 </section>
 
+<section>
+	<h2>TileFace demo</h2>
+	<div class="tile-row">
+		{#each demoCodes as code (code)}
+			<figure>
+				<TileFace {code} />
+				<figcaption>{code ?? 'back'}</figcaption>
+			</figure>
+		{/each}
+	</div>
+</section>
+
 <style lang="scss">
 	// proves the styles/ partials are usable from a page — not real component styling (M4).
 	@use '$lib/styles/layout';
@@ -68,5 +86,20 @@
 		@include layout.tablet-up {
 			padding: var(--space-5);
 		}
+	}
+
+	.tile-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-3);
+	}
+
+	figure {
+		margin: 0;
+		text-align: center;
+	}
+
+	figure :global(.tile-face) {
+		height: 88px;
 	}
 </style>

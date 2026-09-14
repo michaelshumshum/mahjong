@@ -1,0 +1,17 @@
+Third-party assets bundled with this project
+=============================================
+
+Tile face SVGs — web/static/tiles/
+-----------------------------------
+Source:  FluffyStuff/riichi-mahjong-tiles
+         https://github.com/FluffyStuff/riichi-mahjong-tiles
+License: Public domain (CC0 1.0 Universal), per the source repository's README.
+
+Vendored: the 34 playable-tile faces ("Regular" style: Man1-9, Pin1-9, Sou1-9, Ton, Nan, Shaa,
+Pei, Chun, Hatsu, Haku) and the tile back (Back.svg). The source repo's red-five ("-Dora")
+variants and its Black/Export style variants were not vendored — not needed by this ruleset.
+
+Not covered: this project's flower/season tiles (8 additional faces required by Hong Kong
+mahjong, docs/01-rules-spec.md §1) have no equivalent art in the FluffyStuff set, which covers
+only the 34 riichi tile types. That art still needs to be sourced separately — see
+docs/03-frontend.md §7.

@@ -270,13 +270,20 @@ don't replay the missed turns as animation.
 ## 7. Asset pipeline
 
 - Tile art: **[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)**
-  — public domain SVG, regular and black variants. HK uses the same 34 faces as riichi; add the 8
-  flowers/seasons, swap out the red-5 variants.
-- No build step, no atlas. Inline SVG per tile face (or one `<svg><symbol>` sheet loaded once,
-  referenced with `<use>`), served as-is. No @1x/@2x split, no DPR-keyed picking — SVG is
-  resolution-independent, which is the no-pipeline version of the problem the atlas build step
-  existed to solve. (The @1x atlas specifically is moot now, not just deferred — there's no atlas
-  at all — see [99-deferred.md](99-deferred.md).)
+  — public domain SVG, regular and black variants. Vendored (`web/static/tiles/`, see `NOTICE`):
+  the 34 playable faces HK shares with riichi, "Regular" style, skipping the source repo's red-5
+  ("-Dora") variants — a riichi-only concept this ruleset has no use for. The source repo has **no
+  flower/season art** (it covers only the 34 riichi types) — the 8 flower/season faces
+  (`01-rules-spec.md §1`) still need a separate source; `TileFace.svelte` currently renders the
+  tile back for those codes.
+- Rendered via `<img src>` per face, not inlined/`<use>`: the vendored SVGs carry
+  non-namespaced ids (clipPath/filter/gradient) that collide when the same or different tiles are
+  inlined into the DOM more than once, which a hand of tiles does constantly. `<img>` isolates
+  each instance's rendering context at the cost of not being stylable via `currentColor`.
+- No build step, no atlas. Served as static files as-is. No @1x/@2x split, no DPR-keyed picking —
+  SVG is resolution-independent, which is the no-pipeline version of the problem the atlas build
+  step existed to solve. (The @1x atlas specifically is moot now, not just deferred — there's no
+  atlas at all — see [99-deferred.md](99-deferred.md).)
 - 2.5D look: `perspective` + `rotateX` on the table container (§2), not pre-rendered art. The
   Blender pre-render route is deferred — see [99-deferred.md](99-deferred.md).
 - Sound: draw click, discard clack, shuffle — short, compressed, preloaded, mute default-on until
