@@ -44,7 +44,8 @@ mahjong/
 │           ├── net/            # socket.ts, reducer.ts, protocol.d.ts (GENERATED)
 │           ├── game/           # store.svelte.ts
 │           ├── table/          # DOM/CSS table scene: layout, tile positioning, transitions, hit-test
-│           └── ui/             # Svelte components
+│           ├── ui/             # Svelte components
+│           └── styles/         # SCSS: tokens, tile geometry, layout mixins
 ├── shared/protocol.schema.json # GENERATED from pydantic
 ├── server/tools/gen_protocol.py
 ├── docker-compose.yml          # postgres + api + web; profiles: ml, tools

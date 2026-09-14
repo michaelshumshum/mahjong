@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Browser-based multiplayer Hong Kong mahjong. Python/FastAPI server, SvelteKit (DOM/CSS) client.
+Browser-based multiplayer Hong Kong mahjong. Python/FastAPI server, SvelteKit (DOM + SCSS) client.
 Project outline lives in `docs/`.
 
 ## Context triggers

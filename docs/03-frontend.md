@@ -283,6 +283,39 @@ don't replay the missed turns as animation.
   opt-in. Recorded Cantonese call-outs (碰/上/槓/食糊) are deferred — see
   [99-deferred.md](99-deferred.md); unrecorded, unbudgeted content task, not a code task.
 
+## 7.1 Styling: SCSS
+
+Stylesheets are **SCSS** (`sass`, the Dart implementation, as a dev dependency). SvelteKit wires
+it through Vite; component styles use `<style lang="scss">`.
+
+SCSS compiles to plain CSS, so nothing above changes: the GPU-compositing argument (§2), the
+CSS-animation countdown ring (§5), `grid-template-areas` (§3) and `prefers-reduced-motion` (§8)
+are all web-platform features and behave identically. This is an authoring-layer choice only.
+
+```
+src/lib/styles/
+  _tokens.scss      colour, spacing, type scale, z-layers, seat colours
+  _tile.scss        tile geometry: face size, corner radius, stack depth, back pattern
+  _layout.scss      seat-region grid, perspective/rotateX, breakpoint mixins
+  _a11y.scss        focus rings, high-contrast hooks, reduced-motion guards
+  app.scss          entry: forwards the above, global resets
+```
+
+Conventions:
+
+- `@use`, never `@import` — the latter is deprecated in Dart Sass and leaks globals.
+- Tokens are SCSS variables **only when compile-time** (breakpoints, the tile aspect ratio used in
+  `calc()`). Anything a component or the theme toggles at runtime stays a CSS custom property —
+  `--tile-w`, `--seat-accent` — because SCSS variables don't exist in the browser. The tile-size
+  cascade in §3 is `clamp()` on a custom property, not a Sass variable.
+- Nesting: two levels maximum. Svelte already scopes component styles, so deep nesting buys
+  nothing and defeats the flat selectors the table surface needs for fast restyle.
+- Mixins for the four seat rotations and the breakpoint set; avoid mixins that emit layout.
+
+The one real risk is nesting and `@extend` producing selector bloat on a surface with ~150
+elements. Keep the tile rule set flat — the hot path is a transform on a keyed element, and it
+should stay one class plus custom properties.
+
 ## 8. Accessibility and i18n
 
 - English only for v1; all UI strings in one module. Cantonese term glyphs (碰/上/槓/食糊) stay as

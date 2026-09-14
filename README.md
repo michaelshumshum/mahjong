@@ -3,7 +3,7 @@
 Server-authoritative real-time multiplayer Hong Kong (Cantonese) mahjong. Bots fill empty seats
 and take over for disconnected players.
 
-**Stack:** Python 3.13 / FastAPI (REST + native WebSocket) · SvelteKit 2 + Svelte 5 (runes), DOM/CSS · Postgres
+**Stack:** Python 3.13 / FastAPI (REST + native WebSocket) · SvelteKit 2 + Svelte 5 (runes), DOM + SCSS · Postgres
 
 ## Quick start
 
@@ -32,7 +32,7 @@ make help          # everything else
 
 ```
 server/   Python. mahjong_core/ (pure rules, stdlib-only) + app/ (FastAPI, rooms, WS) + bots/
-web/      SvelteKit 2 + Svelte 5. Lobby and table, DOM/CSS throughout.
+web/      SvelteKit 2 + Svelte 5. Lobby and table, DOM throughout, styled with SCSS.
 shared/   Generated protocol JSON schema (make proto)
 docs/     Planning
 ```

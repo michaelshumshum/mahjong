@@ -1,6 +1,6 @@
 # web/AGENTS.md
 
-SvelteKit 2 + Svelte 5 (runes). No canvas — the table is DOM/CSS. Frontend outline:
+SvelteKit 2 + Svelte 5 (runes). No canvas — the table is DOM, styled with SCSS. Frontend outline:
 `docs/03-frontend.md`.
 
 ## Layout
@@ -11,6 +11,7 @@ src/lib/net/    WebSocket client, seq tracking, reducer, generated protocol type
 src/lib/game/   client state store ($state)
 src/lib/table/  table-surface Svelte components (DOM, not canvas)
 src/lib/ui/     Svelte components (app chrome)
+src/lib/styles/ SCSS tokens, tile geometry, layout mixins (see docs/03-frontend.md §7.1)
 ```
 
 ## Rules
@@ -47,3 +48,6 @@ pnpm dev | pnpm build | pnpm lint
 - Interactive controls live in DOM; so does everything else — there's no canvas to keep them out
   of.
 - Motion is CSS transitions/animations driven by state changes, never a JS ticker.
+- Stylesheets are SCSS (`<style lang="scss">`). `@use`, never `@import`; two levels of nesting
+  max. Runtime-varying values are CSS custom properties, not Sass variables — see
+  `docs/03-frontend.md §7.1`.
