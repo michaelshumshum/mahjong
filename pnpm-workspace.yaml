@@ -2,3 +2,6 @@
 # package, so it isn't a workspace member.
 packages:
   - "web"
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
