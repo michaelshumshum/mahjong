@@ -1,6 +1,13 @@
-node_modules/
-.svelte-kit/
-build/
-dist/
-.env
+# Build context is the repo root (needs pnpm-workspace.yaml + lockfile), so this
+# must exclude root-level noise too. BuildKit reads `<dockerfile>.dockerignore`
+# in preference to a context-root .dockerignore.
+**/node_modules/
+**/.svelte-kit/
+**/build/
+**/dist/
+**/.env
 .git/
+
+# Nothing outside the pnpm workspace is needed to build the client.
+server/
+docs/

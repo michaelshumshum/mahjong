@@ -1,3 +1,4 @@
+# shared/ holds only the generated protocol JSON schema (make proto) — not an npm
+# package, so it isn't a workspace member.
 packages:
   - "web"
-  - "shared"

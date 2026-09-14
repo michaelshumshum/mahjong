@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# 3.13 not 3.14: torch/numpy wheel coverage
+# 3.13 not 3.14: broadest current wheel coverage. torch has no cp313 wheels before
+# 2.6 (see the `ml` extra in pyproject.toml) — bump this only alongside that pin.
 
 FROM python:3.13-slim AS base
 ENV PYTHONUNBUFFERED=1 \
@@ -43,4 +44,6 @@ FROM base AS ml
 COPY --from=deps-ml /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 COPY . .
+RUN useradd --system --uid 1001 --no-create-home app && chown -R app:app /app
+USER app
 CMD ["python", "-m", "ml.train", "--help"]

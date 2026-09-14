@@ -49,7 +49,8 @@ services:
 
   web:
     build:
-      context: ./web
+      context: .                      # needs root pnpm-workspace.yaml + lockfile
+      dockerfile: web/Dockerfile
       target: dev
     command: pnpm dev --host 0.0.0.0 --port 5173
     environment:
@@ -57,9 +58,9 @@ services:
       PUBLIC_WS_URL: ws://localhost:${API_PORT:-8000}/ws
     ports: ["${WEB_PORT:-5173}:5173"]
     volumes:
-      - ./web:/app
+      - ./web:/app/web
       - ./shared:/shared
-      - web-modules:/app/node_modules
+      - web-modules:/app/web/node_modules   # keeps the container's node_modules off the host mount
     depends_on: [api]
 
   # torch lives in this image, not in api
@@ -72,10 +73,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mahjong}:${POSTGRES_PASSWORD:-mahjong}@postgres:5432/${POSTGRES_DB:-mahjong}
       PYTHONPATH: /app
+    # no source bind mount: the ml image's baked venv (torch) stays intact.
+    # rebuild (`make train`) to pick up source changes.
     volumes:
-      - ./server:/app
       - ./data:/data                  # game record shards, checkpoints
-      - server-venv-ml:/app/.venv
     depends_on:
       postgres: {condition: service_healthy}
     # gpu:
@@ -90,13 +91,11 @@ services:
     command: uv run python -m bots.arena --a FaanBot --b EfficiencyBot --games 20000 --parallel 8
     environment:
       PYTHONPATH: /app
+    # no source bind mount: keeps the ml image's baked venv (torch) intact. see `trainer`.
     volumes:
-      - ./server:/app
       - ./data:/data
-      - server-venv-ml:/app/.venv
 
 volumes:
   pgdata:
   server-venv:
-  server-venv-ml:
   web-modules:
