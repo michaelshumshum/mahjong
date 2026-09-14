@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Browser-based multiplayer Hong Kong mahjong. Python/FastAPI server, SvelteKit + PixiJS client.
+Browser-based multiplayer Hong Kong mahjong. Python/FastAPI server, SvelteKit (DOM/CSS) client.
 Project outline lives in `docs/`.
 
 ## Context triggers
@@ -26,14 +26,20 @@ Read the listed files before touching matching paths.
 ## Documentation
 
 - Docs are outlines of what the project *is*, not records of how it was decided.
-- Tables, lists and code blocks over prose. No rationale beyond a clause.
+- Default to tables, lists and code blocks over prose.
+- Rationale is allowed, and encouraged, where a decision is non-obvious or the reason it was made
+  is itself load-bearing (why a constraint exists, why the obvious alternative doesn't work) —
+  see `00-architecture.md §1`, `04-bots.md §4`, `06-ml.md §5` for the level to aim for. The rule
+  being replaced ("no rationale beyond a clause") was cutting exactly this kind of content; don't
+  gut a section to satisfy terseness.
 - Update the relevant `docs/` file in the same change as the code.
 
 ## Testing
 
 - `make test` before calling work done.
 - New behaviour gets a test in the same change; bugs get a failing regression test first.
-- `mahjong_core` is pure — test it directly. No fixtures, no mocks, no I/O.
+- `mahjong_core` is pure — test it directly. No mocks, no I/O. Golden fixtures (`tests/replays/`,
+  the scoring hand suite) are data, not mocks, and are required — see `05-roadmap.md`.
 - Seeded and deterministic: a failing game is reproducible from `(ruleset, seed, actions)`.
 
 ## Comments

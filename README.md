@@ -3,7 +3,7 @@
 Server-authoritative real-time multiplayer Hong Kong (Cantonese) mahjong. Bots fill empty seats
 and take over for disconnected players.
 
-**Stack:** Python 3.13 / FastAPI (REST + native WebSocket) · SvelteKit 5 + PixiJS v8 · Postgres
+**Stack:** Python 3.13 / FastAPI (REST + native WebSocket) · SvelteKit 2 + Svelte 5 (runes), DOM/CSS · Postgres
 
 ## Quick start
 
@@ -22,7 +22,7 @@ make help          # everything else
 | [00-architecture.md](docs/00-architecture.md) | System design, room-as-actor model, scaling path |
 | [01-rules-spec.md](docs/01-rules-spec.md) | Tiles, state machine, claim priority, faan table, payouts |
 | [02-protocol.md](docs/02-protocol.md) | WebSocket envelope, message catalog, redaction, reconnect/resync, timers |
-| [03-frontend.md](docs/03-frontend.md) | Svelte/Pixi split, scene layout, asset pipeline, interaction model |
+| [03-frontend.md](docs/03-frontend.md) | Svelte component layout, scene/DOM structure, asset pipeline, interaction model |
 | [04-bots.md](docs/04-bots.md) | Bot tiers, shanten/ukeire, HK 3-faan trap, safety play, evaluation harness |
 | [05-roadmap.md](docs/05-roadmap.md) | Milestones, testing strategy, risk register, open decisions |
 | [06-ml.md](docs/06-ml.md) | Day-2. Constraints to honor now so training isn't a rewrite |
@@ -31,9 +31,9 @@ make help          # everything else
 ## Layout
 
 ```
-server/   Python. mahjong_core/ (pure rules, zero deps) + app/ (FastAPI, rooms, WS) + bots/
-web/      SvelteKit 5. Lobby and table; PixiJS renders the table surface.
-shared/   Generated protocol schema + TS types (make proto)
+server/   Python. mahjong_core/ (pure rules, stdlib-only) + app/ (FastAPI, rooms, WS) + bots/
+web/      SvelteKit 2 + Svelte 5. Lobby and table, DOM/CSS throughout.
+shared/   Generated protocol JSON schema (make proto)
 docs/     Planning
 ```
 
@@ -47,4 +47,10 @@ docs/     Planning
 | `make arena A=FaanBot B=EfficiencyBot N=20000` | one-shot bot evaluation |
 | `docker compose --profile ml up trainer` | torch-enabled container (day 2) |
 
+Only `ml` and `tools` profiles exist — no multi-node/`scale` profile yet ([docs/07-infra.md §3](docs/07-infra.md)).
+
 > `--workers 1` on the API is load-bearing: rooms are in-memory objects owned by one process. [docs/07-infra.md §2](docs/07-infra.md)
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled third-party assets (tile art) are attributed separately; see [docs/07-infra.md §8](docs/07-infra.md).
