@@ -28,8 +28,9 @@ mahjong/
 │   │   ├── registry.py         # RoomRegistry, matchmaking
 │   │   ├── views.py            # seat_view() + redact_event() — redaction
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
-│   │   ├── infra/              # ports.py + memory.py (KV / Queue / Bus)
+│   │   ├── infra/              # in-process dicts (ports layer deferred, see 99-deferred.md)
 │   │   └── db/                 # SQLAlchemy models, migrations
+│   ├── tools/gen_protocol.py   # pydantic → JSON Schema → TS
 │   ├── bots/
 │   │   ├── base.py  random.py  efficiency.py  faan.py  safety.py
 │   │   └── arena.py            # self-play evaluation harness
@@ -47,7 +48,6 @@ mahjong/
 │           ├── ui/             # Svelte components
 │           └── styles/         # SCSS: tokens, tile geometry, layout mixins
 ├── shared/protocol.schema.json # GENERATED from pydantic
-├── server/tools/gen_protocol.py
 ├── docker-compose.yml          # postgres + api + web; profiles: ml, tools
 ├── docker-compose.prod.yml     # prod overlay
 ├── pnpm-workspace.yaml
@@ -79,8 +79,8 @@ for every game, bot-only included (~2h; full definition and the replay-invalidat
 [06-ml §2](06-ml.md)).
 
 ### M2 — Scoring (2–3 weeks)
-All faan patterns for `CLASSIC + NEW_6` (~35 patterns), decomposition maximisation, limit hands,
-caps, the `min_faan` gate, points tables, payment splits.
+All faan patterns for `CLASSIC + NEW_6 + NEW_18` (~43 patterns), decomposition maximisation,
+limit hands, caps, the `min_faan` gate, points tables, payment splits.
 **Done when:** a golden-fixture suite of ~120 hands (hand, context, ruleset → expected faan and
 payments) passes, including every edge case in [01-rules-spec §11](01-rules-spec.md). Hand-authoring
 those 120 fixtures is itself days of work, not an afternoon — budget for it explicitly.
@@ -96,7 +96,7 @@ resumes correctly from `last_seq`; `test_redaction` proves no seat ever receives
 it isn't entitled to.
 
 ### M4 — Playable client + bots (6–10 weeks)
-Lobby, table route, DOM/CSS table scene, tile atlas/sprites, hand/pool/meld rendering,
+Lobby, table route, DOM/CSS table scene, inline-SVG tile faces, hand/pool/meld rendering,
 draw-discard-claim animations, claim buttons, timer ring, hand-end faan breakdown, score sheet.
 T1 `EfficiencyBot` **and T2 `FaanBot`** in the opponent seats — `FaanBot` is pulled forward from
 M6 here, not left until later, because it's load-bearing for M4.5's done gate (next section):
@@ -183,7 +183,7 @@ becomes the bot evaluation harness later.
 | **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer room loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
 | **Scoring disputes** — HK house rules differ from what you implemented | High | `RuleSet` from day one; show a per-pattern faan breakdown at hand end so players can see *why*; ship named presets |
 | **Efficiency bots can't win under 3-faan minimum** | Certain if unaddressed | [04-bots §4](04-bots.md); `FaanBot` moved into M4 specifically to fix this before the M4.5 solo-play gate — see §2; track "tenpai on sub-minimum hand" as an explicit arena metric |
-| Rules scope creep (pao, aborts, regional variants) | High | Ship `CLASSIC + NEW_6` + `min_faan=3` only. Everything else is a config flag behind a flag. |
+| Rules scope creep (pao, aborts, regional variants) | High | Ship the default `hand_sets` (`CLASSIC + NEW_6 + NEW_18`) + `min_faan=3` only. NEW_18 is in scope, not creep: Seven Pairs lives there and the bot shanten parser requires it ([01-rules-spec §7](01-rules-spec.md)). Everything else is a config flag behind a flag. |
 | Mobile ergonomics (13 tiles on a 390px screen) | Medium | Design the mobile layout in M4, not M6. Test on a real phone early. |
 | Information leak via message size/timing | Low | Redact server-side (already). The obvious further mitigation — padding `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer — is **not done**: it's incompatible with the early-exit claim window that [00-architecture.md §4](00-architecture.md) requires for UX, since early exit necessarily reveals timing. Accepted as a known, low-severity leak rather than mitigated. |
 | **Python perf — server** | Low | Turn-based, ~5 msg/s/room; I/O-bound, not CPU-bound. |
@@ -203,7 +203,7 @@ doc, this section just records the answer and points there.
    [07-infra.md](07-infra.md)). Thousands-of-tables routing is out of scope, not a numbered
    future milestone.
 3. **Ruleset defaults.** `min_faan=3`, `faan_cap=10`, `half_spicy`, `discarder_pays_all`,
-   `CLASSIC+NEW_6`, `EAST_SOUTH`.
+   `CLASSIC+NEW_6+NEW_18`, `EAST_ONLY` (一圈).
 4. **Money/stakes.** Cosmetic points only, never real stakes. Real-stakes mahjong is a licensing
    question in most jurisdictions; deciding this in writing now is free, and revisiting it after
    launch is not.

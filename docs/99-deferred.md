@@ -141,10 +141,9 @@ None of that is designed yet. Keep the absolute-`deadline_ts` + measured-clock-o
 as-is (it's correct) and revisit the bank as a follow-up feature with its own event type once
 the extension-message design is worked out.
 
-Related: `docs/01-rules-spec.md` still has `bonus_seconds: int = 20` in the `RuleSet` config
-(§10, `bonus_seconds: int = 20  # per-game reserve bank`) — that field documents the same
-deferred feature and should be cut or marked deferred to match, but `01-rules-spec.md` is not
-owned by this pass.
+Related: the `bonus_seconds: int = 20` field this feature needed has been removed from the
+`RuleSet` in `01-rules-spec.md` §10. Reviving the bank means adding it back alongside the
+deadline-extension message described above.
 
 ## From 03-frontend.md
 
@@ -207,8 +206,8 @@ Original: "Sort hand: auto by default; drag to reorder, sticky per session [desk
 
 ### Chess-clock bonus-bank meter
 
-Provenance: referenced by `02-protocol.md §4` (`bonus_seconds`); no dedicated client UI specified
-for v1.
+Provenance: `02-protocol.md` §4 (Timers), where the bank was cut along with the `bonus_seconds`
+config field; no dedicated client UI was specified for v1 either.
 
 v1 behaviour: bonus seconds are enforced server-side and folded into `deadline_ts` like any other
 deadline; no separate meter/visualization. Revisit once the base countdown ring (`03-frontend.md
@@ -327,13 +326,13 @@ starting now" framing is.
 Provenance: `06-ml.md` §2 (pre-audit), "Input boundary."
 
 ```
-GameState ──view_for(seat)──► SeatView ──► bot ──► Intent
+GameState ──seat_view(state,seat)──► SeatView ──► bot ──► Intent
                                  │
                                  └──► (day 2) encode() ──► tensor ──► policy
 ```
 
 The encoder takes `SeatView`, never `GameState`, so a network trained this way is structurally
-un-cheatable. The rule to hold in M3: `view_for` is the only path to seat-visible state — no
+un-cheatable. The rule to hold in M3: `seat_view()` is the only path to seat-visible state — no
 shortcuts for bots, ever. Cut from the trimmed `06-ml.md` because it mostly restates
 `04-bots.md` §1's existing plan rather than adding new ML-specific work; revive alongside the
 day-2 encoder.

@@ -24,7 +24,7 @@ make help          # everything else
 | [02-protocol.md](docs/02-protocol.md) | WebSocket envelope, message catalog, redaction, reconnect/resync, timers |
 | [03-frontend.md](docs/03-frontend.md) | Svelte component layout, scene/DOM structure, asset pipeline, interaction model |
 | [04-bots.md](docs/04-bots.md) | Bot tiers, shanten/ukeire, HK 3-faan trap, safety play, evaluation harness |
-| [05-roadmap.md](docs/05-roadmap.md) | Milestones, testing strategy, risk register, open decisions |
+| [05-roadmap.md](docs/05-roadmap.md) | Milestones, testing strategy, risk register, resolved decisions |
 | [06-ml.md](docs/06-ml.md) | Day-2. Constraints to honor now so training isn't a rewrite |
 | [07-infra.md](docs/07-infra.md) | Monorepo layout, process model, Docker targets and profiles |
 
