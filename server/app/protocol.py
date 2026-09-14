@@ -58,9 +58,21 @@ class Pong(Envelope):
     d: PongPayload
 
 
+class ErrorPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+
+
+class Error(Envelope):
+    t: Literal["error"] = "error"
+    d: ErrorPayload
+
+
 # One union for both directions: a discriminator needs >=2 members, and each
 # direction currently has too few message types of its own for a standalone
-# union (server has only `pong` so far). Split into ClientMessage/ServerMessage
-# once both sides have enough members — every future sub-task just adds its
-# Envelope subclass to this Union.
-AnyMessage = Annotated[Hello | Ping | Pong, Field(discriminator="t")]
+# union (server has only `pong`/`error` so far). Split into
+# ClientMessage/ServerMessage once both sides have enough members — every
+# future sub-task just adds its Envelope subclass to this Union.
+AnyMessage = Annotated[Hello | Ping | Pong | Error, Field(discriminator="t")]
