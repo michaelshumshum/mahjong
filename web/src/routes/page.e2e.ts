@@ -6,6 +6,19 @@ test('home page loads and has a title', async ({ page }) => {
 	await expect(page).toHaveTitle(/Mahjong/);
 });
 
+test('claim buttons demo: choosing an option reports the right one, disambiguated chows included', async ({
+	page
+}) => {
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Chow 5s-7s' }).click();
+	await expect(page.getByTestId('claim-choice')).toHaveText('chose: chow 5s-7s');
+
+	await page.getByRole('button', { name: 'Pass', exact: true }).click();
+	await expect(page.getByTestId('claim-choice')).toHaveText('chose: pass');
+});
+
 test('lobby route renders', async ({ page }) => {
 	const response = await page.goto('/lobby');
 	expect(response?.status()).toBe(200);
