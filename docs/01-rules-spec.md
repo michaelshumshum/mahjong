@@ -52,12 +52,20 @@ you can cross-validate against them.)
 
 ## 3. Deal
 
-1. Shuffle 144 tiles with the seeded PRNG. Conceptually four walls of 18 stacks × 2.
+1. Shuffle 144 tiles with the seeded PRNG (136 if `flowers_enabled=False` — the 8
+   flowers/seasons are dropped from the physical set before shuffling, and step 4 never
+   triggers). Conceptually four walls of 18 stacks × 2.
 2. Roll dice → break point. Cosmetic; derive the dice from the same seed.
-3. Deal 13 tiles to each player, 14 to the dealer.
+3. Deal 13 tiles to each player, 14 to the dealer. Dealt in seat order starting from the
+   dealer, three rounds of four tiles then a round of one (mirroring the physical deal),
+   dealer drawing one further tile at the end. All from the front of the wall. The exact
+   interleaving is cosmetic — the wall is already a uniform random permutation — but fixed
+   here for reproducible replays/animation.
 4. **Flower replacement**, in seat order starting from the dealer: each player reveals any
    flowers/seasons and draws replacements from the **back end** of the wall, repeating until
-   they hold none. Order matters — it changes who gets which tile.
+   they hold none. Order matters — it changes who gets which tile. Implemented as: fully
+   resolve one seat's cascade (which may chain through several replacements) before moving
+   to the next seat, not round-robin across seats.
 5. Dealer discards.
 
 ## 4. Turn state machine
