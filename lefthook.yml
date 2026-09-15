@@ -11,10 +11,14 @@ pre-commit:
       glob: "*.{js,ts,svelte}"
       run: pnpm exec oxlint {staged_files}
 
+    # exclude must be a glob, not a bare filename: {staged_files} renders top-level
+    # matches as "./AGENTS.md", and a bare "AGENTS.md" pattern silently never matched
+    # it — oxfmt's own ignorePatterns was doing the real exclusion invisibly, which
+    # only broke visibly once AGENTS.md was the *only* file the glob matched.
     - name: web-format
       root: "web/"
       glob: "*.{js,ts,svelte,json,scss,css,md}"
-      exclude: "AGENTS.md"
+      exclude: "**/AGENTS.md"
       run: pnpm exec oxfmt --check {staged_files}
 
     - name: server

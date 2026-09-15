@@ -415,3 +415,37 @@ described as "stage 2" in `00-architecture.md §7`. There is one process and no 
 profile; this is a stage-2+ concern and shouldn't be designed against until stage 1 (one
 process, hundreds of tables) is actually load-bearing.
 
+## From web/AGENTS.md
+
+### TypeScript 7 as the primary compiler (svelte-check)
+
+Provenance: `web/AGENTS.md` "Commands" section. `typescript` is currently pinned to `^6.0.3` as
+the primary dependency; TS7 is installed only as a secondary aliased package
+(`@typescript/native`, `npm:typescript@^7`) and used exclusively via `svelte-check --tsgo`
+(`web/package.json`'s `check`/`check:watch` scripts).
+
+Not a v1 scope cut — a genuine upstream blocker, not a project decision. `svelte-check`'s own
+CLI does an unconditional `require('typescript')` at its top level and hard-requires that to
+resolve to TS5/6 even in `--tsgo` mode (confirmed against `sveltejs/language-tools#3063`);
+TypeScript 7 doesn't yet expose a stable programmatic API for embedding tools — Volar,
+svelte-check, Vue, and Astro all hit the same wall. From Microsoft's own TS7 announcement,
+quoted in that issue: "tools which embed TypeScript into their own compilers and language
+services can only currently rely on TypeScript 6.0 ... We expect this to be a point-in-time
+issue." No date attached as of 2026-09. The `svelte-check` maintainer's own stated plan
+(2026-08-31): even TS 7.1's "content mapper" support — the next incremental step — "will
+currently still require both TypeScript 6 and 7."
+
+**Needs before un-deferring:**
+- TypeScript ships a stable programmatic API `svelte-check` (and the rest of the Volar-based
+  tooling ecosystem) can embed directly — the actual blocker, owned upstream by the TypeScript
+  team, not by us or by Svelte's maintainers.
+- `svelte-check` drops the TS6-primary requirement once that API exists.
+- Before then, if still relying on `--tsgo` in the meantime: re-check its own open bugs —
+  `sveltejs/language-tools#3120` (includes more files than expected under `--tsgo`) and `#3095`
+  (crashes on Linux/arm64 CI, not repro'd on macOS — our CI runs `ubuntu-latest`/x86_64, so
+  likely not hit, but worth reconfirming before depending on it further).
+
+**When it lands:** drop the `@typescript/native` alias, bump `typescript` straight to whatever
+TS7.x is current, remove `--tsgo` from `web/package.json`'s `check`/`check:watch` scripts, and
+delete the rationale note in `web/AGENTS.md`.
+
