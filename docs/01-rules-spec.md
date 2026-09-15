@@ -366,7 +366,7 @@ Write a named test for every one.
 6. Last-tile draw and last-discard win scoring, and their interaction with the wall reserve count after kongs shorten the wall.
 7. Multi-win on one discard — deferred with `multi_win`, see
    [99-deferred.md](99-deferred.md); not required for v1 launch.
-8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just hidden client-side.
+8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just hidden client-side. **M1/M2 boundary:** `mahjong_core/actions.py`'s `legal_actions` (M1) offers `DeclareWin`/`ClaimWin` on win *shape* alone (standard melds+pair, Seven Pairs, Thirteen Orphans) — the `min_faan` gate itself is M2 scope (05-roadmap.md §2, alongside the faan patterns it depends on), so this edge case isn't fully closed until engine.py wires a real faan check in front of these actions once `scoring/` exists. Tracked, not silently assumed away.
 9. Seven Pairs vs. standard parse of the same 14 tiles → since `NEW_18` (and therefore Seven
    Pairs) is on by default (§7, §10), this collision is a default-path case, not an opt-in
    one — scoring must maximize over *all* valid decompositions, not the first found.

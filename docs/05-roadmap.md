@@ -70,6 +70,9 @@ remote runs the CI workflow. **Met** — `.github/workflows/ci.yml`, see [07-inf
 Tiles, seeded wall, deal, flower replacement, melds, full turn state machine, claim priority
 resolution, `legal_actions`, `reduce`. This is the milestone most underestimated by an earlier
 draft of this doc — see the timeline note below for why 3–4 weeks, not 1.
+`legal_actions`' win-declaration legality is win-*shape* only (standard melds+pair, Seven
+Pairs, Thirteen Orphans) — the `min_faan` gate below is a real M2 dependency, not an
+oversight; see [01-rules-spec.md §11.8](01-rules-spec.md).
 **Done when:** `pytest -k selfplay` runs 10,000 complete games with four `RandomBot`s — no
 illegal states, no deadlocks, every game terminates. Run under `hypothesis` too.
 Also: persist `GameRecord` (`engine_version`, full `ruleset` body, `seed`, `actions`, `outcome`)
