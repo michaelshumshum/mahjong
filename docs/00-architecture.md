@@ -114,6 +114,15 @@ path as live play, and search bots that call `reduce` on a determinized copy rat
 a second rules implementation. Crash recovery by replaying a room's action log is **not** a v1
 property — see §7.
 
+**Two pure entry points, not one.** `reduce()` takes exactly one `Action` and returns once a
+real decision is needed from some seat, or the hand ends (`Phase.HAND_OVER`). Advancing from
+`HAND_OVER` to the next deal (or to `GAME_OVER`) is a second function,
+`engine.start_next_hand(state) -> (state, events)` — there is no `Action` for "deal the next
+hand" since it isn't a seat's decision (`legal_actions` is `()` for `HAND_OVER`/`GAME_OVER`), so
+it can't fit `reduce`'s `(state, action)` shape. The Room loop above calls it right after a
+`reduce()` call lands on `HAND_OVER`, in the same tick, before arming timers or publishing —
+same pattern as `state.new_game()` starting hand 1.
+
 ### Room actor
 
 Each table is a single `asyncio.Task` owning its `GameState` exclusively. All mutation happens

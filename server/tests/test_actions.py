@@ -22,6 +22,8 @@ from mahjong_core.state import (
     ClaimOffer,
     ClaimWindow,
     GameState,
+    HandOutcome,
+    HandResult,
     Phase,
     SeatState,
     new_game,
@@ -141,7 +143,10 @@ def _with_seat_concealed(state: GameState, seat: int, concealed: tuple[int, ...]
     "phase", [Phase.AWAIT_DRAW, Phase.SCORING, Phase.HAND_OVER, Phase.GAME_OVER]
 )
 def test_no_actions_for_any_seat_in_non_deciding_phases(phase: Phase) -> None:
-    state = _base_state(phase=phase)
+    overrides: dict[str, object] = {"phase": phase}
+    if phase == Phase.HAND_OVER:
+        overrides["hand_result"] = HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW)
+    state = _base_state(**overrides)
     for seat in range(4):
         assert legal_actions(state, seat) == ()
 

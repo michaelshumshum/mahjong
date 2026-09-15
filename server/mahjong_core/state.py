@@ -10,15 +10,20 @@ and `melds.py` before `actions.py`/`claims.py`/`engine.py` build on it.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld
 from mahjong_core.tiles import Flower, TileId
 from mahjong_core.wall import Wall, WallTile, deal_hands, new_wall, replace_flowers
+
+if TYPE_CHECKING:
+    # deferred: claims.py imports ClaimOffer/ClaimWindow from this module, so this import
+    # only runs for type-checking (PEP 563 string annotations below), never at runtime.
+    from mahjong_core.claims import ClaimResponse
 
 
 class Phase(StrEnum):
@@ -91,6 +96,11 @@ class ClaimWindow:
     source_seat: int  # discarder (DISCARD) or kong-declarer (KONG_ROB)
     tile: TileId
     offers: tuple[ClaimOffer, ...]
+    responses: Mapping[int, ClaimResponse] = field(default_factory=dict)
+    # accumulated across separate reduce() calls -- one per seat's Pass/Claim* action --
+    # since a claim window genuinely waits on multiple independent actors (00-architecture.md
+    # §4). Keyed by seat. engine.py is the only writer; a seat missing here is an implicit
+    # Pass, same convention claims.py's resolve_claims/can_close_early already use.
     deadline_ts: int | None = None
 
     def __post_init__(self) -> None:
@@ -103,6 +113,40 @@ class ClaimWindow:
             raise ValueError(f"duplicate seat among claim offers: {seats}")
         if self.source_seat in seats:
             raise ValueError("the source seat cannot hold an offer on its own discard/kong")
+
+
+class HandOutcome(StrEnum):
+    """How a hand ended (01-rules-spec.md §4, §9) -- the hand-result field this module's
+    class docstring above flagged as engine.py's addition."""
+
+    WIN = "win"
+    EXHAUSTIVE_DRAW = "exhaustive_draw"  # 流局, §9
+
+
+class WinType(StrEnum):
+    """How the winning tile was obtained -- affects New-6 faan patterns (01-rules-spec.md
+    §7: 自摸/海底撈月/搶槓) once scoring (M2) exists; engine.py records it now regardless."""
+
+    SELF_DRAW = "self_draw"
+    DISCARD = "discard"
+    KONG_ROB = "kong_rob"
+
+
+@dataclass(frozen=True)
+class HandResult:
+    """The outcome of the hand that just ended, carried on `GameState.hand_result` only
+    while `phase == Phase.HAND_OVER` -- cleared once the next hand deals or the game ends."""
+
+    outcome: HandOutcome
+    winner: int | None = None
+    win_type: WinType | None = None
+    discarder: int | None = None  # who fed the win (discard/kong_rob); None otherwise
+
+    def __post_init__(self) -> None:
+        if self.outcome == HandOutcome.WIN and self.winner is None:
+            raise ValueError("a WIN result requires a winner")
+        if self.outcome == HandOutcome.EXHAUSTIVE_DRAW and self.winner is not None:
+            raise ValueError("an EXHAUSTIVE_DRAW result cannot have a winner")
 
 
 @dataclass(frozen=True)
@@ -154,6 +198,7 @@ class GameState:
     hand_no: int
     claim_window: ClaimWindow | None = None
     next_window_id: int = 0
+    hand_result: HandResult | None = None
 
     def __post_init__(self) -> None:
         if len(self.seats) != 4:
@@ -175,6 +220,10 @@ class GameState:
             )
             if self.claim_window.kind != want_kind:
                 raise ValueError(f"{self.phase} requires a {want_kind} claim_window")
+        if self.phase == Phase.HAND_OVER and self.hand_result is None:
+            raise ValueError("HAND_OVER requires a hand_result")
+        if self.phase != Phase.HAND_OVER and self.hand_result is not None:
+            raise ValueError(f"{self.phase} must not carry a hand_result")
 
 
 def derive_hand_seed(game_seed: int, hand_no: int) -> bytes:

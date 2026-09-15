@@ -375,3 +375,7 @@ Write a named test for every one.
    Pairs) is on by default (§7, §10), this collision is a default-path case, not an opt-in
    one — scoring must maximize over *all* valid decompositions, not the first found.
 10. Thirteen Orphans 13-way wait vs. single wait (config: some tables double the latter).
+11. Wall runs out **during** a flower-replacement cascade (edge case 1), not just before a
+    normal draw: the seat's already-revealed flowers this cascade stay revealed, but the hand
+    ends as an exhaustive draw right there instead of raising — checked before *every* draw in
+    the cascade, not just the first.
