@@ -301,12 +301,19 @@ class RuleSet:
         # whole set; hand_sets stays the coarse on/off switch per §7 group.
     discard_payment: Literal["all", "half"] = "all"
     self_draw_multiplier: float = 1.5
+    flowers_score: bool = True              # 座位花: +1 faan per flower matching seat, see §7
+    seven_flowers_instant_win: bool = False # 3 faan, variant, see §7
+    eight_flowers_instant_win: bool = False # limit hand, variant, see §7
+    thirteen_orphans_wait_bonus: bool = False  # some tables double a single-tile wait, §11.10
 
     # flow
     game_length: Literal["EAST_ONLY", "EAST_SOUTH", "FULL"] = "EAST_ONLY"  # 一圈; see §2
     dealer_repeat_on_win: bool = True
     dealer_repeat_on_draw: bool = True
     wall_reserve: int = 0                   # HK default: no dead wall, see §9
+    four_kong_abort: bool = False           # see §9
+    nine_terminals_abort: bool = False      # 九種九牌, see §9
+    tenpai_payments: bool = False           # pay tenpai players on exhaustive draw, see §9
 
     # variants
     flowers_enabled: bool = True
@@ -316,12 +323,23 @@ class RuleSet:
     concealed_kong_robbable: bool = False   # only for 十三么, some tables
     pao_rules: bool = False                 # 包 responsibility, v2
 
+    # fairness (see 02-protocol.md "Fairness")
+    provable_fairness: bool = False         # gates hand_start.seed_commit / hand_end.fairness
+
     # timing (server-enforced)
     turn_seconds: int = 15                  # AWAIT_ACTION timeout
     claim_seconds: int = 5                  # AWAIT_CLAIMS window
     turn_timeout_strikes: int = 3           # timeouts before seat flips to AUTOPLAY,
                                              # see 00-architecture.md §8
 ```
+
+`flowers_score`, `seven_flowers_instant_win`, `eight_flowers_instant_win` (§7),
+`four_kong_abort`, `nine_terminals_abort`, `tenpai_payments` (§9), and
+`thirteen_orphans_wait_bonus` (§11.10) were named in prose elsewhere in this doc but missing
+from this dataclass; added here for consistency. `provable_fairness` is specified only in
+[02-protocol.md](02-protocol.md) (gates `hand_start.seed_commit`/`hand_end.fairness`) but
+lives on `RuleSet`, so it's listed here too. None of these have a documented default beyond
+what's shown above; the implementation defaults them to the conservative/off position.
 
 ## 11. Edge cases
 
