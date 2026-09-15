@@ -74,10 +74,12 @@ draft of this doc — see the timeline note below for why 3–4 weeks, not 1.
 Pairs, Thirteen Orphans) — the `min_faan` gate below is a real M2 dependency, not an
 oversight; see [01-rules-spec.md §11.8](01-rules-spec.md).
 **Done when:** `pytest -k selfplay` runs 10,000 complete games with four `RandomBot`s — no
-illegal states, no deadlocks, every game terminates. Run under `hypothesis` too.
+illegal states, no deadlocks, every game terminates. Run under `hypothesis` too. **Met.**
 Also: persist `GameRecord` (`engine_version`, full `ruleset` body, `seed`, `actions`, `outcome`)
 for every game, bot-only included (~2h; full definition and the replay-invalidation policy in
-[06-ml §2](06-ml.md)).
+[06-ml §2](06-ml.md)). **Met** — `server/app/db/models.py` (`games` table), `server/app/db/records.py`
+(`save_game_record`, `is_replayable`), `server/bots/selfplay.py` (`play_and_record_game`, the
+bot-only integration point). M1 is now fully complete.
 
 ### M2 — Scoring (2–3 weeks)
 All faan patterns for `CLASSIC + NEW_6 + NEW_18` (~43 patterns), decomposition maximisation,

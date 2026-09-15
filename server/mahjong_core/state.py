@@ -13,7 +13,7 @@ import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld
@@ -147,6 +147,28 @@ class HandResult:
             raise ValueError("a WIN result requires a winner")
         if self.outcome == HandOutcome.EXHAUSTIVE_DRAW and self.winner is not None:
             raise ValueError("an EXHAUSTIVE_DRAW result cannot have a winner")
+
+
+@dataclass(frozen=True)
+class GameOutcome:
+    """Final result of a completed game (`Phase.GAME_OVER`) -- one component of the
+    `GameRecord` `docs/06-ml.md §2` defines for persistence. Mirrors `engine.GameEnded`'s
+    payload, the only other place this data already exists, pulled out as its own type so
+    `app/db` doesn't need to depend on an `Event` just to read a finished game's result.
+    """
+
+    hand_count: int  # last hand actually played (engine.GameEnded.hand_no)
+    final_scores: tuple[int, int, int, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"hand_count": self.hand_count, "final_scores": list(self.final_scores)}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> GameOutcome:
+        scores = data["final_scores"]
+        return cls(
+            hand_count=data["hand_count"], final_scores=(scores[0], scores[1], scores[2], scores[3])
+        )
 
 
 @dataclass(frozen=True)

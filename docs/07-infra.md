@@ -93,15 +93,23 @@ Not yet decided: hosting target, domain, and TLS termination. Minimum shape once
 
 ## 6. Database schema and migrations
 
-`alembic` is wired into the `Makefile` (`make migrate`, `make revision`) but no schema exists
-beyond the one sentence in `00-architecture.md §6`. Minimum tables to get a first migration
-written:
+`alembic` is wired into the `Makefile` (`make migrate`, `make revision`). `games` is the first
+table, migrated in `server/alembic/versions/95b97823dd97_create_games_table.py`, model at
+`server/app/db/models.py`. `users`/`leaderboard` below are still just the target shape — not
+built yet, no migration for either.
 
-| Table | Holds |
-| --- | --- |
-| `users` | account identity for upgraded (non-guest) players; guests never get a row |
-| `games` | `ruleset`, `seed`, `action_log` (JSONB), players, result — the durable record of a finished game |
-| `leaderboard` | derived/aggregated from `games`; may be a materialized view instead of a table |
+| Table | Holds | Status |
+| --- | --- | --- |
+| `users` | account identity for upgraded (non-guest) players; guests never get a row | not built |
+| `games` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `action_log` (JSONB), `players` (JSONB), `result` (JSONB), `created_at` — the durable record of a finished game (`docs/06-ml.md §2`) | **built** |
+| `leaderboard` | derived/aggregated from `games`; may be a materialized view instead of a table | not built |
+
+`ruleset`/`action_log`/`players`/`result` use `JSON().with_variant(JSONB(), "postgresql")` —
+JSONB on Postgres, generic `JSON` everywhere else, so the same model works against SQLite in
+tests (CI has no Postgres service, §9) and JSONB in production. `save_game_record`
+(`server/app/db/records.py`) is the only write path; `bots/selfplay.py`'s `play_and_record_game`
+is the self-play integration point (`docs/05-roadmap.md §2`'s M1 gate: bot-only games recorded
+end to end).
 
 Room state itself is never persisted — it's in-memory only until stage-3 durability
 (`00-architecture.md §7`) is built, which is out of scope now.

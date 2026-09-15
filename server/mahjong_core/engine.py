@@ -63,6 +63,7 @@ from mahjong_core.state import (
     ClaimKind,
     ClaimOffer,
     ClaimWindow,
+    GameOutcome,
     GameState,
     HandOutcome,
     HandResult,
@@ -78,6 +79,7 @@ from mahjong_core.tiles import Flower, TileId
 from mahjong_core.wall import WallTile, deal_hands, draw_back, draw_front, new_wall, replace_flowers
 
 __all__ = [
+    "ENGINE_VERSION",
     "Action",
     "ClaimResolved",
     "Discarded",
@@ -90,10 +92,17 @@ __all__ = [
     "IllegalActionError",
     "KongReplacementDrawn",
     "MeldFormed",
+    "game_outcome",
     "new_game",
     "reduce",
     "start_next_hand",
 ]
+
+ENGINE_VERSION = "1.0.0"
+# bump on any change to the reducer, wall order, or flower-replacement ordering
+# (docs/06-ml.md §2). Every persisted GameRecord stamps this value; a mismatch against the
+# running engine's ENGINE_VERSION means the record is not replayable, full stop -- there is
+# no migration path (see app/db/records.is_replayable).
 
 
 class IllegalActionError(ValueError):
@@ -302,6 +311,16 @@ def _with_seat(seats: Seats, seat: int, new_state: SeatState) -> Seats:
 
 def _scores(state: GameState) -> tuple[int, int, int, int]:
     return cast(tuple[int, int, int, int], tuple(s.score for s in state.seats))
+
+
+def game_outcome(state: GameState) -> GameOutcome:
+    """Extract `docs/06-ml.md §2`'s `GameOutcome` from a finished game. Same fields as
+    `GameEnded`, but callable independently of catching that event -- a persistence path
+    saving a `GameRecord` after the fact (app/db/records.py) has the final `GameState` on
+    hand, not the event stream that produced it."""
+    if state.phase != Phase.GAME_OVER:
+        raise IllegalActionError(f"game_outcome requires Phase.GAME_OVER, got {state.phase}")
+    return GameOutcome(hand_count=state.hand_no, final_scores=_scores(state))
 
 
 def _can_win_with(seat_state: SeatState, tile: TileId) -> bool:

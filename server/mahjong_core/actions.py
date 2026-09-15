@@ -38,10 +38,10 @@ not-yet-built question.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from mahjong_core.melds import Meld, MeldKind, decompose, legal_self_melds
 from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
@@ -308,3 +308,72 @@ def _turn_actions(state: GameState, seat: int) -> tuple[Action, ...]:
         actions.append(DeclareWin())
 
     return tuple(actions)
+
+
+# --- JSON-safe serialization, for the persisted action log (docs/06-ml.md §2) ----------------
+
+
+def _meld_to_dict(meld: Meld) -> dict[str, Any]:
+    return {"kind": meld.kind.value, "tiles": list(meld.tiles), "from_seat": meld.from_seat}
+
+
+def _meld_from_dict(data: Mapping[str, Any]) -> Meld:
+    return Meld(
+        kind=MeldKind(data["kind"]),
+        tiles=tuple(TileId(t) for t in data["tiles"]),
+        from_seat=data["from_seat"],
+    )
+
+
+def action_to_dict(action: Action) -> dict[str, Any]:
+    """JSON-safe representation of one `Action`. Round-trips via `action_from_dict`. Used to
+    build the `action_log` a `GameRecord` persists (docs/06-ml.md §2) -- not the fixed
+    109-id action *encoding* (06-ml.md §1, M2), which is a distinct, more compact scheme for
+    ML consumption, not storage."""
+    if isinstance(action, Discard):
+        return {"kind": action.kind.value, "tile_id": action.tile_id}
+    if isinstance(action, (ClaimChow, ClaimPung, ClaimKong)):
+        return {
+            "kind": action.kind.value,
+            "window_id": action.window_id,
+            "seat": action.seat,
+            "meld": _meld_to_dict(action.meld),
+        }
+    if isinstance(action, ClaimWin):
+        return {"kind": action.kind.value, "window_id": action.window_id, "seat": action.seat}
+    if isinstance(action, Pass):
+        return {"kind": action.kind.value, "window_id": action.window_id, "seat": action.seat}
+    if isinstance(action, (DeclareConcealedKong, DeclareAddedKong)):
+        return {"kind": action.kind.value, "meld": _meld_to_dict(action.meld)}
+    if isinstance(action, DeclareWin):
+        return {"kind": action.kind.value}
+    raise AssertionError(f"unhandled action type: {action!r}")
+
+
+def action_from_dict(data: Mapping[str, Any]) -> Action:
+    kind = ActionKind(data["kind"])
+    if kind == ActionKind.DISCARD:
+        return Discard(tile_id=TileId(data["tile_id"]))
+    if kind == ActionKind.CLAIM_CHOW:
+        return ClaimChow(
+            window_id=data["window_id"], seat=data["seat"], meld=_meld_from_dict(data["meld"])
+        )
+    if kind == ActionKind.CLAIM_PUNG:
+        return ClaimPung(
+            window_id=data["window_id"], seat=data["seat"], meld=_meld_from_dict(data["meld"])
+        )
+    if kind == ActionKind.CLAIM_KONG:
+        return ClaimKong(
+            window_id=data["window_id"], seat=data["seat"], meld=_meld_from_dict(data["meld"])
+        )
+    if kind == ActionKind.CLAIM_WIN:
+        return ClaimWin(window_id=data["window_id"], seat=data["seat"])
+    if kind == ActionKind.PASS:
+        return Pass(window_id=data["window_id"], seat=data["seat"])
+    if kind == ActionKind.DECLARE_CONCEALED_KONG:
+        return DeclareConcealedKong(meld=_meld_from_dict(data["meld"]))
+    if kind == ActionKind.DECLARE_ADDED_KONG:
+        return DeclareAddedKong(meld=_meld_from_dict(data["meld"]))
+    if kind == ActionKind.DECLARE_WIN:
+        return DeclareWin()
+    raise AssertionError(f"unhandled action kind: {kind}")
