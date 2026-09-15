@@ -14,6 +14,10 @@
 		type Standing,
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
+	import Chat, { type ChatEntry } from '$lib/ui/Chat.svelte';
+	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
+	import Toast from '$lib/ui/Toast.svelte';
+	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 
 	let status = $state<'idle' | 'connecting' | 'connected'>('idle');
 	let lastPong = $state<Pong['d'] | null>(null);
@@ -126,6 +130,38 @@
 		{ seat: 0, total: -30 },
 		{ seat: 2, total: -30 }
 	];
+
+	// Chat demo (this sub-task): mock scrollback, no real `chat`/socket wiring. Sending appends
+	// locally with the current time — a stand-in for the eventual server echo.
+	let chatMessages = $state<ChatEntry[]>([
+		{ seat: 1, phrase: 'Good game', ts: Date.now() - 60_000 },
+		{ seat: 2, phrase: 'Thanks', ts: Date.now() - 30_000 }
+	]);
+	function sendChat(phrase: string): void {
+		chatMessages = [...chatMessages, { seat: 0, phrase, ts: Date.now() }];
+	}
+
+	// Settings demo (this sub-task): mock `auto` pre-arm state plus client-only prefs, no real
+	// `auto` message sent and no prefs persisted anywhere yet.
+	let autoArm = $state<AutoArm>({ noCalls: false, autoPassChow: false });
+	let clientPrefs = $state<ClientPrefs>({ soundEnabled: true, motion: 'system' });
+	let lastAutoArmSummary = $derived(
+		`no_calls=${autoArm.noCalls} auto_pass_chow=${autoArm.autoPassChow}`
+	);
+	let lastPrefsSummary = $derived(
+		`soundEnabled=${clientPrefs.soundEnabled} motion=${clientPrefs.motion}`
+	);
+
+	// Toast demo (this sub-task): a small local queue built from toasts.ts's pure helpers, proving
+	// out queuing/auto-dismiss/manual-dismiss together. Real call sites (reconnect banner, the
+	// lobby's copy-to-clipboard flow) come later with the backend that needs them.
+	let toastQueue = $state<ToastEntry[]>([]);
+	function pushToast(message: string, durationMs?: number): void {
+		toastQueue = [...toastQueue, createToast(message, durationMs)];
+	}
+	function dismissToast(id: number): void {
+		toastQueue = removeToast(toastQueue, id);
+	}
 </script>
 
 <h1>Welcome to SvelteKit</h1>
@@ -252,6 +288,63 @@
 	/>
 </section>
 
+<section>
+	<h2>Chat demo</h2>
+	<p class="hint">
+		Canned-phrase picker only, per docs/02-protocol.md §2 (`chat` is rate-limited; no freeform text
+		box). Sending appends to the scrollback with the current time; no socket involved.
+	</p>
+	<Chat messages={chatMessages} onSend={sendChat} />
+</section>
+
+<section>
+	<h2>Settings demo</h2>
+	<p class="hint">
+		Pre-arm toggles mirror the `auto` message's `no_calls`/`auto_pass_chow` fields
+		(docs/02-protocol.md §2) — no `auto_win`, per that section's "Declining a claim on purpose".
+		Sound/motion are client-only prefs stubbed ahead of the real settings surface.
+	</p>
+	{#if lastAutoArmSummary}
+		<p data-testid="auto-arm-summary">{lastAutoArmSummary}</p>
+	{/if}
+	{#if lastPrefsSummary}
+		<p data-testid="prefs-summary">{lastPrefsSummary}</p>
+	{/if}
+	<Settings
+		{autoArm}
+		prefs={clientPrefs}
+		onAutoArmChange={(next) => {
+			autoArm = next;
+		}}
+		onPrefsChange={(next) => {
+			clientPrefs = next;
+		}}
+	/>
+</section>
+
+<section>
+	<h2>Toast demo</h2>
+	<p class="hint">
+		Generic transient notifications, queued locally with toasts.ts's pure helpers. Auto-dismiss is a
+		one-shot timer per toast (not a JS ticker); dismiss manually with the × button.
+	</p>
+	<div class="toast-controls">
+		<button type="button" onclick={() => pushToast('Reconnecting…')}>Push "Reconnecting…"</button>
+		<button type="button" onclick={() => pushToast('Copied to clipboard', 1500)}>
+			Push "Copied" (1.5s)
+		</button>
+	</div>
+	<div class="toast-stack">
+		{#each toastQueue as toast (toast.id)}
+			<Toast
+				message={toast.message}
+				durationMs={toast.durationMs}
+				onDismiss={() => dismissToast(toast.id)}
+			/>
+		{/each}
+	</div>
+</section>
+
 <style lang="scss">
 	// proves the styles/ partials are usable from a page — not real component styling (M4).
 	@use '$lib/styles/layout';
@@ -296,5 +389,18 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-4);
+	}
+
+	.toast-controls {
+		display: flex;
+		gap: var(--space-3);
+		margin-bottom: var(--space-4);
+	}
+
+	.toast-stack {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		max-width: 20rem;
 	}
 </style>
