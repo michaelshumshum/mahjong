@@ -174,7 +174,14 @@ top of it.
 [02-protocol.md](02-protocol.md) is now enforced, not aspirational.
 
 Build the self-play harness in M1. It finds deadlocks, illegal states, and rules gaps, and
-becomes the bot evaluation harness later.
+becomes the bot evaluation harness later. It runs with `dealer_repeat_on_win`/
+`dealer_repeat_on_draw` off, not `DEFAULT_RULESET` — measured empirically while sizing it,
+`RandomBot` completes a winning hand rarely enough that repeat-on-draw can chain 150+ hands
+before a round rotates, which turns a legitimate slow-converging config into soak-test
+flakiness rather than exercising anything new (the repeat paths already have dedicated unit
+coverage in `test_engine.py`). With repeats off, a game is bounded at exactly 4/8/16 hands for
+EAST_ONLY/EAST_SOUTH/FULL, which is what makes 10,000 games at real bot skill (later
+milestones' `EfficiencyBot`/`FaanBot`) worth re-measuring once they exist.
 
 ## 4. Risks
 
