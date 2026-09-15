@@ -40,6 +40,12 @@ make test-web
 pnpm dev | pnpm build | pnpm lint
 ```
 
+- `typescript` stays pinned to `^6.0.3`; TS7's native/Go compiler is installed alongside as
+  `@typescript/native` (`npm:typescript@^7`) and used only via `svelte-check --tsgo` (wired into
+  `pnpm check`). svelte-check's own CLI hard-requires the plain `typescript` package to resolve to
+  TS6 (`require('typescript')` at its top level, peer range `^5 || ^6`) even in `--tsgo` mode, so
+  TS7 can't be the primary dependency yet — flipping it makes svelte-check refuse to start.
+
 ## Style
 
 - Runes (`$state`, `$derived`, `$effect`), not legacy stores.
