@@ -148,8 +148,11 @@ Win  >  Kong / Pung  >  Chow
    meld; either can come from any seat.
    - **Kong-vs-Pung tiebreak, same tile:** if two players could claim the same discard, one
      as a pung and one as a kong (i.e. one already holds a concealed pair and the other
-     holds a concealed triple), **kong wins**. Only one such claim is possible per discard
-     since a kong claim strictly dominates — there's no seat-order tiebreak needed here.
+     holds a concealed triple), **kong wins**. With 4 copies per tile type (§1) this specific
+     case — a *different* seat holding the pair from the one holding the triple — can't
+     actually arise at the table (see point 5: a kong claim already accounts for all 3
+     copies left after the discard, leaving none for another seat's pair), but the resolver
+     implements the ordering anyway rather than assuming that invariant.
 3. **Chow (上)** is only legal for `claimer_seat == (discarder_seat + 1) % 4` — i.e. the
    next seat in turn order. No other seat may claim a chow on this discard, regardless of
    priority; a chow claim from any other seat is illegal and must be rejected.
@@ -157,11 +160,12 @@ Win  >  Kong / Pung  >  Chow
    order starting from the discarder and going in turn-order — i.e. the smallest
    `(claimer_seat - discarder_seat) % 4` wins. v1 is **always single-winner** (一炮多響 /
    `multi_win` is deferred — see [99-deferred.md](99-deferred.md)).
-5. **Pung/Kong-vs-Pung/Kong tie** (two players can both pung/kong the same discard): cannot
-   happen — a discard has exactly one copy of a given tile type available to claim as
-   pung/kong material beyond what's already in hands, so at most one player can hold the
-   concealed pair/triple needed. Not a real tiebreak case; listed for completeness of the
-   resolution algorithm.
+5. **Pung/Kong-vs-Pung/Kong tie** (two players can both pung and/or kong the same discard,
+   in any combination): cannot happen — with 4 copies per tile type, a discard leaves only 3
+   copies of that type available as pung/kong material beyond what's already in hands, and a
+   kong claim alone consumes all 3. So at most one player can hold enough for a claim at
+   this tier at all, mixed pung-vs-kong (point 2) included. Not a real tiebreak case; listed
+   for completeness of the resolution algorithm.
 
 **Resolution algorithm:** collect all legal claims on a discard during the `AWAIT_CLAIMS`
 window; pick the highest-priority claim type present (win > kong/pung > chow); if multiple
