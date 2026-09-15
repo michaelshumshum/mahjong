@@ -125,6 +125,11 @@ Kong replacements come from the **live wall** (§9) — HK play has no separate 
 kong replacement shrinks the live wall by one tile, so each kong brings the exhaustive draw one
 tile closer.
 
+**Pung vs. kong, same holder.** A player holding 3 concealed matching tiles gets both a pung
+and an exposed-kong option when the 4th is discarded — they may elect the smaller meld. The
+kong-vs-pung tiebreak in §6 is about two *different* players each claiming the same discard
+(one as pung, one as kong), not a restriction on one player's own choice.
+
 ## 6. Claim priority
 
 **Canonical home.** This section is the single source of truth for claim priority,
