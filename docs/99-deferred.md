@@ -443,7 +443,11 @@ currently still require both TypeScript 6 and 7."
 - Before then, if still relying on `--tsgo` in the meantime: re-check its own open bugs —
   `sveltejs/language-tools#3120` (includes more files than expected under `--tsgo`) and `#3095`
   (crashes on Linux/arm64 CI, not repro'd on macOS — our CI runs `ubuntu-latest`/x86_64, so
-  likely not hit, but worth reconfirming before depending on it further).
+  likely not hit, but worth reconfirming before depending on it further). Also found in practice
+  (not filed upstream): `$state<T>(...)`/`$derived<T>(...)`'s explicit generic-argument syntax
+  type-checks fine under plain `tsc` but errors under `--tsgo` in this project — worked around
+  by using `let x: T = $state(...)` annotation style instead of `$state<T>(...)`. Re-check
+  whether this is still needed once revisiting this entry.
 
 **When it lands:** drop the `@typescript/native` alias, bump `typescript` straight to whatever
 TS7.x is current, remove `--tsgo` from `web/package.json`'s `check`/`check:watch` scripts, and
