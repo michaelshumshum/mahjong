@@ -11,6 +11,14 @@ former bare `dict[str, Room]`, which its own docstring already flagged as a stan
 singleton (`_registry` below) -- `RoomRegistry` itself stays an in-process dict per
 docs/00-architecture.md §6, not a new abstraction layer. One `RuleSet` (`DEFAULT_RULESET`) for
 every room -- `?seed=` exists only so tests can pin a room's deal.
+
+**DB wiring + graceful shutdown (a later sub-task).** `_registry` is no longer a fixed
+module-import-time singleton: `reset_registry()` swaps in a fresh `RoomRegistry` (optionally
+carrying a DB session factory) and `app/main.py`'s `lifespan` calls it on every ASGI startup --
+see `reset_registry`'s own docstring for why a fresh instance per startup matters, not just a
+mutated one. `ws_endpoint` itself refuses every new connection once `_registry.draining` is set
+(docs/00-architecture.md §8.1 step 1); `registry()` is the read accessor `/healthz` uses for the
+same flag.
 """
 
 from __future__ import annotations
@@ -20,10 +28,12 @@ import contextlib
 import json
 import time
 import uuid
+from concurrent.futures import Executor
 from typing import Any, Protocol
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, TypeAdapter, ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import protocol as proto
 from app.outbox import BoundedOutbox
@@ -71,6 +81,27 @@ def _now_ms() -> int:
 def get_room(room_id: str) -> Room | None:
     """Test/introspection hook onto the registry -- not part of the wire protocol."""
     return _registry.get(room_id)
+
+
+def registry() -> RoomRegistry:
+    """Accessor for `app/main.py`'s `lifespan` (wiring a DB session factory at startup, running
+    the graceful-shutdown drain at shutdown) and `/healthz` (reading `.draining`)."""
+    return _registry
+
+
+def reset_registry(
+    *,
+    bot_pool: Executor | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+) -> RoomRegistry:
+    """Install a fresh `RoomRegistry` as this module's singleton. `app/main.py`'s `lifespan`
+    calls this on every ASGI startup -- a real process, or one `TestClient(app)` context in
+    tests -- so each server lifetime gets its own registry: `draining` always starts `False`,
+    and a previous lifetime's rooms/background tasks never leak into this one's shutdown drain
+    (docs/00-architecture.md §8.1; see `app/registry.py`'s module docstring)."""
+    global _registry
+    _registry = RoomRegistry(bot_pool=bot_pool, session_factory=session_factory)
+    return _registry
 
 
 def _get_or_create_room(room_id: str, seed: int | None) -> Room:
@@ -372,8 +403,14 @@ class Session:
 
 @router.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket, room: str = "default", seed: int | None = None) -> None:
+    if _registry.draining:
+        # docs/00-architecture.md §8.1 step 1: stop accepting new connections (reconnects
+        # included -- a reconnecting client's own backoff, 02-protocol.md §8, just retries after
+        # the process cycles) once a drain has started. 1013 = "Try Again Later" (RFC 6455).
+        await websocket.close(code=1013)
+        return
     # M0-era stub still applies: no ticket/auth yet (docs/00-architecture.md §2.1, M5 scope) --
-    # accept every connection unconditionally.
+    # accept every other connection unconditionally.
     await websocket.accept()
     room_obj = _get_or_create_room(room, seed)
     session = Session(websocket, room_obj)

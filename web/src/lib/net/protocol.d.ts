@@ -138,6 +138,11 @@ export interface SeatState extends Envelope {
 	d: SeatStatePayload;
 }
 
+export interface ServerShutdown extends Envelope {
+	t: 'server_shutdown';
+	d: ServerShutdownPayload;
+}
+
 export interface Ack extends Envelope {
 	t: 'ack';
 	d: AckPayload;
@@ -305,6 +310,10 @@ export interface SeatStatePayload {
 	status: 'connected' | 'disconnected' | 'autoplay' | 'bot';
 }
 
+export interface ServerShutdownPayload {
+	deadline_ts: number;
+}
+
 export interface AckPayload {
 	id: string;
 	ok: boolean;
@@ -337,6 +346,7 @@ export type ServerEvent =
 	| Score
 	| GameEnd
 	| SeatState
+	| ServerShutdown
 	| Ack;
 
 /** Mirrors protocol.py's AnyMessage — both directions, e.g. for a WS test harness. */
@@ -367,4 +377,5 @@ export type AnyMessage =
 	| Score
 	| GameEnd
 	| SeatState
+	| ServerShutdown
 	| Ack;

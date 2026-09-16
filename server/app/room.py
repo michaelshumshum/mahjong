@@ -46,6 +46,23 @@ happens inside `_apply`, called only from this module's own loop. `join`/`mark_r
 `set_auto` mutate `self.seat_bindings` (not `self.state`) directly from whatever task calls
 them -- safe because they're synchronous with no `await`, so nothing else can interleave on
 this room's event loop between one call's start and its return.
+
+**DB persistence + graceful shutdown (docs/00-architecture.md §6/§8.1, docs/06-ml.md §2's
+`GameRecord`).** `self.actions` accumulates every `Action` this room ever applies via `_apply`
+(never `start_next_hand()` transitions -- those aren't `Action`s and replay reconstructs them
+automatically off `Phase.HAND_OVER`, same convention `bots/selfplay.py`'s `play_game` already
+documents) across the *entire game*, all hands, surviving `start_next_hand()` transitions simply
+because nothing ever resets it -- `Room` is one long-lived object for one game, not recreated
+per hand. On reaching `Phase.GAME_OVER`, `process_one()` calls `save_game_record` (if a
+`session_factory` was wired in at construction -- `None` is a real, supported "no persistence"
+mode, matching every bare `Room()` test that constructs one directly) with `self.actions` and
+`players` taken from each seat's `SeatBinding.session_id` -- the closest thing to a stable
+identity that exists before real auth (M5) ships; a `None` entry means that seat was never
+joined by a human. `_boundary_this_tick`/`_shutdown_boundary` back `wait_for_shutdown_boundary`,
+`app/registry.py`'s `RoomRegistry.begin_shutdown`'s per-room half of the graceful-drain sequence
+(§8.1) -- the boundary-reached event is only ever set *after* an in-flight `GAME_OVER` persist
+finishes, never before, so a drain can't tear down a room (or the process dispose its DB engine)
+while that room's own final write is still in flight.
 """
 
 from __future__ import annotations
@@ -61,6 +78,9 @@ from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.db.records import save_game_record
 from app.idempotency import IdempotencyCache
 from app.views import SeatView, redact_event, seat_view, seat_view_wire
 from bots.worker import compute_action
@@ -296,11 +316,19 @@ class Room:
         *,
         require_ready: bool = False,
         bot_pool: Executor | None = None,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
     ) -> None:
         self.room_id = room_id
         self.inbox: asyncio.Queue[Command | BotResult | _WakeUp] = asyncio.Queue()
         self.state: GameState = new_game(ruleset, game_seed)
         self.event_id = 0  # internal monotonic id: logging/replay only, never on the wire
+        # full-game action log (module docstring's "DB persistence" note) -- every Action _apply
+        # actually runs through reduce(), never start_next_hand() transitions.
+        self.actions: list[Action] = []
+        self._session_factory = session_factory
+        self._persisted = False  # save_game_record fires at most once, even if driven manually
+        self._boundary_this_tick = False  # reset each process_one() tick, set inside _apply
+        self._shutdown_boundary: asyncio.Event | None = None  # see wait_for_shutdown_boundary
         self.seat_seq: list[int] = [0, 0, 0, 0]  # per-seat outbound seq: dense, gapless (D1)
         self.ring: dict[int | str, deque[Envelope]] = {
             seat: deque[Envelope](maxlen=512) for seat in range(4)
@@ -532,6 +560,15 @@ class Room:
         for seat in range(4):
             self.publish_to_seat(seat, dict(wire))
 
+    def broadcast_server_shutdown(self, deadline_ts: int) -> None:
+        """docs/00-architecture.md §8.1 step 2: tell every seat a drain has started -- clients
+        show a "reconnect shortly" banner instead of reading the eventual dropped socket as an
+        error. Called by `app/registry.py`'s `RoomRegistry.begin_shutdown`, once per room that
+        currently has any seat bound, regardless of that seat's live connection status (same
+        "broadcast reaches the ring buffer either way" convention every other broadcast here --
+        `seat_state`, etc. -- already follows)."""
+        self._broadcast_wire({"t": "server_shutdown", "deadline_ts": deadline_ts})
+
     def state_sync_wire(self, seat: int) -> dict[str, Any]:
         """Full redacted snapshot for `seat` (02-protocol.md §3 `state_sync`) -- sent on join,
         and (sub-task 5) on reconnect-with-gap; also what `app/outbox.py`'s backpressure
@@ -607,8 +644,20 @@ class Room:
         the just-rigged `self.state` as "changed" would republish a spurious `turn` nobody
         asked for. `_WakeUp` never itself mutates `self.state` by construction, so it is simply
         never a valid trigger for this check.
+
+        **GAME_OVER persistence + shutdown-boundary signal (module docstring).** Both live at
+        this tail, after everything else this tick did: `_boundary_this_tick` is reset here (not
+        at the top of the *next* call) so it only ever reflects *this* tick's own work, and the
+        GAME_OVER persist -- if a `session_factory` was wired in, and only once ever
+        (`_persisted`) -- is awaited to completion *before* `self._shutdown_boundary` (if a
+        `wait_for_shutdown_boundary` caller is actually waiting on one) is signalled. That
+        ordering is load-bearing, not incidental: `app/registry.py`'s `RoomRegistry.begin_shutdown`
+        disposes the DB engine only after every room's drain wait resolves, so a drain that woke
+        up *before* this room's own final write finished could tear down/dispose the engine out
+        from under an in-flight `session.commit()`.
         """
         pre_state = self.state
+        self._boundary_this_tick = False
         event = await self._next()
         if isinstance(event, Command):
             self._handle(event)
@@ -623,6 +672,11 @@ class Room:
         if not isinstance(event, _WakeUp) and self.state is not pre_state:
             self._publish_turn_if_active()
         self._poke_bots()
+        if self.state.phase == Phase.GAME_OVER and not self._persisted:
+            self._persisted = True
+            await self._persist_game_record()
+        if self._boundary_this_tick and self._shutdown_boundary is not None:
+            self._shutdown_boundary.set()
 
     async def _inbox_getter(self) -> Command | BotResult | _WakeUp:
         return await self.inbox.get()
@@ -879,6 +933,7 @@ class Room:
         `start_next_hand()` on `HAND_OVER` -- the common tail shared by a real `Command`
         (`_handle`), a synthesized claim-timeout `Pass` (`_handle_claim_timeout`), and a
         pre-armed auto-pass (`_send_claim_offers`)."""
+        self.actions.append(action)  # full-game log (module docstring) -- reduce()-bound only
         self.state, events = reduce(self.state, action)
         self.event_id += 1
         self._publish(events)
@@ -889,6 +944,10 @@ class Room:
             self.state, more_events = start_next_hand(self.state)
             self.event_id += 1
             self._publish(more_events)
+            # a hand boundary -- the next hand dealt, or the game ended -- either way
+            # `process_one()`'s tail is what actually wakes a pending `wait_for_shutdown_boundary`
+            # (only after any GAME_OVER persist below has actually finished, never before).
+            self._boundary_this_tick = True
             if self.state.phase == Phase.AWAIT_ACTION:
                 # start_next_hand() deals the next hand with no Event of its own (state.py/
                 # engine.py: `new_game`/`_deal_hand` build state directly, not through
@@ -1117,3 +1176,43 @@ class Room:
                 self._broadcast_wire(
                     {"t": "score", "totals": {s: self.state.seats[s].score for s in range(4)}}
                 )
+
+    async def _persist_game_record(self) -> None:
+        """`Phase.GAME_OVER` persistence (docs/06-ml.md §2, docs/00-architecture.md §6) -- a
+        no-op if this `Room` was never given a `session_factory` (every bare `Room()` test, and
+        any deployment with no `DATABASE_URL`, app/main.py's `lifespan`). `players` is each
+        seat's `SeatBinding.session_id` -- the closest thing to a stable per-seat identity that
+        exists before real auth ships (M5); `None` for a seat nobody ever joined. Only ever
+        called once, from `process_one()`'s own tail (`self._persisted` guards a second call)."""
+        if self._session_factory is None:
+            return
+        players = [b.session_id if b is not None else None for b in self.seat_bindings]
+        async with self._session_factory() as session:
+            await save_game_record(session, self.state, self.actions, players=players)
+
+    async def wait_for_shutdown_boundary(self, timeout: float) -> bool:
+        """docs/00-architecture.md §8.1 steps 3-5: block until this room reaches a hand boundary
+        -- a fresh hand dealt, or the game ends (`_boundary_this_tick`, set inside `_apply`) --
+        or `timeout` seconds elapse, whichever is first. Returns whether a boundary was actually
+        reached; `False` means the grace window elapsed first and the caller
+        (`app/registry.py`'s `RoomRegistry.begin_shutdown`) abandons this room, same as a crash,
+        but warned.
+
+        Already-finished rooms return `True` immediately with no event/wait at all -- nothing
+        left to abandon. Otherwise a *fresh* `asyncio.Event` is installed for the duration of
+        this call (not a long-lived one reused across calls): reusing one risks a stale `.set()`
+        from a boundary that happened *before* this particular drain started being mistaken for
+        "the boundary this drain is waiting for." See `process_one()`'s own docstring for why
+        the GAME_OVER case's signal is guaranteed to fire only after that game's own
+        `save_game_record` write has actually finished, not before.
+        """
+        if self.state.phase == Phase.GAME_OVER:
+            return True
+        self._shutdown_boundary = asyncio.Event()
+        try:
+            await asyncio.wait_for(self._shutdown_boundary.wait(), timeout=timeout)
+            return True
+        except TimeoutError:
+            return False
+        finally:
+            self._shutdown_boundary = None

@@ -121,6 +121,7 @@ sub-tasks actually implemented them; reconciled here to what ships rather than l
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
 | `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay` |
+| `server_shutdown` | `{deadline_ts}` | broadcast once, to every seat ever bound in the room, when a graceful-shutdown drain starts (`00-architecture.md §8.1`); `deadline_ts` is the shared grace-window deadline every room in the drain gets. Clients show a "reconnect shortly" banner instead of reading the eventual dropped socket as an error |
 | `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Room` silently drops a well-formed but currently-illegal command the same as before this existed |
 | `error` | `{code, message}` |
 | `pong` | `{t0, t1}` |

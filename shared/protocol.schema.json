@@ -2134,6 +2134,75 @@
       "title": "SeatStatePayload",
       "type": "object"
     },
+    "ServerShutdown": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "server_shutdown",
+          "default": "server_shutdown",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ServerShutdownPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "ServerShutdown",
+      "type": "object"
+    },
+    "ServerShutdownPayload": {
+      "additionalProperties": false,
+      "description": "docs/00-architecture.md \u00a78.1 step 2 -- broadcast once a graceful-shutdown drain starts,\nso clients can show a \"reconnect shortly\" banner instead of reading the eventual dropped\nsocket as an error. `deadline_ts` is the same bounded grace window every room in this drain\nshares (server epoch ms, same convention as every other `deadline_ts` on the wire).",
+      "properties": {
+        "deadline_ts": {
+          "title": "Deadline Ts",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deadline_ts"
+      ],
+      "title": "ServerShutdownPayload",
+      "type": "object"
+    },
     "StateSync": {
       "additionalProperties": false,
       "properties": {
@@ -2496,6 +2565,7 @@
           "pong": "#/$defs/Pong",
           "score": "#/$defs/Score",
           "seat_state": "#/$defs/SeatState",
+          "server_shutdown": "#/$defs/ServerShutdown",
           "state_sync": "#/$defs/StateSync",
           "turn": "#/$defs/Turn"
         },
@@ -2552,6 +2622,9 @@
         },
         {
           "$ref": "#/$defs/SeatState"
+        },
+        {
+          "$ref": "#/$defs/ServerShutdown"
         },
         {
           "$ref": "#/$defs/Ack"

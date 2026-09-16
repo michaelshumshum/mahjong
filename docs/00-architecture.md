@@ -486,6 +486,25 @@ is **not** evicted — reconnecting after the game ends is still a supported, sy
 size a real eviction from. Full room eviction (freeing a long-dead finished game's memory) stays
 a real, open gap, narrower now than the "no eviction, no capacity limit" it replaces.
 
+**Real-game Postgres persistence (a later M3 sub-task).** M1 only wired `save_game_record` up to
+`bots/selfplay.py`'s bot-only self-play loop; a `Room`-driven game (real humans, or bot handover
+mid-game) had no path to it at all -- `Room` tracked no action log and had no DB dependency.
+Closed by giving `Room` a full-game `self.actions: list[Action]` (every `Action` that actually
+ran through `reduce()`, appended in `_apply` -- never a `start_next_hand()` transition, which
+isn't an `Action`; replay reconstructs those automatically off `Phase.HAND_OVER`, the same
+convention `bots/selfplay.py`'s `play_game` docstring already states) and an optional
+`session_factory: async_sessionmaker[AsyncSession] | None` threaded through `Room.__init__` /
+`RoomRegistry.__init__` / `RoomRegistry.get_or_create`. `app/main.py`'s `lifespan` builds the
+real engine/session factory from a `DATABASE_URL` env var (unset -> no persistence, matching
+every bare `Room()`/`RoomRegistry()` construction that predates this) and installs it into a
+fresh `RoomRegistry` via `app/ws.py`'s `reset_registry()` on every ASGI startup -- "fresh", not a
+mutated eternal singleton, matters for the shutdown-drain state below (§8.1). On
+`Phase.GAME_OVER`, `Room.process_one()` calls `save_game_record` at most once with the
+accumulated `self.actions` and `players` taken from each seat's `SeatBinding.session_id` -- the
+closest thing to a stable per-seat identity that exists before real auth ships (M5); a real
+`players` identity (an account id, not a per-connection session id) is M5 scope, not invented
+here.
+
 ## 7. Scaling path
 
 **Stage 1 — one process (v1, this doc's scope).** In-memory rooms, Postgres for durable records
@@ -543,6 +562,28 @@ instead of trying to survive past one:
 
 This turns "every deploy kills every live table" into "every deploy costs at most the tail of one
 hand per table, with warning," without requiring the mid-game durability that §7 defers.
+
+**Implemented (a later M3 sub-task).** `app/registry.py`'s `RoomRegistry.begin_shutdown` is
+steps 2-5: it sets `.draining` (read by `app/ws.py`'s connection accept -- new connections,
+reconnects included, get closed with code 1013 "try again later" rather than accepted -- and by
+`/healthz`, which serves `503 {"status":"draining"}` once it's set), broadcasts a new
+`server_shutdown{deadline_ts}` event (`app/protocol.py`) to every room with a seat ever bound,
+then waits on each such room's own `Room.wait_for_shutdown_boundary` *concurrently*
+(`asyncio.gather`, not a loop of sequential awaits) so the total wall-clock cost is the grace
+window once, not once per room. A room that never reaches a boundary is logged as abandoned, not
+force-torn-down by this call itself -- the process exiting afterward is what actually ends it,
+same "abandoned, same as a crash, but warned" story, not a second teardown path.
+
+`app/main.py`'s `lifespan` is the hook: the drain runs in the code after `yield`, which uvicorn's
+default SIGTERM handling resumes into (verified against a real `uvicorn.run()` process sent a
+real SIGTERM, not assumed — see that module's own docstring). The grace window defaults to 90s,
+tunable via a `SHUTDOWN_GRACE_SECONDS` env var rather than a `RuleSet` field, since it's a
+process-level shutdown parameter, not a per-game rule. One real consequence of hooking the
+*generic* ASGI shutdown phase rather than a SIGTERM-specific handler: a `TestClient(app)`
+context exiting runs this exact same drain code, which is why `server/tests/conftest.py` pins
+`SHUTDOWN_GRACE_SECONDS=0` for the whole test session (the usual test-time-control pattern this
+codebase already uses elsewhere, e.g. `disconnect_grace_seconds=0`, applied via env var here
+since this parameter lives outside any single game's `RuleSet`).
 
 ## 9. Anti-cheat
 

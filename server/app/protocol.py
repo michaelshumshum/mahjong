@@ -327,6 +327,17 @@ class SeatStatePayload(BaseModel):
     status: Literal["connected", "disconnected", "autoplay", "bot"]
 
 
+class ServerShutdownPayload(BaseModel):
+    """docs/00-architecture.md §8.1 step 2 -- broadcast once a graceful-shutdown drain starts,
+    so clients can show a "reconnect shortly" banner instead of reading the eventual dropped
+    socket as an error. `deadline_ts` is the same bounded grace window every room in this drain
+    shares (server epoch ms, same convention as every other `deadline_ts` on the wire)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    deadline_ts: int
+
+
 class AckPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -410,6 +421,11 @@ class SeatState(Envelope):
     d: SeatStatePayload
 
 
+class ServerShutdown(Envelope):
+    t: Literal["server_shutdown"] = "server_shutdown"
+    d: ServerShutdownPayload
+
+
 class Ack(Envelope):
     t: Literal["ack"] = "ack"
     d: AckPayload
@@ -437,6 +453,7 @@ ServerMessage = Annotated[
     | Score
     | GameEnd
     | SeatState
+    | ServerShutdown
     | Ack,
     Field(discriminator="t"),
 ]

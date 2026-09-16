@@ -113,6 +113,11 @@ persistence of finished games.
 resumes correctly from `last_seq`; `test_redaction` proves no seat ever receives a tile identity
 it isn't entitled to.
 
+Postgres persistence of finished `Room`-driven games (not just M1's bot-only self-play) and the
+graceful-shutdown drain (`00-architecture.md §6`/`§8.1`) are both implemented as of a later M3
+sub-task -- see those sections for what landed. The milestone's own "four scripted WS clients
+play a full game" done-when gate is a separate, later closeout sub-task, not covered by either.
+
 ### M4 — Playable client + bots (6–10 weeks)
 Lobby, table route, DOM/CSS table scene, inline-SVG tile faces, hand/pool/meld rendering,
 draw-discard-claim animations, claim buttons, timer ring, hand-end faan breakdown, score sheet.

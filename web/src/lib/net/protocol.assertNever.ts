@@ -44,6 +44,8 @@ export function _assertExhaustive(e: ServerEvent): void {
 			return;
 		case 'seat_state':
 			return;
+		case 'server_shutdown':
+			return;
 		case 'ack':
 			return;
 		default:
