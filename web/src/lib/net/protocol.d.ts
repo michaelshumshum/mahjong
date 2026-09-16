@@ -146,6 +146,7 @@ export interface Ack extends Envelope {
 export interface HelloPayload {
 	last_seq?: number | null;
 	client_version: string;
+	seat?: number | null;
 }
 
 export interface PingPayload {

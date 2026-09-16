@@ -40,6 +40,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import heapq
+import itertools
 import time
 from collections import deque
 from collections.abc import Callable
@@ -61,6 +62,7 @@ __all__ = [
     "Room",
     "RoomFullError",
     "SeatBinding",
+    "SeatNotBoundError",
     "SeatTakenError",
     "TimerHeap",
 ]
@@ -88,6 +90,17 @@ class SeatTakenError(Exception):
 class RoomFullError(Exception):
     """Raised by `Room.join(seat=None)` when every seat is bound (wire
     `error{code:'room_full'}`)."""
+
+
+class SeatNotBoundError(Exception):
+    """Raised by `Room.reconnect(seat, ...)` when nothing has ever `join`ed this seat -- there
+    is no `SeatBinding` to reclaim (wire `error{code:'no_such_seat'}`, `app/ws.py`). Distinct
+    from `SeatTakenError`: that one fires on `join` finding a seat *already* bound; this one
+    fires on `hello{last_seq, seat}` finding a seat *never* bound."""
+
+    def __init__(self, seat: int) -> None:
+        super().__init__(f"seat {seat} has never been joined")
+        self.seat = seat
 
 
 @dataclass
@@ -141,19 +154,28 @@ class Envelope:
 
 class TimerHeap:
     """Deadline heap keyed by `(deadline_ts, id)` (00-architecture.md §3 D17). Scoped to
-    claim-window deadlines only for this sub-task -- per-seat turn clocks and bot budgets have
-    no driver yet (no client/WS layer exists to run a turn clock against; that's M3 sub-task
-    4+ territory) and half-building that machinery now would just be dead code. `id` is the
-    claim window's own `window_id` (`mahjong_core.state.ClaimWindow`, already a room-global
-    monotonic counter via `GameState.next_window_id`), so no separate id generator is needed
-    here.
+    claim-window deadlines only -- per-seat turn clocks and bot budgets have no driver yet (no
+    timeout *enforcement* exists for either) and half-building that machinery now would just be
+    dead code.
 
-    Lazy deletion: resolving a window early doesn't remove its heap entry -- the entry is left
-    in place and the caller (`Room._handle_claim_timeout`) checks the popped `window_id`
-    against whatever window is actually current when it fires. A claim window resolving before
-    its deadline is the *normal* case (early exit, 00-architecture.md §4), not an edge case, so
-    every popped id has to be staleness-checked regardless of whether removal-on-resolve
-    existed -- eager removal would only save a few stale heap entries, not remove the check.
+    **`id` is a private per-seat timer id (M3 sub-task 5), not the window's own `window_id`.**
+    Sub-task 3 armed exactly one heap entry per claim window, shared by every offered seat, and
+    used `window_id` as the heap id directly -- correct as long as every offered seat's deadline
+    was always identical. Reconnect (docs/00-architecture.md §8's "mid-claim-window" row) breaks
+    that assumption: one seat's deadline can move (re-armed to a fresh window on reconnect)
+    without touching another's, so each offered seat needs its *own* heap entry. `Room` now
+    hands out a fresh id per seat-arm (`_claim_timer_seq`) and keeps `_timer_seat`/
+    `_active_seat_timer` to map an id back to `(window_id, seat)` and to tell a superseded
+    (re-armed-away) entry from the one that's actually still live for that seat -- see
+    `_arm_seat_claim_timer`/`_handle_claim_timeout`.
+
+    Lazy deletion: resolving a window (or re-arming one seat's entry) early doesn't remove the
+    superseded heap entry -- it's left in place and the caller (`Room._handle_claim_timeout`)
+    checks the popped id against whatever is actually current when it fires. A claim window
+    resolving before its deadline is the *normal* case (early exit, 00-architecture.md §4), not
+    an edge case, so every popped id has to be staleness-checked regardless of whether
+    removal-on-resolve existed -- eager removal would only save a few stale heap entries, not
+    remove the check.
     """
 
     def __init__(self) -> None:
@@ -195,7 +217,12 @@ class Room:
         self.deadlines = TimerHeap()  # claim window deadlines only (D17) -- see module docstring
         self._getter: asyncio.Task[Command] | None = None  # long-lived, never cancelled (D17)
         self._armed_window_id: int | None = None  # last claim_window.window_id given a deadline
-        self._claim_deadline_ms: dict[int, int] = {}  # window_id -> epoch-ms deadline, wire-facing
+        # per-seat TimerHeap ids (see TimerHeap docstring)
+        self._claim_timer_seq = itertools.count(1)
+        self._timer_seat: dict[int, tuple[int, int]] = {}  # timer id -> (window_id, seat)
+        # (window_id, seat) -> the timer id that's actually live for it right now
+        self._active_seat_timer: dict[tuple[int, int], int] = {}
+        self._claim_deadline_ms: dict[tuple[int, int], int] = {}  # (window_id, seat) -> deadline_ts
 
         # docs/02-protocol.md §2 "Seat assignment": `require_ready=True` (app/ws.py's real
         # rooms) gates every command on all four seats joining and `ready`-ing before the room
@@ -270,6 +297,61 @@ class Room:
         if auto_pass_chow is not None:
             binding.auto_pass_chow = auto_pass_chow
 
+    # --- reconnect / resync (docs/02-protocol.md §5, docs/00-architecture.md §8) -----------
+
+    def reconnect(
+        self, seat: int, session_id: str, send: Callable[[int, dict[str, Any]], None]
+    ) -> None:
+        """Rebind an already-bound seat's live connection to a fresh socket
+        (02-protocol.md §2: "hello{last_seq} on an already-bound seat reclaims it directly").
+        Unlike `join`, this never constructs a new `SeatBinding` -- `ready`/pre-arm toggles and
+        the per-seat `IdempotencyCache` (02-protocol.md §1: "survives reconnect... the seat's id
+        history") all live on the binding that already exists, so only the live-socket half
+        (`session_id`/`send`) is swapped. Raises `SeatNotBoundError` if nothing has ever joined
+        this seat -- there's no binding to reclaim; the caller should `join` instead.
+        """
+        binding = self.seat_bindings[seat]
+        if binding is None:
+            raise SeatNotBoundError(seat)
+        binding.session_id = session_id
+        binding.send = send
+
+    def resume(self, seat: int, last_seq: int | None) -> None:
+        """The three-way `hello{last_seq}` branch (02-protocol.md §5) for a seat that just
+        called `reconnect()`, compared against *this seat's own* `ring`/`seat_seq` (never the
+        room-global `event_id`, D1):
+
+        - `last_seq == head` -- nothing missed, resume live: no replay.
+        - `last_seq` still in the 512-entry ring -- replay exactly the envelopes after it,
+          already-redacted, exactly as originally sent (never re-redacted against `self.state`,
+          which has moved on -- 02-protocol.md §5's own rationale for why the ring stores
+          post-redaction frames).
+        - otherwise (evicted from the ring, or no real `last_seq` at all) -- a full
+          `state_sync`, same as `join`.
+
+        Also re-arms this seat's own claim-window deadline first if it holds a live, unresolved
+        offer (00-architecture.md §8's "mid-claim-window" reconnect row) -- done before the
+        branch above so a `state_sync` picks up the fresh deadline in the same round trip; the
+        live/replay branches instead follow up with one fresh `claim_offer` carrying the new
+        deadline, since a replayed frame is history and must not be mutated in place.
+        """
+        rearmed = self._rearm_seat_claim_timer(seat)
+        head = self.seat_seq[seat] - 1  # last seq actually sent, or -1 if this seat never got one
+        ring = self.ring[seat]
+        if last_seq is not None and last_seq == head:
+            pass  # nothing missed
+        elif last_seq is not None and ring and ring[0].seq <= last_seq < head:
+            binding = self.seat_bindings[seat]
+            assert binding is not None  # reconnect() above already required a bound seat
+            for env in ring:
+                if env.seq > last_seq:
+                    binding.send(env.seq, dict(env.event))
+        else:
+            self.publish_to_seat(seat, self.state_sync_wire(seat))
+            return  # state_sync already carries any fresh deadline_ts -- nothing further to send
+        if rearmed:
+            self._send_seat_claim_offer(seat)
+
     # --- wire fan-out ------------------------------------------------------------------
 
     def publish_to_seat(self, seat: int, wire: dict[str, Any]) -> None:
@@ -294,7 +376,9 @@ class Room:
         and (sub-task 5) on reconnect-with-gap; also what `app/outbox.py`'s backpressure
         collapse resyncs to when a connection falls behind (§9)."""
         window = self.state.claim_window
-        claim_deadline_ts = self._claim_deadline_ms.get(window.window_id) if window else None
+        claim_deadline_ts = (
+            self._claim_deadline_ms.get((window.window_id, seat)) if window else None
+        )
         view = seat_view(self.state, seat, claim_deadline_ts=claim_deadline_ts)
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
@@ -306,20 +390,27 @@ class Room:
             await self.process_one()
 
     async def process_one(self) -> None:
-        """Handle exactly one event: the next inbox `Command`, or a claim-window deadline
-        expiry, whichever the event loop resolves first (`_next()`). Split out from `run()` so
-        a test can drive the room one event at a time without a real background task racing
-        it. `turn` is only (re-)published when this cycle actually mutated `self.state` --
-        an illegal/dropped command (or a stale, already-resolved claim timeout) leaves `state`
-        as the exact same object (`_authorize`/`_handle_claim_timeout`'s own no-op paths never
-        call `_apply`), and must not re-stamp a fresh `seq` onto every seat's stream for a turn
-        prompt nothing about actually changed."""
+        """Handle exactly one event: the next inbox `Command`, or every claim-window per-seat
+        timer that's expired, whichever the event loop resolves first (`_next()`). Split out
+        from `run()` so a test can drive the room one event at a time without a real background
+        task racing it. `turn` is only (re-)published when this cycle actually mutated
+        `self.state` -- an illegal/dropped command (or a stale, already-resolved/superseded
+        claim timeout) leaves `state` as the exact same object (`_authorize`/
+        `_handle_claim_timeout`'s own no-op paths never call `_apply`), and must not re-stamp a
+        fresh `seq` onto every seat's stream for a turn prompt nothing about actually changed.
+
+        A single `_next()` call can return *several* expired timer ids at once (every offered
+        seat is armed with its own heap entry now, M3 sub-task 5 -- see `TimerHeap`'s
+        docstring), so all of them get processed in this one tick, same as the single shared
+        entry sub-task 3 built handled every offer inline in one `_handle_claim_timeout` call.
+        """
         pre_state = self.state
         event = await self._next()
         if isinstance(event, Command):
             self._handle(event)
         else:
-            self._handle_claim_timeout(event)  # event is the expired window_id
+            for timer_id in event:
+                self._handle_claim_timeout(timer_id)
         self._arm_claim_timer()
         if self.state is not pre_state:
             self._publish_turn_if_active()
@@ -332,7 +423,7 @@ class Room:
             self._getter = asyncio.create_task(self._inbox_getter())
         return self._getter
 
-    async def _next(self) -> Command | int:
+    async def _next(self) -> Command | list[int]:
         """00-architecture.md §3 D17: one long-lived `_inbox_getter()` task for the room's
         entire lifetime, raced against a sleep to `self.deadlines`' soonest entry via
         `asyncio.wait(..., return_when=FIRST_COMPLETED)` -- the getter is *never* cancelled,
@@ -366,7 +457,7 @@ class Room:
 
             expired = self.deadlines.pop_expired(loop.time())
             if expired:
-                return expired[0]
+                return expired  # every id due this tick -- process_one() handles all of them
             # spurious wakeup (shouldn't happen -- loop back and recompute the next deadline)
 
     def _authorize(self, cmd: Command) -> Action | None:
@@ -393,26 +484,38 @@ class Room:
             return  # illegal command: dropped silently, state and ring buffers untouched
         self._apply(action)
 
-    def _handle_claim_timeout(self, window_id: int) -> None:
-        """A claim-window deadline popped off `self.deadlines`. No-op if stale -- the window it
-        was armed for already resolved (early exit or a prior timeout) and `self.state` has
-        moved on, same staleness discipline `window_id` gets everywhere else (00-architecture.md
-        §4: "claims tagged with a stale window are dropped silently"). Otherwise, every offered
-        seat that hasn't responded yet is treated as `Pass` (claims.py's own documented
-        convention) and fed through the same `reduce()` -> `_apply_claim_response` ->
-        `resolve_claims` path a real response uses -- `_apply_claim_response` resolves inline
-        the moment the window is ready, exactly like early exit, so this loop and a human's own
-        early exit share one resolution path start to finish."""
+    def _handle_claim_timeout(self, timer_id: int) -> None:
+        """One per-seat claim-window timer id popped off `self.deadlines` (`_timer_seat` maps
+        it back to `(window_id, seat)` -- M3 sub-task 5 moved from one shared heap entry per
+        window to one per offered seat; see `TimerHeap`'s docstring for why). No-op if stale:
+
+        - unknown id (already handled and dropped from `_timer_seat` -- doesn't happen today
+          since entries are never actively evicted, kept for defensiveness),
+        - the window it was armed for already resolved (early exit or a prior timeout) and
+          `self.state` has moved on (00-architecture.md §4: "claims tagged with a stale window
+          are dropped silently"),
+        - **or this id has been superseded** -- `_active_seat_timer[(window_id, seat)]` no
+          longer points at it, meaning a reconnect re-armed this seat's deadline to a later one
+          (`_rearm_seat_claim_timer`) and this is the original, now-stale entry left behind by
+          lazy deletion. Without this check a reconnecting seat's *old* deadline would still
+          fire and auto-Pass them right out from under the fresh window they were just given.
+
+        Otherwise this seat is treated as `Pass` (claims.py's own documented convention) and fed
+        through the same `reduce()` -> `_apply_claim_response` -> `resolve_claims` path a real
+        response uses -- resolved inline the moment the window is ready, exactly like early
+        exit and a real response."""
+        target = self._timer_seat.get(timer_id)
+        if target is None:
+            return
+        window_id, seat = target
         window = self.state.claim_window
         if window is None or window.window_id != window_id:
             return
-        for offer in window.offers:
-            current = self.state.claim_window
-            if current is None or current.window_id != window_id:
-                return  # resolved partway through (e.g. the second-to-last Pass closed it early)
-            if offer.seat in current.responses:
-                continue
-            self._apply(Pass(window_id=window_id, seat=offer.seat))
+        if self._active_seat_timer.get((window_id, seat)) != timer_id:
+            return
+        if seat in window.responses:
+            return
+        self._apply(Pass(window_id=window_id, seat=seat))
 
     def _apply(self, action: Action) -> None:
         """Run one already-authorized `Action` through `reduce()`, publish, and chain into
@@ -446,26 +549,73 @@ class Room:
         getting a fresh (and later) deadline each time. Duration is `ruleset.claim_seconds`
         (`mahjong_core/config.py`) -- already real config, not a placeholder.
 
+        Arms one heap entry per offered seat (`_arm_seat_claim_timer`), not one shared entry
+        for the whole window -- see `TimerHeap`'s docstring for why M3 sub-task 5 needed that
+        split (a reconnecting seat's deadline has to be movable without touching anyone else's).
+
         Also the one place `claim_offer` gets sent (`_send_claim_offers`): the wire message has
         no backing `Event` either (same "no EventKind" gap as hand_start/deal above), and needs
-        the real deadline this method just computed anyway, so folding both into one idempotent,
+        the real deadlines this method just armed anyway, so folding both into one idempotent,
         once-per-window call avoids a second `_armed_window_id`-shaped tracker.
         """
         window = self.state.claim_window
         if window is None or window.window_id == self._armed_window_id:
             return
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + self.state.ruleset.claim_seconds
-        self.deadlines.add(deadline, window.window_id)
         self._armed_window_id = window.window_id
-        # `TimerHeap`/`deadline` are monotonic loop time (D17); the wire needs server epoch ms
-        # (02-protocol.md §4/§1's `ts`) -- converted once, here, via the (constant, within one
-        # `_arm_claim_timer` call) offset between the two clocks.
-        deadline_ms = _now_ms() + round((deadline - loop.time()) * 1000)
-        self._claim_deadline_ms[window.window_id] = deadline_ms
-        self._send_claim_offers(window, deadline_ms)
+        for offer in window.offers:
+            self._arm_seat_claim_timer(window.window_id, offer.seat)
+        self._send_claim_offers(window)
 
-    def _send_claim_offers(self, window: ClaimWindow, deadline_ms: int) -> None:
+    def _arm_seat_claim_timer(self, window_id: int, seat: int) -> None:
+        """Give `seat` its own fresh `TimerHeap` entry for `window_id`, a full
+        `ruleset.claim_seconds` from right now -- the one primitive both the initial window-open
+        arm (`_arm_claim_timer`, every offered seat at once) and a mid-window reconnect re-arm
+        (`_rearm_seat_claim_timer`, one seat only) go through. Recorded in `_timer_seat` (id ->
+        `(window_id, seat)`) and `_active_seat_timer` (`(window_id, seat)` -> the id that's
+        actually current) so `_handle_claim_timeout` can tell a superseded entry from a live
+        one -- see that method's docstring."""
+        loop = asyncio.get_running_loop()
+        duration = self.state.ruleset.claim_seconds
+        deadline = loop.time() + duration
+        timer_id = next(self._claim_timer_seq)
+        self.deadlines.add(deadline, timer_id)
+        self._timer_seat[timer_id] = (window_id, seat)
+        self._active_seat_timer[(window_id, seat)] = timer_id
+        # `TimerHeap`/`deadline` are monotonic loop time (D17); the wire needs server epoch ms
+        # (02-protocol.md §4/§1's `ts`) -- `duration` converts directly since it's already the
+        # real elapsed span from "now" in both clocks.
+        self._claim_deadline_ms[(window_id, seat)] = _now_ms() + round(duration * 1000)
+
+    def _rearm_seat_claim_timer(self, seat: int) -> bool:
+        """docs/00-architecture.md §8, "mid-claim-window" reconnect row: if `seat` holds a
+        live, unresolved claim offer, give it a fresh full-length window measured from right
+        now (`_arm_seat_claim_timer`, same duration as everyone else) -- every other offered
+        seat's deadline is untouched, since each has its own heap entry. Returns whether a
+        re-arm actually happened, so `resume()` knows whether to also push a fresh
+        `claim_offer` reflecting it. No-op (`False`) if there's no live window, this seat has
+        no offer in it, or it already responded.
+
+        **"sized for a bot answering in milliseconds" (00-architecture.md §8):** bot handover
+        doesn't exist yet (M3 sub-task 6) -- every offered seat, human or not, is armed with
+        the same `ruleset.claim_seconds` human-length window today (`_arm_claim_timer`), so
+        there is no shorter bot deadline in this codebase that could have been "sized" small in
+        the first place. Interpreted literally anyway, since the mechanism itself is useful
+        regardless of bots: without it, a seat that disconnects partway through its window and
+        reconnects late gets only whatever sliver of the *original* deadline is left, not a
+        fair chance to respond. Re-arming to a fresh full window from the reconnect moment
+        fixes that today, and keeps doing the right thing once sub-task 6 gives bots their own
+        (shorter) initial arm -- this re-arm always wins over whatever the seat was offered
+        before, bot-speed or not.
+        """
+        window = self.state.claim_window
+        if window is None or seat in window.responses:
+            return False
+        if not any(o.seat == seat for o in window.offers):
+            return False
+        self._arm_seat_claim_timer(window.window_id, seat)
+        return True
+
+    def _send_claim_offers(self, window: ClaimWindow) -> None:
         """Unicast `claim_offer` to every offered seat (02-protocol.md §3) -- except a seat
         whose pre-arm toggle (`auto`, §2) already decided this offer: `no_calls`, or
         `auto_pass_chow` when every option on offer is a chow. A win-eligible offer is *never*
@@ -490,15 +640,25 @@ class Room:
             ):
                 self._apply(Pass(window_id=window.window_id, seat=offer.seat))
                 continue
-            self.publish_to_seat(
-                offer.seat,
-                {
-                    "t": "claim_offer",
-                    "window_id": window.window_id,
-                    "options": self._claim_options_wire(offer),
-                    "deadline_ts": deadline_ms,
-                },
-            )
+            self._send_seat_claim_offer(offer.seat)
+
+    def _send_seat_claim_offer(self, seat: int) -> None:
+        """The actual `claim_offer` unicast for one seat, reading its deadline back out of
+        `_claim_deadline_ms` -- shared by `_send_claim_offers` (every offered seat, window-open
+        time) and `resume()` (one seat, after a mid-window reconnect re-arm). Requires a live
+        offer for `seat` and a deadline already armed for it (both callers guarantee this)."""
+        window = self.state.claim_window
+        assert window is not None
+        offer = next(o for o in window.offers if o.seat == seat)
+        self.publish_to_seat(
+            seat,
+            {
+                "t": "claim_offer",
+                "window_id": window.window_id,
+                "options": self._claim_options_wire(offer),
+                "deadline_ts": self._claim_deadline_ms[(window.window_id, seat)],
+            },
+        )
 
     @staticmethod
     def _claim_options_wire(offer: ClaimOffer) -> list[dict[str, Any]]:

@@ -42,6 +42,10 @@ class HelloPayload(BaseModel):
 
     last_seq: int | None = None
     client_version: str
+    # reconnect target on an already-bound seat (02-protocol.md §2/§5) -- stands in for the seat
+    # identity a real auth ticket would carry until 00-architecture.md §2.1's ticket flow exists
+    # (M5). Omit for a fresh connection awaiting `join`, unchanged M0 behavior.
+    seat: int | None = None
 
 
 class PingPayload(BaseModel):

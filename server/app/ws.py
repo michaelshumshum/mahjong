@@ -27,7 +27,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app import protocol as proto
 from app.outbox import BoundedOutbox
-from app.room import Room, RoomFullError, SeatTakenError
+from app.room import Room, RoomFullError, SeatNotBoundError, SeatTakenError
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -182,14 +182,15 @@ class Session:
     # --- dispatch --------------------------------------------------------------------------
 
     async def handle(self, message: object) -> None:
-        """`hello`/`ping` are handled exactly as M0 did -- a connection-local `pong`, no `ack`,
-        no per-seat `seq` -- since neither is one of the gameplay intents this sub-task's
+        """`ping` is handled exactly as M0 did -- a connection-local `pong`, no `ack`, no
+        per-seat `seq` -- since it isn't one of the gameplay intents this sub-task's
         `ack`/idempotency contract covers (02-protocol.md §1's `ack` line: "client->server
         intents carrying an id"; the M0 test suite's `ping` already carries an `id` and expects
-        a bare `pong`, not an `ack`, so unifying the two heartbeat messages onto the per-seat
-        stream is left to whichever later sub-task actually builds real liveness/reconnect
-        handling against it, rather than changed incidentally here)."""
+        a bare `pong`, not an `ack`, so unifying it onto the per-seat stream is left to whoever
+        needs it). `hello` with no `seat` is the same M0 no-op preceding `join`; `hello` with a
+        `seat` is M3 sub-task 5's reconnect handshake -- see `_handle_hello`."""
         if isinstance(message, proto.Hello):
+            await self._handle_hello(message)
             return
         if isinstance(message, proto.Ping):
             self._send_local("pong", {"t0": message.d.t0, "t1": _now_ms()})
@@ -218,6 +219,30 @@ class Session:
         # every remaining `AnyMessage` member is server->client (Pong/Error/StateSync/...) --
         # a client sending one parses successfully and is ignored, not rejected (same lenient
         # wrong-direction handling M0's own comment described).
+
+    async def _handle_hello(self, msg: proto.Hello) -> None:
+        """`hello{last_seq, seat}` on an already-bound seat is 02-protocol.md §2's reconnect
+        path ("a reconnecting player doesn't re-join... hello{last_seq} on an already-bound
+        seat reclaims it directly"). `seat` (not part of the wire table before this sub-task)
+        is the interim stand-in for the identity a real auth ticket would carry -- see
+        `HelloPayload`'s own docstring. `d.seat is None` is the unchanged M0 no-op (a bare
+        `hello` ahead of a fresh `join`)."""
+        if msg.d.seat is None:
+            return
+        if self.seat is not None:
+            self._send_local(
+                "error", {"code": "already_joined", "message": "connection already bound"}
+            )
+            return
+        try:
+            self.room.reconnect(msg.d.seat, self.session_id, self._push)
+        except SeatNotBoundError:
+            self._send_local(
+                "error", {"code": "no_such_seat", "message": f"seat {msg.d.seat} is not bound"}
+            )
+            return
+        self.seat = msg.d.seat
+        self.room.resume(msg.d.seat, msg.d.last_seq)
 
     async def _handle_join(self, msg: proto.Join) -> None:
         if self.seat is not None:

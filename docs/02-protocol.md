@@ -65,7 +65,7 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `hello` | `{last_seq?, client_version}` | first frame after connect |
+| `hello` | `{last_seq?, client_version, seat?}` | first frame after connect. `seat` present + already bound -> reconnect (§5); omitted -> the M0 no-op ahead of `join` |
 | `join` | `{seat?: 0-3}` | request a seat; omit `seat` for "first open seat" |
 | `ready` | `{}` | lobby → start; only valid once seated |
 | `discard` | `{tile_id}` | must be in hand, must be your turn |
@@ -236,6 +236,27 @@ on the wire and plays no part in this comparison.
 
 The client applies events through a reducer, so live play, gap replay, and the replay viewer
 are one code path.
+
+**Gap found implementing this (M3 sub-task 5): how does the server know *which seat* is
+reconnecting?** Nothing above says — the three-way branch only says what to do once the seat is
+known. In the target design (docs/00-architecture.md §2.1) that identity comes from the auth
+ticket the socket was opened with; that ticket-to-seat binding is M5 scope and doesn't exist yet.
+Until it does, `hello.seat` (§2's table) carries it directly: a `hello{last_seq, seat}` where
+`seat` is already bound in the room is treated as that seat reconnecting — `Room.reconnect()`
+rebinds the live connection, `Room.resume()` runs the branch above. A `seat` that was never
+joined gets `error{code:"no_such_seat"}`. This is a stand-in, not the final mechanism — once real
+auth ships, `seat` should come from the ticket's own seat claim rather than a client-asserted
+field, which today trusts the connection to name its own seat (no worse than every other
+guest-first, no-ticket-yet corner of this sub-task's scope, but worth closing alongside M5).
+
+**Mid-claim-window reconnect also re-arms a timer (00-architecture.md §8).** If the reconnecting
+seat holds a live, unresolved claim offer, `Room.resume()` re-arms *that seat's own* entry in the
+claim-window timer heap to a fresh `ruleset.claim_seconds` window from the reconnect moment,
+untouched by any other offered seat's deadline. This required splitting the timer heap from one
+shared entry per claim window (M3 sub-task 3's original design — every offered seat shared one
+deadline, since nothing needed to move independently) to one entry per offered seat
+(`server/app/room.py`'s `TimerHeap` docstring) — a real, load-bearing change: a single shared
+entry has no way to extend one seat's deadline without also extending everyone else's.
 
 ## 6. Schema generation
 

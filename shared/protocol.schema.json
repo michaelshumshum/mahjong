@@ -1491,6 +1491,18 @@
         "client_version": {
           "title": "Client Version",
           "type": "string"
+        },
+        "seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seat"
         }
       },
       "required": [
