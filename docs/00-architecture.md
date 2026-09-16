@@ -251,6 +251,16 @@ on DISCARD(seat, tile):
   resolve by priority -> emit exactly one CLAIM_RESOLVED event
 ```
 
+**Implementation split (M3 sub-task 3).** `claims.can_close_early`/`resolve_claims` are pure
+and reason only over responses already collected — they don't know about a clock. Early exit
+is therefore invoked from inside `mahjong_core.engine._apply_claim_response` itself, the moment
+a real claim response makes the window ready; `app/room.py`'s `Room` never has to re-derive it.
+What `Room` owns is what the pure engine *can't*: arming `deadline_ts` (`TimerHeap`, keyed
+`(deadline_ts, window_id)`, D17 above) when a window opens, and — on timer expiry, staleness-
+checked against the live `window_id` — synthesizing `Pass` for every seat that never responded
+and feeding it through that exact same `reduce()`/`resolve_claims` path. Window duration is
+`RuleSet.claim_seconds` (`mahjong_core/config.py`, default 5s) — already real config, not a gap.
+
 Gotchas:
 
 - **Only offer claims to players who actually have one.** Broadcasting "someone may claim" leaks
