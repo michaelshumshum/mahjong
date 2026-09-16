@@ -516,13 +516,25 @@ def _detect_all_terminals(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     return 1 if all(_is_terminal(m.tile_type) for m in (*groups, pair)) else 0
 
 
-def _detect_nine_gates(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """九蓮寶燈: one suit, fully concealed, 1112345678999 plus one more tile of that suit
     (any rank 1-9) -- see `_NINE_GATES_BASE_COUNTS`. Reads `ctx.concealed_tiles` directly
     (see the module docstring's "Raw-hand access" note) rather than `hand`: this is an exact
     tile-count check, not a meld-shape one, and requiring `len(...) == 14` is what excludes an
     open hand (Nine Gates has no claimed-meld variant) without a separate open-meld check.
+
+    **Must still reject a non-empty `hand`.** `ctx.concealed_tiles` is fixed for the whole win
+    (`score_winning_hand` sets it once, the same on every candidate it scores -- see that
+    function's docstring), so without this guard the pattern would fire on *every* candidate
+    scored during decomposition maximisation whenever the raw 14 tiles happen to satisfy this
+    shape, not just the one raw candidate (`melds` alone, no `decompose()` split attached) it's
+    meant for -- stacking onto an unrelated standard decomposition's own patterns. `hand` is
+    non-empty for any candidate with a real meld/decompose split attached; the correct raw
+    candidate is always `()` here since this shape requires a fully concealed hand (no exposed
+    melds possible), so `if hand: return 0` isolates the check to exactly that one candidate.
     """
+    if hand:
+        return 0
     tiles = ctx.concealed_tiles
     if len(tiles) != 14:
         return 0
@@ -539,12 +551,16 @@ def _detect_nine_gates(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     return 1 if all(c >= b for c, b in zip(counts, _NINE_GATES_BASE_COUNTS, strict=True)) else 0
 
 
-def _detect_thirteen_orphans(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+def _detect_thirteen_orphans(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """十三么: all 13 terminal/honor types present at least once among 14 concealed tiles
     (the 14th is necessarily a duplicate of one of them). Mirrors `actions.py`'s
     `_is_thirteen_orphans` -- see `_ORPHAN_TYPES`'s docstring for why this is a copy, not an
     import, and how the two are kept from drifting apart. Reads `ctx.concealed_tiles` for the
-    same reason as Nine Gates: `decompose()` never produces a `hand` for this shape at all."""
+    same reason as Nine Gates: `decompose()` never produces a `hand` for this shape at all.
+    `if hand: return 0` isolates this to the one raw candidate it's meant for -- see
+    `_detect_nine_gates`'s docstring for why."""
+    if hand:
+        return 0
     tiles = ctx.concealed_tiles
     if len(tiles) != 14:
         return 0
@@ -638,14 +654,22 @@ def _detect_flower_set(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     return int(_FULL_FLOWER_SET <= held) + int(_FULL_SEASON_SET <= held)
 
 
-def _detect_seven_pairs(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+def _detect_seven_pairs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """七對子: 14 concealed tiles as 7 *distinct* pairs. Mirrors `actions.py`'s
     `_is_seven_pairs` (win-legality's shape check) for the same reason `_ORPHAN_TYPES` mirrors
     rather than imports it -- see that frozenset's docstring; `test_scoring.py` cross-checks
     the two so they can't drift. Unlike Thirteen Orphans, §7 gives this a plain 4 faan, not a
     limit hand -- `is_limit=False` below. `decompose()` never produces a `hand` for this shape
     (seven pairs isn't four groups plus a pair), so this reads `ctx.concealed_tiles` directly,
-    same as Thirteen Orphans/Nine Gates."""
+    same as Thirteen Orphans/Nine Gates. `if hand: return 0` isolates this to the one raw
+    candidate it's meant for -- see `_detect_nine_gates`'s docstring for why this matters here
+    in particular: unlike Thirteen Orphans/Nine Gates, this isn't a limit pattern, so it isn't
+    shielded from double-counting by the limit-hand non-stacking collapse (`faan.py`'s
+    `_score_candidate`) -- a hand whose 14 tiles happen to also parse as a real standard
+    decomposition would otherwise add 七對子's faan on top of that unrelated decomposition's
+    own patterns on every candidate scored, not just the seven-pairs interpretation itself."""
+    if hand:
+        return 0
     tiles = ctx.concealed_tiles
     if len(tiles) != 14:
         return 0

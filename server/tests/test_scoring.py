@@ -739,6 +739,25 @@ def test_nine_gates_false_when_hand_not_fully_concealed() -> None:
     assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 0
 
 
+def test_nine_gates_false_when_hand_is_non_empty_even_if_concealed_tiles_qualify() -> None:
+    """Regression: `ctx.concealed_tiles` is the same on every decomposition candidate
+    `score_winning_hand` scores for one win (faan.py's own docstring), so without this guard
+    九蓮寶燈 would fire on *every* candidate whenever the raw 14 tiles happen to satisfy the
+    Nine Gates skeleton -- not just the one raw (`hand == ()`) candidate it's meant for. A
+    non-empty `hand` here (an arbitrary real decomposition) must suppress it even though the
+    same `concealed_tiles` alone would qualify -- see `_detect_nine_gates`'s docstring."""
+    tiles = _nine_gates_tiles(TileType.PIN_1, extra_rank=4)
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 1
+    assert _occurrences("九蓮寶燈", hand, _ctx(concealed_tiles=tiles)) == 0
+
+
 # --- Thirteen Orphans (十三么) -----------------------------------------------------------------
 
 _ORPHAN_TYPE_LIST = [
@@ -785,6 +804,22 @@ def test_thirteen_orphans_false_for_a_standard_hand_cross_checked_against_action
     tiles = tuple(t for m in hand for t in m.tiles)
     assert _actions_is_thirteen_orphans(tiles) is False
     assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_thirteen_orphans_false_when_hand_is_non_empty_even_if_concealed_tiles_qualify() -> None:
+    """Regression, same shape as `test_nine_gates_false_when_hand_is_non_empty_...` above --
+    see `_detect_nine_gates`'s docstring for why `ctx.concealed_tiles` alone qualifying isn't
+    enough once `hand` carries a real (if here unrelated/nonsensical) decomposition."""
+    tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 1
+    assert _occurrences("十三么", hand, _ctx(concealed_tiles=tiles)) == 0
 
 
 def test_score_hand_thirteen_orphans_includes_the_limit_entry() -> None:
@@ -1074,6 +1109,41 @@ def test_seven_pairs_false_for_a_standard_hand_cross_checked_against_actions() -
     tiles = tuple(t for m in hand for t in m.tiles)
     assert _actions_is_seven_pairs(tiles) is False
     assert _occurrences("七對子", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_seven_pairs_false_when_hand_is_non_empty_even_if_concealed_tiles_qualify() -> None:
+    """Regression, same shape as the Nine Gates/Thirteen Orphans versions above -- and the one
+    that actually matters most in practice: unlike those two, 七對子 isn't a limit pattern, so
+    it isn't shielded from double-counting by faan.py's limit-hand non-stacking collapse (see
+    `_detect_seven_pairs`'s docstring). A hand whose 14 tiles happen to satisfy Seven Pairs
+    *and* have a real standard decomposition (test_faan.py's
+    `test_seven_pairs_vs_standard_decomposition_maximizes` has one) would otherwise add 七對子's
+    faan on top of that unrelated decomposition's own patterns."""
+    tiles = _tiles(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.SOU_9,
+        TileType.SOU_9,
+        TileType.WIND_EAST,
+        TileType.WIND_EAST,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_RED,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.PIN_7,
+        TileType.PIN_7,
+    )
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("七對子", (), _ctx(concealed_tiles=tiles)) == 1
+    assert _occurrences("七對子", hand, _ctx(concealed_tiles=tiles)) == 0
 
 
 # --- Three Concealed Pungs (三暗刻) -------------------------------------------------------------

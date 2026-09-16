@@ -87,6 +87,21 @@ limit hands, caps, the `min_faan` gate, points tables, payment splits.
 **Done when:** a golden-fixture suite of ~120 hands (hand, context, ruleset → expected faan and
 payments) passes, including every edge case in [01-rules-spec §11](01-rules-spec.md). Hand-authoring
 those 120 fixtures is itself days of work, not an afternoon — budget for it explicitly.
+**Met** — `server/tests/{test_scoring,test_faan,test_payout}.py` carry 145 hand-authored test
+functions (118 + 13 + 14; several parametrized over multiple hands each, e.g. Nine Gates' 9
+wait-rank variants, so 132 + 13 distinct cases before `test_payout.py`'s own ~479, most of that
+last number its `test_payout_always_sums_to_zero` invariant sweep over 4 unrelated axes rather
+than individually-authored hands) — well past ~120 hand-shaped fixtures either way. Every one of
+the 34 registered patterns is positively exercised, and every §11 edge case is either closed with
+a named fixture or explicitly tracked as a scope gap in §11 itself. The closeout audit (M2
+sub-task 10) also found and fixed a real cross-candidate double-counting bug in `patterns.py`'s
+raw-shape detectors (七對子/十三么/九蓮寶燈) and a real concealed-kong-robbing legality bug in
+`engine.py` (see 01-rules-spec.md §11.3, §11.9). Two `RuleSet` fields remain documented but
+unimplemented — `four_kong_abort`/`nine_terminals_abort` (§11.5) and
+`thirteen_orphans_wait_bonus` (§11.10) — and the flower-instant-win check still isn't run against
+the initial deal's own flower-replacement pass, only mid-hand draws (§7 "Flower faan", scope gap
+noted since sub-task 8). None of these are golden-fixture gaps; they're unbuilt features, tracked
+rather than silently missed.
 Also: the fixed 109-action space + `legal_mask` + type-level round-trip property test
 ([06-ml §1](06-ml.md)) — ~1 day, painful to retrofit; the bots share the mask.
 

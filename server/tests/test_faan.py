@@ -59,6 +59,44 @@ def _ctx(
 # --- Decomposition maximisation --------------------------------------------------------------
 
 
+def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
+    """01-rules-spec.md §11.9, specifically for Seven Pairs (the collision the edge case names):
+    11223344556677m parses both as 七對子 (7 distinct pairs, `decompose()`'s empty-tuple raw
+    shape -- patterns.py's "Raw-hand access" note) and as a standard hand (123m 123m 456m 456m
+    77m, a real `decompose()` split -- 平糊 too, since every group is a chow). The standard
+    parse scores far higher here (清一色 alone outvalues 七對子), so maximization must pick it
+    over the raw-shape candidate. Also proves the fix for a real bug the audit found: 七對子
+    must NOT also leak onto the winning standard-decomposition candidate just because the raw
+    14 tiles separately happen to satisfy the seven-pairs shape too (see
+    `patterns._detect_seven_pairs`'s docstring) -- `七對子` must be entirely absent below, not
+    just outweighed."""
+    tiles = _tiles(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_4,
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.MAN_6,
+        TileType.MAN_6,
+        TileType.MAN_7,
+        TileType.MAN_7,
+    )
+    ctx = _ctx()
+    ruleset = RuleSet(faan_cap=13, min_faan=0)
+    result = score_winning_hand(tiles, (), ctx, ruleset)
+    assert result == FaanResult(
+        total_faan=11,
+        breakdown={"平糊": 1, "清一色": 6, "一般高": 2, "無花": 1, "門前清": 1},
+        clears_min_faan=True,
+    )
+    assert "七對子" not in result.breakdown
+
+
 def test_maximizes_across_decompositions() -> None:
     """111p 222p 333p 444p 99s parses two ways: four pungs (對對糊 + 三暗刻, 9 total with
     缺一門), or 123p x3 chows + 444p pung (三般高, 10 total with 缺一門) -- 01-rules-spec.md

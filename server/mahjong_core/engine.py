@@ -63,6 +63,7 @@ from mahjong_core.actions import (
     DeclareWin,
     Discard,
     Pass,
+    _is_thirteen_orphans,
     build_scoring_context,
     hand_is_winning_shape,
     legal_actions,
@@ -515,17 +516,28 @@ def _apply_discard(state: GameState, seat: int, action: Discard) -> tuple[GameSt
 def _kong_rob_offers(
     state: GameState, declarer: int, meld: Meld, rob_tile: TileId
 ) -> tuple[ClaimOffer, ...]:
+    """01-rules-spec.md §11.3: robbing an added kong (加槓) is open to any qualifying win;
+    robbing a **concealed** kong is further restricted to a seat whose win would specifically
+    complete Thirteen Orphans (十三么) -- real HK convention only carves out that one narrow
+    exception (the kong declarer's 4th copy can otherwise be a 十三么 player's sole out), not
+    "any winning hand" once `concealed_kong_robbable` is on.
+    """
     ruleset = state.ruleset
     if not ruleset.kong_rob_enabled:
         return ()
     if meld.kind == MeldKind.CONCEALED_KONG and not ruleset.concealed_kong_robbable:
         return ()
-    return tuple(
-        ClaimOffer(seat=seat, can_win=True)
-        for seat in range(4)
-        if seat != declarer
-        and _can_win_with(state, seat, rob_tile, is_robbing_kong=True, discarder=declarer)
-    )
+    offers = []
+    for seat in range(4):
+        if seat == declarer:
+            continue
+        if meld.kind == MeldKind.CONCEALED_KONG:
+            candidate = (*state.seats[seat].concealed, rob_tile)
+            if not _is_thirteen_orphans(candidate):
+                continue
+        if _can_win_with(state, seat, rob_tile, is_robbing_kong=True, discarder=declarer):
+            offers.append(ClaimOffer(seat=seat, can_win=True))
+    return tuple(offers)
 
 
 def _apply_self_kong(state: GameState, seat: int, meld: Meld) -> tuple[GameState, list[Event]]:

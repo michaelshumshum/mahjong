@@ -356,6 +356,76 @@ def test_declining_to_rob_the_kong_lets_declarer_draw_replacement() -> None:
     assert any(isinstance(e, KongReplacementDrawn) and e.seat == 0 for e in events)
 
 
+# --- robbing a concealed kong: restricted to Thirteen Orphans (01-rules-spec.md §11.3) -------
+
+
+def test_concealed_kong_robbing_denied_to_a_non_thirteen_orphans_win() -> None:
+    """01-rules-spec.md §11.3: robbing a **concealed** kong is only for 十三么, even with
+    `concealed_kong_robbable` on -- unlike an added kong (加槓), which any qualifying win may
+    rob. Seat 2 is tenpai on 1m via a plain chow completion (`_tenpai_on_man1`), a genuinely
+    winning, min_faan-clearing shape once 1m lands -- but not Thirteen Orphans -- so no rob
+    window may open at all. Regression: `_kong_rob_offers` previously gated concealed-kong
+    robbing on the config flag alone, with no shape restriction."""
+    ruleset = RuleSet(concealed_kong_robbable=True)
+    state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=0)
+    state = _with_seat(state, 0, concealed=(*_MAN_1, *_JUNK_HAND[:10]))
+    state = _all_junk(state, except_seat=0)
+    state = _with_seat(state, 2, concealed=_tenpai_on_man1())
+    meld = Meld(MeldKind.CONCEALED_KONG, tuple(_MAN_1))
+
+    state, events = reduce(state, DeclareConcealedKong(meld=meld))
+
+    assert state.phase == Phase.AWAIT_ACTION  # no kong-rob window opened
+    assert state.claim_window is None
+    assert any(isinstance(e, KongReplacementDrawn) for e in events)
+
+
+def test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win() -> None:
+    """The one real exception 01-rules-spec.md §11.3 carves out: a seat whose win would
+    specifically complete Thirteen Orphans may rob a concealed kong when
+    `concealed_kong_robbable` is on. Seat 2 holds 12 of the 13 orphan types plus a doubled
+    dragon (single-tile wait on East, §7's narrower Thirteen Orphans tenpai shape); seat 0
+    concealed-kongs East, the exact tile seat 2 is waiting on."""
+    sou_9 = tile_ids_for_type(TileType.SOU_9)
+    orphan_wait = (
+        _MAN_1[0],
+        _MAN_9[0],
+        _PIN_1[0],
+        _PIN_9[0],
+        _SOU_1[0],
+        sou_9[0],
+        _SOUTH[1],
+        _WEST[1],
+        _NORTH[1],
+        _RED[1],
+        _RED[2],
+        _GREEN[1],
+        _WHITE[1],
+    )
+    ruleset = RuleSet(concealed_kong_robbable=True)
+    state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=0)
+    state = _with_seat(state, 0, concealed=(*_EAST, *_JUNK_HAND[:10]))
+    state = _all_junk(state, except_seat=0)
+    state = _with_seat(state, 2, concealed=orphan_wait, flowers=())
+    meld = Meld(MeldKind.CONCEALED_KONG, tuple(_EAST))
+
+    state, events = reduce(state, DeclareConcealedKong(meld=meld))
+
+    assert state.phase == Phase.AWAIT_KONG_ROB
+    assert state.claim_window is not None
+    assert {o.seat for o in state.claim_window.offers} == {2}
+
+    win_action = next(a for a in legal_actions(state, 2) if isinstance(a, ClaimWin))
+    state, events = reduce(state, win_action)
+
+    assert state.phase == Phase.HAND_OVER
+    result = state.hand_result
+    assert result is not None
+    assert result.win_type == WinType.KONG_ROB
+    assert result.faan_breakdown == {"十三么": 10}  # default faan_cap
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
 # --- self-draw win -----------------------------------------------------------------------------
 
 
@@ -625,6 +695,116 @@ def test_win_on_kong_replacement_scores_kong_replacement() -> None:
     assert any(isinstance(e, HandEnded) for e in events)
 
 
+def test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacement() -> None:
+    """01-rules-spec.md §11.1-2: a kong replacement that's itself a flower chains to a further
+    replacement (§11.1); winning on *that* tile still scores 槓上開花 (§11.2), not just a plain
+    self-draw -- `last_draw_was_kong_replacement` is set from the original draw's `kong=True`
+    once, in `_draw_for_turn`, and untouched by however many flowers the cascade reveals in
+    between (`_draw_and_cascade` never re-derives it). Wall back-to-front:
+    `(_SOU_1[3], _MAN_2[1], Flower.FLOWER_2)` -- `draw_back` pops FLOWER_2 first (revealed,
+    cascades), then _MAN_2[1] (lands, completes the hand); _SOU_1[3] stays unpicked so the wall
+    isn't emptied. FLOWER_2 doesn't match seat 0's East seat wind, so it also proves 座位花
+    correctly stays off (and 無花 correctly drops out, since a flower was held) rather than
+    accidentally cancelling out in the total."""
+    state = _state(
+        phase=Phase.AWAIT_ACTION,
+        turn=0,
+        total_discards=1,
+        wall=Wall(tiles=(_SOU_1[3], _MAN_2[1], Flower.FLOWER_2)),
+    )
+    state = _with_seat(
+        state,
+        0,
+        concealed=(
+            *_MAN_1,
+            _MAN_4[0],
+            _MAN_5[0],
+            _MAN_6[0],
+            _MAN_7[0],
+            _MAN_8[0],
+            _MAN_9[0],
+            *_PIN_1[:3],
+            _MAN_2[0],
+        ),
+        flowers=(),
+    )
+    meld = Meld(MeldKind.CONCEALED_KONG, tuple(_MAN_1))
+
+    state, events = reduce(state, DeclareConcealedKong(meld=meld))
+
+    assert state.phase == Phase.AWAIT_ACTION
+    assert state.last_draw_was_kong_replacement is True
+    assert Flower.FLOWER_2 in state.seats[0].flowers
+    assert _MAN_2[1] in state.seats[0].concealed
+    assert any(isinstance(e, FlowerReplaced) and e.seat == 0 for e in events)
+    assert any(isinstance(e, KongReplacementDrawn) and e.seat == 0 for e in events)
+
+    state, events = reduce(state, DeclareWin())
+
+    assert state.phase == Phase.HAND_OVER
+    result = state.hand_result
+    assert result is not None
+    assert result.win_type == WinType.SELF_DRAW
+    # 缺一門(2) + 自摸(1) + 槓上開花(1) = 4 faan; no 無花 (a flower was held), no 座位花
+    # (FLOWER_2 doesn't match East).
+    assert result.faan == 4
+    assert result.faan_breakdown == {"缺一門": 2, "自摸": 1, "槓上開花": 1}
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+def test_last_tile_flag_accounts_for_wall_reserve_after_a_kong_shortens_the_wall() -> None:
+    """01-rules-spec.md §11.6: `wall_exhausted_at_last_draw` (海底撈月/槓上開花's shared
+    "was this the last usable tile" flag) must compare against `wall_reserve`, not literal
+    emptiness -- and a kong replacement draw shrinking the wall by one tile is exactly the
+    case that can tip a wall from "above reserve" to "at reserve" mid-hand. Same fixture as
+    `test_win_on_kong_replacement_scores_kong_replacement` (2-tile wall, kong replacement pops
+    the back tile) but with `wall_reserve=1`: after the pop, 1 tile remains, which now *is* the
+    reserve threshold, so `wall_exhausted_at_last_draw` flips True where the default-ruleset
+    version of this fixture asserts False. 槓上開花's own mutual exclusion with 海底撈月 (both
+    detectors read the same `is_last_tile`/`is_kong_replacement` pair) must still hold here."""
+    ruleset = RuleSet(wall_reserve=1)
+    state = _state(
+        ruleset=ruleset,
+        phase=Phase.AWAIT_ACTION,
+        turn=0,
+        total_discards=1,
+        wall=Wall(tiles=(_SOU_1[3], _MAN_2[1])),
+    )
+    state = _with_seat(
+        state,
+        0,
+        concealed=(
+            *_MAN_1,
+            _MAN_4[0],
+            _MAN_5[0],
+            _MAN_6[0],
+            _MAN_7[0],
+            _MAN_8[0],
+            _MAN_9[0],
+            *_PIN_1[:3],
+            _MAN_2[0],
+        ),
+        flowers=(),
+    )
+    meld = Meld(MeldKind.CONCEALED_KONG, tuple(_MAN_1))
+
+    state, _ = reduce(state, DeclareConcealedKong(meld=meld))
+
+    assert len(state.wall.tiles) == 1  # == wall_reserve, not literally empty
+    assert state.wall_exhausted_at_last_draw is True
+    assert state.last_draw_was_kong_replacement is True
+
+    state, events = reduce(state, DeclareWin())
+
+    assert state.phase == Phase.HAND_OVER
+    result = state.hand_result
+    assert result is not None
+    # still 槓上開花 only -- 海底撈月 stays excluded even though is_last_tile is also true here.
+    assert result.faan_breakdown["槓上開花"] == 1
+    assert "海底撈月" not in result.faan_breakdown
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
 # --- flower instant-win ------------------------------------------------------------------------
 
 
@@ -677,6 +857,28 @@ def test_wall_exhaustion_ends_hand_as_exhaustive_draw() -> None:
 
     assert state.phase == Phase.HAND_OVER
     assert state.hand_result == HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW)
+    assert any(
+        isinstance(e, HandEnded) and e.outcome == HandOutcome.EXHAUSTIVE_DRAW for e in events
+    )
+
+
+def test_wall_exhaustion_during_flower_cascade_ends_hand_as_exhaustive_draw() -> None:
+    """01-rules-spec.md §11.11: the wall can run out *during* a flower-replacement cascade,
+    not just before a normal draw -- `_draw_and_cascade` checks `_wall_exhausted` before every
+    draw in the cascade, including the replacement draw right after a flower reveal. The seat's
+    already-revealed flower this cascade stays revealed even though the hand ends before a real
+    tile ever lands. Wall holds exactly one tile, a flower: seat 1's turn-draw pops it, reveals
+    it, then finds nothing left to draw a replacement from."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(Flower.FLOWER_1,)))
+    state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
+    state = _all_junk(state, except_seat=0)
+
+    state, events = reduce(state, Discard(tile_id=_EAST[0]))
+
+    assert state.phase == Phase.HAND_OVER
+    assert state.hand_result == HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW)
+    assert Flower.FLOWER_1 in state.seats[1].flowers
+    assert any(isinstance(e, FlowerReplaced) and e.seat == 1 for e in events)
     assert any(
         isinstance(e, HandEnded) and e.outcome == HandOutcome.EXHAUSTIVE_DRAW for e in events
     )
