@@ -15,6 +15,18 @@ make up            # postgres + api + web
 make help          # everything else
 ```
 
+## Screenshots
+
+Mock-data driven — no real server integration yet (that's M3+); these show the client-side
+scaffolding and UI components built so far. Regenerate with `pnpm --dir web run screenshots`
+after any visible frontend change (see `.claude/skills/frontend-screenshots/SKILL.md`).
+
+| | |
+| --- | --- |
+| ![Home](docs/screenshots/home.png) Home — component demos | ![Lobby](docs/screenshots/lobby.png) Lobby — create/join a room |
+| ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
+| ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | |
+
 ## Planning docs
 
 | Doc | Contents |

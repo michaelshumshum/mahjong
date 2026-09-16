@@ -14,7 +14,8 @@
 		"format": "oxfmt .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
-		"test:e2e": "playwright install && playwright test"
+		"test:e2e": "playwright install && playwright test",
+		"screenshots": "playwright install chromium && node scripts/screenshot-pages.mjs"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.63.0",
@@ -25,6 +26,7 @@
 		"@typescript/native": "npm:typescript@^7.0.2",
 		"oxfmt": "^0.67.0",
 		"oxlint": "^1.82.0",
+		"playwright": "^1.63.0",
 		"sass": "^1.104.1",
 		"svelte": "^5.57.0",
 		"svelte-check": "^4.7.6",

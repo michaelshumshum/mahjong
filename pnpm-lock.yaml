@@ -38,6 +38,9 @@ importers:
       oxlint:
         specifier: ^1.82.0
         version: 1.82.0
+      playwright:
+        specifier: ^1.63.0
+        version: 1.63.0
       sass:
         specifier: ^1.104.1
         version: 1.104.1

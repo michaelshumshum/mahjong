@@ -38,7 +38,17 @@ src/lib/styles/ SCSS tokens, tile geometry, layout mixins (see docs/03-frontend.
 ```
 make test-web
 pnpm dev | pnpm build | pnpm lint
+pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
 ```
+
+- **After any change that's visible on a notable page** (new component wired in, layout change,
+  a new mock scenario worth showing, a visual bug fix), regenerate screenshots and commit them
+  in the same change: `pnpm --dir web run screenshots`, then look at the output — this has
+  already caught a real bug (rotated opponent hand-strip CSS escaping its grid column) that
+  wasn't visible from the code or from `pnpm test`. Update `README.md`'s Screenshots section too
+  if a page's content meaningfully changed. Full workflow, troubleshooting, and the notable-pages
+  list: `.claude/skills/frontend-screenshots/SKILL.md`. Skip this for changes with no visible
+  surface (pure logic, test-only, refactors with identical output).
 
 - `typescript` stays pinned to `^6.0.3`; TS7's native/Go compiler is installed alongside as
   `@typescript/native` (`npm:typescript@^7`) and used only via `svelte-check --tsgo` (wired into
