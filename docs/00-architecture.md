@@ -279,9 +279,11 @@ def redact_event(state: GameState, seat: int | None, event: Event) -> dict:
 
 ### `SeatView`
 
-**This subsection is the canonical definition** — `mahjong_core/views.py` — depended on by
+**This subsection is the canonical definition** — `server/app/views.py` — depended on by
 [04-bots.md](04-bots.md) (bot `act()` input) and [06-ml.md](06-ml.md) (encoder input), neither
-of which may change its shape unilaterally.
+of which may change its shape unilaterally. Lives in `app/`, not `mahjong_core/`
+(`05-roadmap.md §1`'s layout): `server/AGENTS.md` reserves `mahjong_core` for pure rules, and
+"what may this specific recipient see" is a wire-recipient concern, not a rule.
 
 ```python
 @dataclass(frozen=True)
@@ -300,14 +302,30 @@ class SeatView:
     wall_remaining: int                            # count only — see wall bullet below
     seat_status: tuple[str, ...]                   # connected | disconnected | autoplay | bot, per seat
     scores: tuple[int, int, int, int]
-    legal_actions: tuple[LegalAction, ...]         # populated ONLY when seat == turn and this is that seat's own view
-    claim_options: tuple[ClaimOption, ...]         # populated ONLY for a seat with a live claim offer (§4)
+    legal_actions: tuple[Action, ...]              # non-empty whenever actions.legal_actions(state, seat) is
+    claim_options: tuple[ClaimOffer, ...]          # this seat's own live claim offer (§4), if any
     deadline_ts: int | None                        # the deadline relevant to this seat, if any
 ```
+
+`legal_actions`/`claim_options` reuse `mahjong_core.actions.Action` / `mahjong_core.state.
+ClaimOffer` directly rather than a separate `LegalAction`/`ClaimOption` wire type — neither
+name is defined anywhere, and both real types already carry only this seat's own tiles or
+already-public tiles, so a parallel type would add translation with no redaction benefit.
+`legal_actions` is non-empty whenever `actions.legal_actions(state, seat)` is — that's "seat's
+own `AWAIT_ACTION` turn" *or* "seat holds a live claim/kong-rob offer", not just `seat == turn`
+(a claim-window seat needs its options too — `04-bots.md`'s bot `act()` is called then as well).
 
 There is no field on `SeatView` capable of holding another seat's concealed tile identity —
 `own_hand` is the only tile-id field, and it's populated only for the view's own seat. That's a
 property of the shape, and it's what the schema walker below checks.
+
+`seat_status` and `deadline_ts` have no real backing yet as of the redaction sub-task that
+first implements this module: `mahjong_core/state.py` deliberately keeps connection status out
+of `SeatState` (own-module rationale: `app/room.py`'s future `SeatBinding` should own it
+without a pure-engine round-trip), and no timer heap exists yet to arm a per-turn deadline (§3
+D17, a later M3 sub-task). `seat_view()` takes `seat_status` as an override, defaulting every
+seat to `"connected"`, and surfaces `deadline_ts` only from `ClaimWindow.deadline_ts` when this
+seat holds a live claim offer. Both get real data once their owning sub-tasks land.
 
 ### Redaction test
 

@@ -172,6 +172,25 @@ Non-owning seats learn the tile identity only via `hand_end.hands` if the hand g
 All other `kind`s (`chow`, `pung`, `added_kong`) are fully public: full `tiles` to everyone, no
 redaction.
 
+**Known gap: `hand_end`'s winning-tile reveal is incomplete for a claimed win.** For a
+self-draw (or the flower-instant-win variant), the winner's revealed hand is exactly
+`state.seats[winner].concealed` and that's complete. For a win claimed off another seat's
+discard or kong, `engine._apply_claim_response` scores the win with the claimed tile folded in
+locally but never merges it back into `state.seats[winner].concealed` — only the scoring
+context sees it — so today's reveal is short exactly that one tile. Fixing it means touching
+`engine.py`'s win path (`mahjong_core`, M1/M2-owned); tracked here rather than fixed in the
+redaction sub-task that found it (`server/app/views.py`'s `HandEndWire` docstring carries the
+same note, and `tests/test_redaction.py::test_hand_end_known_gap_claimed_win_misses_winning_tile`
+pins current behavior so a future engine fix is noticed, not silently re-broken).
+
+**`discard.pool_index` isn't implemented by `redact_event` yet.** It isn't derivable from the
+`state` `redact_event(state, seat, event)` receives in general: if the discard is claimed later
+in the *same* `reduce()` call, the claiming seat's discard-pool entry is removed again by the
+time `state` reaches the redaction layer (`engine._apply_claim_response`), so recomputing it
+from final state would be wrong for exactly the discards that most need a correct wire form.
+The Room actor (a later M3 sub-task) sees each event against its own intermediate state and can
+compute this there — `redact_event` alone cannot, by its own `(state, event)` contract.
+
 ## 4. Timers
 
 The server is the only clock that matters.
