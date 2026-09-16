@@ -231,7 +231,7 @@
 	button.primary {
 		background: var(--color-accent);
 		border-color: var(--color-accent);
-		color: var(--color-bg);
+		color: var(--color-text);
 		font-weight: 600;
 	}
 </style>

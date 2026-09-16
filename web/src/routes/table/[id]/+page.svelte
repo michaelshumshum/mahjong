@@ -591,7 +591,7 @@
 	.scenario-btn.active {
 		background: var(--color-accent);
 		border-color: var(--color-accent);
-		color: var(--color-bg);
+		color: var(--color-text);
 		font-weight: 600;
 	}
 
@@ -605,7 +605,12 @@
 		height: 100%;
 		min-height: 420px;
 		padding: var(--space-3);
-		background: var(--color-surface);
+		// faint overhead-light falloff on the lacquered surface — a believable material cue,
+		// not a texture asset; stays quiet enough that tiles (the brightest thing on screen,
+		// §1) are unaffected.
+		background:
+			radial-gradient(ellipse 80% 60% at 50% 10%, rgb(255 255 255 / 0.035), transparent 65%),
+			var(--color-surface);
 		border-radius: var(--radius-md);
 		transform: rotateX(6deg);
 		transform-style: preserve-3d;
@@ -667,7 +672,7 @@
 		height: 1.25rem;
 		border-radius: 50%;
 		background: var(--color-accent);
-		color: var(--color-bg);
+		color: var(--color-text);
 		font-size: 0.7rem;
 		font-weight: 700;
 	}
@@ -757,6 +762,7 @@
 		text-align: center;
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.center-info strong {

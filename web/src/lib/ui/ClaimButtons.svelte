@@ -68,7 +68,7 @@
 		min-width: 44px;
 		min-height: 44px;
 		padding: var(--space-2) var(--space-4);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		border: 1px solid var(--color-border);
 		background: var(--color-surface-raised);
 		color: var(--color-text);
@@ -80,7 +80,7 @@
 	.claim-btn--win {
 		background: var(--color-accent);
 		border-color: var(--color-accent);
-		color: var(--color-bg);
+		color: var(--color-text);
 	}
 
 	.claim-btn:focus-visible {

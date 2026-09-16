@@ -213,11 +213,11 @@
 	}
 
 	.delta--gain {
-		color: var(--color-accent);
+		color: var(--color-accent-jade);
 	}
 
 	.delta--loss {
-		color: var(--color-status-error);
+		color: var(--color-accent);
 	}
 
 	.delta--dealer {

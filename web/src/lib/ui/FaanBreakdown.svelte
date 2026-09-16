@@ -132,6 +132,7 @@
 
 	.pattern-faan {
 		color: var(--color-text-muted);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.total {
@@ -139,11 +140,12 @@
 		padding-block-start: var(--space-2);
 		border-top: 1px solid var(--color-border);
 		font-size: var(--font-size-lg);
+		font-variant-numeric: tabular-nums;
 	}
 
-	.total--capped strong {
-		color: var(--color-accent);
-	}
+	// no accent here on purpose — cinnabar is reserved for turn/claim-window/win-marker urgency
+	// (docs this sub-task follows), not a "notable number" highlight. The cap-note text alone
+	// carries the information.
 
 	.cap-note {
 		font-size: var(--font-size-sm);
@@ -167,10 +169,10 @@
 	}
 
 	.payment-row--gain .payment-amount {
-		color: var(--color-accent);
+		color: var(--color-accent-jade);
 	}
 
 	.payment-row--loss .payment-amount {
-		color: var(--color-status-error);
+		color: var(--color-accent);
 	}
 </style>

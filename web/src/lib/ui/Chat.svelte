@@ -86,9 +86,10 @@
 		font-size: var(--font-size-sm);
 	}
 
+	// no accent here — cinnabar is reserved for turn/claim-window/win/loss signal, not a
+	// per-message label. Weight alone separates the speaker from the phrase.
 	.entry-seat {
 		font-weight: 600;
-		color: var(--color-accent);
 	}
 
 	.entry-phrase {

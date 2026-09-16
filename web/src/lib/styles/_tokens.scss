@@ -1,5 +1,6 @@
-// design tokens (docs/03-frontend.md §7.1). placeholder values — nothing here reflects real
-// visual design yet, revisit once M4 (component styling) starts.
+// design tokens (docs/03-frontend.md §7.1). material palette: lacquered dark walnut, ivory
+// tiles, cinnabar seal-ink red — the material culture of a real HK mahjong table, not a
+// generic dark-mode SaaS look or an "Asian restaurant" gold+green cliché.
 //
 // all runtime-consumable, so custom properties on :root rather than scss variables: a scss
 // variable is only visible in files that @use this partial, a custom property is visible to
@@ -7,25 +8,42 @@
 // also the kind of thing that gets toggled at runtime later.
 
 :root {
-	// colour
-	--color-bg: #0f1a13;
-	--color-surface: #16281d;
-	--color-surface-raised: #1e3a28;
-	--color-text: #f2f2ee;
-	--color-text-muted: #a8b6ac;
-	--color-accent: #d4af37;
-	--color-border: #2c4433;
-	--color-status-error: #d9776a;
+	// colour — lacquered walnut table, ivory tiles, two reserved accents
+	--color-bg: #1c1410;
+	--color-surface: #241b14;
+	--color-surface-raised: #302319;
+	--color-border: #4a3826;
+	--color-text: #ede6da;
+	--color-text-muted: #a99a85;
 
-	// corner radius
-	--radius-sm: 4px;
-	--radius-md: 8px;
+	// tile-face material: the brightest thing on screen (§1 "tiles are the material hero").
+	// --color-tile-ink is for any text/numerals that must sit on a tile-coloured surface.
+	--color-tile: #f2e8d5;
+	--color-tile-ink: #241b14;
 
-	// seat colours (self/right/across/left, clockwise from you)
-	--color-seat-self: #d4af37;
-	--color-seat-right: #4a90d9;
-	--color-seat-across: #c96a4a;
-	--color-seat-left: #6aa84f;
+	// the ONE urgent signal — your turn, a live claim window, a win/dealer marker. Never
+	// decorative. --color-accent-jade is the one reserved secondary job: positive score/faan
+	// deltas (ScoreSheet, FaanBreakdown). Don't reach for either as a general decorative color.
+	--color-accent: #c23b2e;
+	--color-accent-jade: #3c6e52;
+
+	// distinct hue from both --color-accent (~5°) and --color-accent-jade (~146°) so an error
+	// state never reads as "the urgent accent" or "a positive delta" — a warm amber-orange
+	// alert tier of its own.
+	--color-status-error: #e77e40;
+
+	// corner radius — deliberately tiered, not one radius everywhere: tiles crisp and
+	// physical, chrome (buttons/chips/badges) a little softer, panels/modals softer still.
+	--radius-tile: 3px;
+	--radius-sm: 6px;
+	--radius-md: 12px;
+
+	// seat colours (self/right/across/left, clockwise from you) — muted, mutually
+	// distinguishable, each hue kept well clear of both reserved accents above.
+	--color-seat-self: #bb9d58;
+	--color-seat-right: #5c85a3;
+	--color-seat-across: #a65979;
+	--color-seat-left: #8e73a5;
 
 	// spacing scale, 4px base
 	--space-1: 0.25rem;
@@ -36,12 +54,15 @@
 	--space-6: 2rem;
 	--space-8: 3rem;
 
-	// type scale
-	--font-family-base: system-ui, sans-serif;
+	// type scale — one family throughout (headings via weight/size, not a second family).
+	// 'Noto Sans HK' fallback covers faan pattern names rendered as CJK glyphs (平糊, 對對糊
+	// in FaanBreakdown) on platforms that have it installed; browsers substitute a system CJK
+	// font per-codepoint regardless when it's not.
+	--font-family-base: 'Schibsted Grotesk', 'Noto Sans HK', sans-serif;
 	--font-size-sm: 0.875rem;
 	--font-size-base: 1rem;
-	--font-size-lg: 1.25rem;
-	--font-size-xl: 1.75rem;
+	--font-size-lg: 1.375rem;
+	--font-size-xl: 2rem;
 
 	// z-layers
 	--z-table: 0;

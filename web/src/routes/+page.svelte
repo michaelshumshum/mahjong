@@ -351,7 +351,7 @@
 
 	section {
 		border: 1px solid var(--color-border);
-		border-radius: 4px;
+		border-radius: var(--radius-md);
 		padding: var(--space-3);
 
 		@include layout.tablet-up {
