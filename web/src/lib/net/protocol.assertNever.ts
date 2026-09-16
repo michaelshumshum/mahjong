@@ -14,6 +14,38 @@ export function _assertExhaustive(e: ServerEvent): void {
 			return;
 		case 'error':
 			return;
+		case 'state_sync':
+			return;
+		case 'hand_start':
+			return;
+		case 'deal':
+			return;
+		case 'flower_replace':
+			return;
+		case 'draw':
+			return;
+		case 'discard':
+			return;
+		case 'claim_offer':
+			return;
+		case 'claim_resolved':
+			return;
+		case 'meld':
+			return;
+		case 'kong_replace':
+			return;
+		case 'turn':
+			return;
+		case 'hand_end':
+			return;
+		case 'score':
+			return;
+		case 'game_end':
+			return;
+		case 'seat_state':
+			return;
+		case 'ack':
+			return;
 		default:
 			assertNever(e);
 	}

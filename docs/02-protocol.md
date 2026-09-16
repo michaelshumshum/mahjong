@@ -54,6 +54,10 @@ Every frame, both directions:
 - **Same `id`, different payload** (client bug, not a retry): server rejects the new frame —
   `ack{id, ok:false, error:"id_conflict"}` — and applies neither the old nor the new payload as
   if it were the other.
+- **`join` is the one exception:** the cache lives on the seat binding `join` itself creates, so
+  there's no binding yet to scope a `join` retry to. A `join` isn't deduplicated by `id` — it's
+  answered directly (`seat_taken`/`room_full`/success) every time, same as before this section's
+  id contract existed.
 
 ## 2. Client → server (intents)
 
@@ -96,24 +100,28 @@ PASS, not to WIN, if the player doesn't respond.
 
 ## 3. Server → client (events)
 
-| `t` | payload sketch |
-| --- | --- |
-| `state_sync` | full redacted snapshot — sent on join, reconnect-with-gap, and after any resync |
-| `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` — see Fairness below |
-| `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` |
-| `flower_replace` | `{seat, flower, replacement?}` (`replacement` only for you) |
-| `draw` | `{seat, tile_id?}` — `tile_id` present **only** for the drawing player |
-| `discard` | `{seat, tile_id, tile, pool_index}` |
-| `claim_offer` | `{window_id, options: [...], deadline_ts}` — **unicast**, only to eligible seats |
-| `claim_resolved` | `{window_id, seat?, kind, meld?, from_seat?}` — v1 is single-winner; `seat` is always singular (一炮多響 deferred, D16) |
-| `meld` | `{seat, kind, tiles, from_seat?}` — except `concealed_kong`, which has a redacted per-seat form (see Redaction below) |
-| `kong_replace` | `{seat, tile_id?}` |
-| `turn` | `{seat, phase, deadline_ts, legal: [...]}` — `legal` unicast to the acting seat |
-| `hand_end` | `{result, winner?, hands: {...}, faan_breakdown, payments, fairness?}` — see Fairness below |
-| `score` | `{totals: {seat: n}}` |
-| `game_end` | `{standings, game_id}` |
-| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` |
-| `ack` | `{id, ok, error?}` — **sender-only**, never broadcast: it would leak another player's client-chosen `id` |
+Payload shapes below match `server/app/protocol.py` (§6) exactly — earlier drafts of this table
+sketched a few fields (`result`/`kind`/`hands`/`standings`) before the redaction and Session/WS
+sub-tasks actually implemented them; reconciled here to what ships rather than left to drift.
+
+| `t` | payload | notes |
+| --- | --- | --- |
+| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9) |
+| `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status`; see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/room.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
+| `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; same "no backing `Event`" note as `hand_start` |
+| `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not yet emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event` to redact for those; mid-hand flower reveals (a normal draw) go through `reduce()` normally and *are* emitted |
+| `draw` | `{seat, tile_id?}` | `tile_id` present **only** for the drawing player |
+| `discard` | `{seat, tile_id, tile, pool_index}` | |
+| `claim_offer` | `{window_id, options: [{kind, tiles?}...], deadline_ts}` | **unicast**, only to eligible seats. `options` always ends with `{kind:"pass"}`. No backing `Event` (same synthesis note) — sent by `app/room.py` the moment a window's deadline is armed, so it always carries a real `deadline_ts` |
+| `claim_resolved` | `{window_id, claim_kind, seat?, action_kind?}` | `claim_kind` is the window kind (`discard`\|`kong_rob`), not the winning meld kind — that's `action_kind` (`claim_chow`\|`claim_pung`\|`claim_kong`\|`claim_win`\|`pass`). v1 is single-winner; `seat`/`action_kind` are both `null` when nobody's claim beat a Pass (一炮多響 deferred, D16) |
+| `meld` | `{seat, meld_kind, tiles, from_seat?}` | except `concealed_kong`, which has a redacted per-seat form: `{seat, meld_kind:"concealed_kong", tiles?, count?}` (see Redaction below) |
+| `kong_replace` | `{seat, tile_id?}` | |
+| `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat. No backing `Event` (same synthesis note); **`deadline_ts` is advisory only** — `now + ruleset.turn_seconds`, not a real armed server timer. Per-turn timeout enforcement (tsumogiri-on-expiry) has no driver yet, same scope line `app/room.py`'s module docstring already draws for turn clocks — only the claim-window deadline (`claim_offer.deadline_ts` above) is a real, enforced `TimerHeap` entry today |
+| `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`); see the known reveal gap under Redaction below |
+| `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
+| `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
+| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | every bound seat reads `connected` as of the Session/WS sub-task — disconnect/bot-handover transitions are sub-task 6 |
+| `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Room` silently drops a well-formed but currently-illegal command the same as before this existed |
 | `error` | `{code, message}` |
 | `pong` | `{t0, t1}` |
 
@@ -308,23 +316,26 @@ wire) are noted in comments purely to show what triggered each frame.
 {"v":1,"t":"ack","seq":44,"d":{"id":"c-9e1","ok":true}}
   // ^ sender-only: only Bob's stream ever carries this
 
-{"v":1,"t":"claim_resolved","seq":45,"d":{"window_id":"w-204","seat":1,"kind":"pung","from_seat":0}}
+{"v":1,"t":"claim_resolved","seq":45,
+  "d":{"window_id":"w-204","claim_kind":"discard","seat":1,"action_kind":"claim_pung"}}
   // ^ event_id 102: window closed early, Bob was the only eligible seat
 
-{"v":1,"t":"meld","seq":46,"d":{"seat":1,"kind":"pung","tiles":[31,88,47],"from_seat":0}}
+{"v":1,"t":"meld","seq":46,"d":{"seat":1,"meld_kind":"pung","tiles":[31,88,47],"from_seat":0}}
   // ^ event_id 103: pung is fully public, full tiles to everyone
 
 {"v":1,"t":"turn","seq":47,"d":{"seat":1,"phase":"AWAIT_ACTION","deadline_ts":1757865458000,
-  "legal":[{"kind":"discard","tiles":[3,9,14,"..."]}]}}
-  // ^ event_id 104: Bob is now acting, so he gets "legal"
+  "legal":[{"kind":"discard","tile_id":3},{"kind":"discard","tile_id":9},"..."]}}
+  // ^ event_id 104: Bob is now acting, so he gets "legal" -- one entry per legal Action
+  //   (mahjong_core.actions.action_to_dict), not one entry listing every tile at once
 
 // ── Carol's stream (seat 2) — never eligible; her stream is still dense, no gap ──
 {"v":1,"t":"turn","seq":41,"d":{"seat":0,"phase":"AWAIT_ACTION","deadline_ts":1757865447000}}
 {"v":1,"t":"discard","seq":42,"d":{"seat":0,"tile_id":47,"tile":"5s","pool_index":11}}
   // ^ event_id 101 (claim_offer to Bob) never appears in Carol's stream — not a gap, because
   //   Carol's seq only counts frames Carol actually receives
-{"v":1,"t":"claim_resolved","seq":43,"d":{"window_id":"w-204","seat":1,"kind":"pung","from_seat":0}}
-{"v":1,"t":"meld","seq":44,"d":{"seat":1,"kind":"pung","tiles":[31,88,47],"from_seat":0}}
+{"v":1,"t":"claim_resolved","seq":43,
+  "d":{"window_id":"w-204","claim_kind":"discard","seat":1,"action_kind":"claim_pung"}}
+{"v":1,"t":"meld","seq":44,"d":{"seat":1,"meld_kind":"pung","tiles":[31,88,47],"from_seat":0}}
 {"v":1,"t":"turn","seq":45,"d":{"seat":1,"phase":"AWAIT_ACTION","deadline_ts":1757865458000}}
   // ^ no "legal" — Carol isn't acting
 ```
@@ -359,13 +370,15 @@ to be the heartbeat, or a dead socket looks identical to an idle one:
 ## 9. Backpressure
 
 The Session pumps an outbound queue per connection ([00-architecture.md §2](00-architecture.md));
-that queue must be **bounded** (default 256 frames), not left to grow — an unbounded queue
-behind a stalled TCP connection (dead peer, congested mobile network) is a memory leak that
-scales with however long the peer stays half-open.
+that queue must be **bounded** (default 64 frames — this section previously said 256, drifted
+from 00-architecture.md's "Outbound backpressure" subsection; reconciled to 64, `app/outbox.py`'s
+`BoundedOutbox` default, in the same change that built the real implementation), not left to
+grow — an unbounded queue behind a stalled TCP connection (dead peer, congested mobile network)
+is a memory leak that scales with however long the peer stays half-open.
 
 Policy when the queue is full:
 
-- Drop the oldest *non-critical* queued frames first — `draw`, `discard`, `turn`, and similar
+- Drop the oldest *non-critical* queued frame first — `draw`, `discard`, `turn`, and similar
   state-deltas are superseded by a fresh snapshot anyway. Keep `ack`/`error` if still queued.
 - The instant anything is dropped, stop trying to catch the stream up: clear the queue and
   enqueue a single `state_sync` instead. The client's reducer already treats `state_sync` as an

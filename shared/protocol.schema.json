@@ -1,5 +1,920 @@
 {
   "$defs": {
+    "Ack": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "ack",
+          "default": "ack",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/AckPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Ack",
+      "type": "object"
+    },
+    "AckPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "id",
+        "ok"
+      ],
+      "title": "AckPayload",
+      "type": "object"
+    },
+    "Auto": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "auto",
+          "default": "auto",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/AutoPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Auto",
+      "type": "object"
+    },
+    "AutoPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "no_calls": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "No Calls"
+        },
+        "auto_pass_chow": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auto Pass Chow"
+        }
+      },
+      "title": "AutoPayload",
+      "type": "object"
+    },
+    "Chat": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "chat",
+          "default": "chat",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ChatPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Chat",
+      "type": "object"
+    },
+    "ChatPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "ChatPayload",
+      "type": "object"
+    },
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "claim",
+          "default": "claim",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ClaimPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "ClaimOffer": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "claim_offer",
+          "default": "claim_offer",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ClaimOfferPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "ClaimOffer",
+      "type": "object"
+    },
+    "ClaimOfferPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "window_id": {
+          "title": "Window Id",
+          "type": "integer"
+        },
+        "options": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "deadline_ts": {
+          "title": "Deadline Ts",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "window_id",
+        "options",
+        "deadline_ts"
+      ],
+      "title": "ClaimOfferPayload",
+      "type": "object"
+    },
+    "ClaimPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "window_id": {
+          "title": "Window Id",
+          "type": "integer"
+        },
+        "choice": {
+          "enum": [
+            "pass",
+            "chow",
+            "pung",
+            "kong",
+            "win"
+          ],
+          "title": "Choice",
+          "type": "string"
+        },
+        "tiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tiles"
+        }
+      },
+      "required": [
+        "window_id",
+        "choice"
+      ],
+      "title": "ClaimPayload",
+      "type": "object"
+    },
+    "ClaimResolved": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "claim_resolved",
+          "default": "claim_resolved",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ClaimResolvedPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "ClaimResolved",
+      "type": "object"
+    },
+    "ClaimResolvedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "window_id": {
+          "title": "Window Id",
+          "type": "integer"
+        },
+        "claim_kind": {
+          "title": "Claim Kind",
+          "type": "string"
+        },
+        "seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Seat"
+        },
+        "action_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Action Kind"
+        }
+      },
+      "required": [
+        "window_id",
+        "claim_kind",
+        "seat",
+        "action_kind"
+      ],
+      "title": "ClaimResolvedPayload",
+      "type": "object"
+    },
+    "Deal": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "deal",
+          "default": "deal",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/DealPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Deal",
+      "type": "object"
+    },
+    "DealPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "your_hand": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Your Hand",
+          "type": "array"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "wall_remaining": {
+          "title": "Wall Remaining",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "your_hand",
+        "counts",
+        "wall_remaining"
+      ],
+      "title": "DealPayload",
+      "type": "object"
+    },
+    "Declare": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "declare",
+          "default": "declare",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/DeclarePayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Declare",
+      "type": "object"
+    },
+    "DeclarePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "concealed_kong",
+            "added_kong",
+            "win"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "tiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tiles"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DeclarePayload",
+      "type": "object"
+    },
+    "Discard": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "discard",
+          "default": "discard",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/DiscardPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Discard",
+      "type": "object"
+    },
+    "DiscardEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "discard",
+          "default": "discard",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/DiscardEventPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "DiscardEvent",
+      "type": "object"
+    },
+    "DiscardEventPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "tile_id": {
+          "title": "Tile Id",
+          "type": "integer"
+        },
+        "tile": {
+          "title": "Tile",
+          "type": "string"
+        },
+        "pool_index": {
+          "title": "Pool Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "tile_id",
+        "tile",
+        "pool_index"
+      ],
+      "title": "DiscardEventPayload",
+      "type": "object"
+    },
+    "DiscardPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "tile_id": {
+          "title": "Tile Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tile_id"
+      ],
+      "title": "DiscardPayload",
+      "type": "object"
+    },
+    "Draw": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "draw",
+          "default": "draw",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/DrawPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Draw",
+      "type": "object"
+    },
+    "DrawPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "tile_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tile Id"
+        }
+      },
+      "required": [
+        "seat"
+      ],
+      "title": "DrawPayload",
+      "type": "object"
+    },
     "Error": {
       "additionalProperties": false,
       "properties": {
@@ -71,6 +986,437 @@
         "message"
       ],
       "title": "ErrorPayload",
+      "type": "object"
+    },
+    "FlowerReplace": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "flower_replace",
+          "default": "flower_replace",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/FlowerReplacePayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "FlowerReplace",
+      "type": "object"
+    },
+    "FlowerReplacePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "flower": {
+          "title": "Flower",
+          "type": "string"
+        },
+        "replacement": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replacement"
+        }
+      },
+      "required": [
+        "seat",
+        "flower"
+      ],
+      "title": "FlowerReplacePayload",
+      "type": "object"
+    },
+    "GameEnd": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "game_end",
+          "default": "game_end",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/GameEndPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "GameEnd",
+      "type": "object"
+    },
+    "GameEndPayload": {
+      "additionalProperties": false,
+      "description": "`{hand_no, scores}`, not `02-protocol.md \u00a73`'s original `{standings, game_id}` sketch --\n`app/views.py`'s `GameEndWire` (landed in the earlier redaction sub-task) already mirrors\n`engine.GameEnded` 1:1 as `{hand_no, scores}`; reconciled here rather than reshaping\nalready-tested redaction code to match a sketch that predates it.",
+      "properties": {
+        "hand_no": {
+          "title": "Hand No",
+          "type": "integer"
+        },
+        "scores": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Scores",
+          "type": "array"
+        }
+      },
+      "required": [
+        "hand_no",
+        "scores"
+      ],
+      "title": "GameEndPayload",
+      "type": "object"
+    },
+    "HandEnd": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "hand_end",
+          "default": "hand_end",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/HandEndPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "HandEnd",
+      "type": "object"
+    },
+    "HandEndPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "hand_no": {
+          "title": "Hand No",
+          "type": "integer"
+        },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string"
+        },
+        "winner": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Winner"
+        },
+        "win_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Win Type"
+        },
+        "discarder": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Discarder"
+        },
+        "faan": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Faan"
+        },
+        "faan_breakdown": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Faan Breakdown"
+        },
+        "points": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Points"
+        },
+        "payments": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Payments"
+        },
+        "revealed": {
+          "title": "Revealed",
+          "type": "boolean"
+        },
+        "winning_hand": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Winning Hand"
+        }
+      },
+      "required": [
+        "hand_no",
+        "outcome",
+        "winner",
+        "win_type",
+        "discarder",
+        "faan",
+        "faan_breakdown",
+        "points",
+        "payments",
+        "revealed",
+        "winning_hand"
+      ],
+      "title": "HandEndPayload",
+      "type": "object"
+    },
+    "HandStart": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "hand_start",
+          "default": "hand_start",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/HandStartPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "HandStart",
+      "type": "object"
+    },
+    "HandStartPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "hand_no": {
+          "title": "Hand No",
+          "type": "integer"
+        },
+        "prevailing": {
+          "title": "Prevailing",
+          "type": "string"
+        },
+        "dealer": {
+          "title": "Dealer",
+          "type": "integer"
+        },
+        "seats": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Seats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "hand_no",
+        "prevailing",
+        "dealer",
+        "seats"
+      ],
+      "title": "HandStartPayload",
       "type": "object"
     },
     "Hello": {
@@ -151,6 +1497,271 @@
         "client_version"
       ],
       "title": "HelloPayload",
+      "type": "object"
+    },
+    "Join": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "join",
+          "default": "join",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/JoinPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Join",
+      "type": "object"
+    },
+    "JoinPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seat"
+        }
+      },
+      "title": "JoinPayload",
+      "type": "object"
+    },
+    "KongReplace": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "kong_replace",
+          "default": "kong_replace",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/KongReplacePayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "KongReplace",
+      "type": "object"
+    },
+    "KongReplacePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "tile_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tile Id"
+        }
+      },
+      "required": [
+        "seat"
+      ],
+      "title": "KongReplacePayload",
+      "type": "object"
+    },
+    "Meld": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "meld",
+          "default": "meld",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/MeldPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Meld",
+      "type": "object"
+    },
+    "MeldPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "meld_kind": {
+          "title": "Meld Kind",
+          "type": "string"
+        },
+        "tiles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tiles"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "from_seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From Seat"
+        }
+      },
+      "required": [
+        "seat",
+        "meld_kind",
+        "tiles"
+      ],
+      "title": "MeldPayload",
       "type": "object"
     },
     "Ping": {
@@ -300,29 +1911,640 @@
       ],
       "title": "PongPayload",
       "type": "object"
+    },
+    "Ready": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "ready",
+          "default": "ready",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ReadyPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Ready",
+      "type": "object"
+    },
+    "ReadyPayload": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "ReadyPayload",
+      "type": "object"
+    },
+    "Score": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "score",
+          "default": "score",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/ScorePayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Score",
+      "type": "object"
+    },
+    "ScorePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "totals": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Totals",
+          "type": "object"
+        }
+      },
+      "required": [
+        "totals"
+      ],
+      "title": "ScorePayload",
+      "type": "object"
+    },
+    "SeatState": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "seat_state",
+          "default": "seat_state",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/SeatStatePayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "SeatState",
+      "type": "object"
+    },
+    "SeatStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "autoplay",
+            "bot"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seat",
+        "status"
+      ],
+      "title": "SeatStatePayload",
+      "type": "object"
+    },
+    "StateSync": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "state_sync",
+          "default": "state_sync",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/StateSyncPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "StateSync",
+      "type": "object"
+    },
+    "StateSyncPayload": {
+      "additionalProperties": false,
+      "description": "Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for\n(`seat=None` for a spectator). `legal_actions`/`claim_options` are the JSON-safe dicts\n`mahjong_core.actions.action_to_dict`/`ws.py`'s claim-offer serializer produce -- a full\ntyped model per `Action`/`ClaimOffer` variant would just re-derive that same shape with no\nredaction benefit (same reasoning `SeatView`'s own docstring gives for reusing those types\ndirectly instead of inventing wire-only ones).",
+      "properties": {
+        "seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Seat"
+        },
+        "hand_no": {
+          "title": "Hand No",
+          "type": "integer"
+        },
+        "prevailing": {
+          "title": "Prevailing",
+          "type": "string"
+        },
+        "dealer": {
+          "title": "Dealer",
+          "type": "integer"
+        },
+        "turn": {
+          "title": "Turn",
+          "type": "integer"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "own_hand": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Own Hand",
+          "type": "array"
+        },
+        "concealed_counts": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Concealed Counts",
+          "type": "array"
+        },
+        "melds": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "title": "Melds",
+          "type": "array"
+        },
+        "discard_pools": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "title": "Discard Pools",
+          "type": "array"
+        },
+        "flowers": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Flowers",
+          "type": "array"
+        },
+        "wall_remaining": {
+          "title": "Wall Remaining",
+          "type": "integer"
+        },
+        "seat_status": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Seat Status",
+          "type": "array"
+        },
+        "scores": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Scores",
+          "type": "array"
+        },
+        "legal_actions": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Legal Actions",
+          "type": "array"
+        },
+        "claim_options": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Claim Options",
+          "type": "array"
+        },
+        "deadline_ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deadline Ts"
+        }
+      },
+      "required": [
+        "seat",
+        "hand_no",
+        "prevailing",
+        "dealer",
+        "turn",
+        "phase",
+        "own_hand",
+        "concealed_counts",
+        "melds",
+        "discard_pools",
+        "flowers",
+        "wall_remaining",
+        "seat_status",
+        "scores",
+        "legal_actions",
+        "claim_options",
+        "deadline_ts"
+      ],
+      "title": "StateSyncPayload",
+      "type": "object"
+    },
+    "Turn": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "turn",
+          "default": "turn",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/TurnPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "Turn",
+      "type": "object"
+    },
+    "TurnPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "title": "Seat",
+          "type": "integer"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "deadline_ts": {
+          "title": "Deadline Ts",
+          "type": "integer"
+        },
+        "legal": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Legal"
+        }
+      },
+      "required": [
+        "seat",
+        "phase",
+        "deadline_ts"
+      ],
+      "title": "TurnPayload",
+      "type": "object"
     }
   },
-  "discriminator": {
-    "mapping": {
-      "error": "#/$defs/Error",
-      "hello": "#/$defs/Hello",
-      "ping": "#/$defs/Ping",
-      "pong": "#/$defs/Pong"
-    },
-    "propertyName": "t"
-  },
-  "oneOf": [
+  "anyOf": [
     {
-      "$ref": "#/$defs/Hello"
+      "discriminator": {
+        "mapping": {
+          "auto": "#/$defs/Auto",
+          "chat": "#/$defs/Chat",
+          "claim": "#/$defs/Claim",
+          "declare": "#/$defs/Declare",
+          "discard": "#/$defs/Discard",
+          "hello": "#/$defs/Hello",
+          "join": "#/$defs/Join",
+          "ping": "#/$defs/Ping",
+          "ready": "#/$defs/Ready"
+        },
+        "propertyName": "t"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Hello"
+        },
+        {
+          "$ref": "#/$defs/Ping"
+        },
+        {
+          "$ref": "#/$defs/Join"
+        },
+        {
+          "$ref": "#/$defs/Ready"
+        },
+        {
+          "$ref": "#/$defs/Discard"
+        },
+        {
+          "$ref": "#/$defs/Claim"
+        },
+        {
+          "$ref": "#/$defs/Declare"
+        },
+        {
+          "$ref": "#/$defs/Auto"
+        },
+        {
+          "$ref": "#/$defs/Chat"
+        }
+      ]
     },
     {
-      "$ref": "#/$defs/Ping"
-    },
-    {
-      "$ref": "#/$defs/Pong"
-    },
-    {
-      "$ref": "#/$defs/Error"
+      "discriminator": {
+        "mapping": {
+          "ack": "#/$defs/Ack",
+          "claim_offer": "#/$defs/ClaimOffer",
+          "claim_resolved": "#/$defs/ClaimResolved",
+          "deal": "#/$defs/Deal",
+          "discard": "#/$defs/DiscardEvent",
+          "draw": "#/$defs/Draw",
+          "error": "#/$defs/Error",
+          "flower_replace": "#/$defs/FlowerReplace",
+          "game_end": "#/$defs/GameEnd",
+          "hand_end": "#/$defs/HandEnd",
+          "hand_start": "#/$defs/HandStart",
+          "kong_replace": "#/$defs/KongReplace",
+          "meld": "#/$defs/Meld",
+          "pong": "#/$defs/Pong",
+          "score": "#/$defs/Score",
+          "seat_state": "#/$defs/SeatState",
+          "state_sync": "#/$defs/StateSync",
+          "turn": "#/$defs/Turn"
+        },
+        "propertyName": "t"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Pong"
+        },
+        {
+          "$ref": "#/$defs/Error"
+        },
+        {
+          "$ref": "#/$defs/StateSync"
+        },
+        {
+          "$ref": "#/$defs/HandStart"
+        },
+        {
+          "$ref": "#/$defs/Deal"
+        },
+        {
+          "$ref": "#/$defs/FlowerReplace"
+        },
+        {
+          "$ref": "#/$defs/Draw"
+        },
+        {
+          "$ref": "#/$defs/DiscardEvent"
+        },
+        {
+          "$ref": "#/$defs/ClaimOffer"
+        },
+        {
+          "$ref": "#/$defs/ClaimResolved"
+        },
+        {
+          "$ref": "#/$defs/Meld"
+        },
+        {
+          "$ref": "#/$defs/KongReplace"
+        },
+        {
+          "$ref": "#/$defs/Turn"
+        },
+        {
+          "$ref": "#/$defs/HandEnd"
+        },
+        {
+          "$ref": "#/$defs/Score"
+        },
+        {
+          "$ref": "#/$defs/GameEnd"
+        },
+        {
+          "$ref": "#/$defs/SeatState"
+        },
+        {
+          "$ref": "#/$defs/Ack"
+        }
+      ]
     }
   ]
 }

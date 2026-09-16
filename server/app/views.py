@@ -48,7 +48,7 @@ from dataclasses import dataclass, field, fields
 from enum import Enum
 from typing import Any, Literal, cast
 
-from mahjong_core.actions import Action
+from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.actions import legal_actions as compute_legal_actions
 from mahjong_core.engine import (
     ClaimResolved,
@@ -79,6 +79,7 @@ __all__ = [
     "SeatView",
     "redact_event",
     "seat_view",
+    "seat_view_wire",
 ]
 
 
@@ -140,11 +141,20 @@ class SeatView:
 
 
 def seat_view(
-    state: GameState, seat: int | None, *, seat_status: _SeatStatus | None = None
+    state: GameState,
+    seat: int | None,
+    *,
+    seat_status: _SeatStatus | None = None,
+    claim_deadline_ts: int | None = None,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
     override point for the future `app/room.py` `SeatBinding` (see module docstring); omit it
-    and every seat reads as `"connected"`.
+    and every seat reads as `"connected"`. `claim_deadline_ts` is the same kind of override for
+    `deadline_ts`: `ClaimWindow.deadline_ts` is never set by the pure engine (state.py's own
+    docstring -- "arming and enforcing the actual timer is app/room.py's job"), so `app/room.py`
+    passes its own `TimerHeap`-derived, epoch-converted deadline here once a window is armed;
+    omit it (as every caller before the Room/Session integration sub-task did) and this falls
+    back to the always-`None` `window.deadline_ts`.
     """
     own_hand = state.seats[seat].concealed if seat is not None else ()
     legal = compute_legal_actions(state, seat) if seat is not None else ()
@@ -156,7 +166,7 @@ def seat_view(
         offer = next((o for o in window.offers if o.seat == seat), None)
         if offer is not None:
             claim_options = (offer,)
-            deadline_ts = window.deadline_ts
+            deadline_ts = claim_deadline_ts if claim_deadline_ts is not None else window.deadline_ts
 
     return SeatView(
         seat=seat,
@@ -408,6 +418,47 @@ def _wire_value(value: Any) -> Any:
     if isinstance(value, Mapping):
         return dict(value)
     return value
+
+
+def _meld_wire(meld: Meld) -> dict[str, Any]:
+    return {"kind": meld.kind.value, "tiles": list(meld.tiles), "from_seat": meld.from_seat}
+
+
+def _claim_offer_wire(offer: ClaimOffer) -> dict[str, Any]:
+    return {
+        "seat": offer.seat,
+        "can_win": offer.can_win,
+        "melds": [_meld_wire(m) for m in offer.melds],
+    }
+
+
+def seat_view_wire(view: SeatView) -> dict[str, Any]:
+    """JSON-safe wire dict for a `SeatView` -- `state_sync`'s payload (02-protocol.md §3),
+    built by app/room.py on `join` and (a later sub-task) reconnect. Mirrors `redact_event`'s
+    tail (already-redacted typed data -> wire-safe primitives), but `SeatView.legal_actions`/
+    `claim_options` hold real `mahjong_core.actions.Action`/`mahjong_core.state.ClaimOffer`
+    instances rather than one `WireEvent` dataclass, so they get their own small serializers
+    here instead of `_wire_value`'s generic tuple/mapping unwrap.
+    """
+    return {
+        "seat": view.seat,
+        "hand_no": view.hand_no,
+        "prevailing": view.prevailing.name,
+        "dealer": view.dealer,
+        "turn": view.turn,
+        "phase": view.phase.value,
+        "own_hand": list(view.own_hand),
+        "concealed_counts": list(view.concealed_counts),
+        "melds": [[_meld_wire(m) for m in seat_melds] for seat_melds in view.melds],
+        "discard_pools": [list(pool) for pool in view.discard_pools],
+        "flowers": [[tile_code(f) for f in fl] for fl in view.flowers],
+        "wall_remaining": view.wall_remaining,
+        "seat_status": list(view.seat_status),
+        "scores": list(view.scores),
+        "legal_actions": [action_to_dict(a) for a in view.legal_actions],
+        "claim_options": [_claim_offer_wire(o) for o in view.claim_options],
+        "deadline_ts": view.deadline_ts,
+    }
 
 
 def redact_event(state: GameState, seat: int | None, event: Event) -> dict[str, Any]:

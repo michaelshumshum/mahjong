@@ -37,13 +37,24 @@ def ts_name(cls: type[BaseModel]) -> str:
 
 
 def _union_members(discriminated: Any) -> list[type[BaseModel]]:
-    """Unwrap `Annotated[X | Y | ..., Field(discriminator=...)]` to [X, Y, ...]."""
+    """Unwrap `Annotated[X | Y | ..., Field(discriminator=...)]` to [X, Y, ...]. Recurses into
+    non-model members (`app/protocol.py`'s `AnyMessage = ClientMessage | ServerMessage`, a
+    plain union of two *already*-discriminated unions -- the `discard` tag is reused across
+    directions with different shapes, so one flat discriminator can't cover both; see that
+    module's docstring) so callers always get a flat list of leaf message classes regardless
+    of how many discriminated unions are nested."""
     if typing.get_origin(discriminated) is typing.Annotated:
         discriminated = typing.get_args(discriminated)[0]
     members = typing.get_args(discriminated)
     if not members:
         raise TypeError(f"gen_protocol: expected a Union, got {discriminated!r}")
-    return list(members)
+    flat: list[type[BaseModel]] = []
+    for member in members:
+        if isinstance(member, type) and issubclass(member, BaseModel):
+            flat.append(member)
+        else:
+            flat.extend(_union_members(member))
+    return flat
 
 
 def _nested_models(annotation: Any) -> list[type[BaseModel]]:
@@ -107,6 +118,8 @@ def ts_type(annotation: Any) -> str:
         return " | ".join(parts)
     if annotation is type(None):
         return "null"
+    if annotation is Any:
+        return "unknown"
     if annotation is str:
         return "string"
     if annotation in (int, float):

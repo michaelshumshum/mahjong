@@ -200,6 +200,26 @@ result re-enters through the same `inbox` as any human command, tagged with the
 `(window_id, state_version)` it was computed against, and is **dropped** if either has moved on
 by the time it arrives — the same staleness protection a laggy human click gets (§4).
 
+**Session/WS integration (M3 sub-task 4).** `SeatBinding` (`app/room.py`) ended up holding a
+live socket's push callback, `ready`/pre-arm (`auto`) state, and a per-seat `IdempotencyCache`
+(`app/idempotency.py`, §1's "per seat binding, not per socket" scope) — richer than this
+sketch's one-line placeholder, but the same object. `join`/`mark_ready`/`set_auto` mutate it
+directly from `Session` rather than through `inbox`/`Command` — safe because they're
+synchronous, no-`await` calls on the room's own event loop, same single-writer discipline as
+everything else here, just not routed through `reduce()` (which only ever applies a
+`mahjong_core.actions.Action`, and joining/pre-arming isn't one). A room built with
+`require_ready=True` (every room `app/ws.py` creates) additionally refuses every command until
+all four seats have both joined *and* sent `ready` (§2's "seat assignment"); `Room.__init__`
+still deals hand 1 immediately as this sketch always did, but nothing gets published to a seat
+until that gate opens. Several server events sketched in [02-protocol.md
+§3](02-protocol.md) — `hand_start`, `deal`, `turn`, `claim_offer`, `score` — have no backing
+`mahjong_core.engine.Event`: the pure engine returns none for a hand's opening deal (`new_game`/
+`start_next_hand` build `GameState` directly, not through `reduce()`) and never modeled "it's
+now someone's turn" or "a claim window opened" as `Event`s in the first place, since deciding
+*when a client should be told* is a wire-recipient concern (the same boundary `redact_event`'s
+own docstring already draws for `discard.pool_index`). `Room` synthesizes all five directly,
+at the exact points in its own loop that would otherwise have called `redact_event`.
+
 ### Outbound backpressure
 
 Session pumps a **bounded** outbound queue per connection (default 64 frames), not an unbounded
@@ -212,9 +232,20 @@ Overflow policy: drop the oldest queued frames first (a stale `draw` matters les
 ahead of it and send that instead. Because `seq` is per-seat and gapless (D1, above), a drop is
 self-healing: the client's next `last_seq` is behind, the resume protocol
 ([02-protocol.md §5](02-protocol.md)) notices the gap on its own and requests exactly the
-`state_sync` this policy already forces. The socket write itself carries its own timeout so a
-fully wedged connection can't block the Room task waiting on Session — Session, not Room, absorbs
-the slow consumer.
+`state_sync` this policy already forces.
+
+**Implementation (M3 sub-task 4, `app/outbox.py`'s `BoundedOutbox`).** Room isolation from a
+slow consumer comes from task separation, not a socket-write timeout: `Room.publish_to_seat`
+only ever calls `SeatBinding.send`, a synchronous, non-blocking `push()` onto the queue —
+never `await`s the actual socket write. A separate `Session.writer()` task owns the real
+`websocket.send_text()` loop, so a stalled TCP connection blocks only that task; the Room task
+is never waiting on Session for anything. The overflow policy itself: drop the oldest frame
+that isn't `ack`/`error`, and the instant anything is dropped, clear every remaining
+non-critical frame and ask `Room` to publish a fresh `state_sync` in its place (allocating a
+real `seq` the normal way, rather than the queue fabricating one — see `app/outbox.py`'s module
+docstring). If the queue is still over capacity after that (every frame queued was `ack`/
+`error`, or stayed over capacity post-collapse), the connection is dead, not just slow, and
+`Session` closes it.
 
 ## 4. Claim window
 
