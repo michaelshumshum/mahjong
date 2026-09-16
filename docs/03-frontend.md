@@ -211,22 +211,63 @@ The server closes claim windows **early** — as soon as no better claim is poss
 
 ## 6. Client state
 
+**Implemented as of the `lib/net/` + `lib/game/store.svelte.ts` plumbing sub-task** — the shape
+below is what actually shipped, not the earlier illustrative sketch (fields renamed to mirror
+the wire payloads more directly once the real `ServerEvent` union existed to build against).
+
 ```ts
+// lib/game/state.ts — plain data, no runes, so lib/net/reducer.spec.ts can test it directly
+interface ClientGameState {
+  seat: number | null;                 // learned from state_sync.seat once joined
+  handNo: number; prevailing: string; dealer: number; turn: number; phase: string;
+  ownHand: number[];                   // real tile_ids — this seat's own concealed hand only
+  concealedCounts: number[];           // length-4, count-only for every seat incl. this one
+  melds: MeldState[][];                // length-4; concealed_kong is {tiles:null,count} until reveal
+  discardPools: number[][];            // length-4, append-only, indexed by pool_index
+  flowers: string[][];
+  wallRemaining: number; seatStatus: string[]; scores: number[];
+  legalActions: Record<string, unknown>[];     // this seat's turn options, else []
+  deadlineTs: number | null;
+  claimOffer: { windowId: number | null; options: Record<string, unknown>[]; deadlineTs: number | null } | null;
+  lastHandEnd: HandEndState | null; gameEnd: GameEndState | null; shutdownDeadlineTs: number | null;
+}
+
 // lib/game/store.svelte.ts
 class GameStore {
-  seq      = $state(0);        // last seq seen on THIS seat's own event stream (per-seat, not per-room — see below)
-  version  = $state(0);        // bumped every apply(); cheap change signal for non-reactive consumers
-  phase    = $state<Phase>('IDLE');
-  seats    = $state<SeatView[]>([]);
-  myHand   = $state<TileId[]>([]);
-  drawn    = $state<TileId | null>(null);
-  pool     = $state<Discard[]>([]);         // per-seat pools, see §3
-  offer    = $state<ClaimOffer | null>(null);
-  deadline = $state<number | null>(null);   // server ts, corrected by clock offset
+  state      = $state<ClientGameState>(initialClientGameState());
+  connection = $state<ConnectionStatus>('idle');   // mirrors the socket's own status
+  seq        = $state<number | null>(null);        // last seq applied — UI/debug bookkeeping only
+  version    = $state(0);                          // bumped every apply(); non-reactive-consumer signal
 
-  apply(ev: ServerEvent) { /* pure reducer, one switch, no side effects */ this.version++; }
+  constructor(socket: MahjongSocket) { /* $effect.root(() => { $effect(() => socket.onEvent(...)); ... }) */ }
+  #apply(event: ServerEvent) { this.state = reduce(this.state, event); this.version++; }
+  destroy(): void { /* disposes the $effect.root */ }
 }
 ```
+
+`GameStore` doesn't own seq-gap detection — `lib/net/socket.ts` does (below), since it needs to
+act on a gap (re-send `hello`) independently of whether anything is even listening yet. The
+store's own `seq` field is just a read-model mirror of whatever the socket already accepted.
+
+**`lib/net/socket.ts`** (`MahjongSocket`) owns the wire-level correctness rules:
+
+- Every real client intent (`join`/`ready`/`discard`/`claim`/`declare` + the `declareWin`/
+  `declareConcealedKong`/`declareAddedKong` convenience wrappers/`auto`/`chat`/`ping`), each
+  building its own envelope with a fresh idempotency `id` (`crypto.randomUUID()`-derived —
+  satisfies docs/02-protocol.md §1's per-seat-binding uniqueness; no client-side retry logic
+  exists to need de-duplication beyond that).
+- **Seq-gap detection**: tracks `lastSeq` for this stream; `state_sync` is always accepted
+  as a full replace regardless of its own seq (that *is* the resync mechanism); a frame with
+  `seq <= lastSeq` is a stale replay duplicate and is ignored; a frame with `seq > lastSeq + 1`
+  is a real gap — it's dropped (never forwarded to listeners) and triggers `#requestResync()`
+  (re-sends `hello{last_seq, seat}` on the live connection — docs/02-protocol.md §5's three-way
+  branch isn't reconnect-only, it's keyed only on what `last_seq` compares against, so re-asking
+  mid-connection is the same request). `status` exposes `'resyncing'` while this is in flight.
+- **Reconnect**: unexpected closes schedule a reconnect with exponential backoff + jitter
+  (`min(250ms * 2^attempt, 10s) ± 20%`, docs/02-protocol.md §8); `connect(resume?)` also accepts
+  caller-supplied `{lastSeq, seat}` to seed a fresh instance (the page-reload case — this project
+  doesn't yet persist those across a reload itself, e.g. to `localStorage`; a natural next step,
+  not done here since nothing currently needs it).
 
 Rules:
 

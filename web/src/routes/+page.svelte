@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { MahjongSocket } from '$lib/net/socket';
 	import { reduce } from '$lib/net/reducer';
+	import { initialClientGameState } from '$lib/game/state';
 	import type { Pong } from '$lib/net/protocol';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import type { TileCode } from '$lib/table/tile-code';
@@ -26,8 +27,9 @@
 	let unsubscribe: (() => void) | null = null;
 
 	// M0 demo (docs/05-roadmap.md §2): connect, hello, ping, render the pong.
-	// No game store yet — reduce() is called here only to exercise the reducer
-	// skeleton, its return value is unused.
+	// This page doesn't wire up lib/game/store.svelte.ts (that's /table/[id]'s job, a later
+	// sub-task) — reduce() is called here only to exercise the reducer skeleton, its return
+	// value is unused.
 	function connectAndPing(): void {
 		if (socket) return;
 		status = 'connecting';
@@ -35,7 +37,7 @@
 		const s = new MahjongSocket();
 		socket = s;
 		unsubscribe = s.onEvent((event) => {
-			reduce(null, event);
+			reduce(initialClientGameState(), event);
 			if (event.t === 'pong') lastPong = event.d;
 		});
 		s.connect();

@@ -50,6 +50,15 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   list: `.claude/skills/frontend-screenshots/SKILL.md`. Skip this for changes with no visible
   surface (pure logic, test-only, refactors with identical output).
 
+- **Testing a `*.svelte.ts` file's runes** (`$state`/`$effect`) needs the `vitest.config.ts`
+  `client` project, not `server`: Vitest's default `node` environment still loads modules through
+  Vite's SSR compile target even with `environment: 'jsdom'` set, and Svelte's server runtime
+  never runs `$effect` (there's no DOM to react into) — silently a no-op, not an error, which is
+  easy to mistake for "nothing subscribed yet" rather than "this never ran." The `client` project
+  uses real browser mode (`@vitest/browser-playwright`, reusing the `playwright` install this repo
+  already has for e2e/screenshots) so effects actually execute. Name the spec
+  `*.svelte.spec.ts` to route it there automatically; a plain `.spec.ts` importing a `.svelte.ts`
+  module still runs under `server` and any `$effect` inside it will silently never fire.
 - `typescript` stays pinned to `^6.0.3`; TS7's native/Go compiler is installed alongside as
   `@typescript/native` (`npm:typescript@^7`) and used only via `svelte-check --tsgo` (wired into
   `pnpm check`). svelte-check's own CLI hard-requires the plain `typescript` package to resolve to
