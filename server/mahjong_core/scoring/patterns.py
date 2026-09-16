@@ -1,6 +1,6 @@
 """Faan pattern detectors (docs/01-rules-spec.md §7; docs/05-roadmap.md §1, §2).
 
-Scope (this sub-task, first slice of M2): the detector framework -- `ScoringContext`, the
+Scope (first sub-task, first slice of M2): the detector framework -- `ScoringContext`, the
 `Pattern` registration shape, and `score_hand`, the per-decomposition scorer -- plus the first
 batch of patterns: the structural/suit-shape Classic patterns (All Sequences, All Pungs,
 Voided Suit, Half Flush, Full Flush) and the single-flag situational Classic patterns (No
@@ -8,9 +8,18 @@ Flowers, Self-Draw, Fully Concealed, Seat Wind, Prevailing Wind, Dragon pung). T
 picked as the starting batch because together they exercise every field `ScoringContext` needs
 (seat wind, prevailing wind, self-draw, flowers, concealed-vs-open) without requiring
 decomposition-maximisation (faan.py, later) or wall-timing context (New Six's 海底/槓上開花/
-搶槓, a later sub-task). Seven Pairs, Thirteen Orphans, the three/four-dragon and
-wind "small/big" patterns, New 18's stacking patterns, and every limit hand are later batches
--- see the sub-task breakdown in the M2 planning report this change shipped with.
+搶槓, a later sub-task).
+
+Scope (second sub-task): the "count across the whole hand" aggregate Classic/New-6 patterns --
+Small/Big Three Dragons, Small/Big Four Winds, Mixed Terminals. No `DetectorFn`/`Pattern`
+shape change was needed for these: a detector already receives the *entire* candidate `hand`
+(every group plus the pair, see `_groups_and_pair`), not one meld at a time -- sub-task 1's own
+箭刻 detector already sums dragon pungs across the whole hand this same way. "Small vs Big"
+and stacking-with-sub-task-1-patterns judgment calls are recorded in 01-rules-spec.md §7's
+footnotes next to the patterns they affect, not here.
+
+Seven Pairs, Thirteen Orphans, New 18's stacking patterns, and every limit hand are later
+batches -- see the sub-task breakdown in the M2 planning report this change shipped with.
 
 **What a detector operates on.** `hand` is one candidate full decomposition of the winning
 14 tiles: the seat's already-formed melds (`SeatState.melds` -- claimed chows/pungs/kongs, or
@@ -238,6 +247,82 @@ def _detect_dragon_pung(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     return sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES)
 
 
+def _detect_small_three_dragons(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """小三元: a dragon pair plus pungs/kongs of the other two dragons. Mutually exclusive
+    with Big Three Dragons by construction (01-rules-spec.md §7 note ²) -- no need to check
+    the pair's dragon differs from the two pungs' dragons, physical tile counts (max 4 per
+    type) already rule out an overlap."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, pair = split
+    dragon_pungs = sum(
+        1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
+    )
+    return 1 if dragon_pungs == 2 and pair.tile_type in _DRAGON_TYPES else 0
+
+
+def _detect_big_three_dragons(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """大三元: pungs/kongs of all three dragons."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    dragon_pungs = sum(
+        1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
+    )
+    return 1 if dragon_pungs == 3 else 0
+
+
+def _detect_small_four_winds(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """小四喜: a wind pair plus pungs/kongs of the other three winds."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, pair = split
+    wind_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _WIND_TYPES)
+    return 1 if wind_pungs == 3 and pair.tile_type in _WIND_TYPES else 0
+
+
+def _detect_big_four_winds(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """大四喜: pungs/kongs of all four winds."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    wind_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _WIND_TYPES)
+    return 1 if wind_pungs == 4 else 0
+
+
+def _is_terminal(tile_type: TileType) -> bool:
+    v = int(tile_type)
+    return v < 27 and v % 9 in (0, 8)
+
+
+def _is_honor(tile_type: TileType) -> bool:
+    return int(tile_type) >= 27
+
+
+def _detect_mixed_terminals(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """混么九: every group and the pair is a terminal or an honor, with at least one of each
+    present (01-rules-spec.md §7 note ²). Excluding chows outright (rather than relying on
+    `Meld.tile_type`, which is a chow's *lowest* tile and would wrongly call 1-2-3 "terminal")
+    is required here -- a chow's other tiles are never terminal or honor regardless of its
+    lowest one."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, pair = split
+    if any(m.kind == MeldKind.CHOW for m in groups):
+        return 0
+    all_melds = (*groups, pair)
+    if not all(_is_terminal(m.tile_type) or _is_honor(m.tile_type) for m in all_melds):
+        return 0
+    has_terminal = any(_is_terminal(m.tile_type) for m in all_melds)
+    has_honor = any(_is_honor(m.tile_type) for m in all_melds)
+    return 1 if has_terminal and has_honor else 0
+
+
 PATTERNS: tuple[Pattern, ...] = (
     Pattern("平糊", HandSet.CLASSIC, 1, _detect_all_sequences),
     Pattern("對對糊", HandSet.CLASSIC, 3, _detect_all_pungs),
@@ -250,6 +335,11 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("門風", HandSet.CLASSIC, 1, _detect_seat_wind),
     Pattern("圈風", HandSet.CLASSIC, 1, _detect_prevailing_wind),
     Pattern("箭刻", HandSet.CLASSIC, 1, _detect_dragon_pung),
+    Pattern("小三元", HandSet.CLASSIC, 3, _detect_small_three_dragons),
+    Pattern("大三元", HandSet.CLASSIC, 7, _detect_big_three_dragons),
+    Pattern("小四喜", HandSet.CLASSIC, 5, _detect_small_four_winds),
+    Pattern("大四喜", HandSet.CLASSIC, 8, _detect_big_four_winds),
+    Pattern("混么九", HandSet.NEW_6, 3, _detect_mixed_terminals),
 )
 
 

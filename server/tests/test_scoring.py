@@ -327,6 +327,201 @@ def test_dragon_pair_alone_does_not_count() -> None:
     assert _occurrences("箭刻", hand, _ctx()) == 0
 
 
+# --- Small Three Dragons (小三元) / Big Three Dragons (大三元) -----------------------------------
+
+
+def test_small_three_dragons() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_WHITE),
+    )
+    ctx = _ctx()
+    assert _occurrences("小三元", hand, ctx) == 1
+    assert _occurrences("大三元", hand, ctx) == 0
+
+
+def test_big_three_dragons() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _kong(TileType.DRAGON_WHITE),
+        _chow(TileType.MAN_1),
+        _pair(TileType.SOU_9),
+    )
+    ctx = _ctx()
+    assert _occurrences("大三元", hand, ctx) == 1
+    assert _occurrences("小三元", hand, ctx) == 0
+
+
+def test_two_dragon_pungs_without_dragon_pair_is_neither_small_nor_big() -> None:
+    """The small/big boundary: two dragon pungs alone (pair non-dragon) satisfy neither --
+    Small needs the dragon pair too, Big needs a third dragon pung."""
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.SOU_9),
+    )
+    ctx = _ctx()
+    assert _occurrences("小三元", hand, ctx) == 0
+    assert _occurrences("大三元", hand, ctx) == 0
+
+
+def test_dragon_pung_still_stacks_with_small_three_dragons() -> None:
+    """01-rules-spec.md §7 note ²: 箭刻 keeps firing per dragon pung even once Small/Big Three
+    Dragons also fires on the same pungs."""
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_WHITE),
+    )
+    scored = score_hand(hand, _ctx())
+    assert scored["小三元"] == 3
+    assert scored["箭刻"] == 2
+
+
+# --- Small Four Winds (小四喜) / Big Four Winds (大四喜) -------------------------------------
+
+
+def test_small_four_winds() -> None:
+    hand = (
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.WIND_SOUTH),
+        _pung(TileType.WIND_WEST),
+        _chow(TileType.MAN_1),
+        _pair(TileType.WIND_NORTH),
+    )
+    ctx = _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)
+    assert _occurrences("小四喜", hand, ctx) == 1
+    assert _occurrences("大四喜", hand, ctx) == 0
+
+
+def test_big_four_winds() -> None:
+    hand = (
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.WIND_SOUTH),
+        _pung(TileType.WIND_WEST),
+        _kong(TileType.WIND_NORTH),
+        _pair(TileType.SOU_9),
+    )
+    ctx = _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)
+    assert _occurrences("大四喜", hand, ctx) == 1
+    assert _occurrences("小四喜", hand, ctx) == 0
+
+
+def test_three_wind_pungs_without_wind_pair_is_neither_small_nor_big() -> None:
+    hand = (
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.WIND_SOUTH),
+        _pung(TileType.WIND_WEST),
+        _chow(TileType.MAN_1),
+        _pair(TileType.SOU_9),
+    )
+    ctx = _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)
+    assert _occurrences("小四喜", hand, ctx) == 0
+    assert _occurrences("大四喜", hand, ctx) == 0
+
+
+def test_seat_wind_still_stacks_with_small_four_winds() -> None:
+    """01-rules-spec.md §7 note ²: 門風/圈風 keep firing on their matching pung even once
+    Small/Big Four Winds also fires."""
+    hand = (
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.WIND_SOUTH),
+        _pung(TileType.WIND_WEST),
+        _chow(TileType.MAN_1),
+        _pair(TileType.WIND_NORTH),
+    )
+    ctx = _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)
+    scored = score_hand(hand, ctx)
+    assert scored["小四喜"] == 5
+    assert scored["門風"] == 1
+
+
+# --- Mixed Terminals (混么九) ------------------------------------------------------------------
+
+
+def test_mixed_terminals() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_9),
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("混么九", hand, _ctx()) == 1
+
+
+def test_mixed_terminals_false_with_a_chow() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _chow(TileType.PIN_7),  # 7-8-9: lowest tile isn't terminal, but 8 isn't either
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("混么九", hand, _ctx()) == 0
+
+
+def test_mixed_terminals_false_with_a_middle_tile_pung() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5),
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("混么九", hand, _ctx()) == 0
+
+
+def test_mixed_terminals_false_terminals_only_no_honors() -> None:
+    """01-rules-spec.md §7 note ²: terminals with no honor present is All Terminals (清么九,
+    limit, not implemented yet) territory, not 混么九."""
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_9),
+        _pung(TileType.SOU_1),
+        _pung(TileType.MAN_9),
+        _pair(TileType.SOU_9),
+    )
+    assert _occurrences("混么九", hand, _ctx()) == 0
+
+
+def test_mixed_terminals_false_honors_only_no_terminals() -> None:
+    """01-rules-spec.md §7 note ²: honors with no terminal present is All Honors (字一色,
+    limit, not implemented yet) territory, not 混么九."""
+    hand = (
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.WIND_SOUTH),
+        _pung(TileType.WIND_WEST),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("混么九", hand, _ctx()) == 0
+
+
+def test_mixed_terminals_stacks_with_voided_suit_and_all_pungs() -> None:
+    """01-rules-spec.md §7 note ²: 混么九 stacks with 缺一門/對對糊 when their own conditions
+    also hold on the same hand -- nothing forbids the combination."""
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_9),
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    scored = score_hand(hand, _ctx())
+    assert scored["混么九"] == 3
+    assert scored["缺一門"] == 2
+    assert scored["對對糊"] == 3
+
+
 # --- Combinations, via score_hand -------------------------------------------------------------
 
 

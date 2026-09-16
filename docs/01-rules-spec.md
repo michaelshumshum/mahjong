@@ -189,18 +189,28 @@ Grouped into `CLASSIC`, `NEW_6`, `NEW_18` sets, each toggleable.
 | 2 | Voided Suit (exactly one of the three numbered suits absent)¹ | 缺一門 |
 | 3 | All Pungs | 對對糊 |
 | 3 | Half Flush (one suit + honors) | 混一色 |
-| 3 | Small Three Dragons | 小三元 |
+| 3 | Small Three Dragons (pair of one dragon + pungs of the other two)² | 小三元 |
 | 3 | All four Flowers *or* all four Seasons (as a set) | 正花 (flower set) |
-| 5 | Small Four Winds | 小四喜 |
+| 5 | Small Four Winds (pair of one wind + pungs of the other three)² | 小四喜 |
 | 6 | Full Flush (one suit, no honors) | 清一色 |
-| 7 | Big Three Dragons | 大三元 |
-| 8 | Big Four Winds | 大四喜 |
+| 7 | Big Three Dragons (pungs of all three)² | 大三元 |
+| 8 | Big Four Winds (pungs of all four)² | 大四喜 |
 | **Limit** | Thirteen Orphans | 十三么 |
 | **Limit** | All Honors | 字一色 |
 | **Limit** | All Terminals | 清么九 |
 | **Limit** | Nine Gates | 九蓮寶燈 |
 | **Limit** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
 | **Limit** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
+
+² **Small vs. Big are mutually exclusive by construction, and both stack with the base
+per-pung faan.** Small needs a pair of the "leftover" dragon/wind; Big needs pungs of all of
+them. A hand can never qualify for both: pungs of all three dragons (or all four winds)
+already commit 3 of each type's 4 physical tiles, leaving at most 1 — never enough for the
+pair Small requires. Same trick as 缺一門 vs Half/Full Flush below, no special-cased mutual
+exclusion needed at scoring time. Nothing above says 箭刻 (per dragon pung) or 門風/圈風 stop
+applying once Small/Big Three Dragons or Small/Big Four Winds also fire on the same pungs —
+they stack, the same way Seat Wind and Prevailing Wind already stack on a dealer's own East
+pung.
 
 ¹ **Exactly one, not "at most one."** A hand using tiles from only one suit (or zero, all
 honors) is Half Flush/Full Flush/All Honors territory — stronger patterns that already imply
@@ -212,12 +222,20 @@ separate "don't stack these" rule to enforce at scoring time.
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
-| 3 | Mixed Terminals (terminals + honors only) | 混么九 |
+| 3 | Mixed Terminals (terminals + honors only, both present)² | 混么九 |
 | 1 | Chicken Hand (zero other faan)¹ | 雞糊 |
 | 1 | Win on last wall tile | 海底撈月 |
 | 1 | Win on last discard | 河底撈魚 |
 | 1 | Win on kong replacement | 槓上開花 |
 | 1 | Robbing the Kong | 搶槓 |
+
+² **Both a terminal and an honor must be present, not "at most either."** Mirrors 缺一門/半
+清一色's exact-count trick: a terminals-only hand is All Terminals territory (清么九, limit)
+and an honors-only hand is All Honors territory (字一色, limit) — requiring both present keeps
+混么九 mutually exclusive with those by construction. Composition is pungs only (any chow
+necessarily includes a non-terminal, non-honor middle tile), so 混么九 always stacks with
+對對糊, and can also stack with 缺一門/混一色 when the suit-count conditions for those happen
+to hold on the same hand too — nothing above forbids it.
 
 ¹ **Conditional, not dead config:** 雞糊 is only reachable when `min_faan == 0` — at
 `min_faan >= 1` a zero-other-faan hand is already blocked from winning by the `min_faan`
