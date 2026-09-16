@@ -540,6 +540,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/buttons';
 
 	.sr-only {
 		position: absolute;
@@ -580,19 +581,21 @@
 	.chrome-toggles button {
 		min-height: 44px;
 		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface);
-		color: var(--color-text);
 		font: inherit;
 		cursor: pointer;
 	}
 
+	// inactive scenario tabs are tertiary — only the active one should draw the eye.
+	.scenario-btn {
+		@include buttons.btn-ghost;
+	}
+
 	.scenario-btn.active {
-		background: var(--color-accent);
-		border-color: var(--color-accent);
-		color: var(--color-text);
-		font-weight: 600;
+		@include buttons.btn-primary;
+	}
+
+	.chrome-toggles button {
+		@include buttons.btn-secondary;
 	}
 
 	.table-tilt {
@@ -826,12 +829,9 @@
 		right: var(--space-4);
 		min-height: 44px;
 		min-width: 44px;
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface-raised);
-		color: var(--color-text);
 		font: inherit;
 		cursor: pointer;
+		@include buttons.btn-ghost;
 	}
 
 	.toast-stack {
@@ -857,7 +857,7 @@
 		overflow-y: auto;
 		padding: var(--space-4);
 		background: var(--color-surface-raised);
-		border-radius: var(--radius-md);
+		@include buttons.panel-elevated;
 	}
 
 	.demo-hint {
@@ -875,17 +875,9 @@
 	.demo-reset {
 		min-height: 44px;
 		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface);
-		color: var(--color-text);
 		font: inherit;
 		cursor: pointer;
-
-		&:disabled {
-			opacity: 0.5;
-			cursor: not-allowed;
-		}
+		@include buttons.btn-secondary;
 	}
 
 	.demo-hand-tile {

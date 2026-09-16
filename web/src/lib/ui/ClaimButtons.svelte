@@ -50,6 +50,8 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/buttons';
+
 	// bottom-center per docs/03-frontend.md §5; fixed rather than relying on a positioned
 	// ancestor, since this component isn't slotted into the real table overlay stack yet.
 	.claim-buttons {
@@ -58,6 +60,7 @@
 		bottom: var(--space-5);
 		display: flex;
 		justify-content: center;
+		align-items: center;
 		gap: var(--space-3);
 		z-index: var(--z-overlay);
 		pointer-events: none;
@@ -68,19 +71,28 @@
 		min-width: 44px;
 		min-height: 44px;
 		padding: var(--space-2) var(--space-4);
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface-raised);
-		color: var(--color-text);
 		font: inherit;
-		font-weight: 600;
 		cursor: pointer;
 	}
 
+	// Pung/Chow/Kong: standard claim actions, secondary tier.
+	.claim-btn--chow,
+	.claim-btn--pung,
+	.claim-btn--kong {
+		@include buttons.btn-secondary;
+	}
+
+	// Pass: the do-nothing option, tertiary/ghost so it never competes with a real claim.
+	.claim-btn--pass {
+		@include buttons.btn-ghost;
+	}
+
+	// Win: the one urgent action a claim window can offer — stamped-seal primary tier. Same
+	// box geometry as the other tiers (the TimerRing sits fixed just above this row with only
+	// var(--space-2) of clearance — a taller Win button visibly collides with it), so the
+	// hierarchy comes from weight/shadow/colour alone, not size.
 	.claim-btn--win {
-		background: var(--color-accent);
-		border-color: var(--color-accent);
-		color: var(--color-text);
+		@include buttons.btn-primary;
 	}
 
 	.claim-btn:focus-visible {

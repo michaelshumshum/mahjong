@@ -92,15 +92,16 @@
 </section>
 
 <style lang="scss">
+	@use '$lib/styles/buttons';
+
 	.settings {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
 		max-width: 20rem;
 		padding: var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
 		background: var(--color-surface-raised);
+		@include buttons.panel-elevated;
 	}
 
 	h2 {
@@ -128,10 +129,26 @@
 		align-items: center;
 		gap: var(--space-2);
 		min-height: 44px;
+		padding-inline: var(--space-2);
+		margin-inline: calc(var(--space-2) * -1);
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		transition: background-color 130ms ease;
+
+		&:hover {
+			background: rgb(255 255 255 / 0.06);
+		}
+
+		&:active {
+			background: rgb(255 255 255 / 0.03);
+		}
 	}
 
 	input {
 		accent-color: var(--color-accent);
+		width: 1.05em;
+		height: 1.05em;
+		cursor: pointer;
 	}
 
 	input:focus-visible {

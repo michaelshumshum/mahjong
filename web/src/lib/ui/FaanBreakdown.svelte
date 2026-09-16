@@ -89,15 +89,16 @@
 </section>
 
 <style lang="scss">
+	@use '$lib/styles/buttons';
+
 	.faan-breakdown {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
 		max-width: 24rem;
 		padding: var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
 		background: var(--color-surface-raised);
+		@include buttons.panel-elevated;
 	}
 
 	h2 {

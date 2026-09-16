@@ -53,15 +53,16 @@
 </section>
 
 <style lang="scss">
+	@use '$lib/styles/buttons';
+
 	.chat {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
 		max-width: 20rem;
 		padding: var(--space-4);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
 		background: var(--color-surface-raised);
+		@include buttons.panel-elevated;
 	}
 
 	h2 {
@@ -110,12 +111,10 @@
 	.phrase-btn {
 		min-height: 44px;
 		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface);
-		color: var(--color-text);
 		font: inherit;
+		font-size: var(--font-size-sm);
 		cursor: pointer;
+		@include buttons.btn-secondary;
 	}
 
 	.phrase-btn:focus-visible {

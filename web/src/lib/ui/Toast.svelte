@@ -16,17 +16,17 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/buttons';
+
 	.toast {
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
 		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--color-border);
 		background: var(--color-surface-raised);
 		color: var(--color-text);
-		box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
 		animation: toast-in 150ms ease-out;
+		@include buttons.panel-elevated;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -53,13 +53,11 @@
 	.dismiss {
 		min-width: 44px;
 		min-height: 44px;
-		background: none;
-		border: none;
-		color: var(--color-text-muted);
 		font-size: var(--font-size-lg);
 		line-height: 1;
 		cursor: pointer;
 		padding: 0;
+		@include buttons.btn-ghost;
 	}
 
 	.dismiss:focus-visible {

@@ -1,0 +1,142 @@
+// button/panel/input chrome mixins (docs/03-frontend.md §7.1): the three-tier interactive
+// hierarchy layered on top of the existing token palette (michaels/mahjong-frontend
+// component-craft pass — shape/depth/interaction only, no new colour values, no new type).
+//
+// physical model: chrome belongs to the same lacquered-wood/stamped-ink world as the tiles.
+// primary reads as a carved ink-seal block (inset highlight + hard shadow "riser" + soft cast
+// shadow, presses down on :active); secondary reads as a bevelled wood tile (light top-left /
+// dark bottom-right via box-shadow, lifts on :hover); tertiary is bare text until touched.
+
+@mixin btn-primary {
+	position: relative;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: var(--color-accent);
+	color: var(--color-text);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.18),
+		inset 0 -2px 0 rgb(0 0 0 / 0.2),
+		0 3px 0 rgb(0 0 0 / 0.4),
+		0 7px 12px -2px rgb(10 4 2 / 0.55);
+	transition:
+		transform 130ms ease,
+		box-shadow 130ms ease,
+		background-color 130ms ease;
+
+	&:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-accent) 90%, white 10%);
+	}
+
+	&:active:not(:disabled) {
+		transform: translateY(3px);
+		box-shadow:
+			inset 0 1px 0 rgb(255 255 255 / 0.1),
+			inset 0 -1px 0 rgb(0 0 0 / 0.25),
+			0 0 0 rgb(0 0 0 / 0.4),
+			0 2px 4px rgb(10 4 2 / 0.45);
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+}
+
+@mixin btn-secondary {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface-raised);
+	color: var(--color-text);
+	font-weight: 600;
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.07),
+		inset 0 -1px 0 rgb(0 0 0 / 0.3),
+		0 1px 2px rgb(10 4 2 / 0.35);
+	transition:
+		transform 130ms ease,
+		box-shadow 130ms ease,
+		border-color 130ms ease,
+		background-color 130ms ease;
+
+	&:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%);
+		transform: translateY(-1px);
+		box-shadow:
+			inset 0 1px 0 rgb(255 255 255 / 0.08),
+			inset 0 -1px 0 rgb(0 0 0 / 0.3),
+			0 5px 10px -2px rgb(10 4 2 / 0.5);
+	}
+
+	&:active:not(:disabled) {
+		transform: translateY(0);
+		box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.35);
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+		transform: none;
+	}
+}
+
+@mixin btn-ghost {
+	border: none;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--color-text-muted);
+	font-weight: 600;
+	// a transparent-background button can sit over anything (tiles, table felt, a scrim) — a
+	// quiet shadow keeps the label legible without giving it a visible box at rest.
+	text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+	transition:
+		background-color 130ms ease,
+		color 130ms ease;
+
+	&:hover:not(:disabled) {
+		background: rgb(255 255 255 / 0.07);
+		color: var(--color-text);
+	}
+
+	&:active:not(:disabled) {
+		background: rgb(255 255 255 / 0.03);
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+}
+
+// panels/cards/modals: a shadow tinted from --color-bg's warm brown-black (10 4 2), not
+// neutral grey, so chrome reads as sitting on the lacquered table rather than floating in
+// generic SaaS UI space.
+@mixin panel-elevated {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.03),
+		0 14px 32px -8px rgb(10 4 2 / 0.6),
+		0 4px 12px rgb(10 4 2 / 0.4);
+}
+
+// text inputs: a recessed well (inset shadow) instead of a flat single-tone border, so a
+// field reads as cut into the surface rather than a bordered box sitting on top of it.
+@mixin input-recessed {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface-raised);
+	box-shadow: inset 0 1px 4px rgb(0 0 0 / 0.4);
+	transition:
+		border-color 130ms ease,
+		box-shadow 130ms ease;
+
+	&:hover {
+		border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border) 70%);
+	}
+
+	&:focus-visible {
+		border-color: var(--color-accent);
+	}
+}

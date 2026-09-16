@@ -112,6 +112,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/buttons';
 
 	.tagline {
 		color: var(--color-text-muted);
@@ -131,12 +132,11 @@
 
 	.panel {
 		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
 		padding: var(--space-5);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
+		@include buttons.panel-elevated;
 	}
 
 	.panel h2 {
@@ -199,13 +199,11 @@
 		font-size: var(--font-size-lg);
 		letter-spacing: 0.15em;
 		text-transform: uppercase;
-		background: var(--color-surface-raised);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
 		color: var(--color-text);
 		padding: var(--space-2) var(--space-3);
 		width: 100%;
 		max-width: 12ch;
+		@include buttons.input-recessed;
 	}
 
 	input:focus-visible {
@@ -215,23 +213,13 @@
 
 	button {
 		font: inherit;
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--color-border);
-		background: var(--color-surface-raised);
-		color: var(--color-text);
 		padding: var(--space-2) var(--space-4);
+		min-height: 44px;
 		cursor: pointer;
-	}
-
-	button:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
+		@include buttons.btn-secondary;
 	}
 
 	button.primary {
-		background: var(--color-accent);
-		border-color: var(--color-accent);
-		color: var(--color-text);
-		font-weight: 600;
+		@include buttons.btn-primary;
 	}
 </style>
