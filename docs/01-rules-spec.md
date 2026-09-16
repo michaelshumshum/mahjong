@@ -253,7 +253,8 @@ to hold on the same hand too — nothing above forbids it.
 `min_faan >= 1` a zero-other-faan hand is already blocked from winning by the `min_faan`
 check itself, so 雞糊 never fires and the entry is inert. This mirrors real HK play, where
 雞糊 exists specifically for no-minimum tables. Servers should skip evaluating this pattern
-entirely when `min_faan >= 1`.
+entirely when `min_faan >= 1`. Also gated on the `NEW_6` `hand_set`, same as every other
+entry in this table — disabling `NEW_6` disables 雞糊 too, even at `min_faan == 0`.
 
 ### New 18 (新十八番) — subset most commonly used
 
