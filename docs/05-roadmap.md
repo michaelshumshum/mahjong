@@ -111,12 +111,31 @@ deadline broadcast, seq + ring buffer, reconnect/resync, disconnect→bot handov
 persistence of finished games.
 **Done when:** four scripted WS clients play a full game; killing one mid-hand and reconnecting
 resumes correctly from `last_seq`; `test_redaction` proves no seat ever receives a tile identity
-it isn't entitled to.
+it isn't entitled to. **Met.**
 
 Postgres persistence of finished `Room`-driven games (not just M1's bot-only self-play) and the
-graceful-shutdown drain (`00-architecture.md §6`/`§8.1`) are both implemented as of a later M3
+graceful-shutdown drain (`00-architecture.md §6`/`§8.1`) are implemented as of an earlier M3
 sub-task -- see those sections for what landed. The milestone's own "four scripted WS clients
-play a full game" done-when gate is a separate, later closeout sub-task, not covered by either.
+play a full game" done-when gate closed in a later, dedicated closeout sub-task: `server/tests/
+test_full_game_e2e.py` drives four real WS clients through an entire `EAST_ONLY` game (4 hands,
+dealer rotating 0→1→2→3 with both dealer-repeat flags off -- the cheapest ruleset config that
+reaches a real `Phase.GAME_OVER`), covering a real claim exchange, a real self-draw win, and a
+real mid-claim-window disconnect/reconnect in hand 3 specifically (not hand 1, where
+`test_reconnect.py`'s own scenarios already live) in one continuous run, plus a `GameRecord`
+persist check spanning the whole game's `Room.actions` log. Every frame every connection
+receives is checked live against `app/views.py`'s `Entitlement` rules, not just relying on
+`test_redaction.py`'s schema walk. The closeout audit (mirroring M2 sub-task 10's pattern) found
+and fixed a real bug this way: `mahjong_core/engine.py`'s `_deal_hand` rebuilt `GameState` on
+every hand boundary without carrying `next_window_id` forward, resetting it to 0 each hand.
+`window_id` is a whole-game identifier -- `app/room.py`'s per-window bookkeeping
+(`_armed_window_id`, `_active_seat_timer`, `_claim_deadline_ms`) is keyed by `window_id` alone
+and never reset between hands -- so any hand after the first whose first claim window reused an
+earlier hand's `window_id` had its `claim_offer` silently swallowed by `_arm_claim_timer`'s
+once-per-window idempotency guard: no offer sent, no timer armed, the window just sitting open
+forever. Only reachable with a real multi-hand game driven through `Room`, never visible to
+`mahjong_core`-only or single-hand-scoped tests -- pinned in `tests/test_engine.py::
+test_start_next_hand_carries_forward_next_window_id` before the fix. M3 is now fully complete;
+no gaps remain beyond what's already tracked elsewhere in this doc set (§4, §7, §8, §9).
 
 ### M4 — Playable client + bots (6–10 weeks)
 Lobby, table route, DOM/CSS table scene, inline-SVG tile faces, hand/pool/meld rendering,

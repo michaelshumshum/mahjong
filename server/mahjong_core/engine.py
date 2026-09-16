@@ -788,8 +788,15 @@ def _hand_to_concealed(hand: tuple[WallTile, ...]) -> tuple[TileId, ...]:
 
 def _deal_hand(state: GameState, *, dealer: int, prevailing: Wind, hand_no: int) -> GameState:
     """Deal hand `hand_no` (01-rules-spec.md §3), mirroring `state.new_game` but for hand 2+:
-    scores carry over, everything else about a seat (concealed, melds, discards, flowers)
-    starts fresh."""
+    scores and `next_window_id` carry over, everything else about a seat (concealed, melds,
+    discards, flowers) starts fresh. `next_window_id` has to survive the hand boundary because
+    `window_id` is a whole-game identifier, not a per-hand one -- `app/room.py`'s per-window
+    bookkeeping (`_armed_window_id`, `_active_seat_timer`, `_claim_deadline_ms`) is keyed by
+    `window_id` alone and is never reset between hands; resetting it to 0 here made hand 2's
+    first claim window collide with hand 1's, which silently starved it of a `claim_offer`
+    (`_arm_claim_timer`'s once-per-window idempotency guard treated it as already armed) --
+    caught by `tests/test_full_game_e2e.py`'s live multi-hand run, pinned in
+    `tests/test_engine.py::test_start_next_hand_carries_forward_next_window_id`."""
     hand_seed = derive_hand_seed(state.game_seed, hand_no)
     _, wall = new_wall(hand_seed, state.ruleset)
     hands, wall = deal_hands(wall, dealer_seat=dealer)
@@ -818,4 +825,5 @@ def _deal_hand(state: GameState, *, dealer: int, prevailing: Wind, hand_no: int)
         dealer=dealer,
         prevailing=prevailing,
         hand_no=hand_no,
+        next_window_id=state.next_window_id,
     )
