@@ -80,6 +80,62 @@ claim) iff `meld.from_seat is not None` -- `melds.py`'s `Meld.__post_init__` alr
 `from_seat` on `PAIR`/`CONCEALED_KONG`, and `decompose()` never sets it, so this single check
 correctly covers every meld kind without `ScoringContext` needing its own concealed/open flag
 that could drift out of sync with the melds it describes.
+
+Scope (fifth sub-task): the four remaining New Six win-timing patterns -- Win on Last Wall
+Tile (海底撈月), Win on Last Discard (河底撈魚), Win on Kong Replacement (槓上開花), Robbing the
+Kong (搶槓) -- plus flower faan (座位花, and 正花, a Classic-table pattern missed in sub-task 1's
+"situational" batch, folded in here since it's flower-shaped and this batch is already
+re-reading §7's flower material end to end).
+
+**Win-timing context is a stub, same as Heavenly/Earthly Hand's (third sub-task).**
+`ScoringContext` grows three more booleans, all defaulting `False`: `is_last_tile` (the wall
+was exhausted on the draw or discard that produced this win -- covers both 海底 self-draws and
+河底 claimed discards, distinguished the same way 自摸/門前清 already are, by `ctx.self_drawn`),
+`is_kong_replacement` (this win's tile came from a kong replacement draw, 槓上開花), and
+`is_robbing_kong` (this win claimed a tile another seat just added to an exposed kong -- or,
+per §11.3, a concealed kong under `concealed_kong_robbable` -- 搶槓). Real wall-remaining-count
+and kong-replacement tracking is engine-integration (sub-task 8, same as `won_before_any_discard`/
+`won_on_dealer_first_discard`) -- nothing in `wall.py`/`state.py` yet exposes "tiles left" or
+"this draw was a replacement" to the scoring layer. The detectors below are correct against
+these flags today; only their producer is a stub.
+
+**海底撈月 and 槓上開花 are mutually exclusive by construction.** A kong replacement can
+physically be the wall's last drawable tile (each kong replacement shrinks the live wall by
+one, `wall.py`); §11 edge case 6 flags this exact interaction as needing a resolved rule.
+`_detect_win_on_last_wall_tile` excludes `ctx.is_kong_replacement` so the more specific pattern
+(you won *because* of the kong) takes it instead of also double-counting the generic
+last-tile pattern -- same ladder convention as Small/Big Three Dragons and the step-sequence
+patterns. See the footnote added to 01-rules-spec.md §7.
+
+**Flower faan.** 座位花 ("each," like 箭刻/一般高: up to 2 per seat, the numbered flower and
+the numbered season matching `ctx.seat_wind`) is gated by a new `ScoringContext.flowers_score`
+field mirroring `RuleSet.flowers_score` (config.py) -- a policy toggle, not a per-win fact, but
+`ScoringContext` has no other way to reach `RuleSet` and every other field on this dataclass is
+already "whatever this batch's detectors need," so it fits the same contract rather than
+threading a whole `RuleSet` through for one bool. Defaults `True`, matching `RuleSet`'s own
+default, so a caller that doesn't set it keeps today's behavior. 正花 (all four flowers *or*
+all four seasons held at once) needs no new context field -- it only reads `ctx.flowers`, same
+as `_detect_no_flowers` already does.
+
+**What doesn't fit here.** Two §7 New-6/flower entries are deliberately *not* registered as
+`Pattern`s:
+
+- **Chicken Hand (雞糊)**, "zero other faan" (§7 note ¹): this can't be a `DetectorFn` at all
+  under the current contract -- a detector only ever sees one `hand`/`ctx` pair and reports
+  whether *its own* pattern applies, but Chicken Hand's condition is "every other registered
+  pattern reported zero," which requires already knowing the outcome of the very
+  `score_hand` loop it would need to run inside of. That's `faan.py`'s job (a later sub-task):
+  run `score_hand`, and if the result is empty (and `min_faan == 0`, per the note), award
+  Chicken Hand's floor faan.
+- **Flower instant-win** (`seven_flowers_instant_win`/`eight_flowers_instant_win`,
+  config.py, unconsumed since it was added): not a hand-shape pattern at all -- it wins the
+  hand immediately on flower count alone, with no meld decomposition, cutting the hand short
+  before a normal win would even be checked. `score_hand`/`Pattern` here only ever score an
+  already-complete, already-decomposed winning hand; there's nothing for a detector to
+  decompose for an instant win, and "cut the hand short" is turn-state-machine control flow
+  (engine.py), not a faan value to add to a `dict[str, int]`. Flagged for sub-task 8
+  (engine integration) to implement as its own win-condition check, alongside whatever
+  `faan.py` (sub-task 6) needs to award its fixed faan value.
 """
 
 from __future__ import annotations
@@ -162,7 +218,25 @@ class ScoringContext:
     - `won_on_dealer_first_discard` (地糊, Earthly Hand): the winning seat claimed win off the
       dealer's first discard of the hand.
 
-    All three default so every earlier caller/test keeps working unchanged.
+    Fifth sub-task adds four more fields (see the module docstring's "Win-timing context is a
+    stub" and "Flower faan" notes): three more win-timing stubs, permanently `False` until
+    engine-integration (sub-task 8) wires real wall/kong tracking through --
+
+    - `is_last_tile` (海底撈月/河底撈魚): the wall was exhausted on the draw or discard that
+      produced this win. Covers both the self-draw and claimed-discard cases; `self_drawn`
+      tells the detectors which one they're looking at, the same way it already disambiguates
+      自摸 from 門前清.
+    - `is_kong_replacement` (槓上開花): this win's tile came from a kong-replacement draw.
+    - `is_robbing_kong` (搶槓): this win claimed a tile another seat just added to an exposed
+      kong (or, per 01-rules-spec.md §11.3, a concealed kong under `concealed_kong_robbable`).
+
+    -- and one policy passthrough, not a per-win stub:
+
+    - `flowers_score` (座位花): mirrors `RuleSet.flowers_score` (config.py). Defaults `True`
+      like the `RuleSet` field it mirrors, so an existing caller that never sets it keeps
+      getting 座位花 scored, same as before this field existed.
+
+    All default so every earlier caller/test keeps working unchanged.
     """
 
     seat_wind: Wind
@@ -172,6 +246,10 @@ class ScoringContext:
     concealed_tiles: tuple[TileId, ...] = ()
     won_before_any_discard: bool = False
     won_on_dealer_first_discard: bool = False
+    is_last_tile: bool = False
+    is_kong_replacement: bool = False
+    is_robbing_kong: bool = False
+    flowers_score: bool = True
 
 
 DetectorFn = Callable[[tuple[Meld, ...], ScoringContext], int]
@@ -490,6 +568,76 @@ def _detect_earthly_hand(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     return 1 if ctx.seat_wind != Wind.EAST else 0
 
 
+def _detect_win_on_last_wall_tile(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """海底撈月: self-draw win on the wall's last drawable tile. Excludes
+    `ctx.is_kong_replacement` so this stays mutually exclusive with 槓上開花 when a kong
+    replacement happens to also be that last tile -- see the module docstring's ladder note
+    and the footnote added to 01-rules-spec.md §7. `ctx.is_last_tile`/`.is_kong_replacement`
+    are stub fields, always `False` until sub-task 8 -- see the module docstring."""
+    if not ctx.is_last_tile or not ctx.self_drawn or ctx.is_kong_replacement:
+        return 0
+    return 1
+
+
+def _detect_win_on_last_discard(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """河底撈魚: win claimed off the wall's last discard (the discard made right after the
+    wall's last tile was drawn, with nothing left to draw after it). `not ctx.self_drawn` is
+    the discard-vs-self-draw disambiguation `is_last_tile`'s docstring describes;
+    `not ctx.is_robbing_kong` keeps this from double-firing alongside 搶槓 on the same claim,
+    even though the two shouldn't realistically coincide (a robbed kong isn't a discard)."""
+    if not ctx.is_last_tile or ctx.self_drawn or ctx.is_robbing_kong:
+        return 0
+    return 1
+
+
+def _detect_win_on_kong_replacement(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """槓上開花: self-draw win on a kong-replacement tile. `ctx.self_drawn` is redundant with
+    `ctx.is_kong_replacement` in practice (a replacement draw is always a draw, never a claim)
+    but checked explicitly anyway, same convention as Heavenly/Earthly Hand above."""
+    return 1 if ctx.is_kong_replacement and ctx.self_drawn else 0
+
+
+def _detect_robbing_the_kong(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """搶槓: win by claiming a tile another seat just added to a kong. `not ctx.self_drawn` is
+    redundant with `ctx.is_robbing_kong` (a robbed win is always a claim, never a self-draw)
+    but checked explicitly, same convention as the rest of this batch."""
+    return 1 if ctx.is_robbing_kong and not ctx.self_drawn else 0
+
+
+_SEASON_OFFSET = 4
+
+
+def _seat_flower_types(seat_wind: Wind) -> frozenset[Flower]:
+    """The flower and season that match `seat_wind` (§7 "Flower faan": flower/season number N
+    matches the seat currently holding wind N -- East=1, South=2, West=3, North=4, 0-indexed
+    here to match `Wind`/`Flower`)."""
+    return frozenset({Flower(int(seat_wind)), Flower(int(seat_wind) + _SEASON_OFFSET)})
+
+
+def _detect_seat_flower(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """座位花, "each" like 箭刻/一般高: up to 2 (the seat-matching flower and the
+    seat-matching season). Gated by `ctx.flowers_score`, mirroring `RuleSet.flowers_score`
+    (config.py) -- see the module docstring's "Flower faan" note."""
+    if not ctx.flowers_score:
+        return 0
+    want = _seat_flower_types(ctx.seat_wind)
+    return sum(1 for f in ctx.flowers if f in want)
+
+
+_FULL_FLOWER_SET = frozenset({Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4})
+_FULL_SEASON_SET = frozenset({Flower.SEASON_1, Flower.SEASON_2, Flower.SEASON_3, Flower.SEASON_4})
+
+
+def _detect_flower_set(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """正花 (Classic table, missed in sub-task 1's situational batch -- see the module
+    docstring): holding all four flowers, or all four seasons, at once. "Each," not
+    "either/or" -- physically rare but not impossible to hold both complete sets in one hand
+    (kong-replacement chains can draw arbitrarily many flowers), so this can report 2, same
+    "each" convention as every other aggregate detector in this module."""
+    held = frozenset(ctx.flowers)
+    return int(_FULL_FLOWER_SET <= held) + int(_FULL_SEASON_SET <= held)
+
+
 def _detect_seven_pairs(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """七對子: 14 concealed tiles as 7 *distinct* pairs. Mirrors `actions.py`'s
     `_is_seven_pairs` (win-legality's shape check) for the same reason `_ORPHAN_TYPES` mirrors
@@ -694,6 +842,12 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("小四喜", HandSet.CLASSIC, 5, _detect_small_four_winds),
     Pattern("大四喜", HandSet.CLASSIC, 8, _detect_big_four_winds),
     Pattern("混么九", HandSet.NEW_6, 3, _detect_mixed_terminals),
+    Pattern("海底撈月", HandSet.NEW_6, 1, _detect_win_on_last_wall_tile),
+    Pattern("河底撈魚", HandSet.NEW_6, 1, _detect_win_on_last_discard),
+    Pattern("槓上開花", HandSet.NEW_6, 1, _detect_win_on_kong_replacement),
+    Pattern("搶槓", HandSet.NEW_6, 1, _detect_robbing_the_kong),
+    Pattern("座位花", HandSet.CLASSIC, 1, _detect_seat_flower),
+    Pattern("正花", HandSet.CLASSIC, 3, _detect_flower_set),
     Pattern("字一色", HandSet.CLASSIC, LIMIT_FAAN, _detect_all_honors, is_limit=True),
     Pattern("清么九", HandSet.CLASSIC, LIMIT_FAAN, _detect_all_terminals, is_limit=True),
     Pattern("九蓮寶燈", HandSet.CLASSIC, LIMIT_FAAN, _detect_nine_gates, is_limit=True),

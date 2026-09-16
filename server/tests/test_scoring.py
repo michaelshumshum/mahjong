@@ -12,6 +12,7 @@ import pytest
 
 from mahjong_core.actions import _is_seven_pairs as _actions_is_seven_pairs
 from mahjong_core.actions import _is_thirteen_orphans as _actions_is_thirteen_orphans
+from mahjong_core.config import HandSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.patterns import (
     LIMIT_FAAN,
@@ -54,6 +55,10 @@ def _ctx(
     concealed_tiles: tuple[TileId, ...] = (),
     won_before_any_discard: bool = False,
     won_on_dealer_first_discard: bool = False,
+    is_last_tile: bool = False,
+    is_kong_replacement: bool = False,
+    is_robbing_kong: bool = False,
+    flowers_score: bool = True,
 ) -> ScoringContext:
     return ScoringContext(
         seat_wind=seat_wind,
@@ -63,6 +68,10 @@ def _ctx(
         concealed_tiles=concealed_tiles,
         won_before_any_discard=won_before_any_discard,
         won_on_dealer_first_discard=won_on_dealer_first_discard,
+        is_last_tile=is_last_tile,
+        is_kong_replacement=is_kong_replacement,
+        is_robbing_kong=is_robbing_kong,
+        flowers_score=flowers_score,
     )
 
 
@@ -828,6 +837,161 @@ def test_earthly_hand_false_when_self_drawn() -> None:
 def test_earthly_hand_false_when_flag_unset() -> None:
     ctx = _ctx(seat_wind=Wind.SOUTH, won_on_dealer_first_discard=False)
     assert _occurrences("地糊", (), ctx) == 0
+
+
+# --- Win on Last Wall Tile (海底撈月) / Win on Last Discard (河底撈魚) --------------------------
+#
+# `is_last_tile`/`is_kong_replacement`/`is_robbing_kong` are stub context fields -- nothing in
+# wall.py/state.py yet tracks wall-remaining-count or kong-replacement provenance (sub-task 8's
+# job). These tests exercise the detectors' logic given the flags directly, the same way
+# sub-task 3's Heavenly/Earthly Hand tests did before real turn tracking existed.
+
+
+def test_win_on_last_wall_tile() -> None:
+    assert _occurrences("海底撈月", (), _ctx(self_drawn=True, is_last_tile=True)) == 1
+
+
+def test_win_on_last_wall_tile_false_when_not_self_drawn() -> None:
+    """海底撈月 is the self-draw half of the last-tile pair; a claimed win on the same
+    circumstance is 河底撈魚 instead."""
+    assert _occurrences("海底撈月", (), _ctx(self_drawn=False, is_last_tile=True)) == 0
+
+
+def test_win_on_last_wall_tile_false_when_flag_unset() -> None:
+    assert _occurrences("海底撈月", (), _ctx(self_drawn=True, is_last_tile=False)) == 0
+
+
+def test_win_on_last_wall_tile_false_for_kong_replacement() -> None:
+    """01-rules-spec.md §7 note ³: a kong replacement that happens to be the wall's last tile
+    scores as 槓上開花 only, not also 海底撈月 -- see patterns.py's ladder note."""
+    ctx = _ctx(self_drawn=True, is_last_tile=True, is_kong_replacement=True)
+    assert _occurrences("海底撈月", (), ctx) == 0
+    assert _occurrences("槓上開花", (), ctx) == 1
+
+
+def test_win_on_last_discard() -> None:
+    assert _occurrences("河底撈魚", (), _ctx(self_drawn=False, is_last_tile=True)) == 1
+
+
+def test_win_on_last_discard_false_when_self_drawn() -> None:
+    assert _occurrences("河底撈魚", (), _ctx(self_drawn=True, is_last_tile=True)) == 0
+
+
+def test_win_on_last_discard_false_when_flag_unset() -> None:
+    assert _occurrences("河底撈魚", (), _ctx(self_drawn=False, is_last_tile=False)) == 0
+
+
+def test_win_on_last_discard_false_when_robbing_kong() -> None:
+    ctx = _ctx(self_drawn=False, is_last_tile=True, is_robbing_kong=True)
+    assert _occurrences("河底撈魚", (), ctx) == 0
+
+
+# --- Win on Kong Replacement (槓上開花) ----------------------------------------------------------
+
+
+def test_win_on_kong_replacement() -> None:
+    assert _occurrences("槓上開花", (), _ctx(self_drawn=True, is_kong_replacement=True)) == 1
+
+
+def test_win_on_kong_replacement_false_when_flag_unset() -> None:
+    assert _occurrences("槓上開花", (), _ctx(self_drawn=True, is_kong_replacement=False)) == 0
+
+
+def test_win_on_kong_replacement_false_when_not_self_drawn() -> None:
+    """Defensive-only: a kong-replacement win is always a draw, this flag combination can't
+    arise from real play, but the detector checks explicitly anyway (see its docstring)."""
+    assert _occurrences("槓上開花", (), _ctx(self_drawn=False, is_kong_replacement=True)) == 0
+
+
+# --- Robbing the Kong (搶槓) ---------------------------------------------------------------------
+
+
+def test_robbing_the_kong() -> None:
+    assert _occurrences("搶槓", (), _ctx(self_drawn=False, is_robbing_kong=True)) == 1
+
+
+def test_robbing_the_kong_false_when_flag_unset() -> None:
+    assert _occurrences("搶槓", (), _ctx(self_drawn=False, is_robbing_kong=False)) == 0
+
+
+def test_robbing_the_kong_false_when_self_drawn() -> None:
+    """Defensive-only, same reasoning as 槓上開花: a robbed win is always a claim."""
+    assert _occurrences("搶槓", (), _ctx(self_drawn=True, is_robbing_kong=True)) == 0
+
+
+def test_win_timing_patterns_registered_under_new_6() -> None:
+    timing_names = {"海底撈月", "河底撈魚", "槓上開花", "搶槓"}
+    for pattern in PATTERNS:
+        if pattern.name in timing_names:
+            assert pattern.hand_set == HandSet.NEW_6
+            assert pattern.faan == 1
+
+
+# --- Seat Flower (座位花) / Flower Set (正花) ----------------------------------------------------
+
+
+def test_seat_flower_matches_flower_and_season() -> None:
+    """East (seat_wind index 0) matches FLOWER_1 (index 0) and SEASON_1 (index 4)."""
+    ctx = _ctx(seat_wind=Wind.EAST, flowers=(Flower.FLOWER_1, Flower.SEASON_1))
+    assert _occurrences("座位花", (), ctx) == 2
+
+
+def test_seat_flower_counts_only_matching_seat() -> None:
+    ctx = _ctx(seat_wind=Wind.SOUTH, flowers=(Flower.FLOWER_1, Flower.SEASON_2))
+    assert _occurrences("座位花", (), ctx) == 1  # only SEASON_2 (index 5) matches South (index 1)
+
+
+def test_seat_flower_zero_when_no_flowers_held() -> None:
+    assert _occurrences("座位花", (), _ctx(seat_wind=Wind.WEST, flowers=())) == 0
+
+
+def test_seat_flower_gated_by_flowers_score() -> None:
+    """`ctx.flowers_score` mirrors `RuleSet.flowers_score` (config.py) -- some tables disable
+    seat-flower faan outright."""
+    ctx = _ctx(seat_wind=Wind.EAST, flowers=(Flower.FLOWER_1,), flowers_score=False)
+    assert _occurrences("座位花", (), ctx) == 0
+
+
+def test_flower_set_all_flowers() -> None:
+    ctx = _ctx(
+        flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4),
+    )
+    assert _occurrences("正花", (), ctx) == 1
+
+
+def test_flower_set_all_seasons() -> None:
+    ctx = _ctx(
+        flowers=(Flower.SEASON_1, Flower.SEASON_2, Flower.SEASON_3, Flower.SEASON_4),
+    )
+    assert _occurrences("正花", (), ctx) == 1
+
+
+def test_flower_set_both_complete_sets() -> None:
+    ctx = _ctx(flowers=tuple(Flower))  # all 8
+    assert _occurrences("正花", (), ctx) == 2
+
+
+def test_flower_set_false_when_incomplete() -> None:
+    ctx = _ctx(flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3))
+    assert _occurrences("正花", (), ctx) == 0
+
+
+def test_flower_set_not_gated_by_flowers_score() -> None:
+    """正花 is a Classic-table pattern, distinct from the `flowers_score`-gated 座位花 -- it
+    keeps firing even with `flowers_score=False`."""
+    ctx = _ctx(
+        flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4),
+        flowers_score=False,
+    )
+    assert _occurrences("正花", (), ctx) == 1
+
+
+def test_seat_flower_and_flower_set_registered_under_classic() -> None:
+    for name, expected_faan in (("座位花", 1), ("正花", 3)):
+        pattern = next(p for p in PATTERNS if p.name == name)
+        assert pattern.hand_set == HandSet.CLASSIC
+        assert pattern.faan == expected_faan
+        assert pattern.is_limit is False
 
 
 # --- Limit hands don't stack (01-rules-spec.md §7 "Stacking and caps") -------------------------

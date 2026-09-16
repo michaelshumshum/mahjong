@@ -230,10 +230,16 @@ separate "don't stack these" rule to enforce at scoring time.
 | --- | --- | --- |
 | 3 | Mixed Terminals (terminals + honors only, both present)² | 混么九 |
 | 1 | Chicken Hand (zero other faan)¹ | 雞糊 |
-| 1 | Win on last wall tile | 海底撈月 |
+| 1 | Win on last wall tile³ | 海底撈月 |
 | 1 | Win on last discard | 河底撈魚 |
-| 1 | Win on kong replacement | 槓上開花 |
+| 1 | Win on kong replacement³ | 槓上開花 |
 | 1 | Robbing the Kong | 搶槓 |
+
+³ **Mutually exclusive by construction.** A kong replacement can itself be the wall's last
+drawable tile (each kong replacement shrinks the live wall by one, §5) — see edge case §11.6.
+When it is, this is scored as 槓上開花 only, not also 海底撈月: the more specific "you won
+because of the kong" pattern takes it, the same ladder convention as Small/Big Three
+Dragons/Four Winds and the step-sequence patterns above.
 
 ² **Both a terminal and an honor must be present, not "at most either."** Mirrors 缺一門/半
 清一色's exact-count trick: a terminals-only hand is All Terminals territory (清么九, limit)
@@ -309,6 +315,15 @@ not to be confused with 正花 in the Classic table above, which is a complete s
 flowers *or* all four seasons) — plus the `無花` entry above.
 Config: `flowers_score`, `seven_flowers_instant_win` (3 faan), `eight_flowers_instant_win`
 (limit).
+
+**Implementation note (§7 has no `hand_sets` group for this subsection).** 座位花 and 正花
+are both registered under `HandSet.CLASSIC` (same group as `無花`) since neither is listed
+under `NEW_6`/`NEW_18` and CLASSIC is the always-present baseline group; 座位花 is additionally
+gated by the `flowers_score` config flag specifically (independent of the `CLASSIC` toggle).
+`seven_flowers_instant_win`/`eight_flowers_instant_win` are not faan patterns at all — an
+instant win ends the hand on flower count alone, with no meld decomposition to score — so they
+aren't in `patterns.py`'s registry; see that module's docstring for where they're expected to
+land (engine.py's win-condition check, sub-task 8).
 
 ### Stacking and caps
 
