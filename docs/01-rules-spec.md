@@ -198,9 +198,15 @@ Grouped into `CLASSIC`, `NEW_6`, `NEW_18` sets, each toggleable.
 | **Limit** | Thirteen Orphans | 十三么 |
 | **Limit** | All Honors | 字一色 |
 | **Limit** | All Terminals | 清么九 |
-| **Limit** | Nine Gates | 九蓮寶燈 |
+| **Limit** | Nine Gates³ | 九蓮寶燈 |
 | **Limit** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
 | **Limit** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
+
+³ **Nine Gates' exact tile pattern**, not specified elsewhere in this doc: one suit, fully
+concealed (no calls at all — self-drawn or won on discard, either is fine), 1-1-1-2-3-4-5-6-
+7-8-9-9-9 plus exactly one more tile of that same suit, any rank 1-9. All nine possible
+14th-tile ranks qualify (the "nine-fold wait" the name refers to), not just the one actually
+drawn/claimed to complete it.
 
 ² **Small vs. Big are mutually exclusive by construction, and both stack with the base
 per-pung faan.** Small needs a pair of the "leftover" dragon/wind; Big needs pungs of all of
@@ -277,8 +283,10 @@ Config: `flowers_score`, `seven_flowers_instant_win` (3 faan), `eight_flowers_in
   (§2); in the East round the prevailing wind is East too, so the dealer's own East pung earns
   both 門風 and 圈風 — 2 faan, not 1. Nothing above says these can't combine, and real HK
   scoring awards both.
-- **Limit hands do not stack** with wind/dragon/flower faan. If a hand qualifies for more than
-  one limit hand, take the highest.
+- **Limit hands do not stack with anything** — not wind/dragon/flower faan, and not each
+  other. A qualifying hand scores at the table's `faan_cap`, full stop; every other pattern
+  that also matches (自摸, 門前清, 無花, ...) is ignored, not added on top. If a hand qualifies
+  for more than one limit hand, take the highest, not the sum.
 - `faan_cap` config: `10` (HK Mahjong Association) or `13` (common casual). Total is clamped.
 - `min_faan` config: `0 | 1 | 3 | 5`, default **3**. **A hand below the minimum cannot be
   declared a win.** Changes bot strategy fundamentally — see [04-bots.md §4](04-bots.md).

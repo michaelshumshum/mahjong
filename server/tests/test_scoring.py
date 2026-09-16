@@ -10,10 +10,17 @@ from __future__ import annotations
 
 import pytest
 
+from mahjong_core.actions import _is_thirteen_orphans as _actions_is_thirteen_orphans
 from mahjong_core.melds import Meld, MeldKind
-from mahjong_core.scoring.patterns import PATTERNS, ScoringContext, score_hand, seat_wind_for
+from mahjong_core.scoring.patterns import (
+    LIMIT_FAAN,
+    PATTERNS,
+    ScoringContext,
+    score_hand,
+    seat_wind_for,
+)
 from mahjong_core.state import Wind
-from mahjong_core.tiles import Flower, TileType, tile_ids_for_type
+from mahjong_core.tiles import Flower, TileId, TileType, tile_ids_for_type
 
 
 def _chow(low: TileType, from_seat: int | None = None) -> Meld:
@@ -39,10 +46,31 @@ def _ctx(
     prevailing_wind: Wind = Wind.SOUTH,
     self_drawn: bool = False,
     flowers: tuple[Flower, ...] = (),
+    concealed_tiles: tuple[TileId, ...] = (),
+    won_before_any_discard: bool = False,
+    won_on_dealer_first_discard: bool = False,
 ) -> ScoringContext:
     return ScoringContext(
-        seat_wind=seat_wind, prevailing_wind=prevailing_wind, self_drawn=self_drawn, flowers=flowers
+        seat_wind=seat_wind,
+        prevailing_wind=prevailing_wind,
+        self_drawn=self_drawn,
+        flowers=flowers,
+        concealed_tiles=concealed_tiles,
+        won_before_any_discard=won_before_any_discard,
+        won_on_dealer_first_discard=won_on_dealer_first_discard,
     )
+
+
+def _tiles(*types: TileType) -> tuple[TileId, ...]:
+    """One concealed hand as tile ids, one copy of each `TileType` given, in order --
+    duplicates draw a fresh physical tile each time (up to 4 copies per type)."""
+    seen: dict[TileType, int] = {}
+    ids = []
+    for t in types:
+        n = seen.get(t, 0)
+        ids.append(tile_ids_for_type(t)[n])
+        seen[t] = n + 1
+    return tuple(ids)
 
 
 def _occurrences(name: str, hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -572,3 +600,237 @@ def test_empty_when_no_pattern_matches() -> None:
     assert "對對糊" not in scored
     assert "無花" not in scored
     assert "自摸" not in scored
+
+
+# --- All Honors (字一色) ----------------------------------------------------------------------
+
+
+def test_all_honors() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _pung(TileType.WIND_EAST),
+        _kong(TileType.WIND_SOUTH),
+        _pair(TileType.DRAGON_WHITE),
+    )
+    assert _occurrences("字一色", hand, _ctx()) == 1
+
+
+def test_all_honors_false_with_a_suited_tile() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _pung(TileType.WIND_EAST),
+        _pung(TileType.MAN_1),
+        _pair(TileType.DRAGON_WHITE),
+    )
+    assert _occurrences("字一色", hand, _ctx()) == 0
+
+
+# --- All Terminals (清么九) --------------------------------------------------------------------
+
+
+def test_all_terminals() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.MAN_9),
+        _pung(TileType.PIN_1),
+        _pung(TileType.SOU_9),
+        _pair(TileType.SOU_1),
+    )
+    assert _occurrences("清么九", hand, _ctx()) == 1
+
+
+def test_all_terminals_false_with_an_honor() -> None:
+    """An honor present is 混么九 (Mixed Terminals) territory, not 清么九 -- see
+    `_detect_all_terminals`'s docstring."""
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.MAN_9),
+        _pung(TileType.PIN_1),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.SOU_1),
+    )
+    assert _occurrences("清么九", hand, _ctx()) == 0
+
+
+def test_all_terminals_false_with_a_chow() -> None:
+    """Boundary mirrored from 混么九: a 1-2-3 chow's `tile_type` (its lowest tile) reads as
+    terminal even though 2m/3m aren't."""
+    hand = (
+        _pung(TileType.MAN_1),
+        _chow(TileType.PIN_1),
+        _pung(TileType.SOU_9),
+        _pung(TileType.SOU_1),
+        _pair(TileType.MAN_9),
+    )
+    assert _occurrences("清么九", hand, _ctx()) == 0
+
+
+# --- Nine Gates (九蓮寶燈) ---------------------------------------------------------------------
+
+
+def _tiles_from_counts(suit_base: TileType, counts: list[int]) -> tuple[TileId, ...]:
+    types: list[TileType] = []
+    for rank, n in enumerate(counts):
+        types.extend([TileType(int(suit_base) + rank)] * n)
+    return _tiles(*types)
+
+
+def _nine_gates_tiles(suit_base: TileType, extra_rank: int) -> tuple[TileId, ...]:
+    counts = [3, 1, 1, 1, 1, 1, 1, 1, 3]
+    counts[extra_rank] += 1
+    return _tiles_from_counts(suit_base, counts)
+
+
+@pytest.mark.parametrize("extra_rank", range(9))
+def test_nine_gates_valid_for_any_extra_tile_rank(extra_rank: int) -> None:
+    """The exact tile pattern: 1112345678999 plus one more tile of the same suit, any rank
+    1-9 -- the boundary this pattern is defined by."""
+    tiles = _nine_gates_tiles(TileType.PIN_1, extra_rank)
+    assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 1
+
+
+def test_nine_gates_false_when_a_rank_is_missing_even_with_14_tiles_one_suit() -> None:
+    """One suit, 14 tiles, terminals and middle tiles both present -- but not the exact
+    skeleton (rank 8 is entirely absent here, with two extra 1s and 9s instead of one extra
+    tile). Proves this is an exact-count check, not "one suit, mostly filled in"."""
+    counts = [4, 1, 1, 1, 1, 1, 1, 0, 4]
+    tiles = _tiles_from_counts(TileType.SOU_1, counts)
+    assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_nine_gates_false_with_an_honor_present() -> None:
+    counts = [3, 1, 1, 1, 1, 1, 1, 1, 2]
+    extra = tile_ids_for_type(TileType.DRAGON_RED)[0]
+    tiles = _tiles_from_counts(TileType.MAN_1, counts) + (extra,)
+    assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_nine_gates_false_across_two_suits() -> None:
+    counts = [3, 1, 1, 1, 1, 1, 1, 1, 2]
+    tiles = _tiles_from_counts(TileType.MAN_1, counts) + (tile_ids_for_type(TileType.PIN_1)[0],)
+    assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_nine_gates_false_when_hand_not_fully_concealed() -> None:
+    """An open meld shrinks `concealed_tiles` below 14 -- Nine Gates has no claimed-meld
+    variant."""
+    counts = [3, 1, 1, 1, 1, 1, 1, 1, 3]  # the bare 13-tile skeleton, no 14th tile
+    tiles = _tiles_from_counts(TileType.MAN_1, counts)
+    assert _occurrences("九蓮寶燈", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+# --- Thirteen Orphans (十三么) -----------------------------------------------------------------
+
+_ORPHAN_TYPE_LIST = [
+    TileType.MAN_1,
+    TileType.MAN_9,
+    TileType.PIN_1,
+    TileType.PIN_9,
+    TileType.SOU_1,
+    TileType.SOU_9,
+    TileType.WIND_EAST,
+    TileType.WIND_SOUTH,
+    TileType.WIND_WEST,
+    TileType.WIND_NORTH,
+    TileType.DRAGON_RED,
+    TileType.DRAGON_GREEN,
+    TileType.DRAGON_WHITE,
+]
+
+
+def test_thirteen_orphans() -> None:
+    tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)  # 14th tile duplicates one orphan
+    assert _actions_is_thirteen_orphans(tiles) is True
+    assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 1
+
+
+def test_thirteen_orphans_false_missing_one_type() -> None:
+    types = [*_ORPHAN_TYPE_LIST[:-1], TileType.MAN_9, TileType.MAN_1]  # no DRAGON_WHITE at all
+    tiles = _tiles(*types)
+    assert _actions_is_thirteen_orphans(tiles) is False
+    assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_thirteen_orphans_false_for_a_standard_hand_cross_checked_against_actions() -> None:
+    """patterns.py mirrors, rather than imports, `actions.py`'s shape check (see
+    `_ORPHAN_TYPES`'s docstring in patterns.py) -- cross-validate the two agree on an
+    ordinary, nowhere-near-orphans hand so the copies can't silently drift apart."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    tiles = tuple(t for m in hand for t in m.tiles)
+    assert _actions_is_thirteen_orphans(tiles) is False
+    assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_score_hand_thirteen_orphans_includes_the_limit_entry() -> None:
+    """`decompose()` never produces a `hand` for this shape (module docstring's "Raw-hand
+    access" note) -- `score_hand` is called with an empty `hand` and the concealed tiles on
+    `context`. Every decomposition-shaped detector correctly sees no groups and stays silent;
+    `無花`/`門前清` still fire since they read only `ctx`, not `hand` -- `score_hand` doesn't
+    suppress that (excluding non-limit faan once a limit pattern applies is faan.py's job, see
+    01-rules-spec.md §7 "Limit hands do not stack with anything")."""
+    tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
+    scored = score_hand((), _ctx(concealed_tiles=tiles))
+    assert scored["十三么"] == LIMIT_FAAN
+    assert set(scored) <= {"十三么", "無花", "門前清"}
+
+
+# --- Heavenly Hand (天糊) / Earthly Hand (地糊) -------------------------------------------------
+
+
+def test_heavenly_hand() -> None:
+    ctx = _ctx(seat_wind=Wind.EAST, self_drawn=True, won_before_any_discard=True)
+    assert _occurrences("天糊", (), ctx) == 1
+
+
+def test_heavenly_hand_false_for_non_dealer() -> None:
+    ctx = _ctx(seat_wind=Wind.SOUTH, won_before_any_discard=True)
+    assert _occurrences("天糊", (), ctx) == 0
+
+
+def test_heavenly_hand_false_once_a_discard_has_happened() -> None:
+    ctx = _ctx(seat_wind=Wind.EAST, won_before_any_discard=False)
+    assert _occurrences("天糊", (), ctx) == 0
+
+
+def test_earthly_hand() -> None:
+    ctx = _ctx(seat_wind=Wind.SOUTH, self_drawn=False, won_on_dealer_first_discard=True)
+    assert _occurrences("地糊", (), ctx) == 1
+
+
+def test_earthly_hand_false_for_dealer() -> None:
+    """The dealer can't claim their own discard."""
+    ctx = _ctx(seat_wind=Wind.EAST, won_on_dealer_first_discard=True)
+    assert _occurrences("地糊", (), ctx) == 0
+
+
+def test_earthly_hand_false_when_self_drawn() -> None:
+    ctx = _ctx(seat_wind=Wind.SOUTH, self_drawn=True, won_on_dealer_first_discard=True)
+    assert _occurrences("地糊", (), ctx) == 0
+
+
+def test_earthly_hand_false_when_flag_unset() -> None:
+    ctx = _ctx(seat_wind=Wind.SOUTH, won_on_dealer_first_discard=False)
+    assert _occurrences("地糊", (), ctx) == 0
+
+
+# --- Limit hands don't stack (01-rules-spec.md §7 "Stacking and caps") -------------------------
+
+
+def test_limit_patterns_flagged_for_future_non_stacking() -> None:
+    """Limit hands don't stack with wind/dragon/flower faan, and only the highest limit
+    pattern counts when more than one applies (§7). `score_hand` doesn't implement that rule
+    itself -- it's faan.py's job, once that module exists -- so this proves the flag/value it
+    will need are set correctly on every limit pattern registered so far."""
+    limit_names = {"字一色", "清么九", "九蓮寶燈", "十三么", "天糊", "地糊"}
+    for pattern in PATTERNS:
+        assert pattern.is_limit == (pattern.name in limit_names)
+        if pattern.is_limit:
+            assert pattern.faan == LIMIT_FAAN
