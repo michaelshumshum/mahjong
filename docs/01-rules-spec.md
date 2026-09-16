@@ -186,7 +186,7 @@ Grouped into `CLASSIC`, `NEW_6`, `NEW_18` sets, each toggleable.
 | 1 | No Flowers | 無花 |
 | 1 | Self-Draw | 自摸 |
 | 1 | Fully Concealed (win on discard, no open melds) | 門前清 |
-| 2 | Voided Suit (one suit entirely absent) | 缺一門 |
+| 2 | Voided Suit (exactly one of the three numbered suits absent)¹ | 缺一門 |
 | 3 | All Pungs | 對對糊 |
 | 3 | Half Flush (one suit + honors) | 混一色 |
 | 3 | Small Three Dragons | 小三元 |
@@ -201,6 +201,12 @@ Grouped into `CLASSIC`, `NEW_6`, `NEW_18` sets, each toggleable.
 | **Limit** | Nine Gates | 九蓮寶燈 |
 | **Limit** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
 | **Limit** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
+
+¹ **Exactly one, not "at most one."** A hand using tiles from only one suit (or zero, all
+honors) is Half Flush/Full Flush/All Honors territory — stronger patterns that already imply
+"at least one suit absent." Requiring *exactly two* of the three suits present keeps 缺一門
+mutually exclusive with those by construction: a hand can never satisfy both, so there's no
+separate "don't stack these" rule to enforce at scoring time.
 
 ### New 6 (新六番)
 
@@ -249,6 +255,10 @@ Config: `flowers_score`, `seven_flowers_instant_win` (3 faan), `eight_flowers_in
 ### Stacking and caps
 
 - Faan **stack**: Full Flush (6) + All Pungs (3) = 9.
+- **Seat Wind and Prevailing Wind stack on the same pung.** A dealer's seat wind is always East
+  (§2); in the East round the prevailing wind is East too, so the dealer's own East pung earns
+  both 門風 and 圈風 — 2 faan, not 1. Nothing above says these can't combine, and real HK
+  scoring awards both.
 - **Limit hands do not stack** with wind/dragon/flower faan. If a hand qualifies for more than
   one limit hand, take the highest.
 - `faan_cap` config: `10` (HK Mahjong Association) or `13` (common casual). Total is clamped.
