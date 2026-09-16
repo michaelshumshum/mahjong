@@ -358,12 +358,26 @@ Payment, where `P = points(faan, table)`:
 | Win type | Config | Who pays what |
 | --- | --- | --- |
 | **Self-draw** 自摸 | — | Award is `1.5 × P` (keeps it divisible by three). Each of the three losers pays `0.5 × P`. |
-| **Win on discard** 出銃 | `discarder_pays_all` (default) | Discarder pays `P`. Others pay nothing. |
-| **Win on discard** | `discarder_pays_half` | Discarder pays `P/2`; the other two pay `P/4` each. |
+| **Win on discard** 出銃 | `discard_payment = ALL` (default) | Discarder pays `P`. Others pay nothing. |
+| **Win on discard** | `discard_payment = HALF` | Discarder pays `P/2`; the other two pay `P/4` each. |
 
 Worked example: 3 faan, full spicy → `P = 8`.
 - Discard win, pays-all: discarder −8, winner +8.
 - Self-draw: each loser −4, winner +12.
+
+**Rounding when `P` doesn't divide evenly.** Reachable at `faan = 0` (`P = 1`, legal only at
+`min_faan = 0`) — none of the doc's worked examples hit this since every faan ≥ 1 value in
+both tables is even. Round each share to the nearest whole point, ties up; balance by fixing
+the winner's total (`P` for a discard win, `3 ×` the rounded loser share for self-draw) and
+deriving the rest from it rather than rounding every seat independently, so payments always
+sum to zero. Under `discard_payment = HALF`, round the discarder's own half first and let any
+leftover from splitting the remaining half between the two bystanders fall back onto the
+discarder — same party the 包 rules below already single out as the more responsible payer,
+rather than a bystander.
+
+**Robbing the kong (搶槓) payment shape.** Not specified separately above or in §7: it pays
+exactly like a win on discard, with the seat whose kong was robbed standing in for the
+discarder — one seat is responsible for the winning tile reaching the winner either way.
 
 ### Penalty / responsibility rules (包) — defer to v2
 
