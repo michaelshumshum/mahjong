@@ -15,7 +15,7 @@ from mahjong_core.actions import (
     hand_is_winning_shape,
     legal_actions,
 )
-from mahjong_core.config import DEFAULT_RULESET, RuleSet
+from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import (
     ClaimKind,
@@ -28,7 +28,7 @@ from mahjong_core.state import (
     SeatState,
     new_game,
 )
-from mahjong_core.tiles import TileType, tile_ids_for_type
+from mahjong_core.tiles import Flower, TileType, tile_ids_for_type
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)
 _MAN_2 = tile_ids_for_type(TileType.MAN_2)
@@ -40,8 +40,14 @@ _MAN_7 = tile_ids_for_type(TileType.MAN_7)
 _MAN_8 = tile_ids_for_type(TileType.MAN_8)
 _MAN_9 = tile_ids_for_type(TileType.MAN_9)
 _PIN_1 = tile_ids_for_type(TileType.PIN_1)
+_PIN_2 = tile_ids_for_type(TileType.PIN_2)
+_PIN_3 = tile_ids_for_type(TileType.PIN_3)
+_PIN_4 = tile_ids_for_type(TileType.PIN_4)
 _PIN_9 = tile_ids_for_type(TileType.PIN_9)
 _SOU_1 = tile_ids_for_type(TileType.SOU_1)
+_SOU_2 = tile_ids_for_type(TileType.SOU_2)
+_SOU_3 = tile_ids_for_type(TileType.SOU_3)
+_SOU_4 = tile_ids_for_type(TileType.SOU_4)
 _SOU_9 = tile_ids_for_type(TileType.SOU_9)
 _EAST = tile_ids_for_type(TileType.WIND_EAST)
 _SOUTH = tile_ids_for_type(TileType.WIND_SOUTH)
@@ -245,16 +251,47 @@ def test_declare_win_not_offered_for_incomplete_hand() -> None:
     assert not any(isinstance(a, DeclareWin) for a in actions)
 
 
-def test_declare_win_offered_even_below_min_faan() -> None:
-    """Boundary case (see actions.py module docstring / 01-rules-spec.md §11.8): M1's
-    `legal_actions` checks win *shape* only. A structurally complete hand is offered as
-    `DeclareWin` even under a ruleset whose `min_faan` it could never actually satisfy once
-    scoring/ (M2) exists to check faan for real -- e.g. this hand is a bare 平糊 (1 faan) under
-    the default min_faan=3. Tightening this is tracked, not silently assumed away."""
-    ruleset = RuleSet(min_faan=3)
-    assert ruleset.min_faan == 3
-    seat = SeatState(concealed=_standard_winning_hand())
-    assert hand_is_winning_shape(seat)  # offered despite likely failing min_faan under M2
+def _below_min_faan_hand() -> tuple[int, ...]:
+    """A real, structurally complete 14-tile hand that scores exactly 2 faan under
+    `DEFAULT_RULESET` for a self-declared win: 平糊 (all sequences, 1) + 自摸 (1). Three suits
+    used (man/pin/sou) so 缺一門/half/full-flush all miss; a plain 9s pair so no wind/dragon
+    faan; paired with a held flower that does *not* match the acting seat's wind in the test
+    below, killing 無花 without adding 座位花."""
+    return (
+        _MAN_2[0],
+        _MAN_3[0],
+        _MAN_4[0],
+        _MAN_5[0],
+        _MAN_6[0],
+        _MAN_7[0],
+        _PIN_2[0],
+        _PIN_3[0],
+        _PIN_4[0],
+        _SOU_2[0],
+        _SOU_3[0],
+        _SOU_4[0],
+        _SOU_9[0],
+        _SOU_9[1],
+    )
+
+
+def test_declare_win_not_offered_below_min_faan() -> None:
+    """Real gate, now closed (see actions.py module docstring / 01-rules-spec.md §11.8): a
+    structurally complete hand that scores below `min_faan` under real faan counting is not
+    offered `DeclareWin`. Seat 1 (non-dealer under dealer 0, seat_wind SOUTH) so this isn't
+    confused with a dealer's pre-discard Heavenly Hand; the held flower (FLOWER_1, matches
+    EAST) doesn't match seat 1's own wind, so it kills 無花 without adding 座位花 either."""
+    assert DEFAULT_RULESET.min_faan == 3
+    state = _base_state(phase=Phase.AWAIT_ACTION, turn=1)
+    seats = list(state.seats)
+    seats[1] = dataclasses.replace(  # type: ignore[arg-type]
+        seats[1], concealed=_below_min_faan_hand(), flowers=(Flower.FLOWER_1,)
+    )
+    state = dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
+
+    assert hand_is_winning_shape(state.seats[1])
+    actions = legal_actions(state, 1)
+    assert not any(isinstance(a, DeclareWin) for a in actions)
 
 
 # --- AWAIT_CLAIMS ----------------------------------------------------------------------------

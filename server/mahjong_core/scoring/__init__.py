@@ -1,8 +1,10 @@
 """Faan scoring: pattern detection (patterns.py), decomposition maximisation (faan.py), and
-payout (payout.py, later sub-task) -- docs/05-roadmap.md §1, §2.
+faan -> points -> payments (payout.py) -- docs/05-roadmap.md §1, §2.
 
-Re-exports the public surface `patterns.py`/`faan.py` currently offer; `payout.py` will add
-its own once it exists.
+Re-exports the public surface `patterns.py`/`faan.py` offer. `payout.py`'s `Discard` would
+collide with `actions.Discard` at engine.py's only call site, so it (and its sibling
+`SelfDraw`/`WinType`) stay un-re-exported here -- engine.py imports `mahjong_core.scoring.payout`
+directly, aliased.
 """
 
 from __future__ import annotations

@@ -17,22 +17,20 @@ never empty in an active phase" invariant (05-roadmap.md §3) — that invariant
 *expected to act*, and nobody is, here. Same reasoning covers `SCORING`/`HAND_OVER`/
 `GAME_OVER`: server-computed transitions, no seat decision.
 
-**Win legality is structural only — the `min_faan` gate is deferred to M2, deliberately.**
-`01-rules-spec.md §11.8` requires a mechanically-complete hand below `min_faan` to be
-unable to win, server-side. But `min_faan` gating needs real faan counting, and
-`05-roadmap.md §2` puts "the `min_faan` gate" itself in M2's scope alongside the faan
-patterns and decomposition maximisation it depends on — `scoring/` doesn't exist yet. Faking
-a partial faan count here would mean either duplicating M2's maximisation logic ahead of
-time or shipping a wrong-but-plausible check that's worse than an honest stub. So for M1,
-`DeclareWin`/`ClaimWin` are offered whenever the hand is a **structurally valid winning
-shape** — standard melds+pair (via `melds.decompose`), Seven Pairs, or Thirteen Orphans —
-with no faan-minimum check at all. This is a real, tracked gap: `01-rules-spec.md §11.8`'s
-"disabled server-side" requirement is only fully met once engine.py wires a real faan check
-in front of these actions (or in front of `reduce()`'s handling of them) once `scoring/`
-lands. Don't ship past M2 without closing it. `hand_sets` gating of which shapes count is
-deferred the same way — Seven Pairs/Thirteen Orphans are offered as legal shapes regardless
-of `ruleset.hand_sets`, since whether they're worth any faan is exactly the same
-not-yet-built question.
+**Win legality is structural shape plus `min_faan`.** `01-rules-spec.md §11.8` requires a
+mechanically-complete hand below `min_faan` to be unable to win, server-side. M1 offered
+`DeclareWin`/`ClaimWin` on shape alone (standard melds+pair via `melds.decompose`, Seven
+Pairs, Thirteen Orphans) because `scoring/` didn't exist yet to check faan for real; that gap
+closed in M2 sub-task 8 (`05-roadmap.md §2`) -- `can_declare_win` below runs the same
+`scoring.faan.score_winning_hand` the actual win will be scored with, and only offers
+`DeclareWin` when `clears_min_faan` is true. `engine.py`'s claim-offer construction
+(`_discard_claim_offers`/`_kong_rob_offers`) does the equivalent for `ClaimWin`, via
+`build_scoring_context` below -- offers live there, not here, since they're built while
+processing a *different* seat's discard/kong, not this seat's own turn. `hand_sets` gating
+of which shapes count is still not a factor here: `score_winning_hand` already applies
+`ruleset.hand_sets`/`faan_overrides` internally (faan.py), so a shape worth zero faan under
+the table's config (an unregistered hand_set, or every override zeroed) is naturally caught
+by the same `clears_min_faan` check, with no separate shape-gating needed here.
 """
 
 from __future__ import annotations
@@ -44,6 +42,8 @@ from enum import StrEnum
 from typing import Any, Literal
 
 from mahjong_core.melds import Meld, MeldKind, decompose, legal_self_melds
+from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
 from mahjong_core.tiles import TileId, TileType, tile_id_type
 
@@ -254,6 +254,55 @@ def hand_is_winning_shape(seat: SeatState) -> bool:
     return decompose(seat.concealed) != ()
 
 
+def build_scoring_context(
+    state: GameState,
+    seat: int,
+    *,
+    self_drawn: bool,
+    is_robbing_kong: bool = False,
+    discarder: int | None = None,
+) -> ScoringContext:
+    """The `ScoringContext` for `seat` winning *right now*, real timing flags included --
+    shared by this module's own `can_declare_win` (self-declared, always `self_drawn=True`,
+    `discarder=None`) and `engine.py`'s claim-offer construction and actual win scoring
+    (`_discard_claim_offers`/`_kong_rob_offers`/`_end_win`), so there is exactly one place
+    that knows how a `GameState` maps to a `ScoringContext` -- see `GameState.total_discards`/
+    `wall_exhausted_at_last_draw`/`last_draw_was_kong_replacement`'s docstrings for what each
+    flag below reads.
+    """
+    seat_state = state.seats[seat]
+    return ScoringContext(
+        seat_wind=seat_wind_for(seat, state.dealer),
+        prevailing_wind=state.prevailing,
+        self_drawn=self_drawn,
+        flowers=seat_state.flowers,
+        won_before_any_discard=(self_drawn and seat == state.dealer and state.total_discards == 0),
+        won_on_dealer_first_discard=(
+            not self_drawn
+            and not is_robbing_kong
+            and discarder == state.dealer
+            and state.total_discards == 1
+        ),
+        is_last_tile=state.wall_exhausted_at_last_draw,
+        is_kong_replacement=state.last_draw_was_kong_replacement,
+        is_robbing_kong=is_robbing_kong,
+        flowers_score=state.ruleset.flowers_score,
+    )
+
+
+def can_declare_win(state: GameState, seat: int) -> bool:
+    """Whether `seat` may `DeclareWin` right now: structurally complete (`hand_is_winning_shape`)
+    *and* clears `state.ruleset.min_faan` under real scoring -- the M1/M2 boundary this
+    module's docstring describes. A self-declared win is always self-drawn, off no discarder.
+    """
+    seat_state = state.seats[seat]
+    if not hand_is_winning_shape(seat_state):
+        return False
+    ctx = build_scoring_context(state, seat, self_drawn=True)
+    result = score_winning_hand(seat_state.concealed, seat_state.melds, ctx, state.ruleset)
+    return result.clears_min_faan
+
+
 def legal_actions(state: GameState, seat: int) -> tuple[Action, ...]:
     """Every action `seat` may legally take right now, given `state.phase`/`state.turn`/
     `state.claim_window`. Pure: no mutation, no I/O. Returns `()` for a seat that isn't
@@ -304,7 +353,7 @@ def _turn_actions(state: GameState, seat: int) -> tuple[Action, ...]:
         else:
             actions.append(DeclareAddedKong(meld=meld))
 
-    if hand_is_winning_shape(seat_state):
+    if can_declare_win(state, seat):
         actions.append(DeclareWin())
 
     return tuple(actions)

@@ -125,28 +125,50 @@ class HandOutcome(StrEnum):
 
 class WinType(StrEnum):
     """How the winning tile was obtained -- affects New-6 faan patterns (01-rules-spec.md
-    §7: 自摸/海底撈月/搶槓) once scoring (M2) exists; engine.py records it now regardless."""
+    §7: 自摸/海底撈月/搶槓). `FLOWERS` is the instant-win variant (§7 "Flower faan",
+    `seven_flowers_instant_win`/`eight_flowers_instant_win`): it ends the hand on flower
+    count alone, with no winning tile and no meld decomposition, so it's its own value
+    rather than forced into `SELF_DRAW` -- engine.py's scoring skips `scoring.faan` entirely
+    for it (patterns.py's "What doesn't fit here" note) but still pays out like a self-draw
+    (no seat fed the win)."""
 
     SELF_DRAW = "self_draw"
     DISCARD = "discard"
     KONG_ROB = "kong_rob"
+    FLOWERS = "flowers"
 
 
 @dataclass(frozen=True)
 class HandResult:
     """The outcome of the hand that just ended, carried on `GameState.hand_result` only
-    while `phase == Phase.HAND_OVER` -- cleared once the next hand deals or the game ends."""
+    while `phase == Phase.HAND_OVER` -- cleared once the next hand deals or the game ends.
+
+    `faan`/`faan_breakdown`/`points`/`payments` are only populated for `HandOutcome.WIN`
+    (engine.py's `_finish_win`) -- an `EXHAUSTIVE_DRAW` carries none of them (no
+    `tenpai_payments` support yet, see config.py). `payments` is the per-seat point delta,
+    keyed by seat, summing to zero -- `scoring.payout.payout`'s own contract.
+    """
 
     outcome: HandOutcome
     winner: int | None = None
     win_type: WinType | None = None
     discarder: int | None = None  # who fed the win (discard/kong_rob); None otherwise
+    faan: int = 0
+    faan_breakdown: Mapping[str, int] = field(default_factory=dict)
+    points: int = 0
+    payments: Mapping[int, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.outcome == HandOutcome.WIN and self.winner is None:
             raise ValueError("a WIN result requires a winner")
         if self.outcome == HandOutcome.EXHAUSTIVE_DRAW and self.winner is not None:
             raise ValueError("an EXHAUSTIVE_DRAW result cannot have a winner")
+        if self.outcome == HandOutcome.EXHAUSTIVE_DRAW and (
+            self.faan or self.faan_breakdown or self.points or self.payments
+        ):
+            raise ValueError("an EXHAUSTIVE_DRAW result cannot carry faan/points/payments")
+        if self.payments and sum(self.payments.values()) != 0:
+            raise ValueError("payments must sum to zero")
 
 
 @dataclass(frozen=True)
@@ -221,6 +243,18 @@ class GameState:
     claim_window: ClaimWindow | None = None
     next_window_id: int = 0
     hand_result: HandResult | None = None
+    total_discards: int = 0
+    # count of discards so far this hand -- engine.py's win-timing context (天糊/地糊,
+    # 01-rules-spec.md §7): 0 means nobody has discarded yet (only the dealer can win with
+    # this true), 1 on the dealer's own first discard, checked at claim-resolution time.
+    wall_exhausted_at_last_draw: bool = False
+    # whether the most recent draw (front or back, any seat) brought the wall to
+    # `ruleset.wall_reserve` or below -- 海底撈月/河底撈魚's "last tile" flag. Monotonic
+    # within a hand: once true it stays true (no further draw can un-exhaust the wall), reset
+    # to False only by the next hand's deal.
+    last_draw_was_kong_replacement: bool = False
+    # whether the most recent draw was a kong replacement (back-of-wall) rather than a normal
+    # front draw -- 槓上開花's flag, read only together with a self-draw win on that same turn.
 
     def __post_init__(self) -> None:
         if len(self.seats) != 4:

@@ -323,8 +323,13 @@ under `NEW_6`/`NEW_18` and CLASSIC is the always-present baseline group; 座位�
 gated by the `flowers_score` config flag specifically (independent of the `CLASSIC` toggle).
 `seven_flowers_instant_win`/`eight_flowers_instant_win` are not faan patterns at all — an
 instant win ends the hand on flower count alone, with no meld decomposition to score — so they
-aren't in `patterns.py`'s registry; see that module's docstring for where they're expected to
-land (engine.py's win-condition check, sub-task 8).
+aren't in `patterns.py`'s registry. Implemented in `engine.py`'s `_flower_instant_win`
+(sub-task 8), named `七花`/`八花` there since neither has a name elsewhere in this doc.
+**Scope gap:** only checked on a mid-hand flower-*replacement* draw (`_draw_and_cascade`) —
+a hand already holding 7+/8 flowers straight off the initial deal's own replacement pass
+(`wall.replace_flowers`, called directly by `new_game`/`_deal_hand`, not through
+`_draw_and_cascade`) is not caught. Tracked, not silently assumed away; physically rare (needs
+7-8 of the 8 flowers in one 13/14-tile starting hand) but real.
 
 ### Stacking and caps
 
@@ -470,7 +475,7 @@ Write a named test for every one.
 6. Last-tile draw and last-discard win scoring, and their interaction with the wall reserve count after kongs shorten the wall.
 7. Multi-win on one discard — deferred with `multi_win`, see
    [99-deferred.md](99-deferred.md); not required for v1 launch.
-8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just hidden client-side. **M1/M2 boundary:** `mahjong_core/actions.py`'s `legal_actions` (M1) offers `DeclareWin`/`ClaimWin` on win *shape* alone (standard melds+pair, Seven Pairs, Thirteen Orphans) — the `min_faan` gate itself is M2 scope (05-roadmap.md §2, alongside the faan patterns it depends on), so this edge case isn't fully closed until engine.py wires a real faan check in front of these actions once `scoring/` exists. Tracked, not silently assumed away.
+8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just hidden client-side. **Closed (M2 sub-task 8):** `mahjong_core/actions.py`'s `can_declare_win`/`legal_actions` run real `scoring.faan.score_winning_hand` against the current `GameState` and only offer `DeclareWin` when `clears_min_faan` is true; `engine.py`'s claim-offer construction (`_discard_claim_offers`/`_kong_rob_offers`, via the same `actions.build_scoring_context`) does the equivalent for `ClaimWin`.
 9. Seven Pairs vs. standard parse of the same 14 tiles → since `NEW_18` (and therefore Seven
    Pairs) is on by default (§7, §10), this collision is a default-path case, not an opt-in
    one — scoring must maximize over *all* valid decompositions, not the first found.

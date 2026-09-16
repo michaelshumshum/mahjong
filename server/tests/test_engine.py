@@ -318,7 +318,8 @@ def test_added_kong_opens_kong_rob_window_for_a_tenpai_seat() -> None:
 
 
 def test_robbing_the_kong_ends_the_hand_as_a_kong_rob_win() -> None:
-    state = _added_kong_state()
+    # forced flowerless so the faan below is deterministic regardless of the real seeded deal
+    state = _with_seat(_added_kong_state(), 2, flowers=())
     meld = Meld(MeldKind.ADDED_KONG, tuple(_MAN_1), from_seat=1)
     state, _ = reduce(state, DeclareAddedKong(meld=meld))
     win_action = next(a for a in legal_actions(state, 2) if isinstance(a, ClaimWin))
@@ -326,8 +327,17 @@ def test_robbing_the_kong_ends_the_hand_as_a_kong_rob_win() -> None:
     state, events = reduce(state, win_action)
 
     assert state.phase == Phase.HAND_OVER
+    # 缺一門(2) + 平糊(1) + 門前清(1) + 搶槓(1) + 無花(1) = 6 faan; half-spicy points(6) = 32;
+    # a discard-shaped payment (§8's robbing-the-kong note) with default DiscardPayment.ALL.
     assert state.hand_result == HandResult(
-        outcome=HandOutcome.WIN, winner=2, win_type=WinType.KONG_ROB, discarder=0
+        outcome=HandOutcome.WIN,
+        winner=2,
+        win_type=WinType.KONG_ROB,
+        discarder=0,
+        faan=6,
+        faan_breakdown={"缺一門": 2, "平糊": 1, "門前清": 1, "搶槓": 1, "無花": 1},
+        points=32,
+        payments={0: -32, 1: 0, 2: 32, 3: 0},
     )
     assert any(isinstance(e, HandEnded) for e in events)
 
@@ -365,15 +375,293 @@ def _standard_winning_hand() -> tuple[int, ...]:
 
 
 def test_declare_win_ends_hand_as_self_draw() -> None:
+    # total_discards=1 so this isn't also a (real, correctly-scored) Heavenly Hand -- seat 0
+    # is the dealer and would otherwise still be "before any discard" here.
+    state = _state(phase=Phase.AWAIT_ACTION, turn=0, total_discards=1)
+    state = _with_seat(state, 0, concealed=_standard_winning_hand(), flowers=())
+
+    state, events = reduce(state, DeclareWin())
+
+    assert state.phase == Phase.HAND_OVER
+    # 缺一門(2) + 自摸(1) + 無花(1) = 4 faan; half-spicy points(4) = 16; self-draw split 3 ways.
+    assert state.hand_result == HandResult(
+        outcome=HandOutcome.WIN,
+        winner=0,
+        win_type=WinType.SELF_DRAW,
+        discarder=None,
+        faan=4,
+        faan_breakdown={"缺一門": 2, "自摸": 1, "無花": 1},
+        points=16,
+        payments={0: 24, 1: -8, 2: -8, 3: -8},
+    )
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+# --- claimed win: real faan/points/payments, and the min_faan gate on claim offers -----------
+
+
+def _claimable_standard_hand() -> tuple[int, ...]:
+    """13 concealed tiles: `_standard_winning_hand()` minus its 14th (pairing) tile -- the
+    same shape, waiting on a discard to complete the 2m pair instead of already holding it."""
+    return (
+        *_MAN_1[:3],
+        _MAN_4[0],
+        _MAN_5[0],
+        _MAN_6[0],
+        _MAN_7[0],
+        _MAN_8[0],
+        _MAN_9[0],
+        *_PIN_1[:3],
+        _MAN_2[0],
+    )
+
+
+def test_claim_win_off_discard_scores_and_pays_real_faan() -> None:
+    state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
+    state = _with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = _all_junk(state, except_seat=1)
+    state = _with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))
+    win_action = next(a for a in legal_actions(state, 3) if isinstance(a, ClaimWin))
+    state, events = reduce(state, win_action)
+
+    assert state.phase == Phase.HAND_OVER
+    # 缺一門(2) + 門前清(1, claimed not self-drawn) + 無花(1) = 4 faan; points(4) = 16;
+    # DiscardPayment.ALL (default): discarder pays it all, winner takes it all.
+    assert state.hand_result == HandResult(
+        outcome=HandOutcome.WIN,
+        winner=3,
+        win_type=WinType.DISCARD,
+        discarder=1,
+        faan=4,
+        faan_breakdown={"缺一門": 2, "門前清": 1, "無花": 1},
+        points=16,
+        payments={0: 0, 1: -16, 2: 0, 3: 16},
+    )
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+def test_claim_win_gated_by_min_faan_even_when_window_opens_for_another_seat() -> None:
+    """The engine-level half of the min_faan gate (`_can_win_with`/`_discard_claim_offers`,
+    distinct from `actions.can_declare_win`'s own-turn path -- see test_actions.py's
+    `test_declare_win_not_offered_below_min_faan` for that one). Seat 2 holds a legitimate
+    pung claim on the same discard so the claim window genuinely opens; seat 3's hand is
+    structurally a complete win (the same 4-faan shape as the test above) but `min_faan=5`
+    here puts it under the bar -- proving the absent offer is the gate, not an empty window.
+    """
+    ruleset = RuleSet(min_faan=5)
+    state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
+    state = _with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = _all_junk(state, except_seat=1)
+    state = _with_seat(state, 2, concealed=(_MAN_2[2], _MAN_2[3], *_JUNK_HAND[:11]))
+    state = _with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))
+
+    assert state.phase == Phase.AWAIT_CLAIMS
+    assert state.claim_window is not None
+    assert {o.seat for o in state.claim_window.offers} == {2}  # seat 3's win gated off
+    assert legal_actions(state, 3) == ()
+    pung_offer = state.claim_window.offers[0]
+    assert pung_offer.seat == 2
+    assert not pung_offer.can_win
+
+
+# --- real timing-flag contexts, from actual gameplay sequences -------------------------------
+
+
+def test_heavenly_hand_win_before_any_discard() -> None:
+    """天糊: the dealer's own dealt hand is already complete before anyone has discarded --
+    `_state()`'s fresh `new_game()` output already has `total_discards == 0` and `turn ==
+    dealer == 0`, so this is genuinely "the first decision point of the hand", not a
+    hand-built context override."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = _with_seat(state, 0, concealed=_standard_winning_hand())
+    state = _with_seat(state, 0, concealed=_standard_winning_hand(), flowers=())
 
     state, events = reduce(state, DeclareWin())
 
     assert state.phase == Phase.HAND_OVER
     assert state.hand_result == HandResult(
-        outcome=HandOutcome.WIN, winner=0, win_type=WinType.SELF_DRAW, discarder=None
+        outcome=HandOutcome.WIN,
+        winner=0,
+        win_type=WinType.SELF_DRAW,
+        discarder=None,
+        faan=DEFAULT_RULESET.faan_cap,
+        faan_breakdown={"天糊": DEFAULT_RULESET.faan_cap},
+        points=128,
+        payments={0: 192, 1: -64, 2: -64, 3: -64},
     )
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+def test_earthly_hand_win_on_dealer_first_discard() -> None:
+    """地糊: a non-dealer claims win on the dealer's own first discard of the hand -- reached
+    via one real `Discard` from the fresh post-deal state (`total_discards` goes 0 -> 1 right
+    there), not by setting the flag directly."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=0)
+    state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = _all_junk(state, except_seat=0)
+    state = _with_seat(state, 2, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))  # dealer's first discard
+    win_action = next(a for a in legal_actions(state, 2) if isinstance(a, ClaimWin))
+    state, events = reduce(state, win_action)
+
+    assert state.phase == Phase.HAND_OVER
+    assert state.hand_result == HandResult(
+        outcome=HandOutcome.WIN,
+        winner=2,
+        win_type=WinType.DISCARD,
+        discarder=0,
+        faan=DEFAULT_RULESET.faan_cap,
+        faan_breakdown={"地糊": DEFAULT_RULESET.faan_cap},
+        points=128,
+        payments={0: -128, 1: 0, 2: 128, 3: 0},
+    )
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+def test_win_on_last_wall_tile_scores_last_tile_self_draw() -> None:
+    """海底撈月: a real front draw off a one-tile wall lands the winning tile, setting
+    `wall_exhausted_at_last_draw` from `_draw_for_turn` itself -- not a hand-built context."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_MAN_2[1],)))
+    state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]), flowers=())
+    state = _all_junk(state, except_seat=0)
+    state = _with_seat(state, 1, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_EAST[0]))  # no claims -> seat 1 draws the last tile
+
+    assert state.phase == Phase.AWAIT_ACTION
+    assert state.turn == 1
+    assert state.wall_exhausted_at_last_draw is True
+    assert state.last_draw_was_kong_replacement is False
+    assert _MAN_2[1] in state.seats[1].concealed
+
+    state, events = reduce(state, DeclareWin())
+
+    assert state.phase == Phase.HAND_OVER
+    result = state.hand_result
+    assert result is not None
+    assert result.win_type == WinType.SELF_DRAW
+    # 缺一門(2) + 自摸(1) + 無花(1) + 海底撈月(1) = 5 faan.
+    assert result.faan == 5
+    assert result.faan_breakdown["海底撈月"] == 1
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+def test_win_on_last_discard_scores_river_bottom() -> None:
+    """河底撈魚: the wall empties on seat 1's draw (a tile they don't need), they discard it
+    right back out, and seat 3 claims that discard for the win -- `wall_exhausted_at_last_draw`
+    carries across the intervening discard/claim-window turns untouched, exactly as it must
+    for "the last possible discard" to be claimable at all."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_MAN_2[1],)))
+    state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]), flowers=())
+    state = _all_junk(state, except_seat=0)
+    state = _with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_EAST[0]))  # seat 1 draws the wall's last tile
+    assert _MAN_2[1] in state.seats[1].concealed
+    assert state.wall_exhausted_at_last_draw is True
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))  # seat 1 doesn't need it either
+    win_action = next(a for a in legal_actions(state, 3) if isinstance(a, ClaimWin))
+    state, events = reduce(state, win_action)
+
+    assert state.phase == Phase.HAND_OVER
+    result = state.hand_result
+    assert result is not None
+    assert result.win_type == WinType.DISCARD
+    assert result.discarder == 1
+    # 缺一門(2) + 門前清(1) + 無花(1) + 河底撈魚(1) = 5 faan.
+    assert result.faan == 5
+    assert result.faan_breakdown["河底撈魚"] == 1
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+def test_win_on_kong_replacement_scores_kong_replacement() -> None:
+    """槓上開花: a concealed kong's own replacement draw (drawn from the back of the wall by
+    `_apply_self_kong` -> `_draw_for_turn`) completes the hand -- `last_draw_was_kong_replacement`
+    comes from that real draw, not a hand-built context. An extra tile ahead of it on the wall
+    keeps `wall_exhausted_at_last_draw` false, isolating this from 海底撈月. `total_discards=1`
+    so seat 0 (the dealer) isn't also mistaken for a (real, correctly-scored) Heavenly Hand."""
+    state = _state(
+        phase=Phase.AWAIT_ACTION, turn=0, total_discards=1, wall=Wall(tiles=(_SOU_1[3], _MAN_2[1]))
+    )
+    state = _with_seat(
+        state,
+        0,
+        concealed=(
+            *_MAN_1,
+            _MAN_4[0],
+            _MAN_5[0],
+            _MAN_6[0],
+            _MAN_7[0],
+            _MAN_8[0],
+            _MAN_9[0],
+            *_PIN_1[:3],
+            _MAN_2[0],
+        ),
+        flowers=(),
+    )
+    meld = Meld(MeldKind.CONCEALED_KONG, tuple(_MAN_1))
+
+    state, _ = reduce(state, DeclareConcealedKong(meld=meld))
+
+    assert state.phase == Phase.AWAIT_ACTION
+    assert state.last_draw_was_kong_replacement is True
+    assert state.wall_exhausted_at_last_draw is False
+    assert _MAN_2[1] in state.seats[0].concealed
+
+    state, events = reduce(state, DeclareWin())
+
+    assert state.phase == Phase.HAND_OVER
+    result = state.hand_result
+    assert result is not None
+    assert result.win_type == WinType.SELF_DRAW
+    # 缺一門(2) + 自摸(1) + 無花(1) + 槓上開花(1) = 5 faan.
+    assert result.faan == 5
+    assert result.faan_breakdown["槓上開花"] == 1
+    assert any(isinstance(e, HandEnded) for e in events)
+
+
+# --- flower instant-win ------------------------------------------------------------------------
+
+
+def test_seven_flowers_instant_win_ends_hand_immediately() -> None:
+    """`seven_flowers_instant_win`: a seat's flower-replacement cascade itself ends the hand
+    the moment its 7th flower is set aside -- no winning tile, no meld decomposition. The wall
+    is arranged so a plain discard's follow-up draw cascades through 7 distinct flowers
+    (`Flower` has only 8 values total, no duplicates, so 7 is "all but one")."""
+    ruleset = RuleSet(seven_flowers_instant_win=True)
+    tiles = (
+        Flower.FLOWER_1,
+        Flower.SEASON_3,
+        Flower.SEASON_2,
+        Flower.SEASON_1,
+        Flower.FLOWER_4,
+        Flower.FLOWER_3,
+        Flower.FLOWER_2,
+    )
+    state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=tiles))
+    state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
+    state = _all_junk(state, except_seat=0)
+
+    state, events = reduce(state, Discard(tile_id=_EAST[0]))
+
+    assert state.phase == Phase.HAND_OVER
+    assert len(state.seats[1].flowers) == 7
+    assert state.hand_result == HandResult(
+        outcome=HandOutcome.WIN,
+        winner=1,
+        win_type=WinType.FLOWERS,
+        discarder=None,
+        faan=3,
+        faan_breakdown={"七花": 3},
+        points=8,
+        payments={0: -4, 1: 12, 2: -4, 3: -4},
+    )
+    assert any(isinstance(e, FlowerReplaced) for e in events)
     assert any(isinstance(e, HandEnded) for e in events)
 
 

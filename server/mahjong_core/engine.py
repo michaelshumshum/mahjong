@@ -26,17 +26,27 @@ a "should terminate eventually" comment. Hand-to-hand and game-to-game bookkeepi
 dealer/prevailing-wind rotation is O(1) -- so it cannot loop at all, let alone hang.
 
 **SCORING is a real box in the docs/01-rules-spec.md §4 diagram that never appears in
-`GameState.phase`.** M1 has no faan math (`scoring/` doesn't exist yet -- docs/05-roadmap.md
-§2 is M2), so there is nothing to compute there beyond hand *shape*, which is already known
-the moment a win is declared/claimed. `_end_hand` folds that zero-duration stub step directly
-into the `HAND_OVER` transition rather than returning a state a caller would need to bounce
-straight back out of with no action available -- consistent with `legal_actions` already
-returning `()` for `SCORING` for the same "no seat decision" reason.
+`GameState.phase`.** `_finish_win` folds that zero-duration step directly into the
+`HAND_OVER` transition rather than returning a state a caller would need to bounce straight
+back out of with no action available -- consistent with `legal_actions` already returning
+`()` for `SCORING` for the same "no seat decision" reason. `scoring.faan.score_winning_hand`
+plus `scoring.payout.points`/`payout` run right there, once per win, off the real
+`ScoringContext` `actions.build_scoring_context` builds from this module's own timing state
+(`GameState.total_discards`/`wall_exhausted_at_last_draw`/`last_draw_was_kong_replacement`).
+
+**Flower instant-win (`seven_flowers_instant_win`/`eight_flowers_instant_win`,
+01-rules-spec.md §7) cuts the flower-replacement cascade short.** Checked inside
+`_draw_and_cascade` right after each flower is set aside -- the moment a seat's flower count
+first reaches the configured threshold, the hand ends there as `WinType.FLOWERS` with no
+further replacement draw, bypassing `scoring.faan` entirely (fixed faan, no meld
+decomposition -- patterns.py's "What doesn't fit here" note) but still going through
+`_finish_win` for payout, scored as a self-draw (no seat fed it).
 """
 
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, cast
@@ -53,12 +63,15 @@ from mahjong_core.actions import (
     DeclareWin,
     Discard,
     Pass,
+    build_scoring_context,
     hand_is_winning_shape,
     legal_actions,
 )
 from mahjong_core.claims import ClaimResponse, can_close_early, resolve_claims
-from mahjong_core.config import GameLength
+from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.melds import Meld, MeldKind, legal_claims
+from mahjong_core.scoring import payout as payout_mod
+from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.state import (
     ClaimKind,
     ClaimOffer,
@@ -239,8 +252,14 @@ def reduce(state: GameState, action: Action) -> tuple[GameState, list[Event]]:
     if isinstance(action, (DeclareConcealedKong, DeclareAddedKong)):
         return _apply_self_kong(state, seat, action.meld)
     if isinstance(action, DeclareWin):
-        return _end_hand(
-            state, HandOutcome.WIN, winner=seat, win_type=WinType.SELF_DRAW, discarder=None
+        seat_state = state.seats[seat]
+        return _end_win(
+            state,
+            winner=seat,
+            win_type=WinType.SELF_DRAW,
+            discarder=None,
+            concealed_tiles=seat_state.concealed,
+            melds=seat_state.melds,
         )
     return _apply_claim_response(state, seat, action)
 
@@ -323,9 +342,30 @@ def game_outcome(state: GameState) -> GameOutcome:
     return GameOutcome(hand_count=state.hand_no, final_scores=_scores(state))
 
 
-def _can_win_with(seat_state: SeatState, tile: TileId) -> bool:
+def _can_win_with(
+    state: GameState,
+    seat: int,
+    tile: TileId,
+    *,
+    is_robbing_kong: bool,
+    discarder: int,
+) -> bool:
+    """Whether `seat` could legally claim a win on `tile` right now -- structural shape plus
+    `min_faan`, mirroring `actions.can_declare_win` for the claimed-win path (that function
+    only covers a seat's own-turn `DeclareWin`; a claim is evaluated against a *different*
+    seat's discard/kong, so it's built here instead). `tile` is not yet in `seat`'s concealed
+    tiles (a claim, not a landed draw) -- the candidate hand appends it, matching what
+    `scoring.faan.score_winning_hand` will actually be called with once the win resolves.
+    """
+    seat_state = state.seats[seat]
     candidate = dataclasses.replace(seat_state, concealed=(*seat_state.concealed, tile))
-    return hand_is_winning_shape(candidate)
+    if not hand_is_winning_shape(candidate):
+        return False
+    ctx = build_scoring_context(
+        state, seat, self_drawn=False, is_robbing_kong=is_robbing_kong, discarder=discarder
+    )
+    result = score_winning_hand(candidate.concealed, candidate.melds, ctx, state.ruleset)
+    return result.clears_min_faan
 
 
 # --- draw, incl. flower cascade ------------------------------------------------------------
@@ -367,6 +407,18 @@ def _draw_and_cascade(
         state = dataclasses.replace(
             state, seats=_with_seat(state.seats, seat, seat_state), wall=wall
         )
+        instant = _flower_instant_win(state.ruleset, len(seat_state.flowers))
+        if instant is not None:
+            faan, breakdown = instant
+            end_state, end_events = _finish_win(
+                state,
+                winner=seat,
+                win_type=WinType.FLOWERS,
+                discarder=None,
+                total_faan=faan,
+                breakdown=breakdown,
+            )
+            return end_state, None, events + end_events
         if _wall_exhausted(state):
             return state, None, events
         tile, wall = draw_back(wall)
@@ -379,12 +431,14 @@ def _draw_for_turn(
     state: GameState, seat: int, *, from_front: bool, kong: bool
 ) -> tuple[GameState, list[Event]]:
     """Land a drawn tile in `seat`'s hand and open `AWAIT_ACTION` for them -- or, if the wall
-    runs out before or during the draw, end the hand as an exhaustive draw instead."""
+    runs out before or during the draw, end the hand as an exhaustive draw instead. If a
+    flower instant-win fired mid-cascade, `state` is already `Phase.HAND_OVER` (see
+    `_draw_and_cascade`'s module-docstring note) and this just passes that through."""
     state, tile, events = _draw_and_cascade(state, seat, from_front=from_front)
+    if state.phase == Phase.HAND_OVER:
+        return state, events
     if tile is None:
-        more_state, more_events = _end_hand(
-            state, HandOutcome.EXHAUSTIVE_DRAW, winner=None, win_type=None, discarder=None
-        )
+        more_state, more_events = _end_exhaustive_draw(state)
         return more_state, events + more_events
 
     seat_state = state.seats[seat]
@@ -395,6 +449,8 @@ def _draw_for_turn(
         turn=seat,
         phase=Phase.AWAIT_ACTION,
         claim_window=None,
+        wall_exhausted_at_last_draw=_wall_exhausted(state),
+        last_draw_was_kong_replacement=kong,
     )
     draw_event: Event = (
         KongReplacementDrawn(seat=seat, tile_id=tile) if kong else Drawn(seat=seat, tile_id=tile)
@@ -412,7 +468,7 @@ def _discard_claim_offers(state: GameState, discarder: int, tile: TileId) -> tup
             continue
         seat_state = state.seats[seat]
         melds = legal_claims(seat_state.concealed, tile, discarder, seat)
-        can_win = _can_win_with(seat_state, tile)
+        can_win = _can_win_with(state, seat, tile, is_robbing_kong=False, discarder=discarder)
         if can_win or melds:
             offers.append(ClaimOffer(seat=seat, can_win=can_win, melds=melds))
     return tuple(offers)
@@ -425,7 +481,11 @@ def _apply_discard(state: GameState, seat: int, action: Discard) -> tuple[GameSt
     seat_state = dataclasses.replace(
         seat_state, concealed=new_concealed, discards=(*seat_state.discards, tile)
     )
-    state = dataclasses.replace(state, seats=_with_seat(state.seats, seat, seat_state))
+    state = dataclasses.replace(
+        state,
+        seats=_with_seat(state.seats, seat, seat_state),
+        total_discards=state.total_discards + 1,
+    )
     events: list[Event] = [Discarded(seat=seat, tile_id=tile)]
 
     offers = _discard_claim_offers(state, seat, tile)
@@ -463,7 +523,8 @@ def _kong_rob_offers(
     return tuple(
         ClaimOffer(seat=seat, can_win=True)
         for seat in range(4)
-        if seat != declarer and _can_win_with(state.seats[seat], rob_tile)
+        if seat != declarer
+        and _can_win_with(state, seat, rob_tile, is_robbing_kong=True, discarder=declarer)
     )
 
 
@@ -551,8 +612,14 @@ def _apply_claim_response(
 
     if isinstance(won_action, ClaimWin):
         win_type = WinType.KONG_ROB if window.kind == ClaimKind.KONG_ROB else WinType.DISCARD
-        more_state, more_events = _end_hand(
-            state, HandOutcome.WIN, winner=winner, win_type=win_type, discarder=window.source_seat
+        winner_state = state.seats[winner]
+        more_state, more_events = _end_win(
+            state,
+            winner=winner,
+            win_type=win_type,
+            discarder=window.source_seat,
+            concealed_tiles=(*winner_state.concealed, window.tile),
+            melds=winner_state.melds,
         )
         return more_state, events + more_events
 
@@ -587,24 +654,117 @@ def _apply_claim_response(
 # --- hand end / next hand / game end -------------------------------------------------------
 
 
-def _end_hand(
-    state: GameState,
-    outcome: HandOutcome,
-    *,
-    winner: int | None,
-    win_type: WinType | None,
-    discarder: int | None,
-) -> tuple[GameState, list[Event]]:
-    result = HandResult(outcome=outcome, winner=winner, win_type=win_type, discarder=discarder)
+def _end_exhaustive_draw(state: GameState) -> tuple[GameState, list[Event]]:
+    result = HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW)
     state = dataclasses.replace(state, phase=Phase.HAND_OVER, claim_window=None, hand_result=result)
     event = HandEnded(
         hand_no=state.hand_no,
-        outcome=outcome,
+        outcome=HandOutcome.EXHAUSTIVE_DRAW,
+        winner=None,
+        win_type=None,
+        discarder=None,
+    )
+    return state, [event]
+
+
+_SEVEN_FLOWERS_NAME = "七花"
+_EIGHT_FLOWERS_NAME = "八花"
+_SEVEN_FLOWERS_FAAN = 3  # §7 "Flower faan": seven_flowers_instant_win is a flat 3 faan
+_SEVEN_FLOWERS_THRESHOLD = 7
+_EIGHT_FLOWERS_THRESHOLD = 8
+
+
+def _flower_instant_win(ruleset: RuleSet, flower_count: int) -> tuple[int, dict[str, int]] | None:
+    """`(faan, breakdown)` if `flower_count` just crossed a configured instant-win threshold,
+    else `None`. Eight checked before seven so a table with both enabled resolves to the
+    higher (limit) tier if a single reveal somehow satisfied both -- can't happen in practice
+    (flowers are revealed one at a time) but keeps the ordering correct regardless."""
+    if ruleset.eight_flowers_instant_win and flower_count >= _EIGHT_FLOWERS_THRESHOLD:
+        return ruleset.faan_cap, {_EIGHT_FLOWERS_NAME: ruleset.faan_cap}
+    if ruleset.seven_flowers_instant_win and flower_count >= _SEVEN_FLOWERS_THRESHOLD:
+        return _SEVEN_FLOWERS_FAAN, {_SEVEN_FLOWERS_NAME: _SEVEN_FLOWERS_FAAN}
+    return None
+
+
+def _apply_payments(state: GameState, payments: Mapping[int, int]) -> GameState:
+    seats = list(state.seats)
+    for seat, delta in payments.items():
+        seats[seat] = dataclasses.replace(seats[seat], score=seats[seat].score + delta)
+    return dataclasses.replace(state, seats=cast(Seats, tuple(seats)))
+
+
+def _finish_win(
+    state: GameState,
+    *,
+    winner: int,
+    win_type: WinType,
+    discarder: int | None,
+    total_faan: int,
+    breakdown: Mapping[str, int],
+) -> tuple[GameState, list[Event]]:
+    """Common tail for every win path (normal or flower instant-win): faan -> points ->
+    per-seat payments (`scoring.payout`), applied to `state.seats`, then the `HAND_OVER`
+    transition. `WinType.FLOWERS` pays like a self-draw -- no seat fed an instant win."""
+    pts = payout_mod.points(total_faan, state.ruleset)
+    pay_type: payout_mod.WinType
+    if win_type in (WinType.SELF_DRAW, WinType.FLOWERS):
+        pay_type = payout_mod.SelfDraw()
+    else:
+        assert discarder is not None
+        pay_type = payout_mod.Discard(discarder_seat=discarder)
+    payments = payout_mod.payout(winner, pts, pay_type, state.dealer, state.ruleset)
+
+    state = _apply_payments(state, payments)
+    result = HandResult(
+        outcome=HandOutcome.WIN,
+        winner=winner,
+        win_type=win_type,
+        discarder=discarder,
+        faan=total_faan,
+        faan_breakdown=dict(breakdown),
+        points=pts,
+        payments=payments,
+    )
+    state = dataclasses.replace(state, phase=Phase.HAND_OVER, claim_window=None, hand_result=result)
+    event = HandEnded(
+        hand_no=state.hand_no,
+        outcome=HandOutcome.WIN,
         winner=winner,
         win_type=win_type,
         discarder=discarder,
     )
     return state, [event]
+
+
+def _end_win(
+    state: GameState,
+    *,
+    winner: int,
+    win_type: WinType,
+    discarder: int | None,
+    concealed_tiles: tuple[TileId, ...],
+    melds: tuple[Meld, ...],
+) -> tuple[GameState, list[Event]]:
+    """Score a normal (non-instant-win) win -- `concealed_tiles`/`melds` are the winner's hand
+    at the moment of the win, including the winning tile even when it isn't yet reflected in
+    `state.seats[winner].concealed` (a claimed discard/kong-rob tile isn't merged into the
+    winner's hand before this runs -- see `reduce()`/`_apply_claim_response`'s call sites)."""
+    ctx = build_scoring_context(
+        state,
+        winner,
+        self_drawn=win_type == WinType.SELF_DRAW,
+        is_robbing_kong=win_type == WinType.KONG_ROB,
+        discarder=discarder,
+    )
+    result = score_winning_hand(concealed_tiles, melds, ctx, state.ruleset)
+    return _finish_win(
+        state,
+        winner=winner,
+        win_type=win_type,
+        discarder=discarder,
+        total_faan=result.total_faan,
+        breakdown=result.breakdown,
+    )
 
 
 def _hand_to_concealed(hand: tuple[WallTile, ...]) -> tuple[TileId, ...]:

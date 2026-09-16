@@ -72,7 +72,7 @@ resolution, `legal_actions`, `reduce`. This is the milestone most underestimated
 draft of this doc — see the timeline note below for why 3–4 weeks, not 1.
 `legal_actions`' win-declaration legality is win-*shape* only (standard melds+pair, Seven
 Pairs, Thirteen Orphans) — the `min_faan` gate below is a real M2 dependency, not an
-oversight; see [01-rules-spec.md §11.8](01-rules-spec.md).
+oversight; see [01-rules-spec.md §11.8](01-rules-spec.md). Closed in M2 sub-task 8, below.
 **Done when:** `pytest -k selfplay` runs 10,000 complete games with four `RandomBot`s — no
 illegal states, no deadlocks, every game terminates. Run under `hypothesis` too. **Met.**
 Also: persist `GameRecord` (`engine_version`, full `ruleset` body, `seed`, `actions`, `outcome`)
