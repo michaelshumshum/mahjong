@@ -710,24 +710,21 @@
 		margin-inline-end: var(--space-2);
 	}
 
-	.seat-hand-strip--left,
-	.seat-hand-strip--right {
+	// vertical strip along the table edge (docs/03-frontend.md §3): `writing-mode` alone reflows
+	// the flex axes (a row's main axis becomes the block-progression axis) so the box's own
+	// width/height already account for the vertical footprint, unlike `transform: rotate()`,
+	// which only repaints the box in place and leaves the parent grid cell sized for the
+	// original unrotated (horizontal) footprint — that mismatch is what let the strip's content
+	// escape `.seat-region--left/--right` into whatever sat past the grid's edge.
+	.seat-hand-strip--left {
 		@include layout.tablet-up {
 			writing-mode: vertical-lr;
 		}
 	}
 
-	.seat-hand-strip--left {
-		@include layout.tablet-up {
-			transform: rotate(90deg);
-			transform-origin: left top;
-		}
-	}
-
 	.seat-hand-strip--right {
 		@include layout.tablet-up {
-			transform: rotate(-90deg);
-			transform-origin: right top;
+			writing-mode: vertical-rl;
 		}
 	}
 

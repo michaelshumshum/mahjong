@@ -69,8 +69,8 @@ Seats are always rendered relative to **your** seat, at the bottom. Desktop/tabl
   ┌─────────┐       ├─────────────────────────────────────────┤       ┌─────────┐
   │ left    │       │                                         │       │ right   │
   │ opponent│       │    wall count · prevailing wind ·       │       │ opponent│
-  │ rotated │       │    dealer marker · turn indicator       │       │ rotated │
-  │  +90°   │       │                                         │       │  -90°   │
+  │ vertical│       │    dealer marker · turn indicator       │       │ vertical│
+  │  strip  │       │                                         │       │  strip  │
   │ discard │       ├─────────────────────────────────────────┤       │ discard │
   │  pool   │       │  YOUR HAND: 13 faces, sorted, +drawn    │       │  pool   │
   └─────────┘       │  tile held out at right, melds, flowers │       └─────────┘
@@ -86,6 +86,14 @@ shared pool, and gives each pool independent scroll/collapse behaviour on small 
 CSS: `grid-template-areas` for the four seat regions + centre; `perspective` + `rotateX` on the
 table container for the 2.5D tilt; `transform`/`opacity` only in animated paths. No global scale
 factor — each region sizes to its own content via `clamp()`.
+
+Left/right opponent hand strips run top-to-bottom via `writing-mode: vertical-lr`/`vertical-rl`,
+not `transform: rotate()` — rotate repaints the box in place without resizing the space its
+parent grid cell reserves for it, so a rotated strip's actual (post-rotation) footprint can
+extend outside its grid area into whatever sits past its edge. `writing-mode` reflows the flex
+axes instead, so the element's own width/height already reflect the vertical footprint the grid
+cell needs to reserve. Tile art stays upright (not rotated 90°) as a result — acceptable since
+concealed backs are orientation-agnostic and exposed meld faces stay legible.
 
 Below 768px (phone portrait — the roadmap's stated risk case):
 
