@@ -19,25 +19,35 @@
 	let alt = $derived(code !== null && hasTileArt(code) ? `${code} tile` : 'concealed tile');
 </script>
 
-<img class="tile-face" {src} {alt} draggable="false" />
+<span class="tile-face">
+	<img {src} {alt} draggable="false" />
+</span>
 
 <style lang="scss">
 	// physical-tile treatment (docs/03-frontend.md is silent on this — this sub-task's call):
 	// the vendored art is glyph-only on a transparent canvas, so an ivory background sits
-	// behind it here, clipped to --radius-tile same as any replaced element. The concealed
-	// back (Back.svg) already paints its own opaque fill edge-to-edge, so the ivory never
-	// shows through it — same edge/bevel treatment either way, only the art differs, which is
-	// the deliberate choice: one physical tile shape for the whole set.
+	// behind it here, clipped to --radius-tile. The background-color and the <img> each clip
+	// to border-radius through a different rendering path (CSS background-clip vs. replaced-
+	// element content clip) and can anti-alias the curve by a fractional pixel differently,
+	// leaving a sliver of ivory visible right at the corners — an `overflow: hidden` wrapper
+	// clips both through the same box, so there's nothing left to mismatch.
 	.tile-face {
-		display: block;
+		display: inline-flex;
 		height: 100%;
 		width: auto;
-		user-select: none;
-		background: var(--color-tile);
+		overflow: hidden;
 		border-radius: var(--radius-tile);
+		background: var(--color-tile);
 		box-shadow:
 			0 1px 2px rgb(0 0 0 / 0.35),
 			inset 0 0 0 1px rgb(36 27 20 / 0.35),
 			inset 0 -2px 3px rgb(36 27 20 / 0.18);
+	}
+
+	.tile-face img {
+		display: block;
+		height: 100%;
+		width: auto;
+		user-select: none;
 	}
 </style>
