@@ -120,7 +120,7 @@ sub-tasks actually implemented them; reconciled here to what ships rather than l
 | `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`); see the known reveal gap under Redaction below |
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
-| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | every bound seat reads `connected` as of the Session/WS sub-task — disconnect/bot-handover transitions are sub-task 6 |
+| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay` |
 | `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Room` silently drops a well-formed but currently-illegal command the same as before this existed |
 | `error` | `{code, message}` |
 | `pong` | `{t0, t1}` |

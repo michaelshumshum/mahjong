@@ -7,8 +7,21 @@ the real dual-await-against-a-deadline-heap pattern §3 D17 describes: one long-
 deadline. The heap itself is scoped to claim-window deadlines only (`TimerHeap`'s own
 docstring); per-seat turn clocks and bot budgets still have no driver (no timeout *enforcement*
 exists for either -- `turn`'s wire `deadline_ts` is advisory-only, see `_publish_turn_if_active`)
-so no machinery is built for those deadline kinds until something needs it. Bot dispatch
-(`_poke_bots`) is a later sub-task (6).
+so no machinery is built for those deadline kinds until something needs it (per-turn/claim
+*timeout* enforcement remains unbuilt; only the disconnect-grace deadline below is real).
+
+**Disconnect / bot handover (M3 sub-task 6).** `mark_disconnected`/`reconnect` flip
+`SeatBinding.status` between `connected`/`disconnected`/`autoplay`, surfaced to every seat via
+broadcast `seat_state` and folded into `seat_view()`'s `seat_status`. A disconnect arms a
+per-seat grace timer through the *same* `TimerHeap`/`self.deadlines` claim timers already use
+(shared id space, `_timer_seat` vs. `_disconnect_timer_seat` tell them apart on pop) rather than
+a second timer mechanism; on expiry the seat flips to `autoplay`. `_poke_bots()`, called at the
+tail of every `process_one()` tick, submits a decision to a `ProcessPoolExecutor` (D12) for
+every `autoplay` seat that currently has one (its own turn, or a live claim offer), tagged with
+`BotJobTag` (`(kind, key, state_version)`); the result re-enters through `self.inbox` as a
+`BotResult` and is dropped if the tag no longer matches `_pending_bot[seat]` by the time it
+lands -- the window closed, the turn moved on, or the seat reconnected. See
+`mark_disconnected`/`_poke_bots`/`_handle_bot_result`.
 
 **Early exit is already inside `reduce()`.** `mahjong_core.engine._apply_claim_response`
 (landed in M2's engine-integration sub-task) calls `claims.can_close_early`/`resolve_claims`
@@ -44,11 +57,13 @@ import itertools
 import time
 from collections import deque
 from collections.abc import Callable
+from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal, cast
 
 from app.idempotency import IdempotencyCache
-from app.views import redact_event, seat_view, seat_view_wire
+from app.views import SeatView, redact_event, seat_view, seat_view_wire
+from bots.worker import compute_action
 from mahjong_core.actions import Action, Pass, action_to_dict, legal_actions
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import Discarded, Event, HandEnded, new_game, reduce, start_next_hand
@@ -57,15 +72,36 @@ from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import tile_code, tile_id_type
 
 __all__ = [
+    "BotJobTag",
+    "BotResult",
     "Command",
     "Envelope",
     "Room",
     "RoomFullError",
     "SeatBinding",
     "SeatNotBoundError",
+    "SeatStatus",
     "SeatTakenError",
     "TimerHeap",
 ]
+
+SeatStatus = Literal["connected", "disconnected", "autoplay"]
+
+_BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
+
+_default_bot_pool: ProcessPoolExecutor | None = None
+
+
+def _shared_bot_pool() -> ProcessPoolExecutor:
+    """One `ProcessPoolExecutor` per server process, created lazily on first use (constructing
+    it doesn't spawn a worker -- workers start on first `submit()`), not one per `Room` (D12:
+    "a process pool", not a swarm of them). `Room.__init__`'s `bot_pool` param exists so tests
+    (and a future `RoomRegistry`) can inject a different `Executor` instead."""
+    global _default_bot_pool
+    if _default_bot_pool is None:
+        _default_bot_pool = ProcessPoolExecutor()
+    return _default_bot_pool
+
 
 _CLAIM_KIND_WIRE = {
     MeldKind.CHOW: "chow",
@@ -112,13 +148,17 @@ class SeatBinding:
     the object that will still exist across that swap.
 
     `send` is the live connection's push callback (`seq, wire -> None`); `ready`/`no_calls`/
-    `auto_pass_chow` are the lobby/pre-arm state 02-protocol.md §2 describes. `seat_status`
-    (connected/disconnected/autoplay/bot) has no real transitions yet -- every bound seat here
-    is `"connected"` for this sub-task's scope (disconnect/bot-handover is sub-task 6).
+    `auto_pass_chow` are the lobby/pre-arm state 02-protocol.md §2 describes. `status`
+    (`connected`/`disconnected`/`autoplay` -- `SeatView`'s wire `seat_status` also allows `bot`,
+    unused here: every seat this `Room` ever binds started as a human `join`, so there's no seat
+    that was *never* a human to label `bot` instead of `autoplay`) transitions via
+    `mark_disconnected`/`reconnect`/the disconnect-grace timer (M3 sub-task 6) -- see
+    `Room.mark_disconnected`.
     """
 
     session_id: str
     send: Callable[[int, dict[str, Any]], None]
+    status: SeatStatus = "connected"
     ready: bool = False
     no_calls: bool = False
     auto_pass_chow: bool = False
@@ -152,11 +192,57 @@ class Envelope:
     event: dict[str, object]
 
 
+@dataclass(frozen=True)
+class BotJobTag:
+    """What a submitted bot job was computed against (00-architecture.md §3 D12's
+    `(window_id, state_version)` tag). `state_version` is `Room.event_id` at submission time --
+    `event_id` already exists as the room's own monotonic "has anything actually changed"
+    counter (module docstring), so it doubles as `state_version` rather than inventing a second
+    one; `self.state` is provably unchanged from what a job was computed against as long as
+    `event_id` hasn't moved, since `_apply` is the only place either ever changes, together.
+    `key` disambiguates *what kind* of decision this was for: the acting seat for a `turn`
+    decision (there's no `window_id` outside a claim window), or the `window_id` for a `claim`
+    decision."""
+
+    kind: Literal["turn", "claim"]
+    key: int
+    state_version: int
+
+
+@dataclass(frozen=True)
+class BotResult:
+    """A `ProcessPoolExecutor` worker's answer, re-entering through `Room.inbox` exactly like a
+    real `Command` (D12) -- `tag` is compared against `Room._pending_bot[seat]` and dropped
+    silently if it no longer matches (`_handle_bot_result`)."""
+
+    seat: int
+    tag: BotJobTag
+    action: Action
+
+
+@dataclass(frozen=True)
+class _WakeUp:
+    """No-op inbox marker. `_next()`'s `asyncio.wait()` call fixes its waitable set (the inbox
+    `getter` plus a sleeper for whatever `self.deadlines.peek()` was *at that moment*) the
+    instant it's entered -- nothing changes that set until one of those waitables completes.
+    `_arm_disconnect_timer`/`_arm_seat_claim_timer` can run from *outside* this room's own
+    `process_one()` tick (`mark_disconnected`/`resume()`, both called directly from `Session`
+    on an incoming WS frame, not from this room's loop) and add a heap entry that's earlier
+    than -- or the *only* entry, where none existed -- whatever `_next()` is already blocked
+    on. Without this, that new deadline would sit in the heap unnoticed until some unrelated
+    inbox item happened to arrive and force a fresh `_next()` call to recompute the sleeper.
+    Pushing this onto `self.inbox` forces exactly that recompute, immediately, every time a
+    deadline is armed from outside the loop -- see `Room._wake`."""
+
+
 class TimerHeap:
-    """Deadline heap keyed by `(deadline_ts, id)` (00-architecture.md §3 D17). Scoped to
-    claim-window deadlines only -- per-seat turn clocks and bot budgets have no driver yet (no
-    timeout *enforcement* exists for either) and half-building that machinery now would just be
-    dead code.
+    """Deadline heap keyed by `(deadline_ts, id)` (00-architecture.md §3 D17). Holds both
+    claim-window deadlines and (M3 sub-task 6) disconnect-grace deadlines, sharing one id space
+    (`Room._timer_seq`) and one heap (`Room.deadlines`) -- `_dispatch_expired_timer` tells them
+    apart by which side-table (`_timer_seat` vs. `_disconnect_timer_seat`) recognizes a popped
+    id, rather than this class knowing about either kind. Per-seat turn clocks and bot compute
+    budgets still have no driver (no timeout *enforcement* exists for either) and half-building
+    that machinery now would just be dead code.
 
     **`id` is a private per-seat timer id (M3 sub-task 5), not the window's own `window_id`.**
     Sub-task 3 armed exactly one heap entry per claim window, shared by every offered seat, and
@@ -164,7 +250,7 @@ class TimerHeap:
     was always identical. Reconnect (docs/00-architecture.md §8's "mid-claim-window" row) breaks
     that assumption: one seat's deadline can move (re-armed to a fresh window on reconnect)
     without touching another's, so each offered seat needs its *own* heap entry. `Room` now
-    hands out a fresh id per seat-arm (`_claim_timer_seq`) and keeps `_timer_seat`/
+    hands out a fresh id per seat-arm (`_timer_seq`) and keeps `_timer_seat`/
     `_active_seat_timer` to map an id back to `(window_id, seat)` and to tell a superseded
     (re-armed-away) entry from the one that's actually still live for that seat -- see
     `_arm_seat_claim_timer`/`_handle_claim_timeout`.
@@ -199,30 +285,45 @@ class TimerHeap:
 
 class Room:
     """Owns exactly one `GameState`, mutated only via `reduce()`/`start_next_hand()`. See module
-    docstring for what this sub-task deliberately leaves out (`_poke_bots`, `SeatBinding`/
-    session wiring).
+    docstring for disconnect/bot-handover (`mark_disconnected`/`_poke_bots`, M3 sub-task 6).
     """
 
     def __init__(
-        self, room_id: str, ruleset: RuleSet, game_seed: int, *, require_ready: bool = False
+        self,
+        room_id: str,
+        ruleset: RuleSet,
+        game_seed: int,
+        *,
+        require_ready: bool = False,
+        bot_pool: Executor | None = None,
     ) -> None:
         self.room_id = room_id
-        self.inbox: asyncio.Queue[Command] = asyncio.Queue()
+        self.inbox: asyncio.Queue[Command | BotResult | _WakeUp] = asyncio.Queue()
         self.state: GameState = new_game(ruleset, game_seed)
         self.event_id = 0  # internal monotonic id: logging/replay only, never on the wire
         self.seat_seq: list[int] = [0, 0, 0, 0]  # per-seat outbound seq: dense, gapless (D1)
         self.ring: dict[int | str, deque[Envelope]] = {
             seat: deque[Envelope](maxlen=512) for seat in range(4)
         }
-        self.deadlines = TimerHeap()  # claim window deadlines only (D17) -- see module docstring
-        self._getter: asyncio.Task[Command] | None = None  # long-lived, never cancelled (D17)
+        self.deadlines = TimerHeap()  # claim + disconnect deadlines (D17) -- see module docstring
+        self._getter: asyncio.Task[Command | BotResult | _WakeUp] | None = None  # long-lived (D17)
         self._armed_window_id: int | None = None  # last claim_window.window_id given a deadline
-        # per-seat TimerHeap ids (see TimerHeap docstring)
-        self._claim_timer_seq = itertools.count(1)
+        # shared TimerHeap id space, claim timers and disconnect-grace timers alike (see
+        # TimerHeap's docstring)
+        self._timer_seq = itertools.count(1)
         self._timer_seat: dict[int, tuple[int, int]] = {}  # timer id -> (window_id, seat)
         # (window_id, seat) -> the timer id that's actually live for it right now
         self._active_seat_timer: dict[tuple[int, int], int] = {}
         self._claim_deadline_ms: dict[tuple[int, int], int] = {}  # (window_id, seat) -> deadline_ts
+        self._disconnect_timer_seat: dict[int, int] = {}  # timer id -> seat
+        self._active_disconnect_timer: dict[int, int] = {}  # seat -> the timer id live for it
+
+        # bot handover (M3 sub-task 6, D12): seat -> the BotJobTag currently in flight for it
+        # (absent = no job outstanding). `_bot_tasks` holds strong refs to the asyncio.Tasks
+        # awaiting each ProcessPoolExecutor future so they aren't GC'd mid-flight.
+        self._pending_bot: dict[int, BotJobTag] = {}
+        self._bot_tasks: set[asyncio.Task[None]] = set()
+        self._bot_pool: Executor = bot_pool if bot_pool is not None else _shared_bot_pool()
 
         # docs/02-protocol.md §2 "Seat assignment": `require_ready=True` (app/ws.py's real
         # rooms) gates every command on all four seats joining and `ready`-ing before the room
@@ -301,7 +402,7 @@ class Room:
 
     def reconnect(
         self, seat: int, session_id: str, send: Callable[[int, dict[str, Any]], None]
-    ) -> None:
+    ) -> bool:
         """Rebind an already-bound seat's live connection to a fresh socket
         (02-protocol.md §2: "hello{last_seq} on an already-bound seat reclaims it directly").
         Unlike `join`, this never constructs a new `SeatBinding` -- `ready`/pre-arm toggles and
@@ -309,14 +410,65 @@ class Room:
         history") all live on the binding that already exists, so only the live-socket half
         (`session_id`/`send`) is swapped. Raises `SeatNotBoundError` if nothing has ever joined
         this seat -- there's no binding to reclaim; the caller should `join` instead.
+
+        Also flips `status` back to `connected` (00-architecture.md §8 "Player reconnects": "Bot
+        relinquishes the seat") if this seat was `disconnected`/`autoplay` -- and drops any
+        in-flight bot job for this seat by clearing `_pending_bot[seat]`: a `BotResult` that
+        lands later carries the old tag, which no longer matches, so `_handle_bot_result` drops
+        it (D12's staleness rule doing double duty as "the bot stops acting for it" -- no
+        separate cancellation path needed). Also invalidates this seat's disconnect-grace timer,
+        if one is still ticking, the same lazy-deletion way `_rearm_seat_claim_timer`
+        invalidates a superseded claim timer.
+
+        Returns whether `status` actually changed away from `disconnected`/`autoplay`.
+        **Deliberately does not itself broadcast `seat_state` for that** -- the caller
+        (`Session._handle_hello`, via `resume()`'s `announce_reconnect`) defers that broadcast
+        until after `resume()`'s own replay/state_sync decision. Broadcasting here instead would
+        append the "connected" frame to this very seat's ring *before* `resume()` takes its
+        `head`/ring snapshot, making `resume()`'s own replay branch re-deliver it a second time
+        to the seat that just reconnected -- the exact frame announcing its own reconnection,
+        double-sent. Every other seat only ever sees it once either way; only the reconnecting
+        seat's replay path can re-observe its own just-appended history.
         """
         binding = self.seat_bindings[seat]
         if binding is None:
             raise SeatNotBoundError(seat)
         binding.session_id = session_id
         binding.send = send
+        was_status = binding.status
+        binding.status = "connected"
+        self._pending_bot.pop(seat, None)
+        self._active_disconnect_timer.pop(seat, None)
+        return was_status != "connected"
 
-    def resume(self, seat: int, last_seq: int | None) -> None:
+    def mark_disconnected(self, seat: int, session_id: str) -> None:
+        """The WS connection for `seat` closed (`app/ws.py`'s `ws_endpoint` `finally` block --
+        the only disconnect signal this sub-task wires up; a heartbeat-driven dead-socket
+        timeout per docs/02-protocol.md §8 has no driver anywhere in this codebase yet, sub-task
+        4 never built one, so it's out of scope here too, not silently dropped).
+
+        `session_id` guards a real race: an old, already-superseded connection's `finally` can
+        run *after* a fresh reconnect already rebound this seat to a new session (event-loop
+        scheduling gives no ordering guarantee between "old socket's read loop notices EOF" and
+        "new socket's `hello` gets processed"). If `binding.session_id` no longer matches the
+        session that's reporting the disconnect, a newer connection already has this seat --
+        do nothing, rather than marking a live reconnect disconnected out from under it.
+
+        No-op if the seat isn't bound, or is already `disconnected`/`autoplay` (a duplicate
+        close notification, or a socket that closed after the grace period already flipped the
+        seat to `autoplay`) -- 00-architecture.md §8 "Player disconnects": seat marked
+        `DISCONNECTED`, room continues, grace period before bot takeover.
+        """
+        binding = self.seat_bindings[seat]
+        if binding is None or binding.session_id != session_id:
+            return
+        if binding.status != "connected":
+            return
+        binding.status = "disconnected"
+        self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "disconnected"})
+        self._arm_disconnect_timer(seat)
+
+    def resume(self, seat: int, last_seq: int | None, *, announce_reconnect: bool = False) -> None:
         """The three-way `hello{last_seq}` branch (02-protocol.md §5) for a seat that just
         called `reconnect()`, compared against *this seat's own* `ring`/`seat_seq` (never the
         room-global `event_id`, D1):
@@ -334,6 +486,11 @@ class Room:
         branch above so a `state_sync` picks up the fresh deadline in the same round trip; the
         live/replay branches instead follow up with one fresh `claim_offer` carrying the new
         deadline, since a replayed frame is history and must not be mutated in place.
+
+        `announce_reconnect` (M3 sub-task 6, set from `reconnect()`'s own return value by
+        `Session._handle_hello`) broadcasts `seat_state{status:"connected"}` -- deliberately
+        *after* the branch above, not before: see `reconnect()`'s docstring for why broadcasting
+        it earlier would let this seat's own replay branch re-deliver it a second time.
         """
         rearmed = self._rearm_seat_claim_timer(seat)
         head = self.seat_seq[seat] - 1  # last seq actually sent, or -1 if this seat never got one
@@ -348,7 +505,11 @@ class Room:
                     binding.send(env.seq, dict(env.event))
         else:
             self.publish_to_seat(seat, self.state_sync_wire(seat))
+            if announce_reconnect:
+                self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "connected"})
             return  # state_sync already carries any fresh deadline_ts -- nothing further to send
+        if announce_reconnect:
+            self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "connected"})
         if rearmed:
             self._send_seat_claim_offer(seat)
 
@@ -379,51 +540,99 @@ class Room:
         claim_deadline_ts = (
             self._claim_deadline_ms.get((window.window_id, seat)) if window else None
         )
-        view = seat_view(self.state, seat, claim_deadline_ts=claim_deadline_ts)
+        view = seat_view(
+            self.state,
+            seat,
+            seat_status=self._seat_status_tuple(),
+            claim_deadline_ts=claim_deadline_ts,
+        )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
         return wire
 
+    def _seat_status_tuple(self) -> tuple[SeatStatus, SeatStatus, SeatStatus, SeatStatus]:
+        """Every bound seat's real `status`; an unbound seat reads `connected`, matching the
+        pre-sub-task-6 default (`app/views.py`'s `_DEFAULT_SEAT_STATUS`) -- there's no real
+        signal for "nobody ever joined this seat" distinct from "connected" today, and every
+        `require_ready=True` room (app/ws.py's real rooms) has all four seats bound before any
+        of this is ever surfaced to a client anyway."""
+        return cast(
+            "tuple[SeatStatus, SeatStatus, SeatStatus, SeatStatus]",
+            tuple(b.status if b is not None else "connected" for b in self.seat_bindings),
+        )
+
     async def run(self) -> None:
-        """The room's long-lived loop -- one `asyncio.Task` per room (server/AGENTS.md)."""
+        """The room's long-lived loop -- one `asyncio.Task` per room (server/AGENTS.md). Stops
+        once the game actually ends (`Phase.GAME_OVER`) -- see `app/registry.py`'s
+        `RoomRegistry` module docstring for why a room's task shouldn't loop forever after that.
+        `Room` itself (and reconnect/`state_sync` against it) keeps working after this returns;
+        only the background task -- which would otherwise sit awaiting an inbox that can never
+        legally produce anything again (`_authorize` rejects everything once `legal_actions` is
+        empty for every seat) -- stops.
+        """
         while True:
             await self.process_one()
+            if self.state.phase == Phase.GAME_OVER:
+                return
 
     async def process_one(self) -> None:
-        """Handle exactly one event: the next inbox `Command`, or every claim-window per-seat
-        timer that's expired, whichever the event loop resolves first (`_next()`). Split out
-        from `run()` so a test can drive the room one event at a time without a real background
-        task racing it. `turn` is only (re-)published when this cycle actually mutated
-        `self.state` -- an illegal/dropped command (or a stale, already-resolved/superseded
-        claim timeout) leaves `state` as the exact same object (`_authorize`/
-        `_handle_claim_timeout`'s own no-op paths never call `_apply`), and must not re-stamp a
-        fresh `seq` onto every seat's stream for a turn prompt nothing about actually changed.
+        """Handle exactly one event: the next inbox `Command`/`BotResult`, or every claim-window
+        or disconnect-grace timer that's expired, whichever the event loop resolves first
+        (`_next()`). Split out from `run()` so a test can drive the room one event at a time
+        without a real background task racing it. `turn` is only (re-)published when this cycle
+        actually mutated `self.state` -- an illegal/dropped command (or a stale, already-
+        resolved/superseded timeout) leaves `state` as the exact same object (`_authorize`/
+        `_handle_claim_timeout`/`_handle_bot_result`'s own no-op paths never call `_apply`), and
+        must not re-stamp a fresh `seq` onto every seat's stream for a turn prompt nothing about
+        actually changed. `_poke_bots()` runs every tick regardless (00-architecture.md §3's
+        sketch runs it unconditionally after `_arm_timers()`) -- cheap and idempotent
+        (`_pending_bot` skips a seat whose current decision already has a job in flight), and
+        needed even on a no-op tick: some *other* seat's action can hand an already-`autoplay`
+        seat a fresh turn or claim offer without that seat's own state changing at all.
 
         A single `_next()` call can return *several* expired timer ids at once (every offered
-        seat is armed with its own heap entry now, M3 sub-task 5 -- see `TimerHeap`'s
-        docstring), so all of them get processed in this one tick, same as the single shared
-        entry sub-task 3 built handled every offer inline in one `_handle_claim_timeout` call.
+        claim seat has its own heap entry, M3 sub-task 5 -- see `TimerHeap`'s docstring), so all
+        of them get processed in this one tick.
+
+        **A `_WakeUp` never counts as "state changed", even if `self.state is not pre_state`
+        happens to be true (M3 sub-task 6).** `pre_state` is captured fresh at the top of every
+        `process_one()` call, but this room's *very first* call starts as soon as the
+        `asyncio.Task` is created (`RoomRegistry.get_or_create`) -- before a white-box test's
+        `room.state = ...` rigging (`tests/test_ws_gameplay.py`/`tests/test_reconnect.py`'s own
+        established pattern) gets a chance to run, if that first call is still sitting inside
+        `_next()`'s `await` when the test does it. `_WakeUp` was, until this sub-task, never
+        able to resolve that first pending call at all (join/ready/reconnect never touch
+        `self.inbox`) -- so it never surfaced. It can now: an early disconnect can be the first
+        thing that ever wakes a freshly-created room, and treating that stale `pre_state` vs.
+        the just-rigged `self.state` as "changed" would republish a spurious `turn` nobody
+        asked for. `_WakeUp` never itself mutates `self.state` by construction, so it is simply
+        never a valid trigger for this check.
         """
         pre_state = self.state
         event = await self._next()
         if isinstance(event, Command):
             self._handle(event)
+        elif isinstance(event, BotResult):
+            self._handle_bot_result(event)
+        elif isinstance(event, _WakeUp):
+            pass  # nothing to handle -- see _WakeUp's own docstring
         else:
             for timer_id in event:
-                self._handle_claim_timeout(timer_id)
+                self._dispatch_expired_timer(timer_id)
         self._arm_claim_timer()
-        if self.state is not pre_state:
+        if not isinstance(event, _WakeUp) and self.state is not pre_state:
             self._publish_turn_if_active()
+        self._poke_bots()
 
-    async def _inbox_getter(self) -> Command:
+    async def _inbox_getter(self) -> Command | BotResult | _WakeUp:
         return await self.inbox.get()
 
-    def _ensure_getter(self) -> asyncio.Task[Command]:
+    def _ensure_getter(self) -> asyncio.Task[Command | BotResult | _WakeUp]:
         if self._getter is None:
             self._getter = asyncio.create_task(self._inbox_getter())
         return self._getter
 
-    async def _next(self) -> Command | list[int]:
+    async def _next(self) -> Command | BotResult | _WakeUp | list[int]:
         """00-architecture.md §3 D17: one long-lived `_inbox_getter()` task for the room's
         entire lifetime, raced against a sleep to `self.deadlines`' soonest entry via
         `asyncio.wait(..., return_when=FIRST_COMPLETED)` -- the getter is *never* cancelled,
@@ -483,6 +692,154 @@ class Room:
         if action is None:
             return  # illegal command: dropped silently, state and ring buffers untouched
         self._apply(action)
+
+    def _handle_bot_result(self, result: BotResult) -> None:
+        """A worker's answer, re-entering through `self.inbox` (D12). Dropped silently if
+        `_pending_bot[result.seat]` no longer equals `result.tag` -- the window/turn moved on,
+        or the seat reconnected (`reconnect()` clears the entry outright), since either means
+        this job was computed against a `self.state` that isn't "now" anymore. When the tag
+        *does* match, `self.event_id` is provably unchanged since submission (only `_apply`
+        ever advances it, and nothing else could have without also changing the tag -- see
+        `BotJobTag`'s docstring), so `self.state` is byte-identical to what the worker saw;
+        `_authorize` is still run anyway as a defense-in-depth belt-and-suspenders (server/
+        AGENTS.md: "the server computes the legal-action set" -- true even for the server's own
+        bot output), not because it's expected to ever actually reject something here.
+        """
+        if self._pending_bot.get(result.seat) != result.tag:
+            return
+        del self._pending_bot[result.seat]
+        binding = self.seat_bindings[result.seat]
+        if binding is None or binding.status != "autoplay":
+            return  # reconnected since submission but the tag pop above raced it -- drop
+        action = self._authorize(Command(seat=result.seat, action=result.action))
+        if action is None:
+            return
+        self._apply(action)
+
+    def _dispatch_expired_timer(self, timer_id: int) -> None:
+        """One id popped off the shared `self.deadlines` heap (`TimerHeap`'s docstring): claim-
+        window timers and disconnect-grace timers share one id space, so this just asks which
+        side-table recognizes it."""
+        if timer_id in self._timer_seat:
+            self._handle_claim_timeout(timer_id)
+        else:
+            self._handle_disconnect_timeout(timer_id)
+
+    def _handle_disconnect_timeout(self, timer_id: int) -> None:
+        """A disconnect-grace deadline popped (00-architecture.md §8 "Player disconnects":
+        grace period before AUTOPLAY). No-op if stale -- unknown id, or
+        `_active_disconnect_timer[seat]` no longer points at it (the seat reconnected since this
+        was armed, `reconnect()` pops that mapping -- same lazy-deletion staleness check
+        `_handle_claim_timeout` already uses for claim timers) -- or the seat somehow isn't
+        `disconnected` anymore for any other reason. Otherwise flips the seat to `autoplay` and
+        broadcasts `seat_state`; `_poke_bots()` (this tick's own tail, `process_one()`) picks up
+        the transition and submits a job if this seat currently has a decision to make."""
+        seat = self._disconnect_timer_seat.get(timer_id)
+        if seat is None:
+            return
+        if self._active_disconnect_timer.get(seat) != timer_id:
+            return
+        binding = self.seat_bindings[seat]
+        if binding is None or binding.status != "disconnected":
+            return
+        binding.status = "autoplay"
+        self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "autoplay"})
+
+    def _wake(self) -> None:
+        """Force a blocked `_next()` to re-loop and recompute its wait set against the current
+        `self.deadlines` -- see `_WakeUp`'s docstring for why this is needed at all."""
+        self.inbox.put_nowait(_WakeUp())
+
+    def _arm_disconnect_timer(self, seat: int) -> None:
+        """Give `seat` a fresh `TimerHeap` entry, `ruleset.disconnect_grace_seconds` from right
+        now (default 20s, `mahjong_core/config.py`) -- the disconnect-side analogue of
+        `_arm_seat_claim_timer`, sharing the same heap and id sequence (`TimerHeap`'s
+        docstring). Always called from `mark_disconnected`, itself called from `Session` outside
+        this room's own loop -- `_wake()` at the end guarantees `_next()` actually notices."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.state.ruleset.disconnect_grace_seconds
+        timer_id = next(self._timer_seq)
+        self.deadlines.add(deadline, timer_id)
+        self._disconnect_timer_seat[timer_id] = seat
+        self._active_disconnect_timer[seat] = timer_id
+        self._wake()
+
+    def _poke_bots(self) -> None:
+        """00-architecture.md §3's `_poke_bots()`: submit a decision to the bot worker pool for
+        every `autoplay` seat that currently has one to make -- its own `AWAIT_ACTION` turn, or
+        a live claim offer it hasn't answered -- tagged with what it's computed against
+        (`BotJobTag`) so a stale result is dropped when it lands (D12; see
+        `_handle_bot_result`). Idempotent: a seat whose current decision already has a job in
+        flight (`_pending_bot[seat]` already equals the freshly-computed tag) isn't resubmitted.
+        Never runs bot logic inline (D12) -- `_submit_bot_job` only ever schedules work on
+        `self._bot_pool` and returns immediately; the room loop is never blocked on a bot's
+        answer.
+        """
+        window = self.state.claim_window
+        for seat in range(4):
+            binding = self.seat_bindings[seat]
+            if binding is None or binding.status != "autoplay":
+                continue
+            tag: BotJobTag | None = None
+            if (
+                window is not None
+                and seat not in window.responses
+                and any(o.seat == seat for o in window.offers)
+            ):
+                tag = BotJobTag(kind="claim", key=window.window_id, state_version=self.event_id)
+            elif self.state.phase == Phase.AWAIT_ACTION and self.state.turn == seat:
+                tag = BotJobTag(kind="turn", key=seat, state_version=self.event_id)
+            if tag is None or self._pending_bot.get(seat) == tag:
+                continue
+            self._pending_bot[seat] = tag
+            claim_deadline_ts = (
+                self._claim_deadline_ms.get((tag.key, seat)) if tag.kind == "claim" else None
+            )
+            view = seat_view(
+                self.state,
+                seat,
+                seat_status=self._seat_status_tuple(),
+                claim_deadline_ts=claim_deadline_ts,
+            )
+            self._submit_bot_job(seat, tag, view)
+
+    def _submit_bot_job(self, seat: int, tag: BotJobTag, view: SeatView) -> None:
+        """Schedule `bots.worker.compute_action` on `self._bot_pool` (a `ProcessPoolExecutor` by
+        default, D12: "the GIL makes a thread pool useless for CPU-bound pure-Python search") and
+        return immediately -- the actual wait lives in `_await_bot_job`, a separate task, so this
+        method never blocks the room loop. `seed` is derived from the tag rather than an unseeded
+        `random.Random()` so a given decision point's bot output is reproducible (server/
+        AGENTS.md)."""
+        loop = asyncio.get_running_loop()
+        seed = hash((self.room_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
+        future = loop.run_in_executor(self._bot_pool, compute_action, view, seed)
+        task = asyncio.ensure_future(self._await_bot_job(seat, tag, future))
+        self._bot_tasks.add(task)
+        task.add_done_callback(self._bot_tasks.discard)
+
+    async def _await_bot_job(
+        self, seat: int, tag: BotJobTag, future: asyncio.Future[Action]
+    ) -> None:
+        """Await one submitted job under a hard deadline (00-architecture.md §8 "Bot raises /
+        hangs": "A bot must never be able to wedge a table"), then re-enter it through
+        `self.inbox` as a `BotResult` exactly like the architecture sketch describes (D12) --
+        never applied directly from here, so it still goes through the same staleness check
+        (`_handle_bot_result`) and single-writer discipline every other inbox item does.
+
+        On timeout or a worker crash: no synthesized default action is applied (per-turn timeout
+        enforcement has no driver at all yet -- the same gap `_publish_turn_if_active`'s
+        docstring already documents; an *unanswered claim* still resolves correctly regardless,
+        through its own real `TimerHeap` entry, unaffected by this). This just clears the
+        pending tag (if it's still this job's) so the next `_poke_bots()` tick retries from
+        scratch -- `RandomBot`'s policy is instant, so in practice this path only fires for an
+        actual crash, not a legal miss.
+        """
+        with contextlib.suppress(Exception):
+            action = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
+            self.inbox.put_nowait(BotResult(seat=seat, tag=tag, action=action))
+            return
+        if self._pending_bot.get(seat) == tag:
+            del self._pending_bot[seat]
 
     def _handle_claim_timeout(self, timer_id: int) -> None:
         """One per-seat claim-window timer id popped off `self.deadlines` (`_timer_seat` maps
@@ -573,11 +930,19 @@ class Room:
         (`_rearm_seat_claim_timer`, one seat only) go through. Recorded in `_timer_seat` (id ->
         `(window_id, seat)`) and `_active_seat_timer` (`(window_id, seat)` -> the id that's
         actually current) so `_handle_claim_timeout` can tell a superseded entry from a live
-        one -- see that method's docstring."""
+        one -- see that method's docstring.
+
+        **Not itself a `_wake()` call site** (see `_WakeUp`'s docstring): the initial window-open
+        arm (`_arm_claim_timer`) always runs synchronously inside an already-executing
+        `process_one()` tick, so the *next* `_next()` call picks up the fresh heap entry
+        naturally when it recomputes its wait set -- no external nudge needed. A mid-window
+        re-arm (`_rearm_seat_claim_timer`) runs from `resume()`, outside this room's loop, where
+        that guarantee doesn't hold -- it calls `_wake()` itself, after this returns.
+        """
         loop = asyncio.get_running_loop()
         duration = self.state.ruleset.claim_seconds
         deadline = loop.time() + duration
-        timer_id = next(self._claim_timer_seq)
+        timer_id = next(self._timer_seq)
         self.deadlines.add(deadline, timer_id)
         self._timer_seat[timer_id] = (window_id, seat)
         self._active_seat_timer[(window_id, seat)] = timer_id
@@ -596,16 +961,16 @@ class Room:
         no offer in it, or it already responded.
 
         **"sized for a bot answering in milliseconds" (00-architecture.md §8):** bot handover
-        doesn't exist yet (M3 sub-task 6) -- every offered seat, human or not, is armed with
-        the same `ruleset.claim_seconds` human-length window today (`_arm_claim_timer`), so
-        there is no shorter bot deadline in this codebase that could have been "sized" small in
-        the first place. Interpreted literally anyway, since the mechanism itself is useful
-        regardless of bots: without it, a seat that disconnects partway through its window and
-        reconnects late gets only whatever sliver of the *original* deadline is left, not a
-        fair chance to respond. Re-arming to a fresh full window from the reconnect moment
-        fixes that today, and keeps doing the right thing once sub-task 6 gives bots their own
-        (shorter) initial arm -- this re-arm always wins over whatever the seat was offered
-        before, bot-speed or not.
+        exists now (M3 sub-task 6, `_poke_bots`), but every offered seat -- human, or `AUTOPLAY`
+        and bot-answered -- is still armed with the same `ruleset.claim_seconds` human-length
+        window (`_arm_claim_timer`); nothing gave bots a separate, shorter claim-window deadline
+        (`compute_action`'s policy is instant, so it answers well inside that window regardless,
+        the same way a fast human click would). So the doc's "sized for a bot" scenario still
+        doesn't literally exist -- read as before: without this re-arm, a seat that disconnects
+        partway through its window and reconnects late would get only whatever sliver of the
+        *original* deadline is left, not a fair chance to respond. Re-arming to a fresh full
+        window from the reconnect moment fixes that, and this re-arm always wins over whatever
+        the seat was offered before, bot-answered or not.
         """
         window = self.state.claim_window
         if window is None or seat in window.responses:
@@ -613,6 +978,7 @@ class Room:
         if not any(o.seat == seat for o in window.offers):
             return False
         self._arm_seat_claim_timer(window.window_id, seat)
+        self._wake()  # out-of-loop call (resume(), via Session) -- see _WakeUp's docstring
         return True
 
     def _send_claim_offers(self, window: ClaimWindow) -> None:
@@ -674,9 +1040,8 @@ class Room:
         """Synthesize `hand_start` (broadcast) and `deal` (per-seat) -- see `_arm_claim_timer`'s
         docstring for why these have no backing `Event`. Called once the room actually starts
         (`mark_ready`) and once per later hand (`_apply`, right after `start_next_hand()` deals
-        it). `seats` is each seat's `seat_status` (`app/views.py`'s `SeatView` shape) -- every
-        bound seat reads `"connected"` today (see `SeatBinding`'s docstring on why nothing
-        richer exists yet)."""
+        it). `seats` is each seat's real `status` (`app/views.py`'s `SeatView` shape, M3
+        sub-task 6 -- see `SeatBinding`/`mark_disconnected`)."""
         state = self.state
         self._broadcast_wire(
             {
@@ -684,7 +1049,7 @@ class Room:
                 "hand_no": state.hand_no,
                 "prevailing": state.prevailing.name,
                 "dealer": state.dealer,
-                "seats": ["connected", "connected", "connected", "connected"],
+                "seats": list(self._seat_status_tuple()),
             }
         )
         for seat in range(4):

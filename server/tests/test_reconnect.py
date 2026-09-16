@@ -21,6 +21,7 @@ import uuid
 from collections import deque
 
 from fastapi.testclient import TestClient
+from starlette.testclient import WebSocketTestSession
 
 from app.main import app
 from app.ws import get_room
@@ -113,6 +114,21 @@ def _join_and_ready_all(wss: list) -> dict[int, int]:  # type: ignore[type-arg]
     return last_seq
 
 
+def _drain_teardown_disconnects(
+    ws: WebSocketTestSession, seats: tuple[int, ...] = (3, 2, 1)
+) -> None:
+    """Every scenario below closes `ws1`/`ws2`/`ws3` together in one `with (... as ws1, ... as
+    ws2, ... as ws3):` block (M3 sub-task 6: a closed WS connection now marks its seat
+    `disconnected` and broadcasts `seat_state`) -- multiple context managers in one `with` exit
+    in reverse declaration order, so seat 3 disconnects first, then 2, then 1. `ws` is any
+    connection still open to observe the broadcasts (every scenario here keeps `ws0` open
+    throughout)."""
+    for seat in seats:
+        frame = ws.receive_json()
+        assert frame["t"] == "seat_state"
+        assert frame["d"] == {"seat": seat, "status": "disconnected"}
+
+
 def _rig_uncontested_state(seed: int) -> GameState:
     """Seat 0 on turn holding a lone East wind plus junk; no other seat holds any East wind at
     all (chow is structurally impossible for an honor tile, and pung needs 2+ copies), so
@@ -193,7 +209,10 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
             seat1_last_seq = last_seq[1]
 
         # ws1's `with` block just exited -- the socket is gone, but Room's SeatBinding for
-        # seat 1 survives untouched (this is what makes reconnect possible at all).
+        # seat 1 survives untouched (this is what makes reconnect possible at all). Closing
+        # ws1/ws2/ws3 together also marks all three seats `disconnected` (M3 sub-task 6),
+        # broadcasting `seat_state` to the one connection still open to observe it.
+        _drain_teardown_disconnects(ws0)
 
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
         ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
@@ -206,13 +225,18 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
         turn_evt = ws0.receive_json()
         assert turn_evt["t"] == "turn"
 
-        # exactly 3 frames landed in seat 1's ring while it was offline: discard, draw, turn.
+        # exactly 3 frames landed in seat 1's ring while it was offline: discard, draw, turn
+        # (further back in the ring: the 3 disconnect `seat_state` broadcasts above).
         missed = list(room.ring[1])[-3:]
         assert [e.event["t"] for e in missed] == ["discard", "draw", "turn"]
         seat_seq_before_resume = room.seat_seq[1]
 
         with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
+
+            # seat1_last_seq predates the 3 disconnect broadcasts too (captured back in
+            # `_join_and_ready_all`, before any of this) -- replay picks those up first.
+            _drain_teardown_disconnects(ws1b)
 
             replayed = [ws1b.receive_json() for _ in missed]
             assert [f["t"] for f in replayed] == ["discard", "draw", "turn"]
@@ -222,8 +246,12 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
             assert replayed[1]["d"]["tile_id"] == missed[1].event["tile_id"]
             assert replayed[2]["d"]["seat"] == 1 and "legal" in replayed[2]["d"]
 
-            # replay never allocates a fresh seq -- it resends exactly what's already buffered.
-            assert room.seat_seq[1] == seat_seq_before_resume
+            # replay itself never allocates a fresh seq -- it resends exactly what's already
+            # buffered; the +1 is the live `seat_state{connected}` `resume()` sends afterward.
+            assert room.seat_seq[1] == seat_seq_before_resume + 1
+            reconnected = ws1b.receive_json()
+            assert reconnected["t"] == "seat_state"
+            assert reconnected["d"] == {"seat": 1, "status": "connected"}
 
 
 def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
@@ -242,6 +270,8 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
             last_seq = _join_and_ready_all(wss)
             seat1_last_seq = last_seq[1]
 
+        _drain_teardown_disconnects(ws0)
+
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
         ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
         ws0.receive_json()  # ack
@@ -259,6 +289,10 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
             frame = ws1b.receive_json()
             assert frame["t"] == "state_sync"
             assert frame["d"]["seat"] == 1
+            # `resume()`'s state_sync branch still announces the reconnect afterward.
+            reconnected = ws1b.receive_json()
+            assert reconnected["t"] == "seat_state"
+            assert reconnected["d"] == {"seat": 1, "status": "connected"}
 
 
 def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
@@ -274,19 +308,29 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             client.websocket_connect(f"/ws?room={room_id}") as ws3,
         ):
             wss = [ws0, ws1, ws2, ws3]
-            last_seq = _join_and_ready_all(wss)
-            seat1_last_seq = last_seq[1]
+            _join_and_ready_all(wss)
 
-        # nothing happens while seat 1 is offline -- its own last_seq is still the current head.
+        # seat 1's own last_seq is still the ring/seq head at the moment it reconnects -- but
+        # closing ws1/ws2/ws3 together (M3 sub-task 6) already pushed that head forward by 3
+        # (one `seat_state{disconnected}` broadcast per closed seat), so capture *after* that,
+        # matching what "at head" actually means here: nothing happened *besides* the
+        # disconnects this test isn't about.
+        _drain_teardown_disconnects(ws0)
+        seat1_last_seq = room.seat_seq[1] - 1
         seq_before = room.seat_seq[1]
         ring_len_before = len(room.ring[1])
 
         with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
 
-            # nothing missed -> no replay, no state_sync: seq/ring are untouched by the hello.
-            assert room.seat_seq[1] == seq_before
-            assert len(room.ring[1]) == ring_len_before
+            # nothing missed -> no replay, no state_sync -- but reconnecting from `disconnected`
+            # is itself real news: `resume()` announces it with one live `seat_state`, bumping
+            # seq/ring by exactly that one frame, nothing more.
+            assert room.seat_seq[1] == seq_before + 1
+            assert len(room.ring[1]) == ring_len_before + 1
+            reconnected = ws1b.receive_json()
+            assert reconnected["t"] == "seat_state"
+            assert reconnected["d"] == {"seat": 1, "status": "connected"}
 
             # the connection is genuinely live again: a fresh broadcast reaches it with the
             # very next seq, no gap.
@@ -297,7 +341,7 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             )
             live_frame = ws1b.receive_json()
             assert live_frame["t"] == "discard"
-            assert live_frame["seq"] == seq_before
+            assert live_frame["seq"] == seq_before + 1
 
 
 def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
@@ -351,8 +395,17 @@ def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
             assert room._active_seat_timer[(window_id, 2)] == original_timer2
             assert room._claim_deadline_ms[(window_id, 2)] == original_deadline2
 
-            # seat 1 hears about its fresh deadline: nothing missed (it had already seen its
-            # own claim_offer), so `resume()` follows up with one new claim_offer carrying it.
+            # seat_1_last_seq (captured from the claim_offer, before teardown) is now behind
+            # the 3 disconnect broadcasts closing ws1/ws2/ws3 together produced -- replay picks
+            # those up first, exactly like the non-claim-window reconnect tests above.
+            _drain_teardown_disconnects(ws1b)
+
+            # the reconnect announcement (`resume()`'s `announce_reconnect`) comes next, then
+            # the fresh claim_offer `rearmed` triggers.
+            reconnected = ws1b.receive_json()
+            assert reconnected["t"] == "seat_state"
+            assert reconnected["d"] == {"seat": 1, "status": "connected"}
+
             refreshed = ws1b.receive_json()
             assert refreshed["t"] == "claim_offer"
             assert refreshed["d"]["window_id"] == window_id

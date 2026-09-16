@@ -5,12 +5,12 @@ connection loop, still validates against `AnyMessage`, still keeps hello/ping/po
 M0 left them (see `Session.handle`'s docstring for why those two intentionally do *not* move
 onto the per-seat `seq` stream this sub-task adds for everything else).
 
-**Room lookup is a bare `dict[str, Room]`, deliberately** (docs/05-roadmap.md M3 sub-task 4's
-own brief: "a minimal in-memory dict-based lookup is fine here, a real `RoomRegistry` with
-matchmaking is a later sub-task, don't over-build it"). No eviction, no matchmaking, no
-capacity limit, one `RuleSet` (`DEFAULT_RULESET`) for every room -- `?seed=` exists only so
-tests can pin a room's deal. Sub-task 6 replaces this wholesale; nothing here should be load-
-bearing past that point.
+**Room lookup is `app/registry.py`'s `RoomRegistry`** (M3 sub-task 6 -- replaces this module's
+former bare `dict[str, Room]`, which its own docstring already flagged as a stand-in: "a real
+`RoomRegistry` with matchmaking is a later sub-task"). Still one process-wide, module-level
+singleton (`_registry` below) -- `RoomRegistry` itself stays an in-process dict per
+docs/00-architecture.md §6, not a new abstraction layer. One `RuleSet` (`DEFAULT_RULESET`) for
+every room -- `?seed=` exists only so tests can pin a room's deal.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app import protocol as proto
 from app.outbox import BoundedOutbox
+from app.registry import RoomRegistry
 from app.room import Room, RoomFullError, SeatNotBoundError, SeatTakenError
 from mahjong_core.actions import (
     Action,
@@ -50,9 +51,7 @@ _adapter: TypeAdapter[object] = TypeAdapter(proto.AnyMessage)
 
 _OUTBOX_MAXSIZE = 64  # docs/00-architecture.md "Outbound backpressure" / 02-protocol.md §9
 
-# minimal in-memory room registry -- see module docstring.
-_ROOMS: dict[str, Room] = {}
-_ROOM_TASKS: dict[str, asyncio.Task[None]] = {}
+_registry = RoomRegistry()
 
 _CLAIM_WIRE_TO_MELD_KIND = {
     "chow": MeldKind.CHOW,
@@ -71,22 +70,11 @@ def _now_ms() -> int:
 
 def get_room(room_id: str) -> Room | None:
     """Test/introspection hook onto the registry -- not part of the wire protocol."""
-    return _ROOMS.get(room_id)
+    return _registry.get(room_id)
 
 
 def _get_or_create_room(room_id: str, seed: int | None) -> Room:
-    room = _ROOMS.get(room_id)
-    if room is not None:
-        return room
-    room = Room(
-        room_id,
-        DEFAULT_RULESET,
-        game_seed=seed if seed is not None else time.time_ns(),
-        require_ready=True,
-    )
-    _ROOMS[room_id] = room
-    _ROOM_TASKS[room_id] = asyncio.create_task(room.run())
-    return room
+    return _registry.get_or_create(room_id, DEFAULT_RULESET, seed=seed, require_ready=True)
 
 
 class _IdempotentMessage(Protocol):
@@ -235,14 +223,14 @@ class Session:
             )
             return
         try:
-            self.room.reconnect(msg.d.seat, self.session_id, self._push)
+            was_disconnected = self.room.reconnect(msg.d.seat, self.session_id, self._push)
         except SeatNotBoundError:
             self._send_local(
                 "error", {"code": "no_such_seat", "message": f"seat {msg.d.seat} is not bound"}
             )
             return
         self.seat = msg.d.seat
-        self.room.resume(msg.d.seat, msg.d.last_seq)
+        self.room.resume(msg.d.seat, msg.d.last_seq, announce_reconnect=was_disconnected)
 
     async def _handle_join(self, msg: proto.Join) -> None:
         if self.seat is not None:
@@ -403,6 +391,16 @@ async def ws_endpoint(websocket: WebSocket, room: str = "default", seed: int | N
                 break
             await session.handle(message)
     finally:
+        # disconnect detection (docs/00-architecture.md §8 "Player disconnects"): the only
+        # signal this sub-task wires up is the connection actually closing (`WebSocketDisconnect`
+        # above, a bad-frame break, or any other exit from the loop) -- a heartbeat-driven dead
+        # socket (docs/02-protocol.md §8's `heartbeat_timeout`) has no driver anywhere in this
+        # codebase yet (sub-task 4 never built one; checked, not just assumed), so it's a real,
+        # separate, still-open gap, not silently folded into this. `session.session_id` (not
+        # just `session.seat`) guards the race where a newer reconnect already reclaimed this
+        # seat before this connection's own `finally` runs -- see `Room.mark_disconnected`.
+        if session.seat is not None:
+            room_obj.mark_disconnected(session.seat, session.session_id)
         session.outbox.close()
         with contextlib.suppress(Exception):
             await writer_task
