@@ -1,8 +1,6 @@
-// layout mixins (docs/03-frontend.md §7.1): breakpoint set and the four seat rotations.
-//
-// seat-region-grid below stubs the grid-template-areas pattern from §3 only to prove the
-// partial/mixin plumbing works end to end — the real table layout (seat sizing, discard pools,
-// centre HUD) is M4, not this sub-task.
+// layout mixins (docs/03-frontend.md §7.1): breakpoint set, the four seat rotations, and the
+// seat-region grid (§3's ASCII diagram) fleshed out for the /table route assembly (this
+// sub-task, docs/05-roadmap.md M4 groundwork).
 
 $breakpoint-tablet: 768px;
 
@@ -30,10 +28,34 @@ $breakpoint-tablet: 768px;
 	}
 }
 
+// §3's desktop grid: across on top, left/right flank a wide centre column, self at bottom.
+// Below 768px it collapses to a simple 3-row stack (across, left/centre/right, self) — the
+// per-region content collapse (backs to a strip, discard pools to horizontal scroll, self
+// pinned to the safe-area bottom) is each region's own concern, not the grid's.
 @mixin seat-region-grid {
 	display: grid;
 	grid-template-areas:
 		'. across .'
 		'left center right'
 		'. self .';
+	grid-template-columns: minmax(88px, 1fr) minmax(0, 3fr) minmax(88px, 1fr);
+	grid-template-rows: auto 1fr auto;
+	gap: var(--space-3);
+
+	@include phone-only {
+		grid-template-areas:
+			'across across across'
+			'left center right'
+			'self self self';
+		grid-template-columns: 1fr 1.4fr 1fr;
+		grid-template-rows: auto auto auto;
+	}
+}
+
+// perspective on the table container, per §2/§3 ("the 2.5D look is perspective + rotateX on
+// the table container, not pre-rendered art"). The rotateX angle itself is applied to the
+// child `.table-surface` (a plain transform, not a mixin) so it composes with that element's
+// own transitions without a second mixin call.
+@mixin table-perspective($depth: 1400px) {
+	perspective: $depth;
 }
