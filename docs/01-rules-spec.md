@@ -259,14 +259,48 @@ toggled off via `faan_overrides` (§10) if a table wants to disable a specific o
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
-| 4 | Seven Pairs | 七對子 |
-| 2 | Three Concealed Pungs | 三暗刻 |
-| 2 | All Revealed (only the pair concealed) | 全求人 |
-| 2 | Two Dragon pungs | 雙箭 |
-| 1 | Two Identical Sequences | 一般高 |
-| 6 | Three Identical Sequences | 三般高 |
-| 2 | Three Step Sequences | 三步高 |
-| 6 | Four Step Sequences | 四步高 |
+| 4 | Seven Pairs (plain faan, not a limit hand) | 七對子 |
+| 2 | Three or more concealed pungs/kongs⁴ | 三暗刻 |
+| 2 | All Revealed (every group claimed, win claimed off a discard)⁵ | 全求人 |
+| 2 | Two Dragon pungs/kongs, any pair⁶ | 雙箭 |
+| 1 | Two Identical Sequences⁷ | 一般高 |
+| 6 | Three or more identical sequences⁷ | 三般高 |
+| 2 | Three Step Sequences⁸ | 三步高 |
+| 6 | Four Step Sequences⁸ | 四步高 |
+
+⁴ **"At least three," not "exactly."** A fourth concealed pung has no separate, higher-value
+tier in this ruleset's tables (unlike Small/Big Three Dragons or Small/Big Four Winds), so a
+hand with all four groups as concealed pungs folds into this one rather than scoring nothing.
+A concealed kong counts as a concealed pung (self-declaring a kong doesn't break concealment);
+an exposed kong or a kong added to a claimed pung never does (both are always open).
+
+⁵ **All four groups open, and the win itself claimed off a discard, not self-drawn** — the
+mirror image of 門前清 (open melds: none, win: off a discard). Requiring every group open
+avoids the ambiguity 門前清's own note flags: `decompose()` never marks a group as "claimed to
+complete the win" vs. "held concealed all along," so the only shape this pattern can check
+unambiguously is "no group came from `decompose()` at all."
+
+⁶ **Exactly two, independent of the pair.** Stacks with Small Three Dragons (when the pair
+happens to be the third dragon) and with 箭刻's own per-dragon count, same "nothing above
+forbids it" precedent as 箭刻 stacking with Small/Big Three Dragons (§7 note ²). Mutually
+exclusive with Big Three Dragons by the same physical-tile-count argument as Small vs. Big
+there: three dragon pungs already commit 9 of the 12 physical dragon tiles, so a hand can
+never have "two dragon pungs" resolve to anything but 2 or 3, never higher.
+
+⁷ **Ladder: "exactly two" vs. "three or more," not additive.** A run's count of identical
+chows can't be both `== 2` and `>= 3` at once, so Two and Three Identical Sequences are
+mutually exclusive by construction — no separate subsumption check needed, same trick as
+Voided Suit vs. Half/Full Flush (§7 note ¹). "Three or more" rather than "exactly three" for
+the same reason as concealed pungs above: no fourth tier exists to catch an all-four-identical
+hand.
+
+⁸ **Step is two ranks, not one or three** — three chows in one suit at ranks `r`, `r+2`,
+`r+4` (e.g. 123-345-567), not consecutive ranks. Four Step Sequences is the single shape this
+allows within one suit's nine ranks: 123-345-567-789 (starts 0, 2, 4, 6), using all four of
+the hand's groups. Because that shape's ranks also contain 三步高's own 3-run pattern twice
+over ({0,2,4} and {2,4,6}), 三步高 explicitly excludes any suit that also satisfies 四步高 —
+ladder rule, take the higher tier, same convention as note ⁷ above and Small/Big Three
+Dragons/Four Winds (§7 note ²).
 
 ### Flower faan
 

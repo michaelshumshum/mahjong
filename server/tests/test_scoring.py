@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from mahjong_core.actions import _is_seven_pairs as _actions_is_seven_pairs
 from mahjong_core.actions import _is_thirteen_orphans as _actions_is_thirteen_orphans
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.patterns import (
@@ -34,6 +35,10 @@ def _pung(tile_type: TileType, from_seat: int | None = None) -> Meld:
 
 def _kong(tile_type: TileType, from_seat: int | None = None) -> Meld:
     return Meld(MeldKind.EXPOSED_KONG, tile_ids_for_type(tile_type), from_seat=from_seat)
+
+
+def _concealed_kong(tile_type: TileType) -> Meld:
+    return Meld(MeldKind.CONCEALED_KONG, tile_ids_for_type(tile_type))
 
 
 def _pair(tile_type: TileType) -> Meld:
@@ -554,11 +559,14 @@ def test_mixed_terminals_stacks_with_voided_suit_and_all_pungs() -> None:
 
 
 def test_full_flush_stacks_with_all_pungs() -> None:
-    """01-rules-spec.md §7: "Faan stack: Full Flush (6) + All Pungs (3) = 9"."""
+    """01-rules-spec.md §7: "Faan stack: Full Flush (6) + All Pungs (3) = 9". Two pungs are
+    claimed (open) so this fixture stays about Full Flush + All Pungs only, not also Three
+    Concealed Pungs (fourth sub-task, needs 3+ concealed) -- see
+    `test_three_concealed_pungs_stacks_with_all_pungs` for that combination instead."""
     hand = (
         _pung(TileType.PIN_1),
-        _pung(TileType.PIN_3),
-        _pung(TileType.PIN_5),
+        _pung(TileType.PIN_3, from_seat=2),
+        _pung(TileType.PIN_5, from_seat=3),
         _pung(TileType.PIN_7),
         _pair(TileType.PIN_9),
     )
@@ -568,6 +576,7 @@ def test_full_flush_stacks_with_all_pungs() -> None:
     assert scored["對對糊"] == 3
     assert "混一色" not in scored
     assert "缺一門" not in scored
+    assert "三暗刻" not in scored
     assert sum(scored.values()) == 9 + scored.get("無花", 0) + scored.get("門前清", 0)
 
 
@@ -834,3 +843,416 @@ def test_limit_patterns_flagged_for_future_non_stacking() -> None:
         assert pattern.is_limit == (pattern.name in limit_names)
         if pattern.is_limit:
             assert pattern.faan == LIMIT_FAAN
+
+
+# --- Seven Pairs (七對子) ----------------------------------------------------------------------
+
+
+def test_seven_pairs() -> None:
+    tiles = _tiles(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.SOU_9,
+        TileType.SOU_9,
+        TileType.WIND_EAST,
+        TileType.WIND_EAST,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_RED,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.PIN_7,
+        TileType.PIN_7,
+    )
+    assert _actions_is_seven_pairs(tiles) is True
+    assert _occurrences("七對子", (), _ctx(concealed_tiles=tiles)) == 1
+
+
+def test_seven_pairs_is_not_a_limit_hand() -> None:
+    """§7 gives Seven Pairs a plain 4 faan, unlike Thirteen Orphans in the same "raw-hand
+    shape" family -- see the note in patterns.py's `_detect_seven_pairs`."""
+    pattern = next(p for p in PATTERNS if p.name == "七對子")
+    assert pattern.is_limit is False
+    assert pattern.faan == 4
+
+
+def test_seven_pairs_false_with_a_triple() -> None:
+    """Three of one type plus a lone extra isn't seven *distinct* pairs."""
+    tiles = _tiles(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.PIN_5,
+        TileType.SOU_9,
+        TileType.SOU_9,
+        TileType.WIND_EAST,
+        TileType.WIND_EAST,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_RED,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.PIN_7,
+        TileType.PIN_7,
+    )
+    assert _actions_is_seven_pairs(tiles) is False
+    assert _occurrences("七對子", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+def test_seven_pairs_false_for_a_standard_hand_cross_checked_against_actions() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    tiles = tuple(t for m in hand for t in m.tiles)
+    assert _actions_is_seven_pairs(tiles) is False
+    assert _occurrences("七對子", (), _ctx(concealed_tiles=tiles)) == 0
+
+
+# --- Three Concealed Pungs (三暗刻) -------------------------------------------------------------
+
+
+def test_three_concealed_pungs() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5),
+        _pung(TileType.SOU_9),
+        _chow(TileType.MAN_4, from_seat=3),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三暗刻", hand, _ctx()) == 1
+
+
+def test_three_concealed_pungs_counts_a_concealed_kong() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5),
+        _concealed_kong(TileType.SOU_9),
+        _chow(TileType.MAN_4, from_seat=3),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三暗刻", hand, _ctx()) == 1
+
+
+def test_three_concealed_pungs_false_with_only_two() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5, from_seat=2),  # claimed -- open, doesn't count
+        _pung(TileType.SOU_9),
+        _chow(TileType.MAN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三暗刻", hand, _ctx()) == 0
+
+
+def test_three_concealed_pungs_false_with_an_exposed_kong() -> None:
+    """An exposed kong is always claimed -- never counts as concealed, even though it's a
+    fourth-tile pung in spirit."""
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5),
+        _kong(TileType.SOU_9, from_seat=1),
+        _chow(TileType.MAN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三暗刻", hand, _ctx()) == 0
+
+
+def test_three_concealed_pungs_stacks_with_all_pungs() -> None:
+    """Combination with an earlier batch's pattern (對對糊, sub-task 1): nothing forbids the
+    two from firing on the same hand."""
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5),
+        _pung(TileType.SOU_9),
+        _pung(TileType.MAN_7, from_seat=3),
+        _pair(TileType.DRAGON_RED),
+    )
+    scored = score_hand(hand, _ctx())
+    assert scored["三暗刻"] == 2
+    assert scored["對對糊"] == 3
+
+
+# --- All Revealed (全求人) ----------------------------------------------------------------------
+
+
+def test_all_revealed() -> None:
+    hand = (
+        _pung(TileType.MAN_1, from_seat=1),
+        _chow(TileType.PIN_5, from_seat=2),
+        _pung(TileType.SOU_9, from_seat=3),
+        _kong(TileType.WIND_EAST, from_seat=1),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("全求人", hand, _ctx(self_drawn=False)) == 1
+
+
+def test_all_revealed_false_when_self_drawn() -> None:
+    hand = (
+        _pung(TileType.MAN_1, from_seat=1),
+        _chow(TileType.PIN_5, from_seat=2),
+        _pung(TileType.SOU_9, from_seat=3),
+        _kong(TileType.WIND_EAST, from_seat=1),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("全求人", hand, _ctx(self_drawn=True)) == 0
+
+
+def test_all_revealed_false_with_one_concealed_group() -> None:
+    hand = (
+        _pung(TileType.MAN_1, from_seat=1),
+        _chow(TileType.PIN_5, from_seat=2),
+        _pung(TileType.SOU_9, from_seat=3),
+        _chow(TileType.MAN_5),  # concealed -- breaks "only the pair concealed"
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("全求人", hand, _ctx(self_drawn=False)) == 0
+
+
+def test_all_revealed_mutually_exclusive_with_fully_concealed() -> None:
+    hand = (
+        _pung(TileType.MAN_1, from_seat=1),
+        _chow(TileType.PIN_5, from_seat=2),
+        _pung(TileType.SOU_9, from_seat=3),
+        _kong(TileType.WIND_EAST, from_seat=1),
+        _pair(TileType.DRAGON_RED),
+    )
+    ctx = _ctx(self_drawn=False)
+    assert _occurrences("全求人", hand, ctx) == 1
+    assert _occurrences("門前清", hand, ctx) == 0
+
+
+# --- Two Dragon Pungs (雙箭) --------------------------------------------------------------------
+
+
+def test_two_dragon_pungs() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.SOU_9),
+    )
+    assert _occurrences("雙箭", hand, _ctx()) == 1
+
+
+def test_two_dragon_pungs_false_with_only_one() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _chow(TileType.SOU_2),
+        _pair(TileType.SOU_9),
+    )
+    assert _occurrences("雙箭", hand, _ctx()) == 0
+
+
+def test_two_dragon_pungs_false_with_all_three() -> None:
+    """Mutually exclusive with Big Three Dragons by construction -- see the footnote added to
+    01-rules-spec.md §7."""
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _kong(TileType.DRAGON_WHITE),
+        _chow(TileType.MAN_1),
+        _pair(TileType.SOU_9),
+    )
+    assert _occurrences("雙箭", hand, _ctx()) == 0
+    assert _occurrences("大三元", hand, _ctx()) == 1
+
+
+def test_two_dragon_pungs_stacks_with_small_three_dragons_and_dragon_pung() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_WHITE),
+    )
+    scored = score_hand(hand, _ctx())
+    assert scored["雙箭"] == 2
+    assert scored["小三元"] == 3
+    assert scored["箭刻"] == 2
+
+
+# --- Two/Three Identical Sequences (一般高/三般高) -----------------------------------------------
+
+
+def test_two_identical_sequences() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_5),
+        _chow(TileType.SOU_2),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("一般高", hand, _ctx()) == 1
+    assert _occurrences("三般高", hand, _ctx()) == 0
+
+
+def test_two_identical_sequences_counts_each_distinct_pair() -> None:
+    """Two separate double-chows (123m x2, 456p x2) each count -- "each," like 箭刻."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("一般高", hand, _ctx()) == 2
+
+
+def test_three_identical_sequences() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三般高", hand, _ctx()) == 1
+
+
+def test_three_identical_sequences_ladder_excludes_two_identical() -> None:
+    """Ladder rule (01-rules-spec.md §7 note ⁷): a run counted at 三般高 never also counts at
+    一般高 -- a count can't be both `== 2` and `>= 3`."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    ctx = _ctx()
+    assert _occurrences("三般高", hand, ctx) == 1
+    assert _occurrences("一般高", hand, ctx) == 0
+
+
+def test_identical_sequences_not_confused_with_stepped_sequences() -> None:
+    """Three *identical* 123m chows is 三般高, not 三步高 -- same starting rank each time,
+    not three different ranks spaced two apart. The easy-to-conflate boundary this batch's
+    detectors must keep straight."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    ctx = _ctx()
+    assert _occurrences("三般高", hand, ctx) == 1
+    assert _occurrences("三步高", hand, ctx) == 0
+
+
+def test_no_identical_or_stepped_sequences_for_unrelated_chows() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_RED),
+    )
+    ctx = _ctx()
+    assert _occurrences("一般高", hand, ctx) == 0
+    assert _occurrences("三般高", hand, ctx) == 0
+    assert _occurrences("三步高", hand, ctx) == 0
+    assert _occurrences("四步高", hand, ctx) == 0
+
+
+# --- Three/Four Step Sequences (三步高/四步高) ---------------------------------------------------
+
+
+def test_three_step_sequences() -> None:
+    """123m / 345m / 567m -- starts 0, 2, 4 (ranks), spaced two apart."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_3),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三步高", hand, _ctx()) == 1
+    assert _occurrences("四步高", hand, _ctx()) == 0
+
+
+def test_three_step_sequences_false_for_consecutive_not_spaced_by_two() -> None:
+    """123m / 234m / 345m are spaced by *one* rank, not two -- not this pattern."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_2),
+        _chow(TileType.MAN_3),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三步高", hand, _ctx()) == 0
+
+
+def test_three_step_sequences_false_across_different_suits() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_3),
+        _chow(TileType.SOU_5),
+        _chow(TileType.MAN_7),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("三步高", hand, _ctx()) == 0
+
+
+def test_four_step_sequences() -> None:
+    """123m / 345m / 567m / 789m -- the only shape that fits four step-2 runs in one suit."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_3),
+        _chow(TileType.MAN_5),
+        _chow(TileType.MAN_7),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert _occurrences("四步高", hand, _ctx()) == 1
+
+
+def test_four_step_sequences_ladder_excludes_three_step() -> None:
+    """Ladder rule (01-rules-spec.md §7 note ⁸): 四步高's ranks contain 三步高's own pattern
+    twice over, so 三步高 must not also fire on the same hand."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_3),
+        _chow(TileType.MAN_5),
+        _chow(TileType.MAN_7),
+        _pair(TileType.DRAGON_RED),
+    )
+    ctx = _ctx()
+    assert _occurrences("四步高", hand, ctx) == 1
+    assert _occurrences("三步高", hand, ctx) == 0
+
+
+def test_stepped_sequences_not_confused_with_identical_sequences() -> None:
+    """123m / 345m / 567m are three *different* chows, not identical -- 一般高/三般高 must stay
+    silent here even though three chows of the same suit are present."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_3),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_4),
+        _pair(TileType.DRAGON_RED),
+    )
+    ctx = _ctx()
+    assert _occurrences("三步高", hand, ctx) == 1
+    assert _occurrences("一般高", hand, ctx) == 0
+    assert _occurrences("三般高", hand, ctx) == 0
+
+
+def test_three_step_sequences_stacks_with_half_flush() -> None:
+    """Combination with an earlier batch's pattern (混一色, sub-task 1)."""
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_3),
+        _chow(TileType.MAN_5),
+        _pung(TileType.DRAGON_RED),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    scored = score_hand(hand, _ctx())
+    assert scored["三步高"] == 2
+    assert scored["混一色"] == 3

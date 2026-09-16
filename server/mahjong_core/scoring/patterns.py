@@ -26,6 +26,18 @@ All Terminals, Nine Gates, Heavenly Hand, and Earthly Hand. All six sit in the *
 table (there's no separate "Limit" `hand_set`), so `HandSet.CLASSIC` gates every one of them,
 same as sub-task 1/2's patterns.
 
+Scope (fourth sub-task): all eight `HandSet.NEW_18` patterns -- Seven Pairs, Three Concealed
+Pungs, All Revealed, Two Dragon Pungs, Two/Three Identical Sequences, Three/Four Step
+Sequences. Seven Pairs is a raw-hand shape check like Thirteen Orphans (see "Raw-hand access"
+above) and is *not* a limit hand here -- §7 gives it a plain 4 faan, unlike Thirteen Orphans in
+the same shape family. The other seven operate on `hand` like sub-task 2/3's aggregate
+checks, but Two/Three Identical Sequences and Three/Four Step Sequences need something new:
+comparing groups *against each other* (same run twice, or three/four runs evenly spaced),
+not just counting how many groups match one fixed category (a tile type, concealed-ness).
+Two small helpers, `_chow_run_counts` and `_chow_start_ranks_by_suit`, carry that comparison;
+see their docstrings and the "step" footnote added to 01-rules-spec.md §7 for the shape they
+each resolve.
+
 **What a detector operates on.** `hand` is one candidate full decomposition of the winning
 14 tiles: the seat's already-formed melds (`SeatState.melds` -- claimed chows/pungs/kongs, or
 a self-declared concealed/added kong) plus one candidate parse of the remaining concealed
@@ -72,6 +84,7 @@ that could drift out of sync with the melds it describes.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -477,6 +490,182 @@ def _detect_earthly_hand(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     return 1 if ctx.seat_wind != Wind.EAST else 0
 
 
+def _detect_seven_pairs(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """七對子: 14 concealed tiles as 7 *distinct* pairs. Mirrors `actions.py`'s
+    `_is_seven_pairs` (win-legality's shape check) for the same reason `_ORPHAN_TYPES` mirrors
+    rather than imports it -- see that frozenset's docstring; `test_scoring.py` cross-checks
+    the two so they can't drift. Unlike Thirteen Orphans, §7 gives this a plain 4 faan, not a
+    limit hand -- `is_limit=False` below. `decompose()` never produces a `hand` for this shape
+    (seven pairs isn't four groups plus a pair), so this reads `ctx.concealed_tiles` directly,
+    same as Thirteen Orphans/Nine Gates."""
+    tiles = ctx.concealed_tiles
+    if len(tiles) != 14:
+        return 0
+    counts = Counter(tile_id_type(t) for t in tiles)
+    return 1 if len(counts) == 7 and all(c == 2 for c in counts.values()) else 0
+
+
+def _detect_three_concealed_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """三暗刻: at least three concealed pungs/kongs. "At least," not "exactly" -- a fourth
+    concealed pung has no separate, higher-value pattern in this ruleset's tables to catch it
+    (contrast Small/Big Three Dragons' exact counts, each with its own named tier), so folding
+    a rare four-concealed-pung hand into this one is correct rather than a gap. A `PUNG` meld
+    is concealed iff `from_seat is None` -- decompose() only ever emits pungs that way (self-
+    drawn, never claimed); a claimed pung always carries a `from_seat`. `CONCEALED_KONG` always
+    has `from_seat is None` by construction (`Meld.__post_init__` forbids it otherwise) and
+    counts as a concealed pung here, matching standard practice that a self-declared kong
+    doesn't break concealment. `EXPOSED_KONG`/`ADDED_KONG` are always open (claimed, or
+    upgrading a claimed pung) and never qualify."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    concealed_pungs = sum(
+        1
+        for m in groups
+        if m.kind in (MeldKind.PUNG, MeldKind.CONCEALED_KONG) and m.from_seat is None
+    )
+    return 1 if concealed_pungs >= 3 else 0
+
+
+def _detect_all_revealed(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """全求人: every one of the four groups is open (claimed from another seat) and the win
+    itself is claimed off a discard, not self-drawn -- "entirely obtained from others," the
+    mirror image of `_detect_fully_concealed`'s "no open melds, win on discard." Requiring all
+    four groups open is what keeps this unambiguous despite `decompose()` never tagging a
+    group as claimed-to-win vs self-formed (see `_detect_fully_concealed`'s note that the
+    winning tile is never itself "open"): if every group already carries a `from_seat`, none
+    of them came from `decompose()` at all (`decompose()` never sets `from_seat`), so there's
+    no risk of a self-formed concealed group being mistaken for an open one, or vice versa.
+    `self_drawn` still needs its own check -- a hand can have four pre-claimed groups and then
+    self-draw the tile that completes the pair, which isn't "from others.\""""
+    if ctx.self_drawn:
+        return 0
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    return 1 if all(_is_open(m) for m in groups) else 0
+
+
+def _detect_two_dragon_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """雙箭: pungs/kongs of exactly two dragon types, independent of what the pair is. This
+    reads the same `dragon_pungs` count as Small Three Dragons but doesn't require a dragon
+    pair -- so it fires both when the pair is the third dragon (stacking with Small Three
+    Dragons, same "everything stacks unless §7 says otherwise" precedent as 箭刻 stacking with
+    Small/Big Three Dragons) and when it isn't (a shape Small Three Dragons can't reach at
+    all). "Exactly two," not "at least two," keeps this mutually exclusive with Big Three
+    Dragons by the same physical-tile-count argument as Small vs. Big (three dragon pungs
+    commit 9 of the 12 physical dragon tiles, leaving no room for a fourth pung of a type
+    already exhausted) -- see the footnote added to 01-rules-spec.md §7."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    dragon_pungs = sum(
+        1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
+    )
+    return 1 if dragon_pungs == 2 else 0
+
+
+def _chow_run_counts(groups: tuple[Meld, ...]) -> dict[TileType, int]:
+    """How many `CHOW` melds in `groups` share the exact same three ranks (same `tile_type`,
+    a chow's lowest tile) -- the building block Two/Three Identical Sequences both need. This
+    is a genuinely different shape than every earlier detector in this module: those look at
+    one meld at a time or count a single fixed category (a tile type, concealed-ness) across
+    the hand; identical sequences need groups compared *against each other*, so the comparison
+    has to happen in its own pass before either detector can just check a count."""
+    counts: dict[TileType, int] = {}
+    for m in groups:
+        if m.kind == MeldKind.CHOW:
+            counts[m.tile_type] = counts.get(m.tile_type, 0) + 1
+    return counts
+
+
+def _detect_two_identical_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """一般高, "each" like 箭刻: how many distinct runs appear as *exactly* two identical
+    chows. With only four groups in a hand, two different double-chows (e.g. 123m x2 and
+    456p x2) is the only way this fires more than once. "Exactly two" (not "at least two") is
+    what keeps this mutually exclusive with 三般高 by construction -- a run's count can't be
+    both `== 2` and `>= 3` at once, no separate subsumption check needed, same trick as
+    Voided Suit vs Half/Full Flush."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    return sum(1 for c in _chow_run_counts(groups).values() if c == 2)
+
+
+def _detect_three_identical_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """三般高: a run appearing three (or, physically possible with four matching copies of one
+    suit's three ranks, four) times. "At least three," not "exactly three" -- same reasoning
+    as `_detect_three_concealed_pungs`: there's no separate, higher-value "Four Identical
+    Sequences" tier in this ruleset's tables, so a hand with all four groups identical folds
+    into this one rather than scoring nothing."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    return 1 if any(c >= 3 for c in _chow_run_counts(groups).values()) else 0
+
+
+def _chow_start_ranks_by_suit(groups: tuple[Meld, ...]) -> dict[int, set[int]]:
+    """Which ranks (0-8) start a `CHOW` in `groups`, grouped by suit (0=man/1=pin/2=sou) --
+    the building block Three/Four Step Sequences need to find an evenly-spaced run of chows,
+    the same "compare groups against each other" shape `_chow_run_counts` uses for identical
+    sequences, but keyed by rank-with-suit instead of exact run identity."""
+    result: dict[int, set[int]] = {}
+    for m in groups:
+        if m.kind != MeldKind.CHOW:
+            continue
+        suit, rank = divmod(int(m.tile_type), 9)
+        result.setdefault(suit, set()).add(rank)
+    return result
+
+
+def _has_step_run(ranks: set[int], length: int) -> bool:
+    """Whether `ranks` (one suit's distinct chow-starting ranks) contains `length` runs each
+    starting two ranks above the previous (01-rules-spec.md §7 footnote: 三步高/四步高's step is
+    2, e.g. 123-345-567, not 1 or 3) -- `max_start` is the highest starting rank that still
+    leaves room for `length` such runs within ranks 0-8."""
+    max_start = 6 - 2 * (length - 1)
+    return any(all((s + 2 * i) in ranks for i in range(length)) for s in range(max_start + 1))
+
+
+def _detect_four_step_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """四步高: four chows in one suit, starting ranks spaced two apart. The only shape that
+    fits within one suit's nine ranks is 1-2-3 / 3-4-5 / 5-6-7 / 7-8-9 (starts 0,2,4,6) --
+    using every one of the hand's four groups, so this hand has no room left for a pair drawn
+    from the same suit's chows; that's fine, the pair is unconstrained."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    by_suit = _chow_start_ranks_by_suit(groups)
+    return 1 if any(_has_step_run(ranks, 4) for ranks in by_suit.values()) else 0
+
+
+def _detect_three_step_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """三步高: three chows in one suit, starting ranks spaced two apart. Excludes a suit that
+    also satisfies Four Step Sequences (`not _has_step_run(ranks, 4)`) -- ladder rule, take the
+    higher tier, same convention as Two/Three Identical Sequences above and Small/Big Three
+    Dragons in the second sub-task: a 0,2,4,6 four-step hand's ranks contain the 3-step
+    sub-sequences {0,2,4} and {2,4,6} too, so without this exclusion both patterns would fire
+    on the same four groups. See the footnote added to 01-rules-spec.md §7."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return 0
+    groups, _pair = split
+    by_suit = _chow_start_ranks_by_suit(groups)
+    return (
+        1
+        if any(
+            _has_step_run(ranks, 3) and not _has_step_run(ranks, 4) for ranks in by_suit.values()
+        )
+        else 0
+    )
+
+
 LIMIT_FAAN = 13
 """Placeholder per-occurrence value for `is_limit` patterns. §7 gives limit hands no faan
 number at all -- "take the highest [limit pattern]," scored at the table's `faan_cap` (10 or
@@ -511,6 +700,14 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("十三么", HandSet.CLASSIC, LIMIT_FAAN, _detect_thirteen_orphans, is_limit=True),
     Pattern("天糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_heavenly_hand, is_limit=True),
     Pattern("地糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_earthly_hand, is_limit=True),
+    Pattern("七對子", HandSet.NEW_18, 4, _detect_seven_pairs),
+    Pattern("三暗刻", HandSet.NEW_18, 2, _detect_three_concealed_pungs),
+    Pattern("全求人", HandSet.NEW_18, 2, _detect_all_revealed),
+    Pattern("雙箭", HandSet.NEW_18, 2, _detect_two_dragon_pungs),
+    Pattern("一般高", HandSet.NEW_18, 1, _detect_two_identical_sequences),
+    Pattern("三般高", HandSet.NEW_18, 6, _detect_three_identical_sequences),
+    Pattern("三步高", HandSet.NEW_18, 2, _detect_three_step_sequences),
+    Pattern("四步高", HandSet.NEW_18, 6, _detect_four_step_sequences),
 )
 
 
