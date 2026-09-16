@@ -71,3 +71,56 @@ test('desktop-width viewport does not apply the fixed self-hand collapse', async
 	const selfRegion = page.locator('.seat-region--self');
 	await expect(selfRegion).not.toHaveCSS('position', 'fixed');
 });
+
+// Covers the scripted draw/discard/claim/kong animation demo (docs/03-frontend.md §4's
+// positional slot-identity rule) — the pure slot-resolution algorithm is unit-tested in
+// tile-slots.spec.ts; this proves it's actually wired up and reachable end to end.
+test('animation demo: draw, discard, claim, and concealed kong run the full sequence without errors', async ({
+	page
+}) => {
+	const errors: string[] = [];
+	page.on('pageerror', (err) => errors.push(err.message));
+
+	await page.goto('/table/abc123');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Animate a turn' }).click();
+
+	const demo = page.getByTestId('animation-demo');
+	await expect(demo).toBeVisible();
+	const opponentBacks = demo.locator('.backs-row .demo-slot');
+	await expect(opponentBacks).toHaveCount(13);
+
+	// draw: 13 -> 14 concealed slots
+	await demo.getByRole('button', { name: 'Draw' }).click();
+	await expect(opponentBacks).toHaveCount(14);
+
+	// discard: the drawn slot leaves (transitionend commits it), back down to 13, and it's
+	// now sitting in the discard pool as a revealed tile
+	await demo.getByRole('button', { name: 'Discard', exact: true }).click();
+	await expect(opponentBacks).toHaveCount(13, { timeout: 2000 });
+	await expect(demo.locator('.discard-pool .discard-tile')).toHaveCount(1);
+
+	// claim: that discard becomes an exposed pung meld, and leaves the discard pool
+	await demo.getByRole('button', { name: 'You claim last discard (pung)' }).click();
+	await expect(demo.locator('.discard-pool .discard-tile')).toHaveCount(0);
+	await expect(demo.locator('.meld-row .meld')).toHaveCount(1);
+
+	// concealed kong: 13 -> 9 concealed slots, a second meld appears
+	await demo.getByRole('button', { name: 'Concealed kong' }).click();
+	await expect(opponentBacks).toHaveCount(9);
+	await expect(demo.locator('.meld-row .meld')).toHaveCount(2);
+
+	// your own discard: pick a hand tile, it leaves your hand and lands in your discard pool
+	const yourHand = page.getByTestId('demo-your-hand');
+	const yourDiscards = page.getByTestId('demo-your-discards');
+	await expect(yourHand.locator('.demo-hand-tile')).toHaveCount(5);
+	await yourHand.locator('.demo-hand-tile').first().click();
+	await expect(yourHand.locator('.demo-hand-tile')).toHaveCount(4, { timeout: 2000 });
+	await expect(yourDiscards.locator('.discard-tile')).toHaveCount(1);
+
+	await demo.getByRole('button', { name: 'Reset demo' }).click();
+	await expect(opponentBacks).toHaveCount(13);
+	await expect(yourHand.locator('.demo-hand-tile')).toHaveCount(5);
+
+	expect(errors).toEqual([]);
+});
