@@ -146,17 +146,29 @@ class Room:
         getter = asyncio.create_task(self._inbox_getter())    # long-lived; NEVER cancelled (D17)
         while True:
             cmd = await self._next(getter)     # races getter against self.deadlines.peek(); never cancels getter
-            actions = self._authorize(cmd)
-            for action in actions:
+            action = self._authorize(cmd)      # None if illegal for cmd.seat right now -- drop it
+            if action is not None:
                 self.state, events = reduce(self.state, action)
                 self.event_id += 1
                 self._publish(events)          # redact_event() per recipient; stamps that stream's own seq (§5)
+                if self.state.phase == Phase.HAND_OVER:  # server-computed, no seat decision (§3 above)
+                    self.state, events = start_next_hand(self.state)
+                    self.event_id += 1
+                    self._publish(events)
             self._arm_timers()
             self._poke_bots()                  # submits to a worker pool; never runs bot logic in this loop (D12)
 ```
 
 No locks. No `await` between read and write of shared state. Four simultaneous clicks are four
 items in a queue.
+
+**`start_next_hand()` on the loop (M3 sub-task 2 fix).** An earlier version of this sketch had
+`_authorize` return a plural `actions` and never called `start_next_hand()` at all — engine.py's
+own docstring already says the Room must call it right after a `reduce()` lands on `HAND_OVER`,
+"before offering anyone anything else," so the loop above does that in the same tick, before
+`_arm_timers`/`_poke_bots`. `_authorize` returns at most one `Action` (or `None` to drop an
+illegal command) since `Command` carries exactly one already-validated `(seat, Action)` pair —
+there was never a second action to loop over.
 
 > In-room messages never leave the owning task. A room lives on exactly one node and its
 > members are routed there (§7); room state is never distributed.
