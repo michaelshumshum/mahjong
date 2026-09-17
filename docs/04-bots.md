@@ -102,10 +102,21 @@ decision**. In pure Python that's tens of milliseconds — call it 20–50ms. Th
 200 concurrent tables with 3 bot seats each; even at modest bot-decision frequency that is
 multiple CPU-*seconds* of work per wall-clock second on a single worker process. This is a real
 capacity constraint, not a "Low"-risk line item — size the `ProcessPoolExecutor` and the
-precomputed per-suit lookup table (~500k entries, O(1) lookup replacing the recursive scan)
-accordingly, and build the table alongside T1 in M1, not after load-testing surfaces the problem.
+precomputed per-suit lookup table (O(1) lookup replacing the recursive scan) accordingly, and
+build the table alongside T1, not after load-testing surfaces the problem.
 "Bots run outside the room's task" bounds the room's `asyncio` loop, not total CPU — it does not
 by itself make this cheap.
+
+**Built (M4): lazily-populated, not an eagerly-built ~500k-entry table.** `mahjong_core/shanten.py`'s
+`_frontier` is the per-suit table, `functools.cache`-memoised on a suit's (or honors') count
+vector. The full table has 5\*\*9 ≈ 1.95M possible states (shared by man/pin/sou, since they're
+structurally identical; honors get a smaller 5\*\*7 ≈ 78k table) — measured at **~104s** to
+populate eagerly, cold, which is too slow to pay on every `ProcessPoolExecutor` worker's import.
+A real game only ever visits a few hundred to a few thousand *distinct* suit shapes in its
+lifetime, and a single ukeire scan's ~470 evaluations share almost all of their sub-shapes, so
+the cache is warm within the first hand or two and every subsequent lookup is the O(1) hit this
+section calls for — see `mahjong_core/shanten.py`'s module docstring for the full tradeoff and
+`tests/test_shanten.py`'s perf/import-time tests for what pins it down.
 
 **Ukeire** (受入れ) = for each candidate discard, how many unseen tiles reduce shanten:
 
