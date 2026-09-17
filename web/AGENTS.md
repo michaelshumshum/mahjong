@@ -49,6 +49,10 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   if a page's content meaningfully changed. Full workflow, troubleshooting, and the notable-pages
   list: `.claude/skills/frontend-screenshots/SKILL.md`. Skip this for changes with no visible
   surface (pure logic, test-only, refactors with identical output).
+- `/table/[id]` opens a real live game by default (`[id]` as a room id) — the screenshot script
+  and `table.e2e.ts` explicitly pass `?mock=<scenarioId>` (any value works; a bare `?mock` picks
+  the first scenario) to stay on the frozen `MOCK_SCENARIOS` fixture, since neither runs a backend.
+  Live wiring detail: `docs/03-frontend.md`'s "`/table/[id]` wiring" (§6).
 
 - **Testing a `*.svelte.ts` file's runes** (`$state`/`$effect`) needs the `vitest.config.ts`
   `client` project, not `server`: Vitest's default `node` environment still loads modules through

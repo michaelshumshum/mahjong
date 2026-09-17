@@ -8,7 +8,7 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 	const errors: string[] = [];
 	page.on('pageerror', (err) => errors.push(err.message));
 
-	const response = await page.goto('/table/abc123');
+	const response = await page.goto('/table/abc123?mock=1');
 	expect(response?.status()).toBe(200);
 	await page.waitForLoadState('networkidle');
 
@@ -27,7 +27,7 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 test('switching to the claim-window scenario surfaces claim buttons, and choosing one records the choice', async ({
 	page
 }) => {
-	await page.goto('/table/abc123');
+	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 
 	await page.getByRole('button', { name: 'Claim window open (you)' }).click();
@@ -42,7 +42,7 @@ test('switching to the claim-window scenario surfaces claim buttons, and choosin
 });
 
 test('switching to the hand-ended scenario shows the faan breakdown', async ({ page }) => {
-	await page.goto('/table/abc123');
+	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 
 	await page.getByRole('button', { name: 'Hand just ended' }).click();
@@ -56,7 +56,7 @@ test('phone-width viewport applies the sub-768px collapse to the self hand regio
 	page
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
-	await page.goto('/table/abc123');
+	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 
 	const selfRegion = page.locator('.seat-region--self');
@@ -65,7 +65,7 @@ test('phone-width viewport applies the sub-768px collapse to the self hand regio
 
 test('desktop-width viewport does not apply the fixed self-hand collapse', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 800 });
-	await page.goto('/table/abc123');
+	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 
 	const selfRegion = page.locator('.seat-region--self');
@@ -81,7 +81,7 @@ test('animation demo: draw, discard, claim, and concealed kong run the full sequ
 	const errors: string[] = [];
 	page.on('pageerror', (err) => errors.push(err.message));
 
-	await page.goto('/table/abc123');
+	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Animate a turn' }).click();
 

@@ -17,8 +17,9 @@ make help          # everything else
 
 ## Screenshots
 
-Mock-data driven — no real server integration yet (that's M3+); these show the client-side
-scaffolding and UI components built so far. Regenerate with `pnpm --dir web run screenshots`
+Captured from `/table/[id]`'s frozen mock-scenario fixture (`?mock=`), not a live game — repeatable
+without a running backend, even though `/table/[id]` itself now opens a real one by default
+(`docs/03-frontend.md`'s "`/table/[id]` wiring"). Regenerate with `pnpm --dir web run screenshots`
 after any visible frontend change (see `.claude/skills/frontend-screenshots/SKILL.md`).
 
 | | |

@@ -27,17 +27,21 @@ const BASE = `http://localhost:${PORT}`;
 const PAGES = [
 	{ name: 'home', url: '/' },
 	{ name: 'lobby', url: '/lobby' },
-	{ name: 'table-your-turn', url: '/table/demo123' },
+	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
+	// `[id]` as a room id (docs/03-frontend.md §6) -- there's no backend running during a
+	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
+	// rather than relying on it being the unauthenticated default.
+	{ name: 'table-your-turn', url: '/table/demo123?mock=1' },
 	{
 		name: 'table-claim-window',
-		url: '/table/demo123',
+		url: '/table/demo123?mock=1',
 		async before(page) {
 			await page.getByRole('button', { name: 'Claim window open (you)' }).click();
 		}
 	},
 	{
 		name: 'table-hand-ended',
-		url: '/table/demo123',
+		url: '/table/demo123?mock=1',
 		async before(page) {
 			await page.getByRole('button', { name: 'Hand just ended' }).click();
 			await page.waitForTimeout(150); // FaanBreakdown's own entrance, not a fixed animation wait

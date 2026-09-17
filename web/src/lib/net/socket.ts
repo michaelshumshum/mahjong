@@ -20,7 +20,10 @@ import type { ConnectionStatus } from '../game/state';
 
 const CLIENT_VERSION = '0.1.0';
 
-function defaultWsUrl(): string {
+/** Base WS URL, no query string -- callers append `?room=<id>` (docs/02-protocol.md's
+ * `wss://…/ws?room={id}`, `app/ws.py`'s `room` query param). Exported for
+ * `/table/[id]`'s live wiring, which needs the same base this module defaults to. */
+export function defaultWsUrl(): string {
 	return env.PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 }
 

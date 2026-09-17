@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import {
 		MOCK_SCENARIOS,
@@ -7,6 +8,12 @@
 		type MockSeatState,
 		type Seat
 	} from '$lib/table/mock-game-state';
+	import { tileIdToCode } from '$lib/table/tile-code';
+	import { viewFromClientState } from '$lib/table/live-view';
+	import { MahjongSocket, defaultWsUrl } from '$lib/net/socket';
+	import { GameStore } from '$lib/game/store.svelte';
+	import type { ClientGameState } from '$lib/game/state';
+	import type { ServerEvent } from '$lib/net/protocol';
 	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 	import TimerRing from '$lib/ui/TimerRing.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
@@ -31,15 +38,195 @@
 	const WIND_LABEL: Record<string, string> = { E: 'East', S: 'South', W: 'West', N: 'North' };
 	const SEAT_WINDS = ['E', 'S', 'W', 'N'] as const;
 
-	// dev-only scenario switch (this sub-task's "genuinely demonstrable, not a frozen
-	// screenshot" requirement) — real integration replaces this with the store the reducer
-	// fills from the WS stream (docs/03-frontend.md §6), one scenario at a time.
-	let scenarioId = $state(MOCK_SCENARIOS[0].id);
-	let gameState = $derived(MOCK_SCENARIOS.find((s) => s.id === scenarioId)!.state);
+	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
+	// route) -----------------------------------------------------------------------------------
+	// `?mock=<scenarioId>` (any value, or bare `?mock`) renders a frozen MOCK_SCENARIOS fixture
+	// -- the screenshot workflow (.claude/skills/frontend-screenshots/SKILL.md) and design
+	// iteration need this to keep working with no backend running. Omitted, `[id]` is treated as
+	// a real room id and this opens a real MahjongSocket -> GameStore against it. Both paths
+	// render through the same MockGameState-shaped view model (`gameState` below) so the
+	// template/component tree never forks (`$lib/table/live-view.ts`'s module doc).
+	let isMock = $derived(page.url.searchParams.has('mock'));
+	let roomId = $derived(page.params.id ?? '');
+
+	// `?mock=<scenarioId>` jumps straight to that scenario; any other value (including the bare
+	// `?mock` flag used just to select the mock path at all) falls back to the first one.
+	let initialMockParam = page.url.searchParams.get('mock');
+	let scenarioId = $state(
+		MOCK_SCENARIOS.some((s) => s.id === initialMockParam) ? initialMockParam! : MOCK_SCENARIOS[0].id
+	);
+	let mockGameState = $derived(
+		(MOCK_SCENARIOS.find((s) => s.id === scenarioId) ?? MOCK_SCENARIOS[0]).state
+	);
+
+	// --- live connection -------------------------------------------------------------------
+	let liveStore = $state<GameStore | null>(null);
+	// there's no backend "has this room actually started" field (state_sync's own snapshot
+	// already reflects a fully-dealt hand the instant the room is created -- mahjong_core's
+	// `new_game()` deals immediately, before any `ready` -- so `phase`/`own_hand` can't
+	// distinguish "waiting for the table to fill" from "already playing"). Tracked here
+	// instead: flips permanently once a genuine post-start broadcast is observed, or the very
+	// first snapshot already shows unambiguous play-in-progress evidence (reconnect mid-game).
+	let handEverStarted = $state(false);
+	let readySent = $state(false);
+
+	function hasStartActivity(s: ClientGameState): boolean {
+		return (
+			s.discardPools.some((pool) => pool.some((id) => id !== undefined)) ||
+			s.melds.some((seatMelds) => seatMelds.length > 0) ||
+			s.handNo > 1 ||
+			s.scores.some((score) => score !== 0)
+		);
+	}
+
+	// discrete events that only exist once `Room.started` (app/room.py) -- unlike a state_sync
+	// snapshot, these can't have been computed ahead of the room actually dealing/turning.
+	const HAND_LIFECYCLE_EVENTS = new Set<string>([
+		'hand_start',
+		'draw',
+		'discard',
+		'meld',
+		'kong_replace',
+		'turn',
+		'claim_offer',
+		'flower_replace',
+		'hand_end',
+		'score',
+		'game_end'
+	]);
+
+	$effect(() => {
+		if (isMock) return;
+		const socket = new MahjongSocket(`${defaultWsUrl()}?room=${encodeURIComponent(roomId)}`);
+		const store = new GameStore(socket);
+		handEverStarted = false;
+		readySent = false;
+		liveStore = store;
+		const offEvent = socket.onEvent((event: ServerEvent) => {
+			if (!handEverStarted && HAND_LIFECYCLE_EVENTS.has(event.t)) handEverStarted = true;
+			if (event.t === 'ack' && event.d.ok === false) {
+				pushToast(`Action failed: ${event.d.error ?? 'unknown error'}`);
+			}
+			if (event.t === 'error') {
+				pushToast(`Server error: ${event.d.message}`);
+			}
+		});
+		socket.connect();
+		return () => {
+			offEvent();
+			store.destroy();
+			socket.disconnect();
+			liveStore = null;
+		};
+	});
+
+	// sitting down implies readiness -- no strategic reason to delay `ready` behind a second
+	// button once the player has already made the one real decision (join this table).
+	$effect(() => {
+		const store = liveStore;
+		if (!store || store.state.seat === null || readySent) return;
+		readySent = true;
+		store.socket.ready();
+	});
+
+	$effect(() => {
+		const store = liveStore;
+		if (!store || handEverStarted) return;
+		if (hasStartActivity(store.state)) handEverStarted = true;
+	});
+
+	let live = $derived(!isMock && liveStore ? viewFromClientState(liveStore.state) : null);
+	// falls back to the mock fixture when there's no live view yet (pre-join/pre-start) --
+	// never actually rendered in that case, since `tableReady` below gates the whole template;
+	// this just keeps `gameState` non-null so the rest of the (unchanged) template below doesn't
+	// need null-checks sprinkled through it.
+	let gameState = $derived(isMock ? mockGameState : (live?.view ?? mockGameState));
+	let tableReady = $derived(
+		isMock || (liveStore !== null && liveStore.state.seat !== null && handEverStarted)
+	);
 
 	function seatAt(position: 0 | 1 | 2 | 3): MockSeatState {
 		return gameState.seats.find((s) => relativeSeat(s.seat, gameState.you) === position)!;
 	}
+
+	// --- your hand: real discard/declare interactivity (live only) -------------------------
+	interface OwnHandTile {
+		key: string;
+		code: TileCode;
+		tileId: number | null;
+		drawn: boolean;
+	}
+
+	let ownHandTiles = $derived.by((): OwnHandTile[] => {
+		const seat0 = seatAt(0);
+		const concealedIds = live?.ownHand.concealedIds ?? [];
+		const drawnId = live?.ownHand.drawnId ?? null;
+		const tiles: OwnHandTile[] = (seat0.concealedHand ?? []).map((code, i) => ({
+			key: `c-${i}`,
+			code,
+			tileId: concealedIds[i] ?? null,
+			drawn: false
+		}));
+		if (seat0.drawn) {
+			tiles.push({ key: 'drawn', code: seat0.drawn, tileId: drawnId, drawn: true });
+		}
+		return tiles;
+	});
+
+	let discardableTileIds = $derived(
+		new Set(
+			!isMock && liveStore
+				? liveStore.state.legalActions
+						.filter((a) => a.kind === 'discard')
+						.map((a) => a.tile_id as number)
+				: []
+		)
+	);
+
+	function discardTile(tileId: number | null): void {
+		if (isMock || !liveStore || tileId === null) return;
+		liveStore.socket.discard(tileId);
+	}
+
+	interface DeclareOption {
+		key: string;
+		label: string;
+		onClick: () => void;
+	}
+
+	// legal_actions' own kind tags (mahjong_core.actions.action_to_dict) are the longer
+	// `declare_*`/`claim_*` forms; the wire `declare{kind}` intent takes the shorter
+	// `concealed_kong|added_kong|win` (docs/02-protocol.md §2's DeclarePayload) -- two different
+	// vocabularies for the same concept, same shape of mismatch reducer.ts's `mapMeldDict`
+	// comment already flags for melds.
+	let declareOptions = $derived.by((): DeclareOption[] => {
+		if (isMock || !liveStore) return [];
+		const options: DeclareOption[] = [];
+		for (const action of liveStore.state.legalActions) {
+			const meld = action.meld as { tiles?: number[] } | undefined;
+			if (action.kind === 'declare_win') {
+				const store = liveStore;
+				options.push({ key: 'win', label: 'Win', onClick: () => store.socket.declareWin() });
+			} else if (action.kind === 'declare_concealed_kong' && meld?.tiles) {
+				const store = liveStore;
+				const tiles = meld.tiles;
+				options.push({
+					key: `ck-${tiles.join(',')}`,
+					label: `Concealed kong ${tiles.map(tileIdToCode).join('-')}`,
+					onClick: () => store.socket.declareConcealedKong(tiles)
+				});
+			} else if (action.kind === 'declare_added_kong' && meld?.tiles) {
+				const store = liveStore;
+				const tiles = meld.tiles;
+				options.push({
+					key: `ak-${tiles.join(',')}`,
+					label: `Added kong ${tiles.map(tileIdToCode).join('-')}`,
+					onClick: () => store.socket.declareAddedKong(tiles)
+				});
+			}
+		}
+		return options;
+	});
 
 	// seat wind badge: the dealer holds East for the current hand, remaining seats follow
 	// clockwise in seat-index space — a badge only, never position (§10 "What stays").
@@ -53,8 +240,34 @@
 			: null
 	);
 	let lastClaimChoice: ClaimOption | null = $state(null);
+
+	// the view model's `yourOptions` are display-only (TileCode, no id) -- recover the raw,
+	// real-tile_id option `live-view.ts` built them from to submit the actual `claim` intent.
+	let liveRawClaimOptions = $derived(
+		!isMock ? (liveStore?.state.claimOffer?.options ?? null) : null
+	);
+
+	function findRawClaimOption(option: ClaimOption): Record<string, unknown> | undefined {
+		const raw = liveRawClaimOptions;
+		if (!raw) return undefined;
+		const candidates = raw.filter((o) => o.kind === option.kind);
+		if (candidates.length <= 1) return candidates[0];
+		// only a chow claim can have more than one candidate for the same discard -- disambiguate
+		// by which tile codes the option actually names (docs/02-protocol.md §2's `tiles`).
+		const wanted = new Set(option.tiles ?? []);
+		return candidates.find((o) => {
+			const ids = (o.tiles as number[] | undefined) ?? [];
+			const codes = new Set(ids.map(tileIdToCode));
+			return codes.size === wanted.size && [...codes].every((c) => wanted.has(c));
+		});
+	}
+
 	function chooseClaim(option: ClaimOption): void {
 		lastClaimChoice = option;
+		if (isMock || !liveStore || !gameState.claimWindow) return;
+		const raw = findRawClaimOption(option);
+		const tiles = raw?.tiles as number[] | undefined;
+		liveStore.socket.claim(gameState.claimWindow.windowId, option.kind, tiles);
 	}
 
 	// minimal chrome to prove ScoreSheet/Chat/Settings/Toast compose into the scene without
@@ -80,11 +293,17 @@
 		}
 	]);
 
-	let chatMessages: ChatEntry[] = $state([
-		{ seat: 1, phrase: 'Good game', ts: Date.now() - 60_000 }
-	]);
+	let chatMessages: ChatEntry[] = $state(
+		page.url.searchParams.has('mock')
+			? [{ seat: 1, phrase: 'Good game', ts: Date.now() - 60_000 }]
+			: []
+	);
 	function sendChat(phrase: string): void {
 		chatMessages = [...chatMessages, { seat: 0, phrase, ts: Date.now() }];
+		// rate-limited server-side; not yet rebroadcast to other seats (server/app/ws.py's
+		// `_apply_chat` comment) -- sent anyway so this is a real intent, not a dead end, and the
+		// local echo above is what lets you see your own message today.
+		if (!isMock) liveStore?.socket.chat(phrase);
 	}
 
 	let autoArm: AutoArm = $state({ noCalls: false, autoPassChow: false });
@@ -275,258 +494,320 @@
 	</section>
 {/snippet}
 
-<h1 class="sr-only">Table</h1>
+{#if tableReady}
+	<h1 class="sr-only">Table</h1>
 
-<div class="table-page">
-	<header class="dev-toolbar">
-		<div class="scenario-picker" role="group" aria-label="Mock scenario">
-			{#each MOCK_SCENARIOS as scenario (scenario.id)}
-				<button
-					type="button"
-					class="scenario-btn"
-					class:active={scenario.id === scenarioId}
-					aria-pressed={scenario.id === scenarioId}
-					onclick={() => (scenarioId = scenario.id)}
-				>
-					{scenario.label}
-				</button>
-			{/each}
-		</div>
-
-		<div class="chrome-toggles">
-			<button type="button" onclick={() => (showScoreSheet = !showScoreSheet)}>Score sheet</button>
-			<button type="button" onclick={() => (showChat = !showChat)}>Chat</button>
-			<button type="button" onclick={() => (showSettings = !showSettings)}>Settings</button>
-			<button type="button" onclick={() => pushToast('Reconnecting…')}>Toast</button>
-			<button type="button" onclick={() => (showAnimationDemo = !showAnimationDemo)}
-				>Animate a turn</button
-			>
-		</div>
-	</header>
-
-	<div class="table-tilt">
-		<div class="table-surface" data-testid="table-scene">
-			{@render opponentRegion(seatAt(2), 'across')}
-			{@render opponentRegion(seatAt(3), 'left')}
-			{@render opponentRegion(seatAt(1), 'right')}
-
-			<div class="center-info" aria-label="Table status">
-				<p class="wall-count">Wall <strong>{gameState.wallCount}</strong></p>
-				<p>Prevailing <strong>{WIND_LABEL[gameState.prevailing]}</strong></p>
-				<p>Dealer <strong>{gameState.seats[gameState.dealer].name}</strong></p>
-				<p>Turn <strong>{gameState.seats[gameState.turn].name}</strong></p>
-			</div>
-
-			<section class="seat-region seat-region--self" aria-label="Your hand">
-				<header class="seat-meta">
-					<span class="seat-name">{seatAt(0).name}</span>
-					<span class="seat-wind" title="seat wind">{seatWind(seatAt(0).seat)}</span>
-					{#if seatAt(0).seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span
-						>{/if}
-					{#if seatAt(0).seat === gameState.turn}<span class="turn-badge" title="Current turn"
-							>turn</span
-						>{/if}
-					<span class="seat-score">{seatAt(0).score}</span>
-				</header>
-
-				<div class="your-hand">
-					{#if seatAt(0).flowers.length}
-						<div class="tile-row flower-row" aria-label="Your flowers">
-							{#each seatAt(0).flowers as code, i (i)}
-								<div class="mini-tile"><TileFace {code} /></div>
-							{/each}
-						</div>
-					{/if}
-
-					{#if seatAt(0).melds.length}
-						<div class="tile-row meld-row" aria-label="Your melds">
-							{#each seatAt(0).melds as meld, mi (mi)}
-								<div class="meld">
-									{#each meld.tiles as code, ti (ti)}
-										<div class="mini-tile">
-											<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
-										</div>
-									{/each}
-								</div>
-							{/each}
-						</div>
-					{/if}
-
-					<div class="hand-row" aria-label="Your concealed hand">
-						{#each seatAt(0).concealedHand ?? [] as code, i (i)}
-							<div class="hand-tile"><TileFace {code} /></div>
-						{/each}
-						{#if seatAt(0).drawn}
-							<div class="hand-tile hand-tile--drawn"><TileFace code={seatAt(0).drawn} /></div>
-						{/if}
-					</div>
-				</div>
-
-				<div class="discard-pool discard-pool--self" role="list" aria-label="Your discards">
-					{#each seatAt(0).discards as code, i (i)}
-						<div class="discard-tile" role="listitem"><TileFace {code} /></div>
+	<div class="table-page">
+		<header class="dev-toolbar">
+			{#if isMock}
+				<div class="scenario-picker" role="group" aria-label="Mock scenario">
+					{#each MOCK_SCENARIOS as scenario (scenario.id)}
+						<button
+							type="button"
+							class="scenario-btn"
+							class:active={scenario.id === scenarioId}
+							aria-pressed={scenario.id === scenarioId}
+							onclick={() => (scenarioId = scenario.id)}
+						>
+							{scenario.label}
+						</button>
 					{/each}
 				</div>
-			</section>
-		</div>
-	</div>
-
-	{#if claimOptions}
-		<div class="claim-overlay" data-testid="claim-overlay">
-			<TimerRing durationMs={gameState.claimWindow?.durationMs ?? 0} />
-			<ClaimButtons options={claimOptions} onChoose={chooseClaim} />
-			{#if lastClaimChoice}
-				<p class="sr-only" data-testid="claim-choice">chose: {lastClaimChoice.kind}</p>
+			{:else}
+				<p class="room-label">Room <strong>{roomId}</strong> · seat {liveStore?.state.seat}</p>
 			{/if}
-		</div>
-	{/if}
 
-	{#if gameState.handResult?.outcome === 'win'}
-		<div class="faan-overlay" data-testid="faan-overlay">
-			<FaanBreakdown
-				winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
-				winningHand={gameState.handResult.winningHand ?? []}
-				patterns={gameState.handResult.patterns ?? []}
-				totalFaan={gameState.handResult.totalFaan ?? 0}
-				payments={gameState.handResult.payments ?? {}}
-			/>
-		</div>
-	{/if}
-
-	{#if showScoreSheet}
-		<div class="panel-overlay">
-			<button type="button" class="panel-close" onclick={() => (showScoreSheet = false)}
-				>Close</button
-			>
-			<ScoreSheet seats={scoreSeats} totals={scoreTotals} hands={scoreHands} />
-		</div>
-	{/if}
-
-	{#if showChat}
-		<div class="panel-overlay">
-			<button type="button" class="panel-close" onclick={() => (showChat = false)}>Close</button>
-			<Chat messages={chatMessages} onSend={sendChat} />
-		</div>
-	{/if}
-
-	{#if showSettings}
-		<div class="panel-overlay">
-			<button type="button" class="panel-close" onclick={() => (showSettings = false)}>Close</button
-			>
-			<Settings
-				{autoArm}
-				prefs={clientPrefs}
-				onAutoArmChange={(next) => (autoArm = next)}
-				onPrefsChange={(next) => (clientPrefs = next)}
-			/>
-		</div>
-	{/if}
-
-	{#if showAnimationDemo}
-		<div class="panel-overlay" data-testid="animation-demo">
-			<div class="animation-demo">
-				<button type="button" class="panel-close" onclick={() => (showAnimationDemo = false)}
-					>Close</button
+			<div class="chrome-toggles">
+				<button type="button" onclick={() => (showScoreSheet = !showScoreSheet)}>Score sheet</button
 				>
-				<h2>Animate a turn</h2>
-				<p class="demo-hint">
-					Sandboxed mock, independent of the scenarios above — proves the positional slot-identity
-					mechanics and CSS-only transitions.
-				</p>
+				<button type="button" onclick={() => (showChat = !showChat)}>Chat</button>
+				<button type="button" onclick={() => (showSettings = !showSettings)}>Settings</button>
+				<button type="button" onclick={() => pushToast('Reconnecting…')}>Toast</button>
+				{#if isMock}
+					<button type="button" onclick={() => (showAnimationDemo = !showAnimationDemo)}
+						>Animate a turn</button
+					>
+				{/if}
+			</div>
+		</header>
 
-				<section aria-label="Opponent seat">
-					<h3>Bob (opponent)</h3>
-					<div class="tile-row backs-row" aria-label="Bob's concealed tiles">
-						{#each renderedOpponentSlots as slot (slot.key)}
-							<div
-								class="mini-tile back demo-slot"
-								class:demo-tile-leaving={slot.key === leavingOpponentSlotKey}
-								ontransitionend={slot.key === leavingOpponentSlotKey
-									? commitOpponentDiscard
-									: undefined}
-							>
-								<TileFace code={slot.key === leavingOpponentSlotKey ? leavingOpponentTile : null} />
+		<div class="table-tilt">
+			<div class="table-surface" data-testid="table-scene">
+				{@render opponentRegion(seatAt(2), 'across')}
+				{@render opponentRegion(seatAt(3), 'left')}
+				{@render opponentRegion(seatAt(1), 'right')}
+
+				<div class="center-info" aria-label="Table status">
+					<p class="wall-count">Wall <strong>{gameState.wallCount}</strong></p>
+					<p>Prevailing <strong>{WIND_LABEL[gameState.prevailing]}</strong></p>
+					<p>Dealer <strong>{gameState.seats[gameState.dealer].name}</strong></p>
+					<p>Turn <strong>{gameState.seats[gameState.turn].name}</strong></p>
+				</div>
+
+				<section class="seat-region seat-region--self" aria-label="Your hand">
+					<header class="seat-meta">
+						<span class="seat-name">{seatAt(0).name}</span>
+						<span class="seat-wind" title="seat wind">{seatWind(seatAt(0).seat)}</span>
+						{#if seatAt(0).seat === gameState.dealer}<span class="dealer-badge" title="Dealer"
+								>D</span
+							>{/if}
+						{#if seatAt(0).seat === gameState.turn}<span class="turn-badge" title="Current turn"
+								>turn</span
+							>{/if}
+						<span class="seat-score">{seatAt(0).score}</span>
+					</header>
+
+					<div class="your-hand">
+						{#if seatAt(0).flowers.length}
+							<div class="tile-row flower-row" aria-label="Your flowers">
+								{#each seatAt(0).flowers as code, i (i)}
+									<div class="mini-tile"><TileFace {code} /></div>
+								{/each}
 							</div>
-						{/each}
-					</div>
-					{#if demoOpponentMelds.length}
-						<div class="tile-row meld-row" aria-label="Bob's melds">
-							{#each demoOpponentMelds as meld, mi (mi)}
-								<div class="meld demo-meld-entering">
-									{#each meld.tiles as code, ti (ti)}
-										<div class="mini-tile">
-											<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
-										</div>
-									{/each}
-								</div>
+						{/if}
+
+						{#if seatAt(0).melds.length}
+							<div class="tile-row meld-row" aria-label="Your melds">
+								{#each seatAt(0).melds as meld, mi (mi)}
+									<div class="meld">
+										{#each meld.tiles as code, ti (ti)}
+											<div class="mini-tile">
+												<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+											</div>
+										{/each}
+									</div>
+								{/each}
+							</div>
+						{/if}
+
+						<div class="hand-row" aria-label="Your concealed hand">
+							{#each ownHandTiles as tile (tile.key)}
+								{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
+									<button
+										type="button"
+										class="hand-tile hand-tile-btn"
+										class:hand-tile--drawn={tile.drawn}
+										aria-label="Discard {tile.code}"
+										onclick={() => discardTile(tile.tileId)}
+									>
+										<TileFace code={tile.code} />
+									</button>
+								{:else}
+									<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
+										<TileFace code={tile.code} />
+									</div>
+								{/if}
 							{/each}
 						</div>
-					{/if}
-					<div class="discard-pool" role="list" aria-label="Bob's discards">
-						{#each demoOpponentDiscards as code, i (i)}
+
+						{#if declareOptions.length}
+							<div class="declare-actions" role="group" aria-label="Declare options">
+								{#each declareOptions as opt (opt.key)}
+									<button type="button" onclick={opt.onClick}>{opt.label}</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<div class="discard-pool discard-pool--self" role="list" aria-label="Your discards">
+						{#each seatAt(0).discards as code, i (i)}
 							<div class="discard-tile" role="listitem"><TileFace {code} /></div>
 						{/each}
 					</div>
-					<div class="demo-actions">
-						<button type="button" onclick={demoOpponentDraw}>Draw</button>
-						<button
-							type="button"
-							onclick={demoOpponentDiscard}
-							disabled={leavingOpponentSlotKey !== null || demoOpponentSlots.slots.length === 0}
-						>
-							Discard
-						</button>
-						<button
-							type="button"
-							onclick={demoOpponentConcealedKong}
-							disabled={demoOpponentSlots.slots.length < 4}
-						>
-							Concealed kong
-						</button>
-						<button
-							type="button"
-							onclick={demoOpponentClaim}
-							disabled={demoOpponentDiscards.length === 0}
-						>
-							You claim last discard (pung)
-						</button>
-					</div>
 				</section>
-
-				<section aria-label="Your seat">
-					<h3>You</h3>
-					<div class="hand-row" aria-label="Your demo hand" data-testid="demo-your-hand">
-						{#each demoYourHand as tile (tile.id)}
-							<button
-								type="button"
-								class="hand-tile demo-hand-tile"
-								class:demo-tile-leaving={tile.id === leavingYourTileId}
-								disabled={leavingYourTileId !== null}
-								aria-label="Discard {tile.code}"
-								onclick={() => demoYourDiscard(tile.id)}
-								ontransitionend={tile.id === leavingYourTileId ? commitYourDiscard : undefined}
-							>
-								<TileFace code={tile.code} />
-							</button>
-						{/each}
-					</div>
-					<div
-						class="discard-pool discard-pool--self"
-						role="list"
-						aria-label="Your discards"
-						data-testid="demo-your-discards"
-					>
-						{#each demoYourDiscards as tile (tile.id)}
-							<div class="discard-tile" role="listitem"><TileFace code={tile.code} /></div>
-						{/each}
-					</div>
-				</section>
-
-				<button type="button" class="demo-reset" onclick={resetAnimationDemo}>Reset demo</button>
 			</div>
 		</div>
-	{/if}
 
+		{#if claimOptions}
+			<div class="claim-overlay" data-testid="claim-overlay">
+				<TimerRing durationMs={gameState.claimWindow?.durationMs ?? 0} />
+				<ClaimButtons options={claimOptions} onChoose={chooseClaim} />
+				{#if lastClaimChoice}
+					<p class="sr-only" data-testid="claim-choice">chose: {lastClaimChoice.kind}</p>
+				{/if}
+			</div>
+		{/if}
+
+		{#if gameState.handResult?.outcome === 'win'}
+			<div class="faan-overlay" data-testid="faan-overlay">
+				<FaanBreakdown
+					winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
+					winningHand={gameState.handResult.winningHand ?? []}
+					patterns={gameState.handResult.patterns ?? []}
+					totalFaan={gameState.handResult.totalFaan ?? 0}
+					payments={gameState.handResult.payments ?? {}}
+				/>
+			</div>
+		{/if}
+
+		{#if showScoreSheet}
+			<div class="panel-overlay">
+				<button type="button" class="panel-close" onclick={() => (showScoreSheet = false)}
+					>Close</button
+				>
+				<ScoreSheet seats={scoreSeats} totals={scoreTotals} hands={scoreHands} />
+			</div>
+		{/if}
+
+		{#if showChat}
+			<div class="panel-overlay">
+				<button type="button" class="panel-close" onclick={() => (showChat = false)}>Close</button>
+				<Chat messages={chatMessages} onSend={sendChat} />
+			</div>
+		{/if}
+
+		{#if showSettings}
+			<div class="panel-overlay">
+				<button type="button" class="panel-close" onclick={() => (showSettings = false)}
+					>Close</button
+				>
+				<Settings
+					{autoArm}
+					prefs={clientPrefs}
+					onAutoArmChange={(next) => {
+						autoArm = next;
+						if (!isMock)
+							liveStore?.socket.auto({ no_calls: next.noCalls, auto_pass_chow: next.autoPassChow });
+					}}
+					onPrefsChange={(next) => (clientPrefs = next)}
+				/>
+			</div>
+		{/if}
+
+		{#if showAnimationDemo}
+			<div class="panel-overlay" data-testid="animation-demo">
+				<div class="animation-demo">
+					<button type="button" class="panel-close" onclick={() => (showAnimationDemo = false)}
+						>Close</button
+					>
+					<h2>Animate a turn</h2>
+					<p class="demo-hint">
+						Sandboxed mock, independent of the scenarios above — proves the positional slot-identity
+						mechanics and CSS-only transitions.
+					</p>
+
+					<section aria-label="Opponent seat">
+						<h3>Bob (opponent)</h3>
+						<div class="tile-row backs-row" aria-label="Bob's concealed tiles">
+							{#each renderedOpponentSlots as slot (slot.key)}
+								<div
+									class="mini-tile back demo-slot"
+									class:demo-tile-leaving={slot.key === leavingOpponentSlotKey}
+									ontransitionend={slot.key === leavingOpponentSlotKey
+										? commitOpponentDiscard
+										: undefined}
+								>
+									<TileFace
+										code={slot.key === leavingOpponentSlotKey ? leavingOpponentTile : null}
+									/>
+								</div>
+							{/each}
+						</div>
+						{#if demoOpponentMelds.length}
+							<div class="tile-row meld-row" aria-label="Bob's melds">
+								{#each demoOpponentMelds as meld, mi (mi)}
+									<div class="meld demo-meld-entering">
+										{#each meld.tiles as code, ti (ti)}
+											<div class="mini-tile">
+												<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+											</div>
+										{/each}
+									</div>
+								{/each}
+							</div>
+						{/if}
+						<div class="discard-pool" role="list" aria-label="Bob's discards">
+							{#each demoOpponentDiscards as code, i (i)}
+								<div class="discard-tile" role="listitem"><TileFace {code} /></div>
+							{/each}
+						</div>
+						<div class="demo-actions">
+							<button type="button" onclick={demoOpponentDraw}>Draw</button>
+							<button
+								type="button"
+								onclick={demoOpponentDiscard}
+								disabled={leavingOpponentSlotKey !== null || demoOpponentSlots.slots.length === 0}
+							>
+								Discard
+							</button>
+							<button
+								type="button"
+								onclick={demoOpponentConcealedKong}
+								disabled={demoOpponentSlots.slots.length < 4}
+							>
+								Concealed kong
+							</button>
+							<button
+								type="button"
+								onclick={demoOpponentClaim}
+								disabled={demoOpponentDiscards.length === 0}
+							>
+								You claim last discard (pung)
+							</button>
+						</div>
+					</section>
+
+					<section aria-label="Your seat">
+						<h3>You</h3>
+						<div class="hand-row" aria-label="Your demo hand" data-testid="demo-your-hand">
+							{#each demoYourHand as tile (tile.id)}
+								<button
+									type="button"
+									class="hand-tile demo-hand-tile"
+									class:demo-tile-leaving={tile.id === leavingYourTileId}
+									disabled={leavingYourTileId !== null}
+									aria-label="Discard {tile.code}"
+									onclick={() => demoYourDiscard(tile.id)}
+									ontransitionend={tile.id === leavingYourTileId ? commitYourDiscard : undefined}
+								>
+									<TileFace code={tile.code} />
+								</button>
+							{/each}
+						</div>
+						<div
+							class="discard-pool discard-pool--self"
+							role="list"
+							aria-label="Your discards"
+							data-testid="demo-your-discards"
+						>
+							{#each demoYourDiscards as tile (tile.id)}
+								<div class="discard-tile" role="listitem"><TileFace code={tile.code} /></div>
+							{/each}
+						</div>
+					</section>
+
+					<button type="button" class="demo-reset" onclick={resetAnimationDemo}>Reset demo</button>
+				</div>
+			</div>
+		{/if}
+
+		<div class="toast-stack">
+			{#each toastQueue as toast (toast.id)}
+				<Toast
+					message={toast.message}
+					durationMs={toast.durationMs}
+					onDismiss={() => dismissToast(toast.id)}
+				/>
+			{/each}
+		</div>
+	</div>
+{:else}
+	<h1 class="sr-only">Table</h1>
+	<div class="pretable-page">
+		{#if !liveStore || liveStore.connection === 'idle' || liveStore.connection === 'connecting'}
+			<p>Connecting to table <strong>{roomId}</strong>…</p>
+		{:else if liveStore.state.seat === null}
+			<h2>Table {roomId}</h2>
+			<p>Take an open seat to join this game.</p>
+			<button type="button" onclick={() => liveStore?.socket.join()}> Sit down </button>
+		{:else}
+			<h2>Seated as seat {liveStore.state.seat}</h2>
+			<p>
+				Waiting for the rest of the table to join and ready up — the hand starts automatically once
+				all four seats are ready.
+			</p>
+		{/if}
+	</div>
 	<div class="toast-stack">
 		{#each toastQueue as toast (toast.id)}
 			<Toast
@@ -536,7 +817,7 @@
 			/>
 		{/each}
 	</div>
-</div>
+{/if}
 
 <style lang="scss">
 	@use '$lib/styles/layout';
@@ -560,6 +841,32 @@
 		gap: var(--space-3);
 		min-height: 100dvh;
 		padding: var(--space-3);
+	}
+
+	// pre-game states (connecting / join / waiting-for-players, live mode only) -- same
+	// centered-panel chrome as the lobby's own panels, not a new visual language.
+	.pretable-page {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-3);
+		min-height: 100dvh;
+		padding: var(--space-5);
+		text-align: center;
+
+		p {
+			max-width: 48ch;
+			color: var(--color-text-muted);
+		}
+
+		button {
+			min-height: 44px;
+			padding: var(--space-2) var(--space-4);
+			font: inherit;
+			cursor: pointer;
+			@include buttons.btn-primary;
+		}
 	}
 
 	.dev-toolbar {
@@ -596,6 +903,13 @@
 
 	.chrome-toggles button {
 		@include buttons.btn-secondary;
+	}
+
+	.room-label {
+		margin: 0;
+		align-self: center;
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
 	}
 
 	.table-tilt {
@@ -793,6 +1107,34 @@
 
 	.hand-tile--drawn {
 		margin-inline-start: var(--space-4);
+	}
+
+	// live-mode-only interactive hand tile: same box as the plain `.hand-tile` div (kept a
+	// button only when there's a discard to send it) -- a button reset, not a second style.
+	.hand-tile-btn {
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
+
+		&:focus-visible {
+			outline: 2px solid var(--color-accent);
+			outline-offset: 2px;
+		}
+	}
+
+	.declare-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+
+		button {
+			min-height: 44px;
+			padding: var(--space-2) var(--space-3);
+			font: inherit;
+			cursor: pointer;
+			@include buttons.btn-primary;
+		}
 	}
 
 	.claim-overlay {

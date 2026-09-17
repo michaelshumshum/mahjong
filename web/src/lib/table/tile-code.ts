@@ -59,3 +59,22 @@ export const TILE_ASSET: Record<RenderableTileCode, string> = {
 export function hasTileArt(code: TileCode): code is RenderableTileCode {
 	return code in TILE_ASSET;
 }
+
+const ID_SUITS = ['m', 'p', 's'] as const;
+
+/** Real tile_ids (0..135) -> the `TileCode` they render as. Mirrors `tiles.py`'s
+ * `tile_id_type` (`tile_id // 4` -> the canonical 0..33 `TileType`, docs/01-rules-spec.md §1)
+ * composed with `tile_code()`'s string rendering -- the wire protocol only ever gives this
+ * seat's own tiles (and any public meld) as numeric ids (docs/02-protocol.md §3), never a
+ * code, so the live table view needs this to draw them through the same `TileFace` the mock
+ * scenarios already feed a `TileCode` directly. Flowers never go through here -- the wire
+ * sends `flowers` as `TileCode` strings (`'f1'..'f8'`) already. */
+export function tileIdToCode(tileId: number): TileCode {
+	const value = Math.floor(tileId / 4);
+	if (value < 27) {
+		const suit = ID_SUITS[Math.floor(value / 9)];
+		const rank = (value % 9) + 1;
+		return `${rank}${suit}` as TileCode;
+	}
+	return `z${value - 26}` as TileCode;
+}

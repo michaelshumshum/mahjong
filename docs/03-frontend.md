@@ -316,6 +316,63 @@ On reconnect to your own seat after the 20s `AUTOPLAY` handover
 bot did. Show a one-line, dismissable banner ("Auto-played 3 turns while you were away") once;
 don't replay the missed turns as animation.
 
+### `/table/[id]` wiring
+
+**Implemented as of the route-wiring sub-task following the plumbing above.** `[id]` is a real
+room id (the lobby's client-generated invite code already works as one against the backend's
+auto-create-on-first-connect, `server/app/ws.py`'s `_get_or_create_room` — no room API needed).
+
+`?mock=<scenarioId>` (any value, including a bare `?mock`) renders a frozen `MOCK_SCENARIOS`
+fixture instead — needed by the screenshot workflow (`.claude/skills/frontend-screenshots/
+SKILL.md`) and design iteration, both of which run with no backend. Omitted, the route opens a
+real `MahjongSocket` at `${PUBLIC_WS_URL}?room=<id>` and drives it through `GameStore`.
+
+**One view model, two sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a
+real `ClientGameState` into the same `MockGameState`-shaped object `+page.svelte`'s template
+already renders, so the mock and live paths share one render tree (`TileFace`/`ClaimButtons`/
+`TimerRing`/`FaanBreakdown`/`ScoreSheet`/...) rather than forking into a second one that could
+visually drift. The one thing the mock shape has no room for is real tile identity (mock tiles
+are bare `TileCode`s, no id); `viewFromClientState`'s `LiveTableView.ownHand` carries the real
+`tile_id`s alongside, index-aligned with the view's `concealedHand`/`drawn`, so the page can wire
+a real `discard`/`claim`/`declare` intent off a tile the user actually clicked.
+
+**Join flow.** No auto-join, no assumed seat: a live table shows a "Sit down" screen (sends
+`join{}`, first open seat) until seated, matching the standing "intent, not silent state" rule.
+Sitting down implies readiness (`ready` fires right behind a successful join) — there's no
+strategic reason to gate it behind a second button once the player already made the one real
+decision. Until all four seats are joined and ready, the page shows a plain waiting screen.
+
+**There is no backend "has this room started" field to gate that screen on.** `new_game()` deals
+hand 1 into `Room.state` immediately at room construction, before any `ready` — so a `state_sync`
+sent to the very first joiner already shows a fully dealt hand, computed `legal_actions`, all of
+it indistinguishable on the wire from "already playing." (`app/room.py`'s `require_ready` gate
+blocks *processing* an early command, but the redacted view was never told to hide the
+already-dealt state behind it.) The client works around this itself: a local flag flips
+permanently once either the current snapshot already shows unambiguous play-in-progress evidence
+(a reconnect mid-game — non-empty discard pools/melds, `hand_no > 1`, a nonzero score) or a
+genuine post-start broadcast is observed (`hand_start`/`turn`/`draw`/... — events that structurally
+cannot exist before `Room.started`). Good enough for v1; a real `started`/seat-fill count on the
+wire would be a cleaner fix, filed as a gap here rather than a roadmap doc since it's small enough
+to fold into whoever next touches `state_sync`'s payload.
+
+**Two real bugs the live path surfaced that the mock scenarios never could** (mock fixtures hardcode
+values the real wire never actually sends this way):
+
+- `reduce()`'s `discard` case never cleared `legalActions`/`deadlineTs`. Every entry left in
+  `legalActions` after a discard still names a tile_id genuinely still in `ownHand` (only the
+  discarded one is gone), so a client reading `legalActions` alone couldn't tell the whole set was
+  stale — it kept rendering "legal-looking" discard buttons for a seat that had already acted,
+  and clicking one sent a command the server silently dropped as out-of-turn
+  ([02-protocol.md §1](02-protocol.md)'s `ack` note). Fixed by clearing both fields on a seat's
+  own discard; a `reducer.spec.ts` regression test pins it.
+- `state.prevailing`/`hand_start.prevailing` go over the wire as the `Wind` `IntEnum`'s *member
+  name* (`app/views.py`/`app/room.py`: `.name` — `"EAST"`/`"SOUTH"`/`"WEST"`/`"NORTH"`), not the
+  single-letter code (`'E'|'S'|'W'|'N'`) every mock scenario hardcodes and `WIND_LABEL` indexes
+  by. `live-view.ts`'s `wireWindToCode()` maps it; every other enum-shaped wire field
+  (`phase`/meld `kind`/claim `kind`) already serializes through a `StrEnum`'s `.value`, which is
+  the same string either way, so `Wind` (the one `IntEnum` in the set) was the only one actually
+  wrong.
+
 ## 7. Asset pipeline
 
 - Tile art: **[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)**
