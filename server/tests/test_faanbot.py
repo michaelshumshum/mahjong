@@ -6,9 +6,10 @@ real self-play states, and full games actually complete; (2) scripted hands with
 "obviously correct" value-targeting or fold decision, built directly against `SeatView`; (3) a
 value-aware claim test proving T2 declines a claim T1 would take when it would drop the hand
 below `min_faan`. Every scripted hand's expected shanten/ukeire/value numbers were computed
-directly against `mahjong_core.shanten`/`bots.valuation` before being pinned here -- see
-`bots/faanbot.py`'s `_UKEIRE_SCALE` docstring for the derivation of the "commit to the flush"
-hand specifically (the same hand this file pins).
+directly against `mahjong_core.shanten`/`bots.valuation` before being pinned here, and
+`FaanBot.act` itself was run directly (not just the formula) to confirm each pinned discard --
+see the "value-aware discard" section below for how the weight schedule these hands exercise
+was itself calibrated against a real arena run, not just intuition.
 """
 
 from __future__ import annotations
@@ -88,13 +89,25 @@ def _dummy_pool(n: int, *, base_type: int = 18) -> tuple[TileId, ...]:
     (18 = sou by default) to draw from; callers must pick a band their candidate hand never
     touches AND keep `n <= 9`, so no rank repeats -- a repeated rank would add a *second* copy
     to `seen34` and could spuriously trigger the one-chance signal on an unrelated tile (see
-    `_FOLD_HAND_OWN_POOL`, which needs `n=13` and so cannot use this helper)."""
-    assert n <= 9, "one entry per rank only -- see docstring; use an explicit pool above 9"
+    `_own_pool` for `n > 9`)."""
+    assert n <= 9, "one entry per rank only -- see docstring; use _own_pool for n > 9"
     ids = []
     for i in range(n):
         rank = i % 9
         ids.append(tile_ids_for_type(TileType(base_type + rank))[(i // 9) % 4])
     return tuple(ids)
+
+
+def _own_pool(n: int, *, avoid: set[TileType]) -> tuple[TileId, ...]:
+    """`n` placeholder discards (any `n`, one distinct type each) -- picks the first `n` tile
+    types outside `avoid` in type-id order, one physical copy each, so `seen34` never sees a
+    repeated type. Use this (over `_dummy_pool`) whenever a scripted hand needs a specific own
+    discard-pool *length* (to control `turn` -- `bots/faanbot.py`'s `_act_on_turn` reads
+    `len(view.discard_pools[view.seat])`) beyond 9, or the candidate hand touches more than one
+    9-rank band."""
+    types = [t for t in TileType if t not in avoid]
+    assert n <= len(types), f"need {n} untouched types, only {len(types)} available"
+    return tuple(tile_ids_for_type(t)[0] for t in types[:n])
 
 
 # --- legality: swept across real self-play states -------------------------------------------
@@ -152,50 +165,88 @@ async def test_full_games_complete_faanbot_vs_faanbot(seed: int) -> None:
     assert len(actions) > 0
 
 
-# --- scripted hand: commit to the flush mid-game, chase speed early --------------------------
+# --- scripted hands: value-aware discard, calibrated against the real arena run --------------
 #
-# 9 man tiles (3 complete chows: 123m 456m 789m) + a wind pair (東東) + one off-suit floater
-# (5p) + two more isolated honor floaters (南, 西) -- 14 tiles. Discarding 5p reaches shanten 1
-# with suits_present={man} and honors present -> half_flush reachable (9 man + 3 honor >= 7,
-# docs/04-bots.md §4's threshold), estimate 3+2(closed)=5. Discarding 南 (or 西) also reaches
-# shanten 1 but leaves 5p in hand -> two suits present -> only voided_suit (2+2=4), with far
-# more ukeire (an isolated *numbered* floater like 5p accepts many more draws than an isolated
-# honor floater, which can only ever pair) -- 24 tiles accepted vs 8. Both numbers were computed
-# directly against `mahjong_core.shanten`/`ukeire` and `bots.valuation.estimate_best_faan` while
-# authoring this test (see `bots/faanbot.py`'s `_UKEIRE_SCALE` docstring for the exact figures).
-# At early-game weights (turns <=6, w_speed=1.0/w_value=0.4) the ukeire gap dominates and 南/西
-# win; at mid-game weights (turns 6-12, w_speed=0.5/w_value=1.5) the value gap flips it to 5p.
-
-_FLUSH_HAND = [
-    T.MAN_1,
-    T.MAN_2,
-    T.MAN_3,
-    T.MAN_4,
-    T.MAN_5,
-    T.MAN_6,
-    T.MAN_7,
-    T.MAN_8,
-    T.MAN_9,
-    T.WIND_EAST,
-    T.WIND_EAST,
-    T.PIN_5,
-    T.WIND_SOUTH,
-    T.WIND_WEST,
-]
+# The weight schedule below (`_weights_for_turn`) was tuned against real arena evidence, not
+# just this scripted intuition: an earlier, more value-aggressive calibration (`_UKEIRE_SCALE`
+# still 8, but mid-game `w_value=1.5`) scored a paired-difference CI of [-3.337, -1.503] points
+# per game against `EfficiencyBot` over 1000 duplicate sets -- a real, significant *regression*,
+# not the hoped-for improvement, because it chased every reachable route (including the
+# ubiquitous 2-faan Voided Suit) too eagerly across ordinary hands, not just genuine flush
+# candidates. Retuned mid-game `w_value` down to 0.9 closed most of that gap (CI
+# [-1.857, +0.041] over a second 1000-set run, same seed) while still keeping
+# `tenpai_rate_on_sub_minimum_hand` far below T1's (0.204 vs 0.321) -- see
+# docs/04-bots.md §8's recorded numbers. The two scripted hands below are chosen to be
+# *turn-invariant* under the final weights (every turn picks the same discard) specifically
+# because that arena finding: this calibration is deliberately conservative about chasing a
+# *marginal* value signal, and only commits when the value gap is large. Both hands' shanten/
+# ukeire/value numbers were computed directly against `mahjong_core.shanten`/`ukeire`/
+# `bots.valuation.estimate_best_faan` before being pinned, and `FaanBot.act` itself was run
+# directly (not just the formula) to confirm the discard at every turn bucket.
 
 
-async def test_chases_speed_early_over_committing_to_the_flush() -> None:
-    view = _build_view(0, _FLUSH_HAND, turn=3, discard_pools=(_dummy_pool(3), (), (), ()))
-    mask = _discard_mask(_FLUSH_HAND)
-    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
-    assert aid == int(T.WIND_SOUTH)
+async def test_does_not_chase_a_marginal_value_signal() -> None:
+    """9 man tiles (3 chows) + 東東 pair + 5p + 南 -- 14 tiles. Discarding 5p reaches shanten 1,
+    suits_present={man}+honors -> Half Flush reachable (9 man + 2 honor >= 7), estimate
+    3+2(closed)=5, but only 19 tiles accepted. Discarding 南 also reaches shanten 1 but leaves
+    5p in hand (two suits present, Voided Suit only: 2+2=4) with far more ukeire (24 tiles,
+    since an isolated *numbered* floater keeps accepting far more draws than an isolated honor
+    floater, which can only ever pair). The 1-faan value edge doesn't clear the bar at any
+    turn -- 南 wins throughout, matching real self-play evidence that over-committing to every
+    reachable route (not just strong ones) actively costs points."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.MAN_9,
+        T.WIND_EAST,
+        T.WIND_EAST,
+        T.PIN_5,
+        T.WIND_SOUTH,
+    ]
+    own_pool = _own_pool(13, avoid=set(hand))
+    for turn in (3, 8, 13):
+        view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
+        mask = _discard_mask(hand)
+        aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+        assert aid == int(T.WIND_SOUTH), f"turn={turn}"
 
 
-async def test_commits_to_the_flush_mid_game_over_raw_ukeire() -> None:
-    view = _build_view(0, _FLUSH_HAND, turn=8, discard_pools=(_dummy_pool(8), (), (), ()))
-    mask = _discard_mask(_FLUSH_HAND)
-    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
-    assert aid == int(T.PIN_5)
+async def test_commits_to_a_strong_value_signal() -> None:
+    """13 man tiles (123m 234m 345m 456789m plus a spare 9m -- three chows, a ryanmen, a pair,
+    verified tenpai) + 5p -- 14 tiles. Discarding 5p reaches tenpai (shanten 0) with
+    suits_present={man}, no honors -> Full Flush reachable (13 man >= 9), estimate 6+2=8, *and*
+    more ukeire than the alternative (7 tiles vs 3) -- unlike the marginal-signal hand above,
+    this discard is never a real speed sacrifice, just confirmation that a strong, genuinely
+    reachable value signal is never left on the table."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.MAN_9,
+        T.PIN_5,
+    ]
+    own_pool = _own_pool(13, avoid=set(hand))
+    for turn in (3, 8, 13):
+        view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
+        mask = _discard_mask(hand)
+        aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+        assert aid == int(T.PIN_5), f"turn={turn}"
 
 
 # --- scripted hand: fold to a safe tile late, far from tenpai, against a threat ---------------
