@@ -15,7 +15,7 @@ from __future__ import annotations
 import random
 
 from app.room import Room
-from bots.random import RandomBot
+from bots.random import random_action
 from mahjong_core.actions import Discard
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.state import Phase
@@ -26,9 +26,9 @@ _BOUNDED_RULESET = RuleSet(
 )
 
 
-async def _drive_one_step(room: Room, rng: random.Random, bot: RandomBot) -> None:
+async def _drive_one_step(room: Room, rng: random.Random) -> None:
     """Pick the acting seat the same way `bots/selfplay.py`'s `play_game` does, then submit and
-    process that seat's `RandomBot`-chosen action through the Room."""
+    process that seat's randomly-chosen action through the Room."""
     state = room.state
     if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
         assert state.claim_window is not None
@@ -38,14 +38,13 @@ async def _drive_one_step(room: Room, rng: random.Random, bot: RandomBot) -> Non
         seat = rng.choice(pending)
     else:
         seat = state.turn
-    action = bot.act(state, seat)
+    action = random_action(state, seat, rng)
     room.submit(seat, action)
     await room.process_one()
 
 
 async def test_full_game_through_room_progresses_and_publishes_gapless_redacted_frames() -> None:
     rng = random.Random(20260916)
-    bot = RandomBot(rng=rng)
     room = Room("room-1", _BOUNDED_RULESET, game_seed=20260916)
 
     seen_hand_numbers: set[int] = {room.state.hand_no}
@@ -55,7 +54,7 @@ async def test_full_game_through_room_progresses_and_publishes_gapless_redacted_
         steps += 1
         if steps > _STEP_CAP:
             raise RuntimeError(f"exceeded {_STEP_CAP} steps -- possible deadlock")
-        await _drive_one_step(room, rng, bot)
+        await _drive_one_step(room, rng)
         seen_hand_numbers.add(room.state.hand_no)
         assert room.event_id >= prev_event_id  # never decreases
         prev_event_id = room.event_id

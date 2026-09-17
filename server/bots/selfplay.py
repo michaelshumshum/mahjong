@@ -1,11 +1,19 @@
 """Shared self-play game loop (docs/05-roadmap.md §1 `bots/`; docs/06-ml.md §2's M1 gate:
 `GameRecord` persistence, bot-only included).
 
-`tests/test_selfplay.py`'s soak test plays games without keeping their action log -- it only
-needs to prove the engine terminates cleanly and every invariant holds, and logging 10,000
-games' worth of actions would make that hot loop heavier for no benefit there. This module is
-the version that keeps the log, used anywhere an actual `GameRecord` is wanted (see
-`app/db/records.py`).
+`tests/test_selfplay.py`'s soak test plays games without keeping their action log, and drives
+`bots.random.random_action` directly rather than this module -- it only needs to prove the
+engine terminates cleanly and every invariant holds, and both logging 10,000 games' worth of
+actions and building a real `SeatView`/mask per decision would make that hot loop heavier for
+no benefit there. This module is the version that keeps the log and speaks the real `Bot`
+protocol (`bots/base.py`), used anywhere an actual `GameRecord` is wanted (see
+`app/db/records.py`) or a real (non-`RandomBot`) tier needs exercising end to end.
+
+**`Bot.act` needs `(view, mask, deadline)`; `reduce` needs a concrete `Action`.** This is the
+"someone must decode" caller `bots/base.py`'s docstring describes: this loop already holds the
+real `GameState`, so it builds `seat_view(state, seat)` and `ml.legal_mask(state, seat)` each
+turn, awaits `Bot.act`, then `ml.decode_action(aid, state, seat)` back to the concrete `Action`
+`reduce` and the persisted action log both need.
 """
 
 from __future__ import annotations
@@ -17,19 +25,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import GameRecord
 from app.db.records import save_game_record
+from app.views import seat_view
 from bots.base import Bot
 from bots.random import RandomBot
 from mahjong_core.actions import Action
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
+from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.state import GameState, Phase
 
 __all__ = ["play_and_record_game", "play_game"]
 
 _STEP_CAP = 8000  # matches tests/test_selfplay.py's cap -- see that module for the bound's origin
+_NO_DEADLINE = float("inf")  # self-play has no wall-clock budget; heuristic bots ignore it anyway
 
 
-def play_game(
+async def play_game(
     seed: int,
     ruleset: RuleSet,
     bots: Sequence[Bot] | None = None,
@@ -74,7 +85,10 @@ def play_game(
         else:
             seat = state.turn
 
-        action = seats[seat].act(state, seat)
+        view = seat_view(state, seat)
+        mask = legal_mask(state, seat)
+        aid = await seats[seat].act(view, mask, _NO_DEADLINE)
+        action = decode_action(aid, state, seat)
         actions.append(action)
         state, _ = reduce(state, action)
 
@@ -92,7 +106,7 @@ async def play_and_record_game(
     """Play one bot-only game and persist it -- the actual self-play-to-`GameRecord` path
     (docs/05-roadmap.md §2's M1 gate: "persist `GameRecord` ... bot-only included"). `players`
     defaults to labeling every seat by its bot's class name."""
-    state, actions = play_game(seed, ruleset, bots)
+    state, actions = await play_game(seed, ruleset, bots)
     resolved_players = players
     if resolved_players is None:
         resolved_players = (

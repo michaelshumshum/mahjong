@@ -37,7 +37,7 @@ from app.views import (
     seat_view,
     seat_view_wire,
 )
-from bots import RandomBot
+from bots.random import random_action
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -98,7 +98,6 @@ def _play_and_collect(seed: int) -> Iterator[tuple[GameState, Event]]:
     is always correct, not just convenient.
     """
     rng = random.Random(seed)
-    bots = [RandomBot(rng=rng) for _ in range(4)]
     state = new_game(_RULESET, seed)
     steps = 0
     while state.phase != Phase.GAME_OVER:
@@ -123,7 +122,7 @@ def _play_and_collect(seed: int) -> Iterator[tuple[GameState, Event]]:
         else:
             seat = state.turn
 
-        action = bots[seat].act(state, seat)
+        action = random_action(state, seat, rng)
         state, events = reduce(state, action)
         for event in events:
             yield state, event

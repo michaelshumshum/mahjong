@@ -13,10 +13,17 @@ class Bot(Protocol):
         """-> an action id from the fixed 109-action space (docs/06-ml.md §3)."""
 ```
 
-`mask` is `legal_mask(view) -> list[bool]`, the engine-produced legal-action mask. `mahjong_core`
-is stdlib-only (see README / roadmap "zero deps" rule) — **no numpy**, plain `list[bool]`. Heuristic
-bots decode the chosen id via `decode_action(view, aid)`; near-zero cost, and a learned policy
-drops into the same slot later with no refactor. See [06-ml.md](06-ml.md).
+`mask` is `legal_mask(state, seat) -> list[bool]` (docs/06-ml.md §1's real signature —
+**resolved, was written here as `legal_mask(view)`**: `mahjong_core` must never depend on
+`app.views`, so `legal_mask` stays `GameState`-based; whoever drives a bot — the self-play
+harness, the arena, or the Room — computes the mask from the real `GameState` it already holds
+and hands `(view, mask, deadline)` to `Bot.act` together. `mahjong_core` is stdlib-only (see
+README / roadmap "zero deps" rule) — **no numpy**, plain `list[bool]`. A bot never calls
+`decode_action` itself, for the same reason: it needs the real `GameState`, which a bot never
+has (`app/views.py`'s `SeatView` is the whole point). Decoding the returned id back into a
+concrete `Action` is always the caller's job — near-zero cost, and a learned policy drops into
+the same slot later with no refactor. See [06-ml.md](06-ml.md), and `server/bots/base.py`'s
+module docstring for the implementation of this resolution.
 
 **Scheduling.** Bot decisions do not run inside the room's `asyncio` task — a shanten/ukeire scan
 is tens of milliseconds of pure-Python CPU (§3), which would stall the event loop for every other
@@ -36,6 +43,16 @@ room on the same process. Instead:
 
 Add a humanising think delay — 400–1400ms, longer for close decisions — applied by the room when
 scheduling the deadline, not inside the worker.
+
+**`bots/worker.py`'s `compute_action` stays separate from `Bot.act`, deliberately, even after
+the M4 interface migration below.** A worker process never receives `GameState` (D2: the room's
+`game_seed` must never leave its own process), but decoding a `Bot.act`-returned id back into a
+concrete `Action` needs one (`decode_action(aid, state, seat)`). Routing the live
+disconnect-handover path through `Bot.act` would move that decode step into the Room after the
+result comes back — a real change to `app/room.py`'s result handling, not a refactor this
+sub-task's scope covers. `compute_action` keeps its own uniform-random-over-`legal_actions`
+implementation against `SeatView` directly; revisit this only when a non-uniform tier needs to
+run disconnect-handover for real. See `server/bots/worker.py`'s module docstring.
 
 ## 2. Tiers
 

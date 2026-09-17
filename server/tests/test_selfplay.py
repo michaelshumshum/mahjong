@@ -25,7 +25,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from bots import RandomBot
+from bots.random import random_action
 from mahjong_core.actions import legal_actions
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -76,7 +76,6 @@ def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = _STEP_CAP) ->
     every invariant after every `reduce()`/`start_next_hand()` call; returns the step count.
     """
     rng = random.Random(seed)
-    bots = [RandomBot(rng=rng) for _ in range(4)]
     state = new_game(ruleset, seed)
     total = TOTAL_PHYSICAL_TILES if ruleset.flowers_enabled else 136
     assert _total_tiles(state) == total
@@ -108,7 +107,7 @@ def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = _STEP_CAP) ->
 
         actions = legal_actions(state, seat)
         assert actions, f"seed={seed}: legal_actions empty for seat {seat} in {state.phase}"
-        action = bots[seat].act(state, seat)
+        action = random_action(state, seat, rng)
         assert action in actions
 
         state, _ = reduce(state, action)

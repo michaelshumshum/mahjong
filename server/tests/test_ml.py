@@ -15,7 +15,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from bots import RandomBot
+from bots.random import random_action
 from mahjong_core import ml
 from mahjong_core.actions import (
     Action,
@@ -94,7 +94,6 @@ def _decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, i
     `seat` has a live decision -- the same traversal `test_selfplay.py`'s `_play_one_game` uses,
     minus the tile-conservation assertions (out of scope here)."""
     rng = random.Random(seed)
-    bots = [RandomBot(rng=rng) for _ in range(4)]
     state = new_game(ruleset, seed)
     steps = 0
     while state.phase != Phase.GAME_OVER:
@@ -117,7 +116,7 @@ def _decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, i
             seat = state.turn
 
         yield state, seat
-        action = bots[seat].act(state, seat)
+        action = random_action(state, seat, rng)
         state, _ = reduce(state, action)
 
 

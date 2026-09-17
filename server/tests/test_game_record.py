@@ -126,7 +126,7 @@ def test_game_outcome_requires_game_over() -> None:
 
 
 async def test_save_game_record_round_trips_a_finished_game(session: AsyncSession) -> None:
-    state, actions = play_game(seed=1, ruleset=_BOUNDED_RULESET)
+    state, actions = await play_game(seed=1, ruleset=_BOUNDED_RULESET)
     assert state.phase == Phase.GAME_OVER
 
     saved = await save_game_record(session, state, actions, players=["bot:RandomBot"] * 4)
@@ -149,7 +149,7 @@ async def test_save_game_record_action_log_replays_to_the_same_outcome(
 ) -> None:
     """The actual point of persisting the log: replaying it from `new_game(ruleset, seed)`
     must reproduce the same finished game (docs/00-architecture.md §3)."""
-    state, actions = play_game(seed=7, ruleset=_BOUNDED_RULESET)
+    state, actions = await play_game(seed=7, ruleset=_BOUNDED_RULESET)
     saved = await save_game_record(session, state, actions, players=["bot:RandomBot"] * 4)
     fetched = await get_game_record(session, saved.id)
     assert fetched is not None
@@ -173,7 +173,7 @@ async def test_save_game_record_rejects_unfinished_game(session: AsyncSession) -
 
 
 async def test_save_game_record_rejects_wrong_player_count(session: AsyncSession) -> None:
-    state, actions = play_game(seed=1, ruleset=_BOUNDED_RULESET)
+    state, actions = await play_game(seed=1, ruleset=_BOUNDED_RULESET)
     with pytest.raises(ValueError, match="players"):
         await save_game_record(session, state, actions, players=["bot:RandomBot"] * 3)
 
