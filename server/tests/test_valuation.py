@@ -1,0 +1,275 @@
+"""Golden fixtures for `bots/valuation.py` (docs/04-bots.md §4).
+
+Two kinds of coverage, per this sub-task's testing requirements: (1) `ROUTE_FAAN`'s constants
+cross-checked directly against the real scorer (`mahjong_core.scoring.patterns.score_hand`) on
+a real, physically legal winning hand for each route -- so the numbers this module hard-codes
+can't silently drift from what the engine actually awards; (2) the threshold logic itself
+(`reachable_routes`/`estimate_best_faan`/`pattern_optionality`), exercised directly against
+hand-built 34-count arrays at and around each documented commit threshold.
+
+`test_valuation_selfplay.py` holds the organic self-play validation (real `RandomBot` games,
+comparing this module's estimate against actual awarded faan) -- kept separate because it's
+slower (plays real games) and is itself the measurement this module's docstring reports, not a
+pass/fail regression suite of the same kind as the fixtures below.
+"""
+
+from __future__ import annotations
+
+from bots.valuation import ROUTE_FAAN, estimate_best_faan, pattern_optionality, reachable_routes
+from mahjong_core.melds import Meld, MeldKind
+from mahjong_core.scoring.patterns import ScoringContext, score_hand
+from mahjong_core.state import Wind
+from mahjong_core.tiles import TileType, tile_ids_for_type
+
+
+def _chow(low: TileType) -> Meld:
+    ids = tuple(tile_ids_for_type(TileType(int(low) + k))[0] for k in range(3))
+    return Meld(MeldKind.CHOW, ids)
+
+
+def _pung(tile_type: TileType, *, offset: int = 0) -> Meld:
+    return Meld(MeldKind.PUNG, tile_ids_for_type(tile_type)[offset : offset + 3])
+
+
+def _pair(tile_type: TileType, *, offset: int = 0) -> Meld:
+    return Meld(MeldKind.PAIR, tile_ids_for_type(tile_type)[offset : offset + 2])
+
+
+def _ctx() -> ScoringContext:
+    return ScoringContext(
+        seat_wind=Wind.SOUTH, prevailing_wind=Wind.SOUTH, self_drawn=False, flowers=()
+    )
+
+
+def _hand34(*types: TileType) -> list[int]:
+    counts = [0] * 34
+    for t in types:
+        counts[int(t)] += 1
+    return counts
+
+
+def _routes(hand34: list[int], *, closed: bool) -> dict[str, int]:
+    return {name: faan for faan, name in reachable_routes(hand34, closed=closed)}
+
+
+# --- ROUTE_FAAN constants, cross-checked against the real scorer ----------------------------
+
+
+def test_half_flush_route_faan_matches_real_scorer() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _chow(TileType.MAN_2),
+        _chow(TileType.MAN_5),
+        _pung(TileType.MAN_9),
+        _pair(TileType.WIND_EAST),
+    )
+    assert score_hand(hand, _ctx())["混一色"] == ROUTE_FAAN["half_flush"]
+
+
+def test_full_flush_route_faan_matches_real_scorer() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_4),
+        _chow(TileType.MAN_7),
+        _pair(TileType.MAN_9, offset=1),
+    )
+    assert score_hand(hand, _ctx())["清一色"] == ROUTE_FAAN["full_flush"]
+
+
+def test_all_pungs_route_faan_matches_real_scorer() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_5),
+        _pung(TileType.SOU_9),
+        _pung(TileType.WIND_EAST),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert score_hand(hand, _ctx())["對對糊"] == ROUTE_FAAN["all_pungs"]
+
+
+def test_small_three_dragons_route_faan_matches_real_scorer() -> None:
+    hand = (
+        _pung(TileType.DRAGON_RED),
+        _pung(TileType.DRAGON_GREEN),
+        _pung(TileType.MAN_1),
+        _chow(TileType.PIN_2),
+        _pair(TileType.DRAGON_WHITE),
+    )
+    assert score_hand(hand, _ctx())["小三元"] == ROUTE_FAAN["small_three_dragons"]
+
+
+def test_voided_suit_route_faan_matches_real_scorer() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _chow(TileType.PIN_2),
+        _pung(TileType.WIND_EAST),
+        _chow(TileType.PIN_5),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert score_hand(hand, _ctx())["缺一門"] == ROUTE_FAAN["voided_suit"]
+
+
+def test_all_sequences_route_faan_matches_real_scorer() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_4),
+        _chow(TileType.MAN_5),
+        _pair(TileType.DRAGON_RED),
+    )
+    assert score_hand(hand, _ctx())["平糊"] == ROUTE_FAAN["all_sequences"]
+
+
+# --- threshold logic, directly against hand34 arrays -----------------------------------------
+
+
+def test_half_flush_needs_seven_tiles_in_suit_plus_honors() -> None:
+    below = _hand34(
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.WIND_EAST,
+        TileType.WIND_EAST,
+    )  # 4 man + 2 honor = 6, below the 7-tile threshold
+    assert "half_flush" not in _routes(below, closed=True)
+
+    at_threshold = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.WIND_EAST,
+        TileType.WIND_EAST,
+    )  # 5 man + 2 honor = 7
+    assert _routes(at_threshold, closed=True)["half_flush"] == ROUTE_FAAN["half_flush"]
+
+
+def test_full_flush_needs_nine_tiles_no_honors() -> None:
+    eight = [0] * 34
+    for r in range(8):
+        eight[r] = 1
+    assert "full_flush" not in _routes(eight, closed=True)
+
+    nine = [0] * 34
+    for r in range(9):
+        nine[r] = 1
+    assert _routes(nine, closed=True)["full_flush"] == ROUTE_FAAN["full_flush"]
+
+
+def test_full_flush_excluded_once_a_single_honor_appears() -> None:
+    hand = [0] * 34
+    for r in range(8):
+        hand[r] = 1
+    hand[int(TileType.WIND_EAST)] = 1
+    routes = _routes(hand, closed=True)
+    assert "full_flush" not in routes
+    assert routes["half_flush"] == ROUTE_FAAN["half_flush"]
+
+
+def test_voided_suit_needs_exactly_two_suits() -> None:
+    one_suit = _hand34(TileType.MAN_1, TileType.MAN_2)
+    assert "voided_suit" not in _routes(one_suit, closed=True)
+
+    two_suits = _hand34(TileType.MAN_1, TileType.PIN_2)
+    assert _routes(two_suits, closed=True)["voided_suit"] == ROUTE_FAAN["voided_suit"]
+
+    three_suits = _hand34(TileType.MAN_1, TileType.PIN_2, TileType.SOU_3)
+    assert "voided_suit" not in _routes(three_suits, closed=True)
+
+
+def test_seven_pairs_needs_four_pairs_and_a_closed_hand() -> None:
+    three_pairs = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_4,
+    )
+    assert "seven_pairs" not in _routes(three_pairs, closed=True)
+
+    four_pairs = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_4,
+        TileType.MAN_4,
+    )
+    assert _routes(four_pairs, closed=True)["seven_pairs"] == ROUTE_FAAN["seven_pairs"]
+    assert "seven_pairs" not in _routes(four_pairs, closed=False)
+
+
+def test_small_three_dragons_needs_two_dragon_pairs() -> None:
+    one_pair = _hand34(TileType.DRAGON_RED, TileType.DRAGON_RED)
+    assert "small_three_dragons" not in _routes(one_pair, closed=True)
+
+    two_pairs = _hand34(
+        TileType.DRAGON_RED, TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_GREEN
+    )
+    routes = _routes(two_pairs, closed=True)
+    assert routes["small_three_dragons"] == ROUTE_FAAN["small_three_dragons"]
+
+
+def test_empty_shape_falls_back_to_all_sequences_floor() -> None:
+    scattered = _hand34(TileType.MAN_1, TileType.PIN_4, TileType.SOU_7)
+    assert _routes(scattered, closed=True) == {"all_sequences": ROUTE_FAAN["all_sequences"]}
+
+
+def test_estimate_best_faan_adds_closed_bonus() -> None:
+    hand = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.WIND_EAST,
+        TileType.WIND_EAST,
+    )
+    faan_open, route_open = estimate_best_faan(hand, closed=False)
+    faan_closed, route_closed = estimate_best_faan(hand, closed=True)
+    assert route_open == route_closed == "half_flush"
+    assert faan_closed == faan_open + 2
+
+
+def test_estimate_best_faan_picks_the_highest_reachable_route() -> None:
+    # A one-suit, all-pung hand structurally reaches both full_flush (6) and all_pungs (3) --
+    # the higher one should win.
+    hand = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.MAN_5,
+    )
+    faan, route = estimate_best_faan(hand, closed=False)
+    assert route == "full_flush"
+    assert faan == ROUTE_FAAN["full_flush"]
+
+
+def test_pattern_optionality_counts_distinct_reachable_routes() -> None:
+    scattered = _hand34(TileType.MAN_1, TileType.PIN_4, TileType.SOU_7)
+    assert pattern_optionality(scattered, closed=True) == 1  # only the all_sequences floor
+
+    # voided_suit (2 suits), small_three_dragons (2 dragon pairs), and all_pungs (2+ pair/pung
+    # blocks, no sequence shape) all reach their threshold at once here -> optionality 3, not
+    # the all_sequences floor (only added when nothing else is reachable).
+    multi_route = _hand34(
+        TileType.MAN_1,
+        TileType.PIN_2,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_GREEN,
+        TileType.DRAGON_GREEN,
+    )
+    assert pattern_optionality(multi_route, closed=True) == 3
