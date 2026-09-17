@@ -60,7 +60,7 @@ run disconnect-handover for real. See `server/bots/worker.py`'s module docstring
 | --- | --- | --- | --- |
 | **T0** `RandomBot` | uniform over legal actions | 20 lines | fuzzing, engine tests, never shipped |
 | **T1** `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak | ~400 lines | "Easy". Ship in M4. |
-| **T2** `FaanBot` | T1 + hand-value planning + discard safety | ~900 lines | "Normal"/"Hard". Moved into M4 (see §4) — the real product. |
+| **T2** `FaanBot` | T1 + hand-value planning + discard safety | ~900 lines | "Normal"/"Hard". Moved into M4 (see §4) — the real product. **Built (M4)** — see §4/§5/§8 for the shipped design and real arena numbers. |
 | **T3** `SearchBot` | determinized rollouts / MCTS over the pure engine | large | Deferred — see [99-deferred.md](99-deferred.md). |
 | **T4** learned policy | supervised on self-play or human logs | research | optional, later |
 
@@ -188,6 +188,12 @@ tiles rather than chasing.
 explicitly in the arena harness (§8). A regression there means a candidate bot has quietly
 reverted toward pure-efficiency play.
 
+**Built (M4):** `server/bots/valuation.py` (the `E[faan | best reachable pattern]` estimator —
+a structural proxy validated against the real scorer, not the scorer itself, since the real
+scorer only ever scores a *complete* hand; see that module's docstring for the measured drift)
+and `server/bots/faanbot.py` (the weighted score, fold logic, and value-aware claim guard). Real
+arena numbers, and the tuning story behind the shipped weights, are in §8.
+
 ## 5. Safety (defence)
 
 **Heuristic only — read this section as statistical evidence, not proof of safety.** Hong Kong
@@ -224,6 +230,19 @@ Model as `P(deal_in | tile)` × expected cost and fold into the T2 score (§4). 
 regression over these features, trained on self-play logs, beats hand-tuned weights — and matters
 more here than in riichi ports, precisely because signals 1 and 2 are structurally weaker without
 furiten.
+
+**Built (M4): hand-tuned, not trained — a deliberate scope decision.** `server/bots/safety.py`
+implements all six signals above as bounded multipliers on a baseline deal-in rate
+(`no_chance` the sole hard-zero override, matching item 3's "hard constraint" framing), combined
+into `P(deal_in | tile) * expected_cost`. The logistic-regression model this section recommends
+needs a labelled self-play corpus (`(features at discard time, did this tile deal in)` pairs)
+that doesn't exist yet — docs/06-ml.md §3's "no Hong Kong equivalent of the Tenhou corpus" applies
+here too, and bootstrapping one means self-play against a bot that doesn't have a safety model
+yet to label danger against, a real follow-on project (generate logs, extract features, fit and
+validate a model, re-integrate), not a same-sub-task extension. Flagged as the natural next step,
+not silently skipped — see `bots/safety.py`'s module docstring for the same disclosure closer to
+the code. Nineteen unit tests (`tests/test_safety.py`) pin each signal's *direction*, not its
+calibrated accuracy.
 
 ## 6. T3 / search, and bot personas
 
@@ -269,3 +288,64 @@ games:
 
 Make "candidate's paired-difference CI excludes zero, in the candidate's favor" the merge gate for
 any bot change (replacing a bare win-count threshold).
+
+### Real proof run (M4): T2 `FaanBot` vs T1 `EfficiencyBot`
+
+`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 12`, run
+live end to end (~27 minutes; T2's per-decision cost is far higher than T1's — every candidate
+discard runs a `bots.valuation`/`bots.safety` pass on top of the shared shanten/ukeire scan, see
+[07-infra.md](07-infra.md)/the roadmap's bot-perf risk row). 1000 duplicate sets = 4000 games =
+16,000 `FaanBot` hands and 48,000 `EfficiencyBot` hands (T2 occupies one seat per rotation, T1
+the other three, per §8's duplicate-seeding method).
+
+**First pass — a real regression, reported honestly rather than re-tuned away silently.** The
+weights this sub-task shipped with first (mid-game `w_value=1.5`, `w_speed=0.5`) scored:
+
+| Metric | FaanBot (A) | EfficiencyBot (B) |
+| --- | --- | --- |
+| win_rate | 0.1354 | 0.2251 |
+| deal_in_rate | 0.0932 | 0.1334 |
+| avg_winning_faan | 4.30 | 3.75 |
+| tenpai_rate_on_sub_minimum_hand | 0.1627 | 0.3263 |
+| avg_points_per_hand | -0.4537 | 0.1512 |
+
+Paired difference (A − B): **-2.420 points/game, 95% CI [-3.337, -1.503]** — excludes zero in
+`EfficiencyBot`'s favor. `tenpai_rate_on_sub_minimum_hand` roughly halved (the canary this whole
+sub-task exists to move), but win rate dropped by ~40% relative and points went net negative: the
+first weight calibration chased *every* structurally-reachable route (including the ubiquitous,
+weakly-committal 2-faan Voided Suit — reachable on any hand touching exactly two suits) almost as
+eagerly as a genuine Half/Full Flush commitment, spending far more win rate than the extra faan
+per win was worth. This is exactly the failure mode §8's merge gate exists to catch before a
+"structurally more sophisticated" bot ships as a regression.
+
+**Retuned once, same seed range, real re-run — narrowed but did not close the gap.** Mid-game
+`w_value` dropped 1.5 → 0.9 (`w_speed` up 0.5 → 0.7; early/late nudged the same direction — see
+`bots/faanbot.py`'s `_weights_for_turn` for the exact numbers and reasoning):
+
+| Metric | FaanBot (A) | EfficiencyBot (B) |
+| --- | --- | --- |
+| win_rate | 0.1539 | 0.2246 |
+| deal_in_rate | 0.0981 | 0.1368 |
+| avg_winning_faan | 4.25 | 3.74 |
+| tenpai_rate_on_sub_minimum_hand | 0.2038 | 0.3208 |
+| avg_points_per_hand | -0.1703 | 0.0568 |
+
+Paired difference (A − B): **-0.908 points/game, 95% CI [-1.857, +0.041]** — includes zero
+(barely: the upper bound sits 0.04 points from crossing it), so this does **not** yet clear §8's
+merge gate on points alone. Deal-in rate stays lower than T1's (better defence) and average
+winning faan stays higher (bigger wins when they land), but the two don't yet fully offset a
+still-lower win rate. `tenpai_rate_on_sub_minimum_hand` (0.204 vs T1's 0.321) is the number that
+does clear a clear, real bar: **T2 reaches a sub-minimum tenpai roughly 37% less often than T1**,
+the specific, documented HK-only failure mode (§4: "a T1-only bot loses by construction in HK")
+this sub-task exists to fix. That number moving this much, this consistently, across both
+calibrations is the real evidence T2's value-planning is structurally doing its job even though
+the points race isn't fully won yet.
+
+**Honest status, not spun:** T2 is a genuine structural improvement on the HK-specific failure
+mode this whole section is about, and a real (if not yet statistically decisive) step toward
+parity on raw points — not a clean "beats T1" result by §8's own merge-gate wording. Further
+weight tuning via self-play against this same harness (§4's own stated method) is real,
+concrete follow-up work, not a hand-wave: one retuning pass moved the paired-difference point
+estimate from -2.42 to -0.91 and the CI's upper bound from -1.50 to +0.04 on the same seed
+range, so the remaining gap looks closeable with the same technique, not a sign the approach is
+wrong.

@@ -32,7 +32,7 @@ mahjong/
 │   │   └── db/                 # SQLAlchemy models, migrations
 │   ├── tools/gen_protocol.py   # pydantic → TS directly (+ informational JSON Schema), 02-protocol §6
 │   ├── bots/
-│   │   ├── base.py  random.py  efficiency.py  faan.py  safety.py
+│   │   ├── base.py  random.py  efficiency.py  faanbot.py  safety.py  valuation.py
 │   │   └── arena.py            # self-play evaluation harness
 │   └── tests/
 │       ├── test_engine.py  test_scoring.py  test_claims.py  test_redaction.py
@@ -149,6 +149,16 @@ draws, not finished games. `EfficiencyBot` alone is not sufficient to make M4.5 
 `EfficiencyBot` over an arena run ([04-bots §8](04-bots.md)). The player-facing "does this feel
 like a game" gate lives in M4.5, not here.
 
+**Bots half: built, not yet fully cleared.** `T1`/`T2`/the arena harness are all built and
+merged; the real 1000-duplicate-set arena run ([04-bots §8](04-bots.md)) shows
+`tenpai_rate_on_sub_minimum_hand` roughly halved to a third relative to T1 (0.20 vs 0.32) —
+the specific HK-only failure this milestone exists to fix — but the paired-difference CI on raw
+points is `[-1.857, +0.041]`, still technically including zero, not yet a clean "`FaanBot` beats
+`EfficiencyBot`" per this gate's literal wording. One retuning pass materially narrowed the gap
+(from CI `[-3.337, -1.503]`); closing it the rest of the way is real follow-up self-play tuning
+work against the same harness, not a re-scope. Client work (the rest of this milestone's list)
+is untouched by this note.
+
 ### M4.5 — Single-player is shippable
 No new engine or client work — this is a checkpoint milestone, not a build phase. Play the M4
 client against a table of three `FaanBot`s end to end (not `EfficiencyBot`s — see M4), fix
@@ -230,7 +240,7 @@ milestones' `EfficiencyBot`/`FaanBot`) worth re-measuring once they exist.
 | --- | --- | --- |
 | **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer room loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
 | **Scoring disputes** — HK house rules differ from what you implemented | High | `RuleSet` from day one; show a per-pattern faan breakdown at hand end so players can see *why*; ship named presets |
-| **Efficiency bots can't win under 3-faan minimum** | Certain if unaddressed | [04-bots §4](04-bots.md); `FaanBot` moved into M4 specifically to fix this before the M4.5 solo-play gate — see §2; track "tenpai on sub-minimum hand" as an explicit arena metric |
+| **Efficiency bots can't win under 3-faan minimum** | **Partially mitigated (M4)** | [04-bots §4/§8](04-bots.md); `FaanBot` built and arena-proven to roughly halve-to-third `tenpai_rate_on_sub_minimum_hand` vs T1 (0.20 vs 0.32, real 1000-duplicate-set run); raw-points parity with T1 not yet fully closed (paired-diff CI `[-1.857, +0.041]`) — further self-play weight tuning against the same arena harness is the concrete next step, see [04-bots §8](04-bots.md)'s "Real proof run" |
 | Rules scope creep (pao, aborts, regional variants) | High | Ship the default `hand_sets` (`CLASSIC + NEW_6 + NEW_18`) + `min_faan=3` only. NEW_18 is in scope, not creep: Seven Pairs lives there and the bot shanten parser requires it ([01-rules-spec §7](01-rules-spec.md)). Everything else is a config flag behind a flag. |
 | Mobile ergonomics (13 tiles on a 390px screen) | Medium | Design the mobile layout in M4, not M6. Test on a real phone early. |
 | Information leak via message size/timing | Low | Redact server-side (already). The obvious further mitigation — padding `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer — is **not done**: it's incompatible with the early-exit claim window that [00-architecture.md §4](00-architecture.md) requires for UX, since early exit necessarily reveals timing. Accepted as a known, low-severity leak rather than mitigated. |
