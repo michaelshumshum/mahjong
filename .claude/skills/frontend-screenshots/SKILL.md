@@ -40,7 +40,7 @@ top of `web/scripts/screenshot-pages.mjs`.
    them to change — same commit, not a separate one, so the screenshot always matches the code
    it documents.
 3. **Update `README.md`'s Screenshots section** if you added, removed, or meaningfully changed
-   what a page shows. Keep the embedded set curated (the 5 entries below), not exhaustive —
+   what a page shows. Keep the embedded set curated (the entries listed below), not exhaustive —
    don't add a screenshot for every mock scenario or dev-toolbar state, only for genuinely
    distinct, notable pages.
 
@@ -53,8 +53,35 @@ stable once they're referenced from `README.md`.
 
 ## Current notable pages
 
-`home`, `lobby`, `table-your-turn`, `table-claim-window`, `table-hand-ended` — see
-`README.md`'s Screenshots section for the embedded images.
+`home`, `lobby`, `table-your-turn`, `table-claim-window`, `table-hand-ended`,
+`table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting` — see `README.md`'s
+Screenshots section for the embedded images.
+
+## Live pre-game states: `?pregame=`, not a real backend
+
+The `/table/[id]` connecting / sit-down / waiting-for-players states (docs/03-frontend.md's
+"`/table/[id]` wiring") only ever occur on the real `liveStore`-driven path — `?mock=` always
+renders a fully-seated, already-dealt table (`tableReady` is unconditionally true when
+`isMock`), so there's no `MOCK_SCENARIOS` entry that could stand in for "not seated yet" or
+"seated, waiting for others" the way the other three table screenshots reuse existing mock
+scenarios.
+
+Rather than have this script spawn a second real process (`uv run uvicorn`, matching
+`live.e2e.ts`'s heavier opt-in setup) just for three static captures, `+page.svelte` accepts
+`?pregame=connecting|join|waiting` — same "repeatable, no backend running" posture `?mock=`
+already gives this script. It freezes the page on one of the three pre-game states without ever
+constructing a real `MahjongSocket`: the socket-opening `$effect` early-returns when
+`pregamePreview !== null`, and `effectiveConnection`/`effectiveSeat` (computed alongside it) feed
+the same template branches a real `liveStore` would drive. The `waiting` variant reuses whatever
+`MOCK_SCENARIOS[0]`'s dealer happens to be (via the existing `gameState` fallback) to compute a
+real-looking seat wind — illustrative, not tied to any particular scenario's content.
+
+If you need to see the *real* sequence (not the frozen preview) — e.g. after touching the
+`$effect` that opens the socket, or `GameStore`/`MahjongSocket` themselves — that still needs a
+real backend: `uv run uvicorn app.main:app` from `server/`, `PUBLIC_WS_URL` pointed at it, and
+`/table/<room>` opened in 1-4 browser contexts (`live.e2e.ts` already does exactly this, opt-in
+via `RUN_LIVE_BACKEND_TESTS=1`). Not part of this script — too slow and too flaky (two extra
+real processes) to run on every screenshot regen.
 
 ## Troubleshooting
 

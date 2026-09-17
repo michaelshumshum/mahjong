@@ -46,7 +46,17 @@ const PAGES = [
 			await page.getByRole('button', { name: 'Hand just ended' }).click();
 			await page.waitForTimeout(150); // FaanBreakdown's own entrance, not a fixed animation wait
 		}
-	}
+	},
+	// Pre-game states (docs/03-frontend.md's "/table/[id] wiring") only ever occur on the real
+	// `liveStore`-driven path -- `?mock=` always renders a fully-seated, already-dealt table
+	// (`tableReady` is unconditionally true when `isMock`), so there's no MOCK_SCENARIOS entry
+	// that could stand in for "not seated yet" or "seated, waiting for others". `?pregame=
+	// connecting|join|waiting` freezes on one of these three with no real socket opened at all
+	// -- same "repeatable, no backend running" posture `?mock=` already gives this script,
+	// chosen over spawning a real `uv run uvicorn` backend just for these three captures.
+	{ name: 'table-pregame-connecting', url: '/table/demo123?pregame=connecting' },
+	{ name: 'table-pregame-join', url: '/table/demo123?pregame=join' },
+	{ name: 'table-pregame-waiting', url: '/table/demo123?pregame=waiting' }
 ];
 
 async function waitForServer(url, timeoutMs = 30_000) {

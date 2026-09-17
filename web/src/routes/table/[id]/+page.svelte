@@ -12,7 +12,7 @@
 	import { viewFromClientState } from '$lib/table/live-view';
 	import { MahjongSocket, defaultWsUrl } from '$lib/net/socket';
 	import { GameStore } from '$lib/game/store.svelte';
-	import type { ClientGameState } from '$lib/game/state';
+	import type { ClientGameState, ConnectionStatus } from '$lib/game/state';
 	import type { ServerEvent } from '$lib/net/protocol';
 	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 	import TimerRing from '$lib/ui/TimerRing.svelte';
@@ -48,6 +48,25 @@
 	// template/component tree never forks (`$lib/table/live-view.ts`'s module doc).
 	let isMock = $derived(page.url.searchParams.has('mock'));
 	let roomId = $derived(page.params.id ?? '');
+
+	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket
+	// -- these states depend on `liveStore.connection`/`.state.seat` transitions that a static
+	// `MOCK_SCENARIOS` fixture (which always renders a fully-seated, already-dealt table, see
+	// `tableReady` below) has no room for, so they need a mode of their own rather than folding
+	// into `?mock`. Same "no backend running" posture as `?mock`, for the screenshot workflow
+	// (.claude/skills/frontend-screenshots/SKILL.md) and design iteration.
+	const PREGAME_PREVIEWS = ['connecting', 'join', 'waiting'] as const;
+	type PregamePreview = (typeof PREGAME_PREVIEWS)[number];
+	let pregamePreview = $derived.by((): PregamePreview | null => {
+		const raw = page.url.searchParams.get('pregame');
+		return (PREGAME_PREVIEWS as readonly string[]).includes(raw ?? '')
+			? (raw as PregamePreview)
+			: null;
+	});
+	// arbitrary seat for the 'waiting' preview -- its wind comes from whichever dealer the
+	// MOCK_SCENARIOS fallback below happens to carry, same as any other pre-join reuse of
+	// `gameState`/`seatWind` here.
+	const PREGAME_PREVIEW_SEAT = 1 as Seat;
 
 	// `?mock=<scenarioId>` jumps straight to that scenario; any other value (including the bare
 	// `?mock` flag used just to select the mock path at all) falls back to the first one.
@@ -96,7 +115,7 @@
 	]);
 
 	$effect(() => {
-		if (isMock) return;
+		if (isMock || pregamePreview !== null) return;
 		const socket = new MahjongSocket(`${defaultWsUrl()}?room=${encodeURIComponent(roomId)}`);
 		const store = new GameStore(socket);
 		handEverStarted = false;
@@ -142,8 +161,48 @@
 	// need null-checks sprinkled through it.
 	let gameState = $derived(isMock ? mockGameState : (live?.view ?? mockGameState));
 	let tableReady = $derived(
-		isMock || (liveStore !== null && liveStore.state.seat !== null && handEverStarted)
+		isMock ||
+			(pregamePreview === null &&
+				liveStore !== null &&
+				liveStore.state.seat !== null &&
+				handEverStarted)
 	);
+
+	// unifies the real `liveStore`-driven pre-game states with the static `?pregame=` preview
+	// (above) so the template below branches on one pair of values regardless of which is
+	// driving them, instead of forking into two parallel conditionals.
+	let previewConnection: ConnectionStatus = $derived(
+		pregamePreview === 'connecting' ? 'connecting' : pregamePreview !== null ? 'open' : 'idle'
+	);
+	let effectiveConnection = $derived(
+		pregamePreview !== null ? previewConnection : liveStore?.connection
+	);
+	let effectiveSeat = $derived(
+		pregamePreview === 'waiting'
+			? PREGAME_PREVIEW_SEAT
+			: pregamePreview !== null
+				? null
+				: (liveStore?.state.seat ?? null)
+	);
+
+	// --- pre-game invite link (live mode only) ----------------------------------------------
+	// the room's URL *is* the invite -- whoever opens it lands in this same room (docs/03
+	// -frontend.md's "/table/[id] wiring": [id] is a real room id, auto-created on first
+	// connect). Waiting for the table to fill is exactly the moment you need to hand that link
+	// to someone, so it lives on both the join and waiting screens, not tucked in the lobby.
+	let copiedInviteLink = $state(false);
+	let copyInviteLinkFailed = $state(false);
+
+	async function copyInviteLink(): Promise<void> {
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			copiedInviteLink = true;
+			copyInviteLinkFailed = false;
+		} catch {
+			copiedInviteLink = false;
+			copyInviteLinkFailed = true;
+		}
+	}
 
 	function seatAt(position: 0 | 1 | 2 | 3): MockSeatState {
 		return gameState.seats.find((s) => relativeSeat(s.seat, gameState.you) === position)!;
@@ -436,6 +495,38 @@
 		leavingYourTileId = null;
 	}
 </script>
+
+{#snippet seatRingSlot(label: string, self: boolean = false)}
+	<div class="seat-ring-slot" class:seat-ring-slot--self={self}>
+		<span>{label}</span>
+	</div>
+{/snippet}
+
+<!-- Pre-game seat preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
+	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
+	before any hand exists. `you === null` (not seated yet) shows four identical "Open" seats --
+	there is genuinely nothing else true to say pre-join. Seated, every seat's *wind* is already
+	real (the dealer is fixed at room creation, before any `ready` -- docs/03-frontend.md's
+	"There is no backend has this room started field" note) even though which seats are actually
+	occupied is not: `seat_status` reads every unbound seat as "connected", identical to a seat
+	that really is (`server/app/room.py`'s `_seat_status_tuple` docstring) -- so this deliberately
+	never claims occupancy for a seat that isn't yours. -->
+{#snippet seatRing(you: Seat | null)}
+	<div class="seat-ring" aria-hidden="true">
+		<div class="seat-ring-pos seat-ring-pos--across">
+			{@render seatRingSlot(you !== null ? seatWind(((you + 2) % 4) as Seat) : 'Open')}
+		</div>
+		<div class="seat-ring-pos seat-ring-pos--left">
+			{@render seatRingSlot(you !== null ? seatWind(((you + 3) % 4) as Seat) : 'Open')}
+		</div>
+		<div class="seat-ring-pos seat-ring-pos--right">
+			{@render seatRingSlot(you !== null ? seatWind(((you + 1) % 4) as Seat) : 'Open')}
+		</div>
+		<div class="seat-ring-pos seat-ring-pos--self">
+			{@render seatRingSlot(you !== null ? seatWind(you) : 'Open', you !== null)}
+		</div>
+	</div>
+{/snippet}
 
 {#snippet opponentRegion(seat: MockSeatState, position: 'across' | 'left' | 'right')}
 	<section
@@ -794,19 +885,37 @@
 {:else}
 	<h1 class="sr-only">Table</h1>
 	<div class="pretable-page">
-		{#if !liveStore || liveStore.connection === 'idle' || liveStore.connection === 'connecting'}
-			<p>Connecting to table <strong>{roomId}</strong>…</p>
-		{:else if liveStore.state.seat === null}
-			<h2>Table {roomId}</h2>
-			<p>Take an open seat to join this game.</p>
-			<button type="button" onclick={() => liveStore?.socket.join()}> Sit down </button>
-		{:else}
-			<h2>Seated as seat {liveStore.state.seat}</h2>
-			<p>
-				Waiting for the rest of the table to join and ready up — the hand starts automatically once
-				all four seats are ready.
-			</p>
-		{/if}
+		<div class="pretable-panel">
+			<div class="pretable-room">
+				<span>Table</span>
+				<span class="pretable-code">{roomId}</span>
+				<button type="button" class="pretable-link-btn" onclick={copyInviteLink}>
+					{copiedInviteLink ? 'Copied' : 'Copy invite link'}
+				</button>
+			</div>
+			{#if copyInviteLinkFailed}
+				<p class="pretable-error">Couldn't copy automatically — copy the address bar instead.</p>
+			{/if}
+
+			{#if !effectiveConnection || effectiveConnection === 'idle' || effectiveConnection === 'connecting'}
+				<div class="pretable-spinner"></div>
+				<p class="pretable-status">Connecting…</p>
+			{:else if effectiveSeat === null}
+				{@render seatRing(null)}
+				<h2>Take a seat</h2>
+				<p>Join an open seat to sit down at this table.</p>
+				<button type="button" class="pretable-cta" onclick={() => liveStore?.socket.join()}>
+					Sit down
+				</button>
+			{:else}
+				{@render seatRing(effectiveSeat as Seat)}
+				<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat as Seat)]}</h2>
+				<p>
+					Waiting for the rest of the table to join. The hand starts automatically once all four
+					seats are ready.
+				</p>
+			{/if}
+		</div>
 	</div>
 	<div class="toast-stack">
 		{#each toastQueue as toast (toast.id)}
@@ -844,28 +953,182 @@
 	}
 
 	// pre-game states (connecting / join / waiting-for-players, live mode only) -- same
-	// centered-panel chrome as the lobby's own panels, not a new visual language.
+	// centered-panel chrome as the lobby's own `.panel` (routes/lobby/+page.svelte), not a new
+	// visual language: panel-elevated, --color-surface, the same button/code-pill vocabulary.
 	.pretable-page {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 100dvh;
+		padding: var(--space-5);
+	}
+
+	.pretable-panel {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
 		gap: var(--space-3);
-		min-height: 100dvh;
-		padding: var(--space-5);
+		width: 100%;
+		max-width: 26rem;
+		padding: var(--space-6) var(--space-5);
+		background: var(--color-surface);
 		text-align: center;
+		@include buttons.panel-elevated;
 
-		p {
-			max-width: 48ch;
-			color: var(--color-text-muted);
+		h2 {
+			margin: 0;
+			font-size: var(--font-size-lg);
 		}
 
-		button {
-			min-height: 44px;
-			padding: var(--space-2) var(--space-4);
-			font: inherit;
-			cursor: pointer;
-			@include buttons.btn-primary;
+		p {
+			margin: 0;
+			max-width: 40ch;
+			color: var(--color-text-muted);
+		}
+	}
+
+	.pretable-room {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+	}
+
+	.pretable-code {
+		font-family: monospace;
+		font-size: var(--font-size-base);
+		letter-spacing: 0.08em;
+		color: var(--color-text);
+		background: var(--color-surface-raised);
+		border-radius: var(--radius-sm);
+		padding: var(--space-1) var(--space-2);
+	}
+
+	.pretable-link-btn {
+		min-height: 36px;
+		padding: var(--space-1) var(--space-3);
+		font: inherit;
+		font-size: var(--font-size-sm);
+		cursor: pointer;
+		@include buttons.btn-ghost;
+	}
+
+	.pretable-error {
+		font-size: var(--font-size-sm);
+		color: var(--color-status-error);
+	}
+
+	.pretable-status {
+		font-size: var(--font-size-sm);
+	}
+
+	.pretable-cta {
+		min-height: 44px;
+		padding: var(--space-2) var(--space-5);
+		font: inherit;
+		cursor: pointer;
+		@include buttons.btn-primary;
+	}
+
+	// indeterminate connection spinner -- no durationMs to anchor a TimerRing to (§5's
+	// countdown mechanics are for a known deadline; this is "unknown, still trying").
+	.pretable-spinner {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: 3px solid var(--color-border);
+		border-top-color: var(--color-accent);
+		animation: pretable-spin 900ms linear infinite;
+	}
+
+	@keyframes pretable-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.pretable-spinner {
+			animation: none;
+			opacity: 0.6;
+		}
+	}
+
+	// seat preview ring: across/left/right/self, same relative arrangement as the real table
+	// grid (§3, layout.seat-region-grid) at token scale -- foreshadows the seats you're about
+	// to sit at rather than inventing a second layout language for the waiting room.
+	.seat-ring {
+		display: grid;
+		grid-template-areas:
+			'.      across .'
+			'left   .      right'
+			'.      self   .';
+		grid-template-columns: repeat(3, 3.25rem);
+		grid-template-rows: repeat(3, 3.25rem);
+		gap: var(--space-1);
+		place-items: center;
+	}
+
+	.seat-ring-pos--across {
+		grid-area: across;
+	}
+
+	.seat-ring-pos--left {
+		grid-area: left;
+	}
+
+	.seat-ring-pos--right {
+		grid-area: right;
+	}
+
+	.seat-ring-pos--self {
+		grid-area: self;
+	}
+
+	.seat-ring-slot {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: 50%;
+		border: 1px dashed var(--color-border);
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		font-weight: 600;
+		// "waiting, alive" -- not stalled. Honest about what it doesn't know: this pulses
+		// identically whether or not that seat actually has anyone in it (server/app/room.py's
+		// `_seat_status_tuple` can't tell us -- an unbound seat reads the same as a connected
+		// one), so it never claims occupancy, only that the table is open and listening.
+		animation: seat-ring-breathe 2.4s ease-in-out infinite;
+	}
+
+	// the one seat this screen actually knows something real about: dealer is fixed at room
+	// creation, so once you're seated your own wind is true today, not a guess.
+	.seat-ring-slot--self {
+		border: 1px solid var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+		color: var(--color-text);
+		animation: none;
+	}
+
+	@keyframes seat-ring-breathe {
+		0%,
+		100% {
+			opacity: 0.5;
+		}
+		50% {
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.seat-ring-slot {
+			animation: none;
+			opacity: 0.85;
 		}
 	}
 

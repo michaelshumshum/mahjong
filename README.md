@@ -17,16 +17,18 @@ make help          # everything else
 
 ## Screenshots
 
-Captured from `/table/[id]`'s frozen mock-scenario fixture (`?mock=`), not a live game — repeatable
-without a running backend, even though `/table/[id]` itself now opens a real one by default
-(`docs/03-frontend.md`'s "`/table/[id]` wiring"). Regenerate with `pnpm --dir web run screenshots`
-after any visible frontend change (see `.claude/skills/frontend-screenshots/SKILL.md`).
+Captured from `/table/[id]`'s frozen mock-scenario fixture (`?mock=`) or its no-socket pre-game
+preview (`?pregame=`), not a live game — both repeatable without a running backend, even though
+`/table/[id]` itself now opens a real one by default (`docs/03-frontend.md`'s "`/table/[id]`
+wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible frontend change (see
+`.claude/skills/frontend-screenshots/SKILL.md`).
 
 | | |
 | --- | --- |
 | ![Home](docs/screenshots/home.png) Home — component demos | ![Lobby](docs/screenshots/lobby.png) Lobby — create/join a room |
 | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
-| ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | |
+| ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting |
+| ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players |
 
 ## Planning docs
 

@@ -107,7 +107,7 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		// actually exercises it -- has a real moment to render before the last `ready` starts the
 		// hand and every client moves on together.
 		await pages[0].getByRole('button', { name: 'Sit down' }).click();
-		await expect(pages[0].getByText(/Seated as seat/)).toBeVisible();
+		await expect(pages[0].getByText(/You're seated as/)).toBeVisible();
 		for (const p of pages.slice(1)) {
 			await expect(p.getByRole('button', { name: 'Sit down' })).toBeVisible();
 			await p.getByRole('button', { name: 'Sit down' }).click();

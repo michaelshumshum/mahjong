@@ -327,6 +327,12 @@ fixture instead — needed by the screenshot workflow (`.claude/skills/frontend-
 SKILL.md`) and design iteration, both of which run with no backend. Omitted, the route opens a
 real `MahjongSocket` at `${PUBLIC_WS_URL}?room=<id>` and drives it through `GameStore`.
 
+`?pregame=connecting|join|waiting` is the equivalent escape hatch for the three pre-game states
+below (§"Join flow"): `?mock=` can't stand in for them (a mock scenario is always a fully-seated,
+already-dealt table), so this freezes on one of them with no `MahjongSocket` constructed at all
+— same no-backend repeatability, used by the screenshot workflow's `table-pregame-*` entries and
+by design iteration on this specific part of the page.
+
 **One view model, two sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a
 real `ClientGameState` into the same `MockGameState`-shaped object `+page.svelte`'s template
 already renders, so the mock and live paths share one render tree (`TileFace`/`ClaimButtons`/
@@ -340,7 +346,29 @@ a real `discard`/`claim`/`declare` intent off a tile the user actually clicked.
 `join{}`, first open seat) until seated, matching the standing "intent, not silent state" rule.
 Sitting down implies readiness (`ready` fires right behind a successful join) — there's no
 strategic reason to gate it behind a second button once the player already made the one real
-decision. Until all four seats are joined and ready, the page shows a plain waiting screen.
+decision. Until all four seats are joined and ready, the page shows a waiting screen.
+
+**Pre-game states got their own design pass** (design-pass sub-task following the route-wiring
+above) — connecting, sit-down, and waiting are real, recurring moments in a genuinely
+multiplayer game (arriving at a table, waiting for others to show up), not filler between "real"
+screens, so they use the same `panel-elevated`/button vocabulary as the rest of the app (`_buttons
+.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (room code +
+a "copy invite link" button — the room's URL *is* the invite, and waiting-for-players is exactly
+when you need to hand it to someone) and a seat-preview ring: four slots arranged
+across/left/right/self, the same relative arrangement `layout.seat-region-grid` uses for the real
+table, so the waiting room visually foreshadows the seats you're about to sit at.
+
+The ring is deliberately honest about what it doesn't know. Seat *wind* is real information the
+moment you're seated — the dealer is fixed at room construction, before any `ready`, so
+`seatWind()` (already used for the real table's own badges) works unchanged here — but seat
+*occupancy* is not: `server/app/room.py`'s `_seat_status_tuple()` docstring spells out that an
+unbound seat reads `"connected"`, identical to one that's actually taken, so `seatStatus`
+(`lib/game/state.ts`) cannot tell "3 of 4 joined" from "1 of 4 joined" today. The ring never
+claims it can — the three non-self slots are always rendered identically (ghosted, breathing),
+regardless of real occupancy, and the copy only ever says "waiting for the rest of the table,"
+never a count. A real per-seat join signal on the wire would be a cleaner fix; filed here as the
+same class of gap `state_sync`'s "has this room started" note below already documents, not a
+new one.
 
 **There is no backend "has this room started" field to gate that screen on.** `new_game()` deals
 hand 1 into `Room.state` immediately at room construction, before any `ready` — so a `state_sync`
