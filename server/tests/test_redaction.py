@@ -35,6 +35,7 @@ from app.views import (
     _wire_value,
     redact_event,
     seat_view,
+    seat_view_wire,
 )
 from bots import RandomBot
 from mahjong_core.actions import (
@@ -334,6 +335,34 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
     for offer in view.claim_options:
         leaked = _offer_tile_ids(offer) - allowed
         assert not leaked, f"claim_options leaked {leaked} to seat {seat}: {offer!r}"
+
+    # `seat_view_wire`'s `melds` field has its own hand-rolled serialization (app/views.py's
+    # `_meld_wire`), separate from the WireEvent schema walker above -- check it directly rather
+    # than trusting `melds`' aggregate PUBLIC annotation, which is wrong specifically for a
+    # concealed kong's tiles (00-architecture.md §5).
+    wire = seat_view_wire(view)
+    for owner_seat, seat_melds in enumerate(view.melds):
+        wire_melds = wire["melds"][owner_seat]
+        for meld, wire_meld in zip(seat_melds, wire_melds, strict=True):
+            if meld.kind != MeldKind.CONCEALED_KONG:
+                assert wire_meld["tiles"] == list(meld.tiles), (
+                    f"public meld tiles altered for seat {seat}: {wire_meld!r}"
+                )
+                continue
+            if seat == owner_seat:
+                # ground truth: the declaring seat must still get its own real tiles, not
+                # just "not obviously leaked" -- a bug that nulls tiles for everyone
+                # (including the owner) would otherwise pass the branch below vacuously.
+                assert wire_meld["tiles"] == list(meld.tiles), (
+                    "concealed_kong tiles hidden from the declaring seat itself"
+                )
+                assert wire_meld["count"] is None
+            else:
+                assert wire_meld["tiles"] is None, (
+                    f"concealed_kong tiles leaked to seat {seat} (owner={owner_seat}): "
+                    f"{wire_meld!r}"
+                )
+                assert wire_meld["count"] == len(meld.tiles)
 
 
 def _assert_event_redaction(state: GameState, event: Event) -> None:

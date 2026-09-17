@@ -420,15 +420,35 @@ def _wire_value(value: Any) -> Any:
     return value
 
 
-def _meld_wire(meld: Meld) -> dict[str, Any]:
+def _meld_wire(meld: Meld, *, owner: int, viewer: int | None) -> dict[str, Any]:
+    """Redact exactly like `_build_event_wire`'s `ConcealedKongWire` branch: a concealed kong's
+    tiles go only to the declaring seat (`owner`) for the rest of the hand, `count` to everyone
+    else -- `SeatView.melds`' field-level `PUBLIC` annotation is right in aggregate (which seats
+    hold which meld kinds is public) but wrong for concealed-kong tile identity specifically,
+    which needs this per-viewer check instead."""
+    if meld.kind == MeldKind.CONCEALED_KONG:
+        owns = viewer == owner
+        return {
+            "kind": meld.kind.value,
+            "tiles": list(meld.tiles) if owns else None,
+            "count": None if owns else len(meld.tiles),
+            "from_seat": meld.from_seat,
+        }
     return {"kind": meld.kind.value, "tiles": list(meld.tiles), "from_seat": meld.from_seat}
 
 
-def _claim_offer_wire(offer: ClaimOffer) -> dict[str, Any]:
+def _claim_offer_wire(offer: ClaimOffer, viewer: int | None) -> dict[str, Any]:
+    """`offer.melds` can never actually hold a concealed kong: `_discard_claim_offers`
+    (mahjong_core/engine.py) builds `melds` from `legal_claims`, which only returns
+    chow/pung/exposed-kong -- melds claimable off *another* seat's discard -- and concealed
+    kong is exclusively a self-declared action (`DeclareConcealedKong`), never a claim option;
+    `_kong_rob_offers` never sets `melds` at all (kong-rob is win-only). Still routing through
+    `_meld_wire`'s redaction rather than assuming a bare dict is fine here, in case that ever
+    changes."""
     return {
         "seat": offer.seat,
         "can_win": offer.can_win,
-        "melds": [_meld_wire(m) for m in offer.melds],
+        "melds": [_meld_wire(m, owner=offer.seat, viewer=viewer) for m in offer.melds],
     }
 
 
@@ -449,14 +469,17 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "phase": view.phase.value,
         "own_hand": list(view.own_hand),
         "concealed_counts": list(view.concealed_counts),
-        "melds": [[_meld_wire(m) for m in seat_melds] for seat_melds in view.melds],
+        "melds": [
+            [_meld_wire(m, owner=owner_seat, viewer=view.seat) for m in seat_melds]
+            for owner_seat, seat_melds in enumerate(view.melds)
+        ],
         "discard_pools": [list(pool) for pool in view.discard_pools],
         "flowers": [[tile_code(f) for f in fl] for fl in view.flowers],
         "wall_remaining": view.wall_remaining,
         "seat_status": list(view.seat_status),
         "scores": list(view.scores),
         "legal_actions": [action_to_dict(a) for a in view.legal_actions],
-        "claim_options": [_claim_offer_wire(o) for o in view.claim_options],
+        "claim_options": [_claim_offer_wire(o, view.seat) for o in view.claim_options],
         "deadline_ts": view.deadline_ts,
     }
 
