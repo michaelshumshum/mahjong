@@ -53,6 +53,7 @@ from dataclasses import dataclass
 from app.views import seat_view
 from bots.base import Bot
 from bots.efficiency import EfficiencyBot
+from bots.faanbot import FaanBot
 from bots.random import RandomBot
 from mahjong_core.actions import build_scoring_context
 from mahjong_core.config import RuleSet
@@ -81,9 +82,15 @@ def _efficiency_bot_factory(seed: int) -> Bot:
     return EfficiencyBot()
 
 
+def _faan_bot_factory(seed: int) -> Bot:
+    del seed  # stateless, same as EfficiencyBot
+    return FaanBot()
+
+
 BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "RandomBot": _random_bot_factory,
     "EfficiencyBot": _efficiency_bot_factory,
+    "FaanBot": _faan_bot_factory,
 }
 
 _STEP_CAP = 8000
