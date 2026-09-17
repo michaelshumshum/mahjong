@@ -29,11 +29,15 @@ predates several fields added since M1/M2):
   not just the `seat == turn` case the architecture doc's prose literally says. The doc undersold
   the claim-window case; the field itself was always meant to cover it (`04-bots.md`'s bot
   `act()` needs actions during a claim window too).
-- `seat_status` has no real backing yet. `mahjong_core/state.py` deliberately excluded
-  connected/disconnected/autoplay/bot from `SeatState` (see that module's own docstring) so
-  `app/room.py`'s future `SeatBinding` can own it without a pure-engine round-trip. That type
-  doesn't exist until a later M3 sub-task, so `seat_view()` takes an optional `seat_status`
-  override and defaults to `("connected",) * 4` when the caller has nothing real to pass yet.
+- `seat_status`'s wire vocabulary is connected/disconnected/autoplay/bot/empty.
+  `mahjong_core/state.py` deliberately excludes all of it from `SeatState` (see that module's own
+  docstring): `app/room.py`'s `SeatBinding`/`Room._seat_status_tuple()` own it instead, without a
+  pure-engine round-trip. `seat_view()` itself just takes an optional `seat_status` override and
+  defaults to `("connected",) * 4` when the caller has nothing real to pass -- correct for a
+  caller with no `Room` behind it at all (bots/arena.py, bots/selfplay.py, tests calling
+  `seat_view()` directly), where every seat is a live simulated player, never a lobby seat that
+  may genuinely be unjoined. Only `Room._seat_status_tuple()` ever produces `empty`, for a seat
+  nobody has joined yet; `bot` remains unused (`SeatBinding.status`'s docstring).
 - `deadline_ts` has no real timer source yet either (`00-architecture.md §3` D17's timer heap
   is a later sub-task) -- the only deadline `GameState` carries at all is `ClaimWindow.
   deadline_ts`, itself just an opaque pass-through today (`state.py`'s own docstring: "the pure

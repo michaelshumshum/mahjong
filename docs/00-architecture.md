@@ -367,7 +367,7 @@ class SeatView:
     discard_pools: tuple[tuple[int, ...], ...]    # per seat, fully public tile_ids
     flowers: tuple[tuple[Flower, ...], ...]       # per seat, fully public
     wall_remaining: int                            # count only — see wall bullet below
-    seat_status: tuple[str, ...]                   # connected | disconnected | autoplay | bot, per seat
+    seat_status: tuple[str, ...]                   # connected | disconnected | autoplay | bot | empty, per seat
     scores: tuple[int, int, int, int]
     legal_actions: tuple[Action, ...]              # non-empty whenever actions.legal_actions(state, seat) is
     claim_options: tuple[ClaimOffer, ...]          # this seat's own live claim offer (§4), if any
@@ -399,6 +399,15 @@ seat holds a live claim offer. Both get real data once their owning sub-tasks la
 `seat_status` override everywhere it builds a view (`state_sync_wire`, `_poke_bots`) — see
 `Room.mark_disconnected`/`reconnect`. `deadline_ts` for a *claim* offer has had real backing
 since sub-task 3/5; a per-turn `deadline_ts` is still advisory-only (§3's own note above).
+
+**`empty` distinguishes "never joined" from "connected" (post-M3, `/table/[id]` sub-task).**
+`Room._seat_status_tuple()` reported `"connected"` for an unbound seat too — the only default
+`seat_view()` itself ever had — until the frontend's live table wiring started reading
+`state_sync` before all four seats join (to render a "waiting for the rest of the table"
+screen) and needed a real signal for "nobody's here" distinct from "someone's connected".
+`Room._seat_status_tuple()` now reports `empty` for a `None` slot in `seat_bindings` instead;
+`seat_view()`'s own default (no caller-supplied override) is unchanged at `"connected"` — it
+still serves callers with no `Room`/lobby concept at all (bots, arena, selfplay).
 
 ### Redaction test
 

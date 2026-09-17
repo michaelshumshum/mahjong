@@ -208,7 +208,8 @@ class HandStartPayload(BaseModel):
     hand_no: int
     prevailing: str
     dealer: int
-    seats: list[str]  # per-seat status (connected/disconnected/autoplay/bot), seat_view's shape
+    # per-seat status, seat_view's shape: connected/disconnected/autoplay/bot/empty
+    seats: list[str]
 
 
 class DealPayload(BaseModel):

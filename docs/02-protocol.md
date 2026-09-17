@@ -84,7 +84,9 @@ legality is a UI hint only.
 fills seats first-come-first-served among open ones unless `seat` is given, in which case it's
 rejected (`error{code:"seat_taken"}`) if that seat is already bound, or `error{code:"room_full"}`
 if none are free. A successful `join` is confirmed by a broadcast `seat_state{seat,
-status:"connected"}`. `join` is for first entry only — a reconnecting player doesn't re-`join`;
+status:"connected"}` — sent to every already-bound seat (this one included), so a client
+rendering the empty seats it saw in its own `state_sync` (§3) updates live as the rest of the
+table fills in, not only on its next full resync. `join` is for first entry only — a reconnecting player doesn't re-`join`;
 `hello{last_seq}` on an already-bound seat reclaims it directly (§5). Once all four seats are
 filled the room waits for `ready` from each before dealing.
 
@@ -106,8 +108,8 @@ sub-tasks actually implemented them; reconciled here to what ships rather than l
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9) |
-| `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status`; see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/room.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
+| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen) |
+| `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (same vocabulary as `state_sync` above, `empty` included — unreachable for a `require_ready=True` room, where dealing gates on all four seats bound, but a direct-construction `require_ready=False` room can reach hand 2+ with seats that were never joined at all); see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/room.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
 | `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; same "no backing `Event`" note as `hand_start` |
 | `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not yet emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event` to redact for those; mid-hand flower reveals (a normal draw) go through `reduce()` normally and *are* emitted |
 | `draw` | `{seat, tile_id?}` | `tile_id` present **only** for the drawing player |
@@ -120,7 +122,7 @@ sub-tasks actually implemented them; reconciled here to what ships rather than l
 | `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`); see the known reveal gap under Redaction below |
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
-| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay` |
+| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward |
 | `server_shutdown` | `{deadline_ts}` | broadcast once, to every seat ever bound in the room, when a graceful-shutdown drain starts (`00-architecture.md §8.1`); `deadline_ts` is the shared grace-window deadline every room in the drain gets. Clients show a "reconnect shortly" banner instead of reading the eventual dropped socket as an error |
 | `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Room` silently drops a well-formed but currently-illegal command the same as before this existed |
 | `error` | `{code, message}` |

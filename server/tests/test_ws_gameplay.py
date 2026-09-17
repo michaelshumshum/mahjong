@@ -310,3 +310,44 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
         ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pass"}, id_="bad-1"))
         bad_ack_retry = ws.receive_json()
         assert bad_ack_retry["d"] == {"id": "bad-1", "ok": False, "error": "illegal"}
+
+
+def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
+    """A lobby client (fewer than four seats bound) needs `state_sync.d.seat_status` to tell
+    "nobody has ever joined this seat" apart from "someone's here and connected" -- the signal
+    the `/table/[id]` waiting-room screen renders off. Also confirms a later `join` broadcasts
+    `seat_state` live to already-connected seats, not just the new joiner's own snapshot."""
+    room_id = f"seat-status-{uuid.uuid4()}"
+
+    with (
+        TestClient(app) as client,
+        client.websocket_connect(f"/ws?room={room_id}") as ws0,
+        client.websocket_connect(f"/ws?room={room_id}") as ws1,
+    ):
+        ws0.send_json(_msg("hello", {"client_version": "test"}))
+        ws1.send_json(_msg("hello", {"client_version": "test"}))
+
+        # --- seat 0 joins alone: its own state_sync sees itself connected, every other seat
+        # (never joined by anyone) as empty -- not "connected", the pre-fix behavior.
+        ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        assert ws0.receive_json()["t"] == "seat_state"  # its own join, broadcast to itself
+        sync0 = ws0.receive_json()
+        assert sync0["t"] == "state_sync"
+        assert sync0["d"]["seat_status"] == ["connected", "empty", "empty", "empty"]
+        ack0 = ws0.receive_json()
+        assert ack0["d"]["ok"] is True
+
+        # --- seat 1 joins: seat 0 (already connected) sees a live seat_state broadcast for
+        # it, not just a snapshot on its own next resync -- and seat 1's own fresh state_sync
+        # already reflects both bound seats as connected, the still-open ones as empty.
+        ws1.send_json(_msg("join", {"seat": 1}, id_=_next_id()))
+        live_update = ws0.receive_json()
+        assert live_update["t"] == "seat_state"
+        assert live_update["d"] == {"seat": 1, "status": "connected"}
+
+        assert ws1.receive_json()["t"] == "seat_state"  # seat 1's own join, broadcast to itself
+        sync1 = ws1.receive_json()
+        assert sync1["t"] == "state_sync"
+        assert sync1["d"]["seat_status"] == ["connected", "connected", "empty", "empty"]
+        ack1 = ws1.receive_json()
+        assert ack1["d"]["ok"] is True

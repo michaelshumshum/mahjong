@@ -103,9 +103,17 @@ __all__ = [
     "SeatStatus",
     "SeatTakenError",
     "TimerHeap",
+    "WireSeatStatus",
 ]
 
 SeatStatus = Literal["connected", "disconnected", "autoplay"]
+
+# Wire-level vocabulary for `_seat_status_tuple()`/`seat_view()`'s `seat_status` (also allows
+# `bot`, unused here -- see `SeatBinding.status`'s docstring). `empty` has no `SeatBinding`
+# counterpart: a binding only exists once a seat *is* bound, so "nobody has ever joined this
+# seat" isn't a `SeatBinding.status` value, only something `_seat_status_tuple()` reports for a
+# `None` slot in `Room.seat_bindings`.
+WireSeatStatus = Literal["connected", "disconnected", "autoplay", "empty"]
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
 
@@ -171,7 +179,10 @@ class SeatBinding:
     `auto_pass_chow` are the lobby/pre-arm state 02-protocol.md §2 describes. `status`
     (`connected`/`disconnected`/`autoplay` -- `SeatView`'s wire `seat_status` also allows `bot`,
     unused here: every seat this `Room` ever binds started as a human `join`, so there's no seat
-    that was *never* a human to label `bot` instead of `autoplay`) transitions via
+    that was *never* a human to label `bot` instead of `autoplay`; and `empty`, which can never
+    apply to a `SeatBinding` either -- a binding only exists once a seat *is* bound, so "nobody
+    has ever joined this seat" is reported by `_seat_status_tuple()` for a `None` slot in
+    `Room.seat_bindings`, never as a value of this field) transitions via
     `mark_disconnected`/`reconnect`/the disconnect-grace timer (M3 sub-task 6) -- see
     `Room.mark_disconnected`.
     """
@@ -587,15 +598,20 @@ class Room:
         wire["t"] = "state_sync"
         return wire
 
-    def _seat_status_tuple(self) -> tuple[SeatStatus, SeatStatus, SeatStatus, SeatStatus]:
-        """Every bound seat's real `status`; an unbound seat reads `connected`, matching the
-        pre-sub-task-6 default (`app/views.py`'s `_DEFAULT_SEAT_STATUS`) -- there's no real
-        signal for "nobody ever joined this seat" distinct from "connected" today, and every
-        `require_ready=True` room (app/ws.py's real rooms) has all four seats bound before any
-        of this is ever surfaced to a client anyway."""
+    def _seat_status_tuple(
+        self,
+    ) -> tuple[WireSeatStatus, WireSeatStatus, WireSeatStatus, WireSeatStatus]:
+        """Every bound seat's real `status`; an unbound seat reads `empty` -- distinct from
+        `connected`, so a client mid-lobby (`state_sync` reaches it as soon as it joins, well
+        before all four seats are bound -- 02-protocol.md §3) can tell "nobody has joined this
+        seat yet" from "someone's here and their socket is live", e.g. to render a "waiting for
+        N more players" screen. `app/views.py`'s `_DEFAULT_SEAT_STATUS` stays `connected` --
+        that default is for callers with no `Room` behind them at all (bots/arena.py,
+        bots/selfplay.py, direct `seat_view()` tests), where every seat is a live simulated
+        player, not a lobby seat that may genuinely be empty."""
         return cast(
-            "tuple[SeatStatus, SeatStatus, SeatStatus, SeatStatus]",
-            tuple(b.status if b is not None else "connected" for b in self.seat_bindings),
+            "tuple[WireSeatStatus, WireSeatStatus, WireSeatStatus, WireSeatStatus]",
+            tuple(b.status if b is not None else "empty" for b in self.seat_bindings),
         )
 
     async def run(self) -> None:
