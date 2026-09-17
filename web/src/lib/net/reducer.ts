@@ -160,7 +160,19 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				// a discard claimed later in the same server-side reduce() is removed from the
 				// discarder's pool server-side (docs/02-protocol.md §3); this client-side pool can
 				// transiently show it until the next state_sync corrects it — not attempted here.
-				discardPools: replaceAt(state.discardPools, d.seat, pool)
+				discardPools: replaceAt(state.discardPools, d.seat, pool),
+				// this seat just spent its turn -- `legal_actions`/`deadline_ts` from the `turn`
+				// event that granted it are now stale (every remaining entry still names a tile_id
+				// genuinely still in `ownHand`, since only the discarded one is gone, so a UI
+				// reading `legalActions` alone can't tell they're dead). Left unset, they'd keep
+				// looking actionable until the next `turn`/`claim_offer` overwrites them -- a real
+				// client would let you click a second "legal-looking" discard that the server then
+				// silently drops (`_authorize` on an out-of-turn command, docs/02-protocol.md §1's
+				// ack note), which reads as the UI being stuck. Only this seat's own turn ends here;
+				// another seat's `discard` doesn't touch this seat's own (already-empty-if-not-
+				// acting) `legalActions`.
+				legalActions: isOwn ? [] : state.legalActions,
+				deadlineTs: isOwn ? null : state.deadlineTs
 			};
 		}
 

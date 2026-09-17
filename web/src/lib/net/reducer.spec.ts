@@ -160,6 +160,48 @@ describe('reduce', () => {
 		expect(next.discardPools[0]).toEqual([47]);
 	});
 
+	it("discarding clears this seat's own stale legalActions/deadlineTs, but not another seat's discard", () => {
+		// reproduces a real live-game bug (docs/03-frontend.md §6 sub-task): every entry left in
+		// `legalActions` after a discard still names a tile_id genuinely still in `ownHand` (only
+		// the discarded one is gone), so a UI reading `legalActions` alone can't tell the whole
+		// set is stale -- it kept looking actionable, letting a second click send a discard the
+		// server silently drops as out-of-turn (docs/02-protocol.md §1's ack note).
+		const own = state({
+			seat: 0,
+			ownHand: [1, 2, 47],
+			concealedCounts: [3, 13, 13, 13],
+			legalActions: [
+				{ kind: 'discard', tile_id: 1 },
+				{ kind: 'discard', tile_id: 2 }
+			],
+			deadlineTs: 5000
+		});
+		const ownDiscard = reduce(own, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'discard',
+			d: { seat: 0, tile_id: 47, tile: '5s', pool_index: 0 }
+		});
+		expect(ownDiscard.legalActions).toEqual([]);
+		expect(ownDiscard.deadlineTs).toBeNull();
+
+		const other = state({
+			seat: 1,
+			legalActions: [{ kind: 'pass' }],
+			deadlineTs: 9000
+		});
+		const otherDiscard = reduce(other, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'discard',
+			d: { seat: 0, tile_id: 47, tile: '5s', pool_index: 0 }
+		});
+		expect(otherDiscard.legalActions).toEqual([{ kind: 'pass' }]);
+		expect(otherDiscard.deadlineTs).toBe(9000);
+	});
+
 	describe('claim window', () => {
 		it('claim_offer opens the window, claim_resolved for that window_id closes it', () => {
 			const s = state();
