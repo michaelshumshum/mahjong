@@ -94,26 +94,43 @@ so this threshold doesn't need to be conservative on its own."""
 def _weights_for_turn(turn: int) -> tuple[float, float, float, float]:
     """`(w_speed, w_value, w_safety, w_flex)` -- docs/04-bots.md §4: "speed early (turns 1-6) ->
     value mid (6-12) -> safety late (12+)". Hand-tuned starting points (same disclosure as
-    `bots/safety.py`'s weights), **retuned once against a real arena run, not just intuition**:
-    a first pass (mid-game `w_value=1.5`, `w_speed=0.5`) scored a paired-difference CI of
-    `[-3.337, -1.503]` points/game against `EfficiencyBot` (1000 duplicate sets, seed 1) -- a
-    real, statistically significant *regression*, because `w_value` pulled discards toward
-    preserving *any* reachable route (including the ubiquitous, weakly-committal 2-faan Voided
-    Suit) almost as strongly as a genuine Half/Full Flush commitment, costing far more win rate
-    than the extra faan-per-win was worth. Retuned to the values below (mid-game `w_value` down
-    to 0.9, `w_speed` up to 0.7; early/late nudged the same direction) on the same seed range:
-    CI narrows to `[-1.857, +0.041]` -- points roughly at parity with T1 (still technically
-    includes zero, not a clean win) -- while `tenpai_rate_on_sub_minimum_hand` stays far below
-    T1's (0.204 vs 0.321, docs/04-bots.md §8's recorded numbers): the HK-specific failure mode
-    T2 exists to fix is still substantially improved even though a full points win isn't
-    reached yet. **Further self-play tuning is real follow-up work, not a solved problem** --
-    docs/04-bots.md §4 itself says to tune this way; one retuning pass narrowed the gap, it
-    didn't close it."""
+    `bots/safety.py`'s weights), **retuned twice against real arena runs, not just intuition**.
+
+    **Pass 1 (`w_value`/`w_speed`).** A first calibration (mid-game `w_value=1.5`, `w_speed=0.5`)
+    scored a paired-difference CI of `[-3.337, -1.503]` points/game against `EfficiencyBot` (1000
+    duplicate sets, seed 1) -- a real, statistically significant *regression*, because `w_value`
+    pulled discards toward preserving *any* reachable route (including the ubiquitous, weakly-
+    committal 2-faan Voided Suit) almost as strongly as a genuine Half/Full Flush commitment,
+    costing far more win rate than the extra faan-per-win was worth. Retuned mid-game `w_value`
+    down to 0.9, `w_speed` up to 0.7 (early/late nudged the same direction): CI narrowed to
+    `[-1.857, +0.041]` -- still technically includes zero.
+
+    **Pass 2 (`w_safety`, this pass).** `w_safety` had never been arena-validated at all (only
+    `w_value`/`w_speed` were touched by pass 1) -- `bots/safety.py`'s `tile_risk` sums an assumed
+    5-faan deal-in cost across all three opponents at a 0.06 base rate, which produces a risk
+    magnitude (commonly ~0.3-1.5 after meld/tempo/wall multipliers) large enough to swamp routine
+    speed/value differences between candidate discards once multiplied by the pass-1 `w_safety`
+    values (0.3/0.6/1.6) -- plausibly making T2 fold away from perfectly good efficient plays far
+    more often than the actual deal-in savings were worth, not just in the narrow `fold_mode`
+    path (which already bypasses these weights) but on *every* ordinary discard decision.
+    Halving `w_safety` at each turn bucket (0.3->0.15, 0.6->0.3, 1.6->0.9) confirmed exactly that:
+    a 1000-duplicate-set run (same seed range) moved the paired-difference mean from -0.908 to
+    **+0.591**, 95% CI `[-0.393, +1.575]` -- the point estimate is positive for the first time,
+    but the CI still includes zero, so this is *not yet* a clean win either. Deal-in rate rose
+    only slightly (0.098 -> 0.110, still well below T1's 0.139) while win rate recovered
+    substantially (0.154 -> 0.175) and `tenpai_rate_on_sub_minimum_hand` stayed far below T1's
+    (0.224 vs 0.324, docs/04-bots.md §8's recorded numbers) -- confirming the over-cautious
+    safety weight, not the value/speed balance, was the dominant remaining drag on points.
+    **Further self-play tuning is real follow-up work, not a solved problem** -- docs/04-bots.md
+    §4 itself says to tune this way; two retuning passes have moved the mean paired difference
+    from -2.420 to -0.908 to +0.591 without ever fully closing the CI, and a third pass (likely
+    continuing to trim `w_safety`, since that lever has moved the needle twice as much as
+    `w_value`/`w_speed` did) is the natural next step."""
     if turn <= 6:
-        return (1.0, 0.2, 0.3, 0.15)
+        return (1.0, 0.2, 0.15, 0.15)
     if turn <= 12:
-        return (0.7, 0.9, 0.6, 0.2)
-    return (0.4, 0.4, 1.6, 0.15)
+        return (0.7, 0.9, 0.3, 0.2)
+    return (0.4, 0.4, 0.9, 0.15)
 
 
 def _opponents(seat: int) -> tuple[int, ...]:
