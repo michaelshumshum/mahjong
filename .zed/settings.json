@@ -22,6 +22,15 @@
     },
   },
   "languages": {
+    "Python": {
+      "language_servers": ["basedpyright", "ruff"],
+      "format_on_save": "on",
+      "formatter": {
+        "language_server": {
+          "name": "ruff",
+        },
+      },
+    },
     "Svelte": {
       "language_servers": ["svelte-language-server", "oxlint", "oxfmt"],
       "format_on_save": "on",
