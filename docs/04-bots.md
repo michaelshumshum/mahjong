@@ -41,8 +41,17 @@ room on the same process. Instead:
 4. If no (matching) result lands before `deadline`, the room applies a safe default (tsumogiri /
    pass) and logs it. A bot must never wedge a table.
 
-Add a humanising think delay — 400–1400ms, longer for close decisions — applied by the room when
-scheduling the deadline, not inside the worker.
+**Built: a humanising think delay, 400–1400ms, uniform per decision.** `app/room.py`'s
+`_await_bot_job` sleeps this once the worker replies, before re-entering the result through
+`self.inbox` — applied by the room, not inside the worker, so it never touches
+`_BOT_JOB_TIMEOUT_SECONDS`/`turn_seconds`/`claim_seconds` deadline math (a real tier answers in
+single-digit milliseconds; without this, turns and claims resolve faster than a human watching
+the table can follow). Seeded off the same per-decision `seed` `_submit_bot_job` already derives
+(reproducible, not `random.Random()` unseeded), sleeping in that job's own task so it delays only
+that seat's result, never the room loop or another seat's job. **Deferred:** varying the delay by
+how close the decision was (the docs' original "longer for close decisions") — no tier currently
+returns a confidence/margin signal alongside its chosen action id, so there's nothing to scale the
+delay by yet.
 
 **Built (M4.5): `bots/worker.py`'s `compute_action` now drives the real `Bot.act` tiers.** A
 worker process still never receives `GameState` (D2: the room's `game_seed` must never leave its

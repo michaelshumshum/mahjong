@@ -100,6 +100,8 @@ import asyncio
 import contextlib
 import heapq
 import itertools
+import os
+import random
 import time
 from collections import deque
 from collections.abc import Callable
@@ -155,6 +157,16 @@ SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
+
+# humanising think delay (docs/04-bots.md §1): a real tier answers in single-digit
+# milliseconds, which reads as the table jumping ahead of anyone actually watching it. Applied
+# here, after the worker replies, rather than inside the worker (docs/04-bots.md §1) so it never
+# touches `_BOT_JOB_TIMEOUT_SECONDS`/`turn_seconds`/`claim_seconds` deadline math. Env-overridable
+# (`server/tests/conftest.py` zeroes both for the whole suite) -- same test-time-control
+# convention `app/main.py`'s `SHUTDOWN_GRACE_SECONDS` already established, so tests exercising
+# many bot turns over a real WS connection don't pay real wall-clock seconds for it.
+_BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
+_BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 
 _MAX_NAME_LENGTH = 24  # guest display name cap (M5, docs/02-protocol.md §2 `join.name`)
 
@@ -1277,11 +1289,13 @@ class Room:
         future = loop.run_in_executor(
             self._bot_pool, compute_action, view, mask, seed, self._bot_tier, deadline
         )
-        task = asyncio.ensure_future(self._await_bot_job(seat, tag, future))
+        task = asyncio.ensure_future(self._await_bot_job(seat, tag, future, seed))
         self._bot_tasks.add(task)
         task.add_done_callback(self._bot_tasks.discard)
 
-    async def _await_bot_job(self, seat: int, tag: BotJobTag, future: asyncio.Future[int]) -> None:
+    async def _await_bot_job(
+        self, seat: int, tag: BotJobTag, future: asyncio.Future[int], seed: int
+    ) -> None:
         """Await one submitted job under a hard deadline (00-architecture.md §8 "Bot raises /
         hangs": "A bot must never be able to wedge a table"), then re-enter it through
         `self.inbox` as a `BotResult` exactly like the architecture sketch describes (D12) --
@@ -1298,9 +1312,24 @@ class Room:
         regardless, through its own real `TimerHeap` entry, unaffected by either. In practice
         this path only fires for an actual crash, not a legitimate miss: every tier's `act()`
         here is O(a heuristic scan), not a search with a real budget to exceed.
+
+        Once the worker answers, sleeps a humanising `_BOT_THINK_MIN_SECONDS`-
+        `_BOT_THINK_MAX_SECONDS` delay (docs/04-bots.md §1) before re-entering the result through
+        `self.inbox` -- a real tier answers in single-digit milliseconds, which otherwise reads as
+        the table racing ahead of anyone watching it. `seed`-derived, not an unseeded
+        `random.Random()`, for the same reproducibility reason `_submit_bot_job` seeds the bot's
+        own RNG with it (server/AGENTS.md); XORed with a constant so this delay doesn't just echo
+        the bot's own action-choice draw. Sleeping here, in this job's own task, delays only this
+        seat's result -- it never blocks the room loop or any other seat's job. If the pending tag
+        goes stale while asleep (window closed, turn moved on, seat reconnected), the result lands
+        anyway but `_handle_bot_result` drops it exactly like any other stale answer.
         """
         with contextlib.suppress(Exception):
             aid = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
+            think_seconds = random.Random(seed ^ 0x5A5A5A5A).uniform(
+                _BOT_THINK_MIN_SECONDS, _BOT_THINK_MAX_SECONDS
+            )
+            await asyncio.sleep(think_seconds)
             self.inbox.put_nowait(BotResult(seat=seat, tag=tag, aid=aid))
             return
         if self._pending_bot.get(seat) == tag:

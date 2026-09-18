@@ -12,7 +12,15 @@ import runs) is this codebase's usual test-time-control pattern applied via env 
 a `RuleSet` field -- same idea `test_disconnect_bot_handover.py`'s `disconnect_grace_seconds=0`
 already established, just process-level rather than per-game. A test that actually exercises the
 grace window (`test_shutdown.py`) overrides it per-call via `begin_shutdown(grace_seconds=...)`
-directly rather than relying on this env var."""
+directly rather than relying on this env var.
+
+Same reasoning zeroes `BOT_THINK_MIN_SECONDS`/`BOT_THINK_MAX_SECONDS` (`app/room.py`'s
+`_await_bot_job` humanising think delay, docs/04-bots.md §1): real over the wire in the WS-
+integration tests, a real bot tier answers in milliseconds, but every `_await_bot_job` still
+sleeps 0.4-1.4s per decision by default -- multiplied across a whole hand's worth of bot turns,
+that's real minutes added to the suite for a delay that exists purely for a human watching the
+table, not for test correctness. No test currently asserts on the delay itself, so zeroing it here
+is safe."""
 
 from __future__ import annotations
 
@@ -21,6 +29,8 @@ import os
 import pytest
 
 os.environ.setdefault("SHUTDOWN_GRACE_SECONDS", "0")
+os.environ.setdefault("BOT_THINK_MIN_SECONDS", "0")
+os.environ.setdefault("BOT_THINK_MAX_SECONDS", "0")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
