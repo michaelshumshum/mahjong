@@ -206,19 +206,24 @@ result re-enters through the same `inbox` as any human command, tagged with the
 `(window_id, state_version)` it was computed against, and is **dropped** if either has moved on
 by the time it arrives — the same staleness protection a laggy human click gets (§4).
 
-**Implemented (M3 sub-task 6).** `server/app/room.py`'s `_poke_bots()`/`BotJobTag`/`BotResult`
-match this sketch: `state_version` is `Room.event_id` (already the room's own "did anything
-change" counter, reused rather than duplicated); `key` covers both a claim `window_id` and a
-plain turn (`kind: "turn"|"claim"`), since a bot-handled `AWAIT_ACTION` turn has no window to tag
-against. The worker itself is `bots/worker.py`'s `compute_action(seat_view, seed)` — uniform
-over `seat_view.legal_actions`, the same T0 policy as `RandomBot` but built against `SeatView`
-instead of `GameState` (see that module's docstring for why this closes the redaction gap for
-the one path that crosses a real process boundary, without migrating `bots/base.py`'s tier
-interface, which `04-bots.md` is replacing wholesale in M4 anyway). On a worker crash or a hard
-timeout, no synthesized default action is applied for a *turn* decision — per-turn timeout
-enforcement has no driver at all yet (own note above); a live *claim* offer still resolves
-correctly regardless, through its own real `TimerHeap` entry, independent of whether the bot
-ever answers.
+**Implemented (M3 sub-task 6), real tiers wired in (M4.5).** `server/app/room.py`'s
+`_poke_bots()`/`BotJobTag`/`BotResult` match this sketch: `state_version` is `Room.event_id`
+(already the room's own "did anything change" counter, reused rather than duplicated); `key`
+covers both a claim `window_id` and a plain turn (`kind: "turn"|"claim"`), since a bot-handled
+`AWAIT_ACTION` turn has no window to tag against. The worker itself is `bots/worker.py`'s
+`compute_action(view, mask, seed, tier, deadline)` — it builds the requested real tier
+(`T0`/`T1`/`T2`, `Room.__init__`'s `bot_tier` param, default `T2`/`FaanBot`) and drives its real
+`Bot.act(view, mask, deadline)` via `asyncio.run` against `SeatView`/a `legal_mask`, returning a
+bare action id rather than a concrete `Action` — a worker process still never receives
+`GameState` (D2), so it still can't decode the id itself; `app/room.py`'s `_handle_bot_result`
+does that (`decode_action(aid, state, seat)`) once the result lands back, against the real
+`GameState` the room process holds. `_poke_bots()` also drives seats bound `bot` from room
+creation (M4.5 practice mode, `docs/05-roadmap.md`), not just `autoplay` seats — the identical
+`BotJobTag`/`ProcessPoolExecutor` path, not a parallel one; see `SeatBinding`'s own docstring.
+On a worker crash or a hard timeout, no synthesized default action is applied for a *turn*
+decision — per-turn timeout enforcement has no driver at all yet (own note above); a live
+*claim* offer still resolves correctly regardless, through its own real `TimerHeap` entry,
+independent of whether the bot ever answers.
 
 **Session/WS integration (M3 sub-task 4).** `SeatBinding` (`app/room.py`) ended up holding a
 live socket's push callback, `ready`/pre-arm (`auto`) state, and a per-seat `IdempotencyCache`
@@ -401,10 +406,19 @@ seat to `"connected"`, and surfaces `deadline_ts` only from `ClaimWindow.deadlin
 seat holds a live claim offer. Both get real data once their owning sub-tasks land.
 
 **`seat_status` got its real data in M3 sub-task 6.** `app/room.py`'s `SeatBinding.status`
-(`connected`/`disconnected`/`autoplay`) is now what `Room` passes as `seat_view()`'s
-`seat_status` override everywhere it builds a view (`state_sync_wire`, `_poke_bots`) — see
-`Room.mark_disconnected`/`reconnect`. `deadline_ts` for a *claim* offer has had real backing
-since sub-task 3/5; a per-turn `deadline_ts` is still advisory-only (§3's own note above).
+(`connected`/`disconnected`/`autoplay`, plus `bot` since M4.5 — below) is now what `Room` passes
+as `seat_view()`'s `seat_status` override everywhere it builds a view (`state_sync_wire`,
+`_poke_bots`) — see `Room.mark_disconnected`/`reconnect`. `deadline_ts` for a *claim* offer has
+had real backing since sub-task 3/5; a per-turn `deadline_ts` is still advisory-only (§3's own
+note above).
+
+**`bot` is a real `SeatBinding.status` since M4.5 (practice mode, `docs/05-roadmap.md`), not
+just a reserved wire value.** `Room.__init__(practice=True)` binds seats 1-3 to bots immediately
+at construction, before any human `join`s — a real `SeatBinding` (a no-op `send`, `ready=True`),
+distinct from `autoplay` (a seat that *was* human and lost its connection) but driven through the
+identical `_poke_bots`/`BotJobTag` machinery. `reconnect` refuses to hijack a `bot` seat (raises
+the same `SeatTakenError` `join` raises against an already-taken seat) — there is no prior human
+occupant for a `hello{seat}` to reclaim.
 
 **`empty` distinguishes "never joined" from "connected" (post-M3, `/table/[id]` sub-task).**
 `Room._seat_status_tuple()` reported `"connected"` for an unbound seat too — the only default
@@ -547,7 +561,7 @@ choice implies. Deferred — see [99-deferred.md](99-deferred.md).
 | Event | Behaviour |
 | --- | --- |
 | Player disconnects | Seat marked `DISCONNECTED`. Room continues. Grace period (default 20s) before the bot takes over; the seat keeps playing as `AUTOPLAY`. **Implemented (M3 sub-task 6):** detected only by the WS connection actually closing (`app/ws.py`'s `Session` `finally` block) — a heartbeat-driven dead-socket timeout (§8 "Liveness" below) has no driver anywhere in this codebase yet, so it isn't what starts this clock today. The grace timer reuses the same `TimerHeap`/id space claim-window deadlines already use (`app/room.py`'s `TimerHeap` docstring), not a second mechanism, and a new external-to-the-room-loop deadline (this one, or a mid-claim-window reconnect re-arm below) has to explicitly wake a possibly-already-sleeping `Room._next()` — see `_WakeUp`'s docstring for why that's a real correctness requirement, not a nicety. |
-| Player reconnects | Auth, rejoin room, send `last_seq`. Server replays from that seat's ring buffer or sends a fresh `state_sync` (§3, D1). Bot relinquishes the seat. **Mid-claim-window:** if this seat's claim hasn't resolved yet — the bot hasn't answered and the window is still open — the server re-arms *only this seat's* entry in the timer heap (§3, D17) to a full human-length window measured from the reconnect moment; the original deadline was sized for a bot answering in milliseconds and handing it to a just-reconnected human would be a de facto auto-pass. Other seats' deadlines are untouched. If the claim already resolved before the human reconnected, there's no do-over — they get a `state_sync` reflecting the resolved state, same as a human whose own click lands after the window closed. **Implemented (M3 sub-task 5), and re-checked once bot handover landed (sub-task 6):** bot handover exists now, but every offered seat — human, or `AUTOPLAY`-and-bot-answered — still gets the same `ruleset.claim_seconds` window (`RandomBot`-equivalent's `compute_action` policy is instant, so it always answers well inside that window regardless); nothing gave bots a separate, shorter claim-window deadline. So the doc's "sized for a bot" scenario never literally existed either before or after sub-task 6 — read as the *general* case this guards ("whatever the deadline was armed for, a just-reconnected human gets a fresh full window instead of its leftover sliver"), not literally "detect it was a bot." This re-arm needed no changes once bot handover landed — it already always won over whatever the seat was offered before, bot-answered or not. Building it required splitting the claim-window timer heap from one shared entry per window to one entry per offered seat (`server/app/room.py`'s `TimerHeap` docstring) — a shared entry can't move for one seat without moving for all of them. |
+| Player reconnects | Auth, rejoin room, send `last_seq`. Server replays from that seat's ring buffer or sends a fresh `state_sync` (§3, D1). Bot relinquishes the seat. **Mid-claim-window:** if this seat's claim hasn't resolved yet — the bot hasn't answered and the window is still open — the server re-arms *only this seat's* entry in the timer heap (§3, D17) to a full human-length window measured from the reconnect moment; the original deadline was sized for a bot answering in milliseconds and handing it to a just-reconnected human would be a de facto auto-pass. Other seats' deadlines are untouched. If the claim already resolved before the human reconnected, there's no do-over — they get a `state_sync` reflecting the resolved state, same as a human whose own click lands after the window closed. **Implemented (M3 sub-task 5), and re-checked once bot handover landed (sub-task 6), and again once real tiers replaced the T0 stand-in (M4.5):** bot handover exists now, but every offered seat — human, or `AUTOPLAY`-and-bot-answered — still gets the same `ruleset.claim_seconds` window (`compute_action`'s policy is O(a heuristic scan) for every tier, `T0`/`T1`/`T2` alike, none of them a real search with a budget to spend, so it always answers well inside that window regardless); nothing gave bots a separate, shorter claim-window deadline. So the doc's "sized for a bot" scenario never literally existed either before or after sub-task 6 — read as the *general* case this guards ("whatever the deadline was armed for, a just-reconnected human gets a fresh full window instead of its leftover sliver"), not literally "detect it was a bot." This re-arm needed no changes once bot handover landed — it already always won over whatever the seat was offered before, bot-answered or not. Building it required splitting the claim-window timer heap from one shared entry per window to one entry per offered seat (`server/app/room.py`'s `TimerHeap` docstring) — a shared entry can't move for one seat without moving for all of them. |
 | Player never returns | Bot plays out the game. Result recorded against the human. |
 | Turn timeout | Server acts for them. **After a draw:** tsumogiri — discard the drawn tile. **After a claimed pung or chow:** there is no drawn tile — the claimer goes straight from the claim to `AWAIT_ACTION` with nothing new in hand to reflexively discard ([01-rules-spec.md §4](01-rules-spec.md); kong is unaffected, a kong claim always draws a replacement tile first). The fallback there is deliberately dumb, not defensive: discard the tile in the concealed hand with the lowest `tile_id`. Smart defensive discarding is a bot-tier concern ([04-bots.md](04-bots.md)), not a timeout default — the default only needs to be legal, deterministic, and boring. Either case, auto-pass any pending claims. Three strikes → seat flips to `AUTOPLAY` for the rest of the game. |
 | Bot raises / hangs | Bot runs in a worker pool with a hard deadline, outside the room loop (§3, D12). On timeout, the room applies the same deterministic default action as a human timeout. A bot must never be able to wedge a table. **Implemented (M3 sub-task 6), one gap:** a *claim* offer a bot fails to answer in time is unaffected — it resolves via its own real `TimerHeap` entry (default-to-`Pass`) regardless of whether the bot ever responds, same as a silent human. A bot's own *turn* (`AWAIT_ACTION`) has no deterministic-default fallback to apply on a crash/timeout, because per-turn timeout enforcement itself has no driver at all yet for anyone, human or bot (§3's own note) — `app/room.py`'s `_await_bot_job` just clears the pending job tag on failure so the next tick retries from scratch, which cannot wedge the table (the claim-window path is unaffected) but also doesn't force a stalled turn to resolve. Closing that is the same pre-existing "turn timeout has no driver" gap, not new to bots. |

@@ -44,15 +44,18 @@ room on the same process. Instead:
 Add a humanising think delay — 400–1400ms, longer for close decisions — applied by the room when
 scheduling the deadline, not inside the worker.
 
-**`bots/worker.py`'s `compute_action` stays separate from `Bot.act`, deliberately, even after
-the M4 interface migration below.** A worker process never receives `GameState` (D2: the room's
-`game_seed` must never leave its own process), but decoding a `Bot.act`-returned id back into a
-concrete `Action` needs one (`decode_action(aid, state, seat)`). Routing the live
-disconnect-handover path through `Bot.act` would move that decode step into the Room after the
-result comes back — a real change to `app/room.py`'s result handling, not a refactor this
-sub-task's scope covers. `compute_action` keeps its own uniform-random-over-`legal_actions`
-implementation against `SeatView` directly; revisit this only when a non-uniform tier needs to
-run disconnect-handover for real. See `server/bots/worker.py`'s module docstring.
+**Built (M4.5): `bots/worker.py`'s `compute_action` now drives the real `Bot.act` tiers.** A
+worker process still never receives `GameState` (D2: the room's `game_seed` must never leave its
+own process), so it still can't call `decode_action(aid, state, seat)` itself — that needs the
+real `GameState`. The resolution this section used to defer ("revisit only when a non-uniform
+tier needs to run disconnect-handover for real") has landed: `compute_action` builds the
+requested tier (`T0`/`T1`/`T2`, `app/room.py`'s `Room.__init__(bot_tier=...)`, default
+`T2`/`FaanBot`) and drives its real `act(view, mask, deadline)` via `asyncio.run` (the worker has
+no running event loop of its own — same pattern `bots/arena.py`'s own `ProcessPoolExecutor` entry
+point already uses), returning a bare action id instead of a decoded `Action`. The decode step
+moved to `app/room.py`'s `_handle_bot_result`, which already holds the real `GameState` — the one
+deliberate change to that path's result shape this resolution needed. See
+`server/bots/worker.py`'s module docstring for the full reasoning.
 
 ## 2. Tiers
 

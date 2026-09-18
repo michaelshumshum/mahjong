@@ -160,13 +160,29 @@ work against the same harness, not a re-scope. Client work (the rest of this mil
 is untouched by this note.
 
 ### M4.5 — Single-player is shippable
-No new engine or client work — this is a checkpoint milestone, not a build phase. Play the M4
-client against a table of three `FaanBot`s end to end (not `EfficiencyBot`s — see M4), fix
-whatever that reveals (pacing, animation edge cases, mobile layout per §4 risks), and cut a build.
+No new engine work — this is a checkpoint milestone, not a build phase. Play the M4 client
+against a table of three `FaanBot`s end to end (not `EfficiencyBot`s — see M4), fix whatever that
+reveals (pacing, animation edge cases, mobile layout per §4 risks), and cut a build.
 **Done when:** you can play a full game solo against three bots in a browser, hands end in real
 wins at a normal rate rather than perpetual exhaustive draws, and it feels good. This is the last
 point at which shipping single-player-only is a live, cheap option — given the M5 cost below,
 treat it as a real decision point, not a formality.
+
+**Backend mechanism: built.** Two things had to be true before this checkpoint could even exist,
+and both landed together: (1) the live room path (disconnect-handover's `autoplay` seats) now
+runs the real bot tiers, not `bots/worker.py`'s old hardcoded T0 uniform-random stand-in — see
+[04-bots.md §1](04-bots.md); (2) a room can be started with bots filling the other three seats
+from creation (`?practice=true` on the WS endpoint → `Room.__init__(practice=True)`), not only
+via disconnect-handover — `app/room.py`'s `SeatBinding` gains a real `bot` status (reusing
+`_poke_bots`'s existing `BotJobTag`/`ProcessPoolExecutor` machinery unchanged), auto-`ready` so
+`require_ready` gating starts the hand as soon as the human readies. The room's `bot_tier`
+defaults to `T2`/`FaanBot`, matching this milestone's own requirement above; `T0`/`T1` stay
+selectable at the `Room`/`RoomRegistry` level for tests and any future difficulty setting.
+Proven end to end by a real WS-driven test: one human client, three real `FaanBot`s (no `join`
+ever sent for them), unscripted play to `Phase.GAME_OVER`
+(`server/tests/test_practice_mode_e2e.py`). **What's left for this milestone is entirely
+frontend** — a lobby entry point for practice mode and bot-seat visual treatment — not scoped to
+this backend sub-task.
 
 ### M5 — Real multiplayer (1–2 weeks)
 Guest identity only, by design — no accounts, no password, no email, no JWT, no REST auth
