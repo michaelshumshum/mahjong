@@ -203,11 +203,20 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             assert {o["kind"] for o in offer2["d"]["options"]} == {"pung", "pass"}
             window_id = offer2["d"]["window_id"]
 
+            # an option's `tiles` names only the claimer's own tiles, never the discard, so a
+            # client can echo it straight back as the claim disambiguator (02-protocol.md §2).
+            pung_option = next(o for o in offer2["d"]["options"] if o["kind"] == "pung")
+            assert sorted(pung_option["tiles"]) == sorted([_MAN_5[1], _MAN_5[2]])
+
             # --- seat 2 pungs (higher priority than seat 1's un-answered chow -- early exit,
             # 00-architecture.md §4). No response is ever sent for seat 1's offer.
             claim_id = _next_id()
             wss[2].send_json(
-                _msg("claim", {"window_id": window_id, "choice": "pung"}, id_=claim_id)
+                _msg(
+                    "claim",
+                    {"window_id": window_id, "choice": "pung", "tiles": pung_option["tiles"]},
+                    id_=claim_id,
+                )
             )
             ack_c2 = wss[2].receive_json()
             assert ack_c2["d"] == {"id": claim_id, "ok": True}

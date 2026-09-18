@@ -1526,18 +1526,23 @@ class Room:
             {
                 "t": "claim_offer",
                 "window_id": window.window_id,
-                "options": self._claim_options_wire(offer),
+                "options": self._claim_options_wire(offer, window.tile),
                 "deadline_ts": self._claim_deadline_ms[(window.window_id, seat)],
             },
         )
 
     @staticmethod
-    def _claim_options_wire(offer: ClaimOffer) -> list[dict[str, Any]]:
+    def _claim_options_wire(offer: ClaimOffer, claimed: TileId) -> list[dict[str, Any]]:
+        """`tiles` names only the claimer's *own* tiles, excluding the claimed discard, because
+        that is what a `claim`'s `tiles` disambiguator means on the way back in (02-protocol.md
+        §2 and its §7 example) -- echoing the full meld here made every disambiguated claim
+        fail `_pick_claim_meld` as `illegal`."""
         options: list[dict[str, Any]] = []
         if offer.can_win:
             options.append({"kind": "win"})
         for meld in offer.melds:
-            options.append({"kind": _CLAIM_KIND_WIRE[meld.kind], "tiles": list(meld.tiles)})
+            own = [t for t in meld.tiles if t != claimed]
+            options.append({"kind": _CLAIM_KIND_WIRE[meld.kind], "tiles": own})
         options.append({"kind": "pass"})
         return options
 
