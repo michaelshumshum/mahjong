@@ -13,10 +13,18 @@ COPY web/package.json web/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
-FROM base AS dev
+# the one stage that isn't alpine: `pnpm test` runs vitest's `client` (browser-mode) project
+# and the Playwright e2e suite, and Playwright ships no musl chromium build — on alpine the
+# browser is simply not installable. Baked into the image rather than left to `test:e2e`'s own
+# `playwright install`, which otherwise re-downloads chromium on every `docker compose run --rm`.
+FROM node:24-bookworm-slim AS dev
+ENV PNPM_HOME=/pnpm PATH="/pnpm:$PATH"
+RUN corepack enable
+WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY web/package.json web/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN cd web && pnpm exec playwright install --with-deps chromium
 COPY web/ web/
 WORKDIR /app/web
 EXPOSE 5173

@@ -68,6 +68,18 @@ base ──┬── deps    (lockfile only; cached across source edits)
        └── ml      (venv copied from deps+ml extra, non-root user, for trainer and arena)
 ```
 
+`web`'s `dev` stage is the one exception to the shared `base`: it sits on `node:24-bookworm-slim`
+with chromium baked in (`playwright install --with-deps chromium`), because `pnpm test` runs
+vitest's browser-mode `client` project and the Playwright e2e suite, and Playwright ships no musl
+build — on alpine that browser cannot be installed at all. `deps`/`build`/`prod` stay alpine, so
+the shipped image is untouched. Two consequences worth knowing:
+
+- Changing that stage's base invalidates the `web-modules` volume (native deps are built against
+  the image's libc) — `docker volume rm mahjong_web-modules` once after pulling such a change,
+  or `make test-web` runs against the old base's binaries.
+- `make test-web` passes `CI=true`: vitest browser mode and Playwright both default to *headed*
+  off-CI, and the container has no X server.
+
 `ml` mirrors `prod`'s non-root setup — it just installs from the `ml` extra instead of base
 deps. `trainer`/`arena` don't bind-mount source over the image: doing so would shadow the
 image's baked venv with an empty one and force a ~3GB torch reinstall on first run. Rebuild

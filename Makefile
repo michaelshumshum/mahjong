@@ -43,8 +43,11 @@ test: test-server test-web ## Run all tests
 test-server: ## pytest (excludes slow self-play; use `make selfplay` for that)
 	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m "not slow"
 
+# CI=true: vitest browser mode and playwright both default to *headed* off-CI, and the
+# container has no X server. Set here, not in the compose service, so `make up`'s dev server
+# isn't also told it's running in CI.
 test-web: ## vitest + svelte-check
-	$(COMPOSE) run --rm --no-deps web pnpm test
+	$(COMPOSE) run --rm --no-deps -e CI=true web pnpm test
 
 selfplay: ## Engine soak test: N complete games with random bots (default 10000)
 	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m slow -k selfplay \
