@@ -137,6 +137,22 @@ forever. Only reachable with a real multi-hand game driven through `Room`, never
 test_start_next_hand_carries_forward_next_window_id` before the fix. M3 is now fully complete;
 no gaps remain beyond what's already tracked elsewhere in this doc set (§4, §7, §8, §9).
 
+**Turn timeout closed (a later sub-task).** `RuleSet.turn_seconds`/`turn_timeout_strikes`
+(`mahjong_core/config.py`) existed since M1 but had zero enforcement anywhere -- `00-
+architecture.md §8`'s "Turn timeout" and "Bot raises / hangs" rows both named this gap
+explicitly. `app/room.py`'s `_arm_turn_timer`/`_handle_turn_timeout` add a third `TimerHeap`
+deadline kind (claim-window and disconnect-grace already existed) armed from
+`_publish_turn_if_active`, the single call site every `AWAIT_ACTION` landing already goes
+through; on expiry the room tsumogiris the drawn tile or discards the lowest-`tile_id`
+concealed tile (sourced from `legal_actions`'s own `Discard` set, never raw `concealed`,
+so the default can never name an illegal tile), then registers a strike on
+`SeatBinding.turn_timeout_strikes` -- three flips the seat to `autoplay` for the rest of the
+game, which falls out of simply never resetting that field rather than any per-hand
+bookkeeping. Fires identically for a human or a bot-driven seat, since the timer races the
+wall clock rather than any particular bot job -- closing the "Bot raises / hangs" row's own
+named gap ("a bot's own turn... has no deterministic-default fallback") with no bot-specific
+code at all.
+
 ### M4 — Playable client + bots (6–10 weeks)
 Lobby, table route, DOM/CSS table scene, inline-SVG tile faces, hand/pool/meld rendering,
 draw-discard-claim animations, claim buttons, timer ring, hand-end faan breakdown, score sheet.
