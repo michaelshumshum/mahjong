@@ -427,8 +427,8 @@ async def ws_endpoint(
         # the process cycles) once a drain has started. 1013 = "Try Again Later" (RFC 6455).
         await websocket.close(code=1013)
         return
-    # M0-era stub still applies: no ticket/auth yet (docs/00-architecture.md §2.1, M5 scope) --
-    # accept every other connection unconditionally.
+    # No ticket/auth, permanently (docs/00-architecture.md §2.1 cuts real accounts/tickets
+    # entirely) -- accept every other connection unconditionally.
     await websocket.accept()
     room_obj = _get_or_create_room(room, seed, practice)
     session = Session(websocket, room_obj)

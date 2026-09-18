@@ -1,19 +1,19 @@
 # 02 — Wire protocol
 
-Transport: one WebSocket per client at `wss://…/ws?room={id}&ticket={ticket}`. Plain JSON frames
-— no `permessage-deflate`: at ~150 bytes/frame it typically *grows* the payload (compression
-overhead exceeds the savings) and adds per-frame CPU to every connection for no benefit at this
-message size. REST (`/api/*`) handles everything that isn't live play: auth, profile, room
-listing, replay download, leaderboard.
+Transport: one WebSocket per client at `wss://…/ws?room={id}`. Plain JSON frames — no
+`permessage-deflate`: at ~150 bytes/frame it typically *grows* the payload (compression overhead
+exceeds the savings) and adds per-frame CPU to every connection for no benefit at this message
+size. REST (`/api/*`) handles everything that isn't live play: room listing, replay download,
+leaderboard.
 
-**Auth (D13):** guest-first, with optional account upgrade — never a hard signup wall. REST
-issues a short-lived, single-use WS ticket: `POST /api/auth/ws-ticket` (works for a guest or a
-logged-in session) returns `{ticket, expires_in}`. The client opens the socket with
-`?ticket=...` and the server burns it during the `hello` handshake — one connect per ticket. A
-JWT **never** goes in a query string: query strings land in proxy logs, browser history, and
-Referer headers, none of which should hold a bearer credential. The long-lived session
-credential (JWT or guest cookie) stays in an `Authorization` header / cookie on the REST call
-that mints the ticket; the socket itself only ever sees the disposable ticket.
+**Auth (D13):** guest-only, by design — not a ticket/JWT scheme with a guest fallback. There is
+no account, no password, no email, and no REST auth endpoint at all (`docs/00-architecture.md
+§2.1` cuts an earlier ticket-issuing design entirely — see `docs/05-roadmap.md`'s M5 section for
+why). A player picks a display name client-side, persisted in `localStorage`/a cookie so it
+survives a reload, and sends it as a plain field on `hello` alongside `seat` (§2's table) — no
+REST round trip before opening the socket, no credential of any kind in the WS URL because
+there's no credential to carry. Seat identity is consequently permanently client-asserted, not
+verified against anything — see §5's reconnect-identity note for the full reasoning.
 
 ## 1. Envelope
 
