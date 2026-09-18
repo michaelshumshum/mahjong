@@ -10,6 +10,33 @@ are driven through the room while that seat has no live socket, then a new conne
 with `seat` + `last_seq` and the result is checked against what was actually missed. Timer-heap
 assertions read `Room`'s private per-seat tracking dicts directly, the same white-box style
 `tests/test_room_claims.py` already uses on `room.deadlines`/`_armed_window_id`.
+
+**A real, CI-only race lived in this white-box style -- fixed, not previously documented.**
+`starlette.testclient.TestClient` runs the ASGI app's event loop on its own OS thread (an
+`anyio` `BlockingPortal`); this module's test thread only ever talks to it through
+`WebSocketTestSession.send`/`receive`, both `portal.call(...)` round trips. `send` (used by
+this file's `ws.send_json(...)` helper calls) is fire-and-forget from the *test's* point of
+view: it hands the frame to the app's incoming `anyio` stream and returns as soon as that
+handoff itself completes -- it does not wait for the app's own `ws_endpoint` loop, running on
+the portal's thread, to actually dequeue the frame, dispatch it through `Session.handle`, and
+run whatever `Room` method (`reconnect`/`resume`/...) that entails. `receive`, by contrast,
+genuinely blocks until the app produces a frame, which -- since `Room.reconnect`/`Room.resume`
+have no `await` anywhere in them, see `resume`'s own docstring -- can only happen *after* that
+handler has already run to completion, rearms and all.
+
+Two scenarios below used to assert directly against `Room`'s own attributes (`seat_seq`,
+`ring`, `_active_seat_timer`, `_claim_deadline_ms`) immediately after a `hello` `send_json`,
+with no `receive_json` in between -- nothing here actually waited for the server's own
+event-loop thread to have processed that `hello` yet, so the assertion was racing it. On this
+repo's own fast, idle dev machine the event loop (blocked on nothing else) almost always won
+that race well before the next Python bytecode on the test thread ran; on a loaded/shared CI
+runner, thread-scheduling latency was occasionally large enough for the test thread to read
+Room's pre-reconnect state instead, failing an assertion that was, a moment later, actually
+true. Every other scenario in this file already happened to have a real `receive_json` between
+the `hello` send and its own direct-state assertions (forcing the same synchronization as a
+side effect) -- purely by how each was written, not by design -- which is why only these two
+ever flaked, and only ever on CI. Fix: order every direct `Room`-state assertion after at least
+one `receive_json` produced by that same `hello`'s handling, never before.
 """
 
 from __future__ import annotations
@@ -325,12 +352,19 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
 
             # nothing missed -> no replay, no state_sync -- but reconnecting from `disconnected`
             # is itself real news: `resume()` announces it with one live `seat_state`, bumping
-            # seq/ring by exactly that one frame, nothing more.
-            assert room.seat_seq[1] == seq_before + 1
-            assert len(room.ring[1]) == ring_len_before + 1
+            # seq/ring by exactly that one frame, nothing more. Receive it *before* asserting on
+            # Room's own state directly -- `send_json` only enqueues `hello` onto the ASGI app's
+            # anyio stream for the server's own event-loop thread (a separate OS thread under
+            # `TestClient`) to pick up and process; nothing about it returning guarantees that
+            # thread has actually run `resume()` yet. `receive_json` is this test's only real
+            # synchronization point (a blocking round trip through the portal), so it has to
+            # come before, never after, any assertion reading `room.seat_seq`/`room.ring`
+            # straight off the object -- see this module's own docstring.
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
             assert reconnected["d"] == {"seat": 1, "status": "connected"}
+            assert room.seat_seq[1] == seq_before + 1
+            assert len(room.ring[1]) == ring_len_before + 1
 
             # the connection is genuinely live again: a fresh broadcast reaches it with the
             # very next seq, no gap.
@@ -386,6 +420,19 @@ def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
         with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
 
+            # seat_1_last_seq (captured from the claim_offer, before teardown) is now behind
+            # the 3 disconnect broadcasts closing ws1/ws2/ws3 together produced -- replay picks
+            # those up first, exactly like the non-claim-window reconnect tests above. Draining
+            # them here is also this test's synchronization point, and deliberately comes
+            # *before* any assertion against Room's own state below: `send_json` only enqueues
+            # `hello` onto the ASGI app's anyio stream for the server's own event-loop thread (a
+            # separate OS thread under `TestClient`) to process, with no guarantee it has
+            # actually run `resume()` -- which does the real rearm -- by the time this thread's
+            # next line executes. `resume()` itself has no `await` anywhere in it, so once any
+            # one frame it produced has actually been received here, the rearm is guaranteed
+            # done too -- see this module's own docstring.
+            _drain_teardown_disconnects(ws1b)
+
             # only seat 1's timer entry moved -- a new heap id, a later deadline.
             assert room._active_seat_timer[(window_id, 1)] != original_timer1
             new_deadline1 = room._claim_deadline_ms[(window_id, 1)]
@@ -394,11 +441,6 @@ def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
             # seat 2's own entry is completely undisturbed.
             assert room._active_seat_timer[(window_id, 2)] == original_timer2
             assert room._claim_deadline_ms[(window_id, 2)] == original_deadline2
-
-            # seat_1_last_seq (captured from the claim_offer, before teardown) is now behind
-            # the 3 disconnect broadcasts closing ws1/ws2/ws3 together produced -- replay picks
-            # those up first, exactly like the non-claim-window reconnect tests above.
-            _drain_teardown_disconnects(ws1b)
 
             # the reconnect announcement (`resume()`'s `announce_reconnect`) comes next, then
             # the fresh claim_offer `rearmed` triggers.
