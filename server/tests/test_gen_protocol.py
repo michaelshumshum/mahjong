@@ -1,7 +1,13 @@
 import re
 
 from app.protocol import AnyMessage, ClientMessage, ServerMessage
-from tools.gen_protocol import _union_members, render_assert_never_fixture, render_ts, ts_name
+from tools.gen_protocol import (
+    _union_members,
+    render_assert_never_fixture,
+    render_ts,
+    ts_name,
+    ts_type,
+)
 
 
 def _kwargs() -> dict:
@@ -54,6 +60,13 @@ def test_literal_t_field_is_never_optional() -> None:
     for cls in _union_members(AnyMessage):
         t_value = cls.model_fields["t"].default
         assert f"\tt: '{t_value}';" in ts
+
+
+def test_list_of_optional_union_is_parenthesized() -> None:
+    """`[]` binds tighter than `|` in TS, so `list[str | None]` must render as
+    `(string | null)[]`, never the silently-wrong `string | null[]` (`state_sync.names`, M5) --
+    regression for the bug this field's codegen found."""
+    assert ts_type(list[str | None]) == "(string | null)[]"
 
 
 def test_assert_never_fixture_covers_every_server_event() -> None:
