@@ -96,7 +96,7 @@ test('lobby create room shows a mock invite code', async ({ page }) => {
 test('lobby join room navigates to the table route with the entered code', async ({ page }) => {
 	await page.goto('/lobby');
 	await page.waitForLoadState('networkidle');
-	await page.getByLabel('Invite code').fill('abc123');
+	await page.getByPlaceholder('ABC123').fill('ABC123');
 	await page.getByRole('button', { name: 'Join room' }).click();
 
 	await expect(page).toHaveURL('/table/ABC123');
