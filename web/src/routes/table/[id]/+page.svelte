@@ -1062,8 +1062,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
-		min-height: 100dvh;
+		height: 100dvh;
 		padding: var(--space-3);
+		overflow: hidden;
 	}
 
 	// pre-game states (connecting / join / waiting-for-players, live mode only) -- same
@@ -1318,6 +1319,7 @@
 
 	.table-tilt {
 		flex: 1;
+		min-height: 0;
 		@include layout.table-perspective;
 	}
 
@@ -1338,6 +1340,10 @@
 
 		@include layout.phone-only {
 			transform: none; // tilt reads as decoration, not worth the layout cost on phone widths
+			// `preserve-3d` alone (independent of `transform: none` above) still establishes a
+			// containing block for `position: fixed` descendants -- `.seat-region--self` needs
+			// the real viewport as its containing block on phone, so drop this here too.
+			transform-style: flat;
 		}
 	}
 
@@ -1346,6 +1352,7 @@
 		flex-direction: column;
 		gap: var(--space-2);
 		min-width: 0;
+		min-height: 0;
 	}
 
 	.seat-region--across {
@@ -1722,6 +1729,14 @@
 			max-width: 100%;
 		}
 
+		// `.table-tilt`'s `perspective` (unconditional, for the desktop rotateX) establishes a
+		// containing block for descendant `position: fixed` elements same as `transform` does --
+		// left in place, `.seat-region--self` below pins to the tilted box's own edge instead of
+		// the viewport's. Drop it here so "pinned to the true screen bottom" means what it says.
+		.table-tilt {
+			perspective: none;
+		}
+
 		.seat-region--self {
 			position: fixed;
 			inset-inline: 0;
@@ -1738,6 +1753,13 @@
 
 		.hand-tile {
 			height: clamp(44px, 12vw, 60px);
+		}
+
+		// a full hand at this tile size is wider than a phone screen, and `.seat-region--self` is
+		// `position: fixed` (no scrollable ancestor) -- without this, tiles past the edge are
+		// simply unreachable rather than scrolled-to, same as `.discard-pool` above.
+		.hand-row {
+			overflow-x: auto;
 		}
 	}
 </style>
