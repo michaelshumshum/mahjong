@@ -123,6 +123,43 @@ async def test_mid_hand_room_gets_server_shutdown_and_finishes_within_grace_wind
     assert room.state.hand_no == 2  # exhaustive draw -> next hand dealt: a real boundary
 
 
+async def test_wait_for_shutdown_boundary_waits_out_an_in_flight_game_over_persist() -> None:
+    """Regression for the race `Room.wait_for_shutdown_boundary`'s own docstring now documents:
+    `begin_shutdown` only ever calls this on a room whose background task is still running, so a
+    room already at `Phase.GAME_OVER` here is, by construction, one whose final `process_one()`
+    tick is still suspended inside `_persist_game_record()` -- `state.phase` and `self._persisted`
+    both flip synchronously, before that write even starts. Two bugs used to lose this race:
+    fast-pathing on `state.phase` alone returned instantly, before the write started; and once
+    that was fixed, falling through to the normal `timeout`-bounded wait still lost, since
+    `server/tests/conftest.py` pins `grace_seconds` to `0` for the whole test session and
+    `asyncio.wait_for` with a non-positive timeout never gives the awaited event a single
+    scheduling turn. Both are exercised directly (no real DB, no full hand) by rigging exactly
+    the state `process_one()`'s own tail would have produced mid-persist."""
+    registry = RoomRegistry()
+    room = registry.get_or_create(
+        "shutdown-persist-race", DEFAULT_RULESET, seed=6, require_ready=False
+    )
+    room.state = dataclasses.replace(room.state, phase=Phase.GAME_OVER)
+    room._persisted = True  # process_one()'s tail sets this before the write starts, not after
+
+    async def _finish_persist_soon() -> None:
+        await asyncio.sleep(0.05)
+        room._game_over_persisted = True
+        if room._shutdown_boundary is not None:
+            room._shutdown_boundary.set()
+
+    finisher = asyncio.create_task(_finish_persist_soon())
+
+    # grace_seconds=0, exactly this codebase's session-wide test pin -- must not abandon a
+    # persist that's genuinely about to finish just because there's no grace window to spare.
+    reached = await asyncio.wait_for(room.wait_for_shutdown_boundary(0.0), timeout=1.0)
+    assert reached is True
+    # the load-bearing assertion: proves this genuinely waited for the write, not just for the
+    # phase flip (bug 1) or for `timeout=0` to elapse regardless (bug 2).
+    assert room._game_over_persisted is True
+    await finisher
+
+
 async def test_room_never_reaching_boundary_is_abandoned_not_hung(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

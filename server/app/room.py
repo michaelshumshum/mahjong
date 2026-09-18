@@ -63,7 +63,14 @@ identity that exists before `hello`'s guest `name` field ships (M5, 00-architect
 `app/registry.py`'s `RoomRegistry.begin_shutdown`'s per-room half of the graceful-drain sequence
 (§8.1) -- the boundary-reached event is only ever set *after* an in-flight `GAME_OVER` persist
 finishes, never before, so a drain can't tear down a room (or the process dispose its DB engine)
-while that room's own final write is still in flight.
+while that room's own final write is still in flight. **This was violated until a real bug fix**:
+`wait_for_shutdown_boundary`'s own fast path used to return `True` the instant
+`self.state.phase == Phase.GAME_OVER`, which `_apply` flips *before* `process_one()`'s tail even
+starts the persist -- a drain landing in that window (trivial with `SHUTDOWN_GRACE_SECONDS=0`,
+but reachable in production at any grace window if `SIGTERM` lands in the same instant a hand
+ends) saw "already done" and let `app/main.py`'s `lifespan` dispose the DB engine while
+`_persist_game_record` was still awaiting its own write, silently losing the `GameRecord`. The
+fast path now waits on `_game_over_persisted`, set only once that write has actually returned.
 """
 
 from __future__ import annotations
@@ -339,6 +346,8 @@ class Room:
         self.actions: list[Action] = []
         self._session_factory = session_factory
         self._persisted = False  # save_game_record fires at most once, even if driven manually
+        self._game_over_persisted = False  # see wait_for_shutdown_boundary -- True only once
+        # the GAME_OVER persist attempt (a real write, or the no-session_factory no-op) returns
         self._boundary_this_tick = False  # reset each process_one() tick, set inside _apply
         self._shutdown_boundary: asyncio.Event | None = None  # see wait_for_shutdown_boundary
         self.seat_seq: list[int] = [0, 0, 0, 0]  # per-seat outbound seq: dense, gapless (D1)
@@ -692,6 +701,7 @@ class Room:
         if self.state.phase == Phase.GAME_OVER and not self._persisted:
             self._persisted = True
             await self._persist_game_record()
+            self._game_over_persisted = True
         if self._boundary_this_tick and self._shutdown_boundary is not None:
             self._shutdown_boundary.set()
 
@@ -1216,19 +1226,50 @@ class Room:
         (`app/registry.py`'s `RoomRegistry.begin_shutdown`) abandons this room, same as a crash,
         but warned.
 
-        Already-finished rooms return `True` immediately with no event/wait at all -- nothing
-        left to abandon. Otherwise a *fresh* `asyncio.Event` is installed for the duration of
-        this call (not a long-lived one reused across calls): reusing one risks a stale `.set()`
-        from a boundary that happened *before* this particular drain started being mistaken for
-        "the boundary this drain is waiting for." See `process_one()`'s own docstring for why
-        the GAME_OVER case's signal is guaranteed to fire only after that game's own
-        `save_game_record` write has actually finished, not before.
+        A room whose GAME_OVER persist has actually *finished* (`_game_over_persisted`) returns
+        `True` immediately with no event/wait at all -- nothing left to abandon.
+
+        **The in-between state is the one two real bugs lived in.** `begin_shutdown` only ever
+        calls this on a room whose background task is still running (`RoomRegistry.is_running`),
+        and a still-running room already at `Phase.GAME_OVER` is, by construction, one whose
+        final `process_one()` tick is suspended inside `await self._persist_game_record()` --
+        `state.phase` and `self._persisted` both flip synchronously, with no `await` between
+        them and the persist call, so no other coroutine on this event loop can ever observe
+        `state.phase == Phase.GAME_OVER` with `_game_over_persisted` still `False` except by
+        genuinely racing that in-flight write.
+
+        Bug 1 (fixed): this method used to fast-path on `self.state.phase == Phase.GAME_OVER`
+        directly, before `_game_over_persisted` existed. That returned `True` the instant the
+        phase flipped, well before the write it was supposed to be waiting for even started,
+        letting `app/main.py`'s `lifespan` dispose the DB engine out from under the still-in-
+        flight `save_game_record`.
+
+        Bug 2 (also fixed, and the one that made bug 1's fix alone insufficient): once landed in
+        that in-between state, this fell through to the normal `asyncio.wait_for(..., timeout)`
+        path -- correct for "let the current hand finish," wrong here, because
+        `server/tests/conftest.py` pins `timeout=0` for the entire test session and
+        `asyncio.wait_for` with a non-positive timeout (`asyncio/tasks.py`) cancels immediately
+        without giving the awaited event a single scheduling turn, regardless of how close it is
+        to firing. So a drain landing mid-persist still reached `engine.dispose()` right after --
+        now via the "grace window elapsed, abandoning" branch instead of the old fast path, same
+        data loss, plus a spurious warning for a room that was, in fact, finishing normally. The
+        fix: waiting out an *already-in-flight* GAME_OVER persist is a durability guarantee, not
+        the boundable "let the hand finish" allowance `timeout` exists for -- there is no further
+        hand for a timeout to bound here, so that wait ignores the caller's `timeout` entirely.
+
+        A *fresh* `asyncio.Event` is installed for the duration of this call either way (not a
+        long-lived one reused across calls): reusing one risks a stale `.set()` from a boundary
+        that happened *before* this particular drain started being mistaken for "the boundary
+        this drain is waiting for."
         """
-        if self.state.phase == Phase.GAME_OVER:
+        if self._game_over_persisted:
             return True
+        already_over = self.state.phase == Phase.GAME_OVER
         self._shutdown_boundary = asyncio.Event()
         try:
-            await asyncio.wait_for(self._shutdown_boundary.wait(), timeout=timeout)
+            await asyncio.wait_for(
+                self._shutdown_boundary.wait(), timeout=None if already_over else timeout
+            )
             return True
         except TimeoutError:
             return False
