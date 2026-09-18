@@ -161,6 +161,66 @@ test('four real seats join, ready, and play real discards/claims through the liv
 	}
 });
 
+test('practice mode is reachable from the lobby and reaches real gameplay with bot seats marked', async () => {
+	// M4.5 (docs/05-roadmap.md): the lobby's "Play vs bots" button generates its own room id and
+	// tags the table route `?practice=1`, which `/table/[id]` translates into `&practice=true` on
+	// the real WS URL -- server-side, that binds seats 1-3 to real `FaanBot`s at room creation
+	// (server/app/ws.py's `ws_endpoint`/`app/room.py`'s `Room.__init__(practice=...)`), before
+	// this test's one human seat ever joins. Proves the whole chain end to end: lobby button ->
+	// route -> practice WS param -> bot-filled table -> the seats actually render the `bot` badge
+	// this sub-task added to the table scene.
+	test.setTimeout(60_000);
+	const browser = await chromium.launch();
+	try {
+		const page = await browser.newPage();
+		await page.goto(`${BASE}/lobby`, { waitUntil: 'networkidle' });
+		await page.getByRole('button', { name: 'Play vs bots' }).click();
+
+		await expect(page).toHaveURL(/\/table\/[A-Z0-9]+\?practice=1$/);
+
+		// a practice table's three bot seats are already bound and auto-ready the instant the
+		// room exists (docs/05-roadmap.md M4.5) -- the human's own `join`/`ready` is the only real
+		// gate left. Observed running against a real backend: this clears the "waiting for the
+		// rest of the table" screen so fast (the room's own `ready` gate opens the instant this
+		// seat's `ready` lands) that the intermediate "You're seated as" text often never renders
+		// at all before `tableReady` flips -- so this only asserts the eventual, stable state
+		// (the table scene itself), not the transient one in between.
+		await page.getByRole('button', { name: 'Sit down' }).click();
+		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
+
+		// three opponent seats, all bot-controlled -- the visual treatment this sub-task added.
+		await expect(page.locator('.bot-badge')).toHaveCount(3);
+		await expect(page.locator('.room-label')).toContainText('practice vs FaanBot');
+
+		// hand 1's dealer is fixed at room construction and can be this human seat -- unlike the
+		// four-real-seats test above, there's only one human here, so nothing discards on this
+		// seat's own behalf until it's actually clicked. Tsumogiri whichever discard is offered
+		// and pass any claim window, same policy as `server/tests/test_practice_mode_e2e.py`'s
+		// `_play_practice_game` -- this is what actually lets the three real bots' own turns run
+		// in between, proving `_poke_bots()` drives them, not just that the human's own clicks
+		// produced discards.
+		let sawOpponentDiscard = false;
+		for (let round = 0; round < 30 && !sawOpponentDiscard; round++) {
+			const pass = page.locator('.claim-btn--pass');
+			if (await pass.count()) {
+				await pass.click();
+			} else {
+				const btn = page.locator('.hand-tile-btn').first();
+				if (await btn.count()) await btn.click();
+			}
+			await page.waitForTimeout(400);
+			// any discard tile outside "Your discards" is a real bot-produced discard.
+			const opponentDiscards = await page
+				.locator('.discard-pool:not(.discard-pool--self) .discard-tile')
+				.count();
+			if (opponentDiscards > 0) sawOpponentDiscard = true;
+		}
+		expect(sawOpponentDiscard).toBe(true);
+	} finally {
+		await browser.close();
+	}
+});
+
 test('completing more than one real hand accumulates multi-hand history in the ScoreSheet', async () => {
 	// HK ruleset has no dead wall (mahjong_core/config.py's `wall_reserve = 0`) -- absent an
 	// earlier win, a hand runs until the wall is drawn dry, ~80-something real discards. Two

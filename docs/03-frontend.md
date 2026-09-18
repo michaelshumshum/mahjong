@@ -425,6 +425,31 @@ cannot exist before `Room.started`). Good enough for v1; a real `started`/seat-f
 wire would be a cleaner fix, filed as a gap here rather than a roadmap doc since it's small enough
 to fold into whoever next touches `state_sync`'s payload.
 
+**Practice mode entry point (M4.5, `docs/05-roadmap.md`).** `/lobby` has a third panel, "Practice,"
+alongside create/join: its "Play vs bots" button generates a room id the same way "Create room"
+does and navigates straight to `/table/<id>?practice=1` — no invite code to share, so it skips the
+create/copy step entirely. `?practice=1` is this route's own query param, unrelated in spelling to
+the wire's own `&practice=true`; `/table/[id]`'s live-connect effect appends the latter to the
+`MahjongSocket` URL when the former is present, which is what actually binds seats 1-3 to real
+`FaanBot`s at room creation server-side (`server/app/ws.py`'s `ws_endpoint`, `app/room.py`'s
+`Room.__init__(practice=...)`). The human's own `join`/`ready` — the existing "Sit down" flow — is
+unchanged; a practice table's bot seats are already bound and auto-ready the instant the room
+exists, so the "waiting for the rest of the table" screen should almost never show for long, though
+the client still goes through it structurally since there's still no real "has this room started"
+signal (below). The room label in the live table's dev toolbar appends "· practice vs FaanBot" when
+this flag is set, matching this milestone's "don't invent a tier selector" scope — one fixed
+default tier, named plainly, not a difficulty picker.
+
+**Bot seat badge.** `MockSeatState` grew an optional `status?: string` field (`mock-game-state.ts`)
+that `live-view.ts`'s `viewFromClientState` populates from `ClientGameState.seatStatus[seat]` —
+mock fixtures never set it, so this is a no-op there. `+page.svelte`'s opponent seat header renders
+a small `.bot-badge` chip ("Bot") next to the existing dealer/turn badges whenever `status ===
+'bot'`, styled as a quiet persistent-identity chip (bordered, muted text) rather than borrowing
+`--color-accent` the way the transient dealer/turn badges do — a bot seat's status doesn't change
+mid-hand the way whose turn it is does. Other `seat_status` values (`connected`/`disconnected`/
+`autoplay`/`empty`) have no visual treatment yet; this sub-task only covers `bot`, the one value
+that just gained real backend meaning.
+
 **Two real bugs the live path surfaced that the mock scenarios never could** (mock fixtures hardcode
 values the real wire never actually sends this way):
 

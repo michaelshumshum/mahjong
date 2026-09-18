@@ -56,6 +56,13 @@
 	let isMock = $derived(page.url.searchParams.has('mock'));
 	let roomId = $derived(page.params.id ?? '');
 
+	// `?practice=1` (this route's own query param, set by the lobby's "Play vs bots" button --
+	// spelling is unrelated to the wire's own `&practice=true`) opens the live socket in M4.5
+	// practice mode: seats 1-3 are bot-bound at room *creation* (server/app/ws.py's
+	// `ws_endpoint`/`app/room.py`'s `Room.__init__(practice=...)`), so the human's own `join`
+	// (still a real intent, same "Sit down" flow below) is the only one this page ever sends.
+	let isPractice = $derived(page.url.searchParams.has('practice'));
+
 	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket
 	// -- these states depend on `liveStore.connection`/`.state.seat` transitions that a static
 	// `MOCK_SCENARIOS` fixture (which always renders a fully-seated, already-dealt table, see
@@ -123,7 +130,10 @@
 
 	$effect(() => {
 		if (isMock || pregamePreview !== null) return;
-		const socket = new MahjongSocket(`${defaultWsUrl()}?room=${encodeURIComponent(roomId)}`);
+		const practiceParam = isPractice ? '&practice=true' : '';
+		const socket = new MahjongSocket(
+			`${defaultWsUrl()}?room=${encodeURIComponent(roomId)}${practiceParam}`
+		);
 		const store = new GameStore(socket);
 		handEverStarted = false;
 		readySent = false;
@@ -600,6 +610,9 @@
 			{#if seat.seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
 			{#if seat.seat === gameState.turn}<span class="turn-badge" title="Current turn">turn</span
 				>{/if}
+			{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat (FaanBot)"
+					>Bot</span
+				>{/if}
 			<span class="seat-score">{seat.score}</span>
 		</header>
 
@@ -665,7 +678,10 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="room-label">Room <strong>{roomId}</strong> · seat {liveStore?.state.seat}</p>
+				<p class="room-label">
+					Room <strong>{roomId}</strong> · seat {liveStore?.state.seat}{#if isPractice}
+						· practice vs FaanBot{/if}
+				</p>
 			{/if}
 
 			<div class="chrome-toggles">
@@ -1330,6 +1346,24 @@
 		color: var(--color-accent);
 		font-size: var(--font-size-sm);
 		text-transform: uppercase;
+	}
+
+	// bot-controlled seat (M4.5 practice mode) -- a persistent identity marker, not a transient
+	// state like dealer/turn, so it reads as a quiet chip rather than borrowing --color-accent.
+	.bot-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 1.25rem;
+		padding: 0 0.4rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface-raised);
+		color: var(--color-text-muted);
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
 
 	.seat-score {

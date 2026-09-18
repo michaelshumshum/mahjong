@@ -50,6 +50,16 @@
 		if (!joinCodeValid) return;
 		goto(`/table/${joinCode.trim().toUpperCase()}`);
 	}
+
+	// practice mode (docs/05-roadmap.md M4.5): a solo table with seats 1-3 bot-bound from room
+	// creation (`?practice=true` on the WS endpoint -- server/app/ws.py's `ws_endpoint`). No
+	// invite code to share, so this skips the create/copy step entirely -- generate a room id the
+	// same way "create room" does and go straight to the table, tagged so `/table/[id]` knows to
+	// connect in practice mode. `?practice=1` is this route's own query param, translated into
+	// `&practice=true` on the actual WS URL by `/table/[id]` -- the two spellings are unrelated.
+	function startPractice(): void {
+		goto(`/table/${generateMockCode()}?practice=1`);
+	}
 </script>
 
 <h1>Lobby</h1>
@@ -108,6 +118,12 @@
 			entered, it doesn't check the code is real or connect you to other players.
 		</p>
 	</section>
+
+	<section class="panel panel--practice">
+		<h2>Practice</h2>
+		<p class="hint">Play solo against three bots. No one else needs a code for this one.</p>
+		<button type="button" class="primary" onclick={startPractice}>Play vs bots</button>
+	</section>
 </div>
 
 <style lang="scss">
@@ -127,6 +143,21 @@
 		@include layout.tablet-up {
 			grid-template-columns: 1fr 1fr;
 			align-items: start;
+		}
+	}
+
+	// full-width row of its own, below create/join — a third, unrelated way in rather than a
+	// third tile competing for the same two-column grid create/join already own. The CTA button
+	// still caps at the same width the other panels' buttons read at, so gaining the row's full
+	// width doesn't turn it into a banner.
+	.panel--practice {
+		@include layout.tablet-up {
+			grid-column: 1 / -1;
+		}
+
+		button.primary {
+			align-self: flex-start;
+			min-width: 12rem;
 		}
 	}
 

@@ -155,7 +155,8 @@ export function viewFromClientState(state: ClientGameState): LiveTableView | nul
 				.filter((id): id is number => id !== undefined)
 				.map(tileIdToCode),
 			flowers: state.flowers[seat] as TileCode[],
-			score: state.scores[seat]
+			score: state.scores[seat],
+			status: state.seatStatus[seat]
 		};
 	}) as unknown as Seats;
 

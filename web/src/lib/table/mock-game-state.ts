@@ -51,6 +51,11 @@ export interface MockSeatState {
 	discards: TileCode[];
 	flowers: TileCode[];
 	score: number;
+	// wire `seat_status` (docs/00-architecture.md §5's `SeatView.seat_status`) -- optional since
+	// no mock fixture sets it (mock scenarios have no bot concept); live-view.ts populates it
+	// from `ClientGameState.seatStatus` for the one value the table scene renders today: `"bot"`
+	// (M4.5 practice mode).
+	status?: string;
 }
 
 export type Seats = [MockSeatState, MockSeatState, MockSeatState, MockSeatState];
