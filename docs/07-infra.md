@@ -79,6 +79,10 @@ the shipped image is untouched. Two consequences worth knowing:
   or `make test-web` runs against the old base's binaries.
 - `make test-web` passes `CI=true`: vitest browser mode and Playwright both default to *headed*
   off-CI, and the container has no X server.
+- The browsers also live in a `playwright-browsers` volume mounted at `/root/.cache/ms-playwright`,
+  seeded from the image on first use. Baking alone already means no per-run download; the volume
+  covers the rebuild case, where a lockfile change invalidates the install layer and would
+  otherwise re-fetch ~170MB of chromium.
 
 `ml` mirrors `prod`'s non-root setup — it just installs from the `ml` extra instead of base
 deps. `trainer`/`arena` don't bind-mount source over the image: doing so would shadow the

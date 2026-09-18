@@ -62,6 +62,7 @@ services:
       - ./web:/app/web
       - ./shared:/shared
       - web-modules:/app/web/node_modules   # keeps the container's node_modules off the host mount
+      - playwright-browsers:/root/.cache/ms-playwright  # seeded from the image; survives a rebuild
     depends_on: [api]
 
   # torch lives in this image, not in api
@@ -100,3 +101,4 @@ volumes:
   pgdata:
   server-venv:
   web-modules:
+  playwright-browsers:
