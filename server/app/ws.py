@@ -10,7 +10,10 @@ former bare `dict[str, Room]`, which its own docstring already flagged as a stan
 `RoomRegistry` with matchmaking is a later sub-task"). Still one process-wide, module-level
 singleton (`_registry` below) -- `RoomRegistry` itself stays an in-process dict per
 docs/00-architecture.md §6, not a new abstraction layer. One `RuleSet` (`DEFAULT_RULESET`) for
-every room -- `?seed=` exists only so tests can pin a room's deal.
+every room -- `?seed=` exists only so tests can pin a room's deal. `?practice=true` (M4.5,
+docs/05-roadmap.md) binds seats 1-3 to bots at room creation, before any human ever joins --
+see `app/room.py`'s `Room.__init__(practice=...)`/`_bind_bot_seat`; only meaningful the first
+time a given `room` id is created (`RoomRegistry.get_or_create`'s own note).
 
 **DB wiring + graceful shutdown (a later sub-task).** `_registry` is no longer a fixed
 module-import-time singleton: `reset_registry()` swaps in a fresh `RoomRegistry` (optionally
@@ -104,8 +107,10 @@ def reset_registry(
     return _registry
 
 
-def _get_or_create_room(room_id: str, seed: int | None) -> Room:
-    return _registry.get_or_create(room_id, DEFAULT_RULESET, seed=seed, require_ready=True)
+def _get_or_create_room(room_id: str, seed: int | None, practice: bool) -> Room:
+    return _registry.get_or_create(
+        room_id, DEFAULT_RULESET, seed=seed, require_ready=True, practice=practice
+    )
 
 
 class _IdempotentMessage(Protocol):
@@ -260,6 +265,14 @@ class Session:
                 "error", {"code": "no_such_seat", "message": f"seat {msg.d.seat} is not bound"}
             )
             return
+        except SeatTakenError:
+            # M4.5 practice mode: seat is bound to a bot from room creation, never a human --
+            # there's no prior human occupant for this hello{seat} to reclaim (Room.reconnect's
+            # own docstring). Same wire error `join` gives a seat someone else already holds.
+            self._send_local(
+                "error", {"code": "seat_taken", "message": f"seat {msg.d.seat} is a bot seat"}
+            )
+            return
         self.seat = msg.d.seat
         self.room.resume(msg.d.seat, msg.d.last_seq, announce_reconnect=was_disconnected)
 
@@ -402,7 +415,12 @@ class Session:
 
 
 @router.websocket("/ws")
-async def ws_endpoint(websocket: WebSocket, room: str = "default", seed: int | None = None) -> None:
+async def ws_endpoint(
+    websocket: WebSocket,
+    room: str = "default",
+    seed: int | None = None,
+    practice: bool = False,
+) -> None:
     if _registry.draining:
         # docs/00-architecture.md §8.1 step 1: stop accepting new connections (reconnects
         # included -- a reconnecting client's own backoff, 02-protocol.md §8, just retries after
@@ -412,7 +430,7 @@ async def ws_endpoint(websocket: WebSocket, room: str = "default", seed: int | N
     # M0-era stub still applies: no ticket/auth yet (docs/00-architecture.md §2.1, M5 scope) --
     # accept every other connection unconditionally.
     await websocket.accept()
-    room_obj = _get_or_create_room(room, seed)
+    room_obj = _get_or_create_room(room, seed, practice)
     session = Session(websocket, room_obj)
     writer_task = asyncio.create_task(session.writer())
     try:

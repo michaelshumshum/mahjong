@@ -17,14 +17,20 @@ per-seat grace timer through the *same* `TimerHeap`/`self.deadlines` claim timer
 (shared id space, `_timer_seat` vs. `_disconnect_timer_seat` tell them apart on pop) rather than
 a second timer mechanism; on expiry the seat flips to `autoplay`. `_poke_bots()`, called at the
 tail of every `process_one()` tick, submits a decision to a `ProcessPoolExecutor` (D12) for
-every `autoplay` seat that currently has one (its own turn, or a live claim offer), tagged with
-`BotJobTag` (`(kind, key, state_version)`); the result re-enters through `self.inbox` as a
-`BotResult` carrying a bare action id, decoded back into a real `Action` here (against this
+every `autoplay` **or `bot`** seat that currently has one (its own turn, or a live claim offer),
+tagged with `BotJobTag` (`(kind, key, state_version)`); the result re-enters through `self.inbox`
+as a `BotResult` carrying a bare action id, decoded back into a real `Action` here (against this
 process's own `GameState` -- see `bots/worker.py`'s module docstring for why the worker can't do
 that itself), and is dropped if the tag no longer matches `_pending_bot[seat]` by the time it
 lands -- the window closed, the turn moved on, or the seat reconnected. `_bot_tier` (`Room.
 __init__`) picks the real tier (`T0`/`T1`/`T2`, default `T2`/`FaanBot`) every such job runs. See
 `mark_disconnected`/`_poke_bots`/`_handle_bot_result`.
+
+**Bot-filled seats from room creation (M4.5 practice mode).** `practice=True` (`Room.__init__`)
+binds seats 1-3 to `bot_tier` bots immediately, before seat 0's human ever `join`s -- a `bot`
+`SeatBinding.status`, distinct from `autoplay` (a seat that *was* human and lost its connection)
+but driven through the exact same `_poke_bots`/`BotJobTag`/`ProcessPoolExecutor` machinery, not
+a parallel code path. See `SeatBinding`'s docstring and `_bind_bot_seat`.
 
 **Early exit is already inside `reduce()`.** `mahjong_core.engine._apply_claim_response`
 (landed in M2's engine-integration sub-task) calls `claims.can_close_early`/`resolve_claims`
@@ -118,14 +124,14 @@ __all__ = [
     "WireSeatStatus",
 ]
 
-SeatStatus = Literal["connected", "disconnected", "autoplay"]
+SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 
-# Wire-level vocabulary for `_seat_status_tuple()`/`seat_view()`'s `seat_status` (also allows
-# `bot`, unused here -- see `SeatBinding.status`'s docstring). `empty` has no `SeatBinding`
-# counterpart: a binding only exists once a seat *is* bound, so "nobody has ever joined this
-# seat" isn't a `SeatBinding.status` value, only something `_seat_status_tuple()` reports for a
-# `None` slot in `Room.seat_bindings`.
-WireSeatStatus = Literal["connected", "disconnected", "autoplay", "empty"]
+# Wire-level vocabulary for `_seat_status_tuple()`/`seat_view()`'s `seat_status`. `empty` has no
+# `SeatBinding` counterpart: a binding only exists once a seat *is* bound, so "nobody has ever
+# joined this seat" isn't a `SeatBinding.status` value, only something `_seat_status_tuple()`
+# reports for a `None` slot in `Room.seat_bindings`. `bot` *is* a real `SeatBinding.status` now
+# (M4.5 practice mode, `_bind_bot_seat`) -- see `SeatBinding`'s docstring.
+WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
 
@@ -189,14 +195,23 @@ class SeatBinding:
 
     `send` is the live connection's push callback (`seq, wire -> None`); `ready`/`no_calls`/
     `auto_pass_chow` are the lobby/pre-arm state 02-protocol.md §2 describes. `status`
-    (`connected`/`disconnected`/`autoplay` -- `SeatView`'s wire `seat_status` also allows `bot`,
-    unused here: every seat this `Room` ever binds started as a human `join`, so there's no seat
-    that was *never* a human to label `bot` instead of `autoplay`; and `empty`, which can never
-    apply to a `SeatBinding` either -- a binding only exists once a seat *is* bound, so "nobody
-    has ever joined this seat" is reported by `_seat_status_tuple()` for a `None` slot in
-    `Room.seat_bindings`, never as a value of this field) transitions via
-    `mark_disconnected`/`reconnect`/the disconnect-grace timer (M3 sub-task 6) -- see
+    (`connected`/`disconnected`/`autoplay`/`bot` -- `empty` can never apply to a `SeatBinding`:
+    a binding only exists once a seat *is* bound, so "nobody has ever joined this seat" is
+    reported by `_seat_status_tuple()` for a `None` slot in `Room.seat_bindings`, never as a
+    value of this field) transitions via `mark_disconnected`/`reconnect`/the disconnect-grace
+    timer (M3 sub-task 6) for a seat that started as a human `join` -- see
     `Room.mark_disconnected`.
+
+    **`bot` (M4.5 practice mode, `_bind_bot_seat`) is the other way a `SeatBinding` comes to
+    exist**: a seat bound to a bot from room construction, never a human `join` at all. It
+    reuses this exact dataclass -- a real `send` no-op callback, `ready=True` (a bot doesn't
+    wait to click ready, so `require_ready` gating still starts the hand correctly once every
+    *human* seat has readied) -- rather than a parallel tracking structure, so `_poke_bots()`
+    drives it through the identical `BotJobTag`/`ProcessPoolExecutor` path an `autoplay` seat
+    already uses (see `_poke_bots`). Unlike `autoplay`, `bot` is never reached by
+    `mark_disconnected` (no session ever binds this seat, so `app/ws.py`'s disconnect signal
+    never fires for it) and `reconnect` refuses to hijack it (raises `SeatTakenError`, same as
+    `join` finding the seat already taken) -- there is no human occupant to hand it back to.
     """
 
     session_id: str
@@ -337,10 +352,14 @@ class Room:
     docstring for disconnect/bot-handover (`mark_disconnected`/`_poke_bots`, M3 sub-task 6).
 
     `bot_tier` (`bots.worker.BOT_TIERS`, default `bots.worker.DEFAULT_BOT_TIER` = `T2`/`FaanBot`,
-    per docs/05-roadmap.md M4.5) picks which real tier answers for every `autoplay` seat this
-    room's own disconnect-handover ever creates. Configurable per room, not hardcoded: `T0`/`T1`
-    stay fully selectable by passing a different value, so the arena/tests that assume T0's
-    uniform-random disconnect-handover behavior aren't forced onto T2.
+    per docs/05-roadmap.md M4.5) picks which real tier answers for *every* bot-driven seat this
+    room ever has -- disconnect-handover autoplay and M4.5 practice-mode bot seats alike, both
+    routed through the same `_poke_bots` path (see `SeatBinding`'s docstring). One tier per room,
+    not per seat: nothing in this sub-task's scope (a fixed-difficulty practice table) needs a
+    mixed-tier room, and `T0`/`T1` stay fully selectable by passing a different value, so the
+    arena/tests that assume T0's uniform-random disconnect-handover behavior aren't forced onto
+    T2. `practice=True` binds seats 1-3 to `bot_tier` bots immediately at construction (before
+    seat 0's human ever joins) -- see `_bind_bot_seat`.
     """
 
     def __init__(
@@ -353,6 +372,7 @@ class Room:
         bot_pool: Executor | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         bot_tier: str = DEFAULT_BOT_TIER,
+        practice: bool = False,
     ) -> None:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
@@ -404,6 +424,14 @@ class Room:
         self.started = not require_ready
         self.seat_bindings: list[SeatBinding | None] = [None, None, None, None]
 
+        # M4.5 practice mode (docs/05-roadmap.md): seat 0 is left open for the human `join`;
+        # seats 1-3 are bound to `self._bot_tier` bots immediately, before anyone ever connects
+        # -- see `_bind_bot_seat`'s docstring for why this is cleanest done here rather than on
+        # a later "still empty after N seconds" trigger.
+        if practice:
+            for seat in range(1, 4):
+                self._bind_bot_seat(seat)
+
     def submit(self, seat: int, action: Action) -> None:
         """Push one command onto the inbox. This is app/ws.py's envelope-parsing landing spot
         (sub-task 4) -- also the test-facing entry point (`tests/test_room.py`)."""
@@ -439,6 +467,26 @@ class Room:
         self._broadcast_wire({"t": "seat_state", "seat": chosen, "status": "connected"})
         self.publish_to_seat(chosen, self.state_sync_wire(chosen))
         return chosen
+
+    def _bind_bot_seat(self, seat: int) -> None:
+        """Bind `seat` to a bot from room construction (M4.5 practice mode), not a human `join`
+        -- called only from `__init__`, before any real connection exists, so there is nothing
+        to broadcast yet (the first seat that actually joins gets a correct `seat_status` for
+        this seat -- `bot` -- in its own `state_sync`, same as any other already-bound seat).
+
+        A real `SeatBinding` (see its own docstring's "`bot`" note) rather than a parallel
+        tracking structure: `send` is a no-op (no live socket to push to -- `publish_to_seat`'s
+        ring-buffer bookkeeping is harmless busywork against a seat nobody will ever replay
+        from), `ready=True` (a bot doesn't wait to click ready), `session_id` is a synthetic,
+        never-matched value (`mark_disconnected`'s session-id guard means a stray disconnect
+        signal could never affect this binding even if one somehow arrived for this seat
+        number, which `app/ws.py` never lets happen -- see `reconnect`'s bot-seat guard)."""
+        self.seat_bindings[seat] = SeatBinding(
+            session_id=f"bot-seat-{seat}",
+            send=lambda seq, wire: None,
+            status="bot",
+            ready=True,
+        )
 
     def mark_ready(self, seat: int) -> None:
         """`ready` (02-protocol.md §2): once every seat is joined *and* ready, the room deals
@@ -478,7 +526,12 @@ class Room:
         the per-seat `IdempotencyCache` (02-protocol.md §1: "survives reconnect... the seat's id
         history") all live on the binding that already exists, so only the live-socket half
         (`session_id`/`send`) is swapped. Raises `SeatNotBoundError` if nothing has ever joined
-        this seat -- there's no binding to reclaim; the caller should `join` instead.
+        this seat -- there's no binding to reclaim; the caller should `join` instead. Raises
+        `SeatTakenError` if this seat is bound to a bot from room construction (M4.5 practice
+        mode, `_bind_bot_seat`) rather than a human -- there is no prior human occupant to hand
+        the seat back to, so a `hello{seat}` naming it is refused the same way `join` refuses a
+        seat someone else already holds (`app/ws.py`'s `_handle_hello` turns this into the same
+        `error{code:'seat_taken'}` `join` would).
 
         Also flips `status` back to `connected` (00-architecture.md §8 "Player reconnects": "Bot
         relinquishes the seat") if this seat was `disconnected`/`autoplay` -- and drops any
@@ -502,6 +555,8 @@ class Room:
         binding = self.seat_bindings[seat]
         if binding is None:
             raise SeatNotBoundError(seat)
+        if binding.status == "bot":
+            raise SeatTakenError(seat)
         binding.session_id = session_id
         binding.send = send
         was_status = binding.status
@@ -815,7 +870,7 @@ class Room:
             return
         del self._pending_bot[result.seat]
         binding = self.seat_bindings[result.seat]
-        if binding is None or binding.status != "autoplay":
+        if binding is None or binding.status not in ("autoplay", "bot"):
             return  # reconnected since submission but the tag pop above raced it -- drop
         try:
             decoded = decode_action(result.aid, self.state, result.seat)
@@ -876,19 +931,20 @@ class Room:
 
     def _poke_bots(self) -> None:
         """00-architecture.md §3's `_poke_bots()`: submit a decision to the bot worker pool for
-        every `autoplay` seat that currently has one to make -- its own `AWAIT_ACTION` turn, or
-        a live claim offer it hasn't answered -- tagged with what it's computed against
-        (`BotJobTag`) so a stale result is dropped when it lands (D12; see
-        `_handle_bot_result`). Idempotent: a seat whose current decision already has a job in
-        flight (`_pending_bot[seat]` already equals the freshly-computed tag) isn't resubmitted.
-        Never runs bot logic inline (D12) -- `_submit_bot_job` only ever schedules work on
-        `self._bot_pool` and returns immediately; the room loop is never blocked on a bot's
-        answer.
+        every seat bound `autoplay` *or* `bot` (M4.5 practice mode -- both kinds of `SeatBinding`
+        get driven through the identical path here, not a parallel one; see `SeatBinding`'s
+        docstring) that currently has one to make -- its own `AWAIT_ACTION` turn, or a live claim
+        offer it hasn't answered -- tagged with what it's computed against (`BotJobTag`) so a
+        stale result is dropped when it lands (D12; see `_handle_bot_result`). Idempotent: a seat
+        whose current decision already has a job in flight (`_pending_bot[seat]` already equals
+        the freshly-computed tag) isn't resubmitted. Never runs bot logic inline (D12) --
+        `_submit_bot_job` only ever schedules work on `self._bot_pool` and returns immediately;
+        the room loop is never blocked on a bot's answer.
         """
         window = self.state.claim_window
         for seat in range(4):
             binding = self.seat_bindings[seat]
-            if binding is None or binding.status != "autoplay":
+            if binding is None or binding.status not in ("autoplay", "bot"):
                 continue
             tag: BotJobTag | None = None
             if (
@@ -921,10 +977,10 @@ class Room:
         method never blocks the room loop. `seed` is derived from the tag rather than an unseeded
         `random.Random()` so a given decision point's bot output is reproducible (server/
         AGENTS.md). `self._bot_tier` (`Room.__init__`'s `bot_tier` param, `T0`/`T1`/`T2`) picks
-        which real tier answers -- configurable per room, not hardcoded; `deadline` is advisory
-        only (`bots/base.py`'s `Bot.act` contract), derived from the same hard
-        `_BOT_JOB_TIMEOUT_SECONDS` this room actually enforces in `_await_bot_job` below, on the
-        shared `time.monotonic()` clock every process on this machine agrees on.
+        which real tier answers -- configurable per room, not hardcoded (docs/05-roadmap.md
+        M4.5); `deadline` is advisory only (`bots/base.py`'s `Bot.act` contract), derived from
+        the same hard `_BOT_JOB_TIMEOUT_SECONDS` this room actually enforces in `_await_bot_job`
+        below, on the shared `time.monotonic()` clock every process on this machine agrees on.
         """
         loop = asyncio.get_running_loop()
         seed = hash((self.room_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
@@ -1247,11 +1303,16 @@ class Room:
         any deployment with no `DATABASE_URL`, app/main.py's `lifespan`). `players` is each
         seat's `SeatBinding.session_id` -- the closest thing to a stable per-seat identity that
         exists before `hello`'s guest `name` field ships (M5, 00-architecture.md §2.1); `None`
-        for a seat nobody ever joined. Only ever called once, from `process_one()`'s own tail
-        (`self._persisted` guards a second call)."""
+        for a seat nobody ever joined *by a human* -- a `bot` seat (M4.5 practice mode) was
+        never joined by a human either, so it gets `None` here too, not its synthetic
+        `session_id`, which would otherwise misleadingly read as a real player. Only ever called
+        once, from `process_one()`'s own tail (`self._persisted` guards a second call)."""
         if self._session_factory is None:
             return
-        players = [b.session_id if b is not None else None for b in self.seat_bindings]
+        players = [
+            b.session_id if b is not None and b.status != "bot" else None
+            for b in self.seat_bindings
+        ]
         async with self._session_factory() as session:
             await save_game_record(session, self.state, self.actions, players=players)
 

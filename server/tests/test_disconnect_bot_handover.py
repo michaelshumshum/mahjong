@@ -238,3 +238,123 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
 
             assert room.seat_bindings[1].status == "connected"
             assert 1 not in room._pending_bot
+
+
+def _rig_faan_discard_state(seed: int) -> GameState:
+    """Seat 1 holds a hand that's already tenpai (shanten 0) *before* drawing one junk honor:
+    three complete MAN runs (`MAN_1..9`), a PIN pair, and a SOU kanchan (`SOU_4`/`SOU_6`,
+    waiting on `SOU_5`) -- 13 tiles, uniquely decomposable (disjoint suits, no alternate parse).
+    Drawing `WIND_EAST` (a 14th, otherwise-irrelevant type) and discarding it is the *unique*
+    shanten-minimising choice: discarding anything else breaks the run/pair/kanchan structure
+    and raises shanten from 0 to 1 (checked by hand against `mahjong_core.shanten`'s formula --
+    `melds=3, partials=1, has_pair=1` gives `shanten=(4-3)*2-1-1=0`; removing one tile from any
+    of those three blocks instead drops a meld or the pair/partial, giving `shanten=1` under the
+    same formula, every time). At turn 0 (seat 1's very first discard this hand),
+    `bots/faanbot.py`'s `_weights_for_turn` sets `w_speed=1.0`, so the resulting
+    `_SHANTEN_UNIT=5.0` gap between keeping vs. breaking tenpai dwarfs any value/safety/flex
+    delta among the 13 legal discards -- both T1 (`EfficiencyBot`, which minimises shanten
+    unconditionally) and T2 (`FaanBot`) discard `WIND_EAST` deterministically. `RandomBot` (T0)
+    would instead pick uniformly among the 13 legal discard ids. Every other seat's tiles are
+    disjoint from seat 1's and from `WIND_EAST`/`DRAGON_RED` (seat 0's own uncontested discard,
+    below), so neither discard this fixture actually exercises opens a claim window.
+    """
+    ruleset = dataclasses.replace(DEFAULT_RULESET, disconnect_grace_seconds=0)
+    state = new_game(ruleset, game_seed=seed)
+    state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
+
+    seat0 = (
+        *_tiles(TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
+        tile_ids_for_type(TileType.DRAGON_RED)[0],
+    )
+    seat1 = (
+        tile_ids_for_type(TileType.MAN_1)[0],
+        tile_ids_for_type(TileType.MAN_2)[0],
+        tile_ids_for_type(TileType.MAN_3)[0],
+        tile_ids_for_type(TileType.MAN_4)[0],
+        tile_ids_for_type(TileType.MAN_5)[0],
+        tile_ids_for_type(TileType.MAN_6)[0],
+        tile_ids_for_type(TileType.MAN_7)[0],
+        tile_ids_for_type(TileType.MAN_8)[0],
+        tile_ids_for_type(TileType.MAN_9)[0],
+        tile_ids_for_type(TileType.PIN_2)[0],
+        tile_ids_for_type(TileType.PIN_2)[1],
+        tile_ids_for_type(TileType.SOU_4)[0],
+        tile_ids_for_type(TileType.SOU_6)[0],
+    )
+    seat2 = _tiles(TileType.SOU_1, TileType.SOU_3, TileType.SOU_5, TileType.SOU_7, count=13)
+    seat3 = _tiles(TileType.PIN_1, TileType.PIN_3, TileType.PIN_5, TileType.PIN_7, count=13)
+
+    state = _with_seat(state, 0, concealed=seat0, discards=())
+    state = _with_seat(state, 1, concealed=seat1)
+    state = _with_seat(state, 2, concealed=seat2)
+    state = _with_seat(state, 3, concealed=seat3)
+
+    draw_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
+    wall = state.wall
+    state = dataclasses.replace(
+        state, wall=dataclasses.replace(wall, tiles=(draw_tile, *wall.tiles[1:]))
+    )
+    return state
+
+
+def test_disconnect_bot_runs_faanbot_not_random() -> None:
+    """Regression for the sub-task that wired real bot tiers into the live disconnect-handover
+    path (docs/04-bots.md §1, docs/05-roadmap.md M4.5): `Room`'s default `bot_tier` is now
+    `T2`/`FaanBot`, not the old hardcoded `T0`/`RandomBot` `bots/worker.py.compute_action` used
+    to run unconditionally. `_rig_faan_discard_state`'s hand has a *unique* shanten-minimising
+    discard (see its own docstring); `FaanBot`'s choice is a deterministic function of the hand
+    (unlike `RandomBot`'s uniform-over-13 pick), so asserting the exact discard tile is a real
+    proof the live path is no longer T0 -- not merely improbable-under-random, but exactly what
+    a value/efficiency-aware policy must produce here, every run.
+    """
+    room_id = f"disconnect-handover-faanbot-{uuid.uuid4()}"
+
+    with (
+        TestClient(app) as client,
+        client.websocket_connect(f"/ws?room={room_id}") as ws0,
+        client.websocket_connect(f"/ws?room={room_id}") as ws2,
+        client.websocket_connect(f"/ws?room={room_id}") as ws3,
+    ):
+        room = get_room(room_id)
+        assert room is not None
+        assert room._bot_tier == "T2"  # the M4.5 default -- FaanBot, not RandomBot
+        room.state = _rig_faan_discard_state(seed=2)
+
+        with client.websocket_connect(f"/ws?room={room_id}") as ws1:
+            _join_and_ready_all([ws0, ws1, ws2, ws3])
+        # ws1's `with` block just exited -- only seat 1 disconnects.
+
+        observers = (ws0, ws2, ws3)
+
+        for ws in observers:
+            frame = ws.receive_json()
+            assert frame["t"] == "seat_state"
+            assert frame["d"] == {"seat": 1, "status": "disconnected"}
+
+        for ws in observers:
+            frame = ws.receive_json()
+            assert frame["t"] == "seat_state"
+            assert frame["d"] == {"seat": 1, "status": "autoplay"}
+
+        discard_tile = tile_ids_for_type(TileType.DRAGON_RED)[0]
+        ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
+        ack = ws0.receive_json()
+        assert ack["t"] == "ack" and ack["d"]["ok"] is True
+
+        for ws in observers:
+            discard0 = ws.receive_json()
+            assert discard0["t"] == "discard" and discard0["d"]["seat"] == 0
+            draw1 = ws.receive_json()
+            assert draw1["t"] == "draw" and draw1["d"]["seat"] == 1
+            turn1 = ws.receive_json()
+            assert turn1["t"] == "turn" and turn1["d"]["seat"] == 1
+
+        expected_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
+        for ws in observers:
+            bot_discard = ws.receive_json()
+            assert bot_discard["t"] == "discard"
+            assert bot_discard["d"]["seat"] == 1
+            # the unique shanten-minimising choice (fixture docstring) -- a uniform-random T0
+            # policy would only land here by ~1/13 chance; a deterministic value/efficiency
+            # policy lands here every run.
+            assert bot_discard["d"]["tile_id"] == expected_tile

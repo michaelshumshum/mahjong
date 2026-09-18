@@ -44,6 +44,7 @@ from concurrent.futures import Executor
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.room import Room
+from bots.worker import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
 
 __all__ = ["RoomRegistry"]
@@ -89,10 +90,16 @@ class RoomRegistry:
         *,
         seed: int | None = None,
         require_ready: bool = True,
+        practice: bool = False,
+        bot_tier: str = DEFAULT_BOT_TIER,
     ) -> Room:
         """Return the existing room for `room_id`, or construct and start one -- a room id
         names one particular game, not a recyclable lobby slot, so this never creates a second
-        `Room` for an id that already has one, even a finished one (see module docstring)."""
+        `Room` for an id that already has one, even a finished one (see module docstring).
+        `practice`/`bot_tier` are threaded straight through to `Room.__init__` (docs/05-roadmap.md
+        M4.5) -- only meaningful the first time a given `room_id` is created; an existing room's
+        practice/tier setup was already decided at its own construction and can't be changed
+        retroactively by a later `get_or_create` call for the same id."""
         room = self._rooms.get(room_id)
         if room is not None:
             return room
@@ -103,6 +110,8 @@ class RoomRegistry:
             require_ready=require_ready,
             bot_pool=self._bot_pool,
             session_factory=self._session_factory,
+            practice=practice,
+            bot_tier=bot_tier,
         )
         self._rooms[room_id] = room
         self._tasks[room_id] = asyncio.create_task(self._run(room_id, room))
