@@ -151,13 +151,17 @@ like a game" gate lives in M4.5, not here.
 
 **Bots half: built, not yet fully cleared.** `T1`/`T2`/the arena harness are all built and
 merged; the real 1000-duplicate-set arena run ([04-bots §8](04-bots.md)) shows
-`tenpai_rate_on_sub_minimum_hand` roughly halved to a third relative to T1 (0.20 vs 0.32) —
-the specific HK-only failure this milestone exists to fix — but the paired-difference CI on raw
-points is `[-1.857, +0.041]`, still technically including zero, not yet a clean "`FaanBot` beats
-`EfficiencyBot`" per this gate's literal wording. One retuning pass materially narrowed the gap
-(from CI `[-3.337, -1.503]`); closing it the rest of the way is real follow-up self-play tuning
-work against the same harness, not a re-scope. Client work (the rest of this milestone's list)
-is untouched by this note.
+`tenpai_rate_on_sub_minimum_hand` roughly a third relative to T1 (0.22 vs 0.32) — the specific
+HK-only failure this milestone exists to fix — but the paired-difference CI on raw points is
+`[-0.393, +1.575]`, still including zero, not yet a clean "`FaanBot` beats `EfficiencyBot`" per
+this gate's literal wording. Two retuning passes have moved the mean paired difference from
+-2.420 → -0.908 → +0.591 (first pass retuned `w_value`/`w_speed`; second retuned `w_safety`,
+which had never itself been arena-validated and turned out to be the bigger remaining lever) —
+the point estimate is positive for the first time, but the CI has never yet excluded zero.
+Closing it the rest of the way is real follow-up self-play tuning work against the same harness
+(most likely continuing to trim `w_safety`, per `bots/faanbot.py`'s `_weights_for_turn`
+docstring), not a re-scope. Client work (the rest of this milestone's list) is untouched by this
+note.
 
 ### M4.5 — Single-player is shippable
 No new engine work — this is a checkpoint milestone, not a build phase. Play the M4 client

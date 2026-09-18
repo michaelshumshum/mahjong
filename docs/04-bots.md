@@ -344,11 +344,41 @@ this sub-task exists to fix. That number moving this much, this consistently, ac
 calibrations is the real evidence T2's value-planning is structurally doing its job even though
 the points race isn't fully won yet.
 
+**Retuned a second time — `w_safety`, not `w_value`/`w_speed` — real re-run, gap narrows further
+but still doesn't close.** `w_safety` (0.3/0.6/1.6 across the early/mid/late turn buckets) had
+never itself been checked against a real arena result — only `w_value`/`w_speed` were touched by
+the first retune above. `bots/safety.py`'s `tile_risk` sums an assumed 5-faan deal-in cost across
+all three opponents at a 0.06 base rate, a magnitude (commonly ~0.3–1.5 once meld/tempo/wall
+multipliers apply) large enough to swamp routine speed/value differences between candidate
+discards at the first retune's `w_safety` values — plausibly making T2 play more defensively than
+the actual deal-in savings were worth on *ordinary* discards, not just inside the already-separate
+`fold_mode` path. Halving `w_safety` at each bucket (0.3→0.15, 0.6→0.3, 1.6→0.9,
+`bots/faanbot.py`'s `_weights_for_turn` has the exact numbers and reasoning):
+
+| Metric | FaanBot (A) | EfficiencyBot (B) |
+| --- | --- | --- |
+| win_rate | 0.1752 | 0.2239 |
+| deal_in_rate | 0.1096 | 0.1389 |
+| avg_winning_faan | 4.2294 | 3.7456 |
+| tenpai_rate_on_sub_minimum_hand | 0.2243 | 0.3243 |
+| avg_points_per_hand | 0.1108 | -0.0369 |
+
+Paired difference (A − B): **+0.591 points/game, 95% CI [-0.393, +1.575]** — the point estimate
+is positive for the first time across all three calibrations, but the CI still includes zero, so
+this is **not yet** a clean "`FaanBot` beats `EfficiencyBot`" by §8's literal merge-gate wording
+either. Deal-in rate rose only slightly relative to the first retune (0.098 → 0.110, still well
+below T1's 0.139) while win rate recovered substantially (0.154 → 0.175) — confirming the
+over-cautious safety weight, not the value/speed balance, was the dominant remaining drag on
+points. `tenpai_rate_on_sub_minimum_hand` (0.224 vs T1's 0.324) stays essentially as strong as the
+first retune's number (0.204 vs 0.321) — the HK-specific failure mode this milestone exists to
+fix is not being traded away to chase the points gate.
+
 **Honest status, not spun:** T2 is a genuine structural improvement on the HK-specific failure
-mode this whole section is about, and a real (if not yet statistically decisive) step toward
-parity on raw points — not a clean "beats T1" result by §8's own merge-gate wording. Further
-weight tuning via self-play against this same harness (§4's own stated method) is real,
-concrete follow-up work, not a hand-wave: one retuning pass moved the paired-difference point
-estimate from -2.42 to -0.91 and the CI's upper bound from -1.50 to +0.04 on the same seed
-range, so the remaining gap looks closeable with the same technique, not a sign the approach is
-wrong.
+mode this whole section is about, and after two retuning passes sits closer to parity on raw
+points than ever (mean paired difference: -2.420 → -0.908 → **+0.591** across the three
+calibrations) — but still not a clean "beats T1" result by §8's own merge-gate wording; the CI
+has never yet excluded zero in `FaanBot`'s favor. Further weight tuning via self-play against this
+same harness (§4's own stated method) is real, concrete follow-up work, not a hand-wave:
+`w_safety` moved the needle further than `w_value`/`w_speed` did, so a third pass continuing to
+trim `w_safety` (or re-examining `bots/safety.py`'s own per-signal multipliers, untouched by
+either retune so far) is the natural next step, not a sign the approach is wrong.
