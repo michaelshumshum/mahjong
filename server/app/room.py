@@ -100,6 +100,7 @@ import asyncio
 import contextlib
 import heapq
 import itertools
+import logging
 import os
 import random
 import time
@@ -155,6 +156,8 @@ SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 # reports for a `None` slot in `Room.seat_bindings`. `bot` *is* a real `SeatBinding.status` now
 # (M4.5 practice mode, `_bind_bot_seat`) -- see `SeatBinding`'s docstring.
 WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
+
+logger = logging.getLogger(__name__)
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
 
@@ -493,7 +496,8 @@ class Room:
         self._session_factory = session_factory
         self._persisted = False  # save_game_record fires at most once, even if driven manually
         self._game_over_persisted = False  # see wait_for_shutdown_boundary -- True only once
-        # the GAME_OVER persist attempt (a real write, or the no-session_factory no-op) returns
+        # the GAME_OVER persist attempt returns: a real write, the no-session_factory no-op, or
+        # a write that raised (process_one's tail logs it and marks the attempt finished anyway)
         self._boundary_this_tick = False  # reset each process_one() tick, set inside _apply
         self._shutdown_boundary: asyncio.Event | None = None  # see wait_for_shutdown_boundary
         self.seat_seq: list[int] = [0, 0, 0, 0]  # per-seat outbound seq: dense, gapless (D1)
@@ -966,7 +970,15 @@ class Room:
         self._poke_bots()
         if self.state.phase == Phase.GAME_OVER and not self._persisted:
             self._persisted = True
-            await self._persist_game_record()
+            try:
+                await self._persist_game_record()
+            except Exception:
+                # a lost record must not also wedge the drain: `wait_for_shutdown_boundary`
+                # blocks *unbounded* on exactly this window, so letting this propagate would
+                # kill the room task with `_game_over_persisted` still False and the boundary
+                # below never signalled -- every drain on this room then hangs forever, and
+                # with it the process (or a TestClient context) trying to exit.
+                logger.exception("room %s: GAME_OVER persist failed, record lost", self.room_id)
             self._game_over_persisted = True
         if self._boundary_this_tick and self._shutdown_boundary is not None:
             self._shutdown_boundary.set()
@@ -1665,7 +1677,13 @@ class Room:
         `state.phase` and `self._persisted` both flip synchronously, with no `await` between
         them and the persist call, so no other coroutine on this event loop can ever observe
         `state.phase == Phase.GAME_OVER` with `_game_over_persisted` still `False` except by
-        genuinely racing that in-flight write.
+        genuinely racing that in-flight write. That is exactly why `process_one()`'s tail catches
+        a failing `_persist_game_record()` rather than letting it propagate: a write that raises
+        would otherwise end the room task inside this window, leaving the flag `False` and the
+        boundary event unset with nothing alive left to set either, and the unbounded wait below
+        would then never return -- a dead room wedging the whole drain (and the process, or the
+        `TestClient` context, waiting on it) forever. The wait is unbounded on purpose; what
+        makes that safe is that the window it waits on can only ever be exited, never abandoned.
 
         Bug 1 (fixed): this method used to fast-path on `self.state.phase == Phase.GAME_OVER`
         directly, before `_game_over_persisted` existed. That returned `True` the instant the

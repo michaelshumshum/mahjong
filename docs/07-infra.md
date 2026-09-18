@@ -93,8 +93,11 @@ Not yet decided: hosting target, domain, and TLS termination. Minimum shape once
 
 ## 6. Database schema and migrations
 
-`alembic` is wired into the `Makefile` (`make migrate`, `make revision`). `games` is the first
-table, migrated in `server/alembic/versions/95b97823dd97_create_games_table.py`, model at
+`alembic` is wired into the `Makefile` (`make migrate`, `make revision`). A fresh dev database
+needs `make migrate` once: Compose gives `api` a real `DATABASE_URL`, so `make test-server`
+exercises the real `GAME_OVER` persist rather than the no-session-factory no-op, and against an
+unmigrated database every finished game logs a lost record (`app/room.py`'s `process_one`).
+`games` is the first table, migrated in `server/alembic/versions/95b97823dd97_create_games_table.py`, model at
 `server/app/db/models.py`. `leaderboard` below is still just the target shape — not built yet, no
 migration. There is no `users` table planned: `docs/00-architecture.md §2.1` cuts real accounts
 entirely (guest-only, a client-chosen name in `localStorage`, no server-side identity to give a

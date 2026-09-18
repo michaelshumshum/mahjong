@@ -23,6 +23,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.websockets import WebSocketDisconnect
 
 from app import ws
@@ -73,6 +74,25 @@ def _rig_uncontested_state(seed: int) -> GameState:
     state = _with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
     state = _with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
+
+
+_NO_REPEAT_RULESET = dataclasses.replace(
+    DEFAULT_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
+)
+
+
+def _rig_final_hand_state(seed: int) -> GameState:
+    """`_rig_uncontested_state`, but on the last hand of a repeat-off `EAST_ONLY` game (seat 3
+    deals), so the exhaustive draw that ends this hand ends the whole *game* -- the only thing
+    that triggers `process_one()`'s `GAME_OVER` persist."""
+    state = _rig_uncontested_state(seed)
+    return dataclasses.replace(state, ruleset=_NO_REPEAT_RULESET, dealer=3, hand_no=4)
+
+
+def _exploding_session_factory() -> AsyncSession:
+    """Stands in for `app/main.py`'s real `async_sessionmaker` against a database that refuses
+    the write -- an unapplied migration (no `games` table) is the failure that actually bit."""
+    raise RuntimeError('relation "games" does not exist')
 
 
 class _FakeSocket:
@@ -160,6 +180,41 @@ async def test_wait_for_shutdown_boundary_waits_out_an_in_flight_game_over_persi
     # phase flip (bug 1) or for `timeout=0` to elapse regardless (bug 2).
     assert room._game_over_persisted is True
     await finisher
+
+
+async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_window(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Regression: a `GAME_OVER` write that *raises* used to propagate straight out of
+    `process_one()` -> `Room.run()`, killing the room task with `_game_over_persisted` still
+    `False` and the boundary event never set -- precisely the state
+    `wait_for_shutdown_boundary` waits on *unbounded*, so every later drain (and the process,
+    or the `TestClient` context, waiting on it) hung forever. Found for real: docker-compose
+    sets `DATABASE_URL`, the dev database had no `games` table (migrations never applied), and
+    `make test-server` wedged on the first test that finishes a game.
+
+    Driven through `process_one()` directly rather than a background task so the failing tick
+    is observed, not raced: under the old code this call itself raises.
+    """
+    room = Room(
+        "shutdown-persist-fails",
+        _NO_REPEAT_RULESET,
+        game_seed=7,
+        session_factory=_exploding_session_factory,
+    )
+    room.state = _rig_final_hand_state(seed=7)
+    _bind_fake_seats(room)
+    room.submit(0, Discard(tile_id=_SEAT0_DISCARD))
+
+    with caplog.at_level(logging.ERROR):
+        await asyncio.wait_for(room.process_one(), timeout=2.0)
+
+    assert room.state.phase == Phase.GAME_OVER  # the game still ended for real
+    assert room._game_over_persisted is True  # the attempt returned: nothing left to wait on
+    assert any("persist failed" in r.message for r in caplog.records)
+
+    # and the drain that used to hang on it now resolves immediately, without abandoning it.
+    assert await asyncio.wait_for(room.wait_for_shutdown_boundary(0.0), timeout=1.0) is True
 
 
 async def test_room_never_reaching_boundary_is_abandoned_not_hung(

@@ -642,6 +642,15 @@ context exiting runs this exact same drain code, which is why `server/tests/conf
 codebase already uses elsewhere, e.g. `disconnect_grace_seconds=0`, applied via env var here
 since this parameter lives outside any single game's `RuleSet`).
 
+The drain's one unbounded wait is a room whose `GAME_OVER` persist is already in flight: there's
+no further hand for the grace window to bound, so abandoning it would just throw away a finished
+game's record. That is only safe because the window it waits on can be exited but never
+abandoned — `app/room.py`'s `process_one` catches a persist that raises, logs the lost record,
+and still marks the attempt finished. Letting it propagate instead ends the room task inside that
+window with nothing alive left to signal the boundary, and the drain (plus whatever is waiting on
+the process to exit) hangs forever. Found the hard way: an unmigrated dev database made every
+finished game raise, and the server test suite wedged on the first test to finish one.
+
 ## 9. Anti-cheat
 
 1. **Server-authoritative + per-seat redaction** (§5) closes information cheating, the dominant
