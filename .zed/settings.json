@@ -1,0 +1,44 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "lsp": {
+    "oxfmt": {
+      "initialization_options": {
+        "settings": {
+          "fmt.configPath": "./web/.oxfmtrc.json",
+          "run": "onSave",
+        },
+      },
+    },
+    "oxlint": {
+      "initialization_options": {
+        "settings": {
+          "configPath": "./web/.oxlintrc.json",
+          "run": "onType",
+        },
+      },
+    },
+  },
+  "languages": {
+    "Svelte": {
+      "language_servers": ["svelte-language-server", "oxlint", "oxfmt"],
+      "format_on_save": "on",
+      "formatter": {
+        "language_server": {
+          "name": "oxfmt",
+        },
+      },
+    },
+    "TypeScript": {
+      "language_servers": ["typescript-ls", "oxlint", "oxfmt"],
+      "format_on_save": "on",
+      "formatter": {
+        "language_server": {
+          "name": "oxfmt",
+        },
+      },
+    },
+  },
+}
