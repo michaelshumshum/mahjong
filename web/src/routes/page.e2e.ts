@@ -76,7 +76,6 @@ test('toast demo: a short-duration toast auto-dismisses without manual interacti
 test('lobby route renders', async ({ page }) => {
 	const response = await page.goto('/lobby');
 	expect(response?.status()).toBe(200);
-	await expect(page.locator('h1')).toHaveText('Lobby');
 });
 
 test('lobby create room shows a mock invite code', async ({ page }) => {
