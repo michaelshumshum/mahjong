@@ -24,3 +24,8 @@ pre-commit:
     - name: server
       glob: "server/**"
       run: uv run --project server pre-commit run --config .pre-commit-config.yaml --files {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit $1
