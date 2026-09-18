@@ -48,7 +48,9 @@ export interface LiveTableView {
 // hardcodes the single-letter form, so nothing else exercises this mismatch.
 const WIRE_WIND_TO_CODE: Record<string, Wind> = { EAST: 'E', SOUTH: 'S', WEST: 'W', NORTH: 'N' };
 
-function wireWindToCode(wind: string): Wind {
+/** Exported for `+page.svelte`'s `scoreHands` mapping — `ClientGameState.handHistory` entries
+ * carry the same wire-form `prevailing` string this converts for the live view's own field. */
+export function wireWindToCode(wind: string): Wind {
 	return WIRE_WIND_TO_CODE[wind] ?? (wind as Wind);
 }
 

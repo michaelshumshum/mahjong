@@ -23,11 +23,13 @@
 		deltas: Partial<Record<Seat, number>>;
 	}
 
-	// game_end.standings isn't specified beyond the field name (docs/02-protocol.md §3) — score
-	// and game_end are still doc-only sketches, unimplemented server-side (no Score/GameEnd model
-	// in server/app/protocol.py, nothing generated into protocol.d.ts), same situation
-	// FaanBreakdown notes for faan_breakdown/payments. This is the shape decision this component's
-	// props codify: ranked order, index 0 = 1st place.
+	// `score`/`game_end` are real, shipped wire events (docs/02-protocol.md §3;
+	// server/app/views.py's ScoreWire/GameEndWire) — but `game_end` is only ever `{hand_no,
+	// scores}`, absolute per-seat totals with no ranking baked in. There's no "standings" field
+	// on the wire and no placement-rule spec beyond raw totals, so this component doesn't derive
+	// ranking itself either: `standings` is the shape decision this prop codifies (ranked order,
+	// index 0 = 1st place), left for a caller to fill in from `game_end.scores` (sorted) when it
+	// has one, or leave unset otherwise.
 	export interface Standing {
 		seat: Seat;
 		total: number;

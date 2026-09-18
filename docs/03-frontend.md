@@ -229,7 +229,9 @@ interface ClientGameState {
   legalActions: Record<string, unknown>[];     // this seat's turn options, else []
   deadlineTs: number | null;
   claimOffer: { windowId: number | null; options: Record<string, unknown>[]; deadlineTs: number | null } | null;
-  lastHandEnd: HandEndState | null; gameEnd: GameEndState | null; shutdownDeadlineTs: number | null;
+  lastHandEnd: HandEndState | null;    // latest hand_end only — the just-finished-hand overlay
+  handHistory: HandHistoryEntry[];     // every hand_end this session has seen, oldest first (below)
+  gameEnd: GameEndState | null; shutdownDeadlineTs: number | null;
 }
 
 // lib/game/store.svelte.ts
@@ -291,6 +293,18 @@ Rules:
   events (see `state_sync` below for the one full-replace case).
 - Same reducer drives the replay viewer (§9), fed from the server's per-seat redacted event
   stream — not raw action log.
+- **`hand_end` accumulates into `handHistory`**, not just `lastHandEnd`: `game_end`
+  (`{hand_no, scores}`, `docs/02-protocol.md §3`) is a terminal, fires-once event with no
+  per-hand ranking on the wire, but `hand_end` fires once per hand for the life of a live game,
+  so a score sheet needs the running list, not just the latest one. `dealer`/`prevailing` aren't
+  on `hand_end`'s own payload — the reducer captures them off `state` at the moment it sees the
+  event, since only `hand_start` (always the prior event) changes them. Survives `state_sync`
+  unchanged (a redacted snapshot carries no hand history to replace it with); `ScoreSheet.svelte`'s
+  `historyComplete` flag is what surfaces a reconnect that landed on a full resync rather than
+  gap-replay, missing hands from before this session began. `/table/[id]`'s live path maps this
+  into `ScoreSheet`'s `HandRecord[]`; the mock path (`MOCK_SCENARIOS`) still synthesizes a single
+  row from the current snapshot, unaffected — a mock scenario is always one frozen, already-dealt
+  hand with no real `hand_end` stream behind it.
 
 ### SSR
 

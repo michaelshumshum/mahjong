@@ -9,7 +9,7 @@
 		type Seat
 	} from '$lib/table/mock-game-state';
 	import { tileIdToCode } from '$lib/table/tile-code';
-	import { viewFromClientState } from '$lib/table/live-view';
+	import { viewFromClientState, wireWindToCode } from '$lib/table/live-view';
 	import { MahjongSocket, defaultWsUrl } from '$lib/net/socket';
 	import { GameStore } from '$lib/game/store.svelte';
 	import type { ClientGameState, ConnectionStatus } from '$lib/game/state';
@@ -20,6 +20,7 @@
 	import ScoreSheet, {
 		type HandRecord,
 		type SeatInfo,
+		type Standing,
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
 	import Chat, { type ChatEntry } from '$lib/ui/Chat.svelte';
@@ -341,16 +342,43 @@
 	let scoreTotals: Totals = $derived(
 		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.score])) as Totals
 	);
-	// static single-hand history stand-in — score/game_end are still doc-only sketches
-	// (ScoreSheet.svelte's own comment), same mock-data posture as the root demo page.
-	let scoreHands: HandRecord[] = $derived([
-		{
-			handNo: gameState.handNo,
-			dealer: gameState.dealer as HandRecord['dealer'],
-			prevailing: gameState.prevailing,
-			deltas: gameState.handResult?.payments ?? {}
-		}
-	]);
+	// Mock path: MOCK_SCENARIOS is always one frozen, already-dealt hand (no real hand_end
+	// stream behind it), so a single row synthesized from the current snapshot is the correct
+	// (and only possible) rendering here — unchanged by the live-history work below.
+	// Live path: real accumulated history off `handHistory` (lib/game/state.ts), built by
+	// lib/net/reducer.ts from every `hand_end` this session has actually seen — growing across a
+	// live multi-hand game rather than showing just the latest hand.
+	let scoreHands: HandRecord[] = $derived(
+		isMock
+			? [
+					{
+						handNo: gameState.handNo,
+						dealer: gameState.dealer as HandRecord['dealer'],
+						prevailing: gameState.prevailing,
+						deltas: gameState.handResult?.payments ?? {}
+					}
+				]
+			: (liveStore?.state.handHistory.map((h): HandRecord => ({
+					handNo: h.handNo,
+					dealer: h.dealer as HandRecord['dealer'],
+					prevailing: wireWindToCode(h.prevailing),
+					deltas: (h.payments ?? {}) as HandRecord['deltas']
+				})) ?? [])
+	);
+
+	// `game_end` (docs/02-protocol.md §3) is a terminal, fires-once event carrying only
+	// `{hand_no, scores}` — absolute final totals, no placement rules. Ranking by raw total is
+	// the "straightforward" case ScoreSheet.svelte's `standings` doc comment calls out; anything
+	// beyond that (tiebreak rules, etc.) isn't specified on the wire, so this doesn't invent one
+	// beyond a deterministic seat-order tiebreak. Mock path never has a real `game_end`, so this
+	// stays unset there, same as before.
+	let scoreStandings: Standing[] | undefined = $derived(
+		!isMock && liveStore?.state.gameEnd
+			? liveStore.state.gameEnd.scores
+					.map((total, seat) => ({ seat: seat as Standing['seat'], total }))
+					.sort((a, b) => b.total - a.total || a.seat - b.seat)
+			: undefined
+	);
 
 	let chatMessages: ChatEntry[] = $state(
 		page.url.searchParams.has('mock')
@@ -736,7 +764,12 @@
 				<button type="button" class="panel-close" onclick={() => (showScoreSheet = false)}
 					>Close</button
 				>
-				<ScoreSheet seats={scoreSeats} totals={scoreTotals} hands={scoreHands} />
+				<ScoreSheet
+					seats={scoreSeats}
+					totals={scoreTotals}
+					hands={scoreHands}
+					standings={scoreStandings}
+				/>
 			</div>
 		{/if}
 

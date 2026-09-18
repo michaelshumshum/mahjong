@@ -160,3 +160,116 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		await browser.close();
 	}
 });
+
+test('completing more than one real hand accumulates multi-hand history in the ScoreSheet', async () => {
+	// HK ruleset has no dead wall (mahjong_core/config.py's `wall_reserve = 0`) -- absent an
+	// earlier win, a hand runs until the wall is drawn dry, ~80-something real discards. Two
+	// hands plus the occasional claim window is a few hundred real round trips against the real
+	// backend (observed ~70s end to end during development), hence the generous budget (this is
+	// the actual proof the multi-hand lib/game/state.ts `handHistory` accumulation works end to
+	// end -- docs/03-frontend.md's `/table/[id]` wiring section -- not just reducer.spec.ts's
+	// hand-constructed fixtures).
+	test.setTimeout(300_000);
+	const room = `e2e-history-${Date.now()}`;
+	const browser = await chromium.launch();
+	try {
+		const pages = await Promise.all(
+			Array.from({ length: 4 }, async () => {
+				const ctx = await browser.newContext();
+				return ctx.newPage();
+			})
+		);
+
+		await Promise.all(
+			pages.map((p) => p.goto(`${BASE}/table/${room}`, { waitUntil: 'networkidle' }))
+		);
+		await pages[0].getByRole('button', { name: 'Sit down' }).click();
+		for (const p of pages.slice(1)) {
+			await expect(p.getByRole('button', { name: 'Sit down' })).toBeVisible();
+			await p.getByRole('button', { name: 'Sit down' }).click();
+		}
+		await Promise.all(
+			pages.map((p) => p.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 20_000 }))
+		);
+
+		// `.panel-overlay` (the Score sheet panel's own container) is a real `position: fixed;
+		// inset: 0` modal backdrop -- correctly, it intercepts pointer events for whatever's
+		// behind it. Opening the Score sheet on page 0 *before* playing would permanently block
+		// page 0's own hand-tile clicks for the rest of this loop, since page 0 is seat 0, a real
+		// player (found by running this against a real backend: an earlier version of this test
+		// opened it up front and every discard on page 0 timed out waiting for the tile to become
+		// clickable). So: play the whole thing first, open the Score sheet only once play is
+		// done and nothing needs to click through it anymore.
+		//
+		// Progress signal: `lib/net/reducer.ts`'s `deal` case is the only thing that sets
+		// `wallRemaining` -- `draw` doesn't touch it -- so the "Wall" figure shown in the table
+		// status region is constant for an entire hand and only ever changes at the next hand's
+		// `deal`. Reading that one number is a much cheaper hand-boundary signal than repeatedly
+		// opening/closing the Score sheet (or counting individual discards) would be.
+		const wallCount = pages[0].locator('.wall-count strong');
+		let prevWall: string | null = null;
+		let handBoundaries = 0;
+
+		// tsumogiri whichever seat is offered a real discard, auto-pass every real claim window,
+		// across all four seats, until two real hand boundaries have actually landed -- bounded by
+		// real wall exhaustion (or an incidental real win, which ends a hand faster), not by an
+		// arbitrary action count standing in for game logic. Every page's own actionable-element
+		// check runs in parallel (Promise.all) rather than one page at a time -- with 4 real
+		// browser contexts, a sequential per-page round trip is the dominant cost of each round.
+		for (let round = 0; round < 3000 && handBoundaries < 2; round++) {
+			const wall = await wallCount.textContent().catch(() => null);
+			if (prevWall !== null && wall !== null && wall !== prevWall) handBoundaries++;
+			prevWall = wall;
+
+			// the server closes claim windows early (docs/03-frontend.md §5: "buttons are up" is
+			// not a stable client state) -- a pass button counted a moment ago can be gone, or
+			// mid-CSS-transition and briefly "not stable" by Playwright's own actionability
+			// check, by the time the click actually lands. Found by running this against a real
+			// backend: retrying only page index 0 on failure produced a real deadlock -- if
+			// page 0's specific click kept failing, page 1's identical, perfectly clickable pass
+			// button was never even attempted, so a window with two eligible seats could sit open
+			// indefinitely. Trying every matching page, not just the first, is the fix; a short
+			// per-click timeout + swallow is correct either way since the next round's fresh poll
+			// is the real recovery path.
+			let progressed = false;
+			const passCounts = await Promise.all(pages.map((p) => p.locator('.claim-btn--pass').count()));
+			for (let i = 0; i < pages.length && !progressed; i++) {
+				if (passCounts[i] <= 0) continue;
+				progressed = await pages[i]
+					.locator('.claim-btn--pass')
+					.click({ timeout: 800 })
+					.then(() => true)
+					.catch(() => false);
+			}
+			if (progressed) continue;
+
+			const discardCounts = await Promise.all(
+				pages.map((p) => p.locator('.hand-tile-btn').count())
+			);
+			for (let i = 0; i < pages.length && !progressed; i++) {
+				if (discardCounts[i] <= 0) continue;
+				progressed = await pages[i]
+					.locator('.hand-tile-btn')
+					.first()
+					.click({ timeout: 800 })
+					.then(() => true)
+					.catch(() => false);
+			}
+			if (progressed) continue;
+
+			// nobody has a real action offered right now (mid-broadcast, or a claim window still
+			// resolving) -- a short beat for the next server event, not a fixed per-action cost.
+			await pages[0].waitForTimeout(100);
+		}
+
+		expect(handBoundaries).toBeGreaterThanOrEqual(2);
+
+		await pages[0].getByRole('button', { name: 'Score sheet' }).click();
+		const handRows = pages[0].locator('.score-sheet tbody tr');
+		await expect(handRows).toHaveCount(2, { timeout: 10_000 });
+		await expect(handRows.nth(0).locator('td').first()).toHaveText('1');
+		await expect(handRows.nth(1).locator('td').first()).toHaveText('2');
+	} finally {
+		await browser.close();
+	}
+});

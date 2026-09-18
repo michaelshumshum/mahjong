@@ -44,6 +44,15 @@ export interface GameEndState {
 	scores: number[];
 }
 
+/** One completed hand, accumulated across a live game (docs/03-frontend.md §6's history note).
+ * `hand_end`'s own wire payload has no `dealer`/`prevailing` field — those are captured off
+ * `ClientGameState` at the moment the reducer sees the event, since `hand_start` is the only
+ * thing that changes them and it always arrives before the matching `hand_end`. */
+export interface HandHistoryEntry extends HandEndState {
+	dealer: number;
+	prevailing: string;
+}
+
 export interface ClientGameState {
 	seat: number | null;
 	handNo: number;
@@ -63,6 +72,14 @@ export interface ClientGameState {
 	deadlineTs: number | null;
 	claimOffer: ClaimWindowState | null;
 	lastHandEnd: HandEndState | null;
+	/** Every `hand_end` seen so far this session, oldest first — `lastHandEnd` above only ever
+	 * holds the latest one (used for the just-finished-hand overlay), so this is the running
+	 * history a score sheet needs. Append-only: never cleared by `hand_start` or `state_sync`
+	 * (a redacted snapshot carries no hand history to replace it with — reducer.ts's
+	 * `state_sync` case). Starts empty per `GameStore`/session; a reconnect that lands on a
+	 * full resync rather than gap-replay can leave it missing hands from before this session
+	 * began (`ScoreSheet.svelte`'s `historyComplete` flag exists for exactly that case). */
+	handHistory: HandHistoryEntry[];
 	gameEnd: GameEndState | null;
 	shutdownDeadlineTs: number | null;
 }
@@ -87,6 +104,7 @@ export function initialClientGameState(): ClientGameState {
 		deadlineTs: null,
 		claimOffer: null,
 		lastHandEnd: null,
+		handHistory: [],
 		gameEnd: null,
 		shutdownDeadlineTs: null
 	};

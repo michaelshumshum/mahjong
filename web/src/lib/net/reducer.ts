@@ -1,5 +1,5 @@
 import type { ServerEvent } from './protocol';
-import { type ClientGameState, type MeldState } from '../game/state';
+import { type ClientGameState, type HandHistoryEntry, type MeldState } from '../game/state';
 
 function assertNever(x: never): never {
 	throw new Error(`unhandled: ${JSON.stringify(x)}`);
@@ -290,21 +290,32 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 
 		case 'hand_end': {
 			const d = event.d;
+			const entry: HandHistoryEntry = {
+				handNo: d.hand_no,
+				outcome: d.outcome,
+				winner: d.winner,
+				winType: d.win_type,
+				discarder: d.discarder,
+				faan: d.faan,
+				faanBreakdown: d.faan_breakdown,
+				points: d.points,
+				payments: d.payments,
+				revealed: d.revealed,
+				winningHand: d.winning_hand,
+				// dealer/prevailing aren't on hand_end's own payload (docs/02-protocol.md §3) --
+				// state.dealer/prevailing are still this hand's values, since only hand_start (which
+				// always precedes the matching hand_end) changes them.
+				dealer: state.dealer,
+				prevailing: state.prevailing
+			};
+			// socket.ts already drops a replayed frame by seq before it reaches here (a frame with
+			// seq <= lastSeq never dispatches); this is defense in depth against the same hand_no
+			// landing twice for any other reason, not the primary guard.
+			const alreadyRecorded = state.handHistory.some((h) => h.handNo === d.hand_no);
 			return {
 				...state,
-				lastHandEnd: {
-					handNo: d.hand_no,
-					outcome: d.outcome,
-					winner: d.winner,
-					winType: d.win_type,
-					discarder: d.discarder,
-					faan: d.faan,
-					faanBreakdown: d.faan_breakdown,
-					points: d.points,
-					payments: d.payments,
-					revealed: d.revealed,
-					winningHand: d.winning_hand
-				},
+				lastHandEnd: entry,
+				handHistory: alreadyRecorded ? state.handHistory : [...state.handHistory, entry],
 				claimOffer: null,
 				legalActions: [],
 				deadlineTs: null

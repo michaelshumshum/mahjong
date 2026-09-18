@@ -372,6 +372,144 @@ describe('reduce', () => {
 		expect(next.deadlineTs).toBeNull();
 	});
 
+	it("hand_end also appends to handHistory, capturing this hand's dealer/prevailing", () => {
+		const s = state({ dealer: 2, prevailing: 'SOUTH' });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'hand_end',
+			d: {
+				hand_no: 1,
+				outcome: 'win',
+				winner: 0,
+				win_type: 'self_draw',
+				discarder: null,
+				faan: 3,
+				faan_breakdown: { chicken_hand: 1 },
+				points: 100,
+				payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+				revealed: true,
+				winning_hand: [1, 2, 3]
+			}
+		});
+
+		expect(next.handHistory).toEqual([{ ...next.lastHandEnd, dealer: 2, prevailing: 'SOUTH' }]);
+	});
+
+	it('multiple hand_end events across a sequence grow handHistory rather than overwrite it', () => {
+		const handEnd = (handNo: number): ServerEvent => ({
+			v: 1,
+			ts: 1,
+			seq: handNo,
+			t: 'hand_end',
+			d: {
+				hand_no: handNo,
+				outcome: 'win',
+				winner: 0,
+				win_type: 'self_draw',
+				discarder: null,
+				faan: 1,
+				faan_breakdown: null,
+				points: 10,
+				payments: { 0: 30, 1: -10, 2: -10, 3: -10 },
+				revealed: true,
+				winning_hand: null
+			}
+		});
+
+		// dealer patched directly between hands, standing in for the hand_start that would
+		// normally rotate it in a real stream (this reducer.ts case is covered separately above).
+		let s = state({ dealer: 0 });
+		s = reduce(s, handEnd(1));
+		s = reduce({ ...s, dealer: 1 }, handEnd(2));
+		s = reduce({ ...s, dealer: 2 }, handEnd(3));
+
+		expect(s.handHistory.map((h) => h.handNo)).toEqual([1, 2, 3]);
+		expect(s.handHistory.map((h) => h.dealer)).toEqual([0, 1, 2]);
+		// only the latest hand's result is the "just finished" overlay value
+		expect(s.lastHandEnd?.handNo).toBe(3);
+	});
+
+	it('hand_end does not duplicate an already-recorded hand_no in handHistory', () => {
+		const s = state();
+		const event: ServerEvent = {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'hand_end',
+			d: {
+				hand_no: 1,
+				outcome: 'exhaustive_draw',
+				winner: null,
+				win_type: null,
+				discarder: null,
+				faan: null,
+				faan_breakdown: null,
+				points: null,
+				payments: null,
+				revealed: true,
+				winning_hand: null
+			}
+		};
+
+		const once = reduce(s, event);
+		const twice = reduce(once, event);
+
+		expect(twice.handHistory).toHaveLength(1);
+	});
+
+	it('state_sync preserves accumulated handHistory (a redacted snapshot carries no hand history)', () => {
+		const s = state({
+			handHistory: [
+				{
+					handNo: 1,
+					outcome: 'win',
+					winner: 0,
+					winType: 'self_draw',
+					discarder: null,
+					faan: 3,
+					faanBreakdown: null,
+					points: 100,
+					payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+					revealed: true,
+					winningHand: null,
+					dealer: 0,
+					prevailing: 'EAST'
+				}
+			]
+		});
+		const event: ServerEvent = {
+			v: 1,
+			ts: 1,
+			seq: 5,
+			t: 'state_sync',
+			d: {
+				seat: 2,
+				hand_no: 2,
+				prevailing: 'E',
+				dealer: 1,
+				turn: 2,
+				phase: 'AWAIT_ACTION',
+				own_hand: [10, 11, 12],
+				concealed_counts: [13, 13, 12, 13],
+				melds: [[], [], [], []],
+				discard_pools: [[], [], [], []],
+				flowers: [[], [], [], []],
+				wall_remaining: 80,
+				seat_status: ['connected', 'connected', 'connected', 'connected'],
+				scores: [300, -100, -100, -100],
+				legal_actions: [],
+				claim_options: [],
+				deadline_ts: null
+			}
+		};
+
+		const next = reduce(s, event);
+
+		expect(next.handHistory).toEqual(s.handHistory);
+	});
+
 	it('game_end records final scores', () => {
 		const s = state();
 		const next = reduce(s, {
