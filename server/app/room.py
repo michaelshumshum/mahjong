@@ -4,11 +4,23 @@ docs/05-roadmap.md §1's M3).
 **Timer heap + D17 + claim-window early exit/timeout (M3 sub-task 3).** `_next()` implements
 the real dual-await-against-a-deadline-heap pattern §3 D17 describes: one long-lived
 `_inbox_getter()` task, never cancelled, raced against a sleep to the timer heap's soonest
-deadline. The heap itself is scoped to claim-window deadlines only (`TimerHeap`'s own
-docstring); per-seat turn clocks and bot budgets still have no driver (no timeout *enforcement*
-exists for either -- `turn`'s wire `deadline_ts` is advisory-only, see `_publish_turn_if_active`)
-so no machinery is built for those deadline kinds until something needs it (per-turn/claim
-*timeout* enforcement remains unbuilt; only the disconnect-grace deadline below is real).
+deadline. The heap holds claim-window, disconnect-grace, *and* per-seat turn deadlines, all
+sharing one id space and one `TimerHeap` instance (`TimerHeap`'s own docstring) -- see the
+"Turn timeout" note below for the third kind.
+
+**Turn timeout (00-architecture.md §8 "Turn timeout" / "Bot raises / hangs").**
+`_arm_turn_timer`, called from `_publish_turn_if_active` every time a seat's `AWAIT_ACTION`
+decision is genuinely new, arms a `ruleset.turn_seconds` deadline in the same heap claim
+windows and disconnect-grace use. On expiry (`_handle_turn_timeout`) the room applies the
+doc's deterministic default (`_timeout_discard_action`: tsumogiri if this decision started
+with a freshly drawn tile, else the lowest-`tile_id` concealed tile) through the normal
+`_apply()`/`reduce()` path, exactly like a real `Discard` command, then registers a strike
+(`_register_turn_timeout_strike`) -- three strikes flips the seat to `autoplay` for the rest
+of the game (`SeatBinding.turn_timeout_strikes`). Fires identically for a connected human, a
+disconnected/`autoplay` human, and a `bot` seat (M4.5): the timer races the wall clock, not
+any particular bot job, so a hung or crashed worker (`_await_bot_job`'s own 10s hard deadline,
+`_BOT_JOB_TIMEOUT_SECONDS`) can never wedge a table past `turn_seconds` regardless of whether
+it ever answers.
 
 **Disconnect / bot handover (M3 sub-task 6).** `mark_disconnected`/`reconnect` flip
 `SeatBinding.status` between `connected`/`disconnected`/`autoplay`, surfaced to every seat via
@@ -101,13 +113,22 @@ from app.db.records import save_game_record
 from app.idempotency import IdempotencyCache
 from app.views import SeatView, redact_event, seat_view, seat_view_wire
 from bots.worker import BOT_TIERS, DEFAULT_BOT_TIER, compute_action
-from mahjong_core.actions import Action, Pass, action_to_dict, legal_actions
+from mahjong_core.actions import Action, Discard, Pass, action_to_dict, legal_actions
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import Discarded, Event, HandEnded, new_game, reduce, start_next_hand
+from mahjong_core.engine import (
+    Discarded,
+    Drawn,
+    Event,
+    HandEnded,
+    KongReplacementDrawn,
+    new_game,
+    reduce,
+    start_next_hand,
+)
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
-from mahjong_core.tiles import tile_code, tile_id_type
+from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
 __all__ = [
     "BotJobTag",
@@ -158,6 +179,30 @@ _CLAIM_KIND_WIRE = {
 
 def _now_ms() -> int:
     return time.time_ns() // 1_000_000
+
+
+def _turn_draw_tile_for_current_turn(events: list[Event], state: GameState) -> TileId | None:
+    """Whether `state`'s current `AWAIT_ACTION` seat is holding a genuinely freshly-drawn tile
+    this decision -- the signal `Room._timeout_discard_action` needs to choose tsumogiri over
+    the lowest-`tile_id` fallback (00-architecture.md §8 "Turn timeout"). Reads the real
+    `Drawn`/`KongReplacementDrawn` events `reduce()`/`start_next_hand()` actually emitted this
+    tick, rather than inferring it from tile counts -- both "just drew" and "just claimed a
+    pung/chow" leave the seat's hand at the same size pre-discard, so a count-based heuristic
+    can't tell them apart (and risks naming a tile that was never actually drawn).
+
+    `None` covers two different cases identically, both correctly handled by
+    `_timeout_discard_action`'s fallback: nothing was drawn (a claimed pung/chow landed the
+    seat here with nothing new in hand), and a fresh hand's opening deal (`new_game`/
+    `_deal_hand` build the dealt hand directly, with no `Event` of their own -- module
+    docstring's "no Event" note -- so there's no single tile to call "the drawn one" even
+    though the dealer's stand-in 14th tile plays the same structural role).
+    """
+    if state.phase != Phase.AWAIT_ACTION:
+        return None
+    for event in reversed(events):
+        if isinstance(event, (Drawn, KongReplacementDrawn)) and event.seat == state.turn:
+            return event.tile_id
+    return None
 
 
 class SeatTakenError(Exception):
@@ -212,6 +257,15 @@ class SeatBinding:
     `mark_disconnected` (no session ever binds this seat, so `app/ws.py`'s disconnect signal
     never fires for it) and `reconnect` refuses to hijack it (raises `SeatTakenError`, same as
     `join` finding the seat already taken) -- there is no human occupant to hand it back to.
+
+    `turn_timeout_strikes` (00-architecture.md §8 "Turn timeout": "Three strikes -> seat flips
+    to AUTOPLAY for the rest of the game") counts consecutive-or-not `AWAIT_ACTION` timeouts
+    for this seat, incremented by `Room._register_turn_timeout_strike`. **Never reset anywhere
+    -- that omission is the "for the rest of the game" reset policy, not an oversight.** This
+    binding is one long-lived object for the room's entire game (never recreated per hand;
+    `reconnect` only swaps the live socket underneath it), so simply never zeroing this field
+    already gives "accumulates across hand boundaries and reconnects alike" for free, with no
+    explicit "which hand is this" bookkeeping needed.
     """
 
     session_id: str
@@ -221,6 +275,7 @@ class SeatBinding:
     no_calls: bool = False
     auto_pass_chow: bool = False
     idempotency: IdempotencyCache = field(default_factory=IdempotencyCache)
+    turn_timeout_strikes: int = 0
 
 
 @dataclass(frozen=True)
@@ -300,13 +355,12 @@ class _WakeUp:
 
 
 class TimerHeap:
-    """Deadline heap keyed by `(deadline_ts, id)` (00-architecture.md §3 D17). Holds both
-    claim-window deadlines and (M3 sub-task 6) disconnect-grace deadlines, sharing one id space
+    """Deadline heap keyed by `(deadline_ts, id)` (00-architecture.md §3 D17). Holds claim-window
+    deadlines (M3 sub-task 3/5), disconnect-grace deadlines (M3 sub-task 6), and per-seat
+    `AWAIT_ACTION` turn deadlines (00-architecture.md §8 "Turn timeout"), sharing one id space
     (`Room._timer_seq`) and one heap (`Room.deadlines`) -- `_dispatch_expired_timer` tells them
-    apart by which side-table (`_timer_seat` vs. `_disconnect_timer_seat`) recognizes a popped
-    id, rather than this class knowing about either kind. Per-seat turn clocks and bot compute
-    budgets still have no driver (no timeout *enforcement* exists for either) and half-building
-    that machinery now would just be dead code.
+    apart by which side-table (`_timer_seat` / `_turn_timer_seat` / `_disconnect_timer_seat`)
+    recognizes a popped id, rather than this class knowing about any of them.
 
     **`id` is a private per-seat timer id (M3 sub-task 5), not the window's own `window_id`.**
     Sub-task 3 armed exactly one heap entry per claim window, shared by every offered seat, and
@@ -394,10 +448,10 @@ class Room:
         self.ring: dict[int | str, deque[Envelope]] = {
             seat: deque[Envelope](maxlen=512) for seat in range(4)
         }
-        self.deadlines = TimerHeap()  # claim + disconnect deadlines (D17) -- see module docstring
+        self.deadlines = TimerHeap()  # claim + disconnect + turn deadlines -- see module docstring
         self._getter: asyncio.Task[Command | BotResult | _WakeUp] | None = None  # long-lived (D17)
         self._armed_window_id: int | None = None  # last claim_window.window_id given a deadline
-        # shared TimerHeap id space, claim timers and disconnect-grace timers alike (see
+        # shared TimerHeap id space, claim/turn/disconnect-grace timers alike (see
         # TimerHeap's docstring)
         self._timer_seq = itertools.count(1)
         self._timer_seat: dict[int, tuple[int, int]] = {}  # timer id -> (window_id, seat)
@@ -406,6 +460,17 @@ class Room:
         self._claim_deadline_ms: dict[tuple[int, int], int] = {}  # (window_id, seat) -> deadline_ts
         self._disconnect_timer_seat: dict[int, int] = {}  # timer id -> seat
         self._active_disconnect_timer: dict[int, int] = {}  # seat -> the timer id live for it
+        # per-seat AWAIT_ACTION turn deadlines (00-architecture.md §8 "Turn timeout") -- same
+        # lazy-deletion staleness discipline as the claim-window tables above, one live entry
+        # per seat since only one seat is ever `state.turn` at a time.
+        self._turn_timer_seat: dict[int, int] = {}  # timer id -> seat
+        self._active_turn_timer: dict[int, int] = {}  # seat -> the timer id live for it
+        self._turn_deadline_ms: dict[int, int] = {}  # seat -> that seat's current turn deadline_ts
+        # the tile_id `Drawn`/`KongReplacementDrawn` landed for whichever seat `self.state` is
+        # currently offering an AWAIT_ACTION decision to, if any -- refreshed every `_apply()`
+        # call in lockstep with `self.state` itself, so it's always describing *that* decision by
+        # the time `_timeout_discard_action` reads it (see `_apply`'s own note).
+        self._turn_draw_tile: TileId | None = None
 
         # bot handover (M3 sub-task 6, D12): seat -> the BotJobTag currently in flight for it
         # (absent = no job outstanding). `_bot_tasks` holds strong refs to the asyncio.Tasks
@@ -668,7 +733,10 @@ class Room:
     def state_sync_wire(self, seat: int) -> dict[str, Any]:
         """Full redacted snapshot for `seat` (02-protocol.md §3 `state_sync`) -- sent on join,
         and (sub-task 5) on reconnect-with-gap; also what `app/outbox.py`'s backpressure
-        collapse resyncs to when a connection falls behind (§9)."""
+        collapse resyncs to when a connection falls behind (§9). `turn_deadline_ts` is this
+        seat's real armed `AWAIT_ACTION` deadline (`_turn_deadline_ms`, 00-architecture.md §8
+        "Turn timeout") -- `seat_view()` only actually uses it when `seat == state.turn` and
+        `state.phase == Phase.AWAIT_ACTION`, so passing it unconditionally here is harmless."""
         window = self.state.claim_window
         claim_deadline_ts = (
             self._claim_deadline_ms.get((window.window_id, seat)) if window else None
@@ -678,6 +746,7 @@ class Room:
             seat,
             seat_status=self._seat_status_tuple(),
             claim_deadline_ts=claim_deadline_ts,
+            turn_deadline_ts=self._turn_deadline_ms.get(seat),
         )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
@@ -883,12 +952,94 @@ class Room:
 
     def _dispatch_expired_timer(self, timer_id: int) -> None:
         """One id popped off the shared `self.deadlines` heap (`TimerHeap`'s docstring): claim-
-        window timers and disconnect-grace timers share one id space, so this just asks which
+        window, turn, and disconnect-grace timers share one id space, so this just asks which
         side-table recognizes it."""
         if timer_id in self._timer_seat:
             self._handle_claim_timeout(timer_id)
+        elif timer_id in self._turn_timer_seat:
+            self._handle_turn_timeout(timer_id)
         else:
             self._handle_disconnect_timeout(timer_id)
+
+    def _handle_turn_timeout(self, timer_id: int) -> None:
+        """One per-seat `AWAIT_ACTION` deadline popped (00-architecture.md §8 "Turn timeout").
+        No-op if stale: unknown id, superseded by a later arm for the same seat
+        (`_active_turn_timer[seat]` no longer points at it -- same lazy-deletion staleness
+        check `_handle_claim_timeout` uses), or `seat` genuinely isn't the one still deciding
+        (a real command for it raced this timer and won -- D17's own guarantee).
+
+        `state.claim_window` is always `None` while `state.phase == Phase.AWAIT_ACTION`
+        (`GameState.__post_init__`'s own invariant: a claim window and `AWAIT_ACTION` are
+        mutually exclusive phases) -- a seat can never simultaneously be `state.turn` *and*
+        hold a live claim offer, so 00-architecture.md §8's "auto-pass any pending claims"
+        never has anything to actually do here. The assert documents that this was checked
+        against the real invariant, not assumed.
+
+        Applies the deterministic default (`_timeout_discard_action`) through the normal
+        `_apply()`/`reduce()` path, exactly like a real `Discard` command, then registers a
+        strike (`_register_turn_timeout_strike`). Fires identically whether `seat` is a
+        connected human, a disconnected/`autoplay` human, or a `bot` seat (M4.5) -- the timer
+        races the wall clock, not any particular bot job, so a hung or crashed worker can't
+        outlast `turn_seconds` regardless of whether `_await_bot_job`'s own 10s hard deadline
+        ever fires first. Clears a stale `_pending_bot[seat]` (if any) up front, same tidy-up
+        `reconnect()` already does when it takes a decision away from an in-flight bot job --
+        this tick's own `_poke_bots()` tail then submits fresh work if `seat` still has a
+        decision to make afterward."""
+        seat = self._turn_timer_seat.get(timer_id)
+        if seat is None:
+            return
+        if self._active_turn_timer.get(seat) != timer_id:
+            return
+        if self.state.phase != Phase.AWAIT_ACTION or self.state.turn != seat:
+            return
+        assert self.state.claim_window is None  # AWAIT_ACTION never carries one -- see docstring
+        self._pending_bot.pop(seat, None)
+        self._apply(self._timeout_discard_action(seat))
+        self._register_turn_timeout_strike(seat)
+
+    def _timeout_discard_action(self, seat: int) -> Discard:
+        """00-architecture.md §8 "Turn timeout": deliberately dumb, not defensive. Tsumogiri --
+        discard the tile that just landed in `seat`'s hand -- if this decision point started
+        with a freshly drawn tile (`self._turn_draw_tile`, set in `_apply` from that tick's own
+        `Drawn`/`KongReplacementDrawn` events; a kong's replacement draw is unaffected, since it
+        always produces one of those events too). Otherwise (a claimed pung/chow landed `seat`
+        here with nothing new in hand, or a fresh hand's opening deal with no single "the drawn
+        tile" to name) the lowest-`tile_id` concealed tile.
+
+        Sourced from `legal_actions(state, seat)`'s own `Discard` set, not `state.seats[seat].
+        concealed` directly, so this can never name a tile that isn't actually a legal discard
+        right now -- `AWAIT_ACTION` always offers at least one `Discard` (one per concealed
+        tile, `actions._turn_actions`), so `discard_ids` is never empty here.
+        """
+        discard_ids = sorted(
+            a.tile_id for a in legal_actions(self.state, seat) if isinstance(a, Discard)
+        )
+        assert discard_ids, "AWAIT_ACTION always offers at least one Discard"
+        drawn = self._turn_draw_tile
+        if drawn is not None and drawn in discard_ids:
+            return Discard(tile_id=drawn)
+        return Discard(tile_id=discard_ids[0])
+
+    def _register_turn_timeout_strike(self, seat: int) -> None:
+        """docs/00-architecture.md §8 "Turn timeout": "Three strikes -> seat flips to AUTOPLAY
+        for the rest of the game." Counted on `SeatBinding.turn_timeout_strikes` -- see that
+        field's own docstring for why simply never resetting it already means "for the rest of
+        the game", with no explicit hand-boundary bookkeeping needed.
+
+        A `bot`/already-`autoplay` seat still accumulates strikes here (useful signal if a
+        room-created bot seat were ever malfunctioning) but skips the status flip/broadcast --
+        there's no human occupant to take control away from, and the seat is already being
+        played by the server either way."""
+        binding = self.seat_bindings[seat]
+        if binding is None:
+            return
+        binding.turn_timeout_strikes += 1
+        if binding.turn_timeout_strikes < self.state.ruleset.turn_timeout_strikes:
+            return
+        if binding.status in ("autoplay", "bot"):
+            return
+        binding.status = "autoplay"
+        self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "autoplay"})
 
     def _handle_disconnect_timeout(self, timer_id: int) -> None:
         """A disconnect-grace deadline popped (00-architecture.md §8 "Player disconnects":
@@ -929,6 +1080,27 @@ class Room:
         self._active_disconnect_timer[seat] = timer_id
         self._wake()
 
+    def _arm_turn_timer(self, seat: int) -> int:
+        """Give `seat` a fresh `TimerHeap` entry, `ruleset.turn_seconds` from right now
+        (00-architecture.md §8 "Turn timeout") -- the turn-side analogue of
+        `_arm_seat_claim_timer`/`_arm_disconnect_timer`, sharing the same heap and id sequence
+        (`TimerHeap`'s docstring). Only ever called from `_publish_turn_if_active`, itself
+        always running synchronously inside an already-executing `process_one()` tick or
+        `mark_ready()` -- both on this room's own event loop -- so, like the initial claim-
+        window arm (`_arm_claim_timer`), this needs no `_wake()` call of its own: the next
+        `_next()` call picks up the fresh heap entry naturally when it recomputes its wait set.
+        Returns the wire `deadline_ts` (epoch ms) for `_publish_turn_if_active` to publish."""
+        loop = asyncio.get_running_loop()
+        duration = self.state.ruleset.turn_seconds
+        deadline = loop.time() + duration
+        timer_id = next(self._timer_seq)
+        self.deadlines.add(deadline, timer_id)
+        self._turn_timer_seat[timer_id] = seat
+        self._active_turn_timer[seat] = timer_id
+        deadline_ts = _now_ms() + round(duration * 1000)
+        self._turn_deadline_ms[seat] = deadline_ts
+        return deadline_ts
+
     def _poke_bots(self) -> None:
         """00-architecture.md §3's `_poke_bots()`: submit a decision to the bot worker pool for
         every seat bound `autoplay` *or* `bot` (M4.5 practice mode -- both kinds of `SeatBinding`
@@ -961,11 +1133,13 @@ class Room:
             claim_deadline_ts = (
                 self._claim_deadline_ms.get((tag.key, seat)) if tag.kind == "claim" else None
             )
+            turn_deadline_ts = self._turn_deadline_ms.get(seat) if tag.kind == "turn" else None
             view = seat_view(
                 self.state,
                 seat,
                 seat_status=self._seat_status_tuple(),
                 claim_deadline_ts=claim_deadline_ts,
+                turn_deadline_ts=turn_deadline_ts,
             )
             mask = legal_mask(self.state, seat)
             self._submit_bot_job(seat, tag, view, mask)
@@ -999,14 +1173,16 @@ class Room:
         never applied directly from here, so it still goes through the same staleness check
         (`_handle_bot_result`) and single-writer discipline every other inbox item does.
 
-        On timeout or a worker crash: no synthesized default action is applied (per-turn timeout
-        enforcement has no driver at all yet -- the same gap `_publish_turn_if_active`'s
-        docstring already documents; an *unanswered claim* still resolves correctly regardless,
-        through its own real `TimerHeap` entry, unaffected by this). This just clears the
-        pending tag (if it's still this job's) so the next `_poke_bots()` tick retries from
-        scratch -- every tier's `act()` here is O(a heuristic scan), not a search with a real
-        budget to exceed, so in practice this path only fires for an actual crash, not a
-        legitimate miss.
+        On timeout or a worker crash: this method itself still applies no synthesized default
+        action -- it just clears the pending tag (if it's still this job's) so the next
+        `_poke_bots()` tick retries from scratch. What actually stops a stalled *turn* decision
+        from wedging the table is the independent, seat-level `ruleset.turn_seconds` deadline
+        (`_arm_turn_timer`/`_handle_turn_timeout`, 00-architecture.md §8 "Turn timeout"), which
+        races the wall clock regardless of whether any particular bot job is in flight -- not
+        this method's own 10s job deadline. An *unanswered claim* still resolves correctly
+        regardless, through its own real `TimerHeap` entry, unaffected by either. In practice
+        this path only fires for an actual crash, not a legitimate miss: every tier's `act()`
+        here is O(a heuristic scan), not a search with a real budget to exceed.
         """
         with contextlib.suppress(Exception):
             aid = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
@@ -1051,12 +1227,14 @@ class Room:
     def _apply(self, action: Action) -> None:
         """Run one already-authorized `Action` through `reduce()`, publish, and chain into
         `start_next_hand()` on `HAND_OVER` -- the common tail shared by a real `Command`
-        (`_handle`), a synthesized claim-timeout `Pass` (`_handle_claim_timeout`), and a
-        pre-armed auto-pass (`_send_claim_offers`)."""
+        (`_handle`), a synthesized claim-timeout `Pass` (`_handle_claim_timeout`), a
+        synthesized turn-timeout `Discard` (`_handle_turn_timeout`), and a pre-armed auto-pass
+        (`_send_claim_offers`)."""
         self.actions.append(action)  # full-game log (module docstring) -- reduce()-bound only
         self.state, events = reduce(self.state, action)
         self.event_id += 1
         self._publish(events)
+        all_events = events
         if self.state.phase == Phase.HAND_OVER:
             # server-computed transition, no seat decision (actions.py, engine.py module
             # docstrings) -- advance immediately, same tick, before anything else touches
@@ -1064,6 +1242,7 @@ class Room:
             self.state, more_events = start_next_hand(self.state)
             self.event_id += 1
             self._publish(more_events)
+            all_events = [*events, *more_events]
             # a hand boundary -- the next hand dealt, or the game ended -- either way
             # `process_one()`'s tail is what actually wakes a pending `wait_for_shutdown_boundary`
             # (only after any GAME_OVER persist below has actually finished, never before).
@@ -1076,6 +1255,9 @@ class Room:
                 # synthesizes both here, the same way it does for the ready-triggered hand 1
                 # start (`Room.mark_ready`).
                 self._publish_hand_start_and_deal()
+        # refreshed every call, in lockstep with self.state -- see `_turn_draw_tile`'s own
+        # __init__ comment and `_turn_draw_tile_for_current_turn`'s docstring.
+        self._turn_draw_tile = _turn_draw_tile_for_current_turn(all_events, self.state)
 
     def _arm_claim_timer(self) -> None:
         """Arm a deadline the moment `self.state.claim_window` shows a new `window_id` --
@@ -1248,19 +1430,19 @@ class Room:
         from the ready-triggered start (`mark_ready`). No backing `Event` either (same gap);
         every landing in `AWAIT_ACTION` is a genuinely new decision point (a fresh turn, or the
         same seat again after a self-kong's replacement draw changed their legal actions), so
-        this doesn't need `_arm_claim_timer`'s once-per-window idempotency guard.
+        this doesn't need `_arm_claim_timer`'s once-per-window idempotency guard -- and, by the
+        same reasoning, is the one and only call site for `_arm_turn_timer` (00-architecture.md
+        §8 "Turn timeout"): every call here is a genuinely new decision needing its own fresh
+        deadline, so there's nothing for this method's own idempotency to guard against either.
 
-        `deadline_ts` is advisory only -- `ruleset.turn_seconds` from "now", not a real armed
-        timer: per-turn timeout enforcement (tsumogiri-on-expiry) has no driver yet, same scope
-        line `app/room.py`'s module docstring already draws ("no machinery is built for those
-        deadline kinds until something needs it"); this sub-task is only "how a client would
-        learn the deadline, not new timer logic" (its own brief). `legal` is unicast to the
-        acting seat only, matching `turn.legal`'s own "unicast to the acting seat" contract.
+        `deadline_ts` is now a real, enforced `TimerHeap` deadline (`_arm_turn_timer`), not
+        merely advisory -- see that method and `_handle_turn_timeout`. `legal` is unicast to
+        the acting seat only, matching `turn.legal`'s own "unicast to the acting seat" contract.
         """
         if self.state.phase != Phase.AWAIT_ACTION:
             return
         seat = self.state.turn
-        deadline_ts = _now_ms() + self.state.ruleset.turn_seconds * 1000
+        deadline_ts = self._arm_turn_timer(seat)
         legal = [action_to_dict(a) for a in legal_actions(self.state, seat)]
         for s in range(4):
             wire: dict[str, Any] = {

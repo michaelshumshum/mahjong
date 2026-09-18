@@ -38,11 +38,14 @@ predates several fields added since M1/M2):
   `seat_view()` directly), where every seat is a live simulated player, never a lobby seat that
   may genuinely be unjoined. Only `Room._seat_status_tuple()` ever produces `empty`, for a seat
   nobody has joined yet; `bot` remains unused (`SeatBinding.status`'s docstring).
-- `deadline_ts` has no real timer source yet either (`00-architecture.md §3` D17's timer heap
-  is a later sub-task) -- the only deadline `GameState` carries at all is `ClaimWindow.
-  deadline_ts`, itself just an opaque pass-through today (`state.py`'s own docstring: "the pure
-  engine never reads a clock"). `seat_view()` surfaces it when this seat holds a live claim
-  offer; there is no per-turn deadline to surface until the Room actor arms one.
+- `deadline_ts` sources from whichever of `app/room.py`'s `TimerHeap`-armed deadlines applies to
+  this seat right now (`00-architecture.md §3` D17, `§8` "Turn timeout"): a live claim/kong-rob
+  offer (`claim_deadline_ts`), or this seat's own armed `AWAIT_ACTION` turn deadline
+  (`turn_deadline_ts`, the turn-timeout sub-task). `GameState` itself never carries either --
+  `ClaimWindow.deadline_ts` is just an opaque pass-through (`state.py`'s own docstring: "the pure
+  engine never reads a clock") -- so both are override points a caller with a real `Room` behind
+  it supplies; a bare `seat_view()` call with neither gets `None` for a seat with no live claim
+  offer, matching every pre-Room-integration caller.
 """
 
 from __future__ import annotations
@@ -150,15 +153,22 @@ def seat_view(
     *,
     seat_status: _SeatStatus | None = None,
     claim_deadline_ts: int | None = None,
+    turn_deadline_ts: int | None = None,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
     override point for the future `app/room.py` `SeatBinding` (see module docstring); omit it
     and every seat reads as `"connected"`. `claim_deadline_ts` is the same kind of override for
-    `deadline_ts`: `ClaimWindow.deadline_ts` is never set by the pure engine (state.py's own
-    docstring -- "arming and enforcing the actual timer is app/room.py's job"), so `app/room.py`
-    passes its own `TimerHeap`-derived, epoch-converted deadline here once a window is armed;
-    omit it (as every caller before the Room/Session integration sub-task did) and this falls
-    back to the always-`None` `window.deadline_ts`.
+    `deadline_ts` while this seat holds a live claim/kong-rob offer: `ClaimWindow.deadline_ts`
+    is never set by the pure engine (state.py's own docstring -- "arming and enforcing the
+    actual timer is app/room.py's job"), so `app/room.py` passes its own `TimerHeap`-derived,
+    epoch-converted deadline here once a window is armed; omit it (as every caller before the
+    Room/Session integration sub-task did) and this falls back to the always-`None`
+    `window.deadline_ts`. `turn_deadline_ts` is the analogous override for this seat's own
+    `AWAIT_ACTION` decision (00-architecture.md §8 "Turn timeout") -- surfaced only when
+    `seat == state.turn` and `state.phase == Phase.AWAIT_ACTION`, mutually exclusive with the
+    claim-window branch below (`GameState.__post_init__`: `claim_window` is never set in
+    `AWAIT_ACTION`), so there's never ambiguity about which deadline `SeatView.deadline_ts`
+    means for a given seat/phase.
     """
     own_hand = state.seats[seat].concealed if seat is not None else ()
     legal = compute_legal_actions(state, seat) if seat is not None else ()
@@ -171,6 +181,8 @@ def seat_view(
         if offer is not None:
             claim_options = (offer,)
             deadline_ts = claim_deadline_ts if claim_deadline_ts is not None else window.deadline_ts
+    elif seat is not None and state.phase == Phase.AWAIT_ACTION and state.turn == seat:
+        deadline_ts = turn_deadline_ts
 
     return SeatView(
         seat=seat,

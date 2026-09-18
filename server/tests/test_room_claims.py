@@ -123,7 +123,13 @@ async def test_discard_opening_claim_window_arms_a_deadline() -> None:
     assert loop.time() < deadline <= loop.time() + ruleset.claim_seconds + 1
 
 
-async def test_no_deadline_armed_when_a_discard_draws_no_claims() -> None:
+async def test_no_claim_deadline_armed_when_a_discard_draws_no_claims() -> None:
+    """No claim-window deadline gets armed when a discard draws no claims -- it cascades
+    straight to the next player's draw+`AWAIT_ACTION` instead (00-architecture.md §4). The
+    heap is no longer empty afterward, though: landing in `AWAIT_ACTION` now arms that seat's
+    own turn-timeout deadline too (00-architecture.md §8 "Turn timeout", the turn-timeout
+    sub-task) -- this asserts the *claim* side specifically (no armed window, no per-seat claim
+    timer entries), not "the heap has nothing in it at all"."""
     ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=5)
     room = _pre_discard_room(ruleset)
     # nobody can claim a tile nobody holds a match for
@@ -133,7 +139,12 @@ async def test_no_deadline_armed_when_a_discard_draws_no_claims() -> None:
     await room.process_one()
 
     assert room.state.claim_window is None
-    assert room.deadlines.peek() is None
+    assert room._armed_window_id is None
+    assert room._timer_seat == {}
+    # the turn timer for seat 1 (now on turn) is the only thing left in the heap
+    assert room.state.phase == Phase.AWAIT_ACTION
+    assert room.state.turn == 1
+    assert room._active_turn_timer.keys() == {1}
 
 
 # --- early exit: resolves as soon as the best pending claim can't beat what's already in ------
