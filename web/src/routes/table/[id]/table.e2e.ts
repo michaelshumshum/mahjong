@@ -72,6 +72,31 @@ test('desktop-width viewport does not apply the fixed self-hand collapse', async
 	await expect(selfRegion).not.toHaveCSS('position', 'fixed');
 });
 
+// lib/ui/settings-storage.ts persists clientPrefs/autoArm to localStorage independent of the
+// mock/live split (docs/03-frontend.md §6 "Settings persistence") -- this proves the round trip
+// survives an actual page reload, not just the unit-level save/load pair
+// (settings-storage.spec.ts). autoArm's re-assert-on-reconnect half needs a real socket to
+// observe, which is what RUN_LIVE_BACKEND_TESTS=1 tests (live.e2e.ts) are for; not duplicated
+// here.
+test('reloading the page preserves clientPrefs toggled in Settings', async ({ page }) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Settings' }).click();
+	const soundToggle = page.getByRole('checkbox', { name: 'Sound effects' });
+	const reducedMotion = page.getByRole('radio', { name: 'Reduce motion' });
+	await expect(soundToggle).toBeChecked(); // default is on
+	await soundToggle.uncheck();
+	await reducedMotion.check();
+
+	await page.reload();
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Settings' }).click();
+
+	await expect(page.getByRole('checkbox', { name: 'Sound effects' })).not.toBeChecked();
+	await expect(page.getByRole('radio', { name: 'Reduce motion' })).toBeChecked();
+});
+
 // Covers the scripted draw/discard/claim/kong animation demo (docs/03-frontend.md §4's
 // positional slot-identity rule) — the pure slot-resolution algorithm is unit-tested in
 // tile-slots.spec.ts; this proves it's actually wired up and reachable end to end.

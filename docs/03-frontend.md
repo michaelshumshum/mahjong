@@ -271,6 +271,34 @@ store's own `seq` field is just a read-model mirror of whatever the socket alrea
   doesn't yet persist those across a reload itself, e.g. to `localStorage`; a natural next step,
   not done here since nothing currently needs it).
 
+### Settings persistence (`autoArm`/`clientPrefs`)
+
+`Settings.svelte`'s two prop objects (`AutoArm`, `ClientPrefs`) are held as plain `$state` in
+`/table/[id]/+page.svelte`, not in `ClientGameState` — they're UI-owned, not game truth. Both
+persist to `localStorage` (`lib/ui/settings-storage.ts`, `mahjong:clientPrefs:v1`/
+`mahjong:autoArm:v1`): loaded once on mount, saved on every change, every read/write wrapped in
+`try/catch` and falling back to the hardcoded defaults on missing, corrupted, or malformed stored
+data — the page must render correctly with storage blocked or unavailable (private browsing).
+
+`clientPrefs` (`soundEnabled`, `motion`) has no server component at all; persistence is the whole
+story.
+
+`autoArm` (`no_calls`/`auto_pass_chow`, sent via `auto`, docs/02-protocol.md §2) is different:
+**the server has no wire event that reports a seat's current auto-arm state back to a client** —
+neither `state_sync` (`seat_view_wire`) nor any other event carries `no_calls`/`auto_pass_chow`,
+so there is nothing to read this back from. The persisted value is therefore "this client's last
+known intent," never verified server truth — a page reload builds a fresh `GameStore`/
+`MahjongSocket` with no memory of what was last chosen, even though the server's own
+`SeatBinding` may still hold the real value from before, and the two can silently disagree with no
+way for the client to notice. The fix is **re-assert on (re)connect, not read-back**: once a fresh
+live connection seats us (`ClientGameState.seat` goes non-null), `+page.svelte` re-sends the
+persisted `autoArm` via `socket.auto(...)` exactly once for that connection, pulling the server
+back in line with the client's last choice rather than leaving the two free to drift. This only
+runs in live mode — `?mock=` has no real socket to re-assert against; `clientPrefs`'s persistence
+applies to both paths since it's purely local. A future change that wants the server to be the
+source of truth for auto-arm state needs a real wire field for it first; this model is a
+deliberate stopgap around that gap, not an assumption that it doesn't exist.
+
 Rules:
 
 - The reducer is pure and exhaustively switched over the generated `ServerEvent` union, so

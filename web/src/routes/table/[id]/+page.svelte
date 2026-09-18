@@ -25,6 +25,12 @@
 	} from '$lib/ui/ScoreSheet.svelte';
 	import Chat, { type ChatEntry } from '$lib/ui/Chat.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
+	import {
+		loadAutoArm,
+		loadClientPrefs,
+		saveAutoArm,
+		saveClientPrefs
+	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import {
@@ -121,6 +127,7 @@
 		const store = new GameStore(socket);
 		handEverStarted = false;
 		readySent = false;
+		autoArmSent = false;
 		liveStore = store;
 		const offEvent = socket.onEvent((event: ServerEvent) => {
 			if (!handEverStarted && HAND_LIFECYCLE_EVENTS.has(event.t)) handEverStarted = true;
@@ -147,6 +154,18 @@
 		if (!store || store.state.seat === null || readySent) return;
 		readySent = true;
 		store.socket.ready();
+	});
+
+	// Re-assert on (re)connect, not read-back: the server never reports a seat's current
+	// auto-arm state, so this re-sends the client's last persisted intent once per fresh
+	// connection that successfully seats us, rather than assuming the server already agrees.
+	// Mock mode has no real socket (`liveStore` stays null there), so this is a no-op under
+	// `?mock=`.
+	$effect(() => {
+		const store = liveStore;
+		if (!store || store.state.seat === null || autoArmSent) return;
+		autoArmSent = true;
+		store.socket.auto({ no_calls: autoArm.noCalls, auto_pass_chow: autoArm.autoPassChow });
 	});
 
 	$effect(() => {
@@ -393,8 +412,21 @@
 		if (!isMock) liveStore?.socket.chat(phrase);
 	}
 
-	let autoArm: AutoArm = $state({ noCalls: false, autoPassChow: false });
-	let clientPrefs: ClientPrefs = $state({ soundEnabled: true, motion: 'system' });
+	// Persisted to localStorage (lib/ui/settings-storage.ts) so a reload doesn't reset either
+	// one back to these defaults. `autoArm` is "this client's last known intent," not verified
+	// server truth -- there is no wire event that reports a seat's current `no_calls`/
+	// `auto_pass_chow` back to the client (`seat_view_wire`/`state_sync` carry neither field,
+	// docs/02-protocol.md §3), so the server is never read back here. Instead, the re-assert
+	// effect below re-sends the persisted value once a fresh live connection seats us, so the
+	// server's actual `SeatBinding` gets pulled back in line with it rather than silently
+	// drifting after a reload creates a new `GameStore`/`MahjongSocket` with no memory of what
+	// was last chosen. See docs/03-frontend.md §6 "Settings persistence".
+	let autoArm: AutoArm = $state(loadAutoArm() ?? { noCalls: false, autoPassChow: false });
+	let clientPrefs: ClientPrefs = $state(
+		loadClientPrefs() ?? { soundEnabled: true, motion: 'system' }
+	);
+	// Guards the one-shot re-send below per live connection instance, mirroring `readySent`.
+	let autoArmSent = $state(false);
 
 	let toastQueue: ToastEntry[] = $state([]);
 	function pushToast(message: string): void {
@@ -790,10 +822,14 @@
 					prefs={clientPrefs}
 					onAutoArmChange={(next) => {
 						autoArm = next;
+						saveAutoArm(next);
 						if (!isMock)
 							liveStore?.socket.auto({ no_calls: next.noCalls, auto_pass_chow: next.autoPassChow });
 					}}
-					onPrefsChange={(next) => (clientPrefs = next)}
+					onPrefsChange={(next) => {
+						clientPrefs = next;
+						saveClientPrefs(next);
+					}}
 				/>
 			</div>
 		{/if}
