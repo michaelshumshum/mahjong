@@ -77,9 +77,9 @@ because nothing ever resets it -- `Room` is one long-lived object for one game, 
 per hand. On reaching `Phase.GAME_OVER`, `process_one()` calls `save_game_record` (if a
 `session_factory` was wired in at construction -- `None` is a real, supported "no persistence"
 mode, matching every bare `Room()` test that constructs one directly) with `self.actions` and
-`players` taken from each seat's `SeatBinding.session_id` -- the closest thing to a stable
-identity that exists before `hello`'s guest `name` field ships (M5, 00-architecture.md §2.1); a
-`None` entry means that seat was never joined by a human.
+`players` taken from each seat's real, chosen `SeatBinding.name` (M5, 00-architecture.md §2.1,
+`join.name` -- see `_persist_game_record`'s own docstring); a `None` entry means that seat was
+never joined by a human.
 `_boundary_this_tick`/`_shutdown_boundary` back `wait_for_shutdown_boundary`,
 `app/registry.py`'s `RoomRegistry.begin_shutdown`'s per-room half of the graceful-drain sequence
 (§8.1) -- the boundary-reached event is only ever set *after* an in-flight `GAME_OVER` persist
@@ -155,6 +155,25 @@ SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
+
+_MAX_NAME_LENGTH = 24  # guest display name cap (M5, docs/02-protocol.md §2 `join.name`)
+
+# M4.5 practice-mode bot seats (`_bind_bot_seat`) get a display name from their real tier
+# (`bots/worker.py`'s `BOT_TIERS`), not a generic "Bot" placeholder -- matches the class a
+# curious player could actually go look up.
+_BOT_DISPLAY_NAMES = {"T0": "RandomBot", "T1": "EfficiencyBot", "T2": "FaanBot"}
+
+
+def _normalize_name(raw: str | None, seat: int) -> str:
+    """Guest display name normalization (docs/02-protocol.md §2 `join.name`, M5): trim
+    whitespace, cap at `_MAX_NAME_LENGTH` chars, and fall back to a per-seat default
+    (`"Guest N"`, 1-indexed) when empty or omitted -- this is a low-stakes guest field, so bad
+    input is normalized, never rejected with a hard error (no `error{code:...}` path for it)."""
+    trimmed = (raw or "").strip()
+    if not trimmed:
+        return f"Guest {seat + 1}"
+    return trimmed[:_MAX_NAME_LENGTH]
+
 
 _default_bot_pool: ProcessPoolExecutor | None = None
 
@@ -266,10 +285,17 @@ class SeatBinding:
     `reconnect` only swaps the live socket underneath it), so simply never zeroing this field
     already gives "accumulates across hand boundaries and reconnects alike" for free, with no
     explicit "which hand is this" bookkeeping needed.
+
+    `name` (M5, docs/00-architecture.md §2.1) is this seat's resolved guest display name --
+    always a real, non-empty string (`_normalize_name`), set once at `join` (`name` on
+    `JoinPayload`) or `_bind_bot_seat` and never touched again: a `hello` reconnect doesn't
+    resend it (02-protocol.md §2/§5 -- the server already has it), so there is nothing for
+    `reconnect()` to update on this field.
     """
 
     session_id: str
     send: Callable[[int, dict[str, Any]], None]
+    name: str
     status: SeatStatus = "connected"
     ready: bool = False
     no_calls: bool = False
@@ -510,12 +536,17 @@ class Room:
         send: Callable[[int, dict[str, Any]], None],
         *,
         seat: int | None = None,
+        name: str | None = None,
     ) -> int:
         """Bind a session to a seat -- `seat=None` means "first open seat"
         (02-protocol.md §2). Raises `SeatTakenError`/`RoomFullError` for app/ws.py to turn into
         `error{code:'seat_taken'|'room_full'}`. On success, broadcasts `seat_state` to every
         already-bound seat (including this one) and unicasts a fresh `state_sync` to the
-        joining seat -- both per 02-protocol.md §2/§3."""
+        joining seat -- both per 02-protocol.md §2/§3.
+
+        `name` (M5) is this seat's chosen guest display name -- normalized (`_normalize_name`)
+        and stored on the new `SeatBinding` once, here; there is no later path that changes it
+        (a `hello` reconnect never resends it -- see `SeatBinding.name`'s own docstring)."""
         if seat is not None:
             if not 0 <= seat < 4:
                 raise ValueError(f"seat must be 0..3, got {seat}")
@@ -528,8 +559,13 @@ class Room:
                 raise RoomFullError()
             chosen = open_seats[0]
 
-        self.seat_bindings[chosen] = SeatBinding(session_id=session_id, send=send)
-        self._broadcast_wire({"t": "seat_state", "seat": chosen, "status": "connected"})
+        resolved_name = _normalize_name(name, chosen)
+        self.seat_bindings[chosen] = SeatBinding(
+            session_id=session_id, send=send, name=resolved_name
+        )
+        self._broadcast_wire(
+            {"t": "seat_state", "seat": chosen, "status": "connected", "name": resolved_name}
+        )
         self.publish_to_seat(chosen, self.state_sync_wire(chosen))
         return chosen
 
@@ -549,6 +585,7 @@ class Room:
         self.seat_bindings[seat] = SeatBinding(
             session_id=f"bot-seat-{seat}",
             send=lambda seq, wire: None,
+            name=_BOT_DISPLAY_NAMES.get(self._bot_tier, "Bot"),
             status="bot",
             ready=True,
         )
@@ -654,7 +691,9 @@ class Room:
         if binding.status != "connected":
             return
         binding.status = "disconnected"
-        self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "disconnected"})
+        self._broadcast_wire(
+            {"t": "seat_state", "seat": seat, "status": "disconnected", "name": binding.name}
+        )
         self._arm_disconnect_timer(seat)
 
     def resume(self, seat: int, last_seq: int | None, *, announce_reconnect: bool = False) -> None:
@@ -687,24 +726,28 @@ class Room:
         already finished, rearm included -- see `tests/test_reconnect.py`'s module docstring
         for why that guarantee is the whole fix for a real, CI-only test race that lived here.
         """
+        binding = self.seat_bindings[seat]
+        assert binding is not None  # reconnect() above already required a bound seat
         rearmed = self._rearm_seat_claim_timer(seat)
         head = self.seat_seq[seat] - 1  # last seq actually sent, or -1 if this seat never got one
         ring = self.ring[seat]
         if last_seq is not None and last_seq == head:
             pass  # nothing missed
         elif last_seq is not None and ring and ring[0].seq <= last_seq < head:
-            binding = self.seat_bindings[seat]
-            assert binding is not None  # reconnect() above already required a bound seat
             for env in ring:
                 if env.seq > last_seq:
                     binding.send(env.seq, dict(env.event))
         else:
             self.publish_to_seat(seat, self.state_sync_wire(seat))
             if announce_reconnect:
-                self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "connected"})
+                self._broadcast_wire(
+                    {"t": "seat_state", "seat": seat, "status": "connected", "name": binding.name}
+                )
             return  # state_sync already carries any fresh deadline_ts -- nothing further to send
         if announce_reconnect:
-            self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "connected"})
+            self._broadcast_wire(
+                {"t": "seat_state", "seat": seat, "status": "connected", "name": binding.name}
+            )
         if rearmed:
             self._send_seat_claim_offer(seat)
 
@@ -751,6 +794,7 @@ class Room:
             self.state,
             seat,
             seat_status=self._seat_status_tuple(),
+            names=self._names_tuple(),
             claim_deadline_ts=claim_deadline_ts,
             turn_deadline_ts=self._turn_deadline_ms.get(seat),
         )
@@ -772,6 +816,15 @@ class Room:
         return cast(
             "tuple[WireSeatStatus, WireSeatStatus, WireSeatStatus, WireSeatStatus]",
             tuple(b.status if b is not None else "empty" for b in self.seat_bindings),
+        )
+
+    def _names_tuple(self) -> tuple[str | None, str | None, str | None, str | None]:
+        """Every bound seat's resolved `SeatBinding.name` (M5); `None` for an unbound seat --
+        same "empty" convention `_seat_status_tuple()` uses, one level down (a `null` name
+        rather than a wire-vocabulary string, since there's no name to report at all)."""
+        return cast(
+            "tuple[str | None, str | None, str | None, str | None]",
+            tuple(b.name if b is not None else None for b in self.seat_bindings),
         )
 
     async def run(self) -> None:
@@ -1045,7 +1098,9 @@ class Room:
         if binding.status in ("autoplay", "bot"):
             return
         binding.status = "autoplay"
-        self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "autoplay"})
+        self._broadcast_wire(
+            {"t": "seat_state", "seat": seat, "status": "autoplay", "name": binding.name}
+        )
 
     def _handle_disconnect_timeout(self, timer_id: int) -> None:
         """A disconnect-grace deadline popped (00-architecture.md §8 "Player disconnects":
@@ -1065,7 +1120,9 @@ class Room:
         if binding is None or binding.status != "disconnected":
             return
         binding.status = "autoplay"
-        self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "autoplay"})
+        self._broadcast_wire(
+            {"t": "seat_state", "seat": seat, "status": "autoplay", "name": binding.name}
+        )
 
     def _wake(self) -> None:
         """Force a blocked `_next()` to re-loop and recompute its wait set against the current
@@ -1144,6 +1201,7 @@ class Room:
                 self.state,
                 seat,
                 seat_status=self._seat_status_tuple(),
+                names=self._names_tuple(),
                 claim_deadline_ts=claim_deadline_ts,
                 turn_deadline_ts=turn_deadline_ts,
             )
@@ -1489,17 +1547,17 @@ class Room:
         """`Phase.GAME_OVER` persistence (docs/06-ml.md §2, docs/00-architecture.md §6) -- a
         no-op if this `Room` was never given a `session_factory` (every bare `Room()` test, and
         any deployment with no `DATABASE_URL`, app/main.py's `lifespan`). `players` is each
-        seat's `SeatBinding.session_id` -- the closest thing to a stable per-seat identity that
-        exists before `hello`'s guest `name` field ships (M5, 00-architecture.md §2.1); `None`
-        for a seat nobody ever joined *by a human* -- a `bot` seat (M4.5 practice mode) was
-        never joined by a human either, so it gets `None` here too, not its synthetic
-        `session_id`, which would otherwise misleadingly read as a real player. Only ever called
-        once, from `process_one()`'s own tail (`self._persisted` guards a second call)."""
+        seat's real chosen `SeatBinding.name` (M5, 00-architecture.md §2.1) -- swapped in from
+        the old `SeatBinding.session_id` stand-in this sub-task replaces, now that a real guest
+        name exists. `None` for a seat nobody ever joined *by a human* -- a `bot` seat (M4.5
+        practice mode) was never joined by a human either, so it gets `None` here too, not its
+        synthetic display name (`"FaanBot"` etc.), which would otherwise misleadingly read as a
+        real player. Only ever called once, from `process_one()`'s own tail (`self._persisted`
+        guards a second call)."""
         if self._session_factory is None:
             return
         players = [
-            b.session_id if b is not None and b.status != "bot" else None
-            for b in self.seat_bindings
+            b.name if b is not None and b.status != "bot" else None for b in self.seat_bindings
         ]
         async with self._session_factory() as session:
             await save_game_record(session, self.state, self.actions, players=players)

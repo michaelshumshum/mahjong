@@ -153,7 +153,7 @@ def _drain_teardown_disconnects(
     for seat in seats:
         frame = ws.receive_json()
         assert frame["t"] == "seat_state"
-        assert frame["d"] == {"seat": seat, "status": "disconnected"}
+        assert frame["d"] == {"seat": seat, "status": "disconnected", "name": f"Guest {seat + 1}"}
 
 
 def _rig_uncontested_state(seed: int) -> GameState:
@@ -278,7 +278,7 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
             assert room.seat_seq[1] == seat_seq_before_resume + 1
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
-            assert reconnected["d"] == {"seat": 1, "status": "connected"}
+            assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
 
 def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
@@ -319,7 +319,7 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
             # `resume()`'s state_sync branch still announces the reconnect afterward.
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
-            assert reconnected["d"] == {"seat": 1, "status": "connected"}
+            assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
 
 def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
@@ -362,7 +362,7 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             # straight off the object -- see this module's own docstring.
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
-            assert reconnected["d"] == {"seat": 1, "status": "connected"}
+            assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
             assert room.seat_seq[1] == seq_before + 1
             assert len(room.ring[1]) == ring_len_before + 1
 
@@ -446,10 +446,67 @@ def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
             # the fresh claim_offer `rearmed` triggers.
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
-            assert reconnected["d"] == {"seat": 1, "status": "connected"}
+            assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
             refreshed = ws1b.receive_json()
             assert refreshed["t"] == "claim_offer"
             assert refreshed["d"]["window_id"] == window_id
             assert refreshed["d"]["deadline_ts"] == new_deadline1
             assert refreshed["d"]["deadline_ts"] > original_deadline1
+
+
+def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
+    """M5 (docs/02-protocol.md §2/§5): `join.name` is set once and lives on `SeatBinding.name`
+    for the rest of the game -- a `hello` reconnect carries only `seat`/`last_seq`, never
+    `name`, and the server must still know it (and broadcast it) without a resend."""
+    room_id = f"reconnect-name-{uuid.uuid4()}"
+    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
+        room = get_room(room_id)
+        assert room is not None
+
+        with client.websocket_connect(f"/ws?room={room_id}") as ws1:
+            ws0.send_json(_hello())
+            ws1.send_json(_hello())
+            ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+            ws0.receive_json()  # seat_state (own join)
+            ws0.receive_json()  # state_sync
+            ws0.receive_json()  # ack
+
+            ws1.send_json(_msg("join", {"seat": 1, "name": "Carol"}, id_=_next_id()))
+            joined = ws0.receive_json()  # seat_state broadcast reaches seat 0 live
+            assert joined["t"] == "seat_state"
+            assert joined["d"] == {"seat": 1, "status": "connected", "name": "Carol"}
+            ws1.receive_json()  # seat_state (own join)
+            sync1 = ws1.receive_json()
+            assert sync1["t"] == "state_sync"
+            ack1 = ws1.receive_json()
+            assert ack1["t"] == "ack"
+
+            binding = room.seat_bindings[1]
+            assert binding is not None
+            assert binding.name == "Carol"
+            seat1_last_seq = ack1["seq"]
+
+        # ws1's `with` block exits -- seat 1 disconnects; seat 0 observes it, name unchanged.
+        disconnect = ws0.receive_json()
+        assert disconnect["t"] == "seat_state"
+        assert disconnect["d"] == {"seat": 1, "status": "disconnected", "name": "Carol"}
+
+        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+            # reconnect carries no `name` at all -- the server still knows it.
+            ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
+            # its own disconnect broadcast landed in its own ring too (same seat, same stream)
+            # -- replayed back first, name intact, before the fresh "connected" announcement.
+            replayed_disconnect = ws1b.receive_json()
+            assert replayed_disconnect["t"] == "seat_state"
+            assert replayed_disconnect["d"] == {
+                "seat": 1,
+                "status": "disconnected",
+                "name": "Carol",
+            }
+            reconnected = ws1b.receive_json()
+            assert reconnected["t"] == "seat_state"
+            assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Carol"}
+
+        assert room.seat_bindings[1] is not None
+        assert room.seat_bindings[1].name == "Carol"

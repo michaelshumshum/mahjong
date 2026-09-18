@@ -126,7 +126,11 @@ def test_full_hand_over_real_ws_multi_client() -> None:
                     if bound[s]:
                         frame = other.receive_json()
                         assert frame["t"] == "seat_state"
-                        assert frame["d"] == {"seat": seat, "status": "connected"}
+                        assert frame["d"] == {
+                            "seat": seat,
+                            "status": "connected",
+                            "name": f"Guest {seat + 1}",
+                        }
                 sync = ws.receive_json()
                 assert sync["t"] == "state_sync"
                 assert sync["d"]["seat"] == seat
@@ -329,25 +333,28 @@ def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
 
         # --- seat 0 joins alone: its own state_sync sees itself connected, every other seat
         # (never joined by anyone) as empty -- not "connected", the pre-fix behavior.
-        ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        ws0.send_json(_msg("join", {"seat": 0, "name": "Alice"}, id_=_next_id()))
         assert ws0.receive_json()["t"] == "seat_state"  # its own join, broadcast to itself
         sync0 = ws0.receive_json()
         assert sync0["t"] == "state_sync"
         assert sync0["d"]["seat_status"] == ["connected", "empty", "empty", "empty"]
+        # M5: names mirror seat_status -- a resolved name for a bound seat, null for an empty one.
+        assert sync0["d"]["names"] == ["Alice", None, None, None]
         ack0 = ws0.receive_json()
         assert ack0["d"]["ok"] is True
 
         # --- seat 1 joins: seat 0 (already connected) sees a live seat_state broadcast for
         # it, not just a snapshot on its own next resync -- and seat 1's own fresh state_sync
         # already reflects both bound seats as connected, the still-open ones as empty.
-        ws1.send_json(_msg("join", {"seat": 1}, id_=_next_id()))
+        ws1.send_json(_msg("join", {"seat": 1, "name": "Bob"}, id_=_next_id()))
         live_update = ws0.receive_json()
         assert live_update["t"] == "seat_state"
-        assert live_update["d"] == {"seat": 1, "status": "connected"}
+        assert live_update["d"] == {"seat": 1, "status": "connected", "name": "Bob"}
 
         assert ws1.receive_json()["t"] == "seat_state"  # seat 1's own join, broadcast to itself
         sync1 = ws1.receive_json()
         assert sync1["t"] == "state_sync"
         assert sync1["d"]["seat_status"] == ["connected", "connected", "empty", "empty"]
+        assert sync1["d"]["names"] == ["Alice", "Bob", None, None]
         ack1 = ws1.receive_json()
         assert ack1["d"]["ok"] is True

@@ -47,6 +47,10 @@ class HelloPayload(BaseModel):
     # verified identity to bind this to instead). Omit for a fresh connection awaiting `join`,
     # unchanged M0 behavior.
     seat: int | None = None
+    # deliberately no `name` field here -- `hello` is the reconnect/session message (`seat` only
+    # ever makes sense for an already-bound seat reclaiming itself, per the field above), and the
+    # server already has this seat's chosen name from its original `join`. `JoinPayload.name`
+    # below is the one place a guest display name is ever set (02-protocol.md §2, M5).
 
 
 class PingPayload(BaseModel):
@@ -96,6 +100,12 @@ class JoinPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seat: int | None = None  # omit for "first open seat"
+    # guest display name (M5, docs/00-architecture.md §2.1): client-chosen, persisted client-side
+    # (localStorage), sent once at first `join` -- a reconnecting seat's `hello` never resends it,
+    # the server already has it on `SeatBinding.name`. No wire-level length limit here: an
+    # empty/missing/over-length name is normalized server-side (trim, cap, default), never
+    # rejected -- a low-stakes guest field doesn't get a hard-error validation path.
+    name: str | None = None
 
 
 class ReadyPayload(BaseModel):
@@ -197,6 +207,10 @@ class StateSyncPayload(BaseModel):
     flowers: list[list[str]]
     wall_remaining: int
     seat_status: list[str]
+    # per-seat chosen guest display name (M5), same indexing as seat_status -- `null` for a seat
+    # nobody has ever joined ("empty"); always a resolved, non-empty string for any bound seat
+    # (human or bot), never null for those -- see `app/room.py`'s `_normalize_name`.
+    names: list[str | None]
     scores: list[int]
     legal_actions: list[dict[str, Any]]
     claim_options: list[dict[str, Any]]
@@ -327,6 +341,10 @@ class SeatStatePayload(BaseModel):
 
     seat: int
     status: Literal["connected", "disconnected", "autoplay", "bot"]
+    # this seat's resolved display name (M5) -- carried on every seat_state broadcast, not just
+    # the one from `join`, so an already-connected seat never has to wait for a full `state_sync`
+    # to learn a name that was already resolved earlier in the game.
+    name: str | None = None
 
 
 class ServerShutdownPayload(BaseModel):

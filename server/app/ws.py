@@ -281,7 +281,7 @@ class Session:
             self._ack(msg, ok=False, error="already_joined")
             return
         try:
-            seat = self.room.join(self.session_id, self._push, seat=msg.d.seat)
+            seat = self.room.join(self.session_id, self._push, seat=msg.d.seat, name=msg.d.name)
         except SeatTakenError:
             self._ack(msg, ok=False, error="seat_taken")
             return

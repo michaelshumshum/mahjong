@@ -182,7 +182,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
         for ws in observers:
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
-            assert frame["d"] == {"seat": 1, "status": "disconnected"}
+            assert frame["d"] == {"seat": 1, "status": "disconnected", "name": "Guest 2"}
         assert room.seat_bindings[1] is not None
 
         # --- grace period (0s, already due): the room's own background task pops the timer
@@ -190,7 +190,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
         for ws in observers:
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
-            assert frame["d"] == {"seat": 1, "status": "autoplay"}
+            assert frame["d"] == {"seat": 1, "status": "autoplay", "name": "Guest 2"}
         assert room.seat_bindings[1].status == "autoplay"
 
         # --- seat 0 discards its uncontested tile -> cascades straight to seat 1's draw+turn
@@ -234,7 +234,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
             for ws in observers:
                 frame = ws.receive_json()
                 assert frame["t"] == "seat_state"
-                assert frame["d"] == {"seat": 1, "status": "connected"}
+                assert frame["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
             assert room.seat_bindings[1].status == "connected"
             assert 1 not in room._pending_bot
@@ -329,12 +329,12 @@ def test_disconnect_bot_runs_faanbot_not_random() -> None:
         for ws in observers:
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
-            assert frame["d"] == {"seat": 1, "status": "disconnected"}
+            assert frame["d"] == {"seat": 1, "status": "disconnected", "name": "Guest 2"}
 
         for ws in observers:
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
-            assert frame["d"] == {"seat": 1, "status": "autoplay"}
+            assert frame["d"] == {"seat": 1, "status": "autoplay", "name": "Guest 2"}
 
         discard_tile = tile_ids_for_type(TileType.DRAGON_RED)[0]
         ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))

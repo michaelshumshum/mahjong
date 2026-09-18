@@ -1579,6 +1579,18 @@
           ],
           "default": null,
           "title": "Seat"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         }
       },
       "title": "JoinPayload",
@@ -2125,6 +2137,18 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         }
       },
       "required": [
@@ -2348,6 +2372,20 @@
           "title": "Seat Status",
           "type": "array"
         },
+        "names": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Names",
+          "type": "array"
+        },
         "scores": {
           "items": {
             "type": "integer"
@@ -2397,6 +2435,7 @@
         "flowers",
         "wall_remaining",
         "seat_status",
+        "names",
         "scores",
         "legal_actions",
         "claim_options",

@@ -39,7 +39,8 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      │                                              │
                      │  WS endpoint ──► Session (thin)              │
                      │                    · bind seat from          │
-                     │                      hello{seat, name}       │
+                     │                      join{seat, name} /      │
+                     │                      reclaim via hello{seat} │
                      │                    · parse + validate envelope│
                      │                    · push Command to room    │
                      │                    · pump BOUNDED outbound   │
@@ -74,23 +75,34 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
 Guest-only, by design — not guest-first with an account upgrade path. There is no account, no
 password, no email, no JWT, and no REST auth endpoint at all. A player picks a display name
 client-side; it's persisted in `localStorage` (or a cookie) so it survives a reload, and travels
-with the connection as a plain field on `hello`:
+with the connection as a plain field on `join` — not `hello`, see the note below:
 
 ```
 client ──ws://…/ws?room=…──────────────────────────────────────────► WS endpoint
-client ──hello{seat, name}──────────────────────────────────────────► Session binds this seat
+client ──join{seat?, name?}──────────────────────────────────────────► Session binds this seat
+client ──hello{seat}──(a later reconnect, same seat)─────────────────► Session reclaims it
 ```
 
-An earlier draft of this section specified a short-lived, single-use REST-issued WS ticket
+**`join`, not `hello`, carries the name (M5 implementation note).** An earlier draft of this
+section put `name` on `hello{seat, name}` instead. That's the wrong message: `hello.seat` only
+ever makes sense for an *already-bound* seat reclaiming itself on reconnect
+(`HelloPayload`'s own docstring, `docs/02-protocol.md §2/§5`) — there is no name to carry on a
+reconnect, since the server already has it from the seat's original `join`. `join` is the
+message that actually claims a seat for the first time, so it's the natural place a first-time
+identity gets attached (`docs/02-protocol.md §2`'s `join` row). A `hello` reconnect never
+resends `name`; the server keeps it on `SeatBinding.name` (`server/app/room.py`) for the whole
+game, set once at `join`.
+
+An earlier draft of this section also specified a short-lived, single-use REST-issued WS ticket
 (`POST /api/rooms/{id}/ticket` → `{ticket, expires_in}`, redeemed once by the socket) so a JWT
 would never need to ride in a query string. That design is cut, not deferred — see
 `docs/05-roadmap.md`'s M5 section for why. Its absence has one real consequence, stated plainly
-rather than left implicit: seat identity is permanently client-asserted. A `hello{seat: 2, name:
-"..."}` claiming seat 2 is trusted at face value — nothing verifies the connection actually is
-whoever bound that seat first, the same trust model `hello.seat` already uses today
-(`docs/02-protocol.md §5`). Accepted for a guest-only game with no real stakes; there is no
-ticket, credential, or account anywhere in this design to make that guarantee stronger, and no
-plan to add one.
+rather than left implicit: seat identity is permanently client-asserted. A `join{seat: 2, name:
+"..."}` claiming seat 2 (or a later `hello{seat: 2}` reclaiming it) is trusted at face value —
+nothing verifies the connection actually is whoever bound that seat first, the same trust model
+`hello.seat` already uses today (`docs/02-protocol.md §5`). Accepted for a guest-only game with
+no real stakes; there is no ticket, credential, or account anywhere in this design to make that
+guarantee stronger, and no plan to add one.
 
 ## 3. Core model
 
@@ -383,6 +395,7 @@ class SeatView:
     flowers: tuple[tuple[Flower, ...], ...]       # per seat, fully public
     wall_remaining: int                            # count only — see wall bullet below
     seat_status: tuple[str, ...]                   # connected | disconnected | autoplay | bot | empty, per seat
+    names: tuple[str | None, ...]                  # chosen guest display name (M5), per seat — None if unjoined
     scores: tuple[int, int, int, int]
     legal_actions: tuple[Action, ...]              # non-empty whenever actions.legal_actions(state, seat) is
     claim_options: tuple[ClaimOffer, ...]          # this seat's own live claim offer (§4), if any
@@ -425,6 +438,14 @@ distinct from `autoplay` (a seat that *was* human and lost its connection) but d
 identical `_poke_bots`/`BotJobTag` machinery. `reconnect` refuses to hijack a `bot` seat (raises
 the same `SeatTakenError` `join` raises against an already-taken seat) — there is no prior human
 occupant for a `hello{seat}` to reclaim.
+
+**`names` got its real data in the M5 guest-name sub-task.** `app/room.py`'s `SeatBinding.name`
+(set once at `join`, from `JoinPayload.name`, normalized/trimmed/capped/defaulted by
+`_normalize_name`; synthesized from the room's `bot_tier` for a `bot` seat, `_bind_bot_seat`) is
+what `Room` passes as `seat_view()`'s `names` override everywhere it builds a view
+(`state_sync_wire`, `_poke_bots`), the same override-point shape `seat_status` already
+established. `hello` never carries `name` — see §2.1's note on why `join` is the right message
+for it.
 
 **`empty` distinguishes "never joined" from "connected" (post-M3, `/table/[id]` sub-task).**
 `Room._seat_status_tuple()` reported `"connected"` for an unbound seat too — the only default
@@ -535,11 +556,11 @@ every bare `Room()`/`RoomRegistry()` construction that predates this) and instal
 fresh `RoomRegistry` via `app/ws.py`'s `reset_registry()` on every ASGI startup -- "fresh", not a
 mutated eternal singleton, matters for the shutdown-drain state below (§8.1). On
 `Phase.GAME_OVER`, `Room.process_one()` calls `save_game_record` at most once with the
-accumulated `self.actions` and `players` taken from each seat's `SeatBinding.session_id` -- the
-closest thing to a stable per-seat identity that exists before `hello`'s guest `name` field ships
-(M5, §2.1); swapping `players` to record that chosen name instead of a per-connection session id
-is M5 scope, not invented here. There is no account id anywhere in this design to record instead
--- M5's guest names are the permanent identity model, not a stand-in for one.
+accumulated `self.actions` and `players` taken from each seat's real, chosen `SeatBinding.name`
+(M5, §2.1's `join.name`) -- swapped in from the per-connection `SeatBinding.session_id` this
+originally recorded, before M5's guest `name` field shipped. There is no account id anywhere in
+this design to record instead -- M5's guest names are the permanent identity model, not a
+stand-in for one.
 
 ## 7. Scaling path
 

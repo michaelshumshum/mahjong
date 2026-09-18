@@ -69,6 +69,7 @@ def _bind(room: Room, seat: int, *, status: str = "connected") -> None:
     room.seat_bindings[seat] = SeatBinding(
         session_id=f"seat-{seat}",
         send=lambda seq, wire: None,
+        name=f"Seat {seat}",
         status=status,  # type: ignore[arg-type]
     )
 

@@ -10,8 +10,11 @@ leaderboard.
 no account, no password, no email, and no REST auth endpoint at all (`docs/00-architecture.md
 §2.1` cuts an earlier ticket-issuing design entirely — see `docs/05-roadmap.md`'s M5 section for
 why). A player picks a display name client-side, persisted in `localStorage`/a cookie so it
-survives a reload, and sends it as a plain field on `hello` alongside `seat` (§2's table) — no
-REST round trip before opening the socket, no credential of any kind in the WS URL because
+survives a reload, and sends it once as a plain field on `join` (§2's table) — not `hello`: a
+reconnecting seat's `hello{seat}` never resends it, since the server already has it from that
+seat's original `join` (`JoinPayload.name`; see `HelloPayload`'s own docstring for why `seat` on
+`hello` only ever means "reclaim an already-bound seat", never "set it up for the first time").
+No REST round trip before opening the socket, no credential of any kind in the WS URL because
 there's no credential to carry. Seat identity is consequently permanently client-asserted, not
 verified against anything — see §5's reconnect-identity note for the full reasoning.
 
@@ -65,8 +68,8 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `hello` | `{last_seq?, client_version, seat?}` | first frame after connect. `seat` present + already bound -> reconnect (§5); omitted -> the M0 no-op ahead of `join` |
-| `join` | `{seat?: 0-3}` | request a seat; omit `seat` for "first open seat" |
+| `hello` | `{last_seq?, client_version, seat?}` | first frame after connect. `seat` present + already bound -> reconnect (§5); omitted -> the M0 no-op ahead of `join`. No `name` field — the server already has it from that seat's original `join`, so a reconnect never resends it |
+| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` (M5) is a client-chosen guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty/omitted; never hard-rejected (`server/app/room.py`'s `_normalize_name`). A `hello` reconnect never resends it |
 | `ready` | `{}` | lobby → start; only valid once seated |
 | `discard` | `{tile_id}` | must be in hand, must be your turn |
 | `claim` | `{window_id, choice, tiles?}` | `choice`: `pass\|chow\|pung\|kong\|win`. `tiles` disambiguates a chow (e.g. 4-5 vs 5-6 for a 6). Priority among competing claims is resolved per [01-rules-spec.md §6](01-rules-spec.md) — not restated here. |
@@ -84,9 +87,11 @@ legality is a UI hint only.
 fills seats first-come-first-served among open ones unless `seat` is given, in which case it's
 rejected (`error{code:"seat_taken"}`) if that seat is already bound, or `error{code:"room_full"}`
 if none are free. A successful `join` is confirmed by a broadcast `seat_state{seat,
-status:"connected"}` — sent to every already-bound seat (this one included), so a client
+status:"connected", name}` — sent to every already-bound seat (this one included), so a client
 rendering the empty seats it saw in its own `state_sync` (§3) updates live as the rest of the
-table fills in, not only on its next full resync. `join` is for first entry only — a reconnecting player doesn't re-`join`;
+table fills in, not only on its next full resync; `name` is this seat's resolved guest display
+name (M5, above), so an already-connected seat learns a new player's chosen name the moment they
+join, not just on its next `state_sync`. `join` is for first entry only — a reconnecting player doesn't re-`join`;
 `hello{last_seq}` on an already-bound seat reclaims it directly (§5). Once all four seats are
 filled the room waits for `ready` from each before dealing.
 
@@ -108,7 +113,7 @@ sub-tasks actually implemented them; reconciled here to what ships rather than l
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen) |
+| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen). `d.names` (M5) is each seat's resolved guest display name, same indexing — `null` for an `empty` seat, always a real non-empty string for any bound seat, human or bot |
 | `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (same vocabulary as `state_sync` above, `empty` included — unreachable for a `require_ready=True` room, where dealing gates on all four seats bound, but a direct-construction `require_ready=False` room can reach hand 2+ with seats that were never joined at all); see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/room.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
 | `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; same "no backing `Event`" note as `hand_start` |
 | `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not yet emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event` to redact for those; mid-hand flower reveals (a normal draw) go through `reduce()` normally and *are* emitted |
@@ -122,7 +127,7 @@ sub-tasks actually implemented them; reconciled here to what ships rather than l
 | `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`); see the known reveal gap under Redaction below |
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
-| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward |
+| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot, name?}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward. `name` (M5) is this seat's resolved guest display name, carried on every `seat_state` broadcast for that seat, not just its first |
 | `server_shutdown` | `{deadline_ts}` | broadcast once, to every seat ever bound in the room, when a graceful-shutdown drain starts (`00-architecture.md §8.1`); `deadline_ts` is the shared grace-window deadline every room in the drain gets. Clients show a "reconnect shortly" banner instead of reading the eventual dropped socket as an error |
 | `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Room` silently drops a well-formed but currently-illegal command the same as before this existed |
 | `error` | `{code, message}` |
@@ -251,10 +256,13 @@ live connection, `Room.resume()` runs the branch above. A `seat` that was never 
 future auth ticket to carry seat identity instead of trusting a client-asserted field
 (`docs/00-architecture.md §2.1` originally sketched a REST-issued WS ticket) — that design is cut,
 not deferred (see `docs/05-roadmap.md`'s M5 section), so there is no ticket coming to close this
-gap later. `hello.seat` claiming a seat is trusted at face value, permanently; M5 adds a sibling
-`name` field to the same message (a client-chosen guest display name, persisted in
-`localStorage`) but does not change this trust model at all — a malicious client can still claim
-any seat, same as today. Accepted for a guest-only game with no real stakes.
+gap later. `hello.seat` claiming a seat is trusted at face value, permanently; M5 adds a
+client-chosen guest display name (persisted in `localStorage`) as a sibling field on `join`, not
+`hello` — an earlier draft of this note put it on `hello{seat, name}` instead, which is the wrong
+message: `hello.seat` only ever means "reclaim an already-bound seat" (this section's whole
+subject), and there's nothing to name on a reconnect the server doesn't already know. Either way,
+this doesn't change the trust model at all — a malicious client can still claim any seat, same as
+today. Accepted for a guest-only game with no real stakes.
 
 **Mid-claim-window reconnect also re-arms a timer (00-architecture.md §8).** If the reconnecting
 seat holds a live, unresolved claim offer, `Room.resume()` re-arms *that seat's own* entry in the

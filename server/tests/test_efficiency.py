@@ -63,6 +63,7 @@ def _build_view(
         flowers=((), (), (), ()),
         wall_remaining=50,
         seat_status=("connected", "connected", "connected", "connected"),
+        names=(None, None, None, None),
         scores=(0, 0, 0, 0),
         legal_actions=(),
         claim_options=(),

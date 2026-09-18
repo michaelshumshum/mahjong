@@ -148,10 +148,10 @@ def test_full_game_via_ws_persists_a_game_record(
         room.state = _rig_last_hand_state(seed=seed)
 
         wss = [ws0, ws1, ws2, ws3]
-        session_ids: dict[int, str] = {}
+        names = {seat: f"Player {seat}" for seat in range(4)}
         for seat, sock in enumerate(wss):
             sock.send_json(_msg("hello", {"client_version": "test"}))
-            sock.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
+            sock.send_json(_msg("join", {"seat": seat, "name": names[seat]}, id_=_next_id()))
             for s in range(seat + 1):
                 frame = wss[s].receive_json()
                 assert frame["t"] == "seat_state"
@@ -164,7 +164,7 @@ def test_full_game_via_ws_persists_a_game_record(
         for seat in range(4):
             binding = room.seat_bindings[seat]
             assert binding is not None
-            session_ids[seat] = binding.session_id
+            assert binding.name == names[seat]
 
         for seat in range(3):
             wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
@@ -206,6 +206,6 @@ def test_full_game_via_ws_persists_a_game_record(
     assert RuleSet.from_dict(record.ruleset) == _LAST_HAND_RULESET
     assert record.result["hand_count"] == room.state.hand_no
     assert record.result["final_scores"] == [s.score for s in room.state.seats]
-    assert record.players == [session_ids[s] for s in range(4)]
+    assert record.players == [names[s] for s in range(4)]
     assert len(record.action_log) == len(room.actions)
     assert [action_from_dict(d) for d in record.action_log] == room.actions

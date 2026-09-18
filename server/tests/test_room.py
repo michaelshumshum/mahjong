@@ -117,3 +117,32 @@ async def test_illegal_command_is_rejected_without_corrupting_state() -> None:
     await room.process_one()
     assert room.state is not pre_state
     assert room.event_id == pre_event_id + 1
+
+
+# --- M5 guest display name normalization (docs/02-protocol.md §2 join.name) --------------------
+
+
+def test_join_name_is_trimmed_and_stored() -> None:
+    room = Room("room-name-1", _BOUNDED_RULESET, game_seed=1)
+    seat = room.join("sess-0", lambda seq, wire: None, seat=0, name="  Alice  ")
+    binding = room.seat_bindings[seat]
+    assert binding is not None
+    assert binding.name == "Alice"
+
+
+def test_join_name_empty_or_omitted_falls_back_to_a_per_seat_default() -> None:
+    room = Room("room-name-2", _BOUNDED_RULESET, game_seed=2)
+    room.join("sess-0", lambda seq, wire: None, seat=0, name="   ")
+    room.join("sess-1", lambda seq, wire: None, seat=1, name=None)
+    assert room.seat_bindings[0] is not None and room.seat_bindings[0].name == "Guest 1"
+    assert room.seat_bindings[1] is not None and room.seat_bindings[1].name == "Guest 2"
+
+
+def test_join_name_over_length_is_truncated_not_rejected() -> None:
+    room = Room("room-name-3", _BOUNDED_RULESET, game_seed=3)
+    long_name = "x" * 100
+    seat = room.join("sess-0", lambda seq, wire: None, seat=0, name=long_name)
+    binding = room.seat_bindings[seat]
+    assert binding is not None
+    assert binding.name == "x" * 24
+    assert len(binding.name) == 24

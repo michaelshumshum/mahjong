@@ -444,7 +444,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         # re-armed against something it already saw live.
         disc_seat3 = _recv(ws0, 0)
         assert disc_seat3["t"] == "seat_state"
-        assert disc_seat3["d"] == {"seat": 3, "status": "disconnected"}
+        assert disc_seat3["d"] == {"seat": 3, "status": "disconnected", "name": "Guest 4"}
         assert _recv(ws1, 1)["t"] == "seat_state"
         assert _recv(ws2, 2)["t"] == "seat_state"
 
@@ -469,7 +469,11 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             missed_disconnect = _recv(ws3b, 3)
             assert missed_disconnect["t"] == "seat_state"
-            assert missed_disconnect["d"] == {"seat": 3, "status": "disconnected"}
+            assert missed_disconnect["d"] == {
+                "seat": 3,
+                "status": "disconnected",
+                "name": "Guest 4",
+            }
             missed_discard = _recv(ws3b, 3)
             assert missed_discard["t"] == "discard"
             assert missed_discard["d"]["tile_id"] == _MAN_5[0]
@@ -480,13 +484,13 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             reconnected = _recv(ws3b, 3)
             assert reconnected["t"] == "seat_state"
-            assert reconnected["d"] == {"seat": 3, "status": "connected"}
+            assert reconnected["d"] == {"seat": 3, "status": "connected", "name": "Guest 4"}
             # the reconnect announcement broadcasts to every seat, not just the one that
             # reconnected -- drain it off the three still-live bystander connections too.
             for seat, ws in ((0, ws0), (1, ws1), (2, ws2)):
                 frame = _recv(ws, seat)
                 assert frame["t"] == "seat_state"
-                assert frame["d"] == {"seat": 3, "status": "connected"}
+                assert frame["d"] == {"seat": 3, "status": "connected", "name": "Guest 4"}
 
             rearmed_offer = _recv(ws3b, 3)
             assert rearmed_offer["t"] == "claim_offer"

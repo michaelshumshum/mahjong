@@ -114,6 +114,9 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
             assert binding is not None
             assert binding.status == "bot"
             assert binding.ready is True
+            # M5: a bot seat still gets a real, sensible display name -- never null/empty --
+            # sourced from the room's real tier, not a generic "Bot" placeholder.
+            assert binding.name == "FaanBot"
         assert room._bot_tier == "T2"  # M4.5's default -- FaanBot, not a weaker tier
 
         # override to a repeat-off ruleset (module docstring) -- before any message is sent, so
@@ -121,7 +124,7 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
         room.state = new_game(_GAME_RULESET, seed)
 
         ws0.send_json(_msg("hello", {"client_version": "test"}))
-        ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        ws0.send_json(_msg("join", {"seat": 0, "name": "Dave"}, id_=_next_id()))
         ws0.send_json(_msg("ready", {}, id_=_next_id()))
 
         frames = _play_practice_game(ws0)
@@ -131,6 +134,11 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
     game_end = frames[-1]
     assert game_end["t"] == "game_end"
     assert game_end["d"]["hand_no"] == 4  # bounded, per module docstring
+
+    # --- the human's own join state_sync already shows every bot's real display name, not
+    # null/empty -- proof M5 names are wired through to the human before the game even starts.
+    join_sync = next(f for f in frames if f["t"] == "state_sync")
+    assert join_sync["d"]["names"] == ["Dave", "FaanBot", "FaanBot", "FaanBot"]
 
     # --- the human acted on its own turns (at least one real discard from seat 0)...
     assert any(f["t"] == "discard" and f["d"]["seat"] == 0 for f in frames)

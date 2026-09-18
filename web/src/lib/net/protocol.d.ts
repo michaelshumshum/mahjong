@@ -160,6 +160,7 @@ export interface PingPayload {
 
 export interface JoinPayload {
 	seat?: number | null;
+	name?: string | null;
 }
 
 export interface ReadyPayload {}
@@ -212,6 +213,7 @@ export interface StateSyncPayload {
 	flowers: string[][];
 	wall_remaining: number;
 	seat_status: string[];
+	names: (string | null)[];
 	scores: number[];
 	legal_actions: Record<string, unknown>[];
 	claim_options: Record<string, unknown>[];
@@ -308,6 +310,7 @@ export interface GameEndPayload {
 export interface SeatStatePayload {
 	seat: number;
 	status: 'connected' | 'disconnected' | 'autoplay' | 'bot';
+	name?: string | null;
 }
 
 export interface ServerShutdownPayload {

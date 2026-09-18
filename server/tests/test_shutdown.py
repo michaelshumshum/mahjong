@@ -93,7 +93,9 @@ class _FakeSocket:
 def _bind_fake_seats(room: Room) -> list[_FakeSocket]:
     sockets = [_FakeSocket() for _ in range(4)]
     for seat, sock in enumerate(sockets):
-        room.seat_bindings[seat] = SeatBinding(session_id=f"seat-{seat}", send=sock.send)
+        room.seat_bindings[seat] = SeatBinding(
+            session_id=f"seat-{seat}", send=sock.send, name=f"Seat {seat}"
+        )
     return sockets
 
 

@@ -55,6 +55,7 @@ def _view(
         flowers=((), (), (), ()),
         wall_remaining=wall_remaining,
         seat_status=("connected", "connected", "connected", "connected"),
+        names=(None, None, None, None),
         scores=(0, 0, 0, 0),
         legal_actions=(),
         claim_options=(),

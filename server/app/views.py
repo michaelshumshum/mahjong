@@ -38,6 +38,9 @@ predates several fields added since M1/M2):
   `seat_view()` directly), where every seat is a live simulated player, never a lobby seat that
   may genuinely be unjoined. Only `Room._seat_status_tuple()` ever produces `empty`, for a seat
   nobody has joined yet; `bot` remains unused (`SeatBinding.status`'s docstring).
+- `names` (M5, docs/00-architecture.md §2.1) is the same shape of override as `seat_status`:
+  `app/room.py`'s `SeatBinding.name` (set at `join`, or synthesized for a `bot` seat) is the
+  real source, `seat_view()` defaults to `(None,) * 4` for a caller with no `Room` behind it.
 - `deadline_ts` sources from whichever of `app/room.py`'s `TimerHeap`-armed deadlines applies to
   this seat right now (`00-architecture.md §3` D17, `§8` "Turn timeout"): a live claim/kong-rob
   offer (`claim_deadline_ts`), or this seat's own armed `AWAIT_ACTION` turn deadline
@@ -114,6 +117,9 @@ def _entitled(entitlement: Entitlement) -> dict[str, Any]:
 _SeatStatus = tuple[str, str, str, str]
 _DEFAULT_SEAT_STATUS: _SeatStatus = ("connected", "connected", "connected", "connected")
 
+_SeatNames = tuple[str | None, str | None, str | None, str | None]
+_DEFAULT_NAMES: _SeatNames = (None, None, None, None)
+
 
 @dataclass(frozen=True)
 class SeatView:
@@ -141,6 +147,10 @@ class SeatView:
     flowers: tuple[tuple[Flower, ...], ...] = field(metadata=_entitled(Entitlement.PUBLIC))
     wall_remaining: int = field(metadata=_entitled(Entitlement.COUNT_ONLY))
     seat_status: _SeatStatus = field(metadata=_entitled(Entitlement.PUBLIC))
+    # chosen guest display name per seat (M5) -- public like seat_status: a name is never a
+    # secret, so there's no redaction question here, only a data-availability one (a caller
+    # with no Room behind it, e.g. bots/arena, has no name to report and defaults to None).
+    names: _SeatNames = field(metadata=_entitled(Entitlement.PUBLIC))
     scores: tuple[int, int, int, int] = field(metadata=_entitled(Entitlement.PUBLIC))
     legal_actions: tuple[Action, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
     claim_options: tuple[ClaimOffer, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
@@ -152,12 +162,16 @@ def seat_view(
     seat: int | None,
     *,
     seat_status: _SeatStatus | None = None,
+    names: _SeatNames | None = None,
     claim_deadline_ts: int | None = None,
     turn_deadline_ts: int | None = None,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
     override point for the future `app/room.py` `SeatBinding` (see module docstring); omit it
-    and every seat reads as `"connected"`. `claim_deadline_ts` is the same kind of override for
+    and every seat reads as `"connected"`. `names` is the analogous override for each seat's
+    chosen guest display name (M5) -- `app/room.py` passes `Room`'s own per-seat names; omit it
+    (every pre-M5 caller, and every caller with no `Room` behind it at all -- bots/arena.py,
+    bots/selfplay.py) and every seat reads as `None`. `claim_deadline_ts` is the same kind of override for
     `deadline_ts` while this seat holds a live claim/kong-rob offer: `ClaimWindow.deadline_ts`
     is never set by the pure engine (state.py's own docstring -- "arming and enforcing the
     actual timer is app/room.py's job"), so `app/room.py` passes its own `TimerHeap`-derived,
@@ -200,6 +214,7 @@ def seat_view(
         flowers=tuple(s.flowers for s in state.seats),
         wall_remaining=len(state.wall.tiles),
         seat_status=seat_status if seat_status is not None else _DEFAULT_SEAT_STATUS,
+        names=names if names is not None else _DEFAULT_NAMES,
         scores=cast("tuple[int, int, int, int]", tuple(s.score for s in state.seats)),
         legal_actions=legal,
         claim_options=claim_options,
@@ -493,6 +508,7 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "flowers": [[tile_code(f) for f in fl] for fl in view.flowers],
         "wall_remaining": view.wall_remaining,
         "seat_status": list(view.seat_status),
+        "names": list(view.names),
         "scores": list(view.scores),
         "legal_actions": [action_to_dict(a) for a in view.legal_actions],
         "claim_options": [_claim_offer_wire(o, view.seat) for o in view.claim_options],

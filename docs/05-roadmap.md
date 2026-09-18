@@ -207,24 +207,40 @@ this backend sub-task.
 ### M5 — Real multiplayer (1–2 weeks)
 Guest identity only, by design — no accounts, no password, no email, no JWT, no REST auth
 endpoint. A player picks a display name client-side; it's persisted in `localStorage` (or a
-cookie) so it survives a reload, and sent as part of `hello` alongside `seat`
-(docs/02-protocol.md §5's existing `hello.seat` field grows a sibling `name` field — no new wire
-concept, just one more client-asserted field on a message that already carries one). Matchmaking,
-private rooms with invite codes, mid-game bot takeover for disconnects, spectating, chat with
-canned phrases.
+cookie) so it survives a reload, and sent once at `join` (docs/02-protocol.md §2's existing
+`JoinPayload` grows a sibling `name` field alongside `seat` — no new wire concept, just one more
+client-asserted field on the message that actually claims a seat for the first time; a later
+`hello{seat}` reconnect never resends it — see docs/00-architecture.md §2.1's note on why `join`,
+not `hello`, is the right message). Matchmaking, private rooms with invite codes, mid-game bot
+takeover for disconnects, spectating, chat with canned phrases.
 
 This is a deliberate rescope, not a placeholder for auth done later: `docs/00-architecture.md
 §2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
 top) is cut, not deferred — cutting it removes the one M5 line item that pulled in
 infrastructure (email deliverability, SPF/DKIM, a transactional provider) unlike anything else in
 this project. A consequence worth stating plainly: seat identity stays permanently
-client-asserted (a `hello{seat, name}` claiming seat 2 is trusted at face value, same as the
-stand-in `hello.seat` mechanism already ships today) — there's no ticket to bind a seat to a
-verified identity, so nothing stops a malicious client from claiming a seat it didn't join.
-Accepted for a guest-only, no-real-stakes game; revisit only if real accounts ever become an
-actual goal, which is explicitly not scoped anywhere in this document.
+client-asserted (a `join{seat: 2, name: "..."}` claiming seat 2, or a later `hello{seat: 2}`
+reclaiming it, is trusted at face value, same as the stand-in `hello.seat` mechanism already
+ships today) — there's no ticket to bind a seat to a verified identity, so nothing stops a
+malicious client from claiming a seat it didn't join. Accepted for a guest-only, no-real-stakes
+game; revisit only if real accounts ever become an actual goal, which is explicitly not scoped
+anywhere in this document.
 **Done when:** four browsers on four devices finish a game with one deliberate disconnect, each
 seeing the other three players' chosen names throughout.
+
+**Backend wire slice: built.** `join.name` (validated leniently -- trimmed, capped at 24 chars,
+defaulted to `"Guest N"` when empty/omitted, never hard-rejected: a low-stakes guest field isn't
+worth a rejection flow) is stored on `SeatBinding.name` for the seat's entire game, survives
+reconnect untouched (a `hello` never resends it), and is surfaced three ways: `state_sync.names`
+(every seated player's name, `null` for an unjoined seat), a `name` field on every `seat_state`
+broadcast (so an already-connected seat sees a new name live, not just on its next resync), and
+`GameRecord.players` (swapped from the old `SeatBinding.session_id` stand-in now that a real
+chosen name exists, `docs/00-architecture.md §6`). Practice-mode bot seats (M4.5) get a real
+name too, sourced from the room's `bot_tier` (`"RandomBot"`/`"EfficiencyBot"`/`"FaanBot"`), not a
+placeholder -- `_persist_game_record` still records `None` for them, same as before, since a bot
+was never a human player regardless of what it displays as. What's left for this milestone is
+everything client-side (name-entry UI, `localStorage`, rendering) plus matchmaking, invite codes,
+spectating, and chat -- not scoped to this backend sub-task.
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
