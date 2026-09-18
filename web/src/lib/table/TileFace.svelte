@@ -13,13 +13,14 @@
 	// currentColor/CSS — revisit if that's needed later.
 	const BACK_SRC = '/tiles/Back.svg';
 
+	let isBack = $derived(!(code !== null && hasTileArt(code)));
 	let src = $derived(
 		code !== null && hasTileArt(code) ? `/tiles/${TILE_ASSET[code]}.svg` : BACK_SRC
 	);
 	let alt = $derived(code !== null && hasTileArt(code) ? `${code} tile` : 'concealed tile');
 </script>
 
-<span class="tile-face">
+<span class="tile-face" class:tile-face--back={isBack}>
 	<img {src} {alt} draggable="false" />
 </span>
 
@@ -33,10 +34,12 @@
 	// clips both through the same box, so there's nothing left to mismatch.
 	.tile-face {
 		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		height: 100%;
-		width: auto;
+		aspect-ratio: 3 / 4;
 		overflow: hidden;
-		border-radius: var(--radius-tile);
+		border-radius: calc(var(--radius-tile) * 4 / 3) / var(--radius-tile);
 		background: var(--color-tile);
 		box-shadow:
 			0 1px 2px rgb(0 0 0 / 0.35),
@@ -47,7 +50,18 @@
 	.tile-face img {
 		display: block;
 		height: 100%;
-		width: auto;
+		width: 100%;
+		padding: 7%;
+		box-sizing: border-box;
+		object-fit: contain;
 		user-select: none;
+	}
+
+	.tile-face--back img {
+		padding: 0;
+	}
+
+	.tile-face--back {
+		background: none;
 	}
 </style>
