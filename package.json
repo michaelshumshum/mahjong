@@ -1,12 +1,13 @@
 {
-	"name": "mahjong",
-	"private": true,
-	"devDependencies": {
-		"@commitlint/cli": "^21.2.2",
-		"@commitlint/config-conventional": "^21.2.2",
-		"lefthook": "^2.1.14"
-	},
-	"scripts": {
-		"prepare": "lefthook install"
-	}
+  "name": "mahjong",
+  "private": true,
+  "packageManager": "pnpm@12.4.2",
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "lefthook": "^2.1.14"
+  },
+  "scripts": {
+    "prepare": "lefthook install"
+  }
 }
