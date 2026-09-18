@@ -680,6 +680,12 @@ class Room:
         `Session._handle_hello`) broadcasts `seat_state{status:"connected"}` -- deliberately
         *after* the branch above, not before: see `reconnect()`'s docstring for why broadcasting
         it earlier would let this seat's own replay branch re-deliver it a second time.
+
+        Runs to completion synchronously, with no `await` anywhere in this method: a caller
+        that has actually *received* any one frame this call produced (the replay, the
+        `state_sync`, or the `announce_reconnect` broadcast) is guaranteed this call has
+        already finished, rearm included -- see `tests/test_reconnect.py`'s module docstring
+        for why that guarantee is the whole fix for a real, CI-only test race that lived here.
         """
         rearmed = self._rearm_seat_claim_timer(seat)
         head = self.seat_seq[seat] - 1  # last seq actually sent, or -1 if this seat never got one
