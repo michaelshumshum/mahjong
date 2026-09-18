@@ -335,9 +335,10 @@ class Session:
         return True, None
 
     def _apply_chat(self, seat: int, d: proto.ChatPayload) -> tuple[bool, str | None]:
-        # rebroadcast/rate-limiting deliberately deferred: 02-protocol.md §3's event table has
-        # no server->client chat broadcast type to deliver through in the first place, and it
-        # isn't needed for a hand to play out end to end -- accepted (ack'd) and dropped.
+        # `Room.send_chat` broadcasts (or silently rate-limit-drops -- see its own docstring)
+        # -- `ok=True` either way, same "accepted for processing" ack contract `_dispatch`'s
+        # docstring already documents for every other intent here.
+        self.room.send_chat(seat, d.text)
         return True, None
 
     def _apply_claim(self, seat: int, d: proto.ClaimPayload) -> tuple[bool, str | None]:

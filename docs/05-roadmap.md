@@ -212,7 +212,8 @@ cookie) so it survives a reload, and sent once at `join` (docs/02-protocol.md §
 client-asserted field on the message that actually claims a seat for the first time; a later
 `hello{seat}` reconnect never resends it — see docs/00-architecture.md §2.1's note on why `join`,
 not `hello`, is the right message). Matchmaking, private rooms with invite codes, mid-game bot
-takeover for disconnects, spectating, chat with canned phrases.
+takeover for disconnects, spectating, chat with canned phrases (backend built — see below;
+frontend wiring still open).
 
 This is a deliberate rescope, not a placeholder for auth done later: `docs/00-architecture.md
 §2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
@@ -240,7 +241,25 @@ name too, sourced from the room's `bot_tier` (`"RandomBot"`/`"EfficiencyBot"`/`"
 placeholder -- `_persist_game_record` still records `None` for them, same as before, since a bot
 was never a human player regardless of what it displays as. What's left for this milestone is
 everything client-side (name-entry UI, `localStorage`, rendering) plus matchmaking, invite codes,
-spectating, and chat -- not scoped to this backend sub-task.
+and spectating -- not scoped to this backend sub-task.
+
+**Chat: backend built.** `chat{text}` (§2) rebroadcasts to every bound seat, sender included, as
+a server `chat{seat, text, name}` event (`docs/02-protocol.md §3`) -- direct `_broadcast_wire`,
+mirroring `broadcast_server_shutdown`'s pattern, since chat isn't game state and never goes
+through `reduce()`. `name` is `Room._names_tuple()`'s existing per-seat resolution, so a chat
+bubble never needs a second lookup against `state_sync.names`. Rate limit: 5 messages / 10s
+sliding window per seat (`SeatBinding.chat_timestamps`); over the limit is silently dropped (ack
+stays `ok:true`) rather than an `ack{ok:false}` -- `_dispatch`'s own ack contract already treats
+"accepted for processing, not guaranteed delivered" as the norm for a well-formed-but-currently-
+not-actionable command, and a flooding chat message fits that mold rather than needing a new
+error surface. `text` over 200 chars is truncated, not rejected, matching `join.name`'s
+never-hard-reject precedent for a low-stakes guest field. Not replayed on reconnect/resync --
+live-only, no persistent history. What's left is entirely frontend: `web/src/lib/ui/Chat.svelte`
+already sends `socket.chat(...)` and locally echoes the sender's own message
+(`+page.svelte`'s `sendChat`) -- now redundant with the server's own broadcast reaching the
+sender too, so that local echo should come out once the client wires up the new `chat` event,
+or a canned phrase would double-appear in the sender's own scrollback. Not scoped to this
+backend sub-task.
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
