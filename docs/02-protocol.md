@@ -242,15 +242,19 @@ are one code path.
 
 **Gap found implementing this (M3 sub-task 5): how does the server know *which seat* is
 reconnecting?** Nothing above says — the three-way branch only says what to do once the seat is
-known. In the target design (docs/00-architecture.md §2.1) that identity comes from the auth
-ticket the socket was opened with; that ticket-to-seat binding is M5 scope and doesn't exist yet.
-Until it does, `hello.seat` (§2's table) carries it directly: a `hello{last_seq, seat}` where
-`seat` is already bound in the room is treated as that seat reconnecting — `Room.reconnect()`
-rebinds the live connection, `Room.resume()` runs the branch above. A `seat` that was never
-joined gets `error{code:"no_such_seat"}`. This is a stand-in, not the final mechanism — once real
-auth ships, `seat` should come from the ticket's own seat claim rather than a client-asserted
-field, which today trusts the connection to name its own seat (no worse than every other
-guest-first, no-ticket-yet corner of this sub-task's scope, but worth closing alongside M5).
+known. `hello.seat` (§2's table) carries it directly: a `hello{last_seq, seat}` where `seat` is
+already bound in the room is treated as that seat reconnecting — `Room.reconnect()` rebinds the
+live connection, `Room.resume()` runs the branch above. A `seat` that was never joined gets
+`error{code:"no_such_seat"}`.
+
+**This is the permanent mechanism, not a stand-in.** An earlier draft of this doc expected a
+future auth ticket to carry seat identity instead of trusting a client-asserted field
+(`docs/00-architecture.md §2.1` originally sketched a REST-issued WS ticket) — that design is cut,
+not deferred (see `docs/05-roadmap.md`'s M5 section), so there is no ticket coming to close this
+gap later. `hello.seat` claiming a seat is trusted at face value, permanently; M5 adds a sibling
+`name` field to the same message (a client-chosen guest display name, persisted in
+`localStorage`) but does not change this trust model at all — a malicious client can still claim
+any seat, same as today. Accepted for a guest-only game with no real stakes.
 
 **Mid-claim-window reconnect also re-arms a timer (00-architecture.md §8).** If the reconnecting
 seat holds a live, unresolved claim offer, `Room.resume()` re-arms *that seat's own* entry in the

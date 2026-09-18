@@ -57,8 +57,9 @@ per hand. On reaching `Phase.GAME_OVER`, `process_one()` calls `save_game_record
 `session_factory` was wired in at construction -- `None` is a real, supported "no persistence"
 mode, matching every bare `Room()` test that constructs one directly) with `self.actions` and
 `players` taken from each seat's `SeatBinding.session_id` -- the closest thing to a stable
-identity that exists before real auth (M5) ships; a `None` entry means that seat was never
-joined by a human. `_boundary_this_tick`/`_shutdown_boundary` back `wait_for_shutdown_boundary`,
+identity that exists before `hello`'s guest `name` field ships (M5, 00-architecture.md §2.1); a
+`None` entry means that seat was never joined by a human.
+`_boundary_this_tick`/`_shutdown_boundary` back `wait_for_shutdown_boundary`,
 `app/registry.py`'s `RoomRegistry.begin_shutdown`'s per-room half of the graceful-drain sequence
 (§8.1) -- the boundary-reached event is only ever set *after* an in-flight `GAME_OVER` persist
 finishes, never before, so a drain can't tear down a room (or the process dispose its DB engine)
@@ -1198,8 +1199,9 @@ class Room:
         no-op if this `Room` was never given a `session_factory` (every bare `Room()` test, and
         any deployment with no `DATABASE_URL`, app/main.py's `lifespan`). `players` is each
         seat's `SeatBinding.session_id` -- the closest thing to a stable per-seat identity that
-        exists before real auth ships (M5); `None` for a seat nobody ever joined. Only ever
-        called once, from `process_one()`'s own tail (`self._persisted` guards a second call)."""
+        exists before `hello`'s guest `name` field ships (M5, 00-architecture.md §2.1); `None`
+        for a seat nobody ever joined. Only ever called once, from `process_one()`'s own tail
+        (`self._persisted` guards a second call)."""
         if self._session_factory is None:
             return
         players = [b.session_id if b is not None else None for b in self.seat_bindings]

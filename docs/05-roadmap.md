@@ -168,12 +168,27 @@ wins at a normal rate rather than perpetual exhaustive draws, and it feels good.
 point at which shipping single-player-only is a live, cheap option — given the M5 cost below,
 treat it as a real decision point, not a formality.
 
-### M5 — Real multiplayer (3–4 weeks)
-Auth (magic-link; this means standing up email infrastructure and deliverability — SPF/DKIM, a
-transactional-email provider, bounce handling — not just a token scheme), matchmaking, private
-rooms with invite codes, mid-game bot takeover for disconnects, spectating, chat with canned
-phrases.
-**Done when:** four browsers on four devices finish a game with one deliberate disconnect.
+### M5 — Real multiplayer (1–2 weeks)
+Guest identity only, by design — no accounts, no password, no email, no JWT, no REST auth
+endpoint. A player picks a display name client-side; it's persisted in `localStorage` (or a
+cookie) so it survives a reload, and sent as part of `hello` alongside `seat`
+(docs/02-protocol.md §5's existing `hello.seat` field grows a sibling `name` field — no new wire
+concept, just one more client-asserted field on a message that already carries one). Matchmaking,
+private rooms with invite codes, mid-game bot takeover for disconnects, spectating, chat with
+canned phrases.
+
+This is a deliberate rescope, not a placeholder for auth done later: `docs/00-architecture.md
+§2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
+top) is cut, not deferred — cutting it removes the one M5 line item that pulled in
+infrastructure (email deliverability, SPF/DKIM, a transactional provider) unlike anything else in
+this project. A consequence worth stating plainly: seat identity stays permanently
+client-asserted (a `hello{seat, name}` claiming seat 2 is trusted at face value, same as the
+stand-in `hello.seat` mechanism already ships today) — there's no ticket to bind a seat to a
+verified identity, so nothing stops a malicious client from claiming a seat it didn't join.
+Accepted for a guest-only, no-real-stakes game; revisit only if real accounts ever become an
+actual goal, which is explicitly not scoped anywhere in this document.
+**Done when:** four browsers on four devices finish a game with one deliberate disconnect, each
+seeing the other three players' chosen names throughout.
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
@@ -183,10 +198,13 @@ ship before that's okay.
 
 ### Timeline, honestly
 
-**Total to M5 (real multiplayer): roughly 5–6 months full-time, or 12–18 months on evenings and
-weekends.** An earlier draft of this doc estimated "6–7 weeks of focused work" to the same
+**Total to M5 (real multiplayer): roughly 4.5–5.5 months full-time, or 11–17 months on evenings
+and weekends.** An earlier draft of this doc estimated "6–7 weeks of focused work" to the same
 milestone — that was off by roughly 4×, and 4× is exactly the kind of miss that kills a solo
-project around month three, when the actual pace becomes undeniable and there's no plan B.
+project around month three, when the actual pace becomes undeniable and there's no plan B. (This
+total already reflects cutting magic-link auth from M5 — see that section's own note — which is
+the one change to this estimate since the figure below was first written; every other
+per-milestone number here has held up in practice.)
 Per-milestone reality:
 
 - **M1 engine — 3–4 weeks, not 1.** Flower chains, kong-robbing interleaved with claim windows,
@@ -198,8 +216,11 @@ Per-milestone reality:
   payments, per documented edge case — is by itself days of work.
 - **M4 client — 6–10 weeks, not 2.** This is a full turn-based UI with animation timing, claim
   windows, and a faan breakdown at hand end — a real client application, not a rendering demo.
-- **M5 multiplayer — 3–4 weeks.** Magic-link auth alone pulls in email infrastructure and
-  deliverability, which is a different kind of work than anything in M0–M4.
+- **M5 multiplayer — 1–2 weeks, not 3–4.** The earlier estimate priced in magic-link auth (email
+  infrastructure and deliverability — a different kind of work than anything in M0–M4). Guest-only
+  identity (a client-chosen name in `localStorage`, no server-side account) cuts that out
+  entirely; what's left — matchmaking, invite codes, bot takeover, spectating, chat — is all in
+  the same shape as work already done in M0–M4.
 
 If this is evenings-and-weekends work rather than full-time, the 12–18 month figure already
 accounts for that at roughly 8–10 hours/week — don't also apply a separate part-time discount on

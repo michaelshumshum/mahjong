@@ -243,9 +243,9 @@ class Session:
         """`hello{last_seq, seat}` on an already-bound seat is 02-protocol.md §2's reconnect
         path ("a reconnecting player doesn't re-join... hello{last_seq} on an already-bound
         seat reclaims it directly"). `seat` (not part of the wire table before this sub-task)
-        is the interim stand-in for the identity a real auth ticket would carry -- see
-        `HelloPayload`'s own docstring. `d.seat is None` is the unchanged M0 no-op (a bare
-        `hello` ahead of a fresh `join`)."""
+        is client-asserted, permanently -- see `HelloPayload`'s own docstring; there is no
+        ticket or account system in this design to bind it to instead. `d.seat is None` is the
+        unchanged M0 no-op (a bare `hello` ahead of a fresh `join`)."""
         if msg.d.seat is None:
             return
         if self.seat is not None:

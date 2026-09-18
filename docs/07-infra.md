@@ -95,14 +95,15 @@ Not yet decided: hosting target, domain, and TLS termination. Minimum shape once
 
 `alembic` is wired into the `Makefile` (`make migrate`, `make revision`). `games` is the first
 table, migrated in `server/alembic/versions/95b97823dd97_create_games_table.py`, model at
-`server/app/db/models.py`. `users`/`leaderboard` below are still just the target shape — not
-built yet, no migration for either.
+`server/app/db/models.py`. `leaderboard` below is still just the target shape — not built yet, no
+migration. There is no `users` table planned: `docs/00-architecture.md §2.1` cuts real accounts
+entirely (guest-only, a client-chosen name in `localStorage`, no server-side identity to give a
+table to) — this isn't a "not built yet" line item, it's out of scope by design.
 
 | Table | Holds | Status |
 | --- | --- | --- |
-| `users` | account identity for upgraded (non-guest) players; guests never get a row | not built |
-| `games` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `action_log` (JSONB), `players` (JSONB), `result` (JSONB), `created_at` — the durable record of a finished game (`docs/06-ml.md §2`) | **built** |
-| `leaderboard` | derived/aggregated from `games`; may be a materialized view instead of a table | not built |
+| `games` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `action_log` (JSONB), `players` (JSONB — each seat's chosen guest name, once M5 wires `hello.name` through), `result` (JSONB), `created_at` — the durable record of a finished game (`docs/06-ml.md §2`) | **built** |
+| `leaderboard` | derived/aggregated from `games.players`/`games.result` by name, not by account — a guest who reuses the same name resumes the same leaderboard row, no login needed; may be a materialized view instead of a table | not built |
 
 `ruleset`/`action_log`/`players`/`result` use `JSON().with_variant(JSONB(), "postgresql")` —
 JSONB on Postgres, generic `JSON` everywhere else, so the same model works against SQLite in

@@ -33,12 +33,13 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      ┌──────────────────────────────────────────────┐
    Python process    │  FastAPI / Starlette (uvicorn + uvloop)      │
                      │                                              │
-                     │  REST router ──── auth (guest + ticket, §2.1)│
-                     │                   profile, room list,        │
-                     │                   replays, leaderboard       │
+                     │  REST router ──── room list, replays,        │
+                     │                   leaderboard (no auth       │
+                     │                   endpoint — see §2.1)       │
                      │                                              │
                      │  WS endpoint ──► Session (thin)              │
-                     │                    · redeem WS ticket once   │
+                     │                    · bind seat from          │
+                     │                      hello{seat, name}       │
                      │                    · parse + validate envelope│
                      │                    · push Command to room    │
                      │                    · pump BOUNDED outbound   │
@@ -70,21 +71,26 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
 
 ### 2.1 Auth
 
-Guest-first: a player joins and plays with no account. An account is an optional upgrade
-(profile, persistent stats, ranked play) layered onto the same seat, not a separate code path.
-
-The WS URL never carries a long-lived credential. REST issues a **short-lived, single-use WS
-ticket**; the client exchanges that, not its JWT, for the socket:
+Guest-only, by design — not guest-first with an account upgrade path. There is no account, no
+password, no email, no JWT, and no REST auth endpoint at all. A player picks a display name
+client-side; it's persisted in `localStorage` (or a cookie) so it survives a reload, and travels
+with the connection as a plain field on `hello`:
 
 ```
-client ──POST /api/rooms/{id}/ticket (cookie or JWT)──► REST ──► {ticket, expires_in}
-client ──ws://…/ws?ticket=…──────────────────────────► WS endpoint ──► Session redeems it once
+client ──ws://…/ws?room=…──────────────────────────────────────────► WS endpoint
+client ──hello{seat, name}──────────────────────────────────────────► Session binds this seat
 ```
 
-A JWT never goes in a query string — query strings land in access logs, proxies, and browser
-history. The ticket is redeemable exactly once; a leaked ticket copied out of a log line is
-worthless after the first handshake, and it expires fast enough (seconds) that a leaked-but-unused
-one is worthless too.
+An earlier draft of this section specified a short-lived, single-use REST-issued WS ticket
+(`POST /api/rooms/{id}/ticket` → `{ticket, expires_in}`, redeemed once by the socket) so a JWT
+would never need to ride in a query string. That design is cut, not deferred — see
+`docs/05-roadmap.md`'s M5 section for why. Its absence has one real consequence, stated plainly
+rather than left implicit: seat identity is permanently client-asserted. A `hello{seat: 2, name:
+"..."}` claiming seat 2 is trusted at face value — nothing verifies the connection actually is
+whoever bound that seat first, the same trust model `hello.seat` already uses today
+(`docs/02-protocol.md §5`). Accepted for a guest-only game with no real stakes; there is no
+ticket, credential, or account anywhere in this design to make that guarantee stronger, and no
+plan to add one.
 
 ## 3. Core model
 
@@ -510,9 +516,10 @@ fresh `RoomRegistry` via `app/ws.py`'s `reset_registry()` on every ASGI startup 
 mutated eternal singleton, matters for the shutdown-drain state below (§8.1). On
 `Phase.GAME_OVER`, `Room.process_one()` calls `save_game_record` at most once with the
 accumulated `self.actions` and `players` taken from each seat's `SeatBinding.session_id` -- the
-closest thing to a stable per-seat identity that exists before real auth ships (M5); a real
-`players` identity (an account id, not a per-connection session id) is M5 scope, not invented
-here.
+closest thing to a stable per-seat identity that exists before `hello`'s guest `name` field ships
+(M5, §2.1); swapping `players` to record that chosen name instead of a per-connection session id
+is M5 scope, not invented here. There is no account id anywhere in this design to record instead
+-- M5's guest names are the permanent identity model, not a stand-in for one.
 
 ## 7. Scaling path
 
