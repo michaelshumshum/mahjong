@@ -19,8 +19,11 @@ a second timer mechanism; on expiry the seat flips to `autoplay`. `_poke_bots()`
 tail of every `process_one()` tick, submits a decision to a `ProcessPoolExecutor` (D12) for
 every `autoplay` seat that currently has one (its own turn, or a live claim offer), tagged with
 `BotJobTag` (`(kind, key, state_version)`); the result re-enters through `self.inbox` as a
-`BotResult` and is dropped if the tag no longer matches `_pending_bot[seat]` by the time it
-lands -- the window closed, the turn moved on, or the seat reconnected. See
+`BotResult` carrying a bare action id, decoded back into a real `Action` here (against this
+process's own `GameState` -- see `bots/worker.py`'s module docstring for why the worker can't do
+that itself), and is dropped if the tag no longer matches `_pending_bot[seat]` by the time it
+lands -- the window closed, the turn moved on, or the seat reconnected. `_bot_tier` (`Room.
+__init__`) picks the real tier (`T0`/`T1`/`T2`, default `T2`/`FaanBot`) every such job runs. See
 `mark_disconnected`/`_poke_bots`/`_handle_bot_result`.
 
 **Early exit is already inside `reduce()`.** `mahjong_core.engine._apply_claim_response`
@@ -91,11 +94,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.records import save_game_record
 from app.idempotency import IdempotencyCache
 from app.views import SeatView, redact_event, seat_view, seat_view_wire
-from bots.worker import compute_action
+from bots.worker import BOT_TIERS, DEFAULT_BOT_TIER, compute_action
 from mahjong_core.actions import Action, Pass, action_to_dict, legal_actions
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import Discarded, Event, HandEnded, new_game, reduce, start_next_hand
 from mahjong_core.melds import MeldKind
+from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import tile_code, tile_id_type
 
@@ -252,11 +256,17 @@ class BotJobTag:
 class BotResult:
     """A `ProcessPoolExecutor` worker's answer, re-entering through `Room.inbox` exactly like a
     real `Command` (D12) -- `tag` is compared against `Room._pending_bot[seat]` and dropped
-    silently if it no longer matches (`_handle_bot_result`)."""
+    silently if it no longer matches (`_handle_bot_result`).
+
+    `aid` is a bare action id (`mahjong_core.ml`'s fixed 109-id space), not a concrete `Action`
+    -- `bots/worker.py`'s `compute_action` can't decode one itself (a worker process never
+    receives `GameState`, D2), so `_handle_bot_result` does the `decode_action(aid, state, seat)`
+    step here, against the real `GameState` this process already holds. See `bots/worker.py`'s
+    module docstring for why this is the one deliberate change to this path's result shape."""
 
     seat: int
     tag: BotJobTag
-    action: Action
+    aid: int
 
 
 @dataclass(frozen=True)
@@ -325,6 +335,12 @@ class TimerHeap:
 class Room:
     """Owns exactly one `GameState`, mutated only via `reduce()`/`start_next_hand()`. See module
     docstring for disconnect/bot-handover (`mark_disconnected`/`_poke_bots`, M3 sub-task 6).
+
+    `bot_tier` (`bots.worker.BOT_TIERS`, default `bots.worker.DEFAULT_BOT_TIER` = `T2`/`FaanBot`,
+    per docs/05-roadmap.md M4.5) picks which real tier answers for every `autoplay` seat this
+    room's own disconnect-handover ever creates. Configurable per room, not hardcoded: `T0`/`T1`
+    stay fully selectable by passing a different value, so the arena/tests that assume T0's
+    uniform-random disconnect-handover behavior aren't forced onto T2.
     """
 
     def __init__(
@@ -336,7 +352,11 @@ class Room:
         require_ready: bool = False,
         bot_pool: Executor | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
+        bot_tier: str = DEFAULT_BOT_TIER,
     ) -> None:
+        if bot_tier not in BOT_TIERS:
+            raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
+        self._bot_tier = bot_tier
         self.room_id = room_id
         self.inbox: asyncio.Queue[Command | BotResult | _WakeUp] = asyncio.Queue()
         self.state: GameState = new_game(ruleset, game_seed)
@@ -781,10 +801,15 @@ class Room:
         this job was computed against a `self.state` that isn't "now" anymore. When the tag
         *does* match, `self.event_id` is provably unchanged since submission (only `_apply`
         ever advances it, and nothing else could have without also changing the tag -- see
-        `BotJobTag`'s docstring), so `self.state` is byte-identical to what the worker saw;
-        `_authorize` is still run anyway as a defense-in-depth belt-and-suspenders (server/
-        AGENTS.md: "the server computes the legal-action set" -- true even for the server's own
-        bot output), not because it's expected to ever actually reject something here.
+        `BotJobTag`'s docstring), so `self.state` is byte-identical to what the worker saw --
+        which is exactly what makes `decode_action(result.aid, self.state, result.seat)` safe to
+        call here: the worker never had `self.state` itself (D2), only the id it computed
+        against a `SeatView`/mask built from this same state, so decoding against `self.state`
+        now reconstructs precisely the `Action` the worker meant (see `bots/worker.py`'s module
+        docstring for why the decode step lives here and not there). `_authorize` still runs
+        anyway as a defense-in-depth belt-and-suspenders (server/AGENTS.md: "the server computes
+        the legal-action set" -- true even for the server's own bot output), not because it's
+        expected to ever actually reject something here.
         """
         if self._pending_bot.get(result.seat) != result.tag:
             return
@@ -792,7 +817,11 @@ class Room:
         binding = self.seat_bindings[result.seat]
         if binding is None or binding.status != "autoplay":
             return  # reconnected since submission but the tag pop above raced it -- drop
-        action = self._authorize(Command(seat=result.seat, action=result.action))
+        try:
+            decoded = decode_action(result.aid, self.state, result.seat)
+        except ValueError:
+            return  # defense-in-depth: provably shouldn't happen, see docstring above
+        action = self._authorize(Command(seat=result.seat, action=decoded))
         if action is None:
             return
         self._apply(action)
@@ -882,25 +911,32 @@ class Room:
                 seat_status=self._seat_status_tuple(),
                 claim_deadline_ts=claim_deadline_ts,
             )
-            self._submit_bot_job(seat, tag, view)
+            mask = legal_mask(self.state, seat)
+            self._submit_bot_job(seat, tag, view, mask)
 
-    def _submit_bot_job(self, seat: int, tag: BotJobTag, view: SeatView) -> None:
+    def _submit_bot_job(self, seat: int, tag: BotJobTag, view: SeatView, mask: list[bool]) -> None:
         """Schedule `bots.worker.compute_action` on `self._bot_pool` (a `ProcessPoolExecutor` by
         default, D12: "the GIL makes a thread pool useless for CPU-bound pure-Python search") and
         return immediately -- the actual wait lives in `_await_bot_job`, a separate task, so this
         method never blocks the room loop. `seed` is derived from the tag rather than an unseeded
         `random.Random()` so a given decision point's bot output is reproducible (server/
-        AGENTS.md)."""
+        AGENTS.md). `self._bot_tier` (`Room.__init__`'s `bot_tier` param, `T0`/`T1`/`T2`) picks
+        which real tier answers -- configurable per room, not hardcoded; `deadline` is advisory
+        only (`bots/base.py`'s `Bot.act` contract), derived from the same hard
+        `_BOT_JOB_TIMEOUT_SECONDS` this room actually enforces in `_await_bot_job` below, on the
+        shared `time.monotonic()` clock every process on this machine agrees on.
+        """
         loop = asyncio.get_running_loop()
         seed = hash((self.room_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
-        future = loop.run_in_executor(self._bot_pool, compute_action, view, seed)
+        deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
+        future = loop.run_in_executor(
+            self._bot_pool, compute_action, view, mask, seed, self._bot_tier, deadline
+        )
         task = asyncio.ensure_future(self._await_bot_job(seat, tag, future))
         self._bot_tasks.add(task)
         task.add_done_callback(self._bot_tasks.discard)
 
-    async def _await_bot_job(
-        self, seat: int, tag: BotJobTag, future: asyncio.Future[Action]
-    ) -> None:
+    async def _await_bot_job(self, seat: int, tag: BotJobTag, future: asyncio.Future[int]) -> None:
         """Await one submitted job under a hard deadline (00-architecture.md §8 "Bot raises /
         hangs": "A bot must never be able to wedge a table"), then re-enter it through
         `self.inbox` as a `BotResult` exactly like the architecture sketch describes (D12) --
@@ -912,12 +948,13 @@ class Room:
         docstring already documents; an *unanswered claim* still resolves correctly regardless,
         through its own real `TimerHeap` entry, unaffected by this). This just clears the
         pending tag (if it's still this job's) so the next `_poke_bots()` tick retries from
-        scratch -- `RandomBot`'s policy is instant, so in practice this path only fires for an
-        actual crash, not a legal miss.
+        scratch -- every tier's `act()` here is O(a heuristic scan), not a search with a real
+        budget to exceed, so in practice this path only fires for an actual crash, not a
+        legitimate miss.
         """
         with contextlib.suppress(Exception):
-            action = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
-            self.inbox.put_nowait(BotResult(seat=seat, tag=tag, action=action))
+            aid = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
+            self.inbox.put_nowait(BotResult(seat=seat, tag=tag, aid=aid))
             return
         if self._pending_bot.get(seat) == tag:
             del self._pending_bot[seat]
