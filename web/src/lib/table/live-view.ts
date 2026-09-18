@@ -146,7 +146,11 @@ export function viewFromClientState(state: ClientGameState): LiveTableView | nul
 		const isYou = seat === you;
 		return {
 			seat: seat as Seat,
-			name: isYou ? 'You' : `Seat ${seat}`,
+			// `state.names` (docs/02-protocol.md §3's `state_sync.names`/`seat_state.name`, M5) is
+			// this seat's real guest display name (or a bot's tier name, e.g. "FaanBot") once
+			// bound -- the `isYou`/`Seat N` fallback only covers the moment before that name has
+			// actually arrived, which shouldn't outlast the first state_sync for a bound seat.
+			name: state.names[seat] ?? (isYou ? 'You' : `Seat ${seat}`),
 			concealedCount: state.concealedCounts[seat],
 			concealedHand: isYou ? concealedCodes : undefined,
 			drawn: isYou ? drawnCode : undefined,

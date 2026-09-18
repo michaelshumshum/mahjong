@@ -61,6 +61,7 @@ function stateSyncEvent(seat: number | null, seq: number): ServerEvent {
 			flowers: [[], [], [], []],
 			wall_remaining: 80,
 			seat_status: ['connected', 'connected', 'connected', 'connected'],
+			names: [null, null, null, null],
 			scores: [0, 0, 0, 0],
 			legal_actions: [],
 			claim_options: [],

@@ -67,6 +67,12 @@ export interface ClientGameState {
 	flowers: string[][];
 	wallRemaining: number;
 	seatStatus: string[];
+	/** Each seat's resolved guest display name (docs/02-protocol.md §3's `state_sync.names`),
+	 * length 4, same indexing as every other per-seat array here. `null` for an `empty` seat;
+	 * a real non-empty string (human-chosen or a bot's tier name, e.g. "FaanBot") for any bound
+	 * seat. Kept live by `seat_state`'s own `name` field, mirroring how `seatStatus` above is
+	 * kept live from the same event. */
+	names: (string | null)[];
 	scores: number[];
 	legalActions: Record<string, unknown>[];
 	deadlineTs: number | null;
@@ -99,6 +105,7 @@ export function initialClientGameState(): ClientGameState {
 		flowers: [[], [], [], []],
 		wallRemaining: 0,
 		seatStatus: ['disconnected', 'disconnected', 'disconnected', 'disconnected'],
+		names: [null, null, null, null],
 		scores: [0, 0, 0, 0],
 		legalActions: [],
 		deadlineTs: null,

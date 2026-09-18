@@ -225,7 +225,7 @@ interface ClientGameState {
   melds: MeldState[][];                // length-4; concealed_kong is {tiles:null,count} until reveal
   discardPools: number[][];            // length-4, append-only, indexed by pool_index
   flowers: string[][];
-  wallRemaining: number; seatStatus: string[]; scores: number[];
+  wallRemaining: number; seatStatus: string[]; names: (string | null)[]; scores: number[];
   legalActions: Record<string, unknown>[];     // this seat's turn options, else []
   deadlineTs: number | null;
   claimOffer: { windowId: number | null; options: Record<string, unknown>[]; deadlineTs: number | null } | null;
@@ -298,6 +298,29 @@ runs in live mode — `?mock=` has no real socket to re-assert against; `clientP
 applies to both paths since it's purely local. A future change that wants the server to be the
 source of truth for auto-arm state needs a real wire field for it first; this model is a
 deliberate stopgap around that gap, not an assumption that it doesn't exist.
+
+### Guest display name (`displayName`)
+
+M5's guest-identity mechanism (`docs/02-protocol.md`'s Auth section): a plain text field on the
+pre-game "Take a seat" screen (`/table/[id]/+page.svelte`), persisted to `localStorage`
+(`lib/ui/settings-storage.ts`, `mahjong:displayName:v1`) the same way as `autoArm`/`clientPrefs`
+above — prefilled from a prior session, saved on every keystroke. Unlike `autoArm`, this is
+**not** re-asserted on reconnect: it's sent exactly once, as a plain field on `join`
+(`MahjongSocket.join(seat?, name?)`), which is the only message that ever carries it — a `hello`
+reconnect never resends it, since the server already has it on the seat binding from the original
+`join` (`docs/02-protocol.md §2`'s `join` row). No client-side validation beyond "send whatever's
+in the box, or omit it if empty" — the server trims/caps/defaults it (`JoinPayload.name`), so
+there's nothing to duplicate here.
+
+`ClientGameState.names: (string | null)[]` (length 4, same indexing as every other per-seat
+array) carries every seat's *resolved* name back down: populated from `state_sync.names` on
+every full snapshot, kept live from `seat_state.name` the same way `seatStatus` is kept live from
+`seat_state.status` (`lib/net/reducer.ts`'s `seat_state` case). `lib/table/live-view.ts`'s
+`viewFromClientState` reads this array for every seat's `MockSeatState.name` in the live path —
+including a practice-mode bot seat, whose name is its real server-assigned tier name (e.g.
+"FaanBot"), rendered alongside the existing `.bot-badge` chip, not in place of it. `null` until a
+seat's own name has actually arrived; the mock scenarios (`mock-game-state.ts`) are untouched —
+they hardcode their own fixed sample names and have no `ClientGameState` behind them at all.
 
 Rules:
 
@@ -385,9 +408,11 @@ are bare `TileCode`s, no id); `viewFromClientState`'s `LiveTableView.ownHand` ca
 a real `discard`/`claim`/`declare` intent off a tile the user actually clicked.
 
 **Join flow.** No auto-join, no assumed seat: a live table shows a "Sit down" screen (sends
-`join{}`, first open seat) until seated, matching the standing "intent, not silent state" rule.
-Sitting down implies readiness (`ready` fires right behind a successful join) — there's no
-strategic reason to gate it behind a second button once the player already made the one real
+`join{seat?, name?}`, first open seat) until seated, matching the standing "intent, not silent
+state" rule. The screen carries a plain text field for the M5 guest display name (above),
+prefilled from `localStorage` — editable right up until the click, since `join` is what actually
+sends it. Sitting down implies readiness (`ready` fires right behind a successful join) — there's
+no strategic reason to gate it behind a second button once the player already made the one real
 decision. Until all four seats are joined and ready, the page shows a waiting screen.
 
 **Pre-game states got their own design pass** (design-pass sub-task following the route-wiring

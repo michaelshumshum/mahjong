@@ -12,6 +12,7 @@ import type {
 	Hello,
 	HelloPayload,
 	Join,
+	JoinPayload,
 	Ping,
 	Ready,
 	ServerEvent
@@ -163,14 +164,14 @@ export class MahjongSocket {
 		this.#send(msg);
 	}
 
-	join(seat?: number | null): void {
-		const msg: Join = {
-			v: 1,
-			id: nextId(),
-			ts: Date.now(),
-			t: 'join',
-			d: seat != null ? { seat } : {}
-		};
+	/** `name` (M5, docs/02-protocol.md §2) is a client-chosen guest display name, set once at
+	 * join -- the server trims/caps/defaults it, so no client-side validation beyond what the
+	 * caller already did (`lib/ui/settings-storage.ts`'s persisted value) is needed here. */
+	join(seat?: number | null, name?: string | null): void {
+		const d: JoinPayload = {};
+		if (seat != null) d.seat = seat;
+		if (name != null) d.name = name;
+		const msg: Join = { v: 1, id: nextId(), ts: Date.now(), t: 'join', d };
 		this.#send(msg);
 	}
 

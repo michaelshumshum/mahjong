@@ -4,6 +4,7 @@ import type { AutoArm, ClientPrefs, MotionPref } from './Settings.svelte';
 // missing, below) instead of crashing on an old stored shape.
 export const CLIENT_PREFS_STORAGE_KEY = 'mahjong:clientPrefs:v1';
 export const AUTO_ARM_STORAGE_KEY = 'mahjong:autoArm:v1';
+export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
 
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 
@@ -70,4 +71,19 @@ export function loadAutoArm(): AutoArm | null {
 
 export function saveAutoArm(autoArm: AutoArm): void {
 	writeRaw(AUTO_ARM_STORAGE_KEY, JSON.stringify(autoArm));
+}
+
+function isDisplayName(value: unknown): value is string {
+	return typeof value === 'string';
+}
+
+/** The client-chosen guest display name (docs/02-protocol.md's Auth section, M5), sent once on
+ * `join`. Not validated here beyond "is a string" -- the server trims/caps/defaults it
+ * (`JoinPayload.name`), so this is purely "what the player typed last," not a verified value. */
+export function loadDisplayName(): string | null {
+	return load(DISPLAY_NAME_STORAGE_KEY, isDisplayName);
+}
+
+export function saveDisplayName(name: string): void {
+	writeRaw(DISPLAY_NAME_STORAGE_KEY, JSON.stringify(name));
 }

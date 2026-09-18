@@ -3,10 +3,13 @@ import type { AutoArm, ClientPrefs } from './Settings.svelte';
 import {
 	AUTO_ARM_STORAGE_KEY,
 	CLIENT_PREFS_STORAGE_KEY,
+	DISPLAY_NAME_STORAGE_KEY,
 	loadAutoArm,
 	loadClientPrefs,
+	loadDisplayName,
 	saveAutoArm,
-	saveClientPrefs
+	saveClientPrefs,
+	saveDisplayName
 } from './settings-storage';
 
 // In-memory fake -- this file runs under the 'server' vitest project (plain node, no jsdom/
@@ -109,6 +112,30 @@ describe('settings-storage', () => {
 		});
 	});
 
+	describe('displayName', () => {
+		it('round-trips a saved value', () => {
+			saveDisplayName('Alice');
+			expect(loadDisplayName()).toBe('Alice');
+		});
+
+		it('returns null when nothing has been stored', () => {
+			expect(loadDisplayName()).toBeNull();
+		});
+
+		it('falls back to null on malformed JSON rather than throwing', () => {
+			localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, '{not json');
+			expect(() => loadDisplayName()).not.toThrow();
+			expect(loadDisplayName()).toBeNull();
+		});
+
+		it('falls back to null on a validly-parsed but wrong-shaped value', () => {
+			localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, JSON.stringify(42));
+			expect(loadDisplayName()).toBeNull();
+			localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, JSON.stringify({ name: 'Alice' }));
+			expect(loadDisplayName()).toBeNull();
+		});
+	});
+
 	describe('graceful degradation when localStorage throws or is absent', () => {
 		it('save and load never throw when getItem/setItem throw', () => {
 			const throwing: Storage = {
@@ -127,8 +154,10 @@ describe('settings-storage', () => {
 
 			expect(() => saveClientPrefs({ soundEnabled: true, motion: 'full' })).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
+			expect(() => saveDisplayName('Alice')).not.toThrow();
 			expect(loadClientPrefs()).toBeNull();
 			expect(loadAutoArm()).toBeNull();
+			expect(loadDisplayName()).toBeNull();
 		});
 
 		it('save and load never throw when localStorage is undefined entirely', () => {
@@ -136,8 +165,10 @@ describe('settings-storage', () => {
 
 			expect(() => saveClientPrefs({ soundEnabled: true, motion: 'full' })).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
+			expect(() => saveDisplayName('Alice')).not.toThrow();
 			expect(loadClientPrefs()).toBeNull();
 			expect(loadAutoArm()).toBeNull();
+			expect(loadDisplayName()).toBeNull();
 		});
 	});
 });

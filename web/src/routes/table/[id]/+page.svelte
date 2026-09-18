@@ -28,8 +28,10 @@
 	import {
 		loadAutoArm,
 		loadClientPrefs,
+		loadDisplayName,
 		saveAutoArm,
-		saveClientPrefs
+		saveClientPrefs,
+		saveDisplayName
 	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
@@ -431,6 +433,16 @@
 	// server's actual `SeatBinding` gets pulled back in line with it rather than silently
 	// drifting after a reload creates a new `GameStore`/`MahjongSocket` with no memory of what
 	// was last chosen. See docs/03-frontend.md §6 "Settings persistence".
+	// Guest display name (docs/02-protocol.md's Auth section, M5): persisted the same way as
+	// autoArm/clientPrefs above, but sent once as a plain field on `join`, not re-asserted on
+	// every connection -- the server keeps it on the seat binding for the life of the game once
+	// join carries it (a `hello` reconnect never resends it, see settings-storage.ts's own note).
+	let displayName = $state(loadDisplayName() ?? '');
+	function updateDisplayName(value: string): void {
+		displayName = value;
+		saveDisplayName(value);
+	}
+
 	let autoArm: AutoArm = $state(loadAutoArm() ?? { noCalls: false, autoPassChow: false });
 	let clientPrefs: ClientPrefs = $state(
 		loadClientPrefs() ?? { soundEnabled: true, motion: 'system' }
@@ -989,7 +1001,24 @@
 				{@render seatRing(null)}
 				<h2>Take a seat</h2>
 				<p>Join an open seat to sit down at this table.</p>
-				<button type="button" class="pretable-cta" onclick={() => liveStore?.socket.join()}>
+				<div class="pretable-name-field">
+					<label class="pretable-name-label" for="display-name-input">Your name</label>
+					<input
+						id="display-name-input"
+						type="text"
+						class="pretable-name-input"
+						maxlength="24"
+						placeholder="Guest"
+						autocomplete="off"
+						value={displayName}
+						oninput={(e) => updateDisplayName(e.currentTarget.value)}
+					/>
+				</div>
+				<button
+					type="button"
+					class="pretable-cta"
+					onclick={() => liveStore?.socket.join(undefined, displayName.trim() || undefined)}
+				>
 					Sit down
 				</button>
 			{:else}
@@ -1116,6 +1145,33 @@
 		font: inherit;
 		cursor: pointer;
 		@include buttons.btn-primary;
+	}
+
+	.pretable-name-field {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-1);
+		width: 100%;
+		max-width: 16rem;
+	}
+
+	.pretable-name-label {
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+	}
+
+	.pretable-name-input {
+		width: 100%;
+		min-height: 44px;
+		padding: var(--space-2) var(--space-3);
+		font: inherit;
+		color: var(--color-text);
+		@include buttons.input-recessed;
+
+		&::placeholder {
+			color: var(--color-text-muted);
+		}
 	}
 
 	// indeterminate connection spinner -- no durationMs to anchor a TimerRing to (§5's

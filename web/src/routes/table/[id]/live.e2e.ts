@@ -101,6 +101,13 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		await Promise.all(
 			pages.map((p) => p.goto(`${BASE}/table/${room}`, { waitUntil: 'networkidle' }))
 		);
+		// real guest display names (M5, docs/02-protocol.md's Auth section) -- one per seat, typed
+		// into the pre-game name field before sitting down, so the assertions below can tell "this
+		// text is a real server-resolved name" apart from a placeholder.
+		const names = ['Alice', 'Bob', 'Carol', 'Dave'];
+		for (const [i, p] of pages.entries()) {
+			await p.locator('#display-name-input').fill(names[i]);
+		}
 		// join seats one at a time (not Promise.all) so the first joiner's own waiting-for-players
 		// screen -- there's no signal from `state_sync` alone that distinguishes it from "already
 		// playing" (docs/03-frontend.md §6 sub-task's own finding), so this is the one point that
@@ -116,6 +123,21 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		await Promise.all(
 			pages.map((p) => p.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 20_000 }))
 		);
+
+		// every seat's real chosen name (not a "Seat N"/"You" placeholder) reaches every client --
+		// state_sync.names on the snapshot each of the other three joiners already had, and
+		// seat_state.name live for whoever joined after them (docs/02-protocol.md §3, this
+		// sub-task's reducer wiring). Own seat: the `.seat-region--self` header. Others: anywhere
+		// on the table scene, since seat-to-position varies per viewer.
+		await expect(pages[0].locator('.seat-region--self .seat-name')).toHaveText(names[0]);
+		for (const [i, p] of pages.entries()) {
+			for (const [j, name] of names.entries()) {
+				if (i === j) continue;
+				// `.seat-name` only -- `getByText` alone also matches the center-info "Dealer"/"Turn"
+				// strongs, which repeat whichever name is currently dealer/acting.
+				await expect(p.locator('.seat-name', { hasText: name })).toBeVisible();
+			}
+		}
 
 		// drive real turns until at least 3 real discards have landed somewhere, passing any
 		// claim window that opens along the way -- proves discard, claim/pass, and the
@@ -191,6 +213,15 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 		// three opponent seats, all bot-controlled -- the visual treatment this sub-task added.
 		await expect(page.locator('.bot-badge')).toHaveCount(3);
 		await expect(page.locator('.room-label')).toContainText('practice vs FaanBot');
+
+		// each bot seat's real server-assigned name (M5's `names` array, docs/02-protocol.md
+		// §3: "Practice-mode bot seats get a tier-based name like 'FaanBot'") renders alongside
+		// the badge, not in place of it -- both are real DOM text in the same seat-meta header.
+		const botSeatNames = page.locator('.seat-meta:has(.bot-badge) .seat-name');
+		await expect(botSeatNames).toHaveCount(3);
+		for (let i = 0; i < 3; i++) {
+			await expect(botSeatNames.nth(i)).toContainText('FaanBot');
+		}
 
 		// hand 1's dealer is fixed at room construction and can be this human seat -- unlike the
 		// four-real-seats test above, there's only one human here, so nothing discards on this

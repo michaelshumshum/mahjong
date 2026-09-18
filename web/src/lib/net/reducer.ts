@@ -80,6 +80,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				flowers: d.flowers.map((fl) => fl.slice()),
 				wallRemaining: d.wall_remaining,
 				seatStatus: d.seat_status.slice(),
+				names: d.names.slice(),
 				scores: d.scores.slice(),
 				legalActions: d.legal_actions,
 				deadlineTs: d.deadline_ts,
@@ -336,7 +337,13 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 
 		case 'seat_state': {
 			const d = event.d;
-			return { ...state, seatStatus: replaceAt(state.seatStatus, d.seat, d.status) };
+			return {
+				...state,
+				seatStatus: replaceAt(state.seatStatus, d.seat, d.status),
+				// carried on every seat_state broadcast for that seat, not just its first
+				// (docs/02-protocol.md §3) -- mirrors seatStatus's own live-update above.
+				names: d.name !== undefined ? replaceAt(state.names, d.seat, d.name) : state.names
+			};
 		}
 
 		case 'server_shutdown':

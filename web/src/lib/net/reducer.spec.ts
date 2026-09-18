@@ -65,6 +65,7 @@ describe('reduce', () => {
 				flowers: [[], [], [], []],
 				wall_remaining: 80,
 				seat_status: ['connected', 'connected', 'connected', 'connected'],
+				names: ['Alice', 'Bob', null, 'Dave'],
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
 				claim_options: [{ kind: 'pung', tiles: [4, 4] }],
@@ -77,6 +78,7 @@ describe('reduce', () => {
 		expect(next.seat).toBe(2);
 		expect(next.ownHand).toEqual([10, 11, 12]);
 		expect(next.melds[2]).toEqual([{ kind: 'pung', tiles: [4, 4, 4], count: null, fromSeat: 0 }]);
+		expect(next.names).toEqual(['Alice', 'Bob', null, 'Dave']);
 		expect(next.claimOffer).toEqual({
 			windowId: null,
 			options: [{ kind: 'pung', tiles: [4, 4] }],
@@ -498,6 +500,7 @@ describe('reduce', () => {
 				flowers: [[], [], [], []],
 				wall_remaining: 80,
 				seat_status: ['connected', 'connected', 'connected', 'connected'],
+				names: ['Alice', 'Bob', 'Carol', 'Dave'],
 				scores: [300, -100, -100, -100],
 				legal_actions: [],
 				claim_options: [],
@@ -533,6 +536,30 @@ describe('reduce', () => {
 			d: { seat: 2, status: 'disconnected' }
 		});
 		expect(next.seatStatus).toEqual(['connected', 'connected', 'disconnected', 'connected']);
+	});
+
+	it('seat_state updates a single seat name, leaving the others untouched', () => {
+		const s = state({ names: ['Alice', null, null, null] });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'seat_state',
+			d: { seat: 1, status: 'connected', name: 'Bob' }
+		});
+		expect(next.names).toEqual(['Alice', 'Bob', null, null]);
+	});
+
+	it('seat_state with no name field leaves names untouched', () => {
+		const s = state({ names: ['Alice', 'Bob', null, null] });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'seat_state',
+			d: { seat: 2, status: 'connected' }
+		});
+		expect(next.names).toEqual(['Alice', 'Bob', null, null]);
 	});
 
 	it('server_shutdown records the drain deadline', () => {

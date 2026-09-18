@@ -154,6 +154,15 @@ describe('MahjongSocket', () => {
 			expect(second.d).toEqual({});
 		});
 
+		it('join threads an optional name alongside seat', async () => {
+			const { socket, ws } = await openSocket();
+			socket.join(2, 'Alice');
+			socket.join(undefined, 'Bob');
+			const [, first, second] = sentMessages(ws) as [unknown, Join, Join];
+			expect(first.d).toEqual({ seat: 2, name: 'Alice' });
+			expect(second.d).toEqual({ name: 'Bob' });
+		});
+
 		it('discard sends {tile_id}', async () => {
 			const { socket, ws } = await openSocket();
 			socket.discard(47);
