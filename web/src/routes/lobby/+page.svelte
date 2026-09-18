@@ -62,15 +62,9 @@
 	}
 </script>
 
-<h1>Lobby</h1>
-<p class="tagline">
-	Play with people you already know. Create a room and share the code, or join one.
-</p>
-
 <div class="panels">
 	<section class="panel">
 		<h2>Create a room</h2>
-		<p class="hint">Generates an invite code to share with your table.</p>
 
 		{#if !hostedCode}
 			<button type="button" class="primary" onclick={createRoom}>Create room</button>
@@ -98,10 +92,8 @@
 
 	<section class="panel">
 		<h2>Join a room</h2>
-		<p class="hint">Enter an invite code someone shared with you.</p>
 
 		<form onsubmit={joinRoom}>
-			<label for="join-code">Invite code</label>
 			<input
 				id="join-code"
 				type="text"
@@ -136,14 +128,13 @@
 	}
 
 	.panels {
-		display: grid;
+		display: flex;
+		flex-direction: column;
 		gap: var(--space-5);
-		margin-top: var(--space-5);
-
-		@include layout.tablet-up {
-			grid-template-columns: 1fr 1fr;
-			align-items: start;
-		}
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100vh;
 	}
 
 	// full-width row of its own, below create/join — a third, unrelated way in rather than a
@@ -167,6 +158,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
+		width: 33%;
 		@include buttons.panel-elevated;
 	}
 
