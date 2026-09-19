@@ -167,8 +167,13 @@ describe('reduce', () => {
 		expect(next.scores).toEqual([10, 20, 30, 40]);
 	});
 
-	it('draw appends to own hand and bumps others counts only', () => {
-		const s = state({ seat: 0, ownHand: [1, 2], concealedCounts: [2, 13, 13, 13] });
+	it('draw appends to own hand, bumps others counts only, and decrements wallRemaining', () => {
+		const s = state({
+			seat: 0,
+			ownHand: [1, 2],
+			concealedCounts: [2, 13, 13, 13],
+			wallRemaining: 50
+		});
 
 		const ownDraw = reduce(s, {
 			v: 1,
@@ -179,10 +184,25 @@ describe('reduce', () => {
 		});
 		expect(ownDraw.ownHand).toEqual([1, 2, 99]);
 		expect(ownDraw.concealedCounts[0]).toBe(3);
+		expect(ownDraw.wallRemaining).toBe(49);
 
 		const oppDraw = reduce(s, { v: 1, ts: 1, seq: 1, t: 'draw', d: { seat: 1 } });
 		expect(oppDraw.ownHand).toEqual([1, 2]);
 		expect(oppDraw.concealedCounts[1]).toBe(14);
+		expect(oppDraw.wallRemaining).toBe(49);
+	});
+
+	it('flower_replace decrements wallRemaining for the drawn flower', () => {
+		const s = state({ seat: 0, wallRemaining: 50, flowers: [[], [], [], []] });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'flower_replace',
+			d: { seat: 0, flower: 'f1' }
+		});
+		expect(next.flowers[0]).toEqual(['f1']);
+		expect(next.wallRemaining).toBe(49);
 	});
 
 	it('discard removes from own hand, decrements the discarder count, and records the pool', () => {
@@ -319,7 +339,8 @@ describe('reduce', () => {
 			const s = state({
 				seat: 0,
 				ownHand: [1, 1, 1, 1, 2, 3],
-				concealedCounts: [6, 13, 13, 13]
+				concealedCounts: [6, 13, 13, 13],
+				wallRemaining: 50
 			});
 			const melded = reduce(s, {
 				v: 1,
@@ -343,6 +364,7 @@ describe('reduce', () => {
 			});
 			expect(replaced.ownHand).toEqual([2, 3, 55]);
 			expect(replaced.concealedCounts[0]).toBe(3);
+			expect(replaced.wallRemaining).toBe(49);
 		});
 
 		it('a non-owner concealed_kong only carries a count, never redacts to real tiles', () => {

@@ -139,7 +139,12 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 			return {
 				...state,
 				flowers: replaceAt(state.flowers, d.seat, [...state.flowers[d.seat], d.flower]),
-				ownHand: isOwn && d.replacement != null ? [...state.ownHand, d.replacement] : state.ownHand
+				ownHand: isOwn && d.replacement != null ? [...state.ownHand, d.replacement] : state.ownHand,
+				// every flower_replace is one wall draw of the flower itself
+				// (mahjong_core/engine.py's `_draw_replacing_flowers`) -- mirrors the `draw`/
+				// `kong_replace` decrement below, since state_sync/deal are the only wire events
+				// that carry wall_remaining directly.
+				wallRemaining: Math.max(0, state.wallRemaining - 1)
 			};
 		}
 
@@ -153,7 +158,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					d.seat,
 					state.concealedCounts[d.seat] + 1
 				),
-				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand
+				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
+				wallRemaining: Math.max(0, state.wallRemaining - 1)
 			};
 		}
 
@@ -286,7 +292,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					d.seat,
 					state.concealedCounts[d.seat] + 1
 				),
-				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand
+				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
+				wallRemaining: Math.max(0, state.wallRemaining - 1)
 			};
 		}
 
