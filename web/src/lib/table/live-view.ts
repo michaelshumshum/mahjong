@@ -61,18 +61,22 @@ function sortByTileType(ids: readonly number[]): number[] {
 	return ids.slice().sort((a, b) => Math.floor(a / 4) - Math.floor(b / 4));
 }
 
-/** `state.ownHand` is a flat array with no "which one is drawn" marker; the reducer always
- * appends a fresh draw to the end (lib/net/reducer.ts's `draw`/`kong_replace` cases), so the
- * last element is the held-apart tile for exactly as long as this seat has one -- i.e. while
- * it's this seat's turn with a legal `discard` still available (once discarded, or once melded,
- * the reducer has already removed the specific tile_id, drawn or not, from `ownHand`). */
+/** `state.drawnTileId` (reducer.ts) names the actual held-apart tile, so this only needs to
+ * gate on whether it's this seat's turn to discard -- no more inferring it from `ownHand`'s
+ * array position, which broke for a claimed chow/pung/kong (formed from the discard plus
+ * concealed tiles, never a draw, so whatever tile happened to land last in `ownHand` after the
+ * removal was never really "held apart"). */
 function splitOwnHand(state: ClientGameState): LiveOwnHand {
 	if (state.seat === null) return { concealedIds: [], drawnId: null };
 	const canDiscard =
 		state.turn === state.seat && state.legalActions.some((a) => a.kind === 'discard');
-	if (!canDiscard) return { concealedIds: sortByTileType(state.ownHand), drawnId: null };
-	const drawnId = state.ownHand[state.ownHand.length - 1] ?? null;
-	return { concealedIds: sortByTileType(state.ownHand.slice(0, -1)), drawnId };
+	if (!canDiscard || state.drawnTileId === null) {
+		return { concealedIds: sortByTileType(state.ownHand), drawnId: null };
+	}
+	return {
+		concealedIds: sortByTileType(state.ownHand.filter((id) => id !== state.drawnTileId)),
+		drawnId: state.drawnTileId
+	};
 }
 
 function meldToView(m: MeldState): MockMeld {

@@ -61,6 +61,13 @@ export interface ClientGameState {
 	turn: number;
 	phase: string;
 	ownHand: number[];
+	/** tile_id of the tile this seat drew (or kong-replaced) and hasn't discarded or melded away
+	 * yet, so the table can hold it apart from the sorted hand (docs/03-frontend.md's "as in
+	 * physical play"). `null` whenever there's nothing to hold apart, including right after
+	 * claiming a chow/pung/kong — a claim consumes the discard straight into the exposed meld
+	 * (server/mahjong_core/engine.py's claim handling), so unlike a real draw it never leaves a
+	 * spare tile sitting in `ownHand` for the client to guess at. */
+	drawnTileId: number | null;
 	concealedCounts: number[];
 	melds: MeldState[][];
 	discardPools: number[][];
@@ -111,6 +118,7 @@ export function initialClientGameState(): ClientGameState {
 		turn: 0,
 		phase: 'IDLE',
 		ownHand: [],
+		drawnTileId: null,
 		concealedCounts: [0, 0, 0, 0],
 		melds: [[], [], [], []],
 		discardPools: [[], [], [], []],

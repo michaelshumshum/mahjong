@@ -185,11 +185,13 @@ describe('reduce', () => {
 		expect(ownDraw.ownHand).toEqual([1, 2, 99]);
 		expect(ownDraw.concealedCounts[0]).toBe(3);
 		expect(ownDraw.wallRemaining).toBe(49);
+		expect(ownDraw.drawnTileId).toBe(99);
 
 		const oppDraw = reduce(s, { v: 1, ts: 1, seq: 1, t: 'draw', d: { seat: 1 } });
 		expect(oppDraw.ownHand).toEqual([1, 2]);
 		expect(oppDraw.concealedCounts[1]).toBe(14);
 		expect(oppDraw.wallRemaining).toBe(49);
+		expect(oppDraw.drawnTileId).toBeNull();
 	});
 
 	it('flower_replace decrements wallRemaining for the drawn flower', () => {
@@ -365,6 +367,8 @@ describe('reduce', () => {
 			expect(replaced.ownHand).toEqual([2, 3, 55]);
 			expect(replaced.concealedCounts[0]).toBe(3);
 			expect(replaced.wallRemaining).toBe(49);
+			expect(melded.drawnTileId).toBeNull();
+			expect(replaced.drawnTileId).toBe(55);
 		});
 
 		it('a non-owner concealed_kong only carries a count, never redacts to real tiles', () => {
@@ -415,6 +419,28 @@ describe('reduce', () => {
 			});
 			expect(next.ownHand).toEqual([5]);
 			expect(next.concealedCounts[1]).toBe(1);
+		});
+
+		it('a claimed chow/pung/kong never leaves a held-apart tile -- unlike a real draw, nothing was drawn', () => {
+			// reproduces a real bug: `live-view.ts`'s own-hand split used to infer the held-apart
+			// tile from whatever ended up last in `ownHand`, which after a claim is just leftover
+			// array order, not a tile that was actually just added -- surfacing an already-owned
+			// tile as if freshly drawn.
+			const s = state({
+				seat: 1,
+				ownHand: [4, 5, 8, 12, 16],
+				concealedCounts: [13, 5, 13, 13],
+				drawnTileId: null
+			});
+			const next = reduce(s, {
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'meld',
+				d: { seat: 1, meld_kind: 'pung', tiles: [4, 5, 6], from_seat: 0 }
+			});
+			expect(next.ownHand).toEqual([8, 12, 16]);
+			expect(next.drawnTileId).toBeNull();
 		});
 	});
 

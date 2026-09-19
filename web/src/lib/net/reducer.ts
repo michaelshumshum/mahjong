@@ -74,6 +74,13 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				turn: d.turn,
 				phase: d.phase,
 				ownHand: d.own_hand.slice(),
+				// no dedicated wire field for "held apart" (state.ts's `drawnTileId` doc) -- same
+				// last-tile-in-hand inference `deal`/`draw` rely on, since a resync mid-`AWAIT_ACTION`
+				// after a real draw has no other signal to reconstruct it from.
+				drawnTileId:
+					d.turn === d.seat && d.legal_actions.some((a) => a.kind === 'discard')
+						? (d.own_hand[d.own_hand.length - 1] ?? null)
+						: null,
 				concealedCounts: d.concealed_counts.slice(),
 				melds: d.melds.map((seatMelds) => seatMelds.map(mapMeldDict)),
 				discardPools: d.discard_pools.map((pool) => pool.slice()),
@@ -110,6 +117,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				dealer: d.dealer,
 				seatStatus: d.seats.slice(),
 				ownHand: [],
+				drawnTileId: null,
 				concealedCounts: [0, 0, 0, 0],
 				melds: [[], [], [], []],
 				discardPools: [[], [], [], []],
@@ -128,6 +136,10 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 			return {
 				...state,
 				ownHand: d.your_hand.slice(),
+				// the dealer alone is dealt 14 (server/mahjong_core/wall.py's `deal_hands`: "the
+				// dealer draws one further tile at the end"), appended last -- that bonus tile is
+				// this seat's held-apart tile for turn one, same as any other draw.
+				drawnTileId: d.your_hand.length > 13 ? d.your_hand[d.your_hand.length - 1] : null,
 				concealedCounts: countsFromWire(d.counts),
 				wallRemaining: d.wall_remaining
 			};
@@ -140,6 +152,14 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				...state,
 				flowers: replaceAt(state.flowers, d.seat, [...state.flowers[d.seat], d.flower]),
 				ownHand: isOwn && d.replacement != null ? [...state.ownHand, d.replacement] : state.ownHand,
+				// a flower auto-replaces from the wall (not a decision point) -- if this seat already
+				// held a tile apart (mid-turn, or the dealer's deal-time bonus tile), the replacement
+				// takes over that role; if not (another seat's deal-time flowers), still nothing to
+				// hold apart.
+				drawnTileId:
+					isOwn && d.replacement != null && state.drawnTileId !== null
+						? d.replacement
+						: state.drawnTileId,
 				// every flower_replace is one wall draw of the flower itself
 				// (mahjong_core/engine.py's `_draw_replacing_flowers`) -- mirrors the `draw`/
 				// `kong_replace` decrement below, since state_sync/deal are the only wire events
@@ -159,6 +179,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					state.concealedCounts[d.seat] + 1
 				),
 				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
+				drawnTileId: isOwn && d.tile_id != null ? d.tile_id : state.drawnTileId,
 				wallRemaining: Math.max(0, state.wallRemaining - 1)
 			};
 		}
@@ -176,6 +197,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					Math.max(0, state.concealedCounts[d.seat] - 1)
 				),
 				ownHand: isOwn ? removeOne(state.ownHand, d.tile_id) : state.ownHand,
+				drawnTileId: isOwn ? null : state.drawnTileId,
 				// a discard claimed later in the same server-side reduce() is removed from the
 				// discarder's pool server-side (docs/02-protocol.md §3); this client-side pool can
 				// transiently show it until the next state_sync corrects it — not attempted here.
@@ -246,7 +268,10 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 						Math.max(0, state.concealedCounts[d.seat] - 1)
 					),
 					ownHand:
-						isOwn && addedTile !== undefined ? removeOne(state.ownHand, addedTile) : state.ownHand
+						isOwn && addedTile !== undefined ? removeOne(state.ownHand, addedTile) : state.ownHand,
+					// declaring a kong consumes the held-apart tile into the meld; `kong_replace`
+					// supplies the next one.
+					drawnTileId: isOwn ? null : state.drawnTileId
 				};
 			}
 
@@ -261,7 +286,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 						d.seat,
 						Math.max(0, state.concealedCounts[d.seat] - 4)
 					),
-					ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand
+					ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
+					drawnTileId: isOwn ? null : state.drawnTileId
 				};
 			}
 
@@ -278,7 +304,12 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					d.seat,
 					Math.max(0, state.concealedCounts[d.seat] - fromHandCount)
 				),
-				ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand
+				ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
+				// a claimed chow/pung/kong is formed straight from the discard plus concealed tiles --
+				// this seat never drew for it, so there's nothing held apart (the bug this field
+				// exists to prevent: without it, whatever tile happened to end up last in `ownHand`
+				// after `removeMany` above got shown as if freshly drawn).
+				drawnTileId: isOwn ? null : state.drawnTileId
 			};
 		}
 
@@ -293,6 +324,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					state.concealedCounts[d.seat] + 1
 				),
 				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
+				drawnTileId: isOwn && d.tile_id != null ? d.tile_id : state.drawnTileId,
 				wallRemaining: Math.max(0, state.wallRemaining - 1)
 			};
 		}
