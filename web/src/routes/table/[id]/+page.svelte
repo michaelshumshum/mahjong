@@ -35,6 +35,7 @@
 		saveDisplayName
 	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
+	import CloseButton from '$lib/ui/CloseButton.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import {
 		initialSlotState,
@@ -843,78 +844,83 @@
 
 		{#if gameState.handResult && !(isMock && mockHandEndDismissed)}
 			<div class="faan-overlay" data-testid="faan-overlay">
-				<button type="button" class="panel-close" onclick={dismissHandEnd}>Close</button>
 				{#key gameState.handNo}
 					<div class="hand-end-timer">
 						<TimerRing durationMs={gameState.handEndHoldMs ?? 0} size={40} />
 					</div>
 				{/key}
-				{#if gameState.handResult.outcome === 'win'}
-					<FaanBreakdown
-						winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
-						winningHand={gameState.handResult.winningHand ?? []}
-						patterns={gameState.handResult.patterns ?? []}
-						totalFaan={gameState.handResult.totalFaan ?? 0}
-						payments={gameState.handResult.payments ?? {}}
-					/>
-				{:else}
-					<section class="hand-end-summary" data-testid="hand-end-draw" aria-label="Hand result">
-						<h2>Hand {gameState.handNo}</h2>
-						<p>Draw</p>
-					</section>
-				{/if}
+				<div class="panel">
+					<CloseButton onclick={dismissHandEnd} />
+					{#if gameState.handResult.outcome === 'win'}
+						<FaanBreakdown
+							winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
+							winningHand={gameState.handResult.winningHand ?? []}
+							patterns={gameState.handResult.patterns ?? []}
+							totalFaan={gameState.handResult.totalFaan ?? 0}
+							payments={gameState.handResult.payments ?? {}}
+						/>
+					{:else}
+						<section class="hand-end-summary" data-testid="hand-end-draw" aria-label="Hand result">
+							<h2>Hand {gameState.handNo}</h2>
+							<p>Draw</p>
+						</section>
+					{/if}
+				</div>
 			</div>
 		{/if}
 
 		{#if showScoreSheet}
 			<div class="panel-overlay">
-				<button type="button" class="panel-close" onclick={() => (showScoreSheet = false)}
-					>Close</button
-				>
-				<ScoreSheet
-					seats={scoreSeats}
-					totals={scoreTotals}
-					hands={scoreHands}
-					standings={scoreStandings}
-				/>
+				<div class="panel">
+					<CloseButton onclick={() => (showScoreSheet = false)} />
+					<ScoreSheet
+						seats={scoreSeats}
+						totals={scoreTotals}
+						hands={scoreHands}
+						standings={scoreStandings}
+					/>
+				</div>
 			</div>
 		{/if}
 
 		{#if showChat}
 			<div class="panel-overlay">
-				<button type="button" class="panel-close" onclick={() => (showChat = false)}>Close</button>
-				<Chat messages={chatMessages} onSend={sendChat} />
+				<div class="panel">
+					<CloseButton onclick={() => (showChat = false)} />
+					<Chat messages={chatMessages} onSend={sendChat} />
+				</div>
 			</div>
 		{/if}
 
 		{#if showSettings}
 			<div class="panel-overlay">
-				<button type="button" class="panel-close" onclick={() => (showSettings = false)}
-					>Close</button
-				>
-				<Settings
-					{autoArm}
-					prefs={clientPrefs}
-					onAutoArmChange={(next) => {
-						autoArm = next;
-						saveAutoArm(next);
-						if (!isMock)
-							liveStore?.socket.auto({ no_calls: next.noCalls, auto_pass_chow: next.autoPassChow });
-					}}
-					onPrefsChange={(next) => {
-						clientPrefs = next;
-						saveClientPrefs(next);
-					}}
-				/>
+				<div class="panel">
+					<CloseButton onclick={() => (showSettings = false)} />
+					<Settings
+						{autoArm}
+						prefs={clientPrefs}
+						onAutoArmChange={(next) => {
+							autoArm = next;
+							saveAutoArm(next);
+							if (!isMock)
+								liveStore?.socket.auto({
+									no_calls: next.noCalls,
+									auto_pass_chow: next.autoPassChow
+								});
+						}}
+						onPrefsChange={(next) => {
+							clientPrefs = next;
+							saveClientPrefs(next);
+						}}
+					/>
+				</div>
 			</div>
 		{/if}
 
 		{#if showAnimationDemo}
 			<div class="panel-overlay" data-testid="animation-demo">
 				<div class="animation-demo">
-					<button type="button" class="panel-close" onclick={() => (showAnimationDemo = false)}
-						>Close</button
-					>
+					<CloseButton onclick={() => (showAnimationDemo = false)} />
 					<h2>Animate a turn</h2>
 					<p class="demo-hint">
 						Sandboxed mock, independent of the scenarios above — proves the positional slot-identity
@@ -1638,6 +1644,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
+		// wide enough that a short heading (e.g. "Hand 6") never sits under the CloseButton in
+		// the panel's top-right corner
+		min-width: 14rem;
 		max-width: 24rem;
 		padding: var(--space-4);
 		background: var(--color-surface-raised);
@@ -1654,15 +1663,11 @@
 		}
 	}
 
-	.panel-close {
-		position: absolute;
-		top: var(--space-4);
-		right: var(--space-4);
-		min-height: 44px;
-		min-width: 44px;
-		font: inherit;
-		cursor: pointer;
-		@include buttons.btn-ghost;
+	// hugs whatever dialog content it wraps (ScoreSheet/Chat/Settings/hand-end result) so the
+	// CloseButton it contains is positioned against that panel's own corner, not the fullscreen
+	// scrim's.
+	.panel {
+		position: relative;
 	}
 
 	.toast-stack {
