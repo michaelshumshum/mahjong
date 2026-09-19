@@ -77,6 +77,13 @@ export interface ClientGameState {
 	legalActions: Record<string, unknown>[];
 	deadlineTs: number | null;
 	claimOffer: ClaimWindowState | null;
+	/** The most recent `discard` event seen, kept around only so a live `AWAIT_CLAIMS` window
+	 * (whose own `claim_offer` carries no tile/seat, docs/02-protocol.md §3) can show what's
+	 * actually being claimed — `turn` still names the discarder for the window's whole lifetime
+	 * (no `turn` event fires until it resolves), so this plus `turn` is enough, no dedicated
+	 * wire field needed. Not meaningful for a `kong_rob` window; nothing branches on `kind` to
+	 * gate that yet (`live-view.ts`'s `claimWindowToView`). */
+	lastDiscard: { seat: number; tileId: number } | null;
 	lastHandEnd: HandEndState | null;
 	/** Every `hand_end` seen so far this session, oldest first — `lastHandEnd` above only ever
 	 * holds the latest one (used for the just-finished-hand overlay), so this is the running
@@ -110,6 +117,7 @@ export function initialClientGameState(): ClientGameState {
 		legalActions: [],
 		deadlineTs: null,
 		claimOffer: null,
+		lastDiscard: null,
 		lastHandEnd: null,
 		handHistory: [],
 		gameEnd: null,

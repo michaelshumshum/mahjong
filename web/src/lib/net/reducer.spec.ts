@@ -61,7 +61,7 @@ describe('reduce', () => {
 				own_hand: [10, 11, 12],
 				concealed_counts: [13, 13, 12, 13],
 				melds: [[], [], [{ kind: 'pung', tiles: [4, 4, 4], from_seat: 0 }], []],
-				discard_pools: [[7], [], [], []],
+				discard_pools: [[], [], [7], []],
 				flowers: [[], [], [], []],
 				wall_remaining: 80,
 				seat_status: ['connected', 'connected', 'connected', 'connected'],
@@ -84,6 +84,42 @@ describe('reduce', () => {
 			options: [{ kind: 'pung', tiles: [4, 4] }],
 			deadlineTs: 1000
 		});
+		// `d.turn` (2) is the discarder for the embedded window's whole lifetime, and its pool's
+		// last entry (7) is the tile the offered `claim_options` are about (live-view.ts's
+		// `claimWindowToView` reads this to show what's actually being claimed).
+		expect(next.lastDiscard).toEqual({ seat: 2, tileId: 7 });
+	});
+
+	it('state_sync with no embedded claim window leaves lastDiscard null', () => {
+		const s = state({ lastDiscard: { seat: 0, tileId: 47 } });
+		const event: ServerEvent = {
+			v: 1,
+			ts: 1,
+			seq: 5,
+			t: 'state_sync',
+			d: {
+				seat: 0,
+				hand_no: 3,
+				prevailing: 'E',
+				dealer: 1,
+				turn: 0,
+				phase: 'AWAIT_ACTION',
+				own_hand: [10, 11, 12],
+				concealed_counts: [13, 13, 12, 13],
+				melds: [[], [], [], []],
+				discard_pools: [[7], [], [], []],
+				flowers: [[], [], [], []],
+				wall_remaining: 80,
+				seat_status: ['connected', 'connected', 'connected', 'connected'],
+				names: ['Alice', 'Bob', null, 'Dave'],
+				scores: [0, 0, 0, 0],
+				legal_actions: [{ kind: 'discard' }],
+				claim_options: [],
+				deadline_ts: 1000
+			}
+		};
+
+		expect(reduce(s, event).lastDiscard).toBeNull();
 	});
 
 	it('hand_start resets per-hand fields but not scores', () => {
@@ -91,6 +127,7 @@ describe('reduce', () => {
 			ownHand: [1, 2, 3],
 			discardPools: [[9], [], [], []],
 			scores: [10, 20, 30, 40],
+			lastDiscard: { seat: 0, tileId: 9 },
 			lastHandEnd: {
 				handNo: 1,
 				outcome: 'win',
@@ -124,6 +161,7 @@ describe('reduce', () => {
 		expect(next.ownHand).toEqual([]);
 		expect(next.discardPools).toEqual([[], [], [], []]);
 		expect(next.lastHandEnd).toBeNull();
+		expect(next.lastDiscard).toBeNull();
 		expect(next.scores).toEqual([10, 20, 30, 40]);
 	});
 
@@ -160,6 +198,20 @@ describe('reduce', () => {
 		expect(next.ownHand).toEqual([1, 2]);
 		expect(next.concealedCounts[0]).toBe(2);
 		expect(next.discardPools[0]).toEqual([47]);
+		expect(next.lastDiscard).toEqual({ seat: 0, tileId: 47 });
+	});
+
+	it('a later discard overwrites lastDiscard rather than accumulating', () => {
+		const s = state({ lastDiscard: { seat: 0, tileId: 47 } });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'discard',
+			d: { seat: 2, tile_id: 90, tile: 'z5', pool_index: 0 }
+		});
+
+		expect(next.lastDiscard).toEqual({ seat: 2, tileId: 90 });
 	});
 
 	it("discarding clears this seat's own stale legalActions/deadlineTs, but not another seat's discard", () => {

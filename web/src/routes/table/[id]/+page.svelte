@@ -14,8 +14,8 @@
 	import { GameStore } from '$lib/game/store.svelte';
 	import type { ClientGameState, ConnectionStatus } from '$lib/game/state';
 	import type { ServerEvent } from '$lib/net/protocol';
-	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
-	import TimerRing from '$lib/ui/TimerRing.svelte';
+	import ClaimDialog from '$lib/ui/ClaimDialog.svelte';
+	import type { ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import ScoreSheet, {
 		type HandRecord,
@@ -799,8 +799,15 @@
 
 		{#if claimOptions}
 			<div class="claim-overlay" data-testid="claim-overlay">
-				<TimerRing durationMs={gameState.claimWindow?.durationMs ?? 0} />
-				<ClaimButtons options={claimOptions} onChoose={chooseClaim} />
+				<ClaimDialog
+					discardTile={gameState.claimWindow?.tile ?? null}
+					discarderName={gameState.claimWindow
+						? gameState.seats[gameState.claimWindow.sourceSeat].name
+						: null}
+					options={claimOptions}
+					durationMs={gameState.claimWindow?.durationMs ?? 0}
+					onChoose={chooseClaim}
+				/>
 				{#if lastClaimChoice}
 					<p class="sr-only" data-testid="claim-choice">chose: {lastClaimChoice.kind}</p>
 				{/if}
@@ -1566,22 +1573,10 @@
 		}
 	}
 
-	.claim-overlay {
-		position: fixed;
-		inset-inline: 0;
-		bottom: var(--space-8);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-2);
-		z-index: var(--z-overlay);
-		pointer-events: none;
-	}
-
-	.claim-overlay :global(.timer-ring) {
-		pointer-events: auto;
-	}
-
+	// centered, scrim-backed like `.faan-overlay`/`.panel-overlay` below -- a claim decision is
+	// as consequential as a hand result, so it gets the same modal weight, not a translucent
+	// button row that leaves the table interactive underneath it.
+	.claim-overlay,
 	.faan-overlay,
 	.panel-overlay {
 		position: fixed;

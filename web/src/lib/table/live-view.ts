@@ -1,7 +1,7 @@
 // Projects a real `ClientGameState` (docs/03-frontend.md §6, this seat's own redacted view)
 // into the `MockGameState`-shaped view model `+page.svelte`'s template already renders
 // (mock-game-state.ts). Lets the live path reuse the exact same, already-screenshot-audited
-// render tree (TileFace/ClaimButtons/TimerRing/FaanBreakdown/ScoreSheet/...) instead of a
+// render tree (TileFace/ClaimDialog/FaanBreakdown/ScoreSheet/...) instead of a
 // second parallel one that could visually drift from it -- the alternative this sub-task
 // weighed and rejected (docs/03-frontend.md's own "the adapter problem" framing).
 //
@@ -104,14 +104,16 @@ function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
 	// doc comment) -- there's no real id to claim against, so don't offer buttons for it; the
 	// real `claim_offer` event that follows will carry one.
 	if (!offer || offer.windowId === null) return null;
+	// `kind` stays a placeholder -- the wire's `claim_offer` never says discard vs kong_rob
+	// (docs/02-protocol.md §3) and nothing downstream branches on it. `sourceSeat`/`tile` are
+	// real, though: `state.lastDiscard` (set by the `discard` event, or derived from
+	// `discard_pools` on resync -- reducer.ts) names the actual tile this window is about,
+	// since `turn` still names the discarder for the window's whole lifetime.
 	return {
 		windowId: offer.windowId,
-		// `kind`/`sourceSeat`/`tile` are MockClaimWindow fields the template never actually reads
-		// (only `.yourOptions` and `.durationMs` are) -- real values live server-side and aren't
-		// on the wire here, so these are inert placeholders, not a redaction gap.
 		kind: 'discard',
 		sourceSeat: state.turn as Seat,
-		tile: '1m',
+		tile: state.lastDiscard ? tileIdToCode(state.lastDiscard.tileId) : '1m',
 		durationMs: offer.deadlineTs !== null ? Math.max(0, offer.deadlineTs - Date.now()) : 0,
 		yourOptions: offer.options.map(claimOptionToView)
 	};

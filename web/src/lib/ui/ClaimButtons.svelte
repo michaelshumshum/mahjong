@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TileCode } from '../table/tile-code';
+	import { claimOptionKey, claimOptionLabel } from './claim-option';
 
 	export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
 
@@ -7,7 +8,8 @@
 	// `tiles` only disambiguates `chow` (two options can claim the same discard into
 	// different runs, e.g. 4s-5s vs 5s-7s completing a discarded 6s) — no other kind is ever
 	// ambiguous once the server has offered it. No `window_id` here: this component is pure
-	// presentation, wiring a real offer to a real window is the later integration sub-task.
+	// presentation, wiring a real offer to a real window is the caller's job (`+page.svelte`'s
+	// `chooseClaim`).
 	export interface ClaimOption {
 		kind: ClaimKind;
 		tiles?: TileCode[];
@@ -15,36 +17,16 @@
 
 	let { options, onChoose }: { options: ClaimOption[]; onChoose: (option: ClaimOption) => void } =
 		$props();
-
-	const LABEL: Record<ClaimKind, string> = {
-		pass: 'Pass',
-		chow: 'Chow',
-		pung: 'Pung',
-		kong: 'Kong',
-		win: 'Win'
-	};
-
-	function label(option: ClaimOption): string {
-		return option.tiles?.length
-			? `${LABEL[option.kind]} ${option.tiles.join('-')}`
-			: LABEL[option.kind];
-	}
-
-	// index included because two chow options can otherwise share the same (kind, tiles);
-	// tiles rarely repeat across options but the index guarantees uniqueness regardless.
-	function optionKey(option: ClaimOption, index: number): string {
-		return `${index}:${option.kind}:${option.tiles?.join(',') ?? ''}`;
-	}
 </script>
 
 <div class="claim-buttons" role="group" aria-label="Claim options">
-	{#each options as option, index (optionKey(option, index))}
+	{#each options as option, index (claimOptionKey(option, index))}
 		<button
 			type="button"
 			class="claim-btn claim-btn--{option.kind}"
 			onclick={() => onChoose(option)}
 		>
-			{label(option)}
+			{claimOptionLabel(option)}
 		</button>
 	{/each}
 </div>

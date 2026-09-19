@@ -87,6 +87,16 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				claimOffer:
 					d.claim_options.length > 0
 						? { windowId: null, options: d.claim_options, deadlineTs: d.deadline_ts }
+						: null,
+				// `d.turn` is the discarder for the whole embedded-claim-window lifetime (same
+				// invariant the live `discard`/`turn` events maintain, see state.ts's `lastDiscard`
+				// doc) -- derive it from `discard_pools` since a resync carries no dedicated field.
+				lastDiscard:
+					d.claim_options.length > 0 && d.discard_pools[d.turn].length > 0
+						? {
+								seat: d.turn,
+								tileId: d.discard_pools[d.turn][d.discard_pools[d.turn].length - 1]
+							}
 						: null
 			};
 		}
@@ -107,7 +117,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				claimOffer: null,
 				legalActions: [],
 				deadlineTs: null,
-				lastHandEnd: null
+				lastHandEnd: null,
+				lastDiscard: null
 			};
 		}
 
@@ -162,6 +173,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				// discarder's pool server-side (docs/02-protocol.md §3); this client-side pool can
 				// transiently show it until the next state_sync corrects it — not attempted here.
 				discardPools: replaceAt(state.discardPools, d.seat, pool),
+				lastDiscard: { seat: d.seat, tileId: d.tile_id },
 				// this seat just spent its turn -- `legal_actions`/`deadline_ts` from the `turn`
 				// event that granted it are now stale (every remaining entry still names a tile_id
 				// genuinely still in `ownHand`, since only the discarded one is gone, so a UI
