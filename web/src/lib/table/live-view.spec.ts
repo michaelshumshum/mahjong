@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reduce } from '../net/reducer';
 import { initialClientGameState } from '../game/state';
 import { viewFromClientState } from './live-view';
@@ -80,5 +80,70 @@ describe('viewFromClientState own-hand split', () => {
 		const live = viewFromClientState(state);
 		expect(live!.ownHand.drawnId).toBe(99);
 		expect(live!.ownHand.concealedIds).toEqual([4, 8]);
+	});
+});
+
+describe('viewFromClientState turnDurationMs', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.setSystemTime(0);
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("reflects this seat's own deadline, whether the turn followed a draw or a claimed meld", () => {
+		let state = initialClientGameState();
+		state = { ...state, seat: 1 };
+		// same "seat 1 pungs, then gets a turn" shape as the own-hand-split test above --
+		// the discard-after-claim turn carries a deadline exactly like a normal draw turn does.
+		state = reduce(state, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'turn',
+			d: { seat: 1, phase: 'AWAIT_ACTION', deadline_ts: 5000, legal: [{ kind: 'discard' }] }
+		} as ServerEvent);
+
+		const live = viewFromClientState(state);
+		expect(live!.view.turnDurationMs).toBe(5000);
+	});
+
+	it('is null once this seat has discarded, clearing deadlineTs', () => {
+		let state = initialClientGameState();
+		state = { ...state, seat: 0 };
+		state = reduce(state, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'turn',
+			d: { seat: 0, phase: 'AWAIT_ACTION', deadline_ts: 5000, legal: [{ kind: 'discard' }] }
+		} as ServerEvent);
+		state = reduce(state, {
+			v: 1,
+			ts: 1,
+			seq: 2,
+			t: 'discard',
+			d: { seat: 0, tile_id: 4, tile: '1m', pool_index: 0 }
+		} as ServerEvent);
+
+		const live = viewFromClientState(state);
+		expect(live!.view.turnDurationMs).toBeNull();
+	});
+
+	it("is null for another seat's turn", () => {
+		let state = initialClientGameState();
+		state = { ...state, seat: 0 };
+		state = reduce(state, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'turn',
+			d: { seat: 2, phase: 'AWAIT_ACTION', deadline_ts: 5000, legal: [] }
+		} as ServerEvent);
+
+		const live = viewFromClientState(state);
+		expect(live!.view.turnDurationMs).toBeNull();
 	});
 });

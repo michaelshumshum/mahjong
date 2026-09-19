@@ -119,6 +119,12 @@ export interface MockGameState {
 	// long, or until every seat dismisses, whichever first. `null` whenever `handResult` is
 	// (no hold to show); mirrors `claimWindow.durationMs`'s own shape one level up.
 	handEndHoldMs: number | null;
+	// this seat's own `AWAIT_ACTION` deadline (`ruleset.turn_seconds`, server/mahjong_core/
+	// config.py): set whenever `turn === you`, whether this turn followed a normal draw or a
+	// claimed meld (both arrive as the same `turn` event server-side, docs/00-architecture.md
+	// §8) -- `null` whenever it's any other seat's turn. Mirrors `claimWindow.durationMs`'s own
+	// "already-computed remaining ms" shape.
+	turnDurationMs: number | null;
 	you: Seat;
 }
 
@@ -157,6 +163,7 @@ export const yourTurnToDiscard: MockGameState = {
 	claimWindow: null,
 	handResult: null,
 	handEndHoldMs: null,
+	turnDurationMs: 15000,
 	seats: [
 		emptySeat(0, {
 			concealedHand: ['1m', '2m', '3m', '4p', '5p', '6p', '2s', '3s', '4s', 'z5', 'z5', 'z5', '9s'],
@@ -202,6 +209,7 @@ export const claimWindowOpenForYou: MockGameState = {
 	you: 0,
 	handResult: null,
 	handEndHoldMs: null,
+	turnDurationMs: null,
 	claimWindow: {
 		windowId: 12,
 		kind: 'discard',
@@ -304,7 +312,8 @@ export const handJustEnded: MockGameState = {
 	},
 	// hand-end hold (docs/00-architecture.md §3): the demo's still-open countdown, not an
 	// arbitrary prop -- a real `hand_end` always carries one, win or draw alike.
-	handEndHoldMs: 8000
+	handEndHoldMs: 8000,
+	turnDurationMs: null
 };
 
 // Scenario 4: hand just ended in an exhaustive draw. Same HAND_OVER hold as a win
@@ -327,7 +336,8 @@ export const handJustEndedDraw: MockGameState = {
 		emptySeat(3, { concealedCount: 13, discards: ['8p', '2m'], score: -30 })
 	],
 	handResult: { outcome: 'exhaustive_draw' },
-	handEndHoldMs: 8000
+	handEndHoldMs: 8000,
+	turnDurationMs: null
 };
 
 export interface MockScenario {

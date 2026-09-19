@@ -761,6 +761,13 @@
 						{#if seatAt(0).seat === gameState.turn}<span class="turn-badge" title="Current turn"
 								>turn</span
 							>{/if}
+						{#if gameState.turnDurationMs !== null}
+							{#key gameState.turn}
+								<div class="turn-timer">
+									<TimerRing durationMs={gameState.turnDurationMs} size={24} />
+								</div>
+							{/key}
+						{/if}
 						<span class="seat-score">{seatAt(0).score}</span>
 					</header>
 
@@ -1443,6 +1450,10 @@
 
 	.seat-wind {
 		color: var(--color-text-muted);
+	}
+
+	.turn-timer {
+		pointer-events: none;
 	}
 
 	.dealer-badge {

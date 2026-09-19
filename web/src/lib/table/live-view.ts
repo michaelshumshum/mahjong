@@ -123,6 +123,17 @@ function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
 	};
 }
 
+/** Same "anchored deadline, not a countdown carried over the wire" shape as
+ * `claimWindowToView`'s `durationMs` -- `state.deadlineTs` is set by the `turn` event whenever
+ * it's this seat's `AWAIT_ACTION` (normal draw-then-discard or the discard right after a claimed
+ * meld, both the same wire event server-side), and cleared once this seat acts or the turn moves
+ * on (reducer.ts). */
+function turnDurationMsFromState(state: ClientGameState): number | null {
+	return state.turn === state.seat && state.deadlineTs !== null
+		? Math.max(0, state.deadlineTs - Date.now())
+		: null;
+}
+
 function handEndHoldMsFromState(state: ClientGameState): number | null {
 	// same "anchored deadline, not a countdown carried over the wire" shape claimWindowToView's
 	// durationMs already uses -- `handEndDeadlineTs` is `null` whenever there's no open hold
@@ -190,6 +201,7 @@ export function viewFromClientState(state: ClientGameState): LiveTableView | nul
 		claimWindow: claimWindowToView(state),
 		handResult: handResultToView(state),
 		handEndHoldMs: handEndHoldMsFromState(state),
+		turnDurationMs: turnDurationMsFromState(state),
 		you
 	};
 
