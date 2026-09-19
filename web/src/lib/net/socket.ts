@@ -9,6 +9,7 @@ import type {
 	Declare,
 	DeclarePayload,
 	Discard,
+	HandEndAck,
 	Hello,
 	HelloPayload,
 	Join,
@@ -177,6 +178,11 @@ export class MahjongSocket {
 
 	ready(): void {
 		const msg: Ready = { v: 1, id: nextId(), ts: Date.now(), t: 'ready', d: {} };
+		this.#send(msg);
+	}
+
+	handEndAck(): void {
+		const msg: HandEndAck = { v: 1, id: nextId(), ts: Date.now(), t: 'hand_end_ack', d: {} };
 		this.#send(msg);
 	}
 

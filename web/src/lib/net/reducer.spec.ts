@@ -140,7 +140,8 @@ describe('reduce', () => {
 				payments: null,
 				revealed: true,
 				winningHand: [1, 2, 3]
-			}
+			},
+			handEndDeadlineTs: 5000
 		});
 		const event: ServerEvent = {
 			v: 1,
@@ -161,6 +162,7 @@ describe('reduce', () => {
 		expect(next.ownHand).toEqual([]);
 		expect(next.discardPools).toEqual([[], [], [], []]);
 		expect(next.lastHandEnd).toBeNull();
+		expect(next.handEndDeadlineTs).toBeNull();
 		expect(next.lastDiscard).toBeNull();
 		expect(next.scores).toEqual([10, 20, 30, 40]);
 	});
@@ -416,11 +418,13 @@ describe('reduce', () => {
 				points: 100,
 				payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
 				revealed: true,
-				winning_hand: [1, 2, 3]
+				winning_hand: [1, 2, 3],
+				deadline_ts: 9000
 			}
 		});
 
 		expect(next.lastHandEnd?.winner).toBe(0);
+		expect(next.handEndDeadlineTs).toBe(9000);
 		expect(next.claimOffer).toBeNull();
 		expect(next.legalActions).toEqual([]);
 		expect(next.deadlineTs).toBeNull();
@@ -444,7 +448,8 @@ describe('reduce', () => {
 				points: 100,
 				payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
 				revealed: true,
-				winning_hand: [1, 2, 3]
+				winning_hand: [1, 2, 3],
+				deadline_ts: 9000
 			}
 		});
 
@@ -468,7 +473,8 @@ describe('reduce', () => {
 				points: 10,
 				payments: { 0: 30, 1: -10, 2: -10, 3: -10 },
 				revealed: true,
-				winning_hand: null
+				winning_hand: null,
+				deadline_ts: 9000
 			}
 		});
 
@@ -503,7 +509,8 @@ describe('reduce', () => {
 				points: null,
 				payments: null,
 				revealed: true,
-				winning_hand: null
+				winning_hand: null,
+				deadline_ts: 9000
 			}
 		};
 

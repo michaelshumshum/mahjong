@@ -115,9 +115,9 @@ def _get_or_create_room(room_id: str, seed: int | None, practice: bool) -> Room:
 
 class _IdempotentMessage(Protocol):
     """Structural type for `_dispatch`'s `msg` param -- every post-join `ClientMessage` variant
-    (`Ready`/`Discard`/`Claim`/`Declare`/`Auto`/`Chat`) has an `id` and a `d` payload model,
-    but they share no common base beyond `proto.Envelope`, which doesn't type `d` at all
-    (each subclass narrows it separately)."""
+    (`Ready`/`Discard`/`Claim`/`Declare`/`Auto`/`Chat`/`HandEndAck`) has an `id` and a `d`
+    payload model, but they share no common base beyond `proto.Envelope`, which doesn't type
+    `d` at all (each subclass narrows it separately)."""
 
     id: str | None
 
@@ -225,6 +225,9 @@ class Session:
         if isinstance(message, proto.Ready):
             await self._dispatch(message, self._apply_ready)
             return
+        if isinstance(message, proto.HandEndAck):
+            await self._dispatch(message, self._apply_hand_end_ack)
+            return
         if isinstance(message, proto.Discard):
             await self._dispatch(message, self._apply_discard)
             return
@@ -324,6 +327,12 @@ class Session:
 
     def _apply_ready(self, seat: int, _d: proto.ReadyPayload) -> tuple[bool, str | None]:
         self.room.mark_ready(seat)
+        return True, None
+
+    def _apply_hand_end_ack(
+        self, seat: int, _d: proto.HandEndAckPayload
+    ) -> tuple[bool, str | None]:
+        self.room.mark_hand_end_ack(seat)
         return True, None
 
     def _apply_discard(self, seat: int, d: proto.DiscardPayload) -> tuple[bool, str | None]:

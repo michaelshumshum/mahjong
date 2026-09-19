@@ -118,6 +118,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				legalActions: [],
 				deadlineTs: null,
 				lastHandEnd: null,
+				handEndDeadlineTs: null,
 				lastDiscard: null
 			};
 		}
@@ -328,6 +329,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 			return {
 				...state,
 				lastHandEnd: entry,
+				handEndDeadlineTs: d.deadline_ts,
 				handHistory: alreadyRecorded ? state.handHistory : [...state.handHistory, entry],
 				claimOffer: null,
 				legalActions: [],

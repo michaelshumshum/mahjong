@@ -52,6 +52,38 @@ test('switching to the hand-ended scenario shows the faan breakdown', async ({ p
 	await expect(overlay.getByRole('heading', { name: /wins$/ })).toBeVisible();
 });
 
+test('switching to the hand-ended-in-a-draw scenario shows the plain draw summary', async ({
+	page
+}) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
+
+	const overlay = page.getByTestId('faan-overlay');
+	await expect(overlay).toBeVisible();
+	await expect(page.getByTestId('hand-end-draw')).toBeVisible();
+	await expect(page.getByTestId('hand-end-draw').getByText('Draw')).toBeVisible();
+});
+
+test('dismissing the hand-end hold in mock mode closes it locally with no socket round trip', async ({
+	page
+}) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Hand just ended' }).click();
+	const overlay = page.getByTestId('faan-overlay');
+	await expect(overlay).toBeVisible();
+
+	await overlay.getByRole('button', { name: 'Close' }).click();
+	await expect(overlay).toHaveCount(0);
+
+	// switching scenarios resets the local dismiss -- a fresh hand-end always starts open.
+	await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
+	await expect(page.getByTestId('faan-overlay')).toBeVisible();
+});
+
 test('phone-width viewport applies the sub-768px collapse to the self hand region', async ({
 	page
 }) => {

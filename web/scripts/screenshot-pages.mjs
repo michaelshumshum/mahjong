@@ -47,6 +47,17 @@ const PAGES = [
 			await page.waitForTimeout(150); // FaanBreakdown's own entrance, not a fixed animation wait
 		}
 	},
+	// exhaustive draw gets its own plain summary card, not FaanBreakdown (docs/00-architecture.md
+	// §3 "Hand-end hold" -- the hold itself is uniform across outcomes, but a draw has no
+	// winner/patterns/payments to show), genuinely distinct enough to warrant its own capture.
+	{
+		name: 'table-hand-ended-draw',
+		url: '/table/demo123?mock=1',
+		async before(page) {
+			await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
+			await page.waitForTimeout(150);
+		}
+	},
 	// Pre-game states (docs/03-frontend.md's "/table/[id] wiring") only ever occur on the real
 	// `liveStore`-driven path -- `?mock=` always renders a fully-seated, already-dealt table
 	// (`tableReady` is unconditionally true when `isMock`), so there's no MOCK_SCENARIOS entry

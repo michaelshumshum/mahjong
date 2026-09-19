@@ -255,7 +255,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             ack_d2 = wss[2].receive_json()
             assert ack_d2["d"] == {"id": discard2_id, "ok": True}
 
-            expected_types = ["discard", "hand_end", "score", "hand_start", "deal", "turn"]
+            expected_types = ["discard", "hand_end", "score"]
             frames: dict[int, list[dict[str, object]]] = {s: [] for s in range(4)}
             for _ in expected_types:
                 for seat, ws in enumerate(wss):
@@ -268,15 +268,51 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             assert hand_end["outcome"] == "exhaustive_draw"
             assert hand_end["hand_no"] == 1
             assert hand_end["winner"] is None
+            # hand-end hold (docs/00-architecture.md §3): every seat gets the same deadline,
+            # held until all four ack (below) or it elapses, whichever first.
+            assert isinstance(hand_end["deadline_ts"], int)
 
             score = frames[0][2]["d"]
             assert score["totals"] == {"0": 0, "1": 0, "2": 0, "3": 0}
 
-            next_hand_start = frames[0][3]["d"]
+            # --- hand-end hold: DEFAULT_RULESET's real hand_end_seconds (10s) would otherwise
+            # hold the room open at HAND_OVER -- the next hand's hand_start/deal/turn don't
+            # follow until every seat acks the hold (`hand_end_ack`), same "wait for all 4"
+            # shape `ready` already uses for the hand-1 start above. And, like that hand-1
+            # start, the 4th (last) ack itself cascades hand_start/deal/turn to every seat --
+            # including the acking seat's own connection -- before `_dispatch` gets to send
+            # that seat's own `ack` for the hand_end_ack that triggered it (mark_hand_end_ack
+            # runs synchronously inside `apply()`, ahead of `Session._ack()`), so seat 3's own
+            # hand_start/deal/turn land ahead of its ack, exactly like `ack_3` above.
+            for seat in range(3):
+                ack_id = _next_id()
+                wss[seat].send_json(_msg("hand_end_ack", {}, id_=ack_id))
+                ack = wss[seat].receive_json()
+                assert ack["d"] == {"id": ack_id, "ok": True}
+
+            ack3_id = _next_id()
+            wss[3].send_json(_msg("hand_end_ack", {}, id_=ack3_id))
+            next_hand_start_3 = wss[3].receive_json()
+            next_deal_3 = wss[3].receive_json()
+            next_turn_3 = wss[3].receive_json()
+            next_ack_3 = wss[3].receive_json()
+            assert next_ack_3["d"] == {"id": ack3_id, "ok": True}
+
+            next_types = ["hand_start", "deal", "turn"]
+            next_frames: dict[int, list[dict[str, object]]] = {
+                3: [next_hand_start_3, next_deal_3, next_turn_3]
+            }
+            for seat in range(3):
+                next_frames[seat] = [wss[seat].receive_json() for _ in next_types]
+
+            for seat in range(4):
+                assert [f["t"] for f in next_frames[seat]] == next_types
+
+            next_hand_start = next_frames[0][0]["d"]
             assert next_hand_start["hand_no"] == 2
             assert next_hand_start["dealer"] == 0  # dealer repeats on exhaustive draw (default)
 
-            next_turn = frames[0][5]["d"]
+            next_turn = next_frames[0][2]["d"]
             assert next_turn["seat"] == 0
 
 

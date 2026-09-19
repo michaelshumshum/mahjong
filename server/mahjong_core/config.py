@@ -89,6 +89,7 @@ class RuleSet:
     # timing (server-enforced)
     turn_seconds: int = 15  # AWAIT_ACTION timeout
     claim_seconds: int = 5  # AWAIT_CLAIMS window
+    hand_end_seconds: int = 10  # HAND_OVER hold, until all seats ack or timeout
     turn_timeout_strikes: int = 3  # timeouts before seat flips to AUTOPLAY
     disconnect_grace_seconds: float = 20.0  # DISCONNECTED -> AUTOPLAY (00-architecture.md §8)
 
@@ -135,6 +136,7 @@ class RuleSet:
             "provable_fairness": self.provable_fairness,
             "turn_seconds": self.turn_seconds,
             "claim_seconds": self.claim_seconds,
+            "hand_end_seconds": self.hand_end_seconds,
             "turn_timeout_strikes": self.turn_timeout_strikes,
             "disconnect_grace_seconds": self.disconnect_grace_seconds,
         }
@@ -168,6 +170,7 @@ class RuleSet:
             provable_fairness=data["provable_fairness"],
             turn_seconds=data["turn_seconds"],
             claim_seconds=data["claim_seconds"],
+            hand_end_seconds=data["hand_end_seconds"],
             turn_timeout_strikes=data["turn_timeout_strikes"],
             disconnect_grace_seconds=data["disconnect_grace_seconds"],
         )

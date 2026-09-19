@@ -112,6 +112,14 @@ class ReadyPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class HandEndAckPayload(BaseModel):
+    """`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current
+    hand_no)` server-side (`app/room.py`'s `Room.mark_hand_end_ack`), same shape as `ReadyPayload`
+    above."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class DiscardPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -154,6 +162,11 @@ class Join(Envelope):
 class Ready(Envelope):
     t: Literal["ready"] = "ready"
     d: ReadyPayload
+
+
+class HandEndAck(Envelope):
+    t: Literal["hand_end_ack"] = "hand_end_ack"
+    d: HandEndAckPayload
 
 
 class Discard(Envelope):
@@ -316,6 +329,9 @@ class HandEndPayload(BaseModel):
     payments: dict[int, int] | None
     revealed: bool
     winning_hand: list[int] | None
+    # hand-end hold (docs/00-architecture.md §3 "Hand-end hold"): every seat gets this same
+    # deadline, held until all four ack (`hand_end_ack`) or it elapses, whichever first.
+    deadline_ts: int
 
 
 class ScorePayload(BaseModel):
@@ -476,7 +492,7 @@ class Ack(Envelope):
 
 
 ClientMessage = Annotated[
-    Hello | Ping | Join | Ready | Discard | Claim | Declare | Auto | Chat,
+    Hello | Ping | Join | Ready | Discard | Claim | Declare | Auto | Chat | HandEndAck,
     Field(discriminator="t"),
 ]
 ServerMessage = Annotated[

@@ -12,6 +12,7 @@ fast and deterministically.
 
 from __future__ import annotations
 
+import dataclasses
 import random
 
 from app.room import Room
@@ -22,14 +23,26 @@ from mahjong_core.state import Phase
 
 _STEP_CAP = 8000  # matches bots/selfplay.py's _STEP_CAP for the same bounded ruleset
 _BOUNDED_RULESET = RuleSet(
-    dealer_repeat_on_win=False, dealer_repeat_on_draw=False, game_length=GameLength.EAST_ONLY
+    dealer_repeat_on_win=False,
+    dealer_repeat_on_draw=False,
+    game_length=GameLength.EAST_ONLY,
+    # this bare Room() has no seat_bindings at all (no join/ready flow), so nothing would ever
+    # ack the hand-end hold (app/room.py's `Room._open_hand_end_window`) -- 0 makes every hold
+    # resolve on the very next `process_one()` tick instead, same idiom `claim_seconds=0`/
+    # `turn_seconds=0` already use elsewhere for a test-driven Room.
+    hand_end_seconds=0,
 )
 
 
 async def _drive_one_step(room: Room, rng: random.Random) -> None:
     """Pick the acting seat the same way `bots/selfplay.py`'s `play_game` does, then submit and
-    process that seat's randomly-chosen action through the Room."""
+    process that seat's randomly-chosen action through the Room. `HAND_OVER` has no seat
+    decision at all (`legal_actions` is `()` for every seat in that phase) -- just process the
+    tick so the `hand_end_seconds=0` timer (armed the moment the hand ended) closes the hold."""
     state = room.state
+    if state.phase == Phase.HAND_OVER:
+        await room.process_one()
+        return
     if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
         assert state.claim_window is not None
         pending = [
@@ -146,3 +159,100 @@ def test_join_name_over_length_is_truncated_not_rejected() -> None:
     assert binding is not None
     assert binding.name == "x" * 24
     assert len(binding.name) == 24
+
+
+# --- hand-end hold (docs/00-architecture.md §3, "Hand-end hold") ------------------------------
+#
+# Every hand end -- win or exhaustive draw alike, no outcome branching -- holds the room at
+# `Phase.HAND_OVER` until every non-bot/autoplay seat acks (`Room.mark_hand_end_ack`) or
+# `ruleset.hand_end_seconds` elapses, whichever first (`Room._open_hand_end_window`). These
+# drive a bare `Room()` (join()-bound "connected" seats, no real socket) straight to the very
+# first `HAND_OVER` landing, the same way `_drive_one_step` does for the full-game test above,
+# then exercise the hold itself directly.
+
+
+async def _drive_to_first_hand_over(room: Room, rng: random.Random) -> None:
+    while room.state.phase != Phase.HAND_OVER:
+        await _drive_one_step(room, rng)
+
+
+async def test_hand_end_hold_advances_immediately_once_all_seats_ack() -> None:
+    ruleset = dataclasses.replace(_BOUNDED_RULESET, hand_end_seconds=999)
+    room = Room("room-hold-ack-all", ruleset, game_seed=101)
+    for seat in range(4):
+        room.join(f"sess-{seat}", lambda seq, wire: None, seat=seat)
+
+    await _drive_to_first_hand_over(room, random.Random(101))
+    hand_no = room.state.hand_no
+
+    room.mark_hand_end_ack(0)
+    room.mark_hand_end_ack(1)
+    room.mark_hand_end_ack(2)
+    assert room.state.phase == Phase.HAND_OVER  # seat 3 hasn't acked yet -- still held
+
+    room.mark_hand_end_ack(3)
+    # the last ack closes the hold immediately, without waiting for the (here, deliberately
+    # huge) hand_end_seconds timeout.
+    assert room.state.phase != Phase.HAND_OVER
+    assert room.state.hand_no != hand_no or room.state.phase == Phase.GAME_OVER
+
+
+async def test_hand_end_hold_times_out_with_only_partial_acks() -> None:
+    ruleset = dataclasses.replace(_BOUNDED_RULESET, hand_end_seconds=0)
+    room = Room("room-hold-timeout", ruleset, game_seed=102)
+    for seat in range(4):
+        room.join(f"sess-{seat}", lambda seq, wire: None, seat=seat)
+
+    await _drive_to_first_hand_over(room, random.Random(102))
+
+    room.mark_hand_end_ack(0)
+    room.mark_hand_end_ack(2)
+    assert room.state.phase == Phase.HAND_OVER  # only 2 of 4 -- still held
+
+    # hand_end_seconds=0 -- the very next tick's timer closes it despite the missing acks.
+    await room.process_one()
+    assert room.state.phase != Phase.HAND_OVER
+
+
+async def test_hand_end_hold_pre_acks_bot_and_autoplay_seats() -> None:
+    """M4.5 practice-mode bot seats (and any already-`autoplay` seat) have no human to click
+    dismiss -- pre-seeded into the ack set the instant the hold opens (mirrors
+    `_send_claim_offers`'s `no_calls`/`auto_pass_chow` pre-resolution), so only the one real
+    seat here has to actually ack."""
+    ruleset = dataclasses.replace(_BOUNDED_RULESET, hand_end_seconds=999)
+    room = Room("room-hold-bots", ruleset, game_seed=103, practice=True)
+    room.join("sess-0", lambda seq, wire: None, seat=0)
+
+    await _drive_to_first_hand_over(room, random.Random(103))
+
+    assert room._hand_end_acked == {1, 2, 3}  # every bot seat, pre-seeded
+    room.mark_hand_end_ack(0)
+    assert room.state.phase != Phase.HAND_OVER  # the one real seat closes it out
+
+
+async def test_stray_hand_end_ack_for_an_already_resolved_hand_is_a_no_op() -> None:
+    ruleset = dataclasses.replace(_BOUNDED_RULESET, hand_end_seconds=0)
+    room = Room("room-hold-stray-ack", ruleset, game_seed=104)
+    for seat in range(4):
+        room.join(f"sess-{seat}", lambda seq, wire: None, seat=seat)
+
+    await _drive_to_first_hand_over(room, random.Random(104))
+    await room.process_one()  # timeout closes it (hand_end_seconds=0)
+    assert room.state.phase != Phase.HAND_OVER
+
+    state_before = room.state
+    room.mark_hand_end_ack(0)  # stray ack for the hand that already resolved -- a no-op
+    assert room.state is state_before
+
+
+async def test_state_sync_carries_the_hand_end_deadline_while_the_hold_is_open() -> None:
+    ruleset = dataclasses.replace(_BOUNDED_RULESET, hand_end_seconds=999)
+    room = Room("room-hold-state-sync", ruleset, game_seed=105)
+    for seat in range(4):
+        room.join(f"sess-{seat}", lambda seq, wire: None, seat=seat)
+
+    await _drive_to_first_hand_over(room, random.Random(105))
+
+    wire = room.state_sync_wire(0)
+    assert wire["phase"] == "HAND_OVER"
+    assert isinstance(wire["deadline_ts"], int)

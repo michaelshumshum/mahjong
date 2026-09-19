@@ -1284,6 +1284,67 @@
       "title": "HandEnd",
       "type": "object"
     },
+    "HandEndAck": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "hand_end_ack",
+          "default": "hand_end_ack",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/HandEndAckPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "HandEndAck",
+      "type": "object"
+    },
+    "HandEndAckPayload": {
+      "additionalProperties": false,
+      "description": "`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current\nhand_no)` server-side (`app/room.py`'s `Room.mark_hand_end_ack`), same shape as `ReadyPayload`\nabove.",
+      "properties": {},
+      "title": "HandEndAckPayload",
+      "type": "object"
+    },
     "HandEndPayload": {
       "additionalProperties": false,
       "properties": {
@@ -1395,6 +1456,10 @@
             }
           ],
           "title": "Winning Hand"
+        },
+        "deadline_ts": {
+          "title": "Deadline Ts",
+          "type": "integer"
         }
       },
       "required": [
@@ -1408,7 +1473,8 @@
         "points",
         "payments",
         "revealed",
-        "winning_hand"
+        "winning_hand",
+        "deadline_ts"
       ],
       "title": "HandEndPayload",
       "type": "object"
@@ -2628,6 +2694,7 @@
           "claim": "#/$defs/Claim",
           "declare": "#/$defs/Declare",
           "discard": "#/$defs/Discard",
+          "hand_end_ack": "#/$defs/HandEndAck",
           "hello": "#/$defs/Hello",
           "join": "#/$defs/Join",
           "ping": "#/$defs/Ping",
@@ -2662,6 +2729,9 @@
         },
         {
           "$ref": "#/$defs/Chat"
+        },
+        {
+          "$ref": "#/$defs/HandEndAck"
         }
       ]
     },

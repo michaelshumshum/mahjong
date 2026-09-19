@@ -114,6 +114,11 @@ export interface MockGameState {
 	seats: Seats;
 	claimWindow: MockClaimWindow | null;
 	handResult: MockHandResult | null;
+	// the hand-end hold's remaining time (docs/00-architecture.md §3 "Hand-end hold"): every
+	// `HAND_OVER` hand end -- win or exhaustive draw alike -- holds the round open for this
+	// long, or until every seat dismisses, whichever first. `null` whenever `handResult` is
+	// (no hold to show); mirrors `claimWindow.durationMs`'s own shape one level up.
+	handEndHoldMs: number | null;
 	you: Seat;
 }
 
@@ -151,6 +156,7 @@ export const yourTurnToDiscard: MockGameState = {
 	you: 0,
 	claimWindow: null,
 	handResult: null,
+	handEndHoldMs: null,
 	seats: [
 		emptySeat(0, {
 			concealedHand: ['1m', '2m', '3m', '4p', '5p', '6p', '2s', '3s', '4s', 'z5', 'z5', 'z5', '9s'],
@@ -195,6 +201,7 @@ export const claimWindowOpenForYou: MockGameState = {
 	wallCount: 41,
 	you: 0,
 	handResult: null,
+	handEndHoldMs: null,
 	claimWindow: {
 		windowId: 12,
 		kind: 'discard',
@@ -294,7 +301,33 @@ export const handJustEnded: MockGameState = {
 		],
 		totalFaan: 6,
 		payments: { 0: -16, 1: -16, 2: 48, 3: -16 }
-	}
+	},
+	// hand-end hold (docs/00-architecture.md §3): the demo's still-open countdown, not an
+	// arbitrary prop -- a real `hand_end` always carries one, win or draw alike.
+	handEndHoldMs: 8000
+};
+
+// Scenario 4: hand just ended in an exhaustive draw. Same HAND_OVER hold as a win
+// (docs/00-architecture.md §3's "Hand-end hold" is uniform across outcomes), but with no
+// winner/patterns/payments -- `+page.svelte`'s overlay falls back to a plain draw summary
+// instead of `FaanBreakdown` whenever `outcome !== 'win'`.
+export const handJustEndedDraw: MockGameState = {
+	phase: 'HAND_OVER',
+	turn: 3,
+	dealer: 2,
+	prevailing: 'E',
+	handNo: 6,
+	wallCount: 0,
+	you: 0,
+	claimWindow: null,
+	seats: [
+		emptySeat(0, { concealedCount: 13, discards: ['1s', '9p', 'z2', '4m'], score: 40 }),
+		emptySeat(1, { concealedCount: 13, discards: ['2p', '3p', '7s'], score: -20 }),
+		emptySeat(2, { concealedCount: 13, discards: ['9m', '1p', '5s'], score: 10 }),
+		emptySeat(3, { concealedCount: 13, discards: ['8p', '2m'], score: -30 })
+	],
+	handResult: { outcome: 'exhaustive_draw' },
+	handEndHoldMs: 8000
 };
 
 export interface MockScenario {
@@ -306,5 +339,6 @@ export interface MockScenario {
 export const MOCK_SCENARIOS: MockScenario[] = [
 	{ id: 'your-turn', label: 'Your turn to discard', state: yourTurnToDiscard },
 	{ id: 'claim-window', label: 'Claim window open (you)', state: claimWindowOpenForYou },
-	{ id: 'hand-ended', label: 'Hand just ended', state: handJustEnded }
+	{ id: 'hand-ended', label: 'Hand just ended', state: handJustEnded },
+	{ id: 'hand-ended-draw', label: 'Hand ended in a draw', state: handJustEndedDraw }
 ];

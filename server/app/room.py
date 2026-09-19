@@ -522,6 +522,12 @@ class Room:
         self._turn_timer_seat: dict[int, int] = {}  # timer id -> seat
         self._active_turn_timer: dict[int, int] = {}  # seat -> the timer id live for it
         self._turn_deadline_ms: dict[int, int] = {}  # seat -> that seat's current turn deadline_ts
+        # hand-end hold (HAND_OVER, "hand-end hold" note): whole-room wait, not per-seat like
+        # claims -- a single active timer id, and a single deadline shared by every seat.
+        self._hand_end_acked: set[int] = set()
+        self._hand_end_hand_no: int | None = None  # guards a stray/late ack for a prior hand
+        self._active_hand_end_timer_id: int | None = None
+        self._hand_end_deadline_ms: int | None = None
         # the tile_id `Drawn`/`KongReplacementDrawn` landed for whichever seat `self.state` is
         # currently offering an AWAIT_ACTION decision to, if any -- refreshed every `_apply()`
         # call in lockstep with `self.state` itself, so it's always describing *that* decision by
@@ -634,6 +640,23 @@ class Room:
         if all(b is not None and b.ready for b in self.seat_bindings):
             self.started = True
             self._publish_hand_start_and_deal()
+            self._publish_turn_if_active()
+
+    def mark_hand_end_ack(self, seat: int) -> None:
+        """`hand_end_ack` (hand-end hold): this seat dismissed the hand-end overlay early.
+        Direct, synchronous, not routed through `submit()`/`reduce()` -- there's no `Action`/
+        legality check involved, same reasoning `mark_ready` gives for its own shape. No-op if
+        the hold isn't open for the hand this ack claims (`self.state.phase != Phase.HAND_OVER`,
+        or a late ack for a hand that's already moved on -- `self._hand_end_hand_no` no longer
+        matches `self.state.hand_no`). Once every seat has acked, advances immediately --
+        called directly by `Session`, outside `process_one()`'s own loop, so (like `mark_ready`)
+        this publishes the follow-on `hand_start`/`deal`/`turn` itself rather than relying on
+        `process_one()`'s tail to notice `self.state` changed."""
+        if self.state.phase != Phase.HAND_OVER or self._hand_end_hand_no != self.state.hand_no:
+            return
+        self._hand_end_acked.add(seat)
+        if len(self._hand_end_acked) >= 4:
+            self._advance_to_next_hand()
             self._publish_turn_if_active()
 
     def set_auto(self, seat: int, *, no_calls: bool | None, auto_pass_chow: bool | None) -> None:
@@ -864,6 +887,7 @@ class Room:
             names=self._names_tuple(),
             claim_deadline_ts=claim_deadline_ts,
             turn_deadline_ts=self._turn_deadline_ms.get(seat),
+            hand_end_deadline_ts=self._hand_end_deadline_ms,
         )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
@@ -1086,12 +1110,14 @@ class Room:
 
     def _dispatch_expired_timer(self, timer_id: int) -> None:
         """One id popped off the shared `self.deadlines` heap (`TimerHeap`'s docstring): claim-
-        window, turn, and disconnect-grace timers share one id space, so this just asks which
-        side-table recognizes it."""
+        window, turn, hand-end, and disconnect-grace timers share one id space, so this just
+        asks which side-table (or, for hand-end, single active id) recognizes it."""
         if timer_id in self._timer_seat:
             self._handle_claim_timeout(timer_id)
         elif timer_id in self._turn_timer_seat:
             self._handle_turn_timeout(timer_id)
+        elif timer_id == self._active_hand_end_timer_id:
+            self._handle_hand_end_timeout(timer_id)
         else:
             self._handle_disconnect_timeout(timer_id)
 
@@ -1381,39 +1407,119 @@ class Room:
         self._apply(Pass(window_id=window_id, seat=seat))
 
     def _apply(self, action: Action) -> None:
-        """Run one already-authorized `Action` through `reduce()`, publish, and chain into
-        `start_next_hand()` on `HAND_OVER` -- the common tail shared by a real `Command`
-        (`_handle`), a synthesized claim-timeout `Pass` (`_handle_claim_timeout`), a
-        synthesized turn-timeout `Discard` (`_handle_turn_timeout`), and a pre-armed auto-pass
-        (`_send_claim_offers`)."""
+        """Run one already-authorized `Action` through `reduce()`, publish, and open the
+        hand-end hold on `HAND_OVER` -- the common tail shared by a real `Command` (`_handle`),
+        a synthesized claim-timeout `Pass` (`_handle_claim_timeout`), a synthesized turn-timeout
+        `Discard` (`_handle_turn_timeout`), and a pre-armed auto-pass (`_send_claim_offers`).
+
+        Landing on `HAND_OVER` no longer chains straight into `start_next_hand()` the same
+        tick (that used to happen here, unconditionally) -- see `_open_hand_end_window`'s
+        docstring for why the round is now held open first. `_open_hand_end_window` has to run
+        *before* `self._publish(events)` below (it computes this hold's `deadline_ts`, which
+        the just-produced `hand_end` wire frame needs to carry), but the actual advance -- if
+        every seat is already acked, e.g. an all-bot practice room -- must not run until
+        *after* `events` (which includes `hand_end`/`score`) is on the wire, or `hand_start`/
+        `deal` would leapfrog them out of order."""
         self.actions.append(action)  # full-game log (module docstring) -- reduce()-bound only
         self.state, events = reduce(self.state, action)
         self.event_id += 1
-        self._publish(events)
-        all_events = events
+        advance_immediately = False
         if self.state.phase == Phase.HAND_OVER:
-            # server-computed transition, no seat decision (actions.py, engine.py module
-            # docstrings) -- advance immediately, same tick, before anything else touches
-            # this command's result.
-            self.state, more_events = start_next_hand(self.state)
-            self.event_id += 1
-            self._publish(more_events)
-            all_events = [*events, *more_events]
-            # a hand boundary -- the next hand dealt, or the game ended -- either way
-            # `process_one()`'s tail is what actually wakes a pending `wait_for_shutdown_boundary`
-            # (only after any GAME_OVER persist below has actually finished, never before).
-            self._boundary_this_tick = True
-            if self.state.phase == Phase.AWAIT_ACTION:
-                # start_next_hand() deals the next hand with no Event of its own (state.py/
-                # engine.py: `new_game`/`_deal_hand` build state directly, not through
-                # reduce()) -- hand_start/deal have no engine event to redact either way
-                # (02-protocol.md §3's sketch, no EventKind backs them), so this Room
-                # synthesizes both here, the same way it does for the ready-triggered hand 1
-                # start (`Room.mark_ready`).
-                self._publish_hand_start_and_deal()
-        # refreshed every call, in lockstep with self.state -- see `_turn_draw_tile`'s own
-        # __init__ comment and `_turn_draw_tile_for_current_turn`'s docstring.
-        self._turn_draw_tile = _turn_draw_tile_for_current_turn(all_events, self.state)
+            advance_immediately = self._open_hand_end_window()
+        self._publish(events)
+        if advance_immediately:
+            self._advance_to_next_hand()
+        else:
+            # refreshed every call, in lockstep with self.state -- see `_turn_draw_tile`'s own
+            # __init__ comment and `_turn_draw_tile_for_current_turn`'s docstring. When
+            # `advance_immediately`, `_advance_to_next_hand` refreshes this itself instead,
+            # against `more_events`/the post-advance state.
+            self._turn_draw_tile = _turn_draw_tile_for_current_turn(events, self.state)
+
+    def _open_hand_end_window(self) -> bool:
+        """Open the `HAND_OVER` hold (docs/00-architecture.md §3's "Hand-end hold"): every
+        hand end -- win or exhaustive draw alike, no outcome branching -- holds the room at
+        `HAND_OVER` for up to `ruleset.hand_end_seconds`, or until every seat acks
+        (`mark_hand_end_ack`), whichever first. This is a clock/session concern (`ClaimWindow`'s
+        own docstring: "a clock, socket, or random value belongs in app/"), so it lives entirely
+        here -- `mahjong_core.engine`/`state` are untouched.
+
+        Seeds the ack set with every seat whose `SeatBinding.status` is `bot`/`autoplay` --
+        mirrors `_send_claim_offers`'s `no_calls`/`auto_pass_chow` pre-resolution check: no
+        human is present to click dismiss for those seats. A genuinely `disconnected` seat is
+        deliberately *not* pre-seeded -- it's still someone's seat, it just rides out the same
+        hold as everyone else. An unbound seat (`None` binding -- direct-construction test
+        `Room`s with no join/ready flow at all) isn't pre-seeded either, for the same reason.
+
+        Also computes this hold's `deadline_ts` (`self._hand_end_deadline_ms`) unconditionally,
+        even when about to advance immediately -- the just-published `hand_end` frame carries
+        it regardless of whether the hold turns out to be instantaneous.
+
+        Returns whether every seat is already acked, in which case the caller (`_apply`)
+        advances immediately, same tick, once this tick's own events are on the wire --
+        preserves today's exact behavior for an all-bot practice room. Otherwise arms
+        `_arm_hand_end_timer`."""
+        self._hand_end_hand_no = self.state.hand_no
+        self._hand_end_acked = {
+            seat
+            for seat, binding in enumerate(self.seat_bindings)
+            if binding is not None and binding.status in ("bot", "autoplay")
+        }
+        duration = self.state.ruleset.hand_end_seconds
+        self._hand_end_deadline_ms = _now_ms() + round(duration * 1000)
+        if len(self._hand_end_acked) >= 4:
+            return True
+        self._arm_hand_end_timer()
+        return False
+
+    def _advance_to_next_hand(self) -> None:
+        """The actual `start_next_hand()` transition -- deferred out of `_apply` so it can run
+        once the hand-end hold actually closes (all-acked, `mark_hand_end_ack`, or timeout,
+        `_handle_hand_end_timeout`), not unconditionally the same tick `HAND_OVER` is reached.
+        Body is exactly what `_apply` used to do inline: advance, publish, flag the boundary,
+        and (a fresh hand dealt straight into `AWAIT_ACTION`) synthesize `hand_start`/`deal`."""
+        self.state, more_events = start_next_hand(self.state)
+        self.event_id += 1
+        self._publish(more_events)
+        # a hand boundary -- the next hand dealt, or the game ended -- either way
+        # `process_one()`'s tail is what actually wakes a pending `wait_for_shutdown_boundary`
+        # (only after any GAME_OVER persist below has actually finished, never before).
+        self._boundary_this_tick = True
+        self._turn_draw_tile = _turn_draw_tile_for_current_turn(more_events, self.state)
+        if self.state.phase == Phase.AWAIT_ACTION:
+            # start_next_hand() deals the next hand with no Event of its own (state.py/
+            # engine.py: `new_game`/`_deal_hand` build state directly, not through
+            # reduce()) -- hand_start/deal have no engine event to redact either way
+            # (02-protocol.md §3's sketch, no EventKind backs them), so this Room
+            # synthesizes both here, the same way it does for the ready-triggered hand 1
+            # start (`Room.mark_ready`).
+            self._publish_hand_start_and_deal()
+
+    def _arm_hand_end_timer(self) -> None:
+        """Give the room a single fresh `TimerHeap` entry, `ruleset.hand_end_seconds` from right
+        now -- modeled directly on `_arm_turn_timer`, but whole-room (one active id), not
+        per-seat like claims: there's no priority/tiebreak logic here, just "wait for N of 4"
+        (the closer template is `mark_ready`'s all-seats wait, not `ClaimWindow`). `deadline_ts`
+        itself is computed by the caller (`_open_hand_end_window`), which needs it before this
+        method runs (to stamp the `hand_end` frame) -- this method only arms the heap entry."""
+        loop = asyncio.get_running_loop()
+        duration = self.state.ruleset.hand_end_seconds
+        deadline = loop.time() + duration
+        timer_id = next(self._timer_seq)
+        self.deadlines.add(deadline, timer_id)
+        self._active_hand_end_timer_id = timer_id
+
+    def _handle_hand_end_timeout(self, timer_id: int) -> None:
+        """The hand-end hold's deadline popped with the room still waiting on at least one
+        seat's ack. No-op if stale: unknown/superseded id (`_active_hand_end_timer_id` no
+        longer matches -- same lazy-deletion staleness check every other timer here uses), or
+        the hold already closed some other way (all-acked) before this fired -- `self.state.
+        phase` has moved on to `AWAIT_ACTION`/`GAME_OVER` by then."""
+        if self._active_hand_end_timer_id != timer_id:
+            return
+        if self.state.phase != Phase.HAND_OVER:
+            return
+        self._advance_to_next_hand()
 
     def _arm_claim_timer(self) -> None:
         """Arm a deadline the moment `self.state.claim_window` shows a new `window_id` --
@@ -1624,9 +1730,12 @@ class Room:
         `Discarded` event using `self.state` from immediately after the very `reduce()` call
         that produced it, before any *later*, separate command could claim that discard and
         remove it from the pool -- so `self.state.seats[event.seat].discards` still has it at
-        its correct tail position every time this runs. A `HandEnded` also gets a broadcast
-        `score` alongside it -- `state.seats[*].score` already reflects `_apply_payments()`'s
-        result by the time `self.state` was reassigned above `_publish`'s own caller."""
+        its correct tail position every time this runs. A `HandEnded` also gets `deadline_ts`
+        filled in (the hand-end hold this same `HAND_OVER` landing just opened --
+        `_open_hand_end_window` already set `self._hand_end_deadline_ms` before `_apply` called
+        this, see that method's docstring for why the ordering matters) and a broadcast `score`
+        alongside it -- `state.seats[*].score` already reflects `_apply_payments()`'s result by
+        the time `self.state` was reassigned above `_publish`'s own caller."""
         for event in events:
             for seat in range(4):
                 wire = redact_event(self.state, seat, event)
@@ -1634,6 +1743,8 @@ class Room:
                     pool = self.state.seats[event.seat].discards
                     wire["tile"] = tile_code(tile_id_type(event.tile_id))
                     wire["pool_index"] = len(pool) - 1
+                if isinstance(event, HandEnded):
+                    wire["deadline_ts"] = self._hand_end_deadline_ms
                 self.publish_to_seat(seat, wire)
             if isinstance(event, HandEnded):
                 self._broadcast_wire(

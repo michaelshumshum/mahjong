@@ -170,9 +170,7 @@ class Room:
                 self.event_id += 1
                 self._publish(events)          # redact_event() per recipient; stamps that stream's own seq (§5)
                 if self.state.phase == Phase.HAND_OVER:  # server-computed, no seat decision (§3 above)
-                    self.state, events = start_next_hand(self.state)
-                    self.event_id += 1
-                    self._publish(events)
+                    self._open_hand_end_window() # hold the round open -- see "Hand-end hold" below
             self._arm_timers()
             self._poke_bots()                  # submits to a worker pool; never runs bot logic in this loop (D12)
 ```
@@ -183,10 +181,12 @@ items in a queue.
 **`start_next_hand()` on the loop (M3 sub-task 2 fix).** An earlier version of this sketch had
 `_authorize` return a plural `actions` and never called `start_next_hand()` at all — engine.py's
 own docstring already says the Room must call it right after a `reduce()` lands on `HAND_OVER`,
-"before offering anyone anything else," so the loop above does that in the same tick, before
-`_arm_timers`/`_poke_bots`. `_authorize` returns at most one `Action` (or `None` to drop an
-illegal command) since `Command` carries exactly one already-validated `(seat, Action)` pair —
-there was never a second action to loop over.
+"before offering anyone anything else." A *later* revision (the hand-end hold, below) split that
+single step in two: landing on `HAND_OVER` still happens the same tick a `reduce()` produces it,
+but `start_next_hand()` itself is deferred until the hold actually closes — see "Hand-end hold".
+`_authorize` returns at most one `Action` (or `None` to drop an illegal command) since `Command`
+carries exactly one already-validated `(seat, Action)` pair — there was never a second action to
+loop over.
 
 > In-room messages never leave the owning task. A room lives on exactly one node and its
 > members are routed there (§7); room state is never distributed.
@@ -260,6 +260,54 @@ now someone's turn" or "a claim window opened" as `Event`s in the first place, s
 *when a client should be told* is a wire-recipient concern (the same boundary `redact_event`'s
 own docstring already draws for `discard.pool_index`). `Room` synthesizes all five directly,
 at the exact points in its own loop that would otherwise have called `redact_event`.
+
+### Hand-end hold
+
+A hand ending -- win or exhaustive draw, no outcome branching -- used to chain straight into
+`start_next_hand()` the same tick: `hand_end`, `score`, the next hand's `hand_start`/`deal`/
+`turn`, all landed on the wire back to back, one server-side instant apart. A client applying
+every frame synchronously as it arrives has no chance to actually show the just-finished hand
+before the board resets under it -- reported as "the win doesn't even show and the next round
+starts immediately." The fix holds the room at `Phase.HAND_OVER` for a beat instead of advancing
+inline:
+
+```
+on HAND_OVER:
+  hand_end_acked = {seat for seat in bound_seats if seat.status in (bot, autoplay)}
+  if len(hand_end_acked) == 4:      -> advance immediately (e.g. an all-bot practice room)
+  arm deadline_ts = now + ruleset.hand_end_seconds
+  wait:
+    seat ack (hand_end_ack)  -> hand_end_acked.add(seat); all 4 acked -> advance
+    OR deadline reached      -> advance regardless of who hasn't acked
+```
+
+**Implementation split, `app/room.py`-only.** Same shape as the claim window's own split (§4):
+`mahjong_core.engine`/`state` are untouched -- `Phase.HAND_OVER` and `start_next_hand()` stay
+exactly as they always were, since a clock, socket, or per-seat ack-tracking concern belongs in
+`app/`, not the pure engine (`ClaimWindow`'s own docstring). `Room._open_hand_end_window` seeds
+the ack set and either advances immediately or arms a single whole-room `TimerHeap` entry
+(`_arm_hand_end_timer`) -- not one per seat like a claim window, since there's no priority/
+tiebreak logic here, just "wait for N of 4" (the closer template is `mark_ready`'s all-seats
+wait for the hand-1 start, not `ClaimWindow`). `Room.mark_hand_end_ack(seat)` is called directly
+from `Session`, the same synchronous, not-through-`reduce()` shape `mark_ready` already uses --
+there's no `Action`/legality check involved. The `hand_end` wire frame itself carries this hold's
+`deadline_ts` (mirrors `turn`/`claim_offer`'s own deadlines), computed *before* that frame is
+published so it's never stale by the time a client reads it.
+
+Gotchas:
+
+- **A genuinely `disconnected` seat is not pre-seeded.** It's still someone's seat; it just rides
+  out the same hold as everyone else, no special-casing needed (unlike `bot`/`autoplay`, where
+  there is provably no human behind the seat to ever click dismiss).
+- **A stray or late ack is a no-op.** `Room` guards on `(self.state.phase == Phase.HAND_OVER, the
+  acking hand_no matches the hold that's actually open)` -- an ack for a hand that already
+  resolved (by full-house or by timeout) changes nothing.
+- **The last ack cascades before its own `ack`.** `mark_hand_end_ack`, like `mark_ready`, mutates
+  `Room` directly from `Session`, outside `process_one()`'s own loop -- if this ack is the 4th,
+  the resulting `hand_start`/`deal`/`turn` publish (including to the acking seat's own stream)
+  happens *inside* that same call, before `Session._dispatch` gets to send this message's own
+  `ack` response. The acking seat sees its next hand's frames slightly ahead of its own ack --
+  same ordering `ready`'s own hand-1-start cascade already has.
 
 ### Outbound backpressure
 

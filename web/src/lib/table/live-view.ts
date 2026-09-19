@@ -119,6 +119,15 @@ function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
 	};
 }
 
+function handEndHoldMsFromState(state: ClientGameState): number | null {
+	// same "anchored deadline, not a countdown carried over the wire" shape claimWindowToView's
+	// durationMs already uses -- `handEndDeadlineTs` is `null` whenever there's no open hold
+	// (reducer.ts clears it on `hand_start`).
+	return state.handEndDeadlineTs !== null
+		? Math.max(0, state.handEndDeadlineTs - Date.now())
+		: null;
+}
+
 function handResultToView(state: ClientGameState): MockHandResult | null {
 	const d = state.lastHandEnd;
 	if (!d) return null;
@@ -176,6 +185,7 @@ export function viewFromClientState(state: ClientGameState): LiveTableView | nul
 		seats,
 		claimWindow: claimWindowToView(state),
 		handResult: handResultToView(state),
+		handEndHoldMs: handEndHoldMsFromState(state),
 		you
 	};
 

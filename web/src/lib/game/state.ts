@@ -85,6 +85,11 @@ export interface ClientGameState {
 	 * gate that yet (`live-view.ts`'s `claimWindowToView`). */
 	lastDiscard: { seat: number; tileId: number } | null;
 	lastHandEnd: HandEndState | null;
+	/** The hand-end hold's deadline (`hand_end.deadline_ts`): held open until every seat acks
+	 * (`hand_end_ack`) or this elapses, whichever first — set by `hand_end`, cleared by the
+	 * next `hand_start` (mirrors `lastHandEnd`'s own lifecycle, since both describe the same
+	 * held-open round). */
+	handEndDeadlineTs: number | null;
 	/** Every `hand_end` seen so far this session, oldest first — `lastHandEnd` above only ever
 	 * holds the latest one (used for the just-finished-hand overlay), so this is the running
 	 * history a score sheet needs. Append-only: never cleared by `hand_start` or `state_sync`
@@ -119,6 +124,7 @@ export function initialClientGameState(): ClientGameState {
 		claimOffer: null,
 		lastDiscard: null,
 		lastHandEnd: null,
+		handEndDeadlineTs: null,
 		handHistory: [],
 		gameEnd: null,
 		shutdownDeadlineTs: null

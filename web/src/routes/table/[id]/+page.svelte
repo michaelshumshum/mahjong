@@ -17,6 +17,7 @@
 	import ClaimDialog from '$lib/ui/ClaimDialog.svelte';
 	import type { ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
+	import TimerRing from '$lib/ui/TimerRing.svelte';
 	import ScoreSheet, {
 		type HandRecord,
 		type SeatInfo,
@@ -331,6 +332,32 @@
 			: null
 	);
 	let lastClaimChoice: ClaimOption | null = $state(null);
+
+	// hand-end hold (docs/00-architecture.md §3): dismissing is per-seat, tracked locally and
+	// (live mode) sent once via `hand_end_ack` -- reset per hand, mirroring `readySent`'s
+	// one-shot-per-connection pattern above, but keyed on `handNo` instead of the socket effect.
+	let handEndAckSent = $state(false);
+	$effect(() => {
+		void gameState.handNo;
+		handEndAckSent = false;
+	});
+	// mock mode has no real hand_end_ack round trip to hide the overlay behind -- dismissing
+	// there just closes it locally, reset whenever the scenario picker jumps to a fresh one.
+	let mockHandEndDismissed = $state(false);
+	$effect(() => {
+		void scenarioId;
+		mockHandEndDismissed = false;
+	});
+
+	function dismissHandEnd(): void {
+		if (isMock) {
+			mockHandEndDismissed = true;
+			return;
+		}
+		if (handEndAckSent || !liveStore) return;
+		handEndAckSent = true;
+		liveStore.socket.handEndAck();
+	}
 
 	// the view model's `yourOptions` are display-only (TileCode, no id) -- recover the raw,
 	// real-tile_id option `live-view.ts` built them from to submit the actual `claim` intent.
@@ -814,15 +841,28 @@
 			</div>
 		{/if}
 
-		{#if gameState.handResult?.outcome === 'win'}
+		{#if gameState.handResult && !(isMock && mockHandEndDismissed)}
 			<div class="faan-overlay" data-testid="faan-overlay">
-				<FaanBreakdown
-					winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
-					winningHand={gameState.handResult.winningHand ?? []}
-					patterns={gameState.handResult.patterns ?? []}
-					totalFaan={gameState.handResult.totalFaan ?? 0}
-					payments={gameState.handResult.payments ?? {}}
-				/>
+				<button type="button" class="panel-close" onclick={dismissHandEnd}>Close</button>
+				{#key gameState.handNo}
+					<div class="hand-end-timer">
+						<TimerRing durationMs={gameState.handEndHoldMs ?? 0} size={40} />
+					</div>
+				{/key}
+				{#if gameState.handResult.outcome === 'win'}
+					<FaanBreakdown
+						winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
+						winningHand={gameState.handResult.winningHand ?? []}
+						patterns={gameState.handResult.patterns ?? []}
+						totalFaan={gameState.handResult.totalFaan ?? 0}
+						payments={gameState.handResult.payments ?? {}}
+					/>
+				{:else}
+					<section class="hand-end-summary" data-testid="hand-end-draw" aria-label="Hand result">
+						<h2>Hand {gameState.handNo}</h2>
+						<p>Draw</p>
+					</section>
+				{/if}
 			</div>
 		{/if}
 
@@ -1587,6 +1627,31 @@
 		background: rgb(0 0 0 / 0.5);
 		z-index: var(--z-modal);
 		padding: var(--space-3);
+	}
+
+	.faan-overlay {
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+
+	.hand-end-summary {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		max-width: 24rem;
+		padding: var(--space-4);
+		background: var(--color-surface-raised);
+		@include buttons.panel-elevated;
+
+		h2 {
+			margin: 0;
+			font-size: var(--font-size-lg);
+		}
+
+		p {
+			margin: 0;
+			color: var(--color-text-muted);
+		}
 	}
 
 	.panel-close {

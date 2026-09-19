@@ -322,6 +322,24 @@ test('completing more than one real hand accumulates multi-hand history in the S
 			// indefinitely. Trying every matching page, not just the first, is the fix; a short
 			// per-click timeout + swallow is correct either way since the next round's fresh poll
 			// is the real recovery path.
+			// hand-end hold (docs/00-architecture.md §3): every hand end -- win or exhaustive
+			// draw -- holds the round open for up to the real `ruleset.hand_end_seconds` (10s)
+			// unless every seat acks first. Without dismissing here, each of this loop's two hand
+			// boundaries would pay that real 10s wait instead of advancing as soon as all four
+			// pages click through -- multiplied by however many hands actually land during this
+			// loop, that's the difference between this test finishing in seconds vs. minutes.
+			const overlayCounts = await Promise.all(
+				pages.map((p) => p.getByTestId('faan-overlay').count())
+			);
+			for (let i = 0; i < pages.length; i++) {
+				if (overlayCounts[i] <= 0) continue;
+				await pages[i]
+					.getByTestId('faan-overlay')
+					.getByRole('button', { name: 'Close' })
+					.click({ timeout: 800 })
+					.catch(() => {});
+			}
+
 			let progressed = false;
 			const passCounts = await Promise.all(pages.map((p) => p.locator('.claim-btn--pass').count()));
 			for (let i = 0; i < pages.length && !progressed; i++) {

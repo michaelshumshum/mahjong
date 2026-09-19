@@ -27,8 +27,9 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 | --- | --- |
 | ![Home](docs/screenshots/home.png) Home — component demos | ![Lobby](docs/screenshots/lobby.png) Lobby — create/join a room, or play solo vs bots |
 | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
-| ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting |
-| ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players |
+| ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw |
+| ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
+| ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | |
 
 ## Planning docs
 

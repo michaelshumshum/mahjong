@@ -165,6 +165,7 @@ def seat_view(
     names: _SeatNames | None = None,
     claim_deadline_ts: int | None = None,
     turn_deadline_ts: int | None = None,
+    hand_end_deadline_ts: int | None = None,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
     override point for the future `app/room.py` `SeatBinding` (see module docstring); omit it
@@ -182,7 +183,10 @@ def seat_view(
     `seat == state.turn` and `state.phase == Phase.AWAIT_ACTION`, mutually exclusive with the
     claim-window branch below (`GameState.__post_init__`: `claim_window` is never set in
     `AWAIT_ACTION`), so there's never ambiguity about which deadline `SeatView.deadline_ts`
-    means for a given seat/phase.
+    means for a given seat/phase. `hand_end_deadline_ts` is the analogous override for
+    `Phase.HAND_OVER`'s hand-end hold (`app/room.py`'s `_hand_end_deadline_ms`) -- unlike the
+    other two, it's the same value for every seat (a whole-room wait, not a per-seat one), so
+    it applies regardless of `seat`.
     """
     own_hand = state.seats[seat].concealed if seat is not None else ()
     legal = compute_legal_actions(state, seat) if seat is not None else ()
@@ -197,6 +201,8 @@ def seat_view(
             deadline_ts = claim_deadline_ts if claim_deadline_ts is not None else window.deadline_ts
     elif seat is not None and state.phase == Phase.AWAIT_ACTION and state.turn == seat:
         deadline_ts = turn_deadline_ts
+    elif state.phase == Phase.HAND_OVER:
+        deadline_ts = hand_end_deadline_ts
 
     return SeatView(
         seat=seat,

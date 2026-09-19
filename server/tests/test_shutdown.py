@@ -61,13 +61,21 @@ def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
     return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
+# hand-end hold (docs/00-architecture.md §3): `_bind_fake_seats` binds real "connected"
+# SeatBindings (fake sockets, not bot/autoplay), so `Room._open_hand_end_window` won't
+# pre-seed/auto-ack any of them -- these tests never send a real `hand_end_ack` (no real
+# session/socket in front of these rigged rooms), so `hand_end_seconds=0` is what actually lets
+# the rigged hand boundary resolve, same idiom `tests/test_room.py`'s `_BOUNDED_RULESET` uses.
+_ZERO_HOLD_RULESET = dataclasses.replace(DEFAULT_RULESET, hand_end_seconds=0)
+
+
 def _rig_uncontested_state(seed: int) -> GameState:
     """Seat 0 on turn, about to discard a lone WIND_EAST nobody else holds any of -- every
     other seat's junk is disjoint by tile type, so the discard is guaranteed uncontested
     (no chow/pung possible) regardless of which tile were chosen. Wall emptied so the
     uncontested discard ends the hand (exhaustive draw) immediately -- one action, one hand
     boundary, matching `Room.wait_for_shutdown_boundary`'s contract."""
-    state = new_game(DEFAULT_RULESET, game_seed=seed)
+    state = new_game(_ZERO_HOLD_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
     state = _with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
     state = _with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
@@ -77,7 +85,7 @@ def _rig_uncontested_state(seed: int) -> GameState:
 
 
 _NO_REPEAT_RULESET = dataclasses.replace(
-    DEFAULT_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
+    _ZERO_HOLD_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
 )
 
 
@@ -207,6 +215,12 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
     room.submit(0, Discard(tile_id=_SEAT0_DISCARD))
 
     with caplog.at_level(logging.ERROR):
+        # first tick: the discard lands HAND_OVER and opens the hand-end hold (arms the
+        # hand_end_seconds=0 timer, doesn't advance yet -- no seat here is bot/autoplay, so
+        # nothing pre-acks it). Second tick: that timer has already expired, so this call
+        # processes it and actually advances into GAME_OVER, running the persist attempt.
+        await asyncio.wait_for(room.process_one(), timeout=2.0)
+        assert room.state.phase == Phase.HAND_OVER
         await asyncio.wait_for(room.process_one(), timeout=2.0)
 
     assert room.state.phase == Phase.GAME_OVER  # the game still ended for real

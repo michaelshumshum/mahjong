@@ -67,7 +67,16 @@ _id_gen = itertools.count(1)
 # and reaching dealer 0 again ends the game -- exactly 4 hands, deterministically, the cheapest
 # real multi-hand terminal condition available (mahjong_core/engine.py's start_next_hand).
 _GAME_RULESET = dataclasses.replace(
-    DEFAULT_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
+    DEFAULT_RULESET,
+    dealer_repeat_on_win=False,
+    dealer_repeat_on_draw=False,
+    # hand-end hold (docs/00-architecture.md §3): every seat bound here is a real "connected"
+    # join, not bot/autoplay, so `Room._open_hand_end_window` won't pre-ack any of them and
+    # nothing in this test ever sends a real `hand_end_ack` -- 0 lets the real background
+    # `Room.run()` task advance past each hold on its own very next tick (no real wait), so the
+    # existing per-hand frame sequences below don't need restructuring around an ack step
+    # (unlike tests/test_ws_gameplay.py, which exercises that real ack round trip instead).
+    hand_end_seconds=0,
 )
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)

@@ -54,7 +54,8 @@ stable once they're referenced from `README.md`.
 ## Current notable pages
 
 `home`, `lobby`, `table-your-turn`, `table-claim-window`, `table-hand-ended`,
-`table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting` — see `README.md`'s
+`table-hand-ended-draw`, `table-pregame-connecting`, `table-pregame-join`,
+`table-pregame-waiting` — see `README.md`'s
 Screenshots section for the embedded images.
 
 ## Live pre-game states: `?pregame=`, not a real backend

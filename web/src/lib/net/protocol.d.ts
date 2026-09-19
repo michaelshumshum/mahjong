@@ -53,6 +53,11 @@ export interface Chat extends Envelope {
 	d: ChatPayload;
 }
 
+export interface HandEndAck extends Envelope {
+	t: 'hand_end_ack';
+	d: HandEndAckPayload;
+}
+
 export interface Pong extends Envelope {
 	t: 'pong';
 	d: PongPayload;
@@ -194,6 +199,8 @@ export interface ChatPayload {
 	text: string;
 }
 
+export interface HandEndAckPayload {}
+
 export interface PongPayload {
 	t0?: number | null;
 	t1: number;
@@ -301,6 +308,7 @@ export interface HandEndPayload {
 	payments: Record<number, number> | null;
 	revealed: boolean;
 	winning_hand: number[] | null;
+	deadline_ts: number;
 }
 
 export interface ScorePayload {
@@ -335,7 +343,17 @@ export interface AckPayload {
 }
 
 /** Client -> server intents (docs/02-protocol.md §2). */
-export type ClientMessage = Hello | Ping | Join | Ready | Discard | Claim | Declare | Auto | Chat;
+export type ClientMessage =
+	| Hello
+	| Ping
+	| Join
+	| Ready
+	| Discard
+	| Claim
+	| Declare
+	| Auto
+	| Chat
+	| HandEndAck;
 
 /**
  * Server -> client events (docs/02-protocol.md §3). Keep the reducer's
@@ -375,6 +393,7 @@ export type AnyMessage =
 	| Declare
 	| Auto
 	| Chat
+	| HandEndAck
 	| Pong
 	| ErrorEvent
 	| StateSync
