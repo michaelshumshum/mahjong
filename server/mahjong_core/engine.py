@@ -625,12 +625,19 @@ def _apply_claim_response(
     if isinstance(won_action, ClaimWin):
         win_type = WinType.KONG_ROB if window.kind == ClaimKind.KONG_ROB else WinType.DISCARD
         winner_state = state.seats[winner]
+        # fold the claimed tile into the winner's concealed hand before scoring, not just into
+        # the tuple passed below -- state.seats[winner].concealed feeds HandEndWire.winning_hand
+        # (app/views.py) and used to stay short exactly this tile for a claimed win, since only
+        # the local tuple ever saw it (docs/02-protocol.md §3's now-fixed "known gap").
+        concealed_tiles = (*winner_state.concealed, window.tile)
+        winner_state = dataclasses.replace(winner_state, concealed=concealed_tiles)
+        state = dataclasses.replace(state, seats=_with_seat(state.seats, winner, winner_state))
         more_state, more_events = _end_win(
             state,
             winner=winner,
             win_type=win_type,
             discarder=window.source_seat,
-            concealed_tiles=(*winner_state.concealed, window.tile),
+            concealed_tiles=concealed_tiles,
             melds=winner_state.melds,
         )
         return more_state, events + more_events
@@ -758,9 +765,10 @@ def _end_win(
     melds: tuple[Meld, ...],
 ) -> tuple[GameState, list[Event]]:
     """Score a normal (non-instant-win) win -- `concealed_tiles`/`melds` are the winner's hand
-    at the moment of the win, including the winning tile even when it isn't yet reflected in
-    `state.seats[winner].concealed` (a claimed discard/kong-rob tile isn't merged into the
-    winner's hand before this runs -- see `reduce()`/`_apply_claim_response`'s call sites)."""
+    at the moment of the win, including the winning tile. Passed explicitly rather than read
+    back off `state` because the self-draw call site (`reduce()`) never mutates `state` at all;
+    the claimed-win call site (`_apply_claim_response`) does fold the tile into
+    `state.seats[winner].concealed` before calling this, so the two stay consistent."""
     ctx = build_scoring_context(
         state,
         winner,

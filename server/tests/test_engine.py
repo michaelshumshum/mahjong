@@ -512,6 +512,25 @@ def test_claim_win_off_discard_scores_and_pays_real_faan() -> None:
     assert any(isinstance(e, HandEnded) for e in events)
 
 
+def test_claim_win_off_discard_merges_winning_tile_into_concealed() -> None:
+    """`state.seats[winner].concealed` must end up 14 tiles including the claimed discard, not
+    just the 13 it held while waiting -- app/views.py's `HandEndWire.winning_hand` reads this
+    field directly, so a claimed win used to reveal a hand short exactly this tile."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
+    state = _with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = _all_junk(state, except_seat=1)
+    state = _with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))
+    win_action = next(a for a in legal_actions(state, 3) if isinstance(a, ClaimWin))
+    state, _ = reduce(state, win_action)
+
+    assert state.phase == Phase.HAND_OVER
+    assert len(state.seats[3].concealed) == 14
+    assert _MAN_2[1] in state.seats[3].concealed
+    assert sorted(state.seats[3].concealed) == sorted((*_claimable_standard_hand(), _MAN_2[1]))
+
+
 def test_claim_win_gated_by_min_faan_even_when_window_opens_for_another_seat() -> None:
     """The engine-level half of the min_faan gate (`_can_win_with`/`_discard_claim_offers`,
     distinct from `actions.can_declare_win`'s own-turn path -- see test_actions.py's

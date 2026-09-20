@@ -89,19 +89,16 @@ describe('FaanBreakdown', () => {
 		});
 		expect(body).toMatch(/class="melds\b/);
 		expect(body).toMatch(/class="concealed-hand\b/);
-		expect(body).toContain('Claimed');
-		expect(body).toContain('In hand');
 		const order = [...body.matchAll(/alt="([^"]+) tile"/g)].map((m) => m[1]);
 		expect(order).toEqual(['9s', '9s', '9s', '1m', '2m', '3m']);
 	});
 
-	it('omits the claimed/in-hand labels when there are no claimed melds', () => {
+	it('renders no meld group when there are no claimed melds', () => {
 		const { body } = render(FaanBreakdown, {
 			props: { winner: 2, winningHand: ['1m', '2m', '3m'], patterns, totalFaan: 5, payments }
 		});
 		expect(body).not.toMatch(/class="melds\b/);
-		expect(body).not.toContain('Claimed');
-		expect(body).not.toContain('In hand');
+		expect(body).toMatch(/class="concealed-hand\b/);
 	});
 
 	it('renders a concealed_kong meld as backs, matching the in-play convention', () => {

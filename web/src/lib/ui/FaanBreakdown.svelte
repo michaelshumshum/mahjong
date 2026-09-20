@@ -87,29 +87,23 @@
 	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
 		<div class="winning-hand">
 			{#if sortedMelds.length > 0}
-				<div class="tile-group">
-					<span class="group-label">Claimed</span>
-					<div class="melds">
-						{#each sortedMelds as meld, mi (mi)}
-							<div class="meld">
-								{#each meld.tiles as code, ti (`${mi}:${ti}:${code}`)}
-									<div class="tile">
-										<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
-									</div>
-								{/each}
-							</div>
-						{/each}
-					</div>
+				<div class="melds">
+					{#each sortedMelds as meld, mi (mi)}
+						<div class="meld">
+							{#each meld.tiles as code, ti (`${mi}:${ti}:${code}`)}
+								<div class="tile">
+									<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+								</div>
+							{/each}
+						</div>
+					{/each}
 				</div>
 			{/if}
 			{#if sortedConcealedHand.length > 0}
-				<div class="tile-group">
-					{#if sortedMelds.length > 0}<span class="group-label">In hand</span>{/if}
-					<div class="concealed-hand">
-						{#each sortedConcealedHand as code, index (`${index}:${code}`)}
-							<div class="tile"><TileFace {code} /></div>
-						{/each}
-					</div>
+				<div class="concealed-hand">
+					{#each sortedConcealedHand as code, index (`${index}:${code}`)}
+						<div class="tile"><TileFace {code} /></div>
+					{/each}
 				</div>
 			{/if}
 		</div>
@@ -167,17 +161,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-	}
-
-	.tile-group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
-	.group-label {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
 	}
 
 	.melds,

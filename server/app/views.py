@@ -320,16 +320,9 @@ class HandEndWire:
     """`winning_hand` is `HAND_END`-gated, not owner-gated -- entitled to *every* recipient
     once `revealed` is true, per 00-architecture.md §5's "tile identity allowed only once that
     hand has reached HAND_END". Sourced from `state.seats[winner].concealed` at the moment the
-    hand ended.
-
-    **Known gap, not fixed here:** for a win claimed off another seat's discard/kong (as
-    opposed to a self-draw), `engine._apply_claim_response` scores the win with the claimed
-    tile folded in locally but never merges it back into `state.seats[winner].concealed` --
-    only the scoring context sees it. So `winning_hand` is complete for `SELF_DRAW`/`FLOWERS`
-    wins and short exactly the winning tile for `DISCARD`/`KONG_ROB` wins. Fixing it means
-    touching `engine.py`'s win path (mahjong_core, M1/M2-owned), out of this sub-task's scope;
-    tracked in docs/02-protocol.md §3 instead of silently shipped wrong.
-    """
+    hand ended, which `engine._apply_claim_response` folds the claimed tile into before scoring
+    a `DISCARD`/`KONG_ROB` win -- so this is complete (winning tile included) for every win
+    type, not just `SELF_DRAW`/`FLOWERS`."""
 
     t: Literal["hand_end"] = field(metadata=_entitled(Entitlement.PUBLIC))
     hand_no: int = field(metadata=_entitled(Entitlement.PUBLIC))

@@ -126,7 +126,7 @@ Payload shapes below match `server/app/protocol.py` (§6) exactly.
 | `meld` | `{seat, meld_kind, tiles, from_seat?}` | except `concealed_kong`, which has a redacted per-seat form: `{seat, meld_kind:"concealed_kong", tiles?, count?}` (see Redaction below) |
 | `kong_replace` | `{seat, tile_id?}` | |
 | `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat. No backing `Event` (same synthesis note); `deadline_ts` is a real, enforced `TimerHeap` entry (00-architecture.md §8 "Turn timeout", the turn-timeout sub-task) — on expiry the room tsumogiris the drawn tile (or discards the lowest-`tile_id` concealed tile after a claimed pung/chow with nothing drawn) and auto-passes any pending claims (structurally never any, in `AWAIT_ACTION`), same enforcement the claim-window deadline (`claim_offer.deadline_ts` above) already had |
-| `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?, deadline_ts}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`); see the known reveal gap under Redaction below. `deadline_ts` is the hand-end hold's deadline ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — the same value on every seat's stream, held open until all four `hand_end_ack` or this elapses |
+| `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?, deadline_ts}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`). `deadline_ts` is the hand-end hold's deadline ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — the same value on every seat's stream, held open until all four `hand_end_ack` or this elapses |
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
 | `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot, name?}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward. `name` (M5) is this seat's resolved guest display name, carried on every `seat_state` broadcast for that seat, not just its first |
@@ -189,17 +189,6 @@ contain no tile identity that seat is not entitled to.
 Non-owning seats learn the tile identity only via `hand_end.hands` if the hand goes to showdown.
 All other `kind`s (`chow`, `pung`, `added_kong`) are fully public: full `tiles` to everyone, no
 redaction.
-
-**Known gap: `hand_end`'s winning-tile reveal is incomplete for a claimed win.** For a
-self-draw (or the flower-instant-win variant), the winner's revealed hand is exactly
-`state.seats[winner].concealed` and that's complete. For a win claimed off another seat's
-discard or kong, `engine._apply_claim_response` scores the win with the claimed tile folded in
-locally but never merges it back into `state.seats[winner].concealed` — only the scoring
-context sees it — so today's reveal is short exactly that one tile. Fixing it means touching
-`engine.py`'s win path (`mahjong_core`, M1/M2-owned); tracked here rather than fixed in the
-redaction sub-task that found it (`server/app/views.py`'s `HandEndWire` docstring carries the
-same note, and `tests/test_redaction.py::test_hand_end_known_gap_claimed_win_misses_winning_tile`
-pins current behavior so a future engine fix is noticed, not silently re-broken).
 
 **`discard.pool_index` isn't implemented by `redact_event` yet.** It isn't derivable from the
 `state` `redact_event(state, seat, event)` receives in general: if the discard is claimed later

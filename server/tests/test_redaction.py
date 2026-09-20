@@ -181,12 +181,17 @@ def _self_draw_win_sample() -> tuple[GameState, Event]:
 
 
 def _claimed_win_sample() -> tuple[GameState, Event]:
-    """Winner (seat 2) took the win off seat 0's discard. `state.seats[2].concealed` does NOT
-    include the winning tile -- `engine._apply_claim_response` never merges it back in for a
-    claimed win, only the scoring context sees it (HandEndWire's docstring, app/views.py). This
-    sample exists specifically to pin that known, documented gap in the redacted output, not to
-    assert it's correct."""
+    """Winner (seat 2) took the win off seat 0's discard. `state.seats[2].concealed` is the
+    real post-win shape `engine._apply_claim_response` now produces: the claimed tile folded
+    in, 14 tiles total -- not just the 13 seat 2 held while waiting on the claim."""
     base = new_game(_RULESET, 90003)
+    winner_state = base.seats[2]
+    claimed_tile = TileId(0) if TileId(0) not in winner_state.concealed else TileId(4)
+    winner_state = dataclasses.replace(
+        winner_state, concealed=(*winner_state.concealed, claimed_tile)
+    )
+    seats = (base.seats[0], base.seats[1], winner_state, base.seats[3])
+    base = dataclasses.replace(base, seats=seats)
     result = HandResult(
         outcome=HandOutcome.WIN,
         winner=2,
@@ -466,17 +471,19 @@ def test_seat_view_own_hand_matches_state() -> None:
     assert seat_view(state, None).own_hand == ()
 
 
-def test_hand_end_known_gap_claimed_win_misses_winning_tile() -> None:
-    """Pins the documented gap (HandEndWire's docstring, app/views.py): a claimed win's
-    `winning_hand` reveal is short exactly the winning tile, because `engine.py` never merges
-    it back into `state.seats[winner].concealed`. If `engine.py` is fixed later, this test
-    should start failing and can be flipped to assert full correctness."""
+def test_hand_end_reveals_full_winning_hand_for_claimed_win() -> None:
+    """A claimed win's `winning_hand` reveal includes the claimed tile -- 14 tiles, not the 13
+    the winner held while waiting on the claim (`engine._apply_claim_response` merges it into
+    `state.seats[winner].concealed` before scoring; see `test_engine.py`'s
+    `test_claim_win_off_discard_merges_winning_tile_into_concealed` for the engine-level pin)."""
     state, event = _claimed_win_sample()
     assert isinstance(event, HandEnded)
     assert event.winner is not None
     wire = _build_event_wire(state, event.winner, event)
     assert isinstance(wire, HandEndWire)
     assert wire.winning_hand == tuple(state.seats[event.winner].concealed)
+    assert wire.winning_hand is not None
+    assert len(wire.winning_hand) == 14
 
 
 def test_walker_rejects_unannotated_field() -> None:
