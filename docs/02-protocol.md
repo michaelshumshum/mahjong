@@ -6,17 +6,12 @@ exceeds the savings) and adds per-frame CPU to every connection for no benefit a
 size. REST (`/api/*`) handles everything that isn't live play: room listing, replay download,
 leaderboard.
 
-**Auth (D13):** guest-only, by design — not a ticket/JWT scheme with a guest fallback. There is
-no account, no password, no email, and no REST auth endpoint at all (`docs/00-architecture.md
-§2.1` cuts an earlier ticket-issuing design entirely — see `docs/05-roadmap.md`'s M5 section for
-why). A player picks a display name client-side, persisted in `localStorage`/a cookie so it
-survives a reload, and sends it once as a plain field on `join` (§2's table) — not `hello`: a
-reconnecting seat's `hello{seat}` never resends it, since the server already has it from that
-seat's original `join` (`JoinPayload.name`; see `HelloPayload`'s own docstring for why `seat` on
-`hello` only ever means "reclaim an already-bound seat", never "set it up for the first time").
-No REST round trip before opening the socket, no credential of any kind in the WS URL because
-there's no credential to carry. Seat identity is consequently permanently client-asserted, not
-verified against anything — see §5's reconnect-identity note for the full reasoning.
+**Auth:** guest-only, by design. No account, no password, no email, no REST auth endpoint
+(`docs/00-architecture.md §2.1`). A player picks a display name client-side, persisted in
+`localStorage` so it survives a reload, and sends it once as a plain field on `join` (§2's
+table) — not `hello`: `hello.seat` only ever means "reclaim an already-bound seat", and the
+server already has the name from that seat's original `join` (`JoinPayload.name`). Seat identity
+is permanently client-asserted, not verified against anything — see §5's reconnect note.
 
 ## 1. Envelope
 
@@ -95,20 +90,14 @@ join, not just on its next `state_sync`. `join` is for first entry only — a re
 `hello{last_seq}` on an already-bound seat reclaims it directly (§5). Once all four seats are
 filled the room waits for `ready` from each before dealing.
 
-**Spectating: built ("Spectating" sub-task), trigger reconciled from this section's original
-framing.** "A socket that never sends `join` is a spectator" turned out not to be implementable
-as a literal passive default: registering *every* connection as a spectator the instant it's
-accepted races the `hello{client_version}`-then-`join` handshake every real and test client
-already uses, delivering an unsolicited spectator `state_sync` before that connection's own
-`join` response. The real trigger is an explicit, connection-level `?spectate=true` query
-parameter on the WS URL (`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`'s existing
-shape on the same endpoint) — not a new envelope message, so this section's message tables are
-otherwise unchanged. A `?spectate=true` connection gets a spectator-redacted `state_sync`
+**Spectating** is triggered by an explicit `?spectate=true` query parameter on the WS URL
+(`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`) — not a new envelope message. A passive
+"never sent `join`" trigger would race the `hello{client_version}`-then-`join` handshake every
+real client uses. A `?spectate=true` connection gets a spectator-redacted `state_sync`
 (`seat_view(state, None)`, [00-architecture.md §5](00-architecture.md)) the moment it's
-registered, then every broadcast event and the public half of `turn`; `join`/a `hello{seat}`
-reconnect from that same connection promotes it to a seat and it stops receiving the
-spectator-shaped stream. See [00-architecture.md §3](00-architecture.md)'s "Spectating: built"
-note for the full mechanism and why a spectator session, unlike a seat, is never reconnectable.
+registered, then every broadcast event and the public half of `turn`; a `join`/`hello{seat}` from
+that same connection promotes it to a seat. See [00-architecture.md §3](00-architecture.md) for
+why a spectator session, unlike a seat, is never reconnectable.
 
 ### Declining a claim on purpose
 
@@ -122,9 +111,7 @@ PASS, not to WIN, if the player doesn't respond.
 
 ## 3. Server → client (events)
 
-Payload shapes below match `server/app/protocol.py` (§6) exactly — earlier drafts of this table
-sketched a few fields (`result`/`kind`/`hands`/`standings`) before the redaction and Session/WS
-sub-tasks actually implemented them; reconciled here to what ships rather than left to drift.
+Payload shapes below match `server/app/protocol.py` (§6) exactly.
 
 | `t` | payload | notes |
 | --- | --- | --- |
@@ -226,14 +213,15 @@ compute this there — `redact_event` alone cannot, by its own `(state, event)` 
 
 The server is the only clock that matters.
 
-- Every prompt carries an absolute `deadline_ts` in **server** time.
-- The client measures offset with `ping`/`pong` (`offset ≈ t1 - (t0 + rtt/2)`), smooths it, and
-  counts down against `deadline_ts + offset`. Never count down from a server-sent duration.
-- Render the last ~1.5s of the bar as "about to expire", not as exact.
+- Every prompt carries an absolute `deadline_ts` in **server** time. Never count down from a
+  server-sent duration.
+- Render the last ~1.5s of the bar as "about to expire", not as exact — real
+  (`web/src/lib/ui/timer-ring.ts`'s `computeRingTiming`).
 - On expiry the server acts: tsumogiri on turn timeout, PASS on claim timeout. It emits the
   resulting event normally.
-
-Deferred — see [99-deferred.md](99-deferred.md).
+- **Not implemented:** offset correction. `ping`/`pong` exists (§8) but the client never calls
+  it, so `deadline_ts` is compared against local `Date.now()` with no clock-skew correction —
+  fine on a synced clock, wrong by however far the client's clock actually drifts otherwise.
 
 ## 5. Reconnect and resync
 
@@ -269,33 +257,17 @@ on the wire and plays no part in this comparison.
 The client applies events through a reducer, so live play, gap replay, and the replay viewer
 are one code path.
 
-**Gap found implementing this (M3 sub-task 5): how does the server know *which seat* is
-reconnecting?** Nothing above says — the three-way branch only says what to do once the seat is
-known. `hello.seat` (§2's table) carries it directly: a `hello{last_seq, seat}` where `seat` is
-already bound in the room is treated as that seat reconnecting — `Room.reconnect()` rebinds the
-live connection, `Room.resume()` runs the branch above. A `seat` that was never joined gets
-`error{code:"no_such_seat"}`.
+`hello.seat` (§2's table) is how the server knows which seat is reconnecting: a
+`hello{last_seq, seat}` where `seat` is already bound is treated as that seat reconnecting —
+`Room.reconnect()` rebinds the live connection, `Room.resume()` runs the branch above. A `seat`
+that was never joined gets `error{code:"no_such_seat"}`. `hello.seat` is trusted at face value,
+permanently — there is no ticket or credential anywhere in this design to check it against (the
+Auth note above); a malicious client can claim any seat.
 
-**This is the permanent mechanism, not a stand-in.** An earlier draft of this doc expected a
-future auth ticket to carry seat identity instead of trusting a client-asserted field
-(`docs/00-architecture.md §2.1` originally sketched a REST-issued WS ticket) — that design is cut,
-not deferred (see `docs/05-roadmap.md`'s M5 section), so there is no ticket coming to close this
-gap later. `hello.seat` claiming a seat is trusted at face value, permanently; M5 adds a
-client-chosen guest display name (persisted in `localStorage`) as a sibling field on `join`, not
-`hello` — an earlier draft of this note put it on `hello{seat, name}` instead, which is the wrong
-message: `hello.seat` only ever means "reclaim an already-bound seat" (this section's whole
-subject), and there's nothing to name on a reconnect the server doesn't already know. Either way,
-this doesn't change the trust model at all — a malicious client can still claim any seat, same as
-today. Accepted for a guest-only game with no real stakes.
-
-**Mid-claim-window reconnect also re-arms a timer (00-architecture.md §8).** If the reconnecting
-seat holds a live, unresolved claim offer, `Room.resume()` re-arms *that seat's own* entry in the
-claim-window timer heap to a fresh `ruleset.claim_seconds` window from the reconnect moment,
-untouched by any other offered seat's deadline. This required splitting the timer heap from one
-shared entry per claim window (M3 sub-task 3's original design — every offered seat shared one
-deadline, since nothing needed to move independently) to one entry per offered seat
-(`server/app/room.py`'s `TimerHeap` docstring) — a real, load-bearing change: a single shared
-entry has no way to extend one seat's deadline without also extending everyone else's.
+**Mid-claim-window reconnect re-arms a timer** (00-architecture.md §8). If the reconnecting seat
+holds a live, unresolved claim offer, `Room.resume()` re-arms *that seat's own* entry in the
+claim-window timer heap (one entry per offered seat) to a fresh `ruleset.claim_seconds` window
+from the reconnect moment, untouched by any other offered seat's deadline.
 
 ## 6. Schema generation
 
@@ -408,31 +380,30 @@ event 101, so there's nothing for her to detect.
 
 ## 8. Liveness
 
-A mobile browser's WebSocket can sit open for minutes after the network actually dies without
-firing `onclose` — TCP keepalive defaults to minutes-to-hours, and carrier NATs silently drop
-idle mappings. `ping`/`pong` (§4) is specified only as a clock-offset measurement; it also has
-to be the heartbeat, or a dead socket looks identical to an idle one:
+**Only the `client reconnect backoff` bullet below is implemented.** The rest of this section
+describes the intended design for detecting a dead-but-not-closed socket; none of it has a
+driver yet. Today, disconnect is detected only by the WS connection actually closing
+(`app/ws.py`'s `Session`) — a mobile browser's WebSocket can sit open for minutes after the
+network actually dies without firing `onclose` (TCP keepalive defaults to minutes-to-hours,
+carrier NATs silently drop idle mappings), and nothing here currently catches that case.
 
-- **Client → server:** the client sends `ping` at least every `heartbeat_interval` (default
-  15s) regardless of whether it needs a fresh offset reading.
-- **Server → client:** if no frame has gone out to a client in `heartbeat_interval`, the server
-  sends an unsolicited `pong{t0: null, t1: now}` as a keepalive — harmless to a client that's
-  only using real `ping`/`pong` pairs for offset.
-- **Dead-socket detection:** if the server hasn't heard anything from a connection in
-  `heartbeat_timeout` (default 45s — three missed intervals), it treats the socket as dead:
-  closes it, marks the seat `DISCONNECTED`, and starts the normal grace-period/bot-takeover
-  clock ([00-architecture.md §8](00-architecture.md)).
-- **Client reconnect backoff:** on an unexpected close, reconnect with exponential backoff and
-  jitter — `min(250ms * 2^attempt, 10s)` ± 20% — for as long as the seat is plausibly still
-  reclaimable (through the disconnect grace period, and beyond it while the seat shows
-  `AUTOPLAY` rather than `bot`-owned in `seat_state`).
+- **Client → server:** the client would send `ping` at least every `heartbeat_interval` (15s)
+  regardless of whether it needs a fresh offset reading. `ping`/`pong` (§4) exists and works for
+  on-demand clock-offset measurement today; the client just never calls it on a timer.
+- **Server → client:** if no frame had gone out to a client in `heartbeat_interval`, the server
+  would send an unsolicited `pong{t0: null, t1: now}` as a keepalive.
+- **Dead-socket detection:** if the server hadn't heard anything from a connection in
+  `heartbeat_timeout` (45s), it would treat the socket as dead: close it, mark the seat
+  `DISCONNECTED`, start the normal grace-period/bot-takeover clock
+  ([00-architecture.md §8](00-architecture.md)).
+- **Client reconnect backoff (real):** on an unexpected close, the client reconnects with
+  exponential backoff and jitter — `min(250ms * 2^attempt, 10s)` ± 20%
+  (`web/src/lib/net/socket.ts`).
 
 ## 9. Backpressure
 
 The Session pumps an outbound queue per connection ([00-architecture.md §2](00-architecture.md));
-that queue must be **bounded** (default 64 frames — this section previously said 256, drifted
-from 00-architecture.md's "Outbound backpressure" subsection; reconciled to 64, `app/outbox.py`'s
-`BoundedOutbox` default, in the same change that built the real implementation), not left to
+that queue is **bounded** (`app/outbox.py`'s `BoundedOutbox`, default 64 frames), not left to
 grow — an unbounded queue behind a stalled TCP connection (dead peer, congested mobile network)
 is a memory leak that scales with however long the peer stays half-open.
 

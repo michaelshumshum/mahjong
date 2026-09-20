@@ -419,9 +419,9 @@ process, hundreds of tables) is actually load-bearing.
 
 ### TypeScript 7 as the primary compiler (svelte-check)
 
-Provenance: `web/AGENTS.md` "Commands" section. `typescript` is currently pinned to `^6.0.3` as
-the primary dependency; TS7 is installed only as a secondary aliased package
-(`@typescript/native`, `npm:typescript@^7`) and used exclusively via `svelte-check --tsgo`
+Provenance: `web/AGENTS.md` "Commands" section. `typescript` is pinned to `^6.0.3` as the
+primary dependency; TS7 is installed only as a secondary aliased package (`@typescript/native`,
+`npm:typescript@^7.0.2`) and used exclusively via `svelte-check --tsgo`
 (`web/package.json`'s `check`/`check:watch` scripts).
 
 Not a v1 scope cut — a genuine upstream blocker, not a project decision. `svelte-check`'s own

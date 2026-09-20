@@ -317,19 +317,15 @@ flowers *or* all four seasons) — plus the `無花` entry above.
 Config: `flowers_score`, `seven_flowers_instant_win` (3 faan), `eight_flowers_instant_win`
 (limit).
 
-**Implementation note (§7 has no `hand_sets` group for this subsection).** 座位花 and 正花
-are both registered under `HandSet.CLASSIC` (same group as `無花`) since neither is listed
-under `NEW_6`/`NEW_18` and CLASSIC is the always-present baseline group; 座位花 is additionally
-gated by the `flowers_score` config flag specifically (independent of the `CLASSIC` toggle).
-`seven_flowers_instant_win`/`eight_flowers_instant_win` are not faan patterns at all — an
-instant win ends the hand on flower count alone, with no meld decomposition to score — so they
-aren't in `patterns.py`'s registry. Implemented in `engine.py`'s `_flower_instant_win`
-(sub-task 8), named `七花`/`八花` there since neither has a name elsewhere in this doc.
-**Scope gap:** only checked on a mid-hand flower-*replacement* draw (`_draw_and_cascade`) —
-a hand already holding 7+/8 flowers straight off the initial deal's own replacement pass
-(`wall.replace_flowers`, called directly by `new_game`/`_deal_hand`, not through
-`_draw_and_cascade`) is not caught. Tracked, not silently assumed away; physically rare (needs
-7-8 of the 8 flowers in one 13/14-tile starting hand) but real.
+座位花 and 正花 are both registered under `HandSet.CLASSIC` (neither is listed under
+`NEW_6`/`NEW_18`); 座位花 is additionally gated by the `flowers_score` flag specifically.
+`seven_flowers_instant_win`/`eight_flowers_instant_win` aren't faan patterns — an instant win
+ends the hand on flower count alone, with no meld decomposition to score, so they live in
+`engine.py`'s `_flower_instant_win`, not `patterns.py`'s registry (named `七花`/`八花` there).
+**Known gap:** only checked on a mid-hand flower-*replacement* draw (`_draw_and_cascade`) — a
+hand already holding 7+/8 flowers straight off the initial deal's own replacement pass
+(`wall.replace_flowers`) is not caught. Physically rare (needs 7-8 of the 8 flowers in one
+13/14-tile starting hand) but real.
 
 ### Stacking and caps
 
@@ -412,16 +408,16 @@ Also config: `four_kong_abort`, `nine_terminals_abort` (九種九牌) — both o
 @dataclass(frozen=True)
 class RuleSet:
     # scoring
-    min_faan: int = 3
-    faan_cap: int = 10
-    score_table: Literal["full_spicy", "half_spicy"] = "half_spicy"
-    hand_sets: frozenset[str] = frozenset({"CLASSIC", "NEW_6", "NEW_18"})
+    min_faan: int = 3                       # one of 0 | 1 | 3 | 5; below this a hand cannot win
+    faan_cap: int = 10                      # one of 10 (HKMA) | 13 (casual); total is clamped
+    score_table: ScoreTable = ScoreTable.HALF_SPICY
+    hand_sets: frozenset[HandSet] = frozenset({CLASSIC, NEW_6, NEW_18})
     faan_overrides: dict[str, int] = field(default_factory=dict)
         # per-pattern faan overrides, keyed by the Chinese name in §7 (e.g. {"雞糊": 0} to
         # disable, {"清一色": 7}) — applied after hand_sets selection, before stacking/caps.
         # This is the knob for "same pattern, different table value" without toggling a
         # whole set; hand_sets stays the coarse on/off switch per §7 group.
-    discard_payment: Literal["all", "half"] = "all"
+    discard_payment: DiscardPayment = DiscardPayment.ALL
     self_draw_multiplier: float = 1.5
     flowers_score: bool = True              # 座位花: +1 faan per flower matching seat, see §7
     seven_flowers_instant_win: bool = False # 3 faan, variant, see §7
@@ -429,21 +425,21 @@ class RuleSet:
     thirteen_orphans_wait_bonus: bool = False  # some tables double a single-tile wait, §11.10
 
     # flow
-    game_length: Literal["EAST_ONLY", "EAST_SOUTH", "FULL"] = "EAST_ONLY"  # 一圈; see §2
+    game_length: GameLength = GameLength.EAST_ONLY  # 一圈; see §2
     dealer_repeat_on_win: bool = True
     dealer_repeat_on_draw: bool = True
     wall_reserve: int = 0                   # HK default: no dead wall, see §9
-    four_kong_abort: bool = False           # see §9
-    nine_terminals_abort: bool = False      # 九種九牌, see §9
+    four_kong_abort: bool = False           # see §9 — declared, unimplemented (§11.5)
+    nine_terminals_abort: bool = False      # 九種九牌, see §9 — declared, unimplemented (§11.5)
     tenpai_payments: bool = False           # pay tenpai players on exhaustive draw, see §9
 
     # variants
     flowers_enabled: bool = True
-    multi_win: bool = False                 # 一炮多響 — deferred (see 99-deferred.md);
-                                             # field reserved, always False in v1
+    multi_win: bool = False                 # 一炮多響 — deferred (99-deferred.md); must stay
+                                             # False in v1
     kong_rob_enabled: bool = True
     concealed_kong_robbable: bool = False   # only for 十三么, some tables
-    pao_rules: bool = False                 # 包 responsibility, v2
+    pao_rules: bool = False                 # 包 responsibility, deferred to v2 (§8)
 
     # fairness (see 02-protocol.md "Fairness")
     provable_fairness: bool = False         # gates hand_start.seed_commit / hand_end.fairness
@@ -451,73 +447,62 @@ class RuleSet:
     # timing (server-enforced)
     turn_seconds: int = 15                  # AWAIT_ACTION timeout
     claim_seconds: int = 5                  # AWAIT_CLAIMS window
-    turn_timeout_strikes: int = 3           # timeouts before seat flips to AUTOPLAY,
-                                             # see 00-architecture.md §8
+    hand_end_seconds: int = 10              # HAND_OVER hold, until all seats ack or timeout
+    turn_timeout_strikes: int = 3           # timeouts before seat flips to AUTOPLAY
+    disconnect_grace_seconds: float = 20.0  # DISCONNECTED -> AUTOPLAY, 00-architecture.md §8
 ```
 
-`flowers_score`, `seven_flowers_instant_win`, `eight_flowers_instant_win` (§7),
-`four_kong_abort`, `nine_terminals_abort`, `tenpai_payments` (§9), and
-`thirteen_orphans_wait_bonus` (§11.10) were named in prose elsewhere in this doc but missing
-from this dataclass; added here for consistency. `provable_fairness` is specified only in
-[02-protocol.md](02-protocol.md) (gates `hand_start.seed_commit`/`hand_end.fairness`) but
-lives on `RuleSet`, so it's listed here too. None of these have a documented default beyond
-what's shown above; the implementation defaults them to the conservative/off position.
+`ScoreTable`/`HandSet`/`DiscardPayment`/`GameLength` are `StrEnum`s (`mahjong_core/config.py`),
+shown here as plain names for brevity. `four_kong_abort`, `nine_terminals_abort`, and
+`thirteen_orphans_wait_bonus` (§11.10) are real fields with no reader anywhere — setting them
+has no effect yet.
 
 ## 11. Edge cases
 
 Write a named test for every one.
 
-1. Flower drawn as a kong replacement → another replacement; can chain. **Closed (M2 closeout):**
+1. Flower drawn as a kong replacement → another replacement; can chain.
    `test_flower_drawn_mid_game_chains_to_a_replacement`.
-2. Winning on a flower replacement = 槓上開花. **Closed (M2 closeout):** a kong replacement
-   that's itself a flower and chains through a further replacement before landing the winning
-   tile still scores 槓上開花 — `last_draw_was_kong_replacement` is set once, from the original
-   draw, and untouched by however many flowers the cascade reveals in between; see
+2. Winning on a flower replacement = 槓上開花. A kong replacement that's itself a flower and
+   chains through a further replacement before landing the winning tile still scores this —
+   `last_draw_was_kong_replacement` is set once, from the original draw, untouched by however
+   many flowers the cascade reveals in between.
    `test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacement`.
 3. Robbing an **added** kong (加槓); robbing a **concealed** kong only for 十三么 and only if
-   `concealed_kong_robbable`. **Bug found and fixed (M2 closeout):** `engine.py`'s
-   `_kong_rob_offers` previously gated concealed-kong robbing on the config flag alone, with no
-   shape restriction — any qualifying win could rob a concealed kong once the flag was on, not
-   just Thirteen Orphans. Now restricted to a candidate hand that resolves to 十三么 specifically;
-   see `test_concealed_kong_robbing_denied_to_a_non_thirteen_orphans_win`/
+   `concealed_kong_robbable`. `engine.py`'s `_kong_rob_offers` restricts concealed-kong robbing
+   to a candidate hand that resolves to 十三么 specifically, not any qualifying win.
+   `test_concealed_kong_robbing_denied_to_a_non_thirteen_orphans_win`/
    `test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win`.
-4. Concealed kong that changes an already-tenpai hand's wait — legal in HK. **Closed (M2
-   closeout):** no wait-tracking exists anywhere in `actions.py`/`melds.py` to restrict this —
-   `legal_self_melds` is a tile-count check only — so this is legal by construction; covered by
-   the existing concealed-kong declaration tests (nothing gates it on wait shape).
-5. Four kongs on the table across different players → `four_kong_abort` if enabled. **Scope
-   gap:** `RuleSet.four_kong_abort` (and its neighbor `nine_terminals_abort`, §9) are declared,
-   defaulted, and serialized in `config.py` but never read anywhere in `engine.py` — no kong
-   count is tracked and no abort ever fires, regardless of the flag. Unimplemented, not just
-   untested; tracked here rather than fixtured against a behavior that doesn't exist.
+4. Concealed kong that changes an already-tenpai hand's wait — legal in HK. No wait-tracking
+   exists in `actions.py`/`melds.py` to restrict this (`legal_self_melds` is a tile-count check
+   only), so it's legal by construction.
+5. Four kongs on the table across different players → `four_kong_abort` if enabled. **Not
+   implemented:** `RuleSet.four_kong_abort` (and `nine_terminals_abort`, §9) are declared and
+   serialized but never read anywhere in `engine.py` — no kong count is tracked and no abort
+   ever fires, regardless of the flag.
 6. Last-tile draw and last-discard win scoring, and their interaction with the wall reserve
-   count after kongs shorten the wall. **Closed (M2 closeout):**
-   `test_last_tile_flag_accounts_for_wall_reserve_after_a_kong_shortens_the_wall` proves
-   `wall_exhausted_at_last_draw` compares against `wall_reserve`, not literal emptiness, after a
-   kong replacement draw shrinks the wall to exactly the reserve threshold.
+   count after kongs shorten the wall. `wall_exhausted_at_last_draw` compares against
+   `wall_reserve`, not literal emptiness.
+   `test_last_tile_flag_accounts_for_wall_reserve_after_a_kong_shortens_the_wall`.
 7. Multi-win on one discard — deferred with `multi_win`, see
    [99-deferred.md](99-deferred.md); not required for v1 launch.
-8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just hidden client-side. **Closed (M2 sub-task 8):** `mahjong_core/actions.py`'s `can_declare_win`/`legal_actions` run real `scoring.faan.score_winning_hand` against the current `GameState` and only offer `DeclareWin` when `clears_min_faan` is true; `engine.py`'s claim-offer construction (`_discard_claim_offers`/`_kong_rob_offers`, via the same `actions.build_scoring_context`) does the equivalent for `ClaimWin`.
+8. Mechanically complete hand below `min_faan` — win must be **disabled server-side**, not just
+   hidden client-side. `mahjong_core/actions.py`'s `can_declare_win`/`legal_actions` run real
+   `scoring.faan.score_winning_hand` against the current `GameState` and only offer `DeclareWin`
+   when `clears_min_faan` is true; `engine.py`'s claim-offer construction
+   (`_discard_claim_offers`/`_kong_rob_offers`) does the equivalent for `ClaimWin`.
 9. Seven Pairs vs. standard parse of the same 14 tiles → since `NEW_18` (and therefore Seven
-   Pairs) is on by default (§7, §10), this collision is a default-path case, not an opt-in
-   one — scoring must maximize over *all* valid decompositions, not the first found. **Closed
-   (M2 closeout):** `test_seven_pairs_vs_standard_decomposition_maximizes` (test_faan.py) covers
-   the Seven Pairs instance specifically. This audit also found and fixed a real bug it exposed:
-   `_detect_seven_pairs`/`_detect_thirteen_orphans`/`_detect_nine_gates` read
-   `ScoringContext.concealed_tiles` directly and ignored the candidate `hand` they were called
-   with, so they fired on *every* decomposition candidate scored for a win whenever the raw 14
-   tiles happened to also satisfy their shape — not just the one raw, no-decomposition candidate
-   they're meant for. For Thirteen Orphans/Nine Gates this was invisible (both are limit hands,
-   masked by the limit non-stacking collapse below), but 七對子 would silently stack its 4 faan
-   onto an unrelated winning decomposition's own patterns. Fixed in `patterns.py`: all three now
-   require an empty `hand` (see `_detect_nine_gates`'s docstring for why that's the correct
-   signal, since these shapes can never carry exposed melds).
-10. Thirteen Orphans 13-way wait vs. single wait (config: some tables double the latter). **Scope
-    gap:** `RuleSet.thirteen_orphans_wait_bonus` is declared, defaulted, and serialized in
-    `config.py` but never read by `scoring/*.py` or `engine.py` — no wait-width tracking exists,
-    so the flag has no effect regardless of its value. Unimplemented, not just untested.
+   Pairs) is on by default (§7, §10), this is a default-path case: scoring must maximize over
+   *all* valid decompositions, not the first found. `_detect_seven_pairs`/
+   `_detect_thirteen_orphans`/`_detect_nine_gates` in `patterns.py` all require an empty `hand`
+   argument — these shapes can never carry exposed melds, so that's the correct signal that this
+   candidate is the raw, no-decomposition one they're meant to score, not an unrelated
+   decomposition that happens to also satisfy their tile shape.
+   `test_seven_pairs_vs_standard_decomposition_maximizes` (test_faan.py).
+10. Thirteen Orphans 13-way wait vs. single wait (config: some tables double the latter). **Not
+    implemented:** `RuleSet.thirteen_orphans_wait_bonus` is declared and serialized but never
+    read by `scoring/*.py` or `engine.py` — no wait-width tracking exists.
 11. Wall runs out **during** a flower-replacement cascade (edge case 1), not just before a
     normal draw: the seat's already-revealed flowers this cascade stay revealed, but the hand
-    ends as an exhaustive draw right there instead of raising — checked before *every* draw in
-    the cascade, not just the first. **Closed (M2 closeout):**
-    `test_wall_exhaustion_during_flower_cascade_ends_hand_as_exhaustive_draw`.
+    ends as an exhaustive draw right there — checked before *every* draw in the cascade, not
+    just the first. `test_wall_exhaustion_during_flower_cascade_ends_hand_as_exhaustive_draw`.

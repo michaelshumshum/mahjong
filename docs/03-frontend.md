@@ -196,24 +196,22 @@ The server closes claim windows **early** — as soon as no better claim is poss
 
 ### Countdown mechanics
 
-- Clock offset is measured via `ping`/`pong` using `performance.now()`, not `Date.now()` — the
-  latter can jump under NTP slew or a user changing their system clock mid-measurement. Re-measure
-  periodically (e.g. every 30s); anchor each individual countdown once, at render time.
-- The ring is a CSS animation (`animation-duration` set once from `deadline_ts + offset - now`,
-  `linear`), not a `setInterval`/`requestAnimationFrame` loop. Background tabs clamp JS timers to
-  ≥1000ms, so a JS-ticked ring visibly stalls when the tab loses focus (e.g. during an opponent's
-  long think); a CSS animation keeps compositing and is correct the instant the tab regains focus.
+- The ring is a CSS animation (`animation-duration` set once from `deadline_ts - now`, `linear`),
+  not a `setInterval`/`requestAnimationFrame` loop. Background tabs clamp JS timers to ≥1000ms,
+  so a JS-ticked ring visibly stalls when the tab loses focus (e.g. during an opponent's long
+  think); a CSS animation keeps compositing and is correct the instant the tab regains focus.
 - The ring is cosmetic only; the authoritative close is the server event (claim table above, or
   `turn` for your own timeout).
+- **Not implemented: clock-offset correction.** `deadline_ts - now` uses local `Date.now()`
+  directly — `ping`/`pong` exists on the wire ([02-protocol.md §4](02-protocol.md)) but nothing
+  in the client calls it, so there's no `performance.now()`-based offset measurement to anchor
+  against yet. Fine on a synced clock; the ring reads early/late by however far the client's
+  clock actually drifts otherwise.
 - The protocol's chess-clock bonus-second bank ([02-protocol.md §4](02-protocol.md)) doesn't get a
   dedicated meter in v1 — deferred, see [99-deferred.md](99-deferred.md). The ring reflects only
   the current `deadline_ts`, which already folds in any bonus time the server granted.
 
 ## 6. Client state
-
-**Implemented as of the `lib/net/` + `lib/game/store.svelte.ts` plumbing sub-task** — the shape
-below is what actually shipped, not the earlier illustrative sketch (fields renamed to mirror
-the wire payloads more directly once the real `ServerEvent` union existed to build against).
 
 ```ts
 // lib/game/state.ts — plain data, no runes, so lib/net/reducer.spec.ts can test it directly
@@ -383,8 +381,7 @@ don't replay the missed turns as animation.
 
 ### `/table/[id]` wiring
 
-**Implemented as of the route-wiring sub-task following the plumbing above.** `[id]` is a real
-room id (the lobby's client-generated invite code already works as one against the backend's
+`[id]` is a real room id (the lobby's client-generated invite code already works as one against the backend's
 auto-create-on-first-connect, `server/app/ws.py`'s `_get_or_create_room` — no room API needed).
 
 `?mock=<scenarioId>` (any value, including a bare `?mock`) renders a frozen `MOCK_SCENARIOS`
@@ -415,11 +412,10 @@ sends it. Sitting down implies readiness (`ready` fires right behind a successfu
 no strategic reason to gate it behind a second button once the player already made the one real
 decision. Until all four seats are joined and ready, the page shows a waiting screen.
 
-**Pre-game states got their own design pass** (design-pass sub-task following the route-wiring
-above) — connecting, sit-down, and waiting are real, recurring moments in a genuinely
-multiplayer game (arriving at a table, waiting for others to show up), not filler between "real"
-screens, so they use the same `panel-elevated`/button vocabulary as the rest of the app (`_buttons
-.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (room code +
+**Pre-game states** — connecting, sit-down, and waiting are real, recurring moments in a
+genuinely multiplayer game (arriving at a table, waiting for others to show up), not filler
+between "real" screens, so they use the same `panel-elevated`/button vocabulary as the rest of
+the app (`_buttons.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (room code +
 a "copy invite link" button — the room's URL *is* the invite, and waiting-for-players is exactly
 when you need to hand it to someone) and a seat-preview ring: four slots arranged
 across/left/right/self, the same relative arrangement `layout.seat-region-grid` uses for the real
@@ -475,23 +471,20 @@ mid-hand the way whose turn it is does. Other `seat_status` values (`connected`/
 `autoplay`/`empty`) have no visual treatment yet; this sub-task only covers `bot`, the one value
 that just gained real backend meaning.
 
-**Two real bugs the live path surfaced that the mock scenarios never could** (mock fixtures hardcode
-values the real wire never actually sends this way):
+**Two wire-shape gotchas the mock fixtures can't surface** (they hardcode values the real wire
+doesn't actually send this way):
 
-- `reduce()`'s `discard` case never cleared `legalActions`/`deadlineTs`. Every entry left in
-  `legalActions` after a discard still names a tile_id genuinely still in `ownHand` (only the
-  discarded one is gone), so a client reading `legalActions` alone couldn't tell the whole set was
-  stale — it kept rendering "legal-looking" discard buttons for a seat that had already acted,
-  and clicking one sent a command the server silently dropped as out-of-turn
-  ([02-protocol.md §1](02-protocol.md)'s `ack` note). Fixed by clearing both fields on a seat's
-  own discard; a `reducer.spec.ts` regression test pins it.
+- The reducer clears both `legalActions` and `deadlineTs` on a seat's own `discard` — leaving
+  stale entries would let a client render "legal-looking" discard buttons for a tile still in
+  `ownHand` after this seat had already acted, and clicking one sends a command the server
+  silently drops as out-of-turn ([02-protocol.md §1](02-protocol.md)'s `ack` note). Pinned by a
+  `reducer.spec.ts` regression test.
 - `state.prevailing`/`hand_start.prevailing` go over the wire as the `Wind` `IntEnum`'s *member
   name* (`app/views.py`/`app/room.py`: `.name` — `"EAST"`/`"SOUTH"`/`"WEST"`/`"NORTH"`), not the
-  single-letter code (`'E'|'S'|'W'|'N'`) every mock scenario hardcodes and `WIND_LABEL` indexes
-  by. `live-view.ts`'s `wireWindToCode()` maps it; every other enum-shaped wire field
-  (`phase`/meld `kind`/claim `kind`) already serializes through a `StrEnum`'s `.value`, which is
-  the same string either way, so `Wind` (the one `IntEnum` in the set) was the only one actually
-  wrong.
+  single-letter code (`'E'|'S'|'W'|'N'`) mock scenarios use and `WIND_LABEL` indexes by.
+  `live-view.ts`'s `wireWindToCode()` maps it — the one enum-shaped wire field that needs this;
+  `phase`/meld `kind`/claim `kind` already serialize through a `StrEnum`'s `.value`, the same
+  string either way.
 
 ## 7. Asset pipeline
 
@@ -597,8 +590,8 @@ Unaffected by the DOM change or any finding above:
 
 - One-way data flow: server event → reducer → store → view. Never the reverse.
 - Intent, not state: the client sends "discard tile #47," never "my hand is now X."
-- Server-only time: every deadline is an absolute `deadline_ts` plus a measured clock offset,
-  never a client-started duration.
+- Server-only time: every deadline is an absolute `deadline_ts`, never a client-started duration
+  (clock-offset correction against it is not yet implemented — §6).
 - Always render yourself at the bottom, rotating the other three; seat wind is a badge, not
   position.
 - The drawn tile sits apart from the sorted hand, as in physical play.

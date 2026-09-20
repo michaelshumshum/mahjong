@@ -54,7 +54,7 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   the first scenario) to stay on the frozen `MOCK_SCENARIOS` fixture, since neither runs a backend.
   Live wiring detail: `docs/03-frontend.md`'s "`/table/[id]` wiring" (§6).
 
-- **Testing a `*.svelte.ts` file's runes** (`$state`/`$effect`) needs the `vitest.config.ts`
+- **Testing a `*.svelte.ts` file's runes** (`$state`/`$effect`) needs `vite.config.ts`'s vitest
   `client` project, not `server`: Vitest's default `node` environment still loads modules through
   Vite's SSR compile target even with `environment: 'jsdom'` set, and Svelte's server runtime
   never runs `$effect` (there's no DOM to react into) — silently a no-op, not an error, which is

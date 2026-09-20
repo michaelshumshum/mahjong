@@ -13,17 +13,15 @@ class Bot(Protocol):
         """-> an action id from the fixed 109-action space (docs/06-ml.md §3)."""
 ```
 
-`mask` is `legal_mask(state, seat) -> list[bool]` (docs/06-ml.md §1's real signature —
-**resolved, was written here as `legal_mask(view)`**: `mahjong_core` must never depend on
-`app.views`, so `legal_mask` stays `GameState`-based; whoever drives a bot — the self-play
-harness, the arena, or the Room — computes the mask from the real `GameState` it already holds
-and hands `(view, mask, deadline)` to `Bot.act` together. `mahjong_core` is stdlib-only (see
-README / roadmap "zero deps" rule) — **no numpy**, plain `list[bool]`. A bot never calls
-`decode_action` itself, for the same reason: it needs the real `GameState`, which a bot never
-has (`app/views.py`'s `SeatView` is the whole point). Decoding the returned id back into a
-concrete `Action` is always the caller's job — near-zero cost, and a learned policy drops into
-the same slot later with no refactor. See [06-ml.md](06-ml.md), and `server/bots/base.py`'s
-module docstring for the implementation of this resolution.
+`mask` is `legal_mask(state, seat) -> list[bool]` (docs/06-ml.md §1) — `GameState`-based, not
+`SeatView`-based: `mahjong_core` must never depend on `app.views`, so whoever drives a bot (the
+self-play harness, the arena, or the Room) computes the mask from the real `GameState` it
+already holds and hands `(view, mask, deadline)` to `Bot.act` together. `mahjong_core` is
+stdlib-only — no numpy, plain `list[bool]`. A bot never calls `decode_action` itself either, for
+the same reason: it needs the real `GameState`, which a bot never has (`SeatView` is the whole
+point). Decoding the returned id back into a concrete `Action` is always the caller's job — a
+learned policy drops into the same slot later with no refactor. See
+[06-ml.md](06-ml.md)/`server/bots/base.py`'s module docstring.
 
 **Scheduling.** Bot decisions do not run inside the room's `asyncio` task — a shanten/ukeire scan
 is tens of milliseconds of pure-Python CPU (§3), which would stall the event loop for every other
@@ -41,30 +39,25 @@ room on the same process. Instead:
 4. If no (matching) result lands before `deadline`, the room applies a safe default (tsumogiri /
    pass) and logs it. A bot must never wedge a table.
 
-**Built: a humanising think delay, 400–1400ms, uniform per decision.** `app/room.py`'s
-`_await_bot_job` sleeps this once the worker replies, before re-entering the result through
-`self.inbox` — applied by the room, not inside the worker, so it never touches
+**Humanising think delay: 400–1400ms, uniform per decision.** `app/room.py`'s `_await_bot_job`
+sleeps this once the worker replies, before re-entering the result through `self.inbox` —
+applied by the room, not inside the worker, so it never touches
 `_BOT_JOB_TIMEOUT_SECONDS`/`turn_seconds`/`claim_seconds` deadline math (a real tier answers in
 single-digit milliseconds; without this, turns and claims resolve faster than a human watching
 the table can follow). Seeded off the same per-decision `seed` `_submit_bot_job` already derives
-(reproducible, not `random.Random()` unseeded), sleeping in that job's own task so it delays only
-that seat's result, never the room loop or another seat's job. **Deferred:** varying the delay by
-how close the decision was (the docs' original "longer for close decisions") — no tier currently
-returns a confidence/margin signal alongside its chosen action id, so there's nothing to scale the
-delay by yet.
+(reproducible, not unseeded), sleeping in that job's own task so it delays only that seat's
+result. **Deferred:** varying the delay by how close the decision was — no tier currently
+returns a confidence/margin signal alongside its chosen action id, so there's nothing to scale
+the delay by yet.
 
-**Built (M4.5): `bots/worker.py`'s `compute_action` now drives the real `Bot.act` tiers.** A
-worker process still never receives `GameState` (D2: the room's `game_seed` must never leave its
-own process), so it still can't call `decode_action(aid, state, seat)` itself — that needs the
-real `GameState`. The resolution this section used to defer ("revisit only when a non-uniform
-tier needs to run disconnect-handover for real") has landed: `compute_action` builds the
-requested tier (`T0`/`T1`/`T2`, `app/room.py`'s `Room.__init__(bot_tier=...)`, default
-`T2`/`FaanBot`) and drives its real `act(view, mask, deadline)` via `asyncio.run` (the worker has
-no running event loop of its own — same pattern `bots/arena.py`'s own `ProcessPoolExecutor` entry
-point already uses), returning a bare action id instead of a decoded `Action`. The decode step
-moved to `app/room.py`'s `_handle_bot_result`, which already holds the real `GameState` — the one
-deliberate change to that path's result shape this resolution needed. See
-`server/bots/worker.py`'s module docstring for the full reasoning.
+`bots/worker.py`'s `compute_action` drives the real `Bot.act` tiers. A worker process never
+receives `GameState` (the room's `game_seed` must never leave its own process), so it can't call
+`decode_action(aid, state, seat)` itself — `compute_action` builds the requested tier
+(`T0`/`T1`/`T2`, `app/room.py`'s `Room.__init__(bot_tier=...)`, default `T2`/`FaanBot`) and drives
+its real `act(view, mask, deadline)` via `asyncio.run` (the worker has no running event loop of
+its own — same pattern `bots/arena.py`'s `ProcessPoolExecutor` entry point uses), returning a
+bare action id. `app/room.py`'s `_handle_bot_result` decodes it, since it already holds the real
+`GameState`.
 
 ## 2. Tiers
 
@@ -301,68 +294,12 @@ games:
 Make "candidate's paired-difference CI excludes zero, in the candidate's favor" the merge gate for
 any bot change (replacing a bare win-count threshold).
 
-### Real proof run (M4): T2 `FaanBot` vs T1 `EfficiencyBot`
+### Current arena numbers: T2 `FaanBot` vs T1 `EfficiencyBot`
 
-`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 12`, run
-live end to end (~27 minutes; T2's per-decision cost is far higher than T1's — every candidate
-discard runs a `bots.valuation`/`bots.safety` pass on top of the shared shanten/ukeire scan, see
-[07-infra.md](07-infra.md)/the roadmap's bot-perf risk row). 1000 duplicate sets = 4000 games =
-16,000 `FaanBot` hands and 48,000 `EfficiencyBot` hands (T2 occupies one seat per rotation, T1
-the other three, per §8's duplicate-seeding method).
-
-**First pass — a real regression, reported honestly rather than re-tuned away silently.** The
-weights this sub-task shipped with first (mid-game `w_value=1.5`, `w_speed=0.5`) scored:
-
-| Metric | FaanBot (A) | EfficiencyBot (B) |
-| --- | --- | --- |
-| win_rate | 0.1354 | 0.2251 |
-| deal_in_rate | 0.0932 | 0.1334 |
-| avg_winning_faan | 4.30 | 3.75 |
-| tenpai_rate_on_sub_minimum_hand | 0.1627 | 0.3263 |
-| avg_points_per_hand | -0.4537 | 0.1512 |
-
-Paired difference (A − B): **-2.420 points/game, 95% CI [-3.337, -1.503]** — excludes zero in
-`EfficiencyBot`'s favor. `tenpai_rate_on_sub_minimum_hand` roughly halved (the canary this whole
-sub-task exists to move), but win rate dropped by ~40% relative and points went net negative: the
-first weight calibration chased *every* structurally-reachable route (including the ubiquitous,
-weakly-committal 2-faan Voided Suit — reachable on any hand touching exactly two suits) almost as
-eagerly as a genuine Half/Full Flush commitment, spending far more win rate than the extra faan
-per win was worth. This is exactly the failure mode §8's merge gate exists to catch before a
-"structurally more sophisticated" bot ships as a regression.
-
-**Retuned once, same seed range, real re-run — narrowed but did not close the gap.** Mid-game
-`w_value` dropped 1.5 → 0.9 (`w_speed` up 0.5 → 0.7; early/late nudged the same direction — see
-`bots/faanbot.py`'s `_weights_for_turn` for the exact numbers and reasoning):
-
-| Metric | FaanBot (A) | EfficiencyBot (B) |
-| --- | --- | --- |
-| win_rate | 0.1539 | 0.2246 |
-| deal_in_rate | 0.0981 | 0.1368 |
-| avg_winning_faan | 4.25 | 3.74 |
-| tenpai_rate_on_sub_minimum_hand | 0.2038 | 0.3208 |
-| avg_points_per_hand | -0.1703 | 0.0568 |
-
-Paired difference (A − B): **-0.908 points/game, 95% CI [-1.857, +0.041]** — includes zero
-(barely: the upper bound sits 0.04 points from crossing it), so this does **not** yet clear §8's
-merge gate on points alone. Deal-in rate stays lower than T1's (better defence) and average
-winning faan stays higher (bigger wins when they land), but the two don't yet fully offset a
-still-lower win rate. `tenpai_rate_on_sub_minimum_hand` (0.204 vs T1's 0.321) is the number that
-does clear a clear, real bar: **T2 reaches a sub-minimum tenpai roughly 37% less often than T1**,
-the specific, documented HK-only failure mode (§4: "a T1-only bot loses by construction in HK")
-this sub-task exists to fix. That number moving this much, this consistently, across both
-calibrations is the real evidence T2's value-planning is structurally doing its job even though
-the points race isn't fully won yet.
-
-**Retuned a second time — `w_safety`, not `w_value`/`w_speed` — real re-run, gap narrows further
-but still doesn't close.** `w_safety` (0.3/0.6/1.6 across the early/mid/late turn buckets) had
-never itself been checked against a real arena result — only `w_value`/`w_speed` were touched by
-the first retune above. `bots/safety.py`'s `tile_risk` sums an assumed 5-faan deal-in cost across
-all three opponents at a 0.06 base rate, a magnitude (commonly ~0.3–1.5 once meld/tempo/wall
-multipliers apply) large enough to swamp routine speed/value differences between candidate
-discards at the first retune's `w_safety` values — plausibly making T2 play more defensively than
-the actual deal-in savings were worth on *ordinary* discards, not just inside the already-separate
-`fold_mode` path. Halving `w_safety` at each bucket (0.3→0.15, 0.6→0.3, 1.6→0.9,
-`bots/faanbot.py`'s `_weights_for_turn` has the exact numbers and reasoning):
+`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 12` (1000
+duplicate sets = 4000 games = 16,000 `FaanBot` hands, 48,000 `EfficiencyBot` hands, per §8's
+duplicate-seeding method). Current shipped weights (`bots/faanbot.py`'s `_weights_for_turn` —
+retuned twice against this harness; its docstring carries the full tuning history):
 
 | Metric | FaanBot (A) | EfficiencyBot (B) |
 | --- | --- | --- |
@@ -372,22 +309,11 @@ the actual deal-in savings were worth on *ordinary* discards, not just inside th
 | tenpai_rate_on_sub_minimum_hand | 0.2243 | 0.3243 |
 | avg_points_per_hand | 0.1108 | -0.0369 |
 
-Paired difference (A − B): **+0.591 points/game, 95% CI [-0.393, +1.575]** — the point estimate
-is positive for the first time across all three calibrations, but the CI still includes zero, so
-this is **not yet** a clean "`FaanBot` beats `EfficiencyBot`" by §8's literal merge-gate wording
-either. Deal-in rate rose only slightly relative to the first retune (0.098 → 0.110, still well
-below T1's 0.139) while win rate recovered substantially (0.154 → 0.175) — confirming the
-over-cautious safety weight, not the value/speed balance, was the dominant remaining drag on
-points. `tenpai_rate_on_sub_minimum_hand` (0.224 vs T1's 0.324) stays essentially as strong as the
-first retune's number (0.204 vs 0.321) — the HK-specific failure mode this milestone exists to
-fix is not being traded away to chase the points gate.
-
-**Honest status, not spun:** T2 is a genuine structural improvement on the HK-specific failure
-mode this whole section is about, and after two retuning passes sits closer to parity on raw
-points than ever (mean paired difference: -2.420 → -0.908 → **+0.591** across the three
-calibrations) — but still not a clean "beats T1" result by §8's own merge-gate wording; the CI
-has never yet excluded zero in `FaanBot`'s favor. Further weight tuning via self-play against this
-same harness (§4's own stated method) is real, concrete follow-up work, not a hand-wave:
-`w_safety` moved the needle further than `w_value`/`w_speed` did, so a third pass continuing to
-trim `w_safety` (or re-examining `bots/safety.py`'s own per-signal multipliers, untouched by
-either retune so far) is the natural next step, not a sign the approach is wrong.
+Paired difference (A − B): **+0.591 points/game, 95% CI [-0.393, +1.575]** — positive point
+estimate, but the CI still includes zero, so this doesn't yet clear §8's merge gate on points
+alone. `tenpai_rate_on_sub_minimum_hand` (0.224 vs T1's 0.324) is the number that does clear a
+real bar: **T2 reaches a sub-minimum tenpai ~31% less often than T1**, the HK-specific failure
+mode §4 exists to fix. Deal-in rate stays below T1's (better defence); win rate is still lower.
+`w_safety` moved the needle further than `w_value`/`w_speed` in the retuning so far, so trimming
+it further (or revisiting `bots/safety.py`'s own per-signal multipliers) is the open next step,
+not a sign the approach is wrong.

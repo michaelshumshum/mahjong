@@ -36,12 +36,13 @@ The API container runs uvicorn with **one worker**.
 `--workers` is pinned by a comment in the Compose file and a startup assertion in `main.py`.
 Multi-node scaling is out of scope at this stage. Deferred — see [99-deferred.md](99-deferred.md).
 
-**No graceful shutdown yet.** `restart: unless-stopped` plus in-memory rooms means every deploy
-or restart currently kills every live table mid-hand — there's no drain step between "stop
-accepting new rooms" and "SIGKILL". The drain sequence (stop new joins, wait for in-flight hands,
-persist or reject) is being specified in `00-architecture.md §8`; once it lands, `docker-compose
-*.yml` needs a `stop_grace_period` sized to it and the API needs a SIGTERM handler that actually
-uses the grace window instead of dying with the default 10s.
+**Graceful shutdown is implemented at the app level, not yet matched at the Compose level.**
+`RoomRegistry.begin_shutdown` (`app/registry.py`) runs the real drain on SIGTERM — stop new
+joins, warn connected seats, let a mid-hand room finish that hand within `SHUTDOWN_GRACE_SECONDS`
+(default 90s) — see `00-architecture.md §8.1`. Neither `docker-compose.yml` nor
+`docker-compose.prod.yml` sets a `stop_grace_period` yet, so Compose's own default (10s before
+SIGKILL) can still cut the drain off well before its 90s window closes — needs sizing to match
+once this goes past a personal deploy.
 
 ## 3. Compose profiles
 

@@ -21,23 +21,30 @@ mahjong/
 │   │       ├── faan.py         # maximize over all valid decompositions
 │   │       └── payout.py       # faan -> points -> per-seat payments
 │   ├── app/
-│   │   ├── main.py             # FastAPI app, lifespan, uvicorn entry
-│   │   ├── api/                # REST: auth, rooms, replays, leaderboard
+│   │   ├── main.py             # FastAPI app, lifespan, uvicorn entry, /healthz
 │   │   ├── ws.py               # WebSocket endpoint, Session
 │   │   ├── room.py             # Room actor: task loop, timers, claim windows, seq/ring
-│   │   ├── registry.py         # RoomRegistry, matchmaking
+│   │   ├── registry.py         # RoomRegistry, matchmaking, graceful-shutdown drain
 │   │   ├── views.py            # seat_view() + redact_event() — redaction
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
-│   │   ├── infra/              # in-process dicts (ports layer deferred, see 99-deferred.md)
+│   │   ├── idempotency.py      # per-seat intent id cache (02-protocol.md §1)
+│   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
 │   │   └── db/                 # SQLAlchemy models, migrations
+│   │       # no REST router yet beyond /healthz — room list, replays, leaderboard
+│   │       # (02-protocol.md's REST mention) are not built; matchmaking/presence/rate-
+│   │       # limiting are the in-process dicts 00-architecture.md §6 describes, not a
+│   │       # separate app/infra/ module
 │   ├── tools/gen_protocol.py   # pydantic → TS directly (+ informational JSON Schema), 02-protocol §6
 │   ├── bots/
 │   │   ├── base.py  random.py  efficiency.py  faanbot.py  safety.py  valuation.py
 │   │   └── arena.py            # self-play evaluation harness
 │   └── tests/
-│       ├── test_engine.py  test_scoring.py  test_claims.py  test_redaction.py
-│       ├── test_protocol.py  test_selfplay.py
-│       └── replays/            # golden (seed, actions, expected_result) fixtures
+│       ├── test_engine.py  test_scoring.py  test_faan.py  test_payout.py  test_claims.py
+│       ├── test_redaction.py  test_protocol.py  test_selfplay.py  test_full_game_e2e.py
+│       └── replays/            # NOT YET BUILT — golden (seed, actions, expected_result)
+│                                # fixtures called for by server/AGENTS.md; today's scoring
+│                                # suite is hand-authored parametrized cases in test_faan.py/
+│                                # test_payout.py instead
 ├── web/
 │   └── src/
 │       ├── routes/             # /, /lobby, /table/[id], /replay/[id], /profile
@@ -88,20 +95,11 @@ limit hands, caps, the `min_faan` gate, points tables, payment splits.
 payments) passes, including every edge case in [01-rules-spec §11](01-rules-spec.md). Hand-authoring
 those 120 fixtures is itself days of work, not an afternoon — budget for it explicitly.
 **Met** — `server/tests/{test_scoring,test_faan,test_payout}.py` carry 145 hand-authored test
-functions (118 + 13 + 14; several parametrized over multiple hands each, e.g. Nine Gates' 9
-wait-rank variants, so 132 + 13 distinct cases before `test_payout.py`'s own ~479, most of that
-last number its `test_payout_always_sums_to_zero` invariant sweep over 4 unrelated axes rather
-than individually-authored hands) — well past ~120 hand-shaped fixtures either way. Every one of
-the 34 registered patterns is positively exercised, and every §11 edge case is either closed with
-a named fixture or explicitly tracked as a scope gap in §11 itself. The closeout audit (M2
-sub-task 10) also found and fixed a real cross-candidate double-counting bug in `patterns.py`'s
-raw-shape detectors (七對子/十三么/九蓮寶燈) and a real concealed-kong-robbing legality bug in
-`engine.py` (see 01-rules-spec.md §11.3, §11.9). Two `RuleSet` fields remain documented but
-unimplemented — `four_kong_abort`/`nine_terminals_abort` (§11.5) and
-`thirteen_orphans_wait_bonus` (§11.10) — and the flower-instant-win check still isn't run against
-the initial deal's own flower-replacement pass, only mid-hand draws (§7 "Flower faan", scope gap
-noted since sub-task 8). None of these are golden-fixture gaps; they're unbuilt features, tracked
-rather than silently missed.
+functions, well past the ~120-fixture bar. Every one of the 34 registered patterns is positively
+exercised, and every [01-rules-spec.md §11](01-rules-spec.md) edge case is either closed with a
+named fixture or tracked there as a scope gap (`four_kong_abort`/`nine_terminals_abort`,
+`thirteen_orphans_wait_bonus`, and the initial-deal flower-instant-win check — unbuilt features,
+not fixture gaps).
 Also: the fixed 109-action space + `legal_mask` + type-level round-trip property test
 ([06-ml §1](06-ml.md)) — ~1 day, painful to retrofit; the bots share the mask.
 
@@ -113,45 +111,15 @@ persistence of finished games.
 resumes correctly from `last_seq`; `test_redaction` proves no seat ever receives a tile identity
 it isn't entitled to. **Met.**
 
-Postgres persistence of finished `Room`-driven games (not just M1's bot-only self-play) and the
-graceful-shutdown drain (`00-architecture.md §6`/`§8.1`) are implemented as of an earlier M3
-sub-task -- see those sections for what landed. The milestone's own "four scripted WS clients
-play a full game" done-when gate closed in a later, dedicated closeout sub-task: `server/tests/
-test_full_game_e2e.py` drives four real WS clients through an entire `EAST_ONLY` game (4 hands,
-dealer rotating 0→1→2→3 with both dealer-repeat flags off -- the cheapest ruleset config that
-reaches a real `Phase.GAME_OVER`), covering a real claim exchange, a real self-draw win, and a
-real mid-claim-window disconnect/reconnect in hand 3 specifically (not hand 1, where
-`test_reconnect.py`'s own scenarios already live) in one continuous run, plus a `GameRecord`
-persist check spanning the whole game's `Room.actions` log. Every frame every connection
-receives is checked live against `app/views.py`'s `Entitlement` rules, not just relying on
-`test_redaction.py`'s schema walk. The closeout audit (mirroring M2 sub-task 10's pattern) found
-and fixed a real bug this way: `mahjong_core/engine.py`'s `_deal_hand` rebuilt `GameState` on
-every hand boundary without carrying `next_window_id` forward, resetting it to 0 each hand.
-`window_id` is a whole-game identifier -- `app/room.py`'s per-window bookkeeping
-(`_armed_window_id`, `_active_seat_timer`, `_claim_deadline_ms`) is keyed by `window_id` alone
-and never reset between hands -- so any hand after the first whose first claim window reused an
-earlier hand's `window_id` had its `claim_offer` silently swallowed by `_arm_claim_timer`'s
-once-per-window idempotency guard: no offer sent, no timer armed, the window just sitting open
-forever. Only reachable with a real multi-hand game driven through `Room`, never visible to
-`mahjong_core`-only or single-hand-scoped tests -- pinned in `tests/test_engine.py::
-test_start_next_hand_carries_forward_next_window_id` before the fix. M3 is now fully complete;
-no gaps remain beyond what's already tracked elsewhere in this doc set (§4, §7, §8, §9).
-
-**Turn timeout closed (a later sub-task).** `RuleSet.turn_seconds`/`turn_timeout_strikes`
-(`mahjong_core/config.py`) existed since M1 but had zero enforcement anywhere -- `00-
-architecture.md §8`'s "Turn timeout" and "Bot raises / hangs" rows both named this gap
-explicitly. `app/room.py`'s `_arm_turn_timer`/`_handle_turn_timeout` add a third `TimerHeap`
-deadline kind (claim-window and disconnect-grace already existed) armed from
-`_publish_turn_if_active`, the single call site every `AWAIT_ACTION` landing already goes
-through; on expiry the room tsumogiris the drawn tile or discards the lowest-`tile_id`
-concealed tile (sourced from `legal_actions`'s own `Discard` set, never raw `concealed`,
-so the default can never name an illegal tile), then registers a strike on
-`SeatBinding.turn_timeout_strikes` -- three flips the seat to `autoplay` for the rest of the
-game, which falls out of simply never resetting that field rather than any per-hand
-bookkeeping. Fires identically for a human or a bot-driven seat, since the timer races the
-wall clock rather than any particular bot job -- closing the "Bot raises / hangs" row's own
-named gap ("a bot's own turn... has no deterministic-default fallback") with no bot-specific
-code at all.
+Postgres persistence of finished `Room`-driven games and the graceful-shutdown drain
+([00-architecture.md §6](00-architecture.md)/[§8.1](00-architecture.md)) are both implemented —
+see those sections. `server/tests/test_full_game_e2e.py` drives four real WS clients through a
+complete `EAST_ONLY` game (4 hands, dealer rotating 0→1→2→3) covering a real claim exchange, a
+self-draw win, and a mid-claim-window disconnect/reconnect, checking every frame against
+`app/views.py`'s `Entitlement` rules live. Turn timeout is also closed: `app/room.py`'s
+`_arm_turn_timer`/`_handle_turn_timeout` enforce `RuleSet.turn_seconds`/`turn_timeout_strikes`
+for both human and bot-driven seats identically (00-architecture.md §8 "Turn timeout"). M3 is
+fully complete; no gaps remain beyond what's tracked elsewhere in this doc set (§4, §7, §8, §9).
 
 ### M4 — Playable client + bots (6–10 weeks)
 Lobby, table route, DOM/CSS table scene, inline-SVG tile faces, hand/pool/meld rendering,
@@ -166,18 +134,11 @@ draws, not finished games. `EfficiencyBot` alone is not sufficient to make M4.5 
 like a game" gate lives in M4.5, not here.
 
 **Bots half: built, not yet fully cleared.** `T1`/`T2`/the arena harness are all built and
-merged; the real 1000-duplicate-set arena run ([04-bots §8](04-bots.md)) shows
-`tenpai_rate_on_sub_minimum_hand` roughly a third relative to T1 (0.22 vs 0.32) — the specific
-HK-only failure this milestone exists to fix — but the paired-difference CI on raw points is
-`[-0.393, +1.575]`, still including zero, not yet a clean "`FaanBot` beats `EfficiencyBot`" per
-this gate's literal wording. Two retuning passes have moved the mean paired difference from
--2.420 → -0.908 → +0.591 (first pass retuned `w_value`/`w_speed`; second retuned `w_safety`,
-which had never itself been arena-validated and turned out to be the bigger remaining lever) —
-the point estimate is positive for the first time, but the CI has never yet excluded zero.
-Closing it the rest of the way is real follow-up self-play tuning work against the same harness
-(most likely continuing to trim `w_safety`, per `bots/faanbot.py`'s `_weights_for_turn`
-docstring), not a re-scope. Client work (the rest of this milestone's list) is untouched by this
-note.
+merged; `tenpai_rate_on_sub_minimum_hand` — the HK-only failure this milestone exists to fix —
+is well down relative to T1, but the paired-difference CI on raw points still includes zero, not
+yet a clean "`FaanBot` beats `EfficiencyBot`" per this gate's literal wording. Current numbers
+and tuning status: [04-bots.md §8](04-bots.md). Client work (the rest of this milestone's list)
+is untouched by this note.
 
 ### M4.5 — Single-player is shippable
 No new engine work — this is a checkpoint milestone, not a build phase. Play the M4 client
@@ -188,21 +149,13 @@ wins at a normal rate rather than perpetual exhaustive draws, and it feels good.
 point at which shipping single-player-only is a live, cheap option — given the M5 cost below,
 treat it as a real decision point, not a formality.
 
-**Backend mechanism: built.** Two things had to be true before this checkpoint could even exist,
-and both landed together: (1) the live room path (disconnect-handover's `autoplay` seats) now
-runs the real bot tiers, not `bots/worker.py`'s old hardcoded T0 uniform-random stand-in — see
-[04-bots.md §1](04-bots.md); (2) a room can be started with bots filling the other three seats
-from creation (`?practice=true` on the WS endpoint → `Room.__init__(practice=True)`), not only
-via disconnect-handover — `app/room.py`'s `SeatBinding` gains a real `bot` status (reusing
-`_poke_bots`'s existing `BotJobTag`/`ProcessPoolExecutor` machinery unchanged), auto-`ready` so
-`require_ready` gating starts the hand as soon as the human readies. The room's `bot_tier`
-defaults to `T2`/`FaanBot`, matching this milestone's own requirement above; `T0`/`T1` stay
-selectable at the `Room`/`RoomRegistry` level for tests and any future difficulty setting.
-Proven end to end by a real WS-driven test: one human client, three real `FaanBot`s (no `join`
-ever sent for them), unscripted play to `Phase.GAME_OVER`
+**Backend mechanism: built.** The live room path (disconnect-handover's `autoplay` seats) runs
+the real bot tiers ([04-bots.md §1](04-bots.md)), and a room can also be started with bots
+filling the other three seats from creation (`?practice=true` on the WS endpoint →
+`Room.__init__(practice=True)`), defaulting to `T2`/`FaanBot`. Proven end to end: one human
+client, three real `FaanBot`s, unscripted play to `Phase.GAME_OVER`
 (`server/tests/test_practice_mode_e2e.py`). **What's left for this milestone is entirely
-frontend** — a lobby entry point for practice mode and bot-seat visual treatment — not scoped to
-this backend sub-task.
+frontend** — a lobby entry point for practice mode and bot-seat visual treatment.
 
 ### M5 — Real multiplayer (1–2 weeks)
 Guest identity only, by design — no accounts, no password, no email, no JWT, no REST auth
@@ -229,46 +182,17 @@ anywhere in this document.
 **Done when:** four browsers on four devices finish a game with one deliberate disconnect, each
 seeing the other three players' chosen names throughout.
 
-**Backend wire slice: built.** `join.name` (validated leniently -- trimmed, capped at 24 chars,
-defaulted to `"Guest N"` when empty/omitted, never hard-rejected: a low-stakes guest field isn't
-worth a rejection flow) is stored on `SeatBinding.name` for the seat's entire game, survives
-reconnect untouched (a `hello` never resends it), and is surfaced three ways: `state_sync.names`
-(every seated player's name, `null` for an unjoined seat), a `name` field on every `seat_state`
-broadcast (so an already-connected seat sees a new name live, not just on its next resync), and
-`GameRecord.players` (swapped from the old `SeatBinding.session_id` stand-in now that a real
-chosen name exists, `docs/00-architecture.md §6`). Practice-mode bot seats (M4.5) get a real
-name too, sourced from the room's `bot_tier` (`"RandomBot"`/`"EfficiencyBot"`/`"FaanBot"`), not a
-placeholder -- `_persist_game_record` still records `None` for them, same as before, since a bot
-was never a human player regardless of what it displays as. What's left for this milestone is
-everything client-side (name-entry UI, `localStorage`, rendering) plus matchmaking and invite
-codes -- not scoped to this backend sub-task.
+**Backend wire slice: built.** `join.name` is stored on `SeatBinding.name` for the seat's entire
+game and surfaced via `state_sync.names`, `seat_state.name`, and `GameRecord.players`
+([00-architecture.md §5](00-architecture.md)). What's left for this milestone is everything
+client-side (name-entry UI, `localStorage`, rendering) plus matchmaking and invite codes.
 
-**Spectating: backend built ("Spectating" sub-task).** A connection opts in with `?spectate=true`
-on the WS URL (`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`'s existing shape on the
-same endpoint -- not docs/02-protocol.md §2's originally-sketched literal passive default, which
-turned out to race every real client's own `hello`-then-`join` handshake; see
-docs/00-architecture.md §3's "Spectating: built" note for the full reasoning) and immediately
-gets a spectator-redacted `state_sync` (`seat_view(state, None)`, docs/00-architecture.md §5 --
-already fully correct before this sub-task, just never consumed by a real connection), then
-every live broadcast and public-shaped event a real seat gets, minus anything that would name a
-seat's own concealed tiles (`claim_offer`, `turn.legal`, the private per-seat `deal`). Each
-spectator session gets its own `Room.ring`/`spectator_seq` entry, keyed by `Session.session_id`
-(a string, disjoint from the four integer seat keys already sharing `Room.ring`), giving the
-same dense-and-gapless-per-stream guarantee (D1) a seat already has. Deliberately **not**
-reconnectable, unlike a seat: dropped outright on disconnect (`unregister_spectator`) rather
-than kept around for a reunion `hello{seat}` could never express for a spectator anyway (no
-seat number, no `SeatBinding`) -- see docs/02-protocol.md §5's own note. `join`/a `hello{seat}`
-reconnect from a spectating connection promotes it to a seat and stops the duplicate
-spectator-shaped stream. Proven end to end by a real WS-driven test
-(`server/tests/test_spectator.py`): a spectator connection receives the initial `state_sync`
-with no send of its own, then a real discard/claim/hand-end sequence redacted exactly like
-`seat_view(state, None)`, multiple simultaneous spectators keep independent seq streams, a
-`join` mid-stream promotes and stops the duplicate feed, and a closed connection's ring/seq
-bookkeeping is actually removed (checked directly against `Room`'s internal state). What's left
-is entirely frontend (a "watch" entry point, a spectator-mode table render with no own-hand
-section) -- not scoped to this backend sub-task. Showing hands to spectators after a delay
-(docs/00-architecture.md §5) remains a real, un-built future enhancement, not required for a
-correct v1: showing zero private hand info is already correct.
+**Spectating: backend built.** `?spectate=true` on the WS URL gets a spectator-redacted
+`state_sync` and every subsequent broadcast, minus anything naming a seat's own concealed tiles
+([00-architecture.md §3](00-architecture.md)). Proven end to end
+(`server/tests/test_spectator.py`). What's left is entirely frontend (a "watch" entry point, a
+spectator-mode table render with no own-hand section). Showing hands to spectators after a delay
+remains a real, un-built future enhancement — not required for a correct v1.
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
@@ -341,7 +265,7 @@ milestones' `EfficiencyBot`/`FaanBot`) worth re-measuring once they exist.
 | --- | --- | --- |
 | **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer room loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
 | **Scoring disputes** — HK house rules differ from what you implemented | High | `RuleSet` from day one; show a per-pattern faan breakdown at hand end so players can see *why*; ship named presets |
-| **Efficiency bots can't win under 3-faan minimum** | **Partially mitigated (M4)** | [04-bots §4/§8](04-bots.md); `FaanBot` built and arena-proven to roughly halve-to-third `tenpai_rate_on_sub_minimum_hand` vs T1 (0.20 vs 0.32, real 1000-duplicate-set run); raw-points parity with T1 not yet fully closed (paired-diff CI `[-1.857, +0.041]`) — further self-play weight tuning against the same arena harness is the concrete next step, see [04-bots §8](04-bots.md)'s "Real proof run" |
+| **Efficiency bots can't win under 3-faan minimum** | **Partially mitigated (M4)** | [04-bots §4/§8](04-bots.md); `FaanBot` built and arena-proven to cut `tenpai_rate_on_sub_minimum_hand` well below T1's; raw-points parity not yet fully closed (paired-diff CI still includes zero) — further self-play weight tuning against the same arena harness is the concrete next step |
 | Rules scope creep (pao, aborts, regional variants) | High | Ship the default `hand_sets` (`CLASSIC + NEW_6 + NEW_18`) + `min_faan=3` only. NEW_18 is in scope, not creep: Seven Pairs lives there and the bot shanten parser requires it ([01-rules-spec §7](01-rules-spec.md)). Everything else is a config flag behind a flag. |
 | Mobile ergonomics (13 tiles on a 390px screen) | Medium | Design the mobile layout in M4, not M6. Test on a real phone early. |
 | Information leak via message size/timing | Low | Redact server-side (already). The obvious further mitigation — padding `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer — is **not done**: it's incompatible with the early-exit claim window that [00-architecture.md §4](00-architecture.md) requires for UX, since early exit necessarily reveals timing. Accepted as a known, low-severity leak rather than mitigated. |
@@ -366,9 +290,9 @@ doc, this section just records the answer and points there.
 4. **Money/stakes.** Cosmetic points only, never real stakes. Real-stakes mahjong is a licensing
    question in most jurisdictions; deciding this in writing now is free, and revisiting it after
    launch is not.
-5. **Accounts.** Guest-first, with an optional upgrade to a persistent account for rating/history.
-   No forced signup before playing. Affects M5 scope: the upgrade path is the new work, not guest
-   support itself, which needs no auth at all.
+5. **Accounts.** Guest-only, permanently — not guest-first with an account-upgrade path. No
+   account, password, email, JWT, or REST auth endpoint anywhere in this design (cut, not
+   deferred: see M5 and [00-architecture.md §2.1](00-architecture.md)).
 6. **3D/2.5D rendering.** Cut, not deferred as a live decision — DOM/CSS (see #1) makes a 3D asset
    pipeline out of scope entirely. Deferred — see [99-deferred.md](99-deferred.md).
 
