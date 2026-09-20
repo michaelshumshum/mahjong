@@ -60,40 +60,67 @@ at ~35% of the screen with huge bars, while [05-roadmap.md](05-roadmap.md) separ
 tiles on a 390px screen" as a risk to solve. With DOM, real responsive layout is free; use it
 instead of a scaled logical space.
 
-Seats are always rendered relative to **your** seat, at the bottom. Desktop/tablet (≥768px):
+Seats are always rendered relative to **your** seat, at the bottom. Wall count and prevailing
+wind live in the page header, not the table surface — dealer/turn aren't reproduced there since
+the dealer badge and turn badge on each seat header already say both. Desktop/tablet (≥768px):
 
 ```
+  header: room/scenario · wall count · prevailing wind (東南西北) · chrome toggles
+
                     ┌─────────── opponent (across) ───────────┐
-                    │  13 backs · melds right · flowers left  │
-                    │  discard pool: 6 cols × N (their side)  │
+                    │       13 backs · melds · flowers        │
   ┌─────────┐       ├─────────────────────────────────────────┤       ┌─────────┐
-  │ left    │       │                                         │       │ right   │
-  │ opponent│       │    wall count · prevailing wind ·       │       │ opponent│
-  │ vertical│       │    dealer marker · turn indicator       │       │ vertical│
-  │  strip  │       │                                         │       │  strip  │
-  │ discard │       ├─────────────────────────────────────────┤       │ discard │
-  │  pool   │       │  YOUR HAND: 13 faces, sorted, +drawn    │       │  pool   │
-  └─────────┘       │  tile held out at right, melds, flowers │       └─────────┘
-                    │  discard pool: 6 cols × N (your side)   │
+  │ left    │       │     across's discard pool (top)         │       │ right   │
+  │ opponent│       │                                          │       │ opponent│
+  │ vertical│       │  left's   ┌──────────────┐   right's    │       │ vertical│
+  │  strip  │       │  discards │   (empty —   │   discards   │       │  strip  │
+  │         │       │  (rotated)│   wall/dice  │   (rotated)  │       │         │
+  │         │       │           │   go here    │              │       │         │
+  │         │       │           │   IRL)       │              │       │         │
+  │         │       │           └──────────────┘              │       │         │
+  │         │       │        YOUR discard pool (bottom)        │       │         │
+  └─────────┘       ├─────────────────────────────────────────┤       └─────────┘
+                    │  YOUR HAND: 13 faces, sorted, +drawn    │
+                    │  tile held out at right, melds, flowers │
                     └─────────────────────────────────────────┘
 ```
 
-Discard pool geometry: **per-player**, at that player's edge of the table — resolves the earlier
-ASCII-vs-bullet conflict (the diagram showed one shared centre pool, the bullet said per-player;
-per-player wins). Matches physical play, keeps "who discarded this" legible without reading a
-shared pool, and gives each pool independent scroll/collapse behaviour on small screens (below).
+Discard pool geometry: **all four in the centre** (`.table-center`), forming a box around the
+middle of the table instead of each sitting at its own seat's edge — across on top, left/right
+along the sides (rotated, below), self on the bottom, each still keyed to its own seat so "who
+discarded this" stays legible without a shared/interleaved pool. Superseded from an earlier
+**per-player-at-the-edge** layout (each opponent's pool below their own hand strip, resolving an
+ASCII-vs-bullet conflict in an even earlier draft): edge placement put your own pool in an
+easy-to-miss spot below your hand, in the same 6-column `1fr` grid that stretched a handful of
+discards across the pool's full width, and left the centre area sitting on redundant text
+(wall/prevailing/dealer/turn, moved to the header, dealer/turn dropped) once your own pool moved
+out of it. Moving the other three in too gives the box shape a real table has, rather than only
+half of it. Each pool keeps independent scroll/collapse behaviour on small screens (below).
 
 CSS: `grid-template-areas` for the four seat regions + centre; `perspective` + `rotateX` on the
 table container for the 2.5D tilt; `transform`/`opacity` only in animated paths. No global scale
 factor — each region sizes to its own content via `clamp()`.
 
 Left/right opponent hand strips run top-to-bottom via `writing-mode: vertical-lr`/`vertical-rl`,
-not `transform: rotate()` — rotate repaints the box in place without resizing the space its
-parent grid cell reserves for it, so a rotated strip's actual (post-rotation) footprint can
-extend outside its grid area into whatever sits past its edge. `writing-mode` reflows the flex
-axes instead, so the element's own width/height already reflect the vertical footprint the grid
-cell needs to reserve. Tile art stays upright (not rotated 90°) as a result — acceptable since
-concealed backs are orientation-agnostic and exposed meld faces stay legible.
+not `transform: rotate()` on the strip itself — rotate repaints the box in place without resizing
+the space its parent grid cell reserves for it, so a rotated strip's actual (post-rotation)
+footprint can extend outside its grid area into whatever sits past its edge. `writing-mode`
+reflows the flex axes instead, so the element's own width/height already reflect the vertical
+footprint the grid cell needs to reserve. The individual tiles inside are rotated 90° to face the
+table (the physically-correct read for a side seat): each `.mini-tile` keeps an unrotated box
+already sized to the *post*-rotation (landscape) footprint, and only the tile face inside it is
+absolutely-positioned and rotated — paint-only, so it never changes what the strip/grid measure.
+Same avoid-rotating-the-sized-box principle as the strip-level decision above, just applied one
+level deeper. The left/right discard pools in the centre box reuse the identical technique (an
+unrotated `.discard-tile` box pre-sized to the landscape footprint, rotated face inside it) so
+they read parallel to that seat's own hand rather than upright like the across/self pools.
+
+Seat wind badges and the header's prevailing indicator render the wind as its Chinese character
+(東/南/西/北), not the `E`/`S`/`W`/`N` letter `seatWind()` returns internally — a screen reader
+gets the full English name via `aria-label`, since the glyph alone has no accessible name. The one
+exception is the pre-game "You're seated as East" sentence (§"Join flow" note below): that's a
+full English sentence read as a unit, where a bare glyph substituted into it would read as
+unlabelled.
 
 Below 768px (phone portrait — the roadmap's stated risk case):
 

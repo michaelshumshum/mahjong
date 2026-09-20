@@ -47,6 +47,10 @@
 	import type { TileCode } from '$lib/table/tile-code';
 
 	const WIND_LABEL: Record<string, string> = { E: 'East', S: 'South', W: 'West', N: 'North' };
+	// table-view wind glyphs (revamp: seat/prevailing badges show these instead of the E/S/W/N
+	// letter) — WIND_LABEL above stays in use for the one full-sentence spot ("You're seated as
+	// East") where a bare glyph would read as unlabelled to a screen reader.
+	const WIND_CHAR: Record<string, string> = { E: '東', S: '南', W: '西', N: '北' };
 	const SEAT_WINDS = ['E', 'S', 'W', 'N'] as const;
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
@@ -610,16 +614,16 @@
 {#snippet seatRing(you: Seat | null)}
 	<div class="seat-ring" aria-hidden="true">
 		<div class="seat-ring-pos seat-ring-pos--across">
-			{@render seatRingSlot(you !== null ? seatWind(((you + 2) % 4) as Seat) : 'Open')}
+			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(((you + 2) % 4) as Seat)] : 'Open')}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--left">
-			{@render seatRingSlot(you !== null ? seatWind(((you + 3) % 4) as Seat) : 'Open')}
+			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(((you + 3) % 4) as Seat)] : 'Open')}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--right">
-			{@render seatRingSlot(you !== null ? seatWind(((you + 1) % 4) as Seat) : 'Open')}
+			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(((you + 1) % 4) as Seat)] : 'Open')}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
-			{@render seatRingSlot(you !== null ? seatWind(you) : 'Open', you !== null)}
+			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(you)] : 'Open', you !== null)}
 		</div>
 	</div>
 {/snippet}
@@ -632,7 +636,9 @@
 	>
 		<header class="seat-meta">
 			<span class="seat-name">{seat.name}</span>
-			<span class="seat-wind" title="seat wind">{seatWind(seat.seat)}</span>
+			<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat)]} wind"
+				>{WIND_CHAR[seatWind(seat.seat)]}</span
+			>
 			{#if seat.seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
 			{#if seat.seat === gameState.turn}<span class="turn-badge" title="Current turn">turn</span
 				>{/if}
@@ -671,17 +677,24 @@
 				</div>
 			{/if}
 		</div>
-
-		<div
-			class="discard-pool discard-pool--{position}"
-			role="list"
-			aria-label="{seat.name}'s discards"
-		>
-			{#each seat.discards as code, i (i)}
-				<div class="discard-tile" role="listitem"><TileFace {code} /></div>
-			{/each}
-		</div>
 	</section>
+{/snippet}
+
+<!-- All four discard pools live together in the centre (docs/03-frontend.md §3's "Discard pool
+	geometry"), forming a box around the middle of the table instead of sitting at each seat's own
+	edge -- matches the physical layout of discards piled in front of each player, in the shared
+	space between hands. `position` picks the box side and, for left/right, the rotation that keeps
+	each pool parallel to that seat's own (already-rotated) hand. -->
+{#snippet centerDiscardPool(
+	seat: MockSeatState,
+	position: 'across' | 'left' | 'right' | 'self',
+	ariaLabel: string
+)}
+	<div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
+		{#each seat.discards as code, i (i)}
+			<div class="discard-tile" role="listitem"><TileFace {code} /></div>
+		{/each}
+	</div>
 {/snippet}
 
 {#if tableReady}
@@ -710,6 +723,11 @@
 				</p>
 			{/if}
 
+			<div class="table-status" aria-label="Table status">
+				<span>Wall <strong>{gameState.wallCount}</strong></span>
+				<span>Prevailing <strong>{WIND_CHAR[gameState.prevailing]}</strong></span>
+			</div>
+
 			<div class="chrome-toggles">
 				<button type="button" onclick={() => (showScoreSheet = !showScoreSheet)}>Score sheet</button
 				>
@@ -729,17 +747,19 @@
 				{@render opponentRegion(seatAt(3), 'left')}
 				{@render opponentRegion(seatAt(1), 'right')}
 
-				<div class="center-info" aria-label="Table status">
-					<p class="wall-count">Wall <strong>{gameState.wallCount}</strong></p>
-					<p>Prevailing <strong>{WIND_LABEL[gameState.prevailing]}</strong></p>
-					<p>Dealer <strong>{gameState.seats[gameState.dealer].name}</strong></p>
-					<p>Turn <strong>{gameState.seats[gameState.turn].name}</strong></p>
+				<div class="table-center">
+					{@render centerDiscardPool(seatAt(2), 'across', `${seatAt(2).name}'s discards`)}
+					{@render centerDiscardPool(seatAt(3), 'left', `${seatAt(3).name}'s discards`)}
+					{@render centerDiscardPool(seatAt(1), 'right', `${seatAt(1).name}'s discards`)}
+					{@render centerDiscardPool(seatAt(0), 'self', 'Your discards')}
 				</div>
 
 				<section class="seat-region seat-region--self" aria-label="Your hand">
 					<header class="seat-meta">
 						<span class="seat-name">{seatAt(0).name}</span>
-						<span class="seat-wind" title="seat wind">{seatWind(seatAt(0).seat)}</span>
+						<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seatAt(0).seat)]} wind"
+							>{WIND_CHAR[seatWind(seatAt(0).seat)]}</span
+						>
 						{#if seatAt(0).seat === gameState.dealer}<span class="dealer-badge" title="Dealer"
 								>D</span
 							>{/if}
@@ -806,12 +826,6 @@
 								{/each}
 							</div>
 						{/if}
-					</div>
-
-					<div class="discard-pool discard-pool--self" role="list" aria-label="Your discards">
-						{#each seatAt(0).discards as code, i (i)}
-							<div class="discard-tile" role="listitem"><TileFace {code} /></div>
-						{/each}
 					</div>
 				</section>
 			</div>
@@ -1358,6 +1372,22 @@
 		color: var(--color-text-muted);
 	}
 
+	// wall/prevailing: was `.center-info` on the table surface itself (see `.table-center`
+	// below for what took its place there) -- dealer/turn moved with it but aren't reproduced
+	// here, since `.dealer-badge`/`.turn-badge` on each seat already say that.
+	.table-status {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+		font-variant-numeric: tabular-nums;
+
+		strong {
+			color: var(--color-text);
+		}
+	}
+
 	.table-tilt {
 		flex: 1;
 		min-height: 0;
@@ -1524,15 +1554,48 @@
 		}
 	}
 
-	.discard-pool {
-		display: grid;
-		grid-template-columns: repeat(6, minmax(20px, 1fr));
-		gap: 2px;
-		max-width: 14rem;
+	// tiles themselves rotated 90° to face the table, same physical read as a real side seat.
+	// The mismatch that ruled out `transform: rotate()` on the *strip* above is still real, so
+	// it isn't reused here at the tile level either: `.mini-tile` keeps its normal (unrotated)
+	// box for layout purposes, already sized to the rotated footprint (width/height swapped from
+	// the portrait default) — the swap is what the grid/flex ancestors measure. Only the
+	// `.tile-face` inside is rotated, absolutely positioned off that stable box so the rotation
+	// is paint-only and never changes what its ancestors reserve space for.
+	.seat-hand-strip--left .mini-tile,
+	.seat-hand-strip--right .mini-tile {
+		@include layout.tablet-up {
+			position: relative;
+			width: clamp(24px, 4vw, 36px);
+			height: calc(clamp(24px, 4vw, 36px) * 3 / 4);
+		}
 	}
 
-	.discard-pool--self {
-		max-width: 20rem;
+	.seat-hand-strip--left .mini-tile :global(.tile-face) {
+		@include layout.tablet-up {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			height: clamp(24px, 4vw, 36px);
+			transform: translate(-50%, -50%) rotate(90deg);
+		}
+	}
+
+	.seat-hand-strip--right .mini-tile :global(.tile-face) {
+		@include layout.tablet-up {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			height: clamp(24px, 4vw, 36px);
+			transform: translate(-50%, -50%) rotate(-90deg);
+		}
+	}
+
+	.discard-pool {
+		display: grid;
+		grid-template-columns: repeat(6, minmax(20px, 28px));
+		justify-content: start;
+		gap: 2px;
+		max-width: 14rem;
 	}
 
 	.discard-tile {
@@ -1543,21 +1606,114 @@
 		height: 100%;
 	}
 
-	.center-info {
+	// all four discard pools live in the centre, forming a box around the middle instead of each
+	// sitting at its own seat's table edge (docs/03-frontend.md §3 "Discard pool geometry") --
+	// matches the physical pile-in-front-of-you layout, and the space is free now that
+	// wall/prevailing moved up to `.table-status` and dealer/turn dropped out entirely
+	// (`.dealer-badge`/`.turn-badge` on the seat headers already say both). Below tablet-up
+	// there's no room for a literal box, so the four pools just stack.
+	.table-center {
 		grid-area: center;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
-		gap: var(--space-1);
-		text-align: center;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-		font-variant-numeric: tabular-nums;
+		gap: var(--space-2);
+
+		@include layout.tablet-up {
+			display: grid;
+			grid-template-areas:
+				'.    across .'
+				'left .      right'
+				'.    self   .';
+			grid-template-columns: auto 1fr auto;
+			grid-template-rows: auto 1fr auto;
+			place-items: center;
+		}
 	}
 
-	.center-info strong {
-		color: var(--color-text);
+	.table-center .discard-pool--across {
+		@include layout.tablet-up {
+			grid-area: across;
+		}
+	}
+
+	.table-center .discard-pool--left {
+		@include layout.tablet-up {
+			grid-area: left;
+		}
+	}
+
+	.table-center .discard-pool--right {
+		@include layout.tablet-up {
+			grid-area: right;
+		}
+	}
+
+	.table-center .discard-pool--self {
+		@include layout.tablet-up {
+			grid-area: self;
+		}
+	}
+
+	// tablet-up only: below that, the phone-collapse block further down (`.discard-pool`'s
+	// horizontal-scroll override) needs to win, and it matches these pools the same as any other
+	// via the plain `.discard-pool` class -- gating this to tablet-up keeps that override's
+	// lower-specificity `.discard-pool` selector from silently losing to these on phone.
+	.table-center .discard-pool {
+		@include layout.tablet-up {
+			grid-template-columns: repeat(6, minmax(24px, 32px));
+			max-width: 16rem;
+		}
+	}
+
+	.table-center .discard-tile {
+		@include layout.tablet-up {
+			height: clamp(26px, 4vw, 36px);
+		}
+	}
+
+	// left/right box pools rotated to read parallel to that seat's own already-rotated hand strip
+	// -- same box-stays-put/only-the-face-rotates technique as `.seat-hand-strip--left/--right
+	// .mini-tile` above (paint-only rotation, never changes what the grid measures), reused here
+	// for a grid of discards instead of a flex row of hand tiles. Declared after the shared
+	// `.table-center .discard-pool`/`.discard-tile` rules above so these equal-specificity
+	// overrides win on `grid-template-columns`/height.
+	.table-center .discard-pool--left,
+	.table-center .discard-pool--right {
+		@include layout.tablet-up {
+			grid-template-columns: none;
+			grid-template-rows: repeat(6, minmax(24px, 32px));
+			grid-auto-flow: column;
+		}
+	}
+
+	.table-center .discard-pool--left .discard-tile,
+	.table-center .discard-pool--right .discard-tile {
+		@include layout.tablet-up {
+			position: relative;
+			width: clamp(26px, 4vw, 36px);
+			height: calc(clamp(26px, 4vw, 36px) * 3 / 4);
+		}
+	}
+
+	.table-center .discard-pool--left .discard-tile :global(.tile-face) {
+		@include layout.tablet-up {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			height: clamp(26px, 4vw, 36px);
+			transform: translate(-50%, -50%) rotate(90deg);
+		}
+	}
+
+	.table-center .discard-pool--right .discard-tile :global(.tile-face) {
+		@include layout.tablet-up {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			height: clamp(26px, 4vw, 36px);
+			transform: translate(-50%, -50%) rotate(-90deg);
+		}
 	}
 
 	.your-hand {
