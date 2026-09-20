@@ -10,8 +10,8 @@ Answers [05-roadmap.md §5](05-roadmap.md) open question #1 (rendering): **DOM/C
 │ SvelteKit app (all DOM/CSS — no canvas)                      │
 │                                                                │
 │  Routes                │  Table route                        │
-│  /            landing  │  ┌──────────────────────────────┐   │
-│  /lobby       rooms    │  │ table surface (DOM/CSS)       │   │
+│  /            lobby    │  ┌──────────────────────────────┐   │
+│  /demo        dev demos│  │ table surface (DOM/CSS)       │   │
 │  /table/[id]  game     │  │   felt, wall, 4 hands, melds, │   │
 │  /replay/[id] viewer   │  │   discard pools, dice, hints  │   │
 │  /profile     stats    │  └──────────────────────────────┘   │
@@ -401,7 +401,7 @@ Rules:
 `web/Dockerfile` builds with `pnpm build` and runs `node build` — adapter-node, so SvelteKit SSR
 is on by default for every route unless opted out. Posture:
 
-- `/`, `/lobby`, `/profile` — SSR stays on; cheap, no live-socket dependency.
+- `/`, `/demo`, `/profile` — SSR stays on; cheap, no live-socket dependency.
 - `/table/[id]`, `/replay/[id]` — `export const ssr = false` in `+page.ts`. Auth token, WebSocket
   connection, and per-seat redacted state are all client-only; pre-rendering a stale or empty
   table just to hydrate over it a moment later has no SEO benefit and is wasted work.
@@ -487,7 +487,7 @@ cannot exist before `Room.started`). Good enough for v1; a real `started`/seat-f
 wire would be a cleaner fix, filed as a gap here rather than a roadmap doc since it's small enough
 to fold into whoever next touches `state_sync`'s payload.
 
-**Practice mode entry point (M4.5, `docs/05-roadmap.md`).** `/lobby` has a third panel, "Practice,"
+**Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) has a third panel, "Practice,"
 alongside create/join: its "Play vs bots" button generates a room id the same way "Create room"
 does and navigates straight to `/table/<id>?practice=1` — no invite code to share, so it skips the
 create/copy step entirely. `?practice=1` is this route's own query param, unrelated in spelling to

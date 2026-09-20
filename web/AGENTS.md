@@ -6,7 +6,7 @@ SvelteKit 2 + Svelte 5 (runes). No canvas — the table is DOM, styled with SCSS
 ## Layout
 
 ```
-src/routes/     lobby, table, replay, profile
+src/routes/     lobby (root), demo, table, replay, profile
 src/lib/net/    WebSocket client, seq tracking, reducer, generated protocol types
 src/lib/game/   client state store ($state)
 src/lib/table/  table-surface Svelte components (DOM, not canvas)

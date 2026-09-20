@@ -195,7 +195,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();
-		await page.goto(`${BASE}/lobby`, { waitUntil: 'networkidle' });
+		await page.goto(BASE, { waitUntil: 'networkidle' });
 		await page.getByRole('button', { name: 'Play vs bots' }).click();
 
 		await expect(page).toHaveURL(/\/table\/[A-Z0-9]+\?practice=1$/);

@@ -1123,7 +1123,7 @@
 	}
 
 	// pre-game states (connecting / join / waiting-for-players, live mode only) -- same
-	// centered-panel chrome as the lobby's own `.panel` (routes/lobby/+page.svelte), not a new
+	// centered-panel chrome as the lobby's own `.panel` (routes/+page.svelte), not a new
 	// visual language: panel-elevated, --color-surface, the same button/code-pill vocabulary.
 	.pretable-page {
 		display: flex;

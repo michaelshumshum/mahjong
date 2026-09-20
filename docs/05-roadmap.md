@@ -47,7 +47,7 @@ mahjong/
 │                                # test_payout.py instead
 ├── web/
 │   └── src/
-│       ├── routes/             # /, /lobby, /table/[id], /replay/[id], /profile
+│       ├── routes/             # / (lobby), /demo, /table/[id], /replay/[id], /profile
 │       └── lib/
 │           ├── net/            # socket.ts, reducer.ts, protocol.d.ts (GENERATED)
 │           ├── game/           # store.svelte.ts

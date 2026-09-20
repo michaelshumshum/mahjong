@@ -25,8 +25,8 @@ const BASE = `http://localhost:${PORT}`;
 // README), not exhaustive. Add a page here when it becomes a meaningful, stable part of the
 // app; don't add every mock scenario or every intermediate dev-toolbar state.
 const PAGES = [
-	{ name: 'home', url: '/' },
-	{ name: 'lobby', url: '/lobby' },
+	{ name: 'lobby', url: '/' },
+	{ name: 'demo', url: '/demo' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a room id (docs/03-frontend.md §6) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
