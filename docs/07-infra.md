@@ -195,8 +195,8 @@ once per pipeline instead of 2-3x or needing an artifact handoff between jobs.
 | `pnpm check` (svelte-check) | hard |
 | `pnpm test` (vitest + Playwright) | hard |
 
-**Pre-commit** (`lefthook.yml`): alongside the existing `web-lint`/`web-format` (oxlint/oxfmt on
-staged files) and `server` (ruff via `.pre-commit-config.yaml`) jobs, `web-typecheck` runs `pnpm
-check` (svelte-check) — it inherently checks the whole project graph, not just staged files,
-unlike oxlint/oxfmt's `{staged_files}`, so it's slower and there's no meaningful way to scope it
-down without producing wrong (missing-context) results.
+**Pre-commit** (`lefthook.yml`): `web-lint`/`web-format` (oxlint/oxfmt on staged files),
+`server-format`/`server-check` (ruff on staged `.py` files), and `web-typecheck` (pnpm check,
+whole project) — svelte-check inherently checks the whole graph, not just staged files, so it's
+slower and there's no meaningful way to scope it down without producing wrong (missing-context)
+results.
