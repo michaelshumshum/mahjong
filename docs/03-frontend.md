@@ -306,9 +306,15 @@ store's own `seq` field is just a read-model mirror of whatever the socket alrea
   mid-connection is the same request). `status` exposes `'resyncing'` while this is in flight.
 - **Reconnect**: unexpected closes schedule a reconnect with exponential backoff + jitter
   (`min(250ms * 2^attempt, 10s) ± 20%`, docs/02-protocol.md §8); `connect(resume?)` also accepts
-  caller-supplied `{lastSeq, seat}` to seed a fresh instance (the page-reload case — this project
-  doesn't yet persist those across a reload itself, e.g. to `localStorage`; a natural next step,
-  not done here since nothing currently needs it).
+  caller-supplied `{lastSeq, seat}` to seed a fresh instance (the page-reload case). `+page.svelte`
+  persists this seat per room (`lib/ui/settings-storage.ts`'s `saveSeatForRoom`/`loadSeatForRoom`,
+  `mahjong:seat:v1:<roomId>`) the moment `state_sync` confirms one, and feeds it back into
+  `connect()` on mount — without this, a fresh page load has `seat: null` and falls into the
+  "Sit down" screen's `join`, which fails with `room_full` once all four seats are already bound
+  to this game's players, the same seat included. `lastSeq` is intentionally not persisted:
+  omitting it just means a full `state_sync` instead of ring-buffer replay (docs/02-protocol.md
+  §5's "too old / new session" branch), which a page reload needs anyway since the in-memory
+  reducer state is gone.
 
 ### Settings persistence (`autoArm`/`clientPrefs`)
 

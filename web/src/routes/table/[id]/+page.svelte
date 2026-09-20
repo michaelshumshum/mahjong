@@ -30,9 +30,11 @@
 		loadAutoArm,
 		loadClientPrefs,
 		loadDisplayName,
+		loadSeatForRoom,
 		saveAutoArm,
 		saveClientPrefs,
-		saveDisplayName
+		saveDisplayName,
+		saveSeatForRoom
 	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
@@ -156,13 +158,24 @@
 				pushToast(`Server error: ${event.d.message}`);
 			}
 		});
-		socket.connect();
+		// a page reload builds a fresh MahjongSocket with no memory of which seat this browser
+		// held -- resume it from localStorage so `hello{seat}` reclaims the seat (docs/02
+		// -protocol.md §5) instead of falling into the "Sit down" screen's `join`, which fails
+		// with `room_full` once all four seats are already bound to this game's players.
+		const persistedSeat = loadSeatForRoom(roomId);
+		socket.connect(persistedSeat !== null ? { seat: persistedSeat } : undefined);
 		return () => {
 			offEvent();
 			store.destroy();
 			socket.disconnect();
 			liveStore = null;
 		};
+	});
+
+	// persist the seat the moment the server confirms it, so a later reload can resume it.
+	$effect(() => {
+		const seat = liveStore?.state.seat;
+		if (seat !== null && seat !== undefined) saveSeatForRoom(roomId, seat);
 	});
 
 	// sitting down implies readiness -- no strategic reason to delay `ready` behind a second
