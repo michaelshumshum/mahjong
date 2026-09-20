@@ -1627,6 +1627,16 @@
 			font: inherit;
 			cursor: pointer;
 			@include buttons.btn-primary;
+
+			// `btn-primary`'s `:active` press (`translateY(3px)`) moves the button out from under
+			// a held-then-released pointer before mouseup's hit-test runs, so mouseup/click lands
+			// on this flex row's own `<div>` instead of the button -- Svelte's click delegation
+			// walks up from the real event target and never reaches the button's handler, so the
+			// declare action (win/kong) silently never sends. No visible-position feedback lost:
+			// `:hover`'s background swap still shows the press.
+			&:active:not(:disabled) {
+				transform: none;
+			}
 		}
 	}
 
