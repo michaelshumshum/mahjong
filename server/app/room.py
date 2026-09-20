@@ -173,14 +173,6 @@ _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 
 _MAX_NAME_LENGTH = 24  # guest display name cap (M5, docs/02-protocol.md §2 `join.name`)
 
-# chat (M5, docs/02-protocol.md §2/§3 `chat`) -- a 4-player table's chat is not a firehose, so a
-# small fixed window is plenty: at most 5 messages per 10 real seconds, per seat.
-_CHAT_RATE_LIMIT = 5
-_CHAT_RATE_WINDOW_MS = 10_000
-# `_normalize_name`'s guest-field precedent (trim/cap/default, never hard-reject) applies here
-# too: an over-length message is truncated, not rejected.
-_CHAT_MAX_LEN = 200
-
 # M4.5 practice-mode bot seats (`_bind_bot_seat`) get a display name from their real tier
 # (`bots/worker.py`'s `BOT_TIERS`), not a generic "Bot" placeholder -- matches the class a
 # curious player could actually go look up.
@@ -314,11 +306,6 @@ class SeatBinding:
     `JoinPayload`) or `_bind_bot_seat` and never touched again: a `hello` reconnect doesn't
     resend it (02-protocol.md §2/§5 -- the server already has it), so there is nothing for
     `reconnect()` to update on this field.
-
-    `chat_timestamps` (M5, `Room.send_chat`) is this seat's chat rate-limit bookkeeping: a
-    sliding window of the send times (ms) of its most recent, still-in-window messages. Small
-    and per-seat like `idempotency`, so it lives here rather than a parallel structure keyed by
-    seat elsewhere.
     """
 
     session_id: str
@@ -330,7 +317,6 @@ class SeatBinding:
     auto_pass_chow: bool = False
     idempotency: IdempotencyCache = field(default_factory=IdempotencyCache)
     turn_timeout_strikes: int = 0
-    chat_timestamps: deque[int] = field(default_factory=deque)
 
 
 @dataclass(frozen=True)
@@ -929,43 +915,6 @@ class Room:
         "broadcast reaches the ring buffer either way" convention every other broadcast here --
         `seat_state`, etc. -- already follows)."""
         self._broadcast_wire({"t": "server_shutdown", "deadline_ts": deadline_ts})
-
-    def send_chat(self, seat: int, text: str, *, now_ms: int | None = None) -> None:
-        """`chat` (M5, docs/02-protocol.md §2/§3) -- broadcast to every bound seat, this seat
-        included, mirroring `broadcast_server_shutdown`'s direct `_broadcast_wire` pattern: chat
-        isn't game state, so it never goes through `mahjong_core`'s `reduce()`/event system.
-        `name` is this seat's resolved `SeatBinding.name` (`_names_tuple()`'s same per-seat
-        resolution), so a chat bubble never needs a second lookup against `state_sync.names`.
-
-        **Rate limit:** at most `_CHAT_RATE_LIMIT` messages per `_CHAT_RATE_WINDOW_MS` sliding
-        window, tracked on `binding.chat_timestamps`. A seat over the limit is silently
-        dropped -- no broadcast -- rather than an `ack{ok:false, error:...}`: `_dispatch`'s own
-        docstring already establishes "accepted for processing, not guaranteed delivered" as
-        this server's ack contract for a well-formed-but-currently-not-actionable command (a
-        legal-shaped `Discard` that isn't this seat's turn gets the same silent drop); a chat
-        message that arrives too fast fits that exact mold, not a new error surface. `text` over
-        `_CHAT_MAX_LEN` is truncated, not rejected, for the same "low-stakes guest field, never
-        hard-reject" reason `_normalize_name` already applies to `join.name`.
-
-        `now_ms` lets a test control the clock directly (this project's established
-        no-real-`sleep()` convention -- `docs/05-roadmap.md`/test modules use a zero-length
-        window for timer tests; chat's window is a fixed 10s, too long for that trick, so the
-        clock itself is the injected value instead) -- defaults to the real wall clock.
-        """
-        binding = self.seat_bindings[seat]
-        if binding is None:
-            return
-        now = now_ms if now_ms is not None else _now_ms()
-        timestamps = binding.chat_timestamps
-        cutoff = now - _CHAT_RATE_WINDOW_MS
-        while timestamps and timestamps[0] <= cutoff:
-            timestamps.popleft()
-        if len(timestamps) >= _CHAT_RATE_LIMIT:
-            return
-        timestamps.append(now)
-        self._broadcast_wire(
-            {"t": "chat", "seat": seat, "text": text[:_CHAT_MAX_LEN], "name": binding.name}
-        )
 
     def state_sync_wire(self, seat: int | None) -> dict[str, Any]:
         """Full redacted snapshot for `seat` (02-protocol.md §3 `state_sync`) -- sent on join,

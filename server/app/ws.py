@@ -118,7 +118,7 @@ def _get_or_create_room(room_id: str, seed: int | None, practice: bool) -> Room:
 
 class _IdempotentMessage(Protocol):
     """Structural type for `_dispatch`'s `msg` param -- every post-join `ClientMessage` variant
-    (`Ready`/`Discard`/`Claim`/`Declare`/`Auto`/`Chat`/`HandEndAck`) has an `id` and a `d`
+    (`Ready`/`Discard`/`Claim`/`Declare`/`Auto`/`HandEndAck`) has an `id` and a `d`
     payload model, but they share no common base beyond `proto.Envelope`, which doesn't type
     `d` at all (each subclass narrows it separately)."""
 
@@ -249,9 +249,6 @@ class Session:
         if isinstance(message, proto.Auto):
             await self._dispatch(message, self._apply_auto)
             return
-        if isinstance(message, proto.Chat):
-            await self._dispatch(message, self._apply_chat)
-            return
         # every remaining `AnyMessage` member is server->client (Pong/Error/StateSync/...) --
         # a client sending one parses successfully and is ignored, not rejected (same lenient
         # wrong-direction handling M0's own comment described).
@@ -313,7 +310,7 @@ class Session:
         `ok=True` here means "accepted for processing", not "guaranteed legal" -- `Room`'s own
         `_authorize` silently drops a well-formed but currently-illegal `Command` (unchanged
         M2/M3 behavior); this layer's job is the `id`/ack contract, not re-deriving game
-        legality `Room` already owns. `Discard`/`Ready`/`Auto`/`Chat` are always structurally
+        legality `Room` already owns. `Discard`/`Ready`/`Auto` are always structurally
         applyable; `Claim`/`Declare` can fail to even construct an `Action` (an unknown
         `window_id`, an unmatched disambiguator) and get `ok=False, error="illegal"` without
         ever reaching `Room.submit`.
@@ -350,13 +347,6 @@ class Session:
 
     def _apply_auto(self, seat: int, d: proto.AutoPayload) -> tuple[bool, str | None]:
         self.room.set_auto(seat, no_calls=d.no_calls, auto_pass_chow=d.auto_pass_chow)
-        return True, None
-
-    def _apply_chat(self, seat: int, d: proto.ChatPayload) -> tuple[bool, str | None]:
-        # `Room.send_chat` broadcasts (or silently rate-limit-drops -- see its own docstring)
-        # -- `ok=True` either way, same "accepted for processing" ack contract `_dispatch`'s
-        # docstring already documents for every other intent here.
-        self.room.send_chat(seat, d.text)
         return True, None
 
     def _apply_claim(self, seat: int, d: proto.ClaimPayload) -> tuple[bool, str | None]:

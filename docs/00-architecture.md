@@ -233,7 +233,7 @@ possible, with two deliberate, documented differences:
 
 Once registered, a spectator gets the same spectator-redacted `state_sync` (`seat_view(state,
 None)`, §5) a fresh `join` gets, then every subsequent broadcast (`_broadcast_wire` — `seat_
-state`, `chat`, `hand_start`, `server_shutdown`, `score`) and every `redact_event(state, None,
+state`, `hand_start`, `server_shutdown`, `score`) and every `redact_event(state, None,
 event)`-redacted event `_publish` produces, plus the public half of `turn` (`{seat, phase,
 deadline_ts}`, never `legal`). `claim_offer` is deliberately never sent to spectators — unlike
 every other synthesized event, it would name the offered seat's own concealed tiles used to

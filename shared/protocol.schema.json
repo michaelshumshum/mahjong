@@ -170,154 +170,6 @@
       "title": "AutoPayload",
       "type": "object"
     },
-    "Chat": {
-      "additionalProperties": false,
-      "properties": {
-        "v": {
-          "const": 1,
-          "default": 1,
-          "title": "V",
-          "type": "integer"
-        },
-        "seq": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Seq"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Id"
-        },
-        "ts": {
-          "title": "Ts",
-          "type": "integer"
-        },
-        "t": {
-          "const": "chat",
-          "default": "chat",
-          "title": "T",
-          "type": "string"
-        },
-        "d": {
-          "$ref": "#/$defs/ChatPayload"
-        }
-      },
-      "required": [
-        "ts",
-        "d"
-      ],
-      "title": "Chat",
-      "type": "object"
-    },
-    "ChatEvent": {
-      "additionalProperties": false,
-      "description": "Server->client rebroadcast of a chat message. Reuses the `chat` wire tag the client\nintent (`Chat`, above) already occupies -- same dual-tag pattern the module docstring\ndocuments for `discard`: `ClientMessage`/`ServerMessage` are separate discriminated unions,\nand the two payloads have disjoint required fields (`{text}` vs `{seat, text, name}`) under\n`extra=\"forbid\"`, so `AnyMessage`'s smart-union validation never has a genuine ambiguity.",
-      "properties": {
-        "v": {
-          "const": 1,
-          "default": 1,
-          "title": "V",
-          "type": "integer"
-        },
-        "seq": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Seq"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Id"
-        },
-        "ts": {
-          "title": "Ts",
-          "type": "integer"
-        },
-        "t": {
-          "const": "chat",
-          "default": "chat",
-          "title": "T",
-          "type": "string"
-        },
-        "d": {
-          "$ref": "#/$defs/ChatEventPayload"
-        }
-      },
-      "required": [
-        "ts",
-        "d"
-      ],
-      "title": "ChatEvent",
-      "type": "object"
-    },
-    "ChatEventPayload": {
-      "additionalProperties": false,
-      "description": "Broadcast form of a chat message (docs/02-protocol.md \u00a73 `chat`). `name` is the sender's\nresolved guest display name -- `Room._names_tuple()`'s existing per-seat resolution, carried\nhere so a chat bubble doesn't need a second lookup against `state_sync.names`. No timestamp\nfield beyond the envelope's own `ts` -- same convention `server_shutdown` already uses.",
-      "properties": {
-        "seat": {
-          "title": "Seat",
-          "type": "integer"
-        },
-        "text": {
-          "title": "Text",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        }
-      },
-      "required": [
-        "seat",
-        "text",
-        "name"
-      ],
-      "title": "ChatEventPayload",
-      "type": "object"
-    },
-    "ChatPayload": {
-      "additionalProperties": false,
-      "properties": {
-        "text": {
-          "title": "Text",
-          "type": "string"
-        }
-      },
-      "required": [
-        "text"
-      ],
-      "title": "ChatPayload",
-      "type": "object"
-    },
     "Claim": {
       "additionalProperties": false,
       "properties": {
@@ -2690,7 +2542,6 @@
       "discriminator": {
         "mapping": {
           "auto": "#/$defs/Auto",
-          "chat": "#/$defs/Chat",
           "claim": "#/$defs/Claim",
           "declare": "#/$defs/Declare",
           "discard": "#/$defs/Discard",
@@ -2728,9 +2579,6 @@
           "$ref": "#/$defs/Auto"
         },
         {
-          "$ref": "#/$defs/Chat"
-        },
-        {
           "$ref": "#/$defs/HandEndAck"
         }
       ]
@@ -2739,7 +2587,6 @@
       "discriminator": {
         "mapping": {
           "ack": "#/$defs/Ack",
-          "chat": "#/$defs/ChatEvent",
           "claim_offer": "#/$defs/ClaimOffer",
           "claim_resolved": "#/$defs/ClaimResolved",
           "deal": "#/$defs/Deal",
@@ -2815,9 +2662,6 @@
         },
         {
           "$ref": "#/$defs/ServerShutdown"
-        },
-        {
-          "$ref": "#/$defs/ChatEvent"
         },
         {
           "$ref": "#/$defs/Ack"

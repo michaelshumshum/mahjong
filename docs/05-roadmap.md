@@ -212,8 +212,8 @@ cookie) so it survives a reload, and sent once at `join` (docs/02-protocol.md §
 client-asserted field on the message that actually claims a seat for the first time; a later
 `hello{seat}` reconnect never resends it — see docs/00-architecture.md §2.1's note on why `join`,
 not `hello`, is the right message). Matchmaking, private rooms with invite codes, mid-game bot
-takeover for disconnects, spectating, chat with canned phrases (spectating and chat backend
-built — see below; frontend wiring still open for both, matchmaking/invite codes not started).
+takeover for disconnects, spectating (spectating backend built — see below; frontend wiring
+still open, matchmaking/invite codes not started).
 
 This is a deliberate rescope, not a placeholder for auth done later: `docs/00-architecture.md
 §2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
@@ -270,24 +270,6 @@ section) -- not scoped to this backend sub-task. Showing hands to spectators aft
 (docs/00-architecture.md §5) remains a real, un-built future enhancement, not required for a
 correct v1: showing zero private hand info is already correct.
 
-**Chat: backend built.** `chat{text}` (§2) rebroadcasts to every bound seat, sender included, as
-a server `chat{seat, text, name}` event (`docs/02-protocol.md §3`) -- direct `_broadcast_wire`,
-mirroring `broadcast_server_shutdown`'s pattern, since chat isn't game state and never goes
-through `reduce()`. `name` is `Room._names_tuple()`'s existing per-seat resolution, so a chat
-bubble never needs a second lookup against `state_sync.names`. Rate limit: 5 messages / 10s
-sliding window per seat (`SeatBinding.chat_timestamps`); over the limit is silently dropped (ack
-stays `ok:true`) rather than an `ack{ok:false}` -- `_dispatch`'s own ack contract already treats
-"accepted for processing, not guaranteed delivered" as the norm for a well-formed-but-currently-
-not-actionable command, and a flooding chat message fits that mold rather than needing a new
-error surface. `text` over 200 chars is truncated, not rejected, matching `join.name`'s
-never-hard-reject precedent for a low-stakes guest field. Not replayed on reconnect/resync --
-live-only, no persistent history. What's left is entirely frontend: `web/src/lib/ui/Chat.svelte`
-already sends `socket.chat(...)` and locally echoes the sender's own message
-(`+page.svelte`'s `sendChat`) -- now redundant with the server's own broadcast reaching the
-sender too, so that local echo should come out once the client wires up the new `chat` event,
-or a canned phrase would double-appear in the sender's own scrollback. Not scoped to this
-backend sub-task.
-
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
 (reusing the client reducer). Sound. Ruleset presets. Stats, rating, hand history. i18n
@@ -317,7 +299,7 @@ Per-milestone reality:
 - **M5 multiplayer — 1–2 weeks, not 3–4.** The earlier estimate priced in magic-link auth (email
   infrastructure and deliverability — a different kind of work than anything in M0–M4). Guest-only
   identity (a client-chosen name in `localStorage`, no server-side account) cuts that out
-  entirely; what's left — matchmaking, invite codes, bot takeover, spectating, chat — is all in
+  entirely; what's left — matchmaking, invite codes, bot takeover, spectating — is all in
   the same shape as work already done in M0–M4.
 
 If this is evenings-and-weekends work rather than full-time, the 12–18 month figure already

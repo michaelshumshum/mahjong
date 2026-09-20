@@ -148,12 +148,6 @@ class AutoPayload(BaseModel):
     auto_pass_chow: bool | None = None
 
 
-class ChatPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    text: str
-
-
 class Join(Envelope):
     t: Literal["join"] = "join"
     d: JoinPayload
@@ -187,11 +181,6 @@ class Declare(Envelope):
 class Auto(Envelope):
     t: Literal["auto"] = "auto"
     d: AutoPayload
-
-
-class Chat(Envelope):
-    t: Literal["chat"] = "chat"
-    d: ChatPayload
 
 
 # --- server -> client events (docs/02-protocol.md §3) ------------------------------------------
@@ -363,19 +352,6 @@ class SeatStatePayload(BaseModel):
     name: str | None = None
 
 
-class ChatEventPayload(BaseModel):
-    """Broadcast form of a chat message (docs/02-protocol.md §3 `chat`). `name` is the sender's
-    resolved guest display name -- `Room._names_tuple()`'s existing per-seat resolution, carried
-    here so a chat bubble doesn't need a second lookup against `state_sync.names`. No timestamp
-    field beyond the envelope's own `ts` -- same convention `server_shutdown` already uses."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    seat: int
-    text: str
-    name: str
-
-
 class ServerShutdownPayload(BaseModel):
     """docs/00-architecture.md §8.1 step 2 -- broadcast once a graceful-shutdown drain starts,
     so clients can show a "reconnect shortly" banner instead of reading the eventual dropped
@@ -470,17 +446,6 @@ class SeatState(Envelope):
     d: SeatStatePayload
 
 
-class ChatEvent(Envelope):
-    """Server->client rebroadcast of a chat message. Reuses the `chat` wire tag the client
-    intent (`Chat`, above) already occupies -- same dual-tag pattern the module docstring
-    documents for `discard`: `ClientMessage`/`ServerMessage` are separate discriminated unions,
-    and the two payloads have disjoint required fields (`{text}` vs `{seat, text, name}`) under
-    `extra="forbid"`, so `AnyMessage`'s smart-union validation never has a genuine ambiguity."""
-
-    t: Literal["chat"] = "chat"
-    d: ChatEventPayload
-
-
 class ServerShutdown(Envelope):
     t: Literal["server_shutdown"] = "server_shutdown"
     d: ServerShutdownPayload
@@ -492,7 +457,7 @@ class Ack(Envelope):
 
 
 ClientMessage = Annotated[
-    Hello | Ping | Join | Ready | Discard | Claim | Declare | Auto | Chat | HandEndAck,
+    Hello | Ping | Join | Ready | Discard | Claim | Declare | Auto | HandEndAck,
     Field(discriminator="t"),
 ]
 ServerMessage = Annotated[
@@ -514,7 +479,6 @@ ServerMessage = Annotated[
     | GameEnd
     | SeatState
     | ServerShutdown
-    | ChatEvent
     | Ack,
     Field(discriminator="t"),
 ]
