@@ -1,6 +1,6 @@
 """Real spectator support over the wire ("Spectating" sub-task, docs/05-roadmap.md M5;
 docs/00-architecture.md §3/§5's spectator sketch; docs/02-protocol.md §2/§5). A connection that
-opts in via `?spectate=true` (see `app/room.py`'s `Room.register_spectator` docstring for why
+opts in via `?spectate=true` (see `app/table.py`'s `Table.register_spectator` docstring for why
 this is an explicit connect-time flag, not the literal passive default docs/02-protocol.md §2
 describes) gets the same `seat_view(state, None)`-shaped stream `tests/test_redaction.py`'s
 schema walker has always exercised statically -- this module is the first thing that actually
@@ -22,7 +22,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
@@ -78,18 +78,18 @@ def _rig_state(seed: int) -> GameState:
 
 
 def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
-    room_id = f"spectator-{uuid.uuid4()}"
+    table_id = f"spectator-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_state(seed=20260920)
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_state(seed=20260920)
 
         with (
-            client.websocket_connect(f"/ws?room={room_id}") as ws1,
-            client.websocket_connect(f"/ws?room={room_id}") as ws2,
-            client.websocket_connect(f"/ws?room={room_id}") as ws3,
-            client.websocket_connect(f"/ws?room={room_id}&spectate=true") as spectator,
+            client.websocket_connect(f"/ws?table={table_id}") as ws1,
+            client.websocket_connect(f"/ws?table={table_id}") as ws2,
+            client.websocket_connect(f"/ws?table={table_id}") as ws3,
+            client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spectator,
         ):
             wss = [ws0, ws1, ws2, ws3]
             spec_seq = itertools.count()
@@ -244,15 +244,15 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
 
 
 def test_multiple_spectators_have_independent_dense_seq_streams() -> None:
-    room_id = f"spectator-multi-{uuid.uuid4()}"
+    table_id = f"spectator-multi-{uuid.uuid4()}"
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}&spectate=true") as spec_a,
-        client.websocket_connect(f"/ws?room={room_id}&spectate=true") as spec_b,
+        client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spec_a,
+        client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spec_b,
     ):
-        room = get_room(room_id)
-        assert room is not None
-        assert len(room.spectators) == 2
+        table = get_table(table_id)
+        assert table is not None
+        assert len(table.spectators) == 2
 
         sync_a = spec_a.receive_json()
         sync_b = spec_b.receive_json()
@@ -260,29 +260,29 @@ def test_multiple_spectators_have_independent_dense_seq_streams() -> None:
         assert sync_a["seq"] == 0
         assert sync_b["seq"] == 0  # independent counters -- both start at their own 0
 
-        room.broadcast_server_shutdown(123)
+        table.broadcast_server_shutdown(123)
         assert spec_a.receive_json()["seq"] == 1
         assert spec_b.receive_json()["seq"] == 1
 
-        room.broadcast_server_shutdown(456)
+        table.broadcast_server_shutdown(456)
         assert spec_a.receive_json()["seq"] == 2
         assert spec_b.receive_json()["seq"] == 2
 
         # white-box: both sessions' own next-seq counters advanced identically but
         # independently -- two distinct dict entries, not one shared counter.
-        assert len(room.spectator_seq) == 2
-        assert set(room.spectator_seq.values()) == {3}
+        assert len(table.spectator_seq) == 2
+        assert set(table.spectator_seq.values()) == {3}
 
 
 def test_join_from_spectating_connection_promotes_and_stops_duplicate_stream() -> None:
-    room_id = f"spectator-promote-{uuid.uuid4()}"
+    table_id = f"spectator-promote-{uuid.uuid4()}"
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}&spectate=true") as ws,
+        client.websocket_connect(f"/ws?table={table_id}&spectate=true") as ws,
     ):
-        room = get_room(room_id)
-        assert room is not None
-        assert len(room.spectators) == 1
+        table = get_table(table_id)
+        assert table is not None
+        assert len(table.spectators) == 1
 
         sync = ws.receive_json()
         assert sync["t"] == "state_sync" and sync["d"]["seat"] is None
@@ -295,34 +295,34 @@ def test_join_from_spectating_connection_promotes_and_stops_duplicate_stream() -
         ack = ws.receive_json()
         assert ack["t"] == "ack" and ack["d"]["ok"] is True
 
-        # promoted: no spectator bookkeeping survives for this session -- `room.ring` is back
+        # promoted: no spectator bookkeeping survives for this session -- `table.ring` is back
         # to exactly the four integer seat keys, nothing else.
-        assert room.spectators == {}
-        assert room.spectator_seq == {}
-        assert set(room.ring.keys()) == {0, 1, 2, 3}
+        assert table.spectators == {}
+        assert table.spectator_seq == {}
+        assert set(table.ring.keys()) == {0, 1, 2, 3}
 
         # a further live event (seat 1 joining) reaches this connection exactly once, through
         # its now-real seat stream -- not doubled by a leftover spectator registration.
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1:
             ws1.send_json(_msg("join", {"seat": 1}, id_=_next_id()))
             live_update = ws.receive_json()
             assert live_update["t"] == "seat_state" and live_update["d"]["seat"] == 1
 
 
 def test_spectator_bookkeeping_removed_on_disconnect() -> None:
-    room_id = f"spectator-cleanup-{uuid.uuid4()}"
+    table_id = f"spectator-cleanup-{uuid.uuid4()}"
     with TestClient(app) as client:
-        with client.websocket_connect(f"/ws?room={room_id}&spectate=true") as spectator:
-            room = get_room(room_id)
-            assert room is not None
-            assert len(room.spectators) == 1
-            [session_id] = list(room.spectators)
-            assert session_id in room.ring
-            assert session_id in room.spectator_seq
+        with client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spectator:
+            table = get_table(table_id)
+            assert table is not None
+            assert len(table.spectators) == 1
+            [session_id] = list(table.spectators)
+            assert session_id in table.ring
+            assert session_id in table.spectator_seq
             spectator.receive_json()  # drain the initial state_sync
 
         # connection closed -- app/ws.py's `finally` block calls `unregister_spectator`, same
         # call site `mark_disconnected` uses for a seat's own disconnect cleanup.
-        assert room.spectators == {}
-        assert room.spectator_seq == {}
-        assert session_id not in room.ring
+        assert table.spectators == {}
+        assert table.spectator_seq == {}
+        assert session_id not in table.ring

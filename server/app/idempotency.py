@@ -1,6 +1,6 @@
 """Per-seat idempotency cache (docs/02-protocol.md §1 "Idempotency"): the last 256 client
 `id`s, LRU-evicted, scoped to the seat binding rather than the socket -- a reconnect (a later
-sub-task) inherits the same history since `app/room.py`'s `SeatBinding` survives across
+sub-task) inherits the same history since `app/table.py`'s `SeatBinding` survives across
 sockets, unlike a `Session`.
 
 A repeated `id` with the *same* payload is a genuine retry (e.g. the client resent after a

@@ -44,13 +44,13 @@ knows the resulting wall before it commits.
 
 Provenance: `00-architecture.md` §7 (scaling path) — deferred per doc-audit findings 7 and 8.
 v1 (this doc's actual scope) is single-process with no mid-game durability: a process death
-abandons every live room in it. Everything below is the deferred design space for surviving that,
+abandons every live table in it. Everything below is the deferred design space for surviving that,
 compressed to intent in §7 itself.
 
-**Stage 2 — N nodes, sticky rooms.** A room is pinned to exactly one node for its lifetime; a
-lightweight router in front holds only a room→node directory, the matchmaking queue, and lobby
-presence, and redirects `GET /rooms/{id}/route` to the right node's WebSocket URL. Room state
-itself is never distributed — `shard by room, never split a room` (the single-writer invariant
+**Stage 2 — N nodes, sticky tables.** A table is pinned to exactly one node for its lifetime; a
+lightweight router in front holds only a table→node directory, the matchmaking queue, and lobby
+presence, and redirects `GET /tables/{id}/route` to the right node's WebSocket URL. Table state
+itself is never distributed — `shard by table, never split a table` (the single-writer invariant
 in §3 depends on this).
 
 **Stage 3 — durability.** The originally-drafted plan was "append each action to Postgres as it's
@@ -58,15 +58,15 @@ applied," with a parenthetical alternative of "or batch per hand." These are not
 and the doc previously left both standing at once, which is the bug this entry replaces:
 
 - **Per-action append** conflicts directly with §3's own invariant — "no `await` between read and
-  write of shared state" — since a Postgres write is real I/O and awaiting it inside the room's
-  synchronous reduce-and-publish step reintroduces exactly the race the single-task-per-room
+  write of shared state" — since a Postgres write is real I/O and awaiting it inside the table's
+  synchronous reduce-and-publish step reintroduces exactly the race the single-task-per-table
   design exists to avoid. Making it safe requires moving the write off the hot path (e.g. a
-  separate writer task fed by a queue the room enqueues into without awaiting), which changes the
-  durability guarantee: a write can now be lost between "room applied it" and "writer persisted
+  separate writer task fed by a queue the table enqueues into without awaiting), which changes the
+  durability guarantee: a write can now be lost between "table applied it" and "writer persisted
   it," narrowing but not eliminating the crash window.
 - **Batch per hand** has a larger, differently-shaped crash window: it loses exactly the
   in-progress hand on a crash — the one hand a durability feature exists to protect — while
-  being cheaper and easier to keep off the room's hot path.
+  being cheaper and easier to keep off the table's hot path.
 - Whichever is chosen, **exact replay is the hard unsolved part**, independent of write
   granularity: `reduce` is pure only over its explicit inputs, and two categories of
   non-determinism currently happen *outside* `reduce` and are not logged as actions at all:
@@ -250,7 +250,7 @@ Provenance: `04-bots.md` §2, tier table row for T3 (pre-audit).
 
 Provenance: `04-bots.md` §6, "T3 — search" (pre-audit; cut because T1/T2 alone satisfy the M4
 done-gate per the D9/§4 fix, and the 300–800ms budget below is incompatible with the
-single-worker, single-event-loop process described in `07-infra.md` — it would block every room,
+single-worker, single-event-loop process described in `07-infra.md` — it would block every table,
 every socket, and every heartbeat on that process if run inline, and even off-loop it competes
 for the same `ProcessPoolExecutor` capacity flagged as a real constraint in §3).
 
@@ -400,7 +400,7 @@ class Queue(Protocol):                       # matchmaking
     async def push(self, q: str, item: bytes) -> None: ...
     async def pop_n(self, q: str, n: int) -> list[bytes]: ...   # atomic
 
-class Bus(Protocol):                         # lobby presence fan-out, never in-room
+class Bus(Protocol):                         # lobby presence fan-out, never in-table
     async def publish(self, ch: str, msg: bytes) -> None: ...
     def subscribe(self, ch: str) -> AsyncIterator[bytes]: ...
 ```
@@ -410,7 +410,7 @@ non-`Protocol` class until a second node is actually on the roadmap.
 
 ### Multi-node scaling infrastructure
 
-Cut from §2. The router, room→node directory, and `ws://node-N/ws?room=...` routing scheme
+Cut from §2. The router, table→node directory, and `ws://node-N/ws?table=...` routing scheme
 described as "stage 2" in `00-architecture.md §7`. There is one process and no `scale` compose
 profile; this is a stage-2+ concern and shouldn't be designed against until stage 1 (one
 process, hundreds of tables) is actually load-bearing.

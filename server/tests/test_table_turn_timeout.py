@@ -1,12 +1,12 @@
-"""`app/room.py`'s per-seat `AWAIT_ACTION` turn-timeout timer (docs/00-architecture.md §3 D17,
+"""`app/table.py`'s per-seat `AWAIT_ACTION` turn-timeout timer (docs/00-architecture.md §3 D17,
 §8 "Turn timeout" / "Bot raises / hangs"; docs/05-roadmap.md's M3 turn-timeout sub-task).
 
 `turn_seconds=0` is this file's test-time-control knob for the turn-timeout deadline, matching
-`tests/test_room_claims.py`'s `claim_seconds=0` and `tests/test_disconnect_bot_handover.py`'s
-`disconnect_grace_seconds=0`: the deadline is due the instant it's armed, so the room's own
+`tests/test_table_claims.py`'s `claim_seconds=0` and `tests/test_disconnect_bot_handover.py`'s
+`disconnect_grace_seconds=0`: the deadline is due the instant it's armed, so the table's own
 `_next()` pops it on the very next `process_one()` tick with no real sleep in the test.
 
-Fixtures are white-box state rigs, same style `test_room_claims.py`/`test_disconnect_bot_handover.
+Fixtures are white-box state rigs, same style `test_table_claims.py`/`test_disconnect_bot_handover.
 py` already establish: seats hold disjoint tile types so a discard/draw this file exercises is
 never accidentally contestable by another seat, unless the test is specifically about a claim
 (the claimed-pung-then-timeout fixture).
@@ -18,7 +18,7 @@ import dataclasses
 from concurrent.futures import Executor, Future
 from typing import Any
 
-from app.room import Room, SeatBinding
+from app.table import SeatBinding, Table
 from mahjong_core.actions import ClaimPung, Discard, legal_actions
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
@@ -65,8 +65,8 @@ def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
     return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
-def _bind(room: Room, seat: int, *, status: str = "connected") -> None:
-    room.seat_bindings[seat] = SeatBinding(
+def _bind(table: Table, seat: int, *, status: str = "connected") -> None:
+    table.seat_bindings[seat] = SeatBinding(
         session_id=f"seat-{seat}",
         send=lambda seq, wire: None,
         name=f"Seat {seat}",
@@ -125,24 +125,26 @@ def _rig_uncontested_draw_state(seed: int, *, turn_seconds: int) -> GameState:
 
 
 async def test_turn_timeout_tsumogiris_the_freshly_drawn_tile() -> None:
-    room = Room("room-turn-timeout-draw", DEFAULT_RULESET, game_seed=1)
-    _bind(room, 1)
-    room.state = _rig_uncontested_draw_state(seed=1, turn_seconds=0)
+    table = Table("table-turn-timeout-draw", DEFAULT_RULESET, game_seed=1)
+    _bind(table, 1)
+    table.state = _rig_uncontested_draw_state(seed=1, turn_seconds=0)
 
-    room.submit(0, Discard(tile_id=_EAST[0]))
-    await room.process_one()  # seat 0 discards, cascades to seat 1's draw + AWAIT_ACTION
+    table.submit(0, Discard(tile_id=_EAST[0]))
+    await table.process_one()  # seat 0 discards, cascades to seat 1's draw + AWAIT_ACTION
 
-    assert room.state.phase == Phase.AWAIT_ACTION
-    assert room.state.turn == 1
-    assert _MAN_9[0] in room.state.seats[1].concealed
-    assert room._active_turn_timer.keys() == {1}  # a real deadline is armed, not merely advisory
+    assert table.state.phase == Phase.AWAIT_ACTION
+    assert table.state.turn == 1
+    assert _MAN_9[0] in table.state.seats[1].concealed
+    assert table._active_turn_timer.keys() == {1}  # a real deadline is armed, not merely advisory
 
-    await room.process_one()  # turn_seconds=0 -- the deadline is already due, pops this tick
+    await table.process_one()  # turn_seconds=0 -- the deadline is already due, pops this tick
 
-    assert room.state.seats[1].discards[-1] == _MAN_9[0]  # tsumogiri: the drawn tile, not any other
-    assert _MAN_9[0] not in room.state.seats[1].concealed
-    assert room.seat_bindings[1] is not None
-    assert room.seat_bindings[1].turn_timeout_strikes == 1
+    assert (
+        table.state.seats[1].discards[-1] == _MAN_9[0]
+    )  # tsumogiri: the drawn tile, not any other
+    assert _MAN_9[0] not in table.state.seats[1].concealed
+    assert table.seat_bindings[1] is not None
+    assert table.seat_bindings[1].turn_timeout_strikes == 1
 
 
 # --- fixture: a claimed pung with nothing drawn, so a timeout must discard the lowest tile_id --
@@ -183,55 +185,55 @@ def _rig_pre_pung_state(seed: int, *, claim_seconds: int = 999) -> GameState:
 
 
 async def test_turn_timeout_after_claimed_pung_discards_lowest_tile_id() -> None:
-    room = Room("room-turn-timeout-pung", DEFAULT_RULESET, game_seed=2)
-    _bind(room, 2)
-    room.state = _rig_pre_pung_state(seed=2)
+    table = Table("table-turn-timeout-pung", DEFAULT_RULESET, game_seed=2)
+    _bind(table, 2)
+    table.state = _rig_pre_pung_state(seed=2)
 
-    room.submit(0, Discard(tile_id=_MAN_5[0]))
-    await room.process_one()
-    phase_after_discard = room.state.phase
+    table.submit(0, Discard(tile_id=_MAN_5[0]))
+    await table.process_one()
+    phase_after_discard = table.state.phase
     assert phase_after_discard == Phase.AWAIT_CLAIMS
 
-    pung = next(a for a in legal_actions(room.state, 2) if isinstance(a, ClaimPung))
-    room.submit(2, pung)
-    await room.process_one()  # seat 2's pung is the only offer -- resolves immediately
+    pung = next(a for a in legal_actions(table.state, 2) if isinstance(a, ClaimPung))
+    table.submit(2, pung)
+    await table.process_one()  # seat 2's pung is the only offer -- resolves immediately
 
-    assert room.state.phase == Phase.AWAIT_ACTION
-    assert room.state.turn == 2
-    concealed_after_claim = room.state.seats[2].concealed
+    assert table.state.phase == Phase.AWAIT_ACTION
+    assert table.state.turn == 2
+    concealed_after_claim = table.state.seats[2].concealed
     expected_tile = min(concealed_after_claim)  # nothing drawn -- lowest tile_id is the default
 
     # re-arm with turn_seconds=0 for the timeout half of this test (can't set it on the ruleset
     # before the claim above without also collapsing claim_seconds -- rearm directly instead).
-    room.state = dataclasses.replace(
-        room.state, ruleset=dataclasses.replace(room.state.ruleset, turn_seconds=0)
+    table.state = dataclasses.replace(
+        table.state, ruleset=dataclasses.replace(table.state.ruleset, turn_seconds=0)
     )
-    room._publish_turn_if_active()  # re-arm now that turn_seconds=0 -- see _arm_turn_timer
+    table._publish_turn_if_active()  # re-arm now that turn_seconds=0 -- see _arm_turn_timer
 
-    await room.process_one()  # the just-armed deadline is already due -- pops this tick
+    await table.process_one()  # the just-armed deadline is already due -- pops this tick
 
-    assert room.state.seats[2].discards[-1] == expected_tile
-    assert expected_tile not in room.state.seats[2].concealed
-    assert room.seat_bindings[2] is not None
-    assert room.seat_bindings[2].turn_timeout_strikes == 1
+    assert table.state.seats[2].discards[-1] == expected_tile
+    assert expected_tile not in table.state.seats[2].concealed
+    assert table.seat_bindings[2] is not None
+    assert table.seat_bindings[2].turn_timeout_strikes == 1
 
 
 # --- three strikes -> AUTOPLAY, and the count survives a hand-boundary change -------------------
 
 
 async def test_three_turn_timeouts_flip_seat_to_autoplay() -> None:
-    room = Room("room-turn-timeout-strikes", DEFAULT_RULESET, game_seed=3)
-    _bind(room, 0)
+    table = Table("table-turn-timeout-strikes", DEFAULT_RULESET, game_seed=3)
+    _bind(table, 0)
 
     for _ in range(2):
-        room.state = _rig_uncontested_draw_state(seed=3, turn_seconds=0)
-        room.state = dataclasses.replace(room.state, turn=0, phase=Phase.AWAIT_ACTION)
-        room._publish_turn_if_active()
-        await room.process_one()
+        table.state = _rig_uncontested_draw_state(seed=3, turn_seconds=0)
+        table.state = dataclasses.replace(table.state, turn=0, phase=Phase.AWAIT_ACTION)
+        table._publish_turn_if_active()
+        await table.process_one()
 
-    assert room.seat_bindings[0] is not None
-    assert room.seat_bindings[0].turn_timeout_strikes == 2
-    assert room.seat_bindings[0].status == "connected"  # not flipped yet -- only 2 strikes
+    assert table.seat_bindings[0] is not None
+    assert table.seat_bindings[0].turn_timeout_strikes == 2
+    assert table.seat_bindings[0].status == "connected"  # not flipped yet -- only 2 strikes
 
 
 async def test_third_turn_timeout_flips_to_autoplay_even_across_a_hand_boundary() -> None:
@@ -240,15 +242,15 @@ async def test_third_turn_timeout_flips_to_autoplay_even_across_a_hand_boundary(
     Two strikes land in one `hand_no`, then `hand_no` changes (simulating a new hand dealt) before
     the third -- proving the count survived that change, not merely three timeouts in a row within
     a single hand (which the *other* plausible "resets each hand" interpretation would also pass)."""
-    room = Room("room-turn-timeout-strikes-cross-hand", DEFAULT_RULESET, game_seed=4)
-    _bind(room, 0)
+    table = Table("table-turn-timeout-strikes-cross-hand", DEFAULT_RULESET, game_seed=4)
+    _bind(table, 0)
 
     for _ in range(2):
-        room.state = _rig_uncontested_draw_state(seed=4, turn_seconds=0)
-        room.state = dataclasses.replace(room.state, turn=0, phase=Phase.AWAIT_ACTION, hand_no=1)
-        room._publish_turn_if_active()
-        await room.process_one()
-    binding = room.seat_bindings[0]
+        table.state = _rig_uncontested_draw_state(seed=4, turn_seconds=0)
+        table.state = dataclasses.replace(table.state, turn=0, phase=Phase.AWAIT_ACTION, hand_no=1)
+        table._publish_turn_if_active()
+        await table.process_one()
+    binding = table.seat_bindings[0]
     assert binding is not None
     assert binding.turn_timeout_strikes == 2
     status_after_two = binding.status
@@ -256,10 +258,10 @@ async def test_third_turn_timeout_flips_to_autoplay_even_across_a_hand_boundary(
 
     # a new hand -- hand_no changes. A "resets each hand" implementation would zero the strike
     # count here; this file's chosen semantics (never reset) must not.
-    room.state = _rig_uncontested_draw_state(seed=4, turn_seconds=0)
-    room.state = dataclasses.replace(room.state, turn=0, phase=Phase.AWAIT_ACTION, hand_no=2)
-    room._publish_turn_if_active()
-    await room.process_one()
+    table.state = _rig_uncontested_draw_state(seed=4, turn_seconds=0)
+    table.state = dataclasses.replace(table.state, turn=0, phase=Phase.AWAIT_ACTION, hand_no=2)
+    table._publish_turn_if_active()
+    await table.process_one()
 
     assert binding.turn_timeout_strikes == 3
     status_after_three = binding.status
@@ -273,34 +275,34 @@ class _HangingExecutor(Executor):
     """Simulates a bot worker that crashed or never returns: `submit()` hands back a bare
     `concurrent.futures.Future` that's never resolved. `loop.run_in_executor` only needs a
     `submit(fn, *args, **kwargs)` method, so this is a minimal `Executor` stand-in, matching
-    `Room.__init__`'s `bot_pool: Executor | None` injection point tests already use
+    `Table.__init__`'s `bot_pool: Executor | None` injection point tests already use
     (`tests/test_shutdown.py`'s `SeatBinding` direct-construction convention, applied here to
     `Executor` instead)."""
 
     def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Any]:
-        return Future()  # never marked done -- the room must not wait on it
+        return Future()  # never marked done -- the table must not wait on it
 
 
 async def test_hung_bot_job_still_times_out_via_the_turn_timer() -> None:
-    room = Room(
-        "room-turn-timeout-hung-bot",
+    table = Table(
+        "table-turn-timeout-hung-bot",
         DEFAULT_RULESET,
         game_seed=5,
         bot_pool=_HangingExecutor(),
     )
-    _bind(room, 1, status="autoplay")  # seat 1 is bot-driven -- see _rig_uncontested_draw_state
-    room.state = _rig_uncontested_draw_state(seed=5, turn_seconds=0)
+    _bind(table, 1, status="autoplay")  # seat 1 is bot-driven -- see _rig_uncontested_draw_state
+    table.state = _rig_uncontested_draw_state(seed=5, turn_seconds=0)
 
-    room.submit(0, Discard(tile_id=_EAST[0]))
-    await room.process_one()  # seat 0 discards -> seat 1 draws, AWAIT_ACTION, _poke_bots submits
+    table.submit(0, Discard(tile_id=_EAST[0]))
+    await table.process_one()  # seat 0 discards -> seat 1 draws, AWAIT_ACTION, _poke_bots submits
 
-    assert room.state.phase == Phase.AWAIT_ACTION
-    assert room.state.turn == 1
-    assert 1 in room._pending_bot  # the (hung) job is genuinely in flight
+    assert table.state.phase == Phase.AWAIT_ACTION
+    assert table.state.turn == 1
+    assert 1 in table._pending_bot  # the (hung) job is genuinely in flight
 
-    await room.process_one()  # turn_seconds=0 -- the turn timer fires regardless of the hung job
+    await table.process_one()  # turn_seconds=0 -- the turn timer fires regardless of the hung job
 
-    assert room.state.seats[1].discards[-1] == _MAN_9[0]  # same deterministic default as a human
-    assert 1 not in room._pending_bot  # the stale job tag was cleared, not left dangling
-    assert room.seat_bindings[1] is not None
-    assert room.seat_bindings[1].turn_timeout_strikes == 1
+    assert table.state.seats[1].discards[-1] == _MAN_9[0]  # same deterministic default as a human
+    assert 1 not in table._pending_bot  # the stale job tag was cleared, not left dangling
+    assert table.seat_bindings[1] is not None
+    assert table.seat_bindings[1].turn_timeout_strikes == 1

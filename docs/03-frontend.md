@@ -68,7 +68,7 @@ header's `margin-inline-start: auto`-positioned score, so the indicator is a non
 outline instead. Desktop/tablet (≥768px):
 
 ```
-  header: room/scenario · wall count · prevailing wind (東南西北) · chrome toggles
+  header: table/scenario · wall count · prevailing wind (東南西北) · chrome toggles
 
                     ┌─────────── opponent (across) ───────────┐
                     │       13 backs · melds · flowers        │
@@ -229,7 +229,7 @@ timer fires can lose to the auto-pass if the server treats a seat's first-receiv
 final. Accepted in favor of a dialog that actually closes on its own — see `DialogTimer.svelte`
 below and [02-protocol.md §4](02-protocol.md)'s timer note. `hand_end_ack` gets the same
 auto-close treatment with none of this risk: it's an acknowledgment, not a choice with
-alternatives, and the room already advances at the same `deadline_ts` with or without it
+alternatives, and the table already advances at the same `deadline_ts` with or without it
 ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — the client firing it early just
 lets the *other* seats stop waiting on this one sooner.
 
@@ -310,10 +310,10 @@ store's own `seq` field is just a read-model mirror of whatever the socket alrea
 - **Reconnect**: unexpected closes schedule a reconnect with exponential backoff + jitter
   (`min(250ms * 2^attempt, 10s) ± 20%`, docs/02-protocol.md §8); `connect(resume?)` also accepts
   caller-supplied `{lastSeq, seat}` to seed a fresh instance (the page-reload case). `+page.svelte`
-  persists this seat per room (`lib/ui/settings-storage.ts`'s `saveSeatForRoom`/`loadSeatForRoom`,
-  `mahjong:seat:v1:<roomId>`) the moment `state_sync` confirms one, and feeds it back into
+  persists this seat per table (`lib/ui/settings-storage.ts`'s `saveSeatForTable`/`loadSeatForTable`,
+  `mahjong:seat:v1:<tableId>`) the moment `state_sync` confirms one, and feeds it back into
   `connect()` on mount — without this, a fresh page load has `seat: null` and falls into the
-  "Sit down" screen's `join`, which fails with `room_full` once all four seats are already bound
+  "Sit down" screen's `join`, which fails with `table_full` once all four seats are already bound
   to this game's players, the same seat included. `lastSeq` is intentionally not persisted:
   omitting it just means a full `state_sync` instead of ring-buffer replay (docs/02-protocol.md
   §5's "too old / new session" branch), which a page reload needs anyway since the in-memory
@@ -374,8 +374,8 @@ Rules:
 
 - The reducer is pure and exhaustively switched over the generated `ServerEvent` union, so
   TypeScript flags unhandled events.
-- **Sequence numbers are per-seat**, dense and gapless within *your own* stream — not per-room. A
-  room-wide seq would advance on every unicast `claim_offer`/`turn.legal` sent to other seats, so
+- **Sequence numbers are per-seat**, dense and gapless within *your own* stream — not per-table. A
+  table-wide seq would advance on every unicast `claim_offer`/`turn.legal` sent to other seats, so
   under that scheme a gap would fire on essentially every claim window. A gap on your own stream
   triggers a resync request, never a silent patch.
 - Deep-reactive fields (`$state<TileId[]>`, `SeatView[]`, …) are Svelte proxies. Non-reactive
@@ -431,13 +431,13 @@ don't replay the missed turns as animation.
 
 ### `/table/[id]` wiring
 
-`[id]` is a real room id (the lobby's client-generated invite code already works as one against the backend's
-auto-create-on-first-connect, `server/app/ws.py`'s `_get_or_create_room` — no room API needed).
+`[id]` is a real table id (the lobby's client-generated invite code already works as one against the backend's
+auto-create-on-first-connect, `server/app/ws.py`'s `_get_or_create_table` — no table API needed).
 
 `?mock=<scenarioId>` (any value, including a bare `?mock`) renders a frozen `MOCK_SCENARIOS`
 fixture instead — needed by the screenshot workflow (`.claude/skills/frontend-screenshots/
 SKILL.md`) and design iteration, both of which run with no backend. Omitted, the route opens a
-real `MahjongSocket` at `${PUBLIC_WS_URL}?room=<id>` and drives it through `GameStore`.
+real `MahjongSocket` at `${PUBLIC_WS_URL}?table=<id>` and drives it through `GameStore`.
 
 `?pregame=connecting|join|waiting` is the equivalent escape hatch for the three pre-game states
 below (§"Join flow"): `?mock=` can't stand in for them (a mock scenario is always a fully-seated,
@@ -465,49 +465,49 @@ decision. Until all four seats are joined and ready, the page shows a waiting sc
 **Pre-game states** — connecting, sit-down, and waiting are real, recurring moments in a
 genuinely multiplayer game (arriving at a table, waiting for others to show up), not filler
 between "real" screens, so they use the same `panel-elevated`/button vocabulary as the rest of
-the app (`_buttons.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (room code +
-a "copy invite link" button — the room's URL *is* the invite, and waiting-for-players is exactly
+the app (`_buttons.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (table code +
+a "copy invite link" button — the table's URL *is* the invite, and waiting-for-players is exactly
 when you need to hand it to someone) and a seat-preview ring: four slots arranged
 across/left/right/self, the same relative arrangement `layout.seat-region-grid` uses for the real
-table, so the waiting room visually foreshadows the seats you're about to sit at.
+table, so the pre-game screen visually foreshadows the seats you're about to sit at.
 
 The ring is deliberately honest about what it doesn't know. Seat *wind* is real information the
-moment you're seated — the dealer is fixed at room construction, before any `ready`, so
+moment you're seated — the dealer is fixed at table construction, before any `ready`, so
 `seatWind()` (already used for the real table's own badges) works unchanged here — but seat
-*occupancy* is not: `server/app/room.py`'s `_seat_status_tuple()` docstring spells out that an
+*occupancy* is not: `server/app/table.py`'s `_seat_status_tuple()` docstring spells out that an
 unbound seat reads `"connected"`, identical to one that's actually taken, so `seatStatus`
 (`lib/game/state.ts`) cannot tell "3 of 4 joined" from "1 of 4 joined" today. The ring never
 claims it can — the three non-self slots are always rendered identically (ghosted, breathing),
 regardless of real occupancy, and the copy only ever says "waiting for the rest of the table,"
 never a count. A real per-seat join signal on the wire would be a cleaner fix; filed here as the
-same class of gap `state_sync`'s "has this room started" note below already documents, not a
+same class of gap `state_sync`'s "has this table started" note below already documents, not a
 new one.
 
-**There is no backend "has this room started" field to gate that screen on.** `new_game()` deals
-hand 1 into `Room.state` immediately at room construction, before any `ready` — so a `state_sync`
+**There is no backend "has this table started" field to gate that screen on.** `new_game()` deals
+hand 1 into `Table.state` immediately at table construction, before any `ready` — so a `state_sync`
 sent to the very first joiner already shows a fully dealt hand, computed `legal_actions`, all of
-it indistinguishable on the wire from "already playing." (`app/room.py`'s `require_ready` gate
+it indistinguishable on the wire from "already playing." (`app/table.py`'s `require_ready` gate
 blocks *processing* an early command, but the redacted view was never told to hide the
 already-dealt state behind it.) The client works around this itself: a local flag flips
 permanently once either the current snapshot already shows unambiguous play-in-progress evidence
 (a reconnect mid-game — non-empty discard pools/melds, `hand_no > 1`, a nonzero score) or a
 genuine post-start broadcast is observed (`hand_start`/`turn`/`draw`/... — events that structurally
-cannot exist before `Room.started`). Good enough for v1; a real `started`/seat-fill count on the
+cannot exist before `Table.started`). Good enough for v1; a real `started`/seat-fill count on the
 wire would be a cleaner fix, filed as a gap here rather than a roadmap doc since it's small enough
 to fold into whoever next touches `state_sync`'s payload.
 
 **Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) has a third panel, "Practice,"
-alongside create/join: its "Play vs bots" button generates a room id the same way "Create room"
+alongside create/join: its "Play vs bots" button generates a table id the same way "Create table"
 does and navigates straight to `/table/<id>?practice=1` — no invite code to share, so it skips the
 create/copy step entirely. `?practice=1` is this route's own query param, unrelated in spelling to
 the wire's own `&practice=true`; `/table/[id]`'s live-connect effect appends the latter to the
 `MahjongSocket` URL when the former is present, which is what actually binds seats 1-3 to real
-`FaanBot`s at room creation server-side (`server/app/ws.py`'s `ws_endpoint`, `app/room.py`'s
-`Room.__init__(practice=...)`). The human's own `join`/`ready` — the existing "Sit down" flow — is
-unchanged; a practice table's bot seats are already bound and auto-ready the instant the room
+`FaanBot`s at table creation server-side (`server/app/ws.py`'s `ws_endpoint`, `app/table.py`'s
+`Table.__init__(practice=...)`). The human's own `join`/`ready` — the existing "Sit down" flow — is
+unchanged; a practice table's bot seats are already bound and auto-ready the instant the table
 exists, so the "waiting for the rest of the table" screen should almost never show for long, though
-the client still goes through it structurally since there's still no real "has this room started"
-signal (below). The room label in the live table's dev toolbar appends "· practice vs FaanBot" when
+the client still goes through it structurally since there's still no real "has this table started"
+signal (below). The table label in the live table's dev toolbar appends "· practice vs FaanBot" when
 this flag is set, matching this milestone's "don't invent a tier selector" scope — one fixed
 default tier, named plainly, not a difficulty picker.
 
@@ -530,7 +530,7 @@ doesn't actually send this way):
   silently drops as out-of-turn ([02-protocol.md §1](02-protocol.md)'s `ack` note). Pinned by a
   `reducer.spec.ts` regression test.
 - `state.prevailing`/`hand_start.prevailing` go over the wire as the `Wind` `IntEnum`'s *member
-  name* (`app/views.py`/`app/room.py`: `.name` — `"EAST"`/`"SOUTH"`/`"WEST"`/`"NORTH"`), not the
+  name* (`app/views.py`/`app/table.py`: `.name` — `"EAST"`/`"SOUTH"`/`"WEST"`/`"NORTH"`), not the
   single-letter code (`'E'|'S'|'W'|'N'`) mock scenarios use and `WIND_LABEL` indexes by.
   `live-view.ts`'s `wireWindToCode()` maps it — the one enum-shaped wire field that needs this;
   `phase`/meld `kind`/claim `kind` already serialize through a `StrEnum`'s `.value`, the same

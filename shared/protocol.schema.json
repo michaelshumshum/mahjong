@@ -1192,7 +1192,7 @@
     },
     "HandEndAckPayload": {
       "additionalProperties": false,
-      "description": "`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current\nhand_no)` server-side (`app/room.py`'s `Room.mark_hand_end_ack`), same shape as `ReadyPayload`\nabove.",
+      "description": "`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current\nhand_no)` server-side (`app/table.py`'s `Table.mark_hand_end_ack`), same shape as `ReadyPayload`\nabove.",
       "properties": {},
       "title": "HandEndAckPayload",
       "type": "object"
@@ -2212,7 +2212,7 @@
     },
     "ServerShutdownPayload": {
       "additionalProperties": false,
-      "description": "docs/00-architecture.md \u00a78.1 step 2 -- broadcast once a graceful-shutdown drain starts,\nso clients can show a \"reconnect shortly\" banner instead of reading the eventual dropped\nsocket as an error. `deadline_ts` is the same bounded grace window every room in this drain\nshares (server epoch ms, same convention as every other `deadline_ts` on the wire).",
+      "description": "docs/00-architecture.md \u00a78.1 step 2 -- broadcast once a graceful-shutdown drain starts,\nso clients can show a \"reconnect shortly\" banner instead of reading the eventual dropped\nsocket as an error. `deadline_ts` is the same bounded grace window every table in this drain\nshares (server epoch ms, same convention as every other `deadline_ts` on the wire).",
       "properties": {
         "deadline_ts": {
           "title": "Deadline Ts",

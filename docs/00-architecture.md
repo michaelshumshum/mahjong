@@ -33,7 +33,7 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      ┌──────────────────────────────────────────────┐
    Python process    │  FastAPI / Starlette (uvicorn + uvloop)      │
                      │                                              │
-                     │  REST router ──── room list, replays,        │
+                     │  REST router ──── table list, replays,        │
                      │                   leaderboard (no auth       │
                      │                   endpoint — see §2.1)       │
                      │                                              │
@@ -42,12 +42,12 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      │                      join{seat, name} /      │
                      │                      reclaim via hello{seat} │
                      │                    · parse + validate envelope│
-                     │                    · push Command to room    │
+                     │                    · push Command to table    │
                      │                    · pump BOUNDED outbound   │
                      │                      queue (drop→state_sync) │
                      │                         │                    │
                      │                         ▼                    │
-                     │  RoomRegistry ──► Room (one asyncio.Task)    │
+                     │  TableRegistry ──► Table (one asyncio.Task)    │
                      │                    · owns GameState          │
                      │                    · inbox: asyncio.Queue    │
                      │                    · timer heap (§3)         │
@@ -80,7 +80,7 @@ already-bound seat on reconnect, and the server already has the name from that s
 `join`; `SeatBinding.name` holds it for the game).
 
 ```
-client ──ws://…/ws?room=…──────────────────────────────────────────► WS endpoint
+client ──ws://…/ws?table=…──────────────────────────────────────────► WS endpoint
 client ──join{seat?, name?}──────────────────────────────────────────► Session binds this seat
 client ──hello{seat}──(a later reconnect, same seat)─────────────────► Session reclaims it
 ```
@@ -113,24 +113,24 @@ hand every later wall in the game to every player).
 
 This gives 100k-game test runs in CI, replays as `(game_seed, actions)` through the same code
 path as live play, and search bots that call `reduce` on a determinized copy rather than needing
-a second rules implementation. Crash recovery by replaying a room's action log is **not** a v1
+a second rules implementation. Crash recovery by replaying a table's action log is **not** a v1
 property — see §7.
 
 **Two pure entry points.** `reduce()` takes exactly one `Action` and returns once a real decision
 is needed from some seat, or the hand ends (`Phase.HAND_OVER`). Advancing from `HAND_OVER` to the
 next deal (or `GAME_OVER`) is a second function, `engine.start_next_hand(state) -> (state,
 events)` — there's no `Action` for "deal the next hand" since it isn't a seat's decision
-(`legal_actions` is `()` in that phase). The Room loop calls it right after a `reduce()` call
+(`legal_actions` is `()` in that phase). The Table loop calls it right after a `reduce()` call
 lands on `HAND_OVER`, once the hand-end hold (below) closes.
 
-### Room actor
+### Table actor
 
 Each table is a single `asyncio.Task` owning its `GameState` exclusively. All mutation happens
 inside that task's loop, fed by an `asyncio.Queue` of commands:
 
 ```python
-class Room:
-    def __init__(self, room_id: str, ruleset: RuleSet, game_seed: int):
+class Table:
+    def __init__(self, table_id: str, ruleset: RuleSet, game_seed: int):
         self.inbox: asyncio.Queue[Command] = asyncio.Queue()
         self.state = new_game(ruleset, game_seed)
         self.event_id = 0                     # internal monotonic id: logging/replay only, NEVER on the wire
@@ -161,12 +161,12 @@ class Room:
 No locks. No `await` between read and write of shared state. Four simultaneous clicks are four
 items in a queue.
 
-> In-room messages never leave the owning task. A room lives on exactly one node and its members
-> are routed there (§7); room state is never distributed.
+> In-table messages never leave the owning task. A table lives on exactly one node and its members
+> are routed there (§7); table state is never distributed.
 
 **Sequencing.** `seq` is per-seat (and per-spectator-session): dense and gapless *within that
-stream*, never per-room. Two seats' `seq` counters have no relationship to each other. `event_id`
-is a separate, internal, room-global monotonic counter for server-side logging only — never
+stream*, never per-table. Two seats' `seq` counters have no relationship to each other. `event_id`
+is a separate, internal, table-global monotonic counter for server-side logging only — never
 serialized to a client. The ring buffer is per-seat and stores frames *after* `redact_event()`
 has run, never raw `Event` objects, so a reconnect replay ([02-protocol.md
 §5](02-protocol.md)) can never hand a redacted-out tile back to a seat.
@@ -183,36 +183,36 @@ offered seat's own concealed tiles.
 
 **Timer race.** `asyncio.wait_for(inbox.get(), timeout)` is wrong here: when the timer wins, the
 cancelled `get()` can silently drop an item that arrived in the same scheduler tick. `_next()`
-holds one long-lived `_inbox_getter()` task for the room's entire lifetime and only ever awaits
-`asyncio.wait({getter, sleep_until_next_deadline})`, never cancelling `getter`. A room has several
+holds one long-lived `_inbox_getter()` task for the table's entire lifetime and only ever awaits
+`asyncio.wait({getter, sleep_until_next_deadline})`, never cancelling `getter`. A table has several
 concurrent deadlines live at once — the current claim window, each connected human's per-turn
 clock, each pending bot's budget — so `self.deadlines` is a heap keyed by `(deadline_ts, id)`, not
 a single scalar.
 
 **Bots off the loop.** `_poke_bots()` never runs bot search inline. It submits
-`(room_id, window_id, state_version, seat_view)` to a `ProcessPoolExecutor` — the GIL makes a
+`(table_id, window_id, state_version, seat_view)` to a `ProcessPoolExecutor` — the GIL makes a
 thread pool useless for CPU-bound pure-Python search — with a hard deadline (`bots/worker.py`'s
 `compute_action`, 10s, `_BOT_JOB_TIMEOUT_SECONDS`), and returns immediately. The worker builds the
 requested tier (`T0`/`T1`/`T2`, default `T2`/`FaanBot`, [04-bots.md](04-bots.md)) and drives
 `Bot.act(view, mask, deadline)` against a `SeatView`/`legal_mask`, returning a bare action id — a
-worker process never receives `GameState`; `Room._handle_bot_result` decodes the id against the
+worker process never receives `GameState`; `Table._handle_bot_result` decodes the id against the
 real state once it lands back. The result re-enters through `inbox`, tagged with the
 `(window_id, state_version)` it was computed against, and is dropped if either has moved on by
 the time it arrives — the same staleness protection a laggy human click gets (§4). On a worker
-crash or hard timeout, `Room` applies no synthesized action itself; it just clears the pending job
+crash or hard timeout, `Table` applies no synthesized action itself; it just clears the pending job
 tag so the next tick retries. What actually bounds a stalled turn is the independent per-seat
 `ruleset.turn_seconds` timer (§8), not this path.
 
 ### Hand-end hold
 
-A hand ending — win or exhaustive draw — holds the room at `Phase.HAND_OVER` instead of chaining
+A hand ending — win or exhaustive draw — holds the table at `Phase.HAND_OVER` instead of chaining
 straight into `start_next_hand()`, so a client has a chance to show the just-finished hand before
 the board resets:
 
 ```
 on HAND_OVER:
   acked = {seat for seat in bound_seats if seat.status in (bot, autoplay)}
-  if len(acked) == 4:      -> advance immediately (e.g. an all-bot practice room)
+  if len(acked) == 4:      -> advance immediately (e.g. an all-bot practice table)
   arm deadline_ts = now + ruleset.hand_end_seconds   # default 10s
   wait:
     seat ack (hand_end_ack)  -> acked.add(seat); all 4 acked -> advance
@@ -220,7 +220,7 @@ on HAND_OVER:
 ```
 
 `mahjong_core` is untouched by this — `Phase.HAND_OVER`/`start_next_hand()` are pure engine
-facts; the ack tracking and timer are `app/room.py`-only (`_open_hand_end_window`,
+facts; the ack tracking and timer are `app/table.py`-only (`_open_hand_end_window`,
 `mark_hand_end_ack`, one `TimerHeap` entry per hold, not per seat — there's no priority/tiebreak
 here, just "wait for N of 4"). A stray or late ack (wrong hand, already resolved) is a no-op.
 
@@ -238,9 +238,9 @@ the client's next `last_seq` is behind, and the resume protocol ([02-protocol.md
 forces. If the queue is still over capacity after collapsing to `state_sync` (everything queued
 was `ack`/`error`), the connection is dead, not just slow, and `Session` closes it.
 
-`Room.publish_to_seat` only ever does a synchronous, non-blocking `push()` onto the queue — never
+`Table.publish_to_seat` only ever does a synchronous, non-blocking `push()` onto the queue — never
 awaits the socket write. A separate `Session.writer()` task owns `websocket.send_text()`, so a
-stalled TCP connection blocks only that task, never the Room task.
+stalled TCP connection blocks only that task, never the Table task.
 
 ## 4. Claim window
 
@@ -280,7 +280,7 @@ on DISCARD(seat, tile):
 
 `claims.can_close_early`/`resolve_claims` are pure and reason only over responses already
 collected — early exit is invoked from `mahjong_core.engine._apply_claim_response` itself, the
-moment a real response makes the window ready. `Room` owns what the pure engine can't: arming
+moment a real response makes the window ready. `Table` owns what the pure engine can't: arming
 `deadline_ts` (`TimerHeap`, keyed `(deadline_ts, window_id)`) when a window opens, and — on timer
 expiry, staleness-checked against the live `window_id` — synthesizing `Pass` for every seat that
 never responded, fed through the same `reduce()`/`resolve_claims` path. Window duration is
@@ -307,7 +307,7 @@ Gotchas:
 
 ## 5. Redaction
 
-The room never serializes `GameState`. Redaction is **two named functions**, not one overloaded
+The table never serializes `GameState`. Redaction is **two named functions**, not one overloaded
 one — they answer different questions:
 
 ```python
@@ -362,10 +362,10 @@ There is no field on `SeatView` capable of holding another seat's concealed tile
 `own_hand` is the only tile-id field, and it's populated only for the view's own seat.
 
 `seat_status` (`connected`/`disconnected`/`autoplay`/`bot`/`empty`) comes from
-`SeatBinding.status`; `bot` seats are bound at room construction for practice mode
+`SeatBinding.status`; `bot` seats are bound at table construction for practice mode
 ([05-roadmap.md](05-roadmap.md)) and driven through the identical `_poke_bots`/`BotJobTag` path
 as `autoplay` seats. `names` comes from `SeatBinding.name`, set once at `join`
-(`_normalize_name`), synthesized from the room's `bot_tier` for a `bot` seat. `deadline_ts`
+(`_normalize_name`), synthesized from the table's `bot_tier` for a `bot` seat. `deadline_ts`
 surfaces `ClaimWindow.deadline_ts` for a claim offer, or the per-turn deadline when `seat ==
 state.turn` and `phase == AWAIT_ACTION`.
 
@@ -429,7 +429,7 @@ melds, discard pool). Details in [03-frontend.md](03-frontend.md).
 
 ### Storage
 
-**Postgres** — users, room metadata, finished games as `(ruleset, game_seed, action_log)` with
+**Postgres** — users, table metadata, finished games as `(ruleset, game_seed, action_log)` with
 `action_log` as JSONB, leaderboards. Matchmaking, presence, rate limiting and session state are
 v1 **module-level dicts in the API process** — no `KV`/`Queue`/`Bus` abstraction layer. A
 Protocol-per-backend split earns its keep once there's a second real backend to swap in (Redis,
@@ -438,36 +438,36 @@ would invite `async def` on a plain dict lookup with no I/O behind it, violating
 "`async def` only where there is real I/O or concurrency" rule. Deferred — see
 [99-deferred.md](99-deferred.md).
 
-`RoomRegistry` (`server/app/registry.py`) is exactly this: an in-process `dict[str, Room]` plus
-the bookkeeping to run each room's `asyncio.Task`. `Room.run()` returns on `GAME_OVER`, and
-`RoomRegistry` drops its task-bookkeeping entry then; the `Room` object itself is **not**
+`TableRegistry` (`server/app/registry.py`) is exactly this: an in-process `dict[str, Table]` plus
+the bookkeeping to run each table's `asyncio.Task`. `Table.run()` returns on `GAME_OVER`, and
+`TableRegistry` drops its task-bookkeeping entry then; the `Table` object itself is **not**
 evicted — reconnecting after the game ends is still a supported, synchronous path
-(`Room.reconnect`/`resume`). Full room eviction (freeing a long-dead finished game's memory) is
+(`Table.reconnect`/`resume`). Full table eviction (freeing a long-dead finished game's memory) is
 an open gap — no session-expiry/TTL policy exists.
 
-`Room` persists a real game's full action log (`self.actions`, every `Action` that ran through
+`Table` persists a real game's full action log (`self.actions`, every `Action` that ran through
 `reduce()` — never a `start_next_hand()` transition, which isn't an `Action`; replay reconstructs
 those off `Phase.HAND_OVER`) via an optional `session_factory: async_sessionmaker[AsyncSession] |
-None` threaded through `Room.__init__`/`RoomRegistry`. `app/main.py`'s `lifespan` builds the real
+None` threaded through `Table.__init__`/`TableRegistry`. `app/main.py`'s `lifespan` builds the real
 engine from a `DATABASE_URL` env var (unset → no persistence) and installs it into a fresh
-`RoomRegistry` on every ASGI startup. On `Phase.GAME_OVER`, `Room` calls `save_game_record` at
+`TableRegistry` on every ASGI startup. On `Phase.GAME_OVER`, `Table` calls `save_game_record` at
 most once with `self.actions` and each seat's `SeatBinding.name` — there's no account id in this
 design to record instead; guest names are the permanent identity model.
 
 ## 7. Scaling path
 
-**Stage 1 — one process (v1, this doc's scope).** In-memory rooms, Postgres for durable records
+**Stage 1 — one process (v1, this doc's scope).** In-memory tables, Postgres for durable records
 (users, finished games, leaderboards). Handles hundreds of concurrent tables. **No mid-game
-durability:** a room's live `GameState` exists only in that process's memory. If the process
-dies, every room in it dies too — **games in progress are abandoned**, full stop. This is a
+durability:** a table's live `GameState` exists only in that process's memory. If the process
+dies, every table in it dies too — **games in progress are abandoned**, full stop. This is a
 deliberate v1 answer; see the shutdown story in §8 for the one case (a planned deploy, not a
 crash) where we do better than that.
 
-Everything past Stage 1 is deferred intent, sketched here only so the single-writer-per-room
-invariant (§3) isn't accidentally violated later: **Stage 2** would shard rooms across N nodes,
-each room pinned to exactly one node for its lifetime via a router holding nothing but a
-room→node directory, the matchmaking queue, and lobby presence (`shard by room, never split a
-room`). **Stage 3** would add durability — surviving a node loss without abandoning the room —
+Everything past Stage 1 is deferred intent, sketched here only so the single-writer-per-table
+invariant (§3) isn't accidentally violated later: **Stage 2** would shard tables across N nodes,
+each table pinned to exactly one node for its lifetime via a router holding nothing but a
+table→node directory, the matchmaking queue, and lobby presence (`shard by table, never split a
+table`). **Stage 3** would add durability — surviving a node loss without abandoning the table —
 which needs *every* source of non-determinism logged as a first-class action, including bot
 decisions (ε-random, [04-bots.md](04-bots.md)) and every timer expiry (tsumogiri-on-timeout,
 auto-pass-on-timeout, bot-deadline defaults). No log format or write-granularity tradeoff has been
@@ -477,17 +477,17 @@ picked. Deferred — see [99-deferred.md](99-deferred.md).
 
 | Event | Behaviour |
 | --- | --- |
-| Player disconnects | Seat marked `DISCONNECTED` (only on the WS connection actually closing — no heartbeat/dead-socket timeout exists). Room continues. Grace period (`ruleset.disconnect_grace_seconds`, default 20s) before the seat flips to `AUTOPLAY` and the bot takes over. Uses the same `TimerHeap` claim-window deadlines use. |
-| Player reconnects | Rejoin room, send `last_seq`. Server replays from that seat's ring buffer or sends a fresh `state_sync` (§3). Bot relinquishes the seat. **Mid-claim-window:** if this seat's offer hasn't resolved, its `TimerHeap` entry (one per offered seat, not one shared per window) is re-armed to a full human-length window from the reconnect moment — the original deadline was sized for a bot answering in milliseconds. Other seats' deadlines are untouched. If the claim already resolved, no do-over. |
+| Player disconnects | Seat marked `DISCONNECTED` (only on the WS connection actually closing — no heartbeat/dead-socket timeout exists). Table continues. Grace period (`ruleset.disconnect_grace_seconds`, default 20s) before the seat flips to `AUTOPLAY` and the bot takes over. Uses the same `TimerHeap` claim-window deadlines use. |
+| Player reconnects | Rejoin table, send `last_seq`. Server replays from that seat's ring buffer or sends a fresh `state_sync` (§3). Bot relinquishes the seat. **Mid-claim-window:** if this seat's offer hasn't resolved, its `TimerHeap` entry (one per offered seat, not one shared per window) is re-armed to a full human-length window from the reconnect moment — the original deadline was sized for a bot answering in milliseconds. Other seats' deadlines are untouched. If the claim already resolved, no do-over. |
 | Player never returns | Bot plays out the game. Result recorded against the human. |
 | Turn timeout | `ruleset.turn_seconds` (default 15s), armed from every `AWAIT_ACTION` landing (`_arm_turn_timer`). **After a draw:** tsumogiri — discard the drawn tile. **After a claimed pung or chow:** no drawn tile to reflexively discard, so the fallback discards the concealed tile with the lowest `tile_id` (kong is unaffected — it always draws a replacement first). The drawn-vs-claimed distinction reads the real `Drawn`/`KongReplacementDrawn` events from that tick, not hand size. The synthesized discard is sourced from `legal_actions`, so it can never name an illegal tile. Strikes live on `SeatBinding.turn_timeout_strikes`, incremented on every timeout, never reset — three strikes flips the seat to `AUTOPLAY` for the rest of the game. |
-| Bot raises / hangs | Runs in a worker pool with a hard deadline (§3), outside the room loop. A *claim* offer resolves via its own `TimerHeap` entry (default-to-`Pass`) regardless of whether the bot answers. A bot's *turn* gets the identical `turn_seconds` fallback a human timeout does — it races the wall clock, not the worker job, so a hung/crashed worker can't outlast `turn_seconds` regardless of the job's own 10s deadline. |
+| Bot raises / hangs | Runs in a worker pool with a hard deadline (§3), outside the table loop. A *claim* offer resolves via its own `TimerHeap` entry (default-to-`Pass`) regardless of whether the bot answers. A bot's *turn* gets the identical `turn_seconds` fallback a human timeout does — it races the wall clock, not the worker job, so a hung/crashed worker can't outlast `turn_seconds` regardless of the job's own 10s deadline. |
 | Planned shutdown / deploy | See §8.1 — different from a crash; the process gets to say goodbye. |
 | Node dies (deferred, stage 3) | Not a v1 behavior — see §7. Sketch: router reassigns; new owner replays the action log; clients reconnect and `state_sync`. |
 
 ### 8.1 Graceful shutdown
 
-Nothing in v1 (§7) survives a crash — a killed process abandons every room in it. Acceptable for
+Nothing in v1 (§7) survives a crash — a killed process abandons every table in it. Acceptable for
 a crash, which is rare and unplanned. Not acceptable for a routine deploy, which is frequent and
 planned: `restart: unless-stopped` with a single in-memory process otherwise means every deploy
 kills every live table, silently, mid-hand.
@@ -495,25 +495,25 @@ kills every live table, silently, mid-hand.
 v1's answer is a drain, not durability — it buys the process time to reach a safe stopping point:
 
 1. On `SIGTERM`, the process stops accepting new WebSocket connections and stops matchmaking new
-   rooms; the health check starts failing so a load balancer drains inbound traffic.
-2. Every room still holding players gets a `server_shutdown{deadline_ts}` event so clients can
+   tables; the health check starts failing so a load balancer drains inbound traffic.
+2. Every table still holding players gets a `server_shutdown{deadline_ts}` event so clients can
    show a "reconnect shortly" banner instead of reading a dropped socket as an error.
-3. A room that is mid-hand is allowed to *finish that hand* — but no further — within a bounded
+3. A table that is mid-hand is allowed to *finish that hand* — but no further — within a bounded
    grace window (`SHUTDOWN_GRACE_SECONDS` env var, default 90s). Reaching a hand boundary before
    the window elapses is a clean stop.
-4. If the grace window elapses first, the room is torn down anyway and that hand is abandoned,
+4. If the grace window elapses first, the table is torn down anyway and that hand is abandoned,
    same as a crash — but the players were warned.
-5. The process exits once every room has reached a hand boundary or its grace window has expired,
-   whichever comes first for that room — not a single global sleep.
+5. The process exits once every table has reached a hand boundary or its grace window has expired,
+   whichever comes first for that table — not a single global sleep.
 
-`RoomRegistry.begin_shutdown` implements steps 2–5: sets `.draining` (new connections get closed
-with code 1013; `/healthz` serves `503`), broadcasts `server_shutdown` to every room with a seat
-ever bound, then waits on each room's `Room.wait_for_shutdown_boundary` concurrently
-(`asyncio.gather`, so total wall-clock cost is the grace window once, not per room). A room that
+`TableRegistry.begin_shutdown` implements steps 2–5: sets `.draining` (new connections get closed
+with code 1013; `/healthz` serves `503`), broadcasts `server_shutdown` to every table with a seat
+ever bound, then waits on each table's `Table.wait_for_shutdown_boundary` concurrently
+(`asyncio.gather`, so total wall-clock cost is the grace window once, not per table). A table that
 never reaches a boundary is logged as abandoned; the process exiting is what ends it. `app/main.py`'s
 `lifespan` runs the drain after `yield`, where uvicorn's SIGTERM handling resumes; a
 `TestClient(app)` context exit runs the identical drain, which is why `server/tests/conftest.py`
-pins `SHUTDOWN_GRACE_SECONDS=0` for the test session. A room whose `GAME_OVER` persist is already
+pins `SHUTDOWN_GRACE_SECONDS=0` for the test session. A table whose `GAME_OVER` persist is already
 in flight is the drain's one unbounded wait — `process_one` catches a persist that raises, logs
 the lost record, and still marks the attempt finished, so this wait can always be exited.
 

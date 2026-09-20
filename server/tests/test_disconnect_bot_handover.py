@@ -3,9 +3,9 @@ docs/05-roadmap.md M3 sub-task 6) -- driven over real WebSocket connections, sam
 `fastapi.testclient` style `tests/test_ws_gameplay.py`/`tests/test_reconnect.py` established.
 
 `disconnect_grace_seconds=0` is this file's test-time-control pattern for the grace timer --
-the same idea `tests/test_room_claims.py`'s `claim_seconds=0` already uses for claim-window
-timeouts: the deadline is due the instant it's armed, so the room's own background task pops it
-on its very next tick with no real sleep in the test. `Room._wake()` (see `app/room.py`'s
+the same idea `tests/test_table_claims.py`'s `claim_seconds=0` already uses for claim-window
+timeouts: the deadline is due the instant it's armed, so the table's own background task pops it
+on its very next tick with no real sleep in the test. `Table._wake()` (see `app/table.py`'s
 `_WakeUp` docstring) is what makes that pop happen promptly rather than waiting on an unrelated
 event to nudge the loop.
 
@@ -30,7 +30,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
@@ -158,19 +158,19 @@ def _rig_disconnect_state(seed: int) -> GameState:
 
 
 def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control() -> None:
-    room_id = f"disconnect-handover-{uuid.uuid4()}"
+    table_id = f"disconnect-handover-{uuid.uuid4()}"
 
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}") as ws0,
-        client.websocket_connect(f"/ws?room={room_id}") as ws2,
-        client.websocket_connect(f"/ws?room={room_id}") as ws3,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
+        client.websocket_connect(f"/ws?table={table_id}") as ws2,
+        client.websocket_connect(f"/ws?table={table_id}") as ws3,
     ):
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_disconnect_state(seed=1)
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_disconnect_state(seed=1)
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1:
             _join_and_ready_all([ws0, ws1, ws2, ws3])
         # ws1's `with` block just exited -- only seat 1 disconnects; ws0/ws2/ws3 stay live.
 
@@ -183,15 +183,15 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
             assert frame["d"] == {"seat": 1, "status": "disconnected", "name": "Guest 2"}
-        assert room.seat_bindings[1] is not None
+        assert table.seat_bindings[1] is not None
 
-        # --- grace period (0s, already due): the room's own background task pops the timer
+        # --- grace period (0s, already due): the table's own background task pops the timer
         # with no real sleep here -- receive_json() just blocks until it does.
         for ws in observers:
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
             assert frame["d"] == {"seat": 1, "status": "autoplay", "name": "Guest 2"}
-        assert room.seat_bindings[1].status == "autoplay"
+        assert table.seat_bindings[1].status == "autoplay"
 
         # --- seat 0 discards its uncontested tile -> cascades straight to seat 1's draw+turn
         # (claim-proof by construction, module docstring).
@@ -210,7 +210,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
             assert turn1["t"] == "turn" and turn1["d"]["seat"] == 1
             assert "legal" not in turn1["d"]  # unicast-only, and nobody here is seat 1
 
-        # --- the bot acts for seat 1 (D12: submitted to a ProcessPoolExecutor, off the room's
+        # --- the bot acts for seat 1 (D12: submitted to a ProcessPoolExecutor, off the table's
         # own asyncio task) -- a real, legal discard arrives with no human involvement, and the
         # game keeps progressing straight into seat 2's draw+turn. This is the "doesn't stall"
         # proof: these receive_json() calls block until the worker round-trip actually lands.
@@ -223,12 +223,12 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
             turn2 = ws.receive_json()
             assert turn2["t"] == "turn" and turn2["d"]["seat"] == 2
 
-        assert room.seat_bindings[1].status == "autoplay"
-        assert 1 not in room._pending_bot  # the job resolved and was cleared, not left hanging
+        assert table.seat_bindings[1].status == "autoplay"
+        assert 1 not in table._pending_bot  # the job resolved and was cleared, not left hanging
 
         # --- reconnect: status flips back, the bot stops acting for the seat (D12 staleness
-        # drop doubling as "stop", app/room.py's reconnect() docstring).
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+        # drop doubling as "stop", app/table.py's reconnect() docstring).
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1))
 
             for ws in observers:
@@ -239,8 +239,8 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
             # mypy narrows this status to Literal["autoplay"] from the assert at line 194 and
             # doesn't see the reconnect handling above (driven through real websocket frames)
             # flip it back -- flags this as non-overlapping/unreachable, but it's real and correct.
-            assert room.seat_bindings[1].status == "connected"
-            assert 1 not in room._pending_bot
+            assert table.seat_bindings[1].status == "connected"
+            assert 1 not in table._pending_bot
 
 
 def _rig_faan_discard_state(seed: int) -> GameState:
@@ -302,7 +302,7 @@ def _rig_faan_discard_state(seed: int) -> GameState:
 
 def test_disconnect_bot_runs_faanbot_not_random() -> None:
     """Regression for the sub-task that wired real bot tiers into the live disconnect-handover
-    path (docs/04-bots.md §1, docs/05-roadmap.md M4.5): `Room`'s default `bot_tier` is now
+    path (docs/04-bots.md §1, docs/05-roadmap.md M4.5): `Table`'s default `bot_tier` is now
     `T2`/`FaanBot`, not the old hardcoded `T0`/`RandomBot` `bots/worker.py.compute_action` used
     to run unconditionally. `_rig_faan_discard_state`'s hand has a *unique* shanten-minimising
     discard (see its own docstring); `FaanBot`'s choice is a deterministic function of the hand
@@ -310,20 +310,20 @@ def test_disconnect_bot_runs_faanbot_not_random() -> None:
     proof the live path is no longer T0 -- not merely improbable-under-random, but exactly what
     a value/efficiency-aware policy must produce here, every run.
     """
-    room_id = f"disconnect-handover-faanbot-{uuid.uuid4()}"
+    table_id = f"disconnect-handover-faanbot-{uuid.uuid4()}"
 
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}") as ws0,
-        client.websocket_connect(f"/ws?room={room_id}") as ws2,
-        client.websocket_connect(f"/ws?room={room_id}") as ws3,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
+        client.websocket_connect(f"/ws?table={table_id}") as ws2,
+        client.websocket_connect(f"/ws?table={table_id}") as ws3,
     ):
-        room = get_room(room_id)
-        assert room is not None
-        assert room._bot_tier == "T2"  # the M4.5 default -- FaanBot, not RandomBot
-        room.state = _rig_faan_discard_state(seed=2)
+        table = get_table(table_id)
+        assert table is not None
+        assert table._bot_tier == "T2"  # the M4.5 default -- FaanBot, not RandomBot
+        table.state = _rig_faan_discard_state(seed=2)
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1:
             _join_and_ready_all([ws0, ws1, ws2, ws3])
         # ws1's `with` block just exited -- only seat 1 disconnects.
 

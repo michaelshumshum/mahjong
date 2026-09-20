@@ -26,10 +26,10 @@ need, since asserting on UI state alone would have passed even with this bug pre
 `_rig_claim_window_state` use (`dataclasses.replace` on a freshly-dealt `GameState`), but this
 needs the real backend serving on a real TCP port (a Playwright browser can't connect to
 `TestClient`'s ASGI test transport), so the app runs via a real `uvicorn.Server` on a background
-thread of *this* process instead -- `get_room()` then reaches the exact same in-memory `Room` the
-browser's WS connections land in, the same way `test_reconnect.py`'s direct `room.state = ...`
+thread of *this* process instead -- `get_table()` then reaches the exact same in-memory `Table` the
+browser's WS connections land in, the same way `test_reconnect.py`'s direct `table.state = ...`
 assignment does against `TestClient`. The rig must land after all 4 browser pages have connected
-(so the room exists) but before any of them joins (`Room.mark_ready`'s dealt-hand broadcast reads
+(so the table exists) but before any of them joins (`Table.mark_ready`'s dealt-hand broadcast reads
 `self.state` fresh, per its own docstring, so a rig before the last `ready` is picked up
 verbatim) -- `live-declare-click.mjs` prints `PAGE_LOADED` at exactly that point and waits for a
 `GO` line on its stdin before joining anyone.
@@ -57,7 +57,7 @@ import pytest
 import uvicorn
 
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.state import GameState, Phase, new_game
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
@@ -134,7 +134,7 @@ def _wait_healthy(url: str, timeout_s: float) -> None:
 
 
 def test_concealed_kong_button_sends_declare_frame() -> None:
-    room_id = "declare-live-ui-test"
+    table_id = "declare-live-ui-test"
     backend_port = _free_port()
     frontend_port = _free_port()
 
@@ -172,7 +172,7 @@ def test_concealed_kong_button_sends_declare_frame() -> None:
                     "node",
                     str(DRIVER_SCRIPT),
                     f"http://127.0.0.1:{frontend_port}",
-                    room_id,
+                    table_id,
                     r"^Concealed kong 1m-1m-1m-1m$",
                 ],
                 cwd=WEB_DIR,
@@ -190,9 +190,9 @@ def test_concealed_kong_button_sends_declare_frame() -> None:
                 for line in driver.stdout:
                     line = line.rstrip("\n")
                     if line == "PAGE_LOADED":
-                        room = get_room(room_id)
-                        assert room is not None, "room not created by the browser's connections"
-                        room.state = _rig_concealed_kong(seed=7)
+                        table = get_table(table_id)
+                        assert table is not None, "table not created by the browser's connections"
+                        table.state = _rig_concealed_kong(seed=7)
                         driver.stdin.write("GO\n")
                         driver.stdin.flush()
                     elif line.startswith("RESULT "):

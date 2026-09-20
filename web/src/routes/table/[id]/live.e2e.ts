@@ -88,7 +88,7 @@ test.afterAll(async () => {
 
 test('four real seats join, ready, and play real discards/claims through the live table UI', async () => {
 	test.setTimeout(60_000);
-	const room = `e2e-live-${Date.now()}`;
+	const table = `e2e-live-${Date.now()}`;
 	const browser = await chromium.launch();
 	try {
 		const pages = await Promise.all(
@@ -99,7 +99,7 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		);
 
 		await Promise.all(
-			pages.map((p) => p.goto(`${BASE}/table/${room}`, { waitUntil: 'networkidle' }))
+			pages.map((p) => p.goto(`${BASE}/table/${table}`, { waitUntil: 'networkidle' }))
 		);
 		// real guest display names (M5, docs/02-protocol.md's Auth section) -- one per seat, typed
 		// into the pre-game name field before sitting down, so the assertions below can tell "this
@@ -184,10 +184,10 @@ test('four real seats join, ready, and play real discards/claims through the liv
 });
 
 test('practice mode is reachable from the lobby and reaches real gameplay with bot seats marked', async () => {
-	// M4.5 (docs/05-roadmap.md): the lobby's "Play vs bots" button generates its own room id and
+	// M4.5 (docs/05-roadmap.md): the lobby's "Play vs bots" button generates its own table id and
 	// tags the table route `?practice=1`, which `/table/[id]` translates into `&practice=true` on
-	// the real WS URL -- server-side, that binds seats 1-3 to real `FaanBot`s at room creation
-	// (server/app/ws.py's `ws_endpoint`/`app/room.py`'s `Room.__init__(practice=...)`), before
+	// the real WS URL -- server-side, that binds seats 1-3 to real `FaanBot`s at table creation
+	// (server/app/ws.py's `ws_endpoint`/`app/table.py`'s `Table.__init__(practice=...)`), before
 	// this test's one human seat ever joins. Proves the whole chain end to end: lobby button ->
 	// route -> practice WS param -> bot-filled table -> the seats actually render the `bot` badge
 	// this sub-task added to the table scene.
@@ -201,9 +201,9 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 		await expect(page).toHaveURL(/\/table\/[A-Z0-9]+\?practice=1$/);
 
 		// a practice table's three bot seats are already bound and auto-ready the instant the
-		// room exists (docs/05-roadmap.md M4.5) -- the human's own `join`/`ready` is the only real
+		// table exists (docs/05-roadmap.md M4.5) -- the human's own `join`/`ready` is the only real
 		// gate left. Observed running against a real backend: this clears the "waiting for the
-		// rest of the table" screen so fast (the room's own `ready` gate opens the instant this
+		// rest of the table" screen so fast (the table's own `ready` gate opens the instant this
 		// seat's `ready` lands) that the intermediate "You're seated as" text often never renders
 		// at all before `tableReady` flips -- so this only asserts the eventual, stable state
 		// (the table scene itself), not the transient one in between.
@@ -212,7 +212,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 
 		// three opponent seats, all bot-controlled -- the visual treatment this sub-task added.
 		await expect(page.locator('.bot-badge')).toHaveCount(3);
-		await expect(page.locator('.room-label')).toContainText('practice vs FaanBot');
+		await expect(page.locator('.table-label')).toContainText('practice vs FaanBot');
 
 		// each bot seat's real server-assigned name (M5's `names` array, docs/02-protocol.md
 		// §3: "Practice-mode bot seats get a tier-based name like 'FaanBot'") renders alongside
@@ -223,7 +223,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 			await expect(botSeatNames.nth(i)).toContainText('FaanBot');
 		}
 
-		// hand 1's dealer is fixed at room construction and can be this human seat -- unlike the
+		// hand 1's dealer is fixed at table construction and can be this human seat -- unlike the
 		// four-real-seats test above, there's only one human here, so nothing discards on this
 		// seat's own behalf until it's actually clicked. Tsumogiri whichever discard is offered
 		// and pass any claim window, same policy as `server/tests/test_practice_mode_e2e.py`'s
@@ -261,7 +261,7 @@ test('completing more than one real hand accumulates multi-hand history in the S
 	// end -- docs/03-frontend.md's `/table/[id]` wiring section -- not just reducer.spec.ts's
 	// hand-constructed fixtures).
 	test.setTimeout(300_000);
-	const room = `e2e-history-${Date.now()}`;
+	const table = `e2e-history-${Date.now()}`;
 	const browser = await chromium.launch();
 	try {
 		const pages = await Promise.all(
@@ -272,7 +272,7 @@ test('completing more than one real hand accumulates multi-hand history in the S
 		);
 
 		await Promise.all(
-			pages.map((p) => p.goto(`${BASE}/table/${room}`, { waitUntil: 'networkidle' }))
+			pages.map((p) => p.goto(`${BASE}/table/${table}`, { waitUntil: 'networkidle' }))
 		);
 		await pages[0].getByRole('button', { name: 'Sit down' }).click();
 		for (const p of pages.slice(1)) {

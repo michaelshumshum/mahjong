@@ -1,9 +1,9 @@
-"""A real `Room`/`RoomRegistry`-driven game over WS reaching `Phase.GAME_OVER` and persisting a
+"""A real `Table`/`TableRegistry`-driven game over WS reaching `Phase.GAME_OVER` and persisting a
 `GameRecord` (docs/06-ml.md §2, docs/00-architecture.md §6, docs/05-roadmap.md M3's "Postgres
 persistence of finished games" -- the piece M1's `bots/selfplay.py` covered for bot-only games,
-this covers for a real `Room`-driven one).
+this covers for a real `Table`-driven one).
 
-Same `TestClient` + `room.state = ...` white-box rig `tests/test_ws_gameplay.py` established,
+Same `TestClient` + `table.state = ...` white-box rig `tests/test_ws_gameplay.py` established,
 plus one more trick: `dealer=3` with both dealer-repeat flags off makes *this* hand -- however it
 ends -- the last hand of an `EAST_ONLY` game (`mahjong_core/engine.py`'s `start_next_hand`: once
 `next_dealer` wraps back to seat 0 with no round left, the game ends), so a single uncontested
@@ -33,7 +33,7 @@ from sqlalchemy import select
 from app.db.models import Base, GameRecord
 from app.db.session import make_engine, make_session_factory
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.actions import action_from_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game
@@ -133,19 +133,19 @@ def test_full_game_via_ws_persists_a_game_record(
     asyncio.run(_create_schema())
     monkeypatch.setenv("DATABASE_URL", database_url)
 
-    room_id = f"persist-{uuid.uuid4()}"
+    table_id = f"persist-{uuid.uuid4()}"
     seed = 20260917
 
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}") as ws0,
-        client.websocket_connect(f"/ws?room={room_id}") as ws1,
-        client.websocket_connect(f"/ws?room={room_id}") as ws2,
-        client.websocket_connect(f"/ws?room={room_id}") as ws3,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
+        client.websocket_connect(f"/ws?table={table_id}") as ws1,
+        client.websocket_connect(f"/ws?table={table_id}") as ws2,
+        client.websocket_connect(f"/ws?table={table_id}") as ws3,
     ):
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_last_hand_state(seed=seed)
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_last_hand_state(seed=seed)
 
         wss = [ws0, ws1, ws2, ws3]
         names = {seat: f"Player {seat}" for seat in range(4)}
@@ -160,9 +160,9 @@ def test_full_game_via_ws_persists_a_game_record(
             ack = sock.receive_json()
             assert ack["t"] == "ack" and ack["d"]["ok"] is True
 
-        assert room is not None
+        assert table is not None
         for seat in range(4):
-            binding = room.seat_bindings[seat]
+            binding = table.seat_bindings[seat]
             assert binding is not None
             assert binding.name == names[seat]
 
@@ -194,18 +194,18 @@ def test_full_game_via_ws_persists_a_game_record(
                 frame = ws_conn.receive_json()
                 assert frame["t"] in expected_types
 
-        assert room.state.phase == Phase.GAME_OVER
+        assert table.state.phase == Phase.GAME_OVER
 
-    # the room's background task has to actually finish (and its GAME_OVER persist with it)
-    # before we can trust the DB row exists -- Room.run() returns only after that, and
-    # RoomRegistry's own task-cleanup already proves this timing (tests/test_registry.py).
+    # the table's background task has to actually finish (and its GAME_OVER persist with it)
+    # before we can trust the DB row exists -- Table.run() returns only after that, and
+    # TableRegistry's own task-cleanup already proves this timing (tests/test_registry.py).
     record = _fetch_latest_record(database_url)
     assert record is not None
     assert record.engine_version == ENGINE_VERSION
     assert record.seed == seed
     assert RuleSet.from_dict(record.ruleset) == _LAST_HAND_RULESET
-    assert record.result["hand_count"] == room.state.hand_no
-    assert record.result["final_scores"] == [s.score for s in room.state.seats]
+    assert record.result["hand_count"] == table.state.hand_no
+    assert record.result["final_scores"] == [s.score for s in table.state.seats]
     assert record.players == [names[s] for s in range(4)]
-    assert len(record.action_log) == len(room.actions)
-    assert [action_from_dict(d) for d in record.action_log] == room.actions
+    assert len(record.action_log) == len(table.actions)
+    assert [action_from_dict(d) for d in record.action_log] == table.actions

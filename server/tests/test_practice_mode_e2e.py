@@ -1,7 +1,7 @@
 """M4.5's bot-filled-table mechanism (docs/05-roadmap.md M4.5, docs/04-bots.md §1): one real WS
-client joins a `practice=true` room, seats 1-3 are bot-bound from room *creation* -- no `join`
+client joins a `practice=true` table, seats 1-3 are bot-bound from table *creation* -- no `join`
 ever sent for them -- and a full game plays out to `Phase.GAME_OVER` with the human acting on
-its own turns and the real `FaanBot` (T2, the room's default `bot_tier`) tier acting on the
+its own turns and the real `FaanBot` (T2, the table's default `bot_tier`) tier acting on the
 bots'. Deliberately **not** a scripted hand (`tests/test_full_game_e2e.py`'s own style rigs
 every hand's tiles): proving the mechanism means letting `_poke_bots()`/the real
 `ProcessPoolExecutor` round-trip actually decide the bots' moves, turn after turn, for a whole
@@ -14,7 +14,7 @@ start-up) -- unlike `tests/test_selfplay.py`'s genuinely heavy 10,000-game/200-h
 sweeps, this is a single deterministic run.
 
 `_GAME_RULESET` (dealer-repeat off, same as `test_full_game_e2e.py`'s own) is applied by
-directly overwriting `room.state` with a freshly-dealt `GameState` right after the room is
+directly overwriting `table.state` with a freshly-dealt `GameState` right after the table is
 created (same technique that file already established) -- `ws_endpoint` has no query param to
 choose a ruleset, only `DEFAULT_RULESET` (dealer-repeat *on*), which would make hand count
 unbounded and this test unpredictably slow rather than a bounded, fast, deterministic run.
@@ -32,7 +32,7 @@ from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import Phase
@@ -96,32 +96,32 @@ def _play_practice_game(ws: WebSocketTestSession) -> list[dict[str, Any]]:
 
 
 def test_practice_mode_full_game_against_real_faanbots() -> None:
-    room_id = f"practice-{uuid.uuid4()}"
+    table_id = f"practice-{uuid.uuid4()}"
     seed = 20260918001
 
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}&practice=true") as ws0,
+        client.websocket_connect(f"/ws?table={table_id}&practice=true") as ws0,
     ):
-        room = get_room(room_id)
-        assert room is not None
+        table = get_table(table_id)
+        assert table is not None
 
-        # --- seats 1-3 are bot-bound from room *creation*, before this test ever sends `join`
+        # --- seats 1-3 are bot-bound from table *creation*, before this test ever sends `join`
         # for anyone -- the whole point of this sub-task's mechanism.
-        assert room.seat_bindings[0] is None
+        assert table.seat_bindings[0] is None
         for seat in (1, 2, 3):
-            binding = room.seat_bindings[seat]
+            binding = table.seat_bindings[seat]
             assert binding is not None
             assert binding.status == "bot"
             assert binding.ready is True
             # M5: a bot seat still gets a real, sensible display name -- never null/empty --
-            # sourced from the room's real tier, not a generic "Bot" placeholder.
+            # sourced from the table's real tier, not a generic "Bot" placeholder.
             assert binding.name == "FaanBot"
-        assert room._bot_tier == "T2"  # M4.5's default -- FaanBot, not a weaker tier
+        assert table._bot_tier == "T2"  # M4.5's default -- FaanBot, not a weaker tier
 
         # override to a repeat-off ruleset (module docstring) -- before any message is sent, so
         # every frame the human ever receives (including its own join's state_sync) reflects it.
-        room.state = new_game(_GAME_RULESET, seed)
+        table.state = new_game(_GAME_RULESET, seed)
 
         ws0.send_json(_msg("hello", {"client_version": "test"}))
         ws0.send_json(_msg("join", {"seat": 0, "name": "Dave"}, id_=_next_id()))
@@ -130,7 +130,7 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
         frames = _play_practice_game(ws0)
 
     # --- the game actually finished, through the real engine, not a rigged shortcut.
-    assert room.state.phase == Phase.GAME_OVER
+    assert table.state.phase == Phase.GAME_OVER
     game_end = frames[-1]
     assert game_end["t"] == "game_end"
     assert game_end["d"]["hand_no"] == 4  # bounded, per module docstring
@@ -153,6 +153,6 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
     # was no human behind them to disconnect, so status stays exactly "bot" throughout the whole
     # game, never flipped to "disconnected"/"autoplay"/"connected" by anything.
     for seat in (1, 2, 3):
-        binding = room.seat_bindings[seat]
+        binding = table.seat_bindings[seat]
         assert binding is not None
         assert binding.status == "bot"

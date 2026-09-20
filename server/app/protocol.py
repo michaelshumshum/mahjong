@@ -114,7 +114,7 @@ class ReadyPayload(BaseModel):
 
 class HandEndAckPayload(BaseModel):
     """`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current
-    hand_no)` server-side (`app/room.py`'s `Room.mark_hand_end_ack`), same shape as `ReadyPayload`
+    hand_no)` server-side (`app/table.py`'s `Table.mark_hand_end_ack`), same shape as `ReadyPayload`
     above."""
 
     model_config = ConfigDict(extra="forbid")
@@ -211,7 +211,7 @@ class StateSyncPayload(BaseModel):
     seat_status: list[str]
     # per-seat chosen guest display name (M5), same indexing as seat_status -- `null` for a seat
     # nobody has ever joined ("empty"); always a resolved, non-empty string for any bound seat
-    # (human or bot), never null for those -- see `app/room.py`'s `_normalize_name`.
+    # (human or bot), never null for those -- see `app/table.py`'s `_normalize_name`.
     names: list[str | None]
     scores: list[int]
     legal_actions: list[dict[str, Any]]
@@ -355,7 +355,7 @@ class SeatStatePayload(BaseModel):
 class ServerShutdownPayload(BaseModel):
     """docs/00-architecture.md §8.1 step 2 -- broadcast once a graceful-shutdown drain starts,
     so clients can show a "reconnect shortly" banner instead of reading the eventual dropped
-    socket as an error. `deadline_ts` is the same bounded grace window every room in this drain
+    socket as an error. `deadline_ts` is the same bounded grace window every table in this drain
     shares (server epoch ms, same convention as every other `deadline_ts` on the wire)."""
 
     model_config = ConfigDict(extra="forbid")

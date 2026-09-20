@@ -93,14 +93,14 @@ function isSeat(value: unknown): value is number {
 	return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 3;
 }
 
-/** Which seat this browser last held in a given room, keyed per-room since a seat number only
- * means something relative to one room's `Room.seats`. Lets a page reload resume via
+/** Which seat this browser last held in a given table, keyed per-table since a seat number only
+ * means something relative to one table's `Table.seats`. Lets a page reload resume via
  * `hello{seat}` (docs/02-protocol.md §5) instead of falling back to `join`, which fails with
- * `room_full` once all four seats are already bound -- the bug this persistence exists to fix. */
-export function loadSeatForRoom(roomId: string): number | null {
-	return load(SEAT_STORAGE_KEY_PREFIX + roomId, isSeat);
+ * `table_full` once all four seats are already bound -- the bug this persistence exists to fix. */
+export function loadSeatForTable(tableId: string): number | null {
+	return load(SEAT_STORAGE_KEY_PREFIX + tableId, isSeat);
 }
 
-export function saveSeatForRoom(roomId: string, seat: number): void {
-	writeRaw(SEAT_STORAGE_KEY_PREFIX + roomId, JSON.stringify(seat));
+export function saveSeatForTable(tableId: string, seat: number): void {
+	writeRaw(SEAT_STORAGE_KEY_PREFIX + tableId, JSON.stringify(seat));
 }

@@ -26,7 +26,7 @@ src/lib/styles/ SCSS tokens, tile geometry, layout mixins (see docs/03-frontend.
   the default SSR that `web/Dockerfile`'s `node build` (adapter-node) turns on.
 - `src/lib/net/protocol.d.ts` is generated — edit `server/app/protocol.py`, run `make proto`.
 - The reducer is pure and exhaustively switched over the event union.
-- **Sequence numbers are per-seat**, gapless within your own stream, not per-room. A gap on your
+- **Sequence numbers are per-seat**, gapless within your own stream, not per-table. A gap on your
   own stream triggers a resync, never a silent patch.
 - Code that subscribes outside a `.svelte` file (e.g. a `lib/net/` socket manager driving an
   `$effect`) must wrap it in `$effect.root(...)` with an explicit disposer — effects need an
@@ -49,7 +49,7 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   if a page's content meaningfully changed. Full workflow, troubleshooting, and the notable-pages
   list: `.claude/skills/frontend-screenshots/SKILL.md`. Skip this for changes with no visible
   surface (pure logic, test-only, refactors with identical output).
-- `/table/[id]` opens a real live game by default (`[id]` as a room id) — the screenshot script
+- `/table/[id]` opens a real live game by default (`[id]` as a table id) — the screenshot script
   and `table.e2e.ts` explicitly pass `?mock=<scenarioId>` (any value works; a bare `?mock` picks
   the first scenario) to stay on the frozen `MOCK_SCENARIOS` fixture, since neither runs a backend.
   Live wiring detail: `docs/03-frontend.md`'s "`/table/[id]` wiring" (§6).

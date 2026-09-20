@@ -29,16 +29,16 @@ Deferred — see [99-deferred.md](99-deferred.md).
 
 The API container runs uvicorn with **one worker**.
 
-> Rooms are in-memory objects owned by one process. Two workers mean two disjoint sets of rooms
-> with no routing between them — players 1 and 2 land in worker A's room #7 while players 3 and
-> 4 land in worker B's *different* room #7.
+> Tables are in-memory objects owned by one process. Two workers mean two disjoint sets of tables
+> with no routing between them — players 1 and 2 land in worker A's table #7 while players 3 and
+> 4 land in worker B's *different* table #7.
 
 `--workers` is pinned by a comment in the Compose file and a startup assertion in `main.py`.
 Multi-node scaling is out of scope at this stage. Deferred — see [99-deferred.md](99-deferred.md).
 
 **Graceful shutdown is implemented at the app level, not yet matched at the Compose level.**
-`RoomRegistry.begin_shutdown` (`app/registry.py`) runs the real drain on SIGTERM — stop new
-joins, warn connected seats, let a mid-hand room finish that hand within `SHUTDOWN_GRACE_SECONDS`
+`TableRegistry.begin_shutdown` (`app/registry.py`) runs the real drain on SIGTERM — stop new
+joins, warn connected seats, let a mid-hand table finish that hand within `SHUTDOWN_GRACE_SECONDS`
 (default 90s) — see `00-architecture.md §8.1`. Neither `docker-compose.yml` nor
 `docker-compose.prod.yml` sets a `stop_grace_period` yet, so Compose's own default (10s before
 SIGKILL) can still cut the drain off well before its 90s window closes — needs sizing to match
@@ -113,7 +113,7 @@ Not yet decided: hosting target, domain, and TLS termination. Minimum shape once
 `alembic` is wired into the `Makefile` (`make migrate`, `make revision`). A fresh dev database
 needs `make migrate` once: Compose gives `api` a real `DATABASE_URL`, so `make test-server`
 exercises the real `GAME_OVER` persist rather than the no-session-factory no-op, and against an
-unmigrated database every finished game logs a lost record (`app/room.py`'s `process_one`).
+unmigrated database every finished game logs a lost record (`app/table.py`'s `process_one`).
 `games` is the first table, migrated in `server/alembic/versions/95b97823dd97_create_games_table.py`, model at
 `server/app/db/models.py`. `leaderboard` below is still just the target shape — not built yet, no
 migration. There is no `users` table planned: `docs/00-architecture.md §2.1` cuts real accounts
@@ -132,21 +132,21 @@ tests (CI has no Postgres service, §9) and JSONB in production. `save_game_reco
 is the self-play integration point (`docs/05-roadmap.md §2`'s M1 gate: bot-only games recorded
 end to end).
 
-Room state itself is never persisted — it's in-memory only until stage-3 durability
+Table state itself is never persisted — it's in-memory only until stage-3 durability
 (`00-architecture.md §7`) is built, which is out of scope now.
 
 ## 7. Observability
 
-Nothing exists here yet. For a stateful single-process server where one wedged room silently
+Nothing exists here yet. For a stateful single-process server where one wedged table silently
 kills a game in progress, this is a gap, not a nice-to-have. Minimum bar before real users:
 
 - **Logging:** structured (JSON) to stdout, one line per request/event, `LOG_LEVEL` already
   wired via env. Docker captures stdout; no log shipping decided yet.
 - **Health:** `/healthz` already exists (used by the `api` container healthcheck). No readiness
   vs. liveness distinction yet — fine at one instance.
-- **Metrics:** none. At minimum, room count, active connections, and per-room hand duration
-  would surface a wedged room before a player reports it.
-- **Error tracking:** none. Uncaught exceptions in a room's `asyncio.Task` currently have
+- **Metrics:** none. At minimum, table count, active connections, and per-table hand duration
+  would surface a wedged table before a player reports it.
+- **Error tracking:** none. Uncaught exceptions in a table's `asyncio.Task` currently have
   nowhere to go but the log.
 - **Tracing:** not needed at this scale; skip until stage 2.
 

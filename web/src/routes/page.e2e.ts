@@ -6,26 +6,26 @@ test('home page loads and has a title', async ({ page }) => {
 	await expect(page).toHaveTitle(/Mahjong/);
 });
 
-test('lobby create room shows a mock invite code', async ({ page }) => {
+test('lobby create table shows a mock invite code', async ({ page }) => {
 	await page.goto('/');
 	// wait past hydration: the create button is server-rendered but its click handler only
 	// attaches once svelte-kit finishes loading, so an immediate click can race it.
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Create room' }).click();
+	await page.getByRole('button', { name: 'Create table' }).click();
 
 	const code = page.getByTestId('hosted-code');
 	await expect(code).toBeVisible();
 	await expect(code).toHaveText(/^[A-Z0-9]{6}$/);
 
-	await page.getByRole('button', { name: 'Enter room' }).click();
+	await page.getByRole('button', { name: 'Enter table' }).click();
 	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}$/);
 });
 
-test('lobby join room navigates to the table route with the entered code', async ({ page }) => {
+test('lobby join table navigates to the table route with the entered code', async ({ page }) => {
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
 	await page.getByPlaceholder('ABC123').fill('ABC123');
-	await page.getByRole('button', { name: 'Join room' }).click();
+	await page.getByRole('button', { name: 'Join table' }).click();
 
 	await expect(page).toHaveURL('/table/ABC123');
 	await expect(page.locator('h1')).toHaveText('Table');

@@ -1017,10 +1017,10 @@ def test_dealer_repeats_on_draw_when_configured() -> None:
 
 def test_start_next_hand_carries_forward_next_window_id() -> None:
     """`window_id` must stay unique for the life of a game, not just within one hand --
-    `app/room.py`'s per-window bookkeeping (`_armed_window_id`, `_active_seat_timer`,
+    `app/table.py`'s per-window bookkeeping (`_armed_window_id`, `_active_seat_timer`,
     `_claim_deadline_ms`) is keyed by `window_id` alone (docs/05-roadmap.md M3 closeout audit)
     and is never reset between hands. If `next_window_id` reset to 0 every hand, hand 2's first
-    claim window would collide with a window_id already used in hand 1, and `Room.
+    claim window would collide with a window_id already used in hand 1, and `Table.
     _arm_claim_timer`'s once-per-window idempotency guard would silently skip arming it -- no
     `claim_offer`, no timer, ever, for that window."""
     ruleset = RuleSet(dealer_repeat_on_draw=False, dealer_repeat_on_win=False)

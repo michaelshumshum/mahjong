@@ -42,7 +42,7 @@ export interface LiveTableView {
 }
 
 // `state.prevailing`/`hand_start.prevailing` are the wire's `Wind` enum *name*
-// (`app/views.py`/`app/room.py`: `state.prevailing.name` -- IntEnum members EAST=0..NORTH=3),
+// (`app/views.py`/`app/table.py`: `state.prevailing.name` -- IntEnum members EAST=0..NORTH=3),
 // not the single-letter code (`'E'|'S'|'W'|'N'`) `WIND_LABEL`/`MockGameState` use everywhere
 // else. Only found by actually running a live hand end to end -- every mock scenario already
 // hardcodes the single-letter form, so nothing else exercises this mismatch.

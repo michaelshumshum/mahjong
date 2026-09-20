@@ -30,11 +30,11 @@
 		loadAutoArm,
 		loadClientPrefs,
 		loadDisplayName,
-		loadSeatForRoom,
+		loadSeatForTable,
 		saveAutoArm,
 		saveClientPrefs,
 		saveDisplayName,
-		saveSeatForRoom
+		saveSeatForTable
 	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
@@ -60,16 +60,16 @@
 	// `?mock=<scenarioId>` (any value, or bare `?mock`) renders a frozen MOCK_SCENARIOS fixture
 	// -- the screenshot workflow (.claude/skills/frontend-screenshots/SKILL.md) and design
 	// iteration need this to keep working with no backend running. Omitted, `[id]` is treated as
-	// a real room id and this opens a real MahjongSocket -> GameStore against it. Both paths
+	// a real table id and this opens a real MahjongSocket -> GameStore against it. Both paths
 	// render through the same MockGameState-shaped view model (`gameState` below) so the
 	// template/component tree never forks (`$lib/table/live-view.ts`'s module doc).
 	let isMock = $derived(page.url.searchParams.has('mock'));
-	let roomId = $derived(page.params.id ?? '');
+	let tableId = $derived(page.params.id ?? '');
 
 	// `?practice=1` (this route's own query param, set by the lobby's "Play vs bots" button --
 	// spelling is unrelated to the wire's own `&practice=true`) opens the live socket in M4.5
-	// practice mode: seats 1-3 are bot-bound at room *creation* (server/app/ws.py's
-	// `ws_endpoint`/`app/room.py`'s `Room.__init__(practice=...)`), so the human's own `join`
+	// practice mode: seats 1-3 are bot-bound at table *creation* (server/app/ws.py's
+	// `ws_endpoint`/`app/table.py`'s `Table.__init__(practice=...)`), so the human's own `join`
 	// (still a real intent, same "Sit down" flow below) is the only one this page ever sends.
 	let isPractice = $derived(page.url.searchParams.has('practice'));
 
@@ -104,8 +104,8 @@
 
 	// --- live connection -------------------------------------------------------------------
 	let liveStore = $state<GameStore | null>(null);
-	// there's no backend "has this room actually started" field (state_sync's own snapshot
-	// already reflects a fully-dealt hand the instant the room is created -- mahjong_core's
+	// there's no backend "has this table actually started" field (state_sync's own snapshot
+	// already reflects a fully-dealt hand the instant the table is created -- mahjong_core's
 	// `new_game()` deals immediately, before any `ready` -- so `phase`/`own_hand` can't
 	// distinguish "waiting for the table to fill" from "already playing"). Tracked here
 	// instead: flips permanently once a genuine post-start broadcast is observed, or the very
@@ -122,8 +122,8 @@
 		);
 	}
 
-	// discrete events that only exist once `Room.started` (app/room.py) -- unlike a state_sync
-	// snapshot, these can't have been computed ahead of the room actually dealing/turning.
+	// discrete events that only exist once `Table.started` (app/table.py) -- unlike a state_sync
+	// snapshot, these can't have been computed ahead of the table actually dealing/turning.
 	const HAND_LIFECYCLE_EVENTS = new Set<string>([
 		'hand_start',
 		'draw',
@@ -142,7 +142,7 @@
 		if (isMock || pregamePreview !== null) return;
 		const practiceParam = isPractice ? '&practice=true' : '';
 		const socket = new MahjongSocket(
-			`${defaultWsUrl()}?room=${encodeURIComponent(roomId)}${practiceParam}`
+			`${defaultWsUrl()}?table=${encodeURIComponent(tableId)}${practiceParam}`
 		);
 		const store = new GameStore(socket);
 		handEverStarted = false;
@@ -161,8 +161,8 @@
 		// a page reload builds a fresh MahjongSocket with no memory of which seat this browser
 		// held -- resume it from localStorage so `hello{seat}` reclaims the seat (docs/02
 		// -protocol.md §5) instead of falling into the "Sit down" screen's `join`, which fails
-		// with `room_full` once all four seats are already bound to this game's players.
-		const persistedSeat = loadSeatForRoom(roomId);
+		// with `table_full` once all four seats are already bound to this game's players.
+		const persistedSeat = loadSeatForTable(tableId);
 		socket.connect(persistedSeat !== null ? { seat: persistedSeat } : undefined);
 		return () => {
 			offEvent();
@@ -175,7 +175,7 @@
 	// persist the seat the moment the server confirms it, so a later reload can resume it.
 	$effect(() => {
 		const seat = liveStore?.state.seat;
-		if (seat !== null && seat !== undefined) saveSeatForRoom(roomId, seat);
+		if (seat !== null && seat !== undefined) saveSeatForTable(tableId, seat);
 	});
 
 	// sitting down implies readiness -- no strategic reason to delay `ready` behind a second
@@ -237,8 +237,8 @@
 	);
 
 	// --- pre-game invite link (live mode only) ----------------------------------------------
-	// the room's URL *is* the invite -- whoever opens it lands in this same room (docs/03
-	// -frontend.md's "/table/[id] wiring": [id] is a real room id, auto-created on first
+	// the table's URL *is* the invite -- whoever opens it lands in this same table (docs/03
+	// -frontend.md's "/table/[id] wiring": [id] is a real table id, auto-created on first
 	// connect). Waiting for the table to fill is exactly the moment you need to hand that link
 	// to someone, so it lives on both the join and waiting screens, not tucked in the lobby.
 	let copiedInviteLink = $state(false);
@@ -619,10 +619,10 @@
 	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
 	before any hand exists. `you === null` (not seated yet) shows four identical "Open" seats --
 	there is genuinely nothing else true to say pre-join. Seated, every seat's *wind* is already
-	real (the dealer is fixed at room creation, before any `ready` -- docs/03-frontend.md's
-	"There is no backend has this room started field" note) even though which seats are actually
+	real (the dealer is fixed at table creation, before any `ready` -- docs/03-frontend.md's
+	"There is no backend has this table started field" note) even though which seats are actually
 	occupied is not: `seat_status` reads every unbound seat as "connected", identical to a seat
-	that really is (`server/app/room.py`'s `_seat_status_tuple` docstring) -- so this deliberately
+	that really is (`server/app/table.py`'s `_seat_status_tuple` docstring) -- so this deliberately
 	never claims occupancy for a seat that isn't yours. -->
 {#snippet seatRing(you: Seat | null)}
 	<div class="seat-ring" aria-hidden="true">
@@ -727,8 +727,8 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="room-label">
-					Room <strong>{roomId}</strong> · seat {liveStore?.state.seat}{#if isPractice}
+				<p class="table-label">
+					Table <strong>{tableId}</strong> · seat {liveStore?.state.seat}{#if isPractice}
 						· practice vs FaanBot{/if}
 				</p>
 			{/if}
@@ -1044,9 +1044,9 @@
 	<h1 class="sr-only">Table</h1>
 	<div class="pretable-page">
 		<div class="pretable-panel">
-			<div class="pretable-room">
+			<div class="pretable-info">
 				<span>Table</span>
-				<span class="pretable-code">{roomId}</span>
+				<span class="pretable-code">{tableId}</span>
 				<button type="button" class="pretable-link-btn" onclick={copyInviteLink}>
 					{copiedInviteLink ? 'Copied' : 'Copy invite link'}
 				</button>
@@ -1163,7 +1163,7 @@
 		}
 	}
 
-	.pretable-room {
+	.pretable-info {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -1262,7 +1262,7 @@
 
 	// seat preview ring: across/left/right/self, same relative arrangement as the real table
 	// grid (§3, layout.seat-region-grid) at token scale -- foreshadows the seats you're about
-	// to sit at rather than inventing a second layout language for the waiting room.
+	// to sit at rather than inventing a second layout language for the pre-game screen.
 	.seat-ring {
 		display: grid;
 		grid-template-areas:
@@ -1303,13 +1303,13 @@
 		font-size: var(--font-size-sm);
 		font-weight: 600;
 		// "waiting, alive" -- not stalled. Honest about what it doesn't know: this pulses
-		// identically whether or not that seat actually has anyone in it (server/app/room.py's
+		// identically whether or not that seat actually has anyone in it (server/app/table.py's
 		// `_seat_status_tuple` can't tell us -- an unbound seat reads the same as a connected
 		// one), so it never claims occupancy, only that the table is open and listening.
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
 	}
 
-	// the one seat this screen actually knows something real about: dealer is fixed at room
+	// the one seat this screen actually knows something real about: dealer is fixed at table
 	// creation, so once you're seated your own wind is true today, not a guess.
 	.seat-ring-slot--self {
 		border: 1px solid var(--color-accent);
@@ -1371,7 +1371,7 @@
 		@include buttons.btn-secondary;
 	}
 
-	.room-label {
+	.table-label {
 		margin: 0;
 		align-self: center;
 		font-size: var(--font-size-sm);

@@ -1,9 +1,9 @@
 # 02 — Wire protocol
 
-Transport: one WebSocket per client at `wss://…/ws?room={id}`. Plain JSON frames — no
+Transport: one WebSocket per client at `wss://…/ws?table={id}`. Plain JSON frames — no
 `permessage-deflate`: at ~150 bytes/frame it typically *grows* the payload (compression overhead
 exceeds the savings) and adds per-frame CPU to every connection for no benefit at this message
-size. REST (`/api/*`) handles everything that isn't live play: room listing, replay download,
+size. REST (`/api/*`) handles everything that isn't live play: table listing, replay download,
 leaderboard.
 
 **Auth:** guest-only, by design. No account, no password, no email, no REST auth endpoint
@@ -31,10 +31,10 @@ Every frame, both directions:
 - `v` — protocol version; mismatch → `error{code:"version"}`, then close.
 - `t` — message type.
 - `seq` — server→client, **per-seat** (and per-spectator-session): dense and gapless within the
-  stream sent to *that recipient*, not per room. Two players never share a seq space, so what
+  stream sent to *that recipient*, not per table. Two players never share a seq space, so what
   one player is or isn't offered (e.g. a `claim_offer` someone else didn't get) never shows up
   as a gap for anyone else — see §5 for the resync algorithm and §7 for a worked example. The
-  room separately keeps an internal monotonic `event_id` for logging and replay ordering; it
+  table separately keeps an internal monotonic `event_id` for logging and replay ordering; it
   never goes on the wire and is not what `last_seq` is compared against.
 - `id` — client→server idempotency key. See "Idempotency" below.
 - `ts` — server clock, ms.
@@ -54,7 +54,7 @@ Every frame, both directions:
   if it were the other.
 - **`join` is the one exception:** the cache lives on the seat binding `join` itself creates, so
   there's no binding yet to scope a `join` retry to. A `join` isn't deduplicated by `id` — it's
-  answered directly (`seat_taken`/`room_full`/success) every time, same as before this section's
+  answered directly (`seat_taken`/`table_full`/success) every time, same as before this section's
   id contract existed.
 
 ## 2. Client → server (intents)
@@ -64,9 +64,9 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 | `t` | payload | notes |
 | --- | --- | --- |
 | `hello` | `{last_seq?, client_version, seat?}` | first frame after connect. `seat` present + already bound -> reconnect (§5); omitted -> the M0 no-op ahead of `join`. No `name` field — the server already has it from that seat's original `join`, so a reconnect never resends it |
-| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` (M5) is a client-chosen guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty/omitted; never hard-rejected (`server/app/room.py`'s `_normalize_name`). A `hello` reconnect never resends it |
+| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` (M5) is a client-chosen guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty/omitted; never hard-rejected (`server/app/table.py`'s `_normalize_name`). A `hello` reconnect never resends it |
 | `ready` | `{}` | lobby → start; only valid once seated |
-| `hand_end_ack` | `{}` | dismiss the hand-end hold early ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — every hand end (win or exhaustive draw) holds the room at `HAND_OVER` until all four seats send this or `ruleset.hand_end_seconds` elapses, whichever first |
+| `hand_end_ack` | `{}` | dismiss the hand-end hold early ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — every hand end (win or exhaustive draw) holds the table at `HAND_OVER` until all four seats send this or `ruleset.hand_end_seconds` elapses, whichever first |
 | `discard` | `{tile_id}` | must be in hand, must be your turn |
 | `claim` | `{window_id, choice, tiles?}` | `choice`: `pass\|chow\|pung\|kong\|win`. `tiles` disambiguates a chow (e.g. 4-5 vs 5-6 for a 6). Priority among competing claims is resolved per [01-rules-spec.md §6](01-rules-spec.md) — not restated here. |
 | `declare` | `{kind, tiles}` | `concealed_kong \| added_kong \| win` on your own turn |
@@ -80,7 +80,7 @@ legality is a UI hint only.
 
 `join` is the only way to occupy a seat; a socket that never sends it is a spectator. The server
 fills seats first-come-first-served among open ones unless `seat` is given, in which case it's
-rejected (`error{code:"seat_taken"}`) if that seat is already bound, or `error{code:"room_full"}`
+rejected (`error{code:"seat_taken"}`) if that seat is already bound, or `error{code:"table_full"}`
 if none are free. A successful `join` is confirmed by a broadcast `seat_state{seat,
 status:"connected", name}` — sent to every already-bound seat (this one included), so a client
 rendering the empty seats it saw in its own `state_sync` (§3) updates live as the rest of the
@@ -88,7 +88,7 @@ table fills in, not only on its next full resync; `name` is this seat's resolved
 name (M5, above), so an already-connected seat learns a new player's chosen name the moment they
 join, not just on its next `state_sync`. `join` is for first entry only — a reconnecting player doesn't re-`join`;
 `hello{last_seq}` on an already-bound seat reclaims it directly (§5). Once all four seats are
-filled the room waits for `ready` from each before dealing.
+filled the table waits for `ready` from each before dealing.
 
 **Spectating** is triggered by an explicit `?spectate=true` query parameter on the WS URL
 (`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`) — not a new envelope message. A passive
@@ -116,22 +116,22 @@ Payload shapes below match `server/app/protocol.py` (§6) exactly.
 | `t` | payload | notes |
 | --- | --- | --- |
 | `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen). `d.names` (M5) is each seat's resolved guest display name, same indexing — `null` for an `empty` seat, always a real non-empty string for any bound seat, human or bot |
-| `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (same vocabulary as `state_sync` above, `empty` included — unreachable for a `require_ready=True` room, where dealing gates on all four seats bound, but a direct-construction `require_ready=False` room can reach hand 2+ with seats that were never joined at all); see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/room.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
+| `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (same vocabulary as `state_sync` above, `empty` included — unreachable for a `require_ready=True` table, where dealing gates on all four seats bound, but a direct-construction `require_ready=False` table can reach hand 2+ with seats that were never joined at all); see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/table.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
 | `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; same "no backing `Event`" note as `hand_start` |
 | `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not yet emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event` to redact for those; mid-hand flower reveals (a normal draw) go through `reduce()` normally and *are* emitted |
 | `draw` | `{seat, tile_id?}` | `tile_id` present **only** for the drawing player |
 | `discard` | `{seat, tile_id, tile, pool_index}` | |
-| `claim_offer` | `{window_id, options: [{kind, tiles?}...], deadline_ts}` | **unicast**, only to eligible seats. `options` always ends with `{kind:"pass"}`. No backing `Event` (same synthesis note) — sent by `app/room.py` the moment a window's deadline is armed, so it always carries a real `deadline_ts` |
+| `claim_offer` | `{window_id, options: [{kind, tiles?}...], deadline_ts}` | **unicast**, only to eligible seats. `options` always ends with `{kind:"pass"}`. No backing `Event` (same synthesis note) — sent by `app/table.py` the moment a window's deadline is armed, so it always carries a real `deadline_ts` |
 | `claim_resolved` | `{window_id, claim_kind, seat?, action_kind?}` | `claim_kind` is the window kind (`discard`\|`kong_rob`), not the winning meld kind — that's `action_kind` (`claim_chow`\|`claim_pung`\|`claim_kong`\|`claim_win`\|`pass`). v1 is single-winner; `seat`/`action_kind` are both `null` when nobody's claim beat a Pass (一炮多響 deferred, D16) |
 | `meld` | `{seat, meld_kind, tiles, from_seat?}` | except `concealed_kong`, which has a redacted per-seat form: `{seat, meld_kind:"concealed_kong", tiles?, count?}` (see Redaction below) |
 | `kong_replace` | `{seat, tile_id?}` | |
-| `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat. No backing `Event` (same synthesis note); `deadline_ts` is a real, enforced `TimerHeap` entry (00-architecture.md §8 "Turn timeout", the turn-timeout sub-task) — on expiry the room tsumogiris the drawn tile (or discards the lowest-`tile_id` concealed tile after a claimed pung/chow with nothing drawn) and auto-passes any pending claims (structurally never any, in `AWAIT_ACTION`), same enforcement the claim-window deadline (`claim_offer.deadline_ts` above) already had |
+| `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat. No backing `Event` (same synthesis note); `deadline_ts` is a real, enforced `TimerHeap` entry (00-architecture.md §8 "Turn timeout", the turn-timeout sub-task) — on expiry the table tsumogiris the drawn tile (or discards the lowest-`tile_id` concealed tile after a claimed pung/chow with nothing drawn) and auto-passes any pending claims (structurally never any, in `AWAIT_ACTION`), same enforcement the claim-window deadline (`claim_offer.deadline_ts` above) already had |
 | `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?, deadline_ts}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed` (self-draw/flowers immediately, a claimed win only once `HAND_OVER`). `deadline_ts` is the hand-end hold's deadline ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — the same value on every seat's stream, held open until all four `hand_end_ack` or this elapses |
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end` (absolute post-payment totals, not a delta) — no backing `Event` of its own |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
-| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot, name?}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/room.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward. `name` (M5) is this seat's resolved guest display name, carried on every `seat_state` broadcast for that seat, not just its first |
-| `server_shutdown` | `{deadline_ts}` | broadcast once, to every seat ever bound in the room, when a graceful-shutdown drain starts (`00-architecture.md §8.1`); `deadline_ts` is the shared grace-window deadline every room in the drain gets. Clients show a "reconnect shortly" banner instead of reading the eventual dropped socket as an error |
-| `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Room` silently drops a well-formed but currently-illegal command the same as before this existed |
+| `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot, name?}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/table.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward. `name` (M5) is this seat's resolved guest display name, carried on every `seat_state` broadcast for that seat, not just its first |
+| `server_shutdown` | `{deadline_ts}` | broadcast once, to every seat ever bound in the table, when a graceful-shutdown drain starts (`00-architecture.md §8.1`); `deadline_ts` is the shared grace-window deadline every table in the drain gets. Clients show a "reconnect shortly" banner instead of reading the eventual dropped socket as an error |
+| `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Table` silently drops a well-formed but currently-illegal command the same as before this existed |
 | `error` | `{code, message}` |
 | `pong` | `{t0, t1}` |
 
@@ -195,7 +195,7 @@ redaction.
 in the *same* `reduce()` call, the claiming seat's discard-pool entry is removed again by the
 time `state` reaches the redaction layer (`engine._apply_claim_response`), so recomputing it
 from final state would be wrong for exactly the discards that most need a correct wire form.
-The Room actor (a later M3 sub-task) sees each event against its own intermediate state and can
+The Table actor (a later M3 sub-task) sees each event against its own intermediate state and can
 compute this there — `redact_event` alone cannot, by its own `(state, event)` contract.
 
 ## 4. Timers
@@ -222,9 +222,9 @@ client reconnects
          └─ too old / new session                          → state_sync (full redacted snapshot), then resume
 ```
 
-The ring buffer lives on the `Room`: one `deque[Envelope]` (`maxlen=512`) **per seat** (and per
-active spectator session — built, "Spectating" sub-task: `Room.ring` is keyed by seat number
-*or* a spectator's `session_id` string, `app/room.py`'s `register_spectator`/
+The ring buffer lives on the `Table`: one `deque[Envelope]` (`maxlen=512`) **per seat** (and per
+active spectator session — built, "Spectating" sub-task: `Table.ring` is keyed by seat number
+*or* a spectator's `session_id` string, `app/table.py`'s `register_spectator`/
 `publish_to_spectator`), holding *already-redacted* frames exactly as sent. **A spectator session
 is deliberately never reconnectable, unlike a seat** — there is nothing shaped like `hello{seat}`
 for "the same spectator, again" (no seat number, no `SeatBinding` to reclaim, and a spectator's
@@ -237,9 +237,9 @@ with a fresh `state_sync`, not a resumed one. That's the only implementable opti
 replay time `state` has moved on to wherever the game is now, so re-redacting a buffered event
 against today's state would produce wrong, and potentially leaky, output. Pre-redacting once at
 send time and buffering the result is correct and cheap enough: 512 frames × ~150 bytes × 4
-seats is a few hundred KB per room.
+seats is a few hundred KB per table.
 
-`last_seq` in `hello` is compared against *that seat's own* buffered stream, per D1 — the room's
+`last_seq` in `hello` is compared against *that seat's own* buffered stream, per D1 — the table's
 internal `event_id` (used only for server-side logging and replay-viewer ordering) never appears
 on the wire and plays no part in this comparison.
 
@@ -248,13 +248,13 @@ are one code path.
 
 `hello.seat` (§2's table) is how the server knows which seat is reconnecting: a
 `hello{last_seq, seat}` where `seat` is already bound is treated as that seat reconnecting —
-`Room.reconnect()` rebinds the live connection, `Room.resume()` runs the branch above. A `seat`
+`Table.reconnect()` rebinds the live connection, `Table.resume()` runs the branch above. A `seat`
 that was never joined gets `error{code:"no_such_seat"}`. `hello.seat` is trusted at face value,
 permanently — there is no ticket or credential anywhere in this design to check it against (the
 Auth note above); a malicious client can claim any seat.
 
 **Mid-claim-window reconnect re-arms a timer** (00-architecture.md §8). If the reconnecting seat
-holds a live, unresolved claim offer, `Room.resume()` re-arms *that seat's own* entry in the
+holds a live, unresolved claim offer, `Table.resume()` re-arms *that seat's own* entry in the
 claim-window timer heap (one entry per offered seat) to a fresh `ruleset.claim_seconds` window
 from the reconnect moment, untouched by any other offered seat's deadline.
 
@@ -316,7 +316,7 @@ the CI gate for "fails if the generated TS is stale" — see `docs/07-infra.md �
 Same logical sequence as before (Alice discards, Bob pungs), but `seq` is per-seat (D1), so
 there is no single wire trace — each recipient has its own dense, gapless stream. The `turn` and
 `discard` events are broadcast (redacted per seat where needed); `claim_offer` goes only to the
-eligible seat; `ack` goes only to the sender. Below, room-internal `event_id`s (never on the
+eligible seat; `ack` goes only to the sender. Below, table-internal `event_id`s (never on the
 wire) are noted in comments purely to show what triggered each frame.
 
 ```jsonc
@@ -361,7 +361,7 @@ wire) are noted in comments purely to show what triggered each frame.
   // ^ no "legal" — Carol isn't acting
 ```
 
-Compare: under the old per-room `seq`, Carol would have observed 90 → 92 (skipping Bob's
+Compare: under the old per-table `seq`, Carol would have observed 90 → 92 (skipping Bob's
 unicast `claim_offer` at 91) and been forced to full-resync on every claim window — and the
 existence of the gap itself would have told her a claim was offered, defeating redaction (§3).
 Per-seat `seq` makes that structurally impossible: Carol's stream was never going to contain
@@ -405,5 +405,5 @@ Policy when the queue is full:
   idempotent full replace (§5), so a torn-out middle of the stream is harmless once the snapshot
   lands — this reuses the reconnect-with-gap code path rather than adding a second one.
 - If the queue is still full after that (socket is dead, not just slow), the Session closes the
-  connection; the room marks the seat `DISCONNECTED` and normal grace-period/bot-takeover
+  connection; the table marks the seat `DISCONNECTED` and normal grace-period/bot-takeover
   ([00-architecture.md §8](00-architecture.md)) applies.

@@ -15,7 +15,7 @@ class Bot(Protocol):
 
 `mask` is `legal_mask(state, seat) -> list[bool]` (docs/06-ml.md §1) — `GameState`-based, not
 `SeatView`-based: `mahjong_core` must never depend on `app.views`, so whoever drives a bot (the
-self-play harness, the arena, or the Room) computes the mask from the real `GameState` it
+self-play harness, the arena, or the Table) computes the mask from the real `GameState` it
 already holds and hands `(view, mask, deadline)` to `Bot.act` together. `mahjong_core` is
 stdlib-only — no numpy, plain `list[bool]`. A bot never calls `decode_action` itself either, for
 the same reason: it needs the real `GameState`, which a bot never has (`SeatView` is the whole
@@ -23,25 +23,25 @@ point). Decoding the returned id back into a concrete `Action` is always the cal
 learned policy drops into the same slot later with no refactor. See
 [06-ml.md](06-ml.md)/`server/bots/base.py`'s module docstring.
 
-**Scheduling.** Bot decisions do not run inside the room's `asyncio` task — a shanten/ukeire scan
+**Scheduling.** Bot decisions do not run inside the table's `asyncio` task — a shanten/ukeire scan
 is tens of milliseconds of pure-Python CPU (§3), which would stall the event loop for every other
-room on the same process. Instead:
+table on the same process. Instead:
 
-1. The room enqueues `(bot_id, view, mask, deadline, window_id, state_version)` to a
+1. The table enqueues `(bot_id, view, mask, deadline, window_id, state_version)` to a
    `ProcessPoolExecutor` (the GIL makes a thread pool useless for CPU-bound pure-Python search —
    a process pool is the only scheduling primitive that actually parallelises this work).
 2. The worker computes an action id and returns `(window_id, state_version, action_id)` to the
-   room's inbox.
-3. The room compares the tag against its *current* `window_id`/`state_version`. If they don't
+   table's inbox.
+3. The table compares the tag against its *current* `window_id`/`state_version`. If they don't
    match — the claim window closed, or the hand moved on before the worker replied — the result
    is **dropped silently**, exactly like a stale human claim. This is the same staleness
    protection humans get; bots get no special path around it.
-4. If no (matching) result lands before `deadline`, the room applies a safe default (tsumogiri /
+4. If no (matching) result lands before `deadline`, the table applies a safe default (tsumogiri /
    pass) and logs it. A bot must never wedge a table.
 
-**Humanising think delay: 400–1400ms, uniform per decision.** `app/room.py`'s `_await_bot_job`
+**Humanising think delay: 400–1400ms, uniform per decision.** `app/table.py`'s `_await_bot_job`
 sleeps this once the worker replies, before re-entering the result through `self.inbox` —
-applied by the room, not inside the worker, so it never touches
+applied by the table, not inside the worker, so it never touches
 `_BOT_JOB_TIMEOUT_SECONDS`/`turn_seconds`/`claim_seconds` deadline math (a real tier answers in
 single-digit milliseconds; without this, turns and claims resolve faster than a human watching
 the table can follow). Seeded off the same per-decision `seed` `_submit_bot_job` already derives
@@ -51,12 +51,12 @@ returns a confidence/margin signal alongside its chosen action id, so there's no
 the delay by yet.
 
 `bots/worker.py`'s `compute_action` drives the real `Bot.act` tiers. A worker process never
-receives `GameState` (the room's `game_seed` must never leave its own process), so it can't call
+receives `GameState` (the table's `game_seed` must never leave its own process), so it can't call
 `decode_action(aid, state, seat)` itself — `compute_action` builds the requested tier
-(`T0`/`T1`/`T2`, `app/room.py`'s `Room.__init__(bot_tier=...)`, default `T2`/`FaanBot`) and drives
+(`T0`/`T1`/`T2`, `app/table.py`'s `Table.__init__(bot_tier=...)`, default `T2`/`FaanBot`) and drives
 its real `act(view, mask, deadline)` via `asyncio.run` (the worker has no running event loop of
 its own — same pattern `bots/arena.py`'s `ProcessPoolExecutor` entry point uses), returning a
-bare action id. `app/room.py`'s `_handle_bot_result` decodes it, since it already holds the real
+bare action id. `app/table.py`'s `_handle_bot_result` decodes it, since it already holds the real
 `GameState`.
 
 ## 2. Tiers
@@ -109,7 +109,7 @@ multiple CPU-*seconds* of work per wall-clock second on a single worker process.
 capacity constraint, not a "Low"-risk line item — size the `ProcessPoolExecutor` and the
 precomputed per-suit lookup table (O(1) lookup replacing the recursive scan) accordingly, and
 build the table alongside T1, not after load-testing surfaces the problem.
-"Bots run outside the room's task" bounds the room's `asyncio` loop, not total CPU — it does not
+"Bots run outside the table's task" bounds the table's `asyncio` loop, not total CPU — it does not
 by itself make this cheap.
 
 **Built (M4): lazily-populated, not an eagerly-built ~500k-entry table.** `mahjong_core/shanten.py`'s

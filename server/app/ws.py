@@ -1,25 +1,25 @@
 """WS endpoint speaking the envelope protocol (docs/02-protocol.md §1) -- a real `Session` per
-connection that joins a `Room` and exchanges gameplay messages (docs/05-roadmap.md M3 sub-task
+connection that joins a `Table` and exchanges gameplay messages (docs/05-roadmap.md M3 sub-task
 4). Extends M0's hello/ping stub in place rather than replacing it: `Session` still owns the
 connection loop, still validates against `AnyMessage`, still keeps hello/ping/pong exactly as
 M0 left them (see `Session.handle`'s docstring for why those two intentionally do *not* move
 onto the per-seat `seq` stream this sub-task adds for everything else).
 
-**Room lookup is `app/registry.py`'s `RoomRegistry`** (M3 sub-task 6 -- replaces this module's
-former bare `dict[str, Room]`, which its own docstring already flagged as a stand-in: "a real
-`RoomRegistry` with matchmaking is a later sub-task"). Still one process-wide, module-level
-singleton (`_registry` below) -- `RoomRegistry` itself stays an in-process dict per
+**Table lookup is `app/registry.py`'s `TableRegistry`** (M3 sub-task 6 -- replaces this module's
+former bare `dict[str, Table]`, which its own docstring already flagged as a stand-in: "a real
+`TableRegistry` with matchmaking is a later sub-task"). Still one process-wide, module-level
+singleton (`_registry` below) -- `TableRegistry` itself stays an in-process dict per
 docs/00-architecture.md §6, not a new abstraction layer. One `RuleSet` (`DEFAULT_RULESET`) for
-every room -- `?seed=` exists only so tests can pin a room's deal. `?practice=true` (M4.5,
-docs/05-roadmap.md) binds seats 1-3 to bots at room creation, before any human ever joins --
-see `app/room.py`'s `Room.__init__(practice=...)`/`_bind_bot_seat`; only meaningful the first
-time a given `room` id is created (`RoomRegistry.get_or_create`'s own note). `?spectate=true`
+every table -- `?seed=` exists only so tests can pin a table's deal. `?practice=true` (M4.5,
+docs/05-roadmap.md) binds seats 1-3 to bots at table creation, before any human ever joins --
+see `app/table.py`'s `Table.__init__(practice=...)`/`_bind_bot_seat`; only meaningful the first
+time a given `table` id is created (`TableRegistry.get_or_create`'s own note). `?spectate=true`
 ("Spectating" sub-task, docs/05-roadmap.md M5) registers this connection as an active spectator
-at accept time -- see `app/room.py`'s `Room.register_spectator` for why this is an explicit,
+at accept time -- see `app/table.py`'s `Table.register_spectator` for why this is an explicit,
 per-connection opt-in rather than the literal passive default docs/02-protocol.md §2 describes.
 
 **DB wiring + graceful shutdown (a later sub-task).** `_registry` is no longer a fixed
-module-import-time singleton: `reset_registry()` swaps in a fresh `RoomRegistry` (optionally
+module-import-time singleton: `reset_registry()` swaps in a fresh `TableRegistry` (optionally
 carrying a DB session factory) and `app/main.py`'s `lifespan` calls it on every ASGI startup --
 see `reset_registry`'s own docstring for why a fresh instance per startup matters, not just a
 mutated one. `ws_endpoint` itself refuses every new connection once `_registry.draining` is set
@@ -43,8 +43,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import protocol as proto
 from app.outbox import BoundedOutbox
-from app.registry import RoomRegistry
-from app.room import Room, RoomFullError, SeatNotBoundError, SeatTakenError
+from app.registry import TableRegistry
+from app.table import SeatNotBoundError, SeatTakenError, Table, TableFullError
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -67,7 +67,7 @@ _adapter: TypeAdapter[object] = TypeAdapter(proto.AnyMessage)
 
 _OUTBOX_MAXSIZE = 64  # docs/00-architecture.md "Outbound backpressure" / 02-protocol.md §9
 
-_registry = RoomRegistry()
+_registry = TableRegistry()
 
 _CLAIM_WIRE_TO_MELD_KIND = {
     "chow": MeldKind.CHOW,
@@ -84,12 +84,12 @@ def _now_ms() -> int:
     return time.time_ns() // 1_000_000
 
 
-def get_room(room_id: str) -> Room | None:
+def get_table(table_id: str) -> Table | None:
     """Test/introspection hook onto the registry -- not part of the wire protocol."""
-    return _registry.get(room_id)
+    return _registry.get(table_id)
 
 
-def registry() -> RoomRegistry:
+def registry() -> TableRegistry:
     """Accessor for `app/main.py`'s `lifespan` (wiring a DB session factory at startup, running
     the graceful-shutdown drain at shutdown) and `/healthz` (reading `.draining`)."""
     return _registry
@@ -99,20 +99,20 @@ def reset_registry(
     *,
     bot_pool: Executor | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
-) -> RoomRegistry:
-    """Install a fresh `RoomRegistry` as this module's singleton. `app/main.py`'s `lifespan`
+) -> TableRegistry:
+    """Install a fresh `TableRegistry` as this module's singleton. `app/main.py`'s `lifespan`
     calls this on every ASGI startup -- a real process, or one `TestClient(app)` context in
     tests -- so each server lifetime gets its own registry: `draining` always starts `False`,
-    and a previous lifetime's rooms/background tasks never leak into this one's shutdown drain
+    and a previous lifetime's tables/background tasks never leak into this one's shutdown drain
     (docs/00-architecture.md §8.1; see `app/registry.py`'s module docstring)."""
     global _registry
-    _registry = RoomRegistry(bot_pool=bot_pool, session_factory=session_factory)
+    _registry = TableRegistry(bot_pool=bot_pool, session_factory=session_factory)
     return _registry
 
 
-def _get_or_create_room(room_id: str, seed: int | None, practice: bool) -> Room:
+def _get_or_create_table(table_id: str, seed: int | None, practice: bool) -> Table:
     return _registry.get_or_create(
-        room_id, DEFAULT_RULESET, seed=seed, require_ready=True, practice=practice
+        table_id, DEFAULT_RULESET, seed=seed, require_ready=True, practice=practice
     )
 
 
@@ -159,13 +159,13 @@ def _pick_claim_meld(
 class Session:
     """One connection. Pre-`join`, frames go out on a local per-connection counter (exactly
     M0's behavior -- `hello`/`ping` never move off it, see `handle`). Once `join` binds a seat,
-    every gameplay response (`ack`, and anything `Room` publishes) is routed through that
-    seat's own `Room.publish_to_seat`, which owns the real per-seat `seq` (docs/02-protocol.md
+    every gameplay response (`ack`, and anything `Table` publishes) is routed through that
+    seat's own `Table.publish_to_seat`, which owns the real per-seat `seq` (docs/02-protocol.md
     §1 D1)."""
 
-    def __init__(self, websocket: WebSocket, room: Room) -> None:
+    def __init__(self, websocket: WebSocket, table: Table) -> None:
         self.ws = websocket
-        self.room = room
+        self.table = table
         self.session_id = str(uuid.uuid4())
         self.seat: int | None = None
         self._local_seq = 0
@@ -175,19 +175,19 @@ class Session:
 
     def _resync(self) -> None:
         """`BoundedOutbox`'s overflow callback (docs/02-protocol.md §9) -- re-publishes a fresh
-        `state_sync` through `Room`, which allocates a real, correctly-ordered `seq` for it
+        `state_sync` through `Table`, which allocates a real, correctly-ordered `seq` for it
         (see `app/outbox.py`'s module docstring for why this can't fabricate one locally). A
         registered spectator (`self.seat is None`) gets the spectator-shaped equivalent
-        (`Room.publish_to_spectator`/`state_sync_wire(None)`) -- a no-op if this session was
+        (`Table.publish_to_spectator`/`state_sync_wire(None)`) -- a no-op if this session was
         never registered as one (`?spectate=true`), same tolerance `publish_to_spectator`
         already documents."""
         if self.seat is not None:
-            self.room.publish_to_seat(self.seat, self.room.state_sync_wire(self.seat))
+            self.table.publish_to_seat(self.seat, self.table.state_sync_wire(self.seat))
         else:
-            self.room.publish_to_spectator(self.session_id, self.room.state_sync_wire(None))
+            self.table.publish_to_spectator(self.session_id, self.table.state_sync_wire(None))
 
     def _push(self, seq: int, wire: dict[str, Any]) -> None:
-        """Registered with `Room` as this seat's `SeatBinding.send` once joined."""
+        """Registered with `Table` as this seat's `SeatBinding.send` once joined."""
         t = wire["t"]
         d = {k: v for k, v in wire.items() if k != "t"}
         self.outbox.push({"v": 1, "t": t, "seq": seq, "ts": _now_ms(), "d": d})
@@ -205,7 +205,7 @@ class Session:
         if error is not None:
             payload["error"] = error
         if self.seat is not None:
-            self.room.publish_to_seat(self.seat, {"t": "ack", **payload})
+            self.table.publish_to_seat(self.seat, {"t": "ack", **payload})
         else:
             self._send_local("ack", payload)
 
@@ -268,34 +268,34 @@ class Session:
             )
             return
         try:
-            was_disconnected = self.room.reconnect(msg.d.seat, self.session_id, self._push)
+            was_disconnected = self.table.reconnect(msg.d.seat, self.session_id, self._push)
         except SeatNotBoundError:
             self._send_local(
                 "error", {"code": "no_such_seat", "message": f"seat {msg.d.seat} is not bound"}
             )
             return
         except SeatTakenError:
-            # M4.5 practice mode: seat is bound to a bot from room creation, never a human --
-            # there's no prior human occupant for this hello{seat} to reclaim (Room.reconnect's
+            # M4.5 practice mode: seat is bound to a bot from table creation, never a human --
+            # there's no prior human occupant for this hello{seat} to reclaim (Table.reconnect's
             # own docstring). Same wire error `join` gives a seat someone else already holds.
             self._send_local(
                 "error", {"code": "seat_taken", "message": f"seat {msg.d.seat} is a bot seat"}
             )
             return
         self.seat = msg.d.seat
-        self.room.resume(msg.d.seat, msg.d.last_seq, announce_reconnect=was_disconnected)
+        self.table.resume(msg.d.seat, msg.d.last_seq, announce_reconnect=was_disconnected)
 
     async def _handle_join(self, msg: proto.Join) -> None:
         if self.seat is not None:
             self._ack(msg, ok=False, error="already_joined")
             return
         try:
-            seat = self.room.join(self.session_id, self._push, seat=msg.d.seat, name=msg.d.name)
+            seat = self.table.join(self.session_id, self._push, seat=msg.d.seat, name=msg.d.name)
         except SeatTakenError:
             self._ack(msg, ok=False, error="seat_taken")
             return
-        except RoomFullError:
-            self._ack(msg, ok=False, error="room_full")
+        except TableFullError:
+            self._ack(msg, ok=False, error="table_full")
             return
         self.seat = seat
         self._ack(msg, ok=True)
@@ -307,19 +307,19 @@ class Session:
         `(ok, error)`; idempotency is scoped to the seat *binding* (`SeatBinding.idempotency`,
         not this `Session`) per 02-protocol.md §1, so it survives this connection.
 
-        `ok=True` here means "accepted for processing", not "guaranteed legal" -- `Room`'s own
+        `ok=True` here means "accepted for processing", not "guaranteed legal" -- `Table`'s own
         `_authorize` silently drops a well-formed but currently-illegal `Command` (unchanged
         M2/M3 behavior); this layer's job is the `id`/ack contract, not re-deriving game
-        legality `Room` already owns. `Discard`/`Ready`/`Auto` are always structurally
+        legality `Table` already owns. `Discard`/`Ready`/`Auto` are always structurally
         applyable; `Claim`/`Declare` can fail to even construct an `Action` (an unknown
         `window_id`, an unmatched disambiguator) and get `ok=False, error="illegal"` without
-        ever reaching `Room.submit`.
+        ever reaching `Table.submit`.
         """
         if self.seat is None:
             self._send_local("error", {"code": "not_joined", "message": "join a seat first"})
             return
-        binding = self.room.seat_bindings[self.seat]
-        assert binding is not None  # self.seat is only ever set once Room.join bound it
+        binding = self.table.seat_bindings[self.seat]
+        assert binding is not None  # self.seat is only ever set once Table.join bound it
         payload = msg.d.model_dump()
         if msg.id is not None:
             is_retry, ok, error = binding.idempotency.check(msg.id, payload)
@@ -332,32 +332,32 @@ class Session:
         self._ack(msg, ok=ok, error=error)
 
     def _apply_ready(self, seat: int, _d: proto.ReadyPayload) -> tuple[bool, str | None]:
-        self.room.mark_ready(seat)
+        self.table.mark_ready(seat)
         return True, None
 
     def _apply_hand_end_ack(
         self, seat: int, _d: proto.HandEndAckPayload
     ) -> tuple[bool, str | None]:
-        self.room.mark_hand_end_ack(seat)
+        self.table.mark_hand_end_ack(seat)
         return True, None
 
     def _apply_discard(self, seat: int, d: proto.DiscardPayload) -> tuple[bool, str | None]:
-        self.room.submit(seat, DiscardAction(tile_id=TileId(d.tile_id)))
+        self.table.submit(seat, DiscardAction(tile_id=TileId(d.tile_id)))
         return True, None
 
     def _apply_auto(self, seat: int, d: proto.AutoPayload) -> tuple[bool, str | None]:
-        self.room.set_auto(seat, no_calls=d.no_calls, auto_pass_chow=d.auto_pass_chow)
+        self.table.set_auto(seat, no_calls=d.no_calls, auto_pass_chow=d.auto_pass_chow)
         return True, None
 
     def _apply_claim(self, seat: int, d: proto.ClaimPayload) -> tuple[bool, str | None]:
         action = self._build_claim_action(seat, d)
         if action is None:
             return False, "illegal"
-        self.room.submit(seat, action)
+        self.table.submit(seat, action)
         return True, None
 
     def _build_claim_action(self, seat: int, d: proto.ClaimPayload) -> Action | None:
-        window = self.room.state.claim_window
+        window = self.table.state.claim_window
         if window is None or window.window_id != d.window_id:
             return None
         if d.choice == "pass":
@@ -384,14 +384,14 @@ class Session:
         action = self._build_declare_action(seat, d)
         if action is None:
             return False, "illegal"
-        self.room.submit(seat, action)
+        self.table.submit(seat, action)
         return True, None
 
     def _build_declare_action(self, seat: int, d: proto.DeclarePayload) -> Action | None:
         if d.kind == "win":
             return DeclareWin()
         want_kind = _DECLARE_WIRE_TO_MELD_KIND[d.kind]
-        seat_state = self.room.state.seats[seat]
+        seat_state = self.table.state.seats[seat]
         candidates = [
             m
             for m in legal_self_melds(seat_state.concealed, seat_state.melds)
@@ -426,7 +426,7 @@ class Session:
 @router.websocket("/ws")
 async def ws_endpoint(
     websocket: WebSocket,
-    room: str = "default",
+    table: str = "default",
     seed: int | None = None,
     practice: bool = False,
     spectate: bool = False,
@@ -440,15 +440,15 @@ async def ws_endpoint(
     # No ticket/auth, permanently (docs/00-architecture.md §2.1 cuts real accounts/tickets
     # entirely) -- accept every other connection unconditionally.
     await websocket.accept()
-    room_obj = _get_or_create_room(room, seed, practice)
-    session = Session(websocket, room_obj)
+    table_obj = _get_or_create_table(table, seed, practice)
+    session = Session(websocket, table_obj)
     if spectate:
-        # Explicit, connection-level opt-in ("Spectating" sub-task; `Room.register_spectator`'s
+        # Explicit, connection-level opt-in ("Spectating" sub-task; `Table.register_spectator`'s
         # own docstring explains why this can't be the literal passive default docs/02-
         # protocol.md §2 describes -- it would race every real client's own hello-before-join
         # handshake). Mirrors `?practice=true`'s existing shape on this same endpoint rather
         # than adding a new wire message.
-        room_obj.register_spectator(session.session_id, session._push)
+        table_obj.register_spectator(session.session_id, session._push)
     writer_task = asyncio.create_task(session.writer())
     try:
         while True:
@@ -470,15 +470,15 @@ async def ws_endpoint(
         # codebase yet (sub-task 4 never built one; checked, not just assumed), so it's a real,
         # separate, still-open gap, not silently folded into this. `session.session_id` (not
         # just `session.seat`) guards the race where a newer reconnect already reclaimed this
-        # seat before this connection's own `finally` runs -- see `Room.mark_disconnected`.
+        # seat before this connection's own `finally` runs -- see `Table.mark_disconnected`.
         if session.seat is not None:
-            room_obj.mark_disconnected(session.seat, session.session_id)
+            table_obj.mark_disconnected(session.seat, session.session_id)
         else:
             # A no-op for a connection never registered as a spectator (no `?spectate=true`) --
-            # see `Room.unregister_spectator`'s own docstring for why a spectator's bookkeeping
+            # see `Table.unregister_spectator`'s own docstring for why a spectator's bookkeeping
             # is dropped outright on close rather than kept around for reconnect the way a
             # seat's is.
-            room_obj.unregister_spectator(session.session_id)
+            table_obj.unregister_spectator(session.session_id)
         session.outbox.close()
         with contextlib.suppress(Exception):
             await writer_task

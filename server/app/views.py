@@ -31,24 +31,24 @@ predates several fields added since M1/M2):
   `act()` needs actions during a claim window too).
 - `seat_status`'s wire vocabulary is connected/disconnected/autoplay/bot/empty.
   `mahjong_core/state.py` deliberately excludes all of it from `SeatState` (see that module's own
-  docstring): `app/room.py`'s `SeatBinding`/`Room._seat_status_tuple()` own it instead, without a
+  docstring): `app/table.py`'s `SeatBinding`/`Table._seat_status_tuple()` own it instead, without a
   pure-engine round-trip. `seat_view()` itself just takes an optional `seat_status` override and
   defaults to `("connected",) * 4` when the caller has nothing real to pass -- correct for a
-  caller with no `Room` behind it at all (bots/arena.py, bots/selfplay.py, tests calling
+  caller with no `Table` behind it at all (bots/arena.py, bots/selfplay.py, tests calling
   `seat_view()` directly), where every seat is a live simulated player, never a lobby seat that
-  may genuinely be unjoined. Only `Room._seat_status_tuple()` ever produces `empty`, for a seat
+  may genuinely be unjoined. Only `Table._seat_status_tuple()` ever produces `empty`, for a seat
   nobody has joined yet; `bot` remains unused (`SeatBinding.status`'s docstring).
 - `names` (M5, docs/00-architecture.md §2.1) is the same shape of override as `seat_status`:
-  `app/room.py`'s `SeatBinding.name` (set at `join`, or synthesized for a `bot` seat) is the
-  real source, `seat_view()` defaults to `(None,) * 4` for a caller with no `Room` behind it.
-- `deadline_ts` sources from whichever of `app/room.py`'s `TimerHeap`-armed deadlines applies to
+  `app/table.py`'s `SeatBinding.name` (set at `join`, or synthesized for a `bot` seat) is the
+  real source, `seat_view()` defaults to `(None,) * 4` for a caller with no `Table` behind it.
+- `deadline_ts` sources from whichever of `app/table.py`'s `TimerHeap`-armed deadlines applies to
   this seat right now (`00-architecture.md §3` D17, `§8` "Turn timeout"): a live claim/kong-rob
   offer (`claim_deadline_ts`), or this seat's own armed `AWAIT_ACTION` turn deadline
   (`turn_deadline_ts`, the turn-timeout sub-task). `GameState` itself never carries either --
   `ClaimWindow.deadline_ts` is just an opaque pass-through (`state.py`'s own docstring: "the pure
-  engine never reads a clock") -- so both are override points a caller with a real `Room` behind
+  engine never reads a clock") -- so both are override points a caller with a real `Table` behind
   it supplies; a bare `seat_view()` call with neither gets `None` for a seat with no live claim
-  offer, matching every pre-Room-integration caller.
+  offer, matching every pre-Table-integration caller.
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ class SeatView:
     seat_status: _SeatStatus = field(metadata=_entitled(Entitlement.PUBLIC))
     # chosen guest display name per seat (M5) -- public like seat_status: a name is never a
     # secret, so there's no redaction question here, only a data-availability one (a caller
-    # with no Room behind it, e.g. bots/arena, has no name to report and defaults to None).
+    # with no Table behind it, e.g. bots/arena, has no name to report and defaults to None).
     names: _SeatNames = field(metadata=_entitled(Entitlement.PUBLIC))
     scores: tuple[int, int, int, int] = field(metadata=_entitled(Entitlement.PUBLIC))
     legal_actions: tuple[Action, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
@@ -168,24 +168,24 @@ def seat_view(
     hand_end_deadline_ts: int | None = None,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
-    override point for the future `app/room.py` `SeatBinding` (see module docstring); omit it
+    override point for the future `app/table.py` `SeatBinding` (see module docstring); omit it
     and every seat reads as `"connected"`. `names` is the analogous override for each seat's
-    chosen guest display name (M5) -- `app/room.py` passes `Room`'s own per-seat names; omit it
-    (every pre-M5 caller, and every caller with no `Room` behind it at all -- bots/arena.py,
+    chosen guest display name (M5) -- `app/table.py` passes `Table`'s own per-seat names; omit it
+    (every pre-M5 caller, and every caller with no `Table` behind it at all -- bots/arena.py,
     bots/selfplay.py) and every seat reads as `None`. `claim_deadline_ts` is the same kind of override for
     `deadline_ts` while this seat holds a live claim/kong-rob offer: `ClaimWindow.deadline_ts`
     is never set by the pure engine (state.py's own docstring -- "arming and enforcing the
-    actual timer is app/room.py's job"), so `app/room.py` passes its own `TimerHeap`-derived,
+    actual timer is app/table.py's job"), so `app/table.py` passes its own `TimerHeap`-derived,
     epoch-converted deadline here once a window is armed; omit it (as every caller before the
-    Room/Session integration sub-task did) and this falls back to the always-`None`
+    Table/Session integration sub-task did) and this falls back to the always-`None`
     `window.deadline_ts`. `turn_deadline_ts` is the analogous override for this seat's own
     `AWAIT_ACTION` decision (00-architecture.md §8 "Turn timeout") -- surfaced only when
     `seat == state.turn` and `state.phase == Phase.AWAIT_ACTION`, mutually exclusive with the
     claim-window branch below (`GameState.__post_init__`: `claim_window` is never set in
     `AWAIT_ACTION`), so there's never ambiguity about which deadline `SeatView.deadline_ts`
     means for a given seat/phase. `hand_end_deadline_ts` is the analogous override for
-    `Phase.HAND_OVER`'s hand-end hold (`app/room.py`'s `_hand_end_deadline_ms`) -- unlike the
-    other two, it's the same value for every seat (a whole-room wait, not a per-seat one), so
+    `Phase.HAND_OVER`'s hand-end hold (`app/table.py`'s `_hand_end_deadline_ms`) -- unlike the
+    other two, it's the same value for every seat (a whole-table wait, not a per-seat one), so
     it applies regardless of `seat`.
     """
     own_hand = state.seats[seat].concealed if seat is not None else ()
@@ -244,7 +244,7 @@ def seat_view(
 #     in general: if the discard is claimed later in the *same* `reduce()` call, the claiming
 #     seat's discards tuple has the entry removed again by the time `state` reaches here (see
 #     `engine._apply_claim_response`), so recomputing it from final state would be wrong for
-#     exactly the discards that most need a correct wire form. The Room actor sees each event
+#     exactly the discards that most need a correct wire form. The Table actor sees each event
 #     against its own intermediate state and can compute it there; `redact_event` cannot.
 #   - flower_replace fusing a replacement tile into the same frame (02-protocol.md §3's sketch
 #     shows one `{seat, flower, replacement?}` message) -- the engine emits `FlowerReplaced`
@@ -484,7 +484,7 @@ def _claim_offer_wire(offer: ClaimOffer, viewer: int | None) -> dict[str, Any]:
 
 def seat_view_wire(view: SeatView) -> dict[str, Any]:
     """JSON-safe wire dict for a `SeatView` -- `state_sync`'s payload (02-protocol.md §3),
-    built by app/room.py on `join` and (a later sub-task) reconnect. Mirrors `redact_event`'s
+    built by app/table.py on `join` and (a later sub-task) reconnect. Mirrors `redact_event`'s
     tail (already-redacted typed data -> wire-safe primitives), but `SeatView.legal_actions`/
     `claim_options` hold real `mahjong_core.actions.Action`/`mahjong_core.state.ClaimOffer`
     instances rather than one `WireEvent` dataclass, so they get their own small serializers

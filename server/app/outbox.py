@@ -13,7 +13,7 @@ reconciled to 64, this module's default, in the same change that added this file
    non-critical frame and ask the caller-supplied `resync` callback to enqueue a fresh
    `state_sync` in its place. `resync` re-enters `push()` (the caller is expected to run the
    real per-seat `seq` allocation through the same path every other frame uses -- see
-   `app/room.py`'s `Room.publish_to_seat`/`Session._resync` -- rather than this module
+   `app/table.py`'s `Table.publish_to_seat`/`Session._resync` -- rather than this module
    fabricating a seq number of its own, which could collide with whatever the real stream
    assigns next).
 3. If the queue is still over capacity after that (every queued frame was critical, or stayed

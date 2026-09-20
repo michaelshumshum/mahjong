@@ -103,14 +103,14 @@ describe.skipIf(!process.env.RUN_LIVE_BACKEND_TESTS)('live backend (opt-in)', ()
 	}, 10_000);
 
 	it('four real seats join, deal, and exchange one real discard, redacted correctly per seat', async () => {
-		const roomId = `it-${Date.now()}`;
+		const tableId = `it-${Date.now()}`;
 		const seats: {
 			socket: MahjongSocket;
 			state: ClientGameState;
 		}[] = [];
 
 		for (let seat = 0; seat < 4; seat++) {
-			const socket = new MahjongSocket(`${wsUrl}?room=${roomId}&seed=42`);
+			const socket = new MahjongSocket(`${wsUrl}?table=${tableId}&seed=42`);
 			const entry = { socket, state: initialClientGameState() };
 			socket.onEvent((event: ServerEvent) => {
 				entry.state = reduce(entry.state, event);

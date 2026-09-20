@@ -1,4 +1,4 @@
-"""`Room` -- the room actor's core dispatch loop (docs/00-architecture.md §3, §5;
+"""`Table` -- the table actor's core dispatch loop (docs/00-architecture.md §3, §5;
 docs/05-roadmap.md §1's M3).
 
 **Timer heap + D17 + claim-window early exit/timeout (M3 sub-task 3).** `_next()` implements
@@ -11,7 +11,7 @@ sharing one id space and one `TimerHeap` instance (`TimerHeap`'s own docstring) 
 **Turn timeout (00-architecture.md §8 "Turn timeout" / "Bot raises / hangs").**
 `_arm_turn_timer`, called from `_publish_turn_if_active` every time a seat's `AWAIT_ACTION`
 decision is genuinely new, arms a `ruleset.turn_seconds` deadline in the same heap claim
-windows and disconnect-grace use. On expiry (`_handle_turn_timeout`) the room applies the
+windows and disconnect-grace use. On expiry (`_handle_turn_timeout`) the table applies the
 doc's deterministic default (`_timeout_discard_action`: tsumogiri if this decision started
 with a freshly drawn tile, else the lowest-`tile_id` concealed tile) through the normal
 `_apply()`/`reduce()` path, exactly like a real `Discard` command, then registers a strike
@@ -34,11 +34,11 @@ tagged with `BotJobTag` (`(kind, key, state_version)`); the result re-enters thr
 as a `BotResult` carrying a bare action id, decoded back into a real `Action` here (against this
 process's own `GameState` -- see `bots/worker.py`'s module docstring for why the worker can't do
 that itself), and is dropped if the tag no longer matches `_pending_bot[seat]` by the time it
-lands -- the window closed, the turn moved on, or the seat reconnected. `_bot_tier` (`Room.
+lands -- the window closed, the turn moved on, or the seat reconnected. `_bot_tier` (`Table.
 __init__`) picks the real tier (`T0`/`T1`/`T2`, default `T2`/`FaanBot`) every such job runs. See
 `mark_disconnected`/`_poke_bots`/`_handle_bot_result`.
 
-**Bot-filled seats from room creation (M4.5 practice mode).** `practice=True` (`Room.__init__`)
+**Bot-filled seats from table creation (M4.5 practice mode).** `practice=True` (`Table.__init__`)
 binds seats 1-3 to `bot_tier` bots immediately, before seat 0's human ever `join`s -- a `bot`
 `SeatBinding.status`, distinct from `autoplay` (a seat that *was* human and lost its connection)
 but driven through the exact same `_poke_bots`/`BotJobTag`/`ProcessPoolExecutor` machinery, not
@@ -53,8 +53,8 @@ same `reduce()` path (`_apply_claim_response`/`resolve_claims`) a real response 
 `_handle_claim_timeout`.
 
 **Session/WS integration (M3 sub-task 4).** `join`/`mark_ready`/`set_auto`/`publish_to_seat`/
-`state_sync_wire` are this Room's half of the wire protocol -- `app/ws.py`'s `Session` is the
-other half, turning raw envelopes into calls here and this Room's published wire dicts into
+`state_sync_wire` are this Table's half of the wire protocol -- `app/ws.py`'s `Session` is the
+other half, turning raw envelopes into calls here and this Table's published wire dicts into
 real frames on a socket. `SeatBinding` holds the live per-seat state that has no home in the
 pure `GameState` (a connection's push callback, `ready`/pre-arm flags, per-seat idempotency).
 Several wire events (`hand_start`/`deal`/`turn`/`claim_offer`/`score`) have no backing
@@ -62,29 +62,29 @@ Several wire events (`hand_start`/`deal`/`turn`/`claim_offer`/`score`) have no b
 `_publish_turn_if_active`/`_send_claim_offers`'s docstrings for why, and
 docs/00-architecture.md §3's "Session/WS integration" note for the short version.
 
-One room = one `asyncio.Task` = one writer (server/AGENTS.md): every mutation of `self.state`
+One table = one `asyncio.Task` = one writer (server/AGENTS.md): every mutation of `self.state`
 happens inside `_apply`, called only from this module's own loop. `join`/`mark_ready`/
 `set_auto` mutate `self.seat_bindings` (not `self.state`) directly from whatever task calls
 them -- safe because they're synchronous with no `await`, so nothing else can interleave on
-this room's event loop between one call's start and its return.
+this table's event loop between one call's start and its return.
 
 **DB persistence + graceful shutdown (docs/00-architecture.md §6/§8.1, docs/06-ml.md §2's
-`GameRecord`).** `self.actions` accumulates every `Action` this room ever applies via `_apply`
+`GameRecord`).** `self.actions` accumulates every `Action` this table ever applies via `_apply`
 (never `start_next_hand()` transitions -- those aren't `Action`s and replay reconstructs them
 automatically off `Phase.HAND_OVER`, same convention `bots/selfplay.py`'s `play_game` already
 documents) across the *entire game*, all hands, surviving `start_next_hand()` transitions simply
-because nothing ever resets it -- `Room` is one long-lived object for one game, not recreated
+because nothing ever resets it -- `Table` is one long-lived object for one game, not recreated
 per hand. On reaching `Phase.GAME_OVER`, `process_one()` calls `save_game_record` (if a
 `session_factory` was wired in at construction -- `None` is a real, supported "no persistence"
-mode, matching every bare `Room()` test that constructs one directly) with `self.actions` and
+mode, matching every bare `Table()` test that constructs one directly) with `self.actions` and
 `players` taken from each seat's real, chosen `SeatBinding.name` (M5, 00-architecture.md §2.1,
 `join.name` -- see `_persist_game_record`'s own docstring); a `None` entry means that seat was
 never joined by a human.
 `_boundary_this_tick`/`_shutdown_boundary` back `wait_for_shutdown_boundary`,
-`app/registry.py`'s `RoomRegistry.begin_shutdown`'s per-room half of the graceful-drain sequence
+`app/registry.py`'s `TableRegistry.begin_shutdown`'s per-table half of the graceful-drain sequence
 (§8.1) -- the boundary-reached event is only ever set *after* an in-flight `GAME_OVER` persist
-finishes, never before, so a drain can't tear down a room (or the process dispose its DB engine)
-while that room's own final write is still in flight. **This was violated until a real bug fix**:
+finishes, never before, so a drain can't tear down a table (or the process dispose its DB engine)
+while that table's own final write is still in flight. **This was violated until a real bug fix**:
 `wait_for_shutdown_boundary`'s own fast path used to return `True` the instant
 `self.state.phase == Phase.GAME_OVER`, which `_apply` flips *before* `process_one()`'s tail even
 starts the persist -- a drain landing in that window (trivial with `SHUTDOWN_GRACE_SECONDS=0`,
@@ -138,12 +138,12 @@ __all__ = [
     "BotResult",
     "Command",
     "Envelope",
-    "Room",
-    "RoomFullError",
     "SeatBinding",
     "SeatNotBoundError",
     "SeatStatus",
     "SeatTakenError",
+    "Table",
+    "TableFullError",
     "TimerHeap",
     "WireSeatStatus",
 ]
@@ -153,7 +153,7 @@ SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 # Wire-level vocabulary for `_seat_status_tuple()`/`seat_view()`'s `seat_status`. `empty` has no
 # `SeatBinding` counterpart: a binding only exists once a seat *is* bound, so "nobody has ever
 # joined this seat" isn't a `SeatBinding.status` value, only something `_seat_status_tuple()`
-# reports for a `None` slot in `Room.seat_bindings`. `bot` *is* a real `SeatBinding.status` now
+# reports for a `None` slot in `Table.seat_bindings`. `bot` *is* a real `SeatBinding.status` now
 # (M4.5 practice mode, `_bind_bot_seat`) -- see `SeatBinding`'s docstring.
 WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
 
@@ -195,9 +195,9 @@ _default_bot_pool: ProcessPoolExecutor | None = None
 
 def _shared_bot_pool() -> ProcessPoolExecutor:
     """One `ProcessPoolExecutor` per server process, created lazily on first use (constructing
-    it doesn't spawn a worker -- workers start on first `submit()`), not one per `Room` (D12:
-    "a process pool", not a swarm of them). `Room.__init__`'s `bot_pool` param exists so tests
-    (and a future `RoomRegistry`) can inject a different `Executor` instead."""
+    it doesn't spawn a worker -- workers start on first `submit()`), not one per `Table` (D12:
+    "a process pool", not a swarm of them). `Table.__init__`'s `bot_pool` param exists so tests
+    (and a future `TableRegistry`) can inject a different `Executor` instead."""
     global _default_bot_pool
     if _default_bot_pool is None:
         _default_bot_pool = ProcessPoolExecutor()
@@ -217,7 +217,7 @@ def _now_ms() -> int:
 
 def _turn_draw_tile_for_current_turn(events: list[Event], state: GameState) -> TileId | None:
     """Whether `state`'s current `AWAIT_ACTION` seat is holding a genuinely freshly-drawn tile
-    this decision -- the signal `Room._timeout_discard_action` needs to choose tsumogiri over
+    this decision -- the signal `Table._timeout_discard_action` needs to choose tsumogiri over
     the lowest-`tile_id` fallback (00-architecture.md §8 "Turn timeout"). Reads the real
     `Drawn`/`KongReplacementDrawn` events `reduce()`/`start_next_hand()` actually emitted this
     tick, rather than inferring it from tile counts -- both "just drew" and "just claimed a
@@ -240,7 +240,7 @@ def _turn_draw_tile_for_current_turn(events: list[Event], state: GameState) -> T
 
 
 class SeatTakenError(Exception):
-    """Raised by `Room.join(seat=...)` when the requested seat is already bound
+    """Raised by `Table.join(seat=...)` when the requested seat is already bound
     (docs/02-protocol.md §2 "Seat assignment" -> wire `error{code:'seat_taken'}`)."""
 
     def __init__(self, seat: int) -> None:
@@ -248,13 +248,13 @@ class SeatTakenError(Exception):
         self.seat = seat
 
 
-class RoomFullError(Exception):
-    """Raised by `Room.join(seat=None)` when every seat is bound (wire
-    `error{code:'room_full'}`)."""
+class TableFullError(Exception):
+    """Raised by `Table.join(seat=None)` when every seat is bound (wire
+    `error{code:'table_full'}`)."""
 
 
 class SeatNotBoundError(Exception):
-    """Raised by `Room.reconnect(seat, ...)` when nothing has ever `join`ed this seat -- there
+    """Raised by `Table.reconnect(seat, ...)` when nothing has ever `join`ed this seat -- there
     is no `SeatBinding` to reclaim (wire `error{code:'no_such_seat'}`, `app/ws.py`). Distinct
     from `SeatTakenError`: that one fires on `join` finding a seat *already* bound; this one
     fires on `hello{last_seq, seat}` finding a seat *never* bound."""
@@ -267,7 +267,7 @@ class SeatNotBoundError(Exception):
 @dataclass
 class SeatBinding:
     """One seat's session binding (docs/00-architecture.md §3's sketch, built out here --
-    sub-task 4's job per that sketch's own note). Lives on `Room`, not `Session`: idempotency
+    sub-task 4's job per that sketch's own note). Lives on `Table`, not `Session`: idempotency
     is scoped "per seat binding, not per socket" (02-protocol.md §1), so it has to survive a
     future reconnect (sub-task 5) swapping out the `Session`/socket underneath it -- this is
     the object that will still exist across that swap.
@@ -276,13 +276,13 @@ class SeatBinding:
     `auto_pass_chow` are the lobby/pre-arm state 02-protocol.md §2 describes. `status`
     (`connected`/`disconnected`/`autoplay`/`bot` -- `empty` can never apply to a `SeatBinding`:
     a binding only exists once a seat *is* bound, so "nobody has ever joined this seat" is
-    reported by `_seat_status_tuple()` for a `None` slot in `Room.seat_bindings`, never as a
+    reported by `_seat_status_tuple()` for a `None` slot in `Table.seat_bindings`, never as a
     value of this field) transitions via `mark_disconnected`/`reconnect`/the disconnect-grace
     timer (M3 sub-task 6) for a seat that started as a human `join` -- see
-    `Room.mark_disconnected`.
+    `Table.mark_disconnected`.
 
     **`bot` (M4.5 practice mode, `_bind_bot_seat`) is the other way a `SeatBinding` comes to
-    exist**: a seat bound to a bot from room construction, never a human `join` at all. It
+    exist**: a seat bound to a bot from table construction, never a human `join` at all. It
     reuses this exact dataclass -- a real `send` no-op callback, `ready=True` (a bot doesn't
     wait to click ready, so `require_ready` gating still starts the hand correctly once every
     *human* seat has readied) -- rather than a parallel tracking structure, so `_poke_bots()`
@@ -294,9 +294,9 @@ class SeatBinding:
 
     `turn_timeout_strikes` (00-architecture.md §8 "Turn timeout": "Three strikes -> seat flips
     to AUTOPLAY for the rest of the game") counts consecutive-or-not `AWAIT_ACTION` timeouts
-    for this seat, incremented by `Room._register_turn_timeout_strike`. **Never reset anywhere
+    for this seat, incremented by `Table._register_turn_timeout_strike`. **Never reset anywhere
     -- that omission is the "for the rest of the game" reset policy, not an oversight.** This
-    binding is one long-lived object for the room's entire game (never recreated per hand;
+    binding is one long-lived object for the table's entire game (never recreated per hand;
     `reconnect` only swaps the live socket underneath it), so simply never zeroing this field
     already gives "accumulates across hand boundaries and reconnects alike" for free, with no
     explicit "which hand is this" bookkeeping needed.
@@ -321,7 +321,7 @@ class SeatBinding:
 
 @dataclass(frozen=True)
 class Command:
-    """One already-validated `(seat, Action)` pair flowing through `Room.inbox`. `seat` is the
+    """One already-validated `(seat, Action)` pair flowing through `Table.inbox`. `seat` is the
     seat claiming to issue this. Most claim-window `Action`s (`ClaimChow`/`ClaimPung`/
     `ClaimKong`/`ClaimWin`/`Pass`) already carry their own `seat` field; `Discard`/`DeclareWin`/
     `DeclareConcealedKong`/`DeclareAddedKong` don't (`engine._acting_seat` reads `state.turn` for
@@ -339,7 +339,7 @@ class Command:
 @dataclass(frozen=True)
 class Envelope:
     """One already-redacted wire frame in a seat's ring buffer, stamped with that stream's own
-    `seq` (00-architecture.md §3 D1: per-seat, dense, gapless -- never per-room, never derived
+    `seq` (00-architecture.md §3 D1: per-seat, dense, gapless -- never per-table, never derived
     from `event_id`)."""
 
     seq: int
@@ -349,8 +349,8 @@ class Envelope:
 @dataclass(frozen=True)
 class BotJobTag:
     """What a submitted bot job was computed against (00-architecture.md §3 D12's
-    `(window_id, state_version)` tag). `state_version` is `Room.event_id` at submission time --
-    `event_id` already exists as the room's own monotonic "has anything actually changed"
+    `(window_id, state_version)` tag). `state_version` is `Table.event_id` at submission time --
+    `event_id` already exists as the table's own monotonic "has anything actually changed"
     counter (module docstring), so it doubles as `state_version` rather than inventing a second
     one; `self.state` is provably unchanged from what a job was computed against as long as
     `event_id` hasn't moved, since `_apply` is the only place either ever changes, together.
@@ -365,8 +365,8 @@ class BotJobTag:
 
 @dataclass(frozen=True)
 class BotResult:
-    """A `ProcessPoolExecutor` worker's answer, re-entering through `Room.inbox` exactly like a
-    real `Command` (D12) -- `tag` is compared against `Room._pending_bot[seat]` and dropped
+    """A `ProcessPoolExecutor` worker's answer, re-entering through `Table.inbox` exactly like a
+    real `Command` (D12) -- `tag` is compared against `Table._pending_bot[seat]` and dropped
     silently if it no longer matches (`_handle_bot_result`).
 
     `aid` is a bare action id (`mahjong_core.ml`'s fixed 109-id space), not a concrete `Action`
@@ -381,25 +381,39 @@ class BotResult:
 
 
 @dataclass(frozen=True)
+class SeatDisconnected:
+    """A seat's live socket just closed (`mark_disconnected`, called directly from `Session`,
+    outside this table's own loop -- see `_WakeUp`'s docstring for why that matters). Routed
+    through `Table.inbox` rather than forfeiting the seat's claim inline from `mark_disconnected`
+    itself: forfeiting means calling `_apply()`, which mutates `self.state`, and server/AGENTS.md
+    reserves every `GameState` mutation for this table's own task processing its inbox in order --
+    `mark_disconnected` already keeps to that boundary for its own bookkeeping (`SeatBinding`/
+    `TimerHeap` are Table-level, not `GameState`), and a disconnect is no exception just because
+    it wants to feed a synthesized action in. Handled by `_handle_seat_disconnected` (below)."""
+
+    seat: int
+
+
+@dataclass(frozen=True)
 class _WakeUp:
     """No-op inbox marker. `_next()`'s `asyncio.wait()` call fixes its waitable set (the inbox
     `getter` plus a sleeper for whatever `self.deadlines.peek()` was *at that moment*) the
     instant it's entered -- nothing changes that set until one of those waitables completes.
-    `_arm_disconnect_timer`/`_arm_seat_claim_timer` can run from *outside* this room's own
+    `_arm_disconnect_timer`/`_arm_seat_claim_timer` can run from *outside* this table's own
     `process_one()` tick (`mark_disconnected`/`resume()`, both called directly from `Session`
-    on an incoming WS frame, not from this room's loop) and add a heap entry that's earlier
+    on an incoming WS frame, not from this table's loop) and add a heap entry that's earlier
     than -- or the *only* entry, where none existed -- whatever `_next()` is already blocked
     on. Without this, that new deadline would sit in the heap unnoticed until some unrelated
     inbox item happened to arrive and force a fresh `_next()` call to recompute the sleeper.
     Pushing this onto `self.inbox` forces exactly that recompute, immediately, every time a
-    deadline is armed from outside the loop -- see `Room._wake`."""
+    deadline is armed from outside the loop -- see `Table._wake`."""
 
 
 class TimerHeap:
     """Deadline heap keyed by `(deadline_ts, id)` (00-architecture.md §3 D17). Holds claim-window
     deadlines (M3 sub-task 3/5), disconnect-grace deadlines (M3 sub-task 6), and per-seat
     `AWAIT_ACTION` turn deadlines (00-architecture.md §8 "Turn timeout"), sharing one id space
-    (`Room._timer_seq`) and one heap (`Room.deadlines`) -- `_dispatch_expired_timer` tells them
+    (`Table._timer_seq`) and one heap (`Table.deadlines`) -- `_dispatch_expired_timer` tells them
     apart by which side-table (`_timer_seat` / `_turn_timer_seat` / `_disconnect_timer_seat`)
     recognizes a popped id, rather than this class knowing about any of them.
 
@@ -408,14 +422,14 @@ class TimerHeap:
     used `window_id` as the heap id directly -- correct as long as every offered seat's deadline
     was always identical. Reconnect (docs/00-architecture.md §8's "mid-claim-window" row) breaks
     that assumption: one seat's deadline can move (re-armed to a fresh window on reconnect)
-    without touching another's, so each offered seat needs its *own* heap entry. `Room` now
+    without touching another's, so each offered seat needs its *own* heap entry. `Table` now
     hands out a fresh id per seat-arm (`_timer_seq`) and keeps `_timer_seat`/
     `_active_seat_timer` to map an id back to `(window_id, seat)` and to tell a superseded
     (re-armed-away) entry from the one that's actually still live for that seat -- see
     `_arm_seat_claim_timer`/`_handle_claim_timeout`.
 
     Lazy deletion: resolving a window (or re-arming one seat's entry) early doesn't remove the
-    superseded heap entry -- it's left in place and the caller (`Room._handle_claim_timeout`)
+    superseded heap entry -- it's left in place and the caller (`Table._handle_claim_timeout`)
     checks the popped id against whatever is actually current when it fires. A claim window
     resolving before its deadline is the *normal* case (early exit, 00-architecture.md §4), not
     an edge case, so every popped id has to be staleness-checked regardless of whether
@@ -442,16 +456,16 @@ class TimerHeap:
         return expired
 
 
-class Room:
+class Table:
     """Owns exactly one `GameState`, mutated only via `reduce()`/`start_next_hand()`. See module
     docstring for disconnect/bot-handover (`mark_disconnected`/`_poke_bots`, M3 sub-task 6).
 
     `bot_tier` (`bots.worker.BOT_TIERS`, default `bots.worker.DEFAULT_BOT_TIER` = `T2`/`FaanBot`,
     per docs/05-roadmap.md M4.5) picks which real tier answers for *every* bot-driven seat this
-    room ever has -- disconnect-handover autoplay and M4.5 practice-mode bot seats alike, both
-    routed through the same `_poke_bots` path (see `SeatBinding`'s docstring). One tier per room,
+    table ever has -- disconnect-handover autoplay and M4.5 practice-mode bot seats alike, both
+    routed through the same `_poke_bots` path (see `SeatBinding`'s docstring). One tier per table,
     not per seat: nothing in this sub-task's scope (a fixed-difficulty practice table) needs a
-    mixed-tier room, and `T0`/`T1` stay fully selectable by passing a different value, so the
+    mixed-tier table, and `T0`/`T1` stay fully selectable by passing a different value, so the
     arena/tests that assume T0's uniform-random disconnect-handover behavior aren't forced onto
     T2. `practice=True` binds seats 1-3 to `bot_tier` bots immediately at construction (before
     seat 0's human ever joins) -- see `_bind_bot_seat`.
@@ -459,7 +473,7 @@ class Room:
 
     def __init__(
         self,
-        room_id: str,
+        table_id: str,
         ruleset: RuleSet,
         game_seed: int,
         *,
@@ -472,8 +486,10 @@ class Room:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
         self._bot_tier = bot_tier
-        self.room_id = room_id
-        self.inbox: asyncio.Queue[Command | BotResult | _WakeUp] = asyncio.Queue()
+        self.table_id = table_id
+        self.inbox: asyncio.Queue[Command | BotResult | SeatDisconnected | _WakeUp] = (
+            asyncio.Queue()
+        )
         self.state: GameState = new_game(ruleset, game_seed)
         self.event_id = 0  # internal monotonic id: logging/replay only, never on the wire
         # full-game action log (module docstring's "DB persistence" note) -- every Action _apply
@@ -502,7 +518,9 @@ class Room:
         self.spectator_seq: dict[str, int] = {}
         self.spectators: dict[str, Callable[[int, dict[str, Any]], None]] = {}
         self.deadlines = TimerHeap()  # claim + disconnect + turn deadlines -- see module docstring
-        self._getter: asyncio.Task[Command | BotResult | _WakeUp] | None = None  # long-lived (D17)
+        self._getter: asyncio.Task[Command | BotResult | SeatDisconnected | _WakeUp] | None = (
+            None  # long-lived (D17)
+        )
         self._armed_window_id: int | None = None  # last claim_window.window_id given a deadline
         # shared TimerHeap id space, claim/turn/disconnect-grace timers alike (see
         # TimerHeap's docstring)
@@ -519,7 +537,7 @@ class Room:
         self._turn_timer_seat: dict[int, int] = {}  # timer id -> seat
         self._active_turn_timer: dict[int, int] = {}  # seat -> the timer id live for it
         self._turn_deadline_ms: dict[int, int] = {}  # seat -> that seat's current turn deadline_ts
-        # hand-end hold (HAND_OVER, "hand-end hold" note): whole-room wait, not per-seat like
+        # hand-end hold (HAND_OVER, "hand-end hold" note): whole-table wait, not per-seat like
         # claims -- a single active timer id, and a single deadline shared by every seat.
         self._hand_end_acked: set[int] = set()
         self._hand_end_hand_no: int | None = None  # guards a stray/late ack for a prior hand
@@ -539,11 +557,11 @@ class Room:
         self._bot_pool: Executor = bot_pool if bot_pool is not None else _shared_bot_pool()
 
         # docs/02-protocol.md §2 "Seat assignment": `require_ready=True` (app/ws.py's real
-        # rooms) gates every command on all four seats joining and `ready`-ing before the room
+        # tables) gates every command on all four seats joining and `ready`-ing before the table
         # will process anything (`_authorize` below). `require_ready=False` (the default)
-        # preserves this Room's pre-sub-task-4 behavior -- immediately actionable straight off
-        # `new_game()` -- so `tests/test_room.py`/`tests/test_room_claims.py`, which drive a
-        # bare `Room()` with no join/ready flow at all, are unaffected.
+        # preserves this Table's pre-sub-task-4 behavior -- immediately actionable straight off
+        # `new_game()` -- so `tests/test_table.py`/`tests/test_table_claims.py`, which drive a
+        # bare `Table()` with no join/ready flow at all, are unaffected.
         self.require_ready = require_ready
         self.started = not require_ready
         self.seat_bindings: list[SeatBinding | None] = [None, None, None, None]
@@ -558,7 +576,7 @@ class Room:
 
     def submit(self, seat: int, action: Action) -> None:
         """Push one command onto the inbox. This is app/ws.py's envelope-parsing landing spot
-        (sub-task 4) -- also the test-facing entry point (`tests/test_room.py`)."""
+        (sub-task 4) -- also the test-facing entry point (`tests/test_table.py`)."""
         self.inbox.put_nowait(Command(seat=seat, action=action))
 
     # --- seats: join / ready / pre-arm (docs/02-protocol.md §2) --------------------------
@@ -572,8 +590,8 @@ class Room:
         name: str | None = None,
     ) -> int:
         """Bind a session to a seat -- `seat=None` means "first open seat"
-        (02-protocol.md §2). Raises `SeatTakenError`/`RoomFullError` for app/ws.py to turn into
-        `error{code:'seat_taken'|'room_full'}`. On success, broadcasts `seat_state` to every
+        (02-protocol.md §2). Raises `SeatTakenError`/`TableFullError` for app/ws.py to turn into
+        `error{code:'seat_taken'|'table_full'}`. On success, broadcasts `seat_state` to every
         already-bound seat (including this one) and unicasts a fresh `state_sync` to the
         joining seat -- both per 02-protocol.md §2/§3.
 
@@ -589,7 +607,7 @@ class Room:
         else:
             open_seats = [s for s in range(4) if self.seat_bindings[s] is None]
             if not open_seats:
-                raise RoomFullError()
+                raise TableFullError()
             chosen = open_seats[0]
 
         resolved_name = _normalize_name(name, chosen)
@@ -609,7 +627,7 @@ class Room:
         return chosen
 
     def _bind_bot_seat(self, seat: int) -> None:
-        """Bind `seat` to a bot from room construction (M4.5 practice mode), not a human `join`
+        """Bind `seat` to a bot from table construction (M4.5 practice mode), not a human `join`
         -- called only from `__init__`, before any real connection exists, so there is nothing
         to broadcast yet (the first seat that actually joins gets a correct `seat_status` for
         this seat -- `bot` -- in its own `state_sync`, same as any other already-bound seat).
@@ -630,10 +648,10 @@ class Room:
         )
 
     def mark_ready(self, seat: int) -> None:
-        """`ready` (02-protocol.md §2): once every seat is joined *and* ready, the room deals
-        -- for `require_ready=False` rooms (the default; see `__init__`) `self.started` is
+        """`ready` (02-protocol.md §2): once every seat is joined *and* ready, the table deals
+        -- for `require_ready=False` tables (the default; see `__init__`) `self.started` is
         already `True` and this only flips the binding's own flag, matching "not a required
-        step" for those direct-construction test rooms."""
+        step" for those direct-construction test tables."""
         binding = self.seat_bindings[seat]
         if binding is None:
             raise ValueError(f"seat {seat} has not joined")
@@ -685,7 +703,7 @@ class Room:
         history") all live on the binding that already exists, so only the live-socket half
         (`session_id`/`send`) is swapped. Raises `SeatNotBoundError` if nothing has ever joined
         this seat -- there's no binding to reclaim; the caller should `join` instead. Raises
-        `SeatTakenError` if this seat is bound to a bot from room construction (M4.5 practice
+        `SeatTakenError` if this seat is bound to a bot from table construction (M4.5 practice
         mode, `_bind_bot_seat`) rather than a human -- there is no prior human occupant to hand
         the seat back to, so a `hello{seat}` naming it is refused the same way `join` refuses a
         seat someone else already holds (`app/ws.py`'s `_handle_hello` turns this into the same
@@ -743,7 +761,14 @@ class Room:
         No-op if the seat isn't bound, or is already `disconnected`/`autoplay` (a duplicate
         close notification, or a socket that closed after the grace period already flipped the
         seat to `autoplay`) -- 00-architecture.md §8 "Player disconnects": seat marked
-        `DISCONNECTED`, room continues, grace period before bot takeover.
+        `DISCONNECTED`, table continues, grace period before bot takeover.
+
+        Also enqueues `SeatDisconnected` so this table's own loop can forfeit a live claim offer
+        this seat is mid-decision on, if it has one (`_handle_seat_disconnected`'s docstring for
+        why a disconnect forfeits rather than waiting for reconnect to re-arm). Routed through
+        `self.inbox` rather than applied inline here for the same reason every other `GameState`
+        mutation is: this method runs on `Session`'s task, not this table's own (`_WakeUp`'s
+        docstring) -- `_apply()` must only ever run from inside this table's loop.
         """
         binding = self.seat_bindings[seat]
         if binding is None or binding.session_id != session_id:
@@ -755,11 +780,12 @@ class Room:
             {"t": "seat_state", "seat": seat, "status": "disconnected", "name": binding.name}
         )
         self._arm_disconnect_timer(seat)
+        self.inbox.put_nowait(SeatDisconnected(seat=seat))
 
     def resume(self, seat: int, last_seq: int | None, *, announce_reconnect: bool = False) -> None:
         """The three-way `hello{last_seq}` branch (02-protocol.md §5) for a seat that just
         called `reconnect()`, compared against *this seat's own* `ring`/`seat_seq` (never the
-        room-global `event_id`, D1):
+        table-global `event_id`, D1):
 
         - `last_seq == head` -- nothing missed, resume live: no replay.
         - `last_seq` still in the 512-entry ring -- replay exactly the envelopes after it,
@@ -816,7 +842,7 @@ class Room:
     def publish_to_seat(self, seat: int, wire: dict[str, Any]) -> None:
         """Stamp `wire` with this seat's next `seq`, append it to the seat's ring buffer, and
         push it out over that seat's live connection if one is bound (`SeatBinding.send`) --
-        the *only* path any seat-facing frame leaves this Room through, whether it came from
+        the *only* path any seat-facing frame leaves this Table through, whether it came from
         `redact_event()` (`_publish`) or was synthesized here (`state_sync`/`hand_start`/
         `deal`/`turn`/`claim_offer`/`score`/`seat_state`/`ack`)."""
         seq = self.seat_seq[seat]
@@ -878,11 +904,11 @@ class Room:
         session back -- there is nothing in this protocol shaped like `hello{seat}` for "the
         same spectator, again" (a spectator session id isn't a value a client could even present
         back on a fresh connection). So a spectator's ring/seq bookkeeping isn't preserved for a
-        future reconnect the way a seat's is (docs/00-architecture.md §6's `RoomRegistry` note:
+        future reconnect the way a seat's is (docs/00-architecture.md §6's `TableRegistry` note:
         a `SeatBinding` persists forever for reconnect) -- it's removed outright here, and a
         spectator that reconnects later is, correctly, a brand-new spectator session with a
         fresh `state_sync` (a fresh `register_spectator` call from `app/ws.py`, same as its
-        first connection). This also bounds memory for a long-running room with many transient
+        first connection). This also bounds memory for a long-running table with many transient
         spectators, which `SeatBinding`'s own "persists forever" story would not.
         """
         self.spectators.pop(session_id, None)
@@ -910,7 +936,7 @@ class Room:
     def broadcast_server_shutdown(self, deadline_ts: int) -> None:
         """docs/00-architecture.md §8.1 step 2: tell every seat a drain has started -- clients
         show a "reconnect shortly" banner instead of reading the eventual dropped socket as an
-        error. Called by `app/registry.py`'s `RoomRegistry.begin_shutdown`, once per room that
+        error. Called by `app/registry.py`'s `TableRegistry.begin_shutdown`, once per table that
         currently has any seat bound, regardless of that seat's live connection status (same
         "broadcast reaches the ring buffer either way" convention every other broadcast here --
         `seat_state`, etc. -- already follows)."""
@@ -956,7 +982,7 @@ class Room:
         before all four seats are bound -- 02-protocol.md §3) can tell "nobody has joined this
         seat yet" from "someone's here and their socket is live", e.g. to render a "waiting for
         N more players" screen. `app/views.py`'s `_DEFAULT_SEAT_STATUS` stays `connected` --
-        that default is for callers with no `Room` behind them at all (bots/arena.py,
+        that default is for callers with no `Table` behind them at all (bots/arena.py,
         bots/selfplay.py, direct `seat_view()` tests), where every seat is a live simulated
         player, not a lobby seat that may genuinely be empty."""
         return cast(
@@ -974,10 +1000,10 @@ class Room:
         )
 
     async def run(self) -> None:
-        """The room's long-lived loop -- one `asyncio.Task` per room (server/AGENTS.md). Stops
+        """The table's long-lived loop -- one `asyncio.Task` per table (server/AGENTS.md). Stops
         once the game actually ends (`Phase.GAME_OVER`) -- see `app/registry.py`'s
-        `RoomRegistry` module docstring for why a room's task shouldn't loop forever after that.
-        `Room` itself (and reconnect/`state_sync` against it) keeps working after this returns;
+        `TableRegistry` module docstring for why a table's task shouldn't loop forever after that.
+        `Table` itself (and reconnect/`state_sync` against it) keeps working after this returns;
         only the background task -- which would otherwise sit awaiting an inbox that can never
         legally produce anything again (`_authorize` rejects everything once `legal_actions` is
         empty for every seat) -- stops.
@@ -990,7 +1016,7 @@ class Room:
     async def process_one(self) -> None:
         """Handle exactly one event: the next inbox `Command`/`BotResult`, or every claim-window
         or disconnect-grace timer that's expired, whichever the event loop resolves first
-        (`_next()`). Split out from `run()` so a test can drive the room one event at a time
+        (`_next()`). Split out from `run()` so a test can drive the table one event at a time
         without a real background task racing it. `turn` is only (re-)published when this cycle
         actually mutated `self.state` -- an illegal/dropped command (or a stale, already-
         resolved/superseded timeout) leaves `state` as the exact same object (`_authorize`/
@@ -1008,14 +1034,14 @@ class Room:
 
         **A `_WakeUp` never counts as "state changed", even if `self.state is not pre_state`
         happens to be true (M3 sub-task 6).** `pre_state` is captured fresh at the top of every
-        `process_one()` call, but this room's *very first* call starts as soon as the
-        `asyncio.Task` is created (`RoomRegistry.get_or_create`) -- before a white-box test's
-        `room.state = ...` rigging (`tests/test_ws_gameplay.py`/`tests/test_reconnect.py`'s own
+        `process_one()` call, but this table's *very first* call starts as soon as the
+        `asyncio.Task` is created (`TableRegistry.get_or_create`) -- before a white-box test's
+        `table.state = ...` rigging (`tests/test_ws_gameplay.py`/`tests/test_reconnect.py`'s own
         established pattern) gets a chance to run, if that first call is still sitting inside
         `_next()`'s `await` when the test does it. `_WakeUp` was, until this sub-task, never
         able to resolve that first pending call at all (join/ready/reconnect never touch
         `self.inbox`) -- so it never surfaced. It can now: an early disconnect can be the first
-        thing that ever wakes a freshly-created room, and treating that stale `pre_state` vs.
+        thing that ever wakes a freshly-created table, and treating that stale `pre_state` vs.
         the just-rigged `self.state` as "changed" would republish a spurious `turn` nobody
         asked for. `_WakeUp` never itself mutates `self.state` by construction, so it is simply
         never a valid trigger for this check.
@@ -1026,9 +1052,9 @@ class Room:
         GAME_OVER persist -- if a `session_factory` was wired in, and only once ever
         (`_persisted`) -- is awaited to completion *before* `self._shutdown_boundary` (if a
         `wait_for_shutdown_boundary` caller is actually waiting on one) is signalled. That
-        ordering is load-bearing, not incidental: `app/registry.py`'s `RoomRegistry.begin_shutdown`
-        disposes the DB engine only after every room's drain wait resolves, so a drain that woke
-        up *before* this room's own final write finished could tear down/dispose the engine out
+        ordering is load-bearing, not incidental: `app/registry.py`'s `TableRegistry.begin_shutdown`
+        disposes the DB engine only after every table's drain wait resolves, so a drain that woke
+        up *before* this table's own final write finished could tear down/dispose the engine out
         from under an in-flight `session.commit()`.
         """
         pre_state = self.state
@@ -1038,6 +1064,8 @@ class Room:
             self._handle(event)
         elif isinstance(event, BotResult):
             self._handle_bot_result(event)
+        elif isinstance(event, SeatDisconnected):
+            self._handle_seat_disconnected(event)
         elif isinstance(event, _WakeUp):
             pass  # nothing to handle -- see _WakeUp's own docstring
         else:
@@ -1054,24 +1082,24 @@ class Room:
             except Exception:
                 # a lost record must not also wedge the drain: `wait_for_shutdown_boundary`
                 # blocks *unbounded* on exactly this window, so letting this propagate would
-                # kill the room task with `_game_over_persisted` still False and the boundary
-                # below never signalled -- every drain on this room then hangs forever, and
+                # kill the table task with `_game_over_persisted` still False and the boundary
+                # below never signalled -- every drain on this table then hangs forever, and
                 # with it the process (or a TestClient context) trying to exit.
-                logger.exception("room %s: GAME_OVER persist failed, record lost", self.room_id)
+                logger.exception("table %s: GAME_OVER persist failed, record lost", self.table_id)
             self._game_over_persisted = True
         if self._boundary_this_tick and self._shutdown_boundary is not None:
             self._shutdown_boundary.set()
 
-    async def _inbox_getter(self) -> Command | BotResult | _WakeUp:
+    async def _inbox_getter(self) -> Command | BotResult | SeatDisconnected | _WakeUp:
         return await self.inbox.get()
 
-    def _ensure_getter(self) -> asyncio.Task[Command | BotResult | _WakeUp]:
+    def _ensure_getter(self) -> asyncio.Task[Command | BotResult | SeatDisconnected | _WakeUp]:
         if self._getter is None:
             self._getter = asyncio.create_task(self._inbox_getter())
         return self._getter
 
-    async def _next(self) -> Command | BotResult | _WakeUp | list[int]:
-        """00-architecture.md §3 D17: one long-lived `_inbox_getter()` task for the room's
+    async def _next(self) -> Command | BotResult | SeatDisconnected | _WakeUp | list[int]:
+        """00-architecture.md §3 D17: one long-lived `_inbox_getter()` task for the table's
         entire lifetime, raced against a sleep to `self.deadlines`' soonest entry via
         `asyncio.wait(..., return_when=FIRST_COMPLETED)` -- the getter is *never* cancelled,
         on either branch. When both are ready in the same `asyncio.wait` call (a command
@@ -1114,7 +1142,7 @@ class Room:
         own test, since sub-task 4 will feed real client input through this exact path
         unchanged. Returns `None` for an illegal command; `_handle` drops it with no mutation.
 
-        `require_ready` rooms additionally refuse everything until `self.started` -- belt and
+        `require_ready` tables additionally refuse everything until `self.started` -- belt and
         suspenders with app/ws.py's own pre-check (Session never even calls `submit()` before
         `ready`-gating completes), but this is the one place server/AGENTS.md's "never trust a
         client-supplied [legal-action set]" is actually enforced, so the gate belongs here too.
@@ -1242,7 +1270,7 @@ class Room:
         the game", with no explicit hand-boundary bookkeeping needed.
 
         A `bot`/already-`autoplay` seat still accumulates strikes here (useful signal if a
-        room-created bot seat were ever malfunctioning) but skips the status flip/broadcast --
+        table-created bot seat were ever malfunctioning) but skips the status flip/broadcast --
         there's no human occupant to take control away from, and the seat is already being
         played by the server either way."""
         binding = self.seat_bindings[seat]
@@ -1290,7 +1318,7 @@ class Room:
         now (default 20s, `mahjong_core/config.py`) -- the disconnect-side analogue of
         `_arm_seat_claim_timer`, sharing the same heap and id sequence (`TimerHeap`'s
         docstring). Always called from `mark_disconnected`, itself called from `Session` outside
-        this room's own loop -- `_wake()` at the end guarantees `_next()` actually notices."""
+        this table's own loop -- `_wake()` at the end guarantees `_next()` actually notices."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.state.ruleset.disconnect_grace_seconds
         timer_id = next(self._timer_seq)
@@ -1305,7 +1333,7 @@ class Room:
         `_arm_seat_claim_timer`/`_arm_disconnect_timer`, sharing the same heap and id sequence
         (`TimerHeap`'s docstring). Only ever called from `_publish_turn_if_active`, itself
         always running synchronously inside an already-executing `process_one()` tick or
-        `mark_ready()` -- both on this room's own event loop -- so, like the initial claim-
+        `mark_ready()` -- both on this table's own event loop -- so, like the initial claim-
         window arm (`_arm_claim_timer`), this needs no `_wake()` call of its own: the next
         `_next()` call picks up the fresh heap entry naturally when it recomputes its wait set.
         Returns the wire `deadline_ts` (epoch ms) for `_publish_turn_if_active` to publish."""
@@ -1330,7 +1358,7 @@ class Room:
         whose current decision already has a job in flight (`_pending_bot[seat]` already equals
         the freshly-computed tag) isn't resubmitted. Never runs bot logic inline (D12) --
         `_submit_bot_job` only ever schedules work on `self._bot_pool` and returns immediately;
-        the room loop is never blocked on a bot's answer.
+        the table loop is never blocked on a bot's answer.
         """
         window = self.state.claim_window
         for seat in range(4):
@@ -1368,16 +1396,16 @@ class Room:
         """Schedule `bots.worker.compute_action` on `self._bot_pool` (a `ProcessPoolExecutor` by
         default, D12: "the GIL makes a thread pool useless for CPU-bound pure-Python search") and
         return immediately -- the actual wait lives in `_await_bot_job`, a separate task, so this
-        method never blocks the room loop. `seed` is derived from the tag rather than an unseeded
+        method never blocks the table loop. `seed` is derived from the tag rather than an unseeded
         `random.Random()` so a given decision point's bot output is reproducible (server/
-        AGENTS.md). `self._bot_tier` (`Room.__init__`'s `bot_tier` param, `T0`/`T1`/`T2`) picks
-        which real tier answers -- configurable per room, not hardcoded (docs/05-roadmap.md
+        AGENTS.md). `self._bot_tier` (`Table.__init__`'s `bot_tier` param, `T0`/`T1`/`T2`) picks
+        which real tier answers -- configurable per table, not hardcoded (docs/05-roadmap.md
         M4.5); `deadline` is advisory only (`bots/base.py`'s `Bot.act` contract), derived from
-        the same hard `_BOT_JOB_TIMEOUT_SECONDS` this room actually enforces in `_await_bot_job`
+        the same hard `_BOT_JOB_TIMEOUT_SECONDS` this table actually enforces in `_await_bot_job`
         below, on the shared `time.monotonic()` clock every process on this machine agrees on.
         """
         loop = asyncio.get_running_loop()
-        seed = hash((self.room_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
+        seed = hash((self.table_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
         deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
         future = loop.run_in_executor(
             self._bot_pool, compute_action, view, mask, seed, self._bot_tier, deadline
@@ -1413,7 +1441,7 @@ class Room:
         `random.Random()`, for the same reproducibility reason `_submit_bot_job` seeds the bot's
         own RNG with it (server/AGENTS.md); XORed with a constant so this delay doesn't just echo
         the bot's own action-choice draw. Sleeping here, in this job's own task, delays only this
-        seat's result -- it never blocks the room loop or any other seat's job. If the pending tag
+        seat's result -- it never blocks the table loop or any other seat's job. If the pending tag
         goes stale while asleep (window closed, turn moved on, seat reconnected), the result lands
         anyway but `_handle_bot_result` drops it exactly like any other stale answer.
         """
@@ -1461,6 +1489,37 @@ class Room:
             return
         self._apply(Pass(window_id=window_id, seat=seat))
 
+    def _handle_seat_disconnected(self, event: SeatDisconnected) -> None:
+        """`mark_disconnected` enqueued this the moment `event.seat`'s socket closed. If that
+        seat held a live, unresolved claim offer at that instant, forfeit it right now --
+        immediately, not on the claim-window timeout -- same `Pass` path a real timeout uses
+        (`_handle_claim_timeout` above).
+
+        Why immediately, not "wait for `resume()` to re-arm on reconnect" (the previous
+        design, 00-architecture.md §8's "mid-claim-window" reconnect row): `Table.resume()`'s
+        full-`state_sync` branch (the common case now that seats survive a page reload) never
+        follows up with a real `claim_offer` -- `StateSyncPayload.claim_options` carries only
+        `{kind, tiles?}` per option, no `window_id`, no discarder, no discarded tile
+        (`app/protocol.py`), so the client has nothing to render a dialog from or submit a
+        `claim` against even though the server was still nominally waiting on this seat. The
+        seat would reconnect into a table that looked paused with no way to act on the thing
+        pausing it, until the re-armed timer eventually passed it anyway. Forfeiting on
+        disconnect removes the offer before any reconnect can observe it, so there is nothing
+        left to hand back -- simpler than teaching every reconnect path to resend a full,
+        un-redacted-shape `claim_offer`, and product-acceptable: a player who drops mid-decision
+        forfeits that decision, the same way a claim-window timeout already treats silence.
+
+        No-op if there's no live window, this seat has no offer in it, or it already responded
+        (its real `Claim`/`Pass` was already in `self.inbox` ahead of this disconnect notice --
+        `_apply`'s single-writer ordering means whichever actually got here first wins, and a
+        response already recorded always beats a forfeit that arrives after it)."""
+        window = self.state.claim_window
+        if window is None or event.seat in window.responses:
+            return
+        if not any(o.seat == event.seat for o in window.offers):
+            return
+        self._apply(Pass(window_id=window.window_id, seat=event.seat))
+
     def _apply(self, action: Action) -> None:
         """Run one already-authorized `Action` through `reduce()`, publish, and open the
         hand-end hold on `HAND_OVER` -- the common tail shared by a real `Command` (`_handle`),
@@ -1472,7 +1531,7 @@ class Room:
         docstring for why the round is now held open first. `_open_hand_end_window` has to run
         *before* `self._publish(events)` below (it computes this hold's `deadline_ts`, which
         the just-produced `hand_end` wire frame needs to carry), but the actual advance -- if
-        every seat is already acked, e.g. an all-bot practice room -- must not run until
+        every seat is already acked, e.g. an all-bot practice table -- must not run until
         *after* `events` (which includes `hand_end`/`score`) is on the wire, or `hand_start`/
         `deal` would leapfrog them out of order."""
         self.actions.append(action)  # full-game log (module docstring) -- reduce()-bound only
@@ -1493,7 +1552,7 @@ class Room:
 
     def _open_hand_end_window(self) -> bool:
         """Open the `HAND_OVER` hold (docs/00-architecture.md §3's "Hand-end hold"): every
-        hand end -- win or exhaustive draw alike, no outcome branching -- holds the room at
+        hand end -- win or exhaustive draw alike, no outcome branching -- holds the table at
         `HAND_OVER` for up to `ruleset.hand_end_seconds`, or until every seat acks
         (`mark_hand_end_ack`), whichever first. This is a clock/session concern (`ClaimWindow`'s
         own docstring: "a clock, socket, or random value belongs in app/"), so it lives entirely
@@ -1504,7 +1563,7 @@ class Room:
         human is present to click dismiss for those seats. A genuinely `disconnected` seat is
         deliberately *not* pre-seeded -- it's still someone's seat, it just rides out the same
         hold as everyone else. An unbound seat (`None` binding -- direct-construction test
-        `Room`s with no join/ready flow at all) isn't pre-seeded either, for the same reason.
+        `Table`s with no join/ready flow at all) isn't pre-seeded either, for the same reason.
 
         Also computes this hold's `deadline_ts` (`self._hand_end_deadline_ms`) unconditionally,
         even when about to advance immediately -- the just-published `hand_end` frame carries
@@ -1512,7 +1571,7 @@ class Room:
 
         Returns whether every seat is already acked, in which case the caller (`_apply`)
         advances immediately, same tick, once this tick's own events are on the wire --
-        preserves today's exact behavior for an all-bot practice room. Otherwise arms
+        preserves today's exact behavior for an all-bot practice table. Otherwise arms
         `_arm_hand_end_timer`."""
         self._hand_end_hand_no = self.state.hand_no
         self._hand_end_acked = {
@@ -1545,14 +1604,14 @@ class Room:
             # start_next_hand() deals the next hand with no Event of its own (state.py/
             # engine.py: `new_game`/`_deal_hand` build state directly, not through
             # reduce()) -- hand_start/deal have no engine event to redact either way
-            # (02-protocol.md §3's sketch, no EventKind backs them), so this Room
+            # (02-protocol.md §3's sketch, no EventKind backs them), so this Table
             # synthesizes both here, the same way it does for the ready-triggered hand 1
-            # start (`Room.mark_ready`).
+            # start (`Table.mark_ready`).
             self._publish_hand_start_and_deal()
 
     def _arm_hand_end_timer(self) -> None:
-        """Give the room a single fresh `TimerHeap` entry, `ruleset.hand_end_seconds` from right
-        now -- modeled directly on `_arm_turn_timer`, but whole-room (one active id), not
+        """Give the table a single fresh `TimerHeap` entry, `ruleset.hand_end_seconds` from right
+        now -- modeled directly on `_arm_turn_timer`, but whole-table (one active id), not
         per-seat like claims: there's no priority/tiebreak logic here, just "wait for N of 4"
         (the closer template is `mark_ready`'s all-seats wait, not `ClaimWindow`). `deadline_ts`
         itself is computed by the caller (`_open_hand_end_window`), which needs it before this
@@ -1565,7 +1624,7 @@ class Room:
         self._active_hand_end_timer_id = timer_id
 
     def _handle_hand_end_timeout(self, timer_id: int) -> None:
-        """The hand-end hold's deadline popped with the room still waiting on at least one
+        """The hand-end hold's deadline popped with the table still waiting on at least one
         seat's ack. No-op if stale: unknown/superseded id (`_active_hand_end_timer_id` no
         longer matches -- same lazy-deletion staleness check every other timer here uses), or
         the hold already closed some other way (all-acked) before this fired -- `self.state.
@@ -1579,7 +1638,7 @@ class Room:
     def _arm_claim_timer(self) -> None:
         """Arm a deadline the moment `self.state.claim_window` shows a new `window_id` --
         called after every event `process_one()` handles, mirroring `_arm_timers()` in
-        00-architecture.md §3's Room sketch. Idempotent per window: `_armed_window_id` stops a
+        00-architecture.md §3's Table sketch. Idempotent per window: `_armed_window_id` stops a
         window that's still accumulating responses across several `process_one()` calls from
         getting a fresh (and later) deadline each time. Duration is `ruleset.claim_seconds`
         (`mahjong_core/config.py`) -- already real config, not a placeholder.
@@ -1614,7 +1673,7 @@ class Room:
         arm (`_arm_claim_timer`) always runs synchronously inside an already-executing
         `process_one()` tick, so the *next* `_next()` call picks up the fresh heap entry
         naturally when it recomputes its wait set -- no external nudge needed. A mid-window
-        re-arm (`_rearm_seat_claim_timer`) runs from `resume()`, outside this room's loop, where
+        re-arm (`_rearm_seat_claim_timer`) runs from `resume()`, outside this table's loop, where
         that guarantee doesn't hold -- it calls `_wake()` itself, after this returns.
         """
         loop = asyncio.get_running_loop()
@@ -1721,7 +1780,7 @@ class Room:
 
     def _publish_hand_start_and_deal(self) -> None:
         """Synthesize `hand_start` (broadcast) and `deal` (per-seat) -- see `_arm_claim_timer`'s
-        docstring for why these have no backing `Event`. Called once the room actually starts
+        docstring for why these have no backing `Event`. Called once the table actually starts
         (`mark_ready`) and once per later hand (`_apply`, right after `start_next_hand()` deals
         it). `seats` is each seat's real `status` (`app/views.py`'s `SeatView` shape, M3
         sub-task 6 -- see `SeatBinding`/`mark_disconnected`)."""
@@ -1783,7 +1842,7 @@ class Room:
 
     def _augment_event_wire(self, wire: dict[str, Any], event: Event) -> None:
         """The two fields `redact_event` alone can't derive from `state` in general (see that
-        function's own module docstring): `discard.tile`/`pool_index` (this Room still holds
+        function's own module docstring): `discard.tile`/`pool_index` (this Table still holds
         `state` from immediately after the `reduce()` call that produced the event, before any
         *later* command could claim that discard away) and `hand_end.deadline_ts` (this
         `HAND_OVER` landing's own hold, already computed by `_open_hand_end_window` before
@@ -1823,7 +1882,7 @@ class Room:
 
     async def _persist_game_record(self) -> None:
         """`Phase.GAME_OVER` persistence (docs/06-ml.md §2, docs/00-architecture.md §6) -- a
-        no-op if this `Room` was never given a `session_factory` (every bare `Room()` test, and
+        no-op if this `Table` was never given a `session_factory` (every bare `Table()` test, and
         any deployment with no `DATABASE_URL`, app/main.py's `lifespan`). `players` is each
         seat's real chosen `SeatBinding.name` (M5, 00-architecture.md §2.1) -- swapped in from
         the old `SeatBinding.session_id` stand-in this sub-task replaces, now that a real guest
@@ -1841,28 +1900,28 @@ class Room:
             await save_game_record(session, self.state, self.actions, players=players)
 
     async def wait_for_shutdown_boundary(self, timeout: float) -> bool:
-        """docs/00-architecture.md §8.1 steps 3-5: block until this room reaches a hand boundary
+        """docs/00-architecture.md §8.1 steps 3-5: block until this table reaches a hand boundary
         -- a fresh hand dealt, or the game ends (`_boundary_this_tick`, set inside `_apply`) --
         or `timeout` seconds elapse, whichever is first. Returns whether a boundary was actually
         reached; `False` means the grace window elapsed first and the caller
-        (`app/registry.py`'s `RoomRegistry.begin_shutdown`) abandons this room, same as a crash,
+        (`app/registry.py`'s `TableRegistry.begin_shutdown`) abandons this table, same as a crash,
         but warned.
 
-        A room whose GAME_OVER persist has actually *finished* (`_game_over_persisted`) returns
+        A table whose GAME_OVER persist has actually *finished* (`_game_over_persisted`) returns
         `True` immediately with no event/wait at all -- nothing left to abandon.
 
         **The in-between state is the one two real bugs lived in.** `begin_shutdown` only ever
-        calls this on a room whose background task is still running (`RoomRegistry.is_running`),
-        and a still-running room already at `Phase.GAME_OVER` is, by construction, one whose
+        calls this on a table whose background task is still running (`TableRegistry.is_running`),
+        and a still-running table already at `Phase.GAME_OVER` is, by construction, one whose
         final `process_one()` tick is suspended inside `await self._persist_game_record()` --
         `state.phase` and `self._persisted` both flip synchronously, with no `await` between
         them and the persist call, so no other coroutine on this event loop can ever observe
         `state.phase == Phase.GAME_OVER` with `_game_over_persisted` still `False` except by
         genuinely racing that in-flight write. That is exactly why `process_one()`'s tail catches
         a failing `_persist_game_record()` rather than letting it propagate: a write that raises
-        would otherwise end the room task inside this window, leaving the flag `False` and the
+        would otherwise end the table task inside this window, leaving the flag `False` and the
         boundary event unset with nothing alive left to set either, and the unbounded wait below
-        would then never return -- a dead room wedging the whole drain (and the process, or the
+        would then never return -- a dead table wedging the whole drain (and the process, or the
         `TestClient` context, waiting on it) forever. The wait is unbounded on purpose; what
         makes that safe is that the window it waits on can only ever be exited, never abandoned.
 
@@ -1880,7 +1939,7 @@ class Room:
         without giving the awaited event a single scheduling turn, regardless of how close it is
         to firing. So a drain landing mid-persist still reached `engine.dispose()` right after --
         now via the "grace window elapsed, abandoning" branch instead of the old fast path, same
-        data loss, plus a spurious warning for a room that was, in fact, finishing normally. The
+        data loss, plus a spurious warning for a table that was, in fact, finishing normally. The
         fix: waiting out an *already-in-flight* GAME_OVER persist is a durability guarantee, not
         the boundable "let the hand finish" allowance `timeout` exists for -- there is no further
         hand for a timeout to bound here, so that wait ignores the caller's `timeout` entirely.

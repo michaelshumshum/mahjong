@@ -1,10 +1,10 @@
 """Real gameplay over the wire (docs/05-roadmap.md M3 sub-task 4) -- the M3 gate in miniature:
-four scripted WS clients `join` the same room, `ready` up, and play a hand through real
+four scripted WS clients `join` the same table, `ready` up, and play a hand through real
 `discard`/`claim`/`declare` intents, asserting correctly-sequenced, correctly-redacted frames.
 
 The mid-hand fixture (seat 0 discards 5m, seat 1 can chow it, seat 2 can pung it, seat 3 holds
-nothing relevant) is `tests/test_room_claims.py`'s exact fixture, injected the same white-box
-way that module already established (`room.state = ...`) -- here additionally with an emptied
+nothing relevant) is `tests/test_table_claims.py`'s exact fixture, injected the same white-box
+way that module already established (`table.state = ...`) -- here additionally with an emptied
 wall, so the hand ends in a fast, deterministic exhaustive draw right after the pung resolves
 and its claimant discards, instead of needing to hand-craft a real winning hand or play out
 however much of the wall real random legal actions would need. That still exercises a full
@@ -13,10 +13,10 @@ real wire, not just the claim exchange.
 
 Every read below is a *blocking* `receive_json()` on a specific connection's queue, never a
 raw count-mismatch risk: a session's own outbound stream is strictly FIFO in true production
-order (`app/room.py`'s `Room.publish_to_seat`), so reading a known, derivable number of frames
+order (`app/table.py`'s `Table.publish_to_seat`), so reading a known, derivable number of frames
 off a specific connection can only return exactly those frames in that order -- there is
 nothing to race. The one thing to get right is *how many* frames a given step produces per
-connection, which is computed here the same way `Room` produces it (a broadcast reaches every
+connection, which is computed here the same way `Table` produces it (a broadcast reaches every
 currently-bound seat; a unicast reaches one), not hand-counted.
 """
 
@@ -30,7 +30,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
@@ -46,7 +46,7 @@ def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
     return tuple(ids[:count])
 
 
-# Unlike tests/test_room_claims.py's fixture (which never drives play past the pung, so its
+# Unlike tests/test_table_claims.py's fixture (which never drives play past the pung, so its
 # junk tiles can safely repeat the same physical ids across seats), this test plays a second
 # discard for real -- so every seat's junk needs to be both physically distinct (no tile_id
 # reused across two seats -- mahjong_core has no cross-seat uniqueness check of its own, so a
@@ -106,17 +106,17 @@ def _rig_state(seed: int) -> GameState:
 
 
 def test_full_hand_over_real_ws_multi_client() -> None:
-    room_id = f"gameplay-{uuid.uuid4()}"
+    table_id = f"gameplay-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_state(seed=20260916)
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_state(seed=20260916)
 
         with (
-            client.websocket_connect(f"/ws?room={room_id}") as ws1,
-            client.websocket_connect(f"/ws?room={room_id}") as ws2,
-            client.websocket_connect(f"/ws?room={room_id}") as ws3,
+            client.websocket_connect(f"/ws?table={table_id}") as ws1,
+            client.websocket_connect(f"/ws?table={table_id}") as ws2,
+            client.websocket_connect(f"/ws?table={table_id}") as ws3,
         ):
             wss = [ws0, ws1, ws2, ws3]
             for ws in wss:
@@ -252,8 +252,8 @@ def test_full_hand_over_real_ws_multi_client() -> None:
 
             # --- seat 2 discards a junk tile: nobody can claim it, so the engine cascades
             # straight through "advance to seat 3's draw" -> wall exhausted -> hand over --
-            # all inside this one reduce() call, then Room chains start_next_hand() into a
-            # fresh hand 2 in the same tick (app/room.py's `_apply`).
+            # all inside this one reduce() call, then Table chains start_next_hand() into a
+            # fresh hand 2 in the same tick (app/table.py's `_apply`).
             discard2_id = _next_id()
             wss[2].send_json(
                 _msg("discard", {"tile_id": discard_action["tile_id"]}, id_=discard2_id)
@@ -282,7 +282,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             assert score["totals"] == {"0": 0, "1": 0, "2": 0, "3": 0}
 
             # --- hand-end hold: DEFAULT_RULESET's real hand_end_seconds (10s) would otherwise
-            # hold the room open at HAND_OVER -- the next hand's hand_start/deal/turn don't
+            # hold the table open at HAND_OVER -- the next hand's hand_start/deal/turn don't
             # follow until every seat acks the hold (`hand_end_ack`), same "wait for all 4"
             # shape `ready` already uses for the hand-1 start above. And, like that hand-1
             # start, the 4th (last) ack itself cascades hand_start/deal/turn to every seat --
@@ -323,9 +323,9 @@ def test_full_hand_over_real_ws_multi_client() -> None:
 
 
 def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -> None:
-    room_id = f"idempotency-{uuid.uuid4()}"
+    table_id = f"idempotency-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws:
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
         ws.send_json(_msg("hello", {"client_version": "test"}))
         ws.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
         assert ws.receive_json()["t"] == "seat_state"
@@ -333,12 +333,12 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
         join_ack = ws.receive_json()
         assert join_ack["d"]["ok"] is True
 
-        room = get_room(room_id)
-        assert room is not None
-        tile_a, tile_b = room.state.seats[room.state.turn].concealed[:2]
+        table = get_table(table_id)
+        assert table is not None
+        tile_a, tile_b = table.state.seats[table.state.turn].concealed[:2]
 
         # not this seat's turn (seat 0 may not even be the dealer here) -- irrelevant to the
-        # id contract itself, which fires before Room ever gets to judge legality; Room simply
+        # id contract itself, which fires before Table ever gets to judge legality; Table simply
         # drops the command silently if it isn't actually legal (unchanged sub-task 2/3
         # behavior), and this test only cares about the ack/idempotency layer above that.
         ws.send_json(_msg("discard", {"tile_id": int(tile_a)}, id_="d-1"))
@@ -357,7 +357,7 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
         assert conflict_ack["d"]["error"] == "id_conflict"
 
         # a genuinely illegal claim (unknown window) still gets ok=False without ever
-        # reaching Room.submit -- and is itself idempotent under the same id contract.
+        # reaching Table.submit -- and is itself idempotent under the same id contract.
         ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pass"}, id_="bad-1"))
         bad_ack = ws.receive_json()
         assert bad_ack["d"] == {"id": "bad-1", "ok": False, "error": "illegal"}
@@ -370,14 +370,14 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
 def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
     """A lobby client (fewer than four seats bound) needs `state_sync.d.seat_status` to tell
     "nobody has ever joined this seat" apart from "someone's here and connected" -- the signal
-    the `/table/[id]` waiting-room screen renders off. Also confirms a later `join` broadcasts
+    the `/table/[id]` waiting-table screen renders off. Also confirms a later `join` broadcasts
     `seat_state` live to already-connected seats, not just the new joiner's own snapshot."""
-    room_id = f"seat-status-{uuid.uuid4()}"
+    table_id = f"seat-status-{uuid.uuid4()}"
 
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}") as ws0,
-        client.websocket_connect(f"/ws?room={room_id}") as ws1,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
+        client.websocket_connect(f"/ws?table={table_id}") as ws1,
     ):
         ws0.send_json(_msg("hello", {"client_version": "test"}))
         ws1.send_json(_msg("hello", {"client_version": "test"}))

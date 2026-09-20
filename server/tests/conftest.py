@@ -5,7 +5,7 @@ Also sets a session-wide default for `SHUTDOWN_GRACE_SECONDS` (docs/00-architect
 `app/main.py`'s `lifespan`): every `TestClient(app)` context in the WS-integration tests
 (`test_ws_gameplay.py`, `test_reconnect.py`, `test_disconnect_bot_handover.py`, ...) runs the
 exact same ASGI shutdown-phase code a real SIGTERM does when its `with` block exits, and most of
-those rooms are still mid-game (not `Phase.GAME_OVER`) at that point -- the real default
+those tables are still mid-game (not `Phase.GAME_OVER`) at that point -- the real default
 (90s) would make every one of those tests hang for up to 90 real seconds on teardown.
 `setdefault` here (module-level, evaluated once at collection, before any test or `app.main`
 import runs) is this codebase's usual test-time-control pattern applied via env var rather than
@@ -14,7 +14,7 @@ already established, just process-level rather than per-game. A test that actual
 grace window (`test_shutdown.py`) overrides it per-call via `begin_shutdown(grace_seconds=...)`
 directly rather than relying on this env var.
 
-Same reasoning zeroes `BOT_THINK_MIN_SECONDS`/`BOT_THINK_MAX_SECONDS` (`app/room.py`'s
+Same reasoning zeroes `BOT_THINK_MIN_SECONDS`/`BOT_THINK_MAX_SECONDS` (`app/table.py`'s
 `_await_bot_job` humanising think delay, docs/04-bots.md §1): real over the wire in the WS-
 integration tests, a real bot tier answers in milliseconds, but every `_await_bot_job` still
 sleeps 0.4-1.4s per decision by default -- multiplied across a whole hand's worth of bot turns,

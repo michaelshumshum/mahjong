@@ -1,8 +1,8 @@
 """Graceful shutdown drain (docs/00-architecture.md §8.1, docs/05-roadmap.md M3).
 
-`RoomRegistry.begin_shutdown`/`Room.wait_for_shutdown_boundary` are driven directly (bare
-`Room`/`RoomRegistry`, no real WebSocket -- `tests/test_room.py`'s style: a `RoomRegistry`'s
-`get_or_create` already starts a real background `asyncio.Task` running `Room.run()`, so this
+`TableRegistry.begin_shutdown`/`Table.wait_for_shutdown_boundary` are driven directly (bare
+`Table`/`TableRegistry`, no real WebSocket -- `tests/test_table.py`'s style: a `TableRegistry`'s
+`get_or_create` already starts a real background `asyncio.Task` running `Table.run()`, so this
 still exercises the real dispatch loop, just without a socket in front of it) since the grace
 window itself needs fine-grained async control (a concurrent drain-wait racing real inbox
 processing) that `fastapi.testclient`'s blocking `receive_json()` API doesn't give a clean way to
@@ -29,8 +29,8 @@ from starlette.websockets import WebSocketDisconnect
 from app import ws
 from app.db.session import make_engine, make_session_factory
 from app.main import app
-from app.registry import RoomRegistry
-from app.room import Room, SeatBinding
+from app.registry import TableRegistry
+from app.table import SeatBinding, Table
 from mahjong_core.actions import Discard
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
@@ -63,10 +63,10 @@ def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
 
 
 # hand-end hold (docs/00-architecture.md §3): `_bind_fake_seats` binds real "connected"
-# SeatBindings (fake sockets, not bot/autoplay), so `Room._open_hand_end_window` won't
+# SeatBindings (fake sockets, not bot/autoplay), so `Table._open_hand_end_window` won't
 # pre-seed/auto-ack any of them -- these tests never send a real `hand_end_ack` (no real
-# session/socket in front of these rigged rooms), so `hand_end_seconds=0` is what actually lets
-# the rigged hand boundary resolve, same idiom `tests/test_room.py`'s `_BOUNDED_RULESET` uses.
+# session/socket in front of these rigged tables), so `hand_end_seconds=0` is what actually lets
+# the rigged hand boundary resolve, same idiom `tests/test_table.py`'s `_BOUNDED_RULESET` uses.
 _ZERO_HOLD_RULESET = dataclasses.replace(DEFAULT_RULESET, hand_end_seconds=0)
 
 
@@ -75,7 +75,7 @@ def _rig_uncontested_state(seed: int) -> GameState:
     other seat's junk is disjoint by tile type, so the discard is guaranteed uncontested
     (no chow/pung possible) regardless of which tile were chosen. Wall emptied so the
     uncontested discard ends the hand (exhaustive draw) immediately -- one action, one hand
-    boundary, matching `Room.wait_for_shutdown_boundary`'s contract."""
+    boundary, matching `Table.wait_for_shutdown_boundary`'s contract."""
     state = new_game(_ZERO_HOLD_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
     state = _with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
@@ -100,7 +100,7 @@ def _rig_final_hand_state(seed: int) -> GameState:
 
 def _broken_session_factory() -> async_sessionmaker[AsyncSession]:
     """A real `async_sessionmaker` (not a bare stand-in callable, which fails the same type
-    check `Room` enforces against the real one from `app/main.py`) against a schema-less
+    check `Table` enforces against the real one from `app/main.py`) against a schema-less
     in-memory SQLite DB -- no `Base.metadata.create_all`, so a write against it fails exactly
     like an unapplied migration would (no `games` table): the failure that actually bit."""
     engine = make_engine("sqlite+aiosqlite:///:memory:")
@@ -122,20 +122,20 @@ class _FakeSocket:
         return await self.queue.get()
 
 
-def _bind_fake_seats(room: Room) -> list[_FakeSocket]:
+def _bind_fake_seats(table: Table) -> list[_FakeSocket]:
     sockets = [_FakeSocket() for _ in range(4)]
     for seat, sock in enumerate(sockets):
-        room.seat_bindings[seat] = SeatBinding(
+        table.seat_bindings[seat] = SeatBinding(
             session_id=f"seat-{seat}", send=sock.send, name=f"Seat {seat}"
         )
     return sockets
 
 
-async def test_mid_hand_room_gets_server_shutdown_and_finishes_within_grace_window() -> None:
-    registry = RoomRegistry()
-    room = registry.get_or_create("shutdown-finish", DEFAULT_RULESET, seed=1, require_ready=False)
-    room.state = _rig_uncontested_state(seed=1)
-    sockets = _bind_fake_seats(room)
+async def test_mid_hand_table_gets_server_shutdown_and_finishes_within_grace_window() -> None:
+    registry = TableRegistry()
+    table = registry.get_or_create("shutdown-finish", DEFAULT_RULESET, seed=1, require_ready=False)
+    table.state = _rig_uncontested_state(seed=1)
+    sockets = _bind_fake_seats(table)
 
     drain_task = asyncio.create_task(registry.begin_shutdown(grace_seconds=5.0))
 
@@ -146,21 +146,21 @@ async def test_mid_hand_room_gets_server_shutdown_and_finishes_within_grace_wind
         assert isinstance(frame["deadline_ts"], int)
 
     assert registry.draining is True
-    assert not drain_task.done()  # still waiting on this room's own hand boundary
+    assert not drain_task.done()  # still waiting on this table's own hand boundary
 
-    # finish the mid-hand discard for real -- Room's own background task processes it.
-    room.submit(0, Discard(tile_id=_SEAT0_DISCARD))
+    # finish the mid-hand discard for real -- Table's own background task processes it.
+    table.submit(0, Discard(tile_id=_SEAT0_DISCARD))
 
-    # drain resolves once the room reaches the hand boundary -- well under the 5s grace window,
+    # drain resolves once the table reaches the hand boundary -- well under the 5s grace window,
     # proving this isn't just "waited out the timeout".
     await asyncio.wait_for(drain_task, timeout=1.0)
-    assert room.state.hand_no == 2  # exhaustive draw -> next hand dealt: a real boundary
+    assert table.state.hand_no == 2  # exhaustive draw -> next hand dealt: a real boundary
 
 
 async def test_wait_for_shutdown_boundary_waits_out_an_in_flight_game_over_persist() -> None:
-    """Regression for the race `Room.wait_for_shutdown_boundary`'s own docstring now documents:
-    `begin_shutdown` only ever calls this on a room whose background task is still running, so a
-    room already at `Phase.GAME_OVER` here is, by construction, one whose final `process_one()`
+    """Regression for the race `Table.wait_for_shutdown_boundary`'s own docstring now documents:
+    `begin_shutdown` only ever calls this on a table whose background task is still running, so a
+    table already at `Phase.GAME_OVER` here is, by construction, one whose final `process_one()`
     tick is still suspended inside `_persist_game_record()` -- `state.phase` and `self._persisted`
     both flip synchronously, before that write even starts. Two bugs used to lose this race:
     fast-pathing on `state.phase` alone returned instantly, before the write started; and once
@@ -169,28 +169,28 @@ async def test_wait_for_shutdown_boundary_waits_out_an_in_flight_game_over_persi
     `asyncio.wait_for` with a non-positive timeout never gives the awaited event a single
     scheduling turn. Both are exercised directly (no real DB, no full hand) by rigging exactly
     the state `process_one()`'s own tail would have produced mid-persist."""
-    registry = RoomRegistry()
-    room = registry.get_or_create(
+    registry = TableRegistry()
+    table = registry.get_or_create(
         "shutdown-persist-race", DEFAULT_RULESET, seed=6, require_ready=False
     )
-    room.state = dataclasses.replace(room.state, phase=Phase.GAME_OVER)
-    room._persisted = True  # process_one()'s tail sets this before the write starts, not after
+    table.state = dataclasses.replace(table.state, phase=Phase.GAME_OVER)
+    table._persisted = True  # process_one()'s tail sets this before the write starts, not after
 
     async def _finish_persist_soon() -> None:
         await asyncio.sleep(0.05)
-        room._game_over_persisted = True
-        if room._shutdown_boundary is not None:
-            room._shutdown_boundary.set()
+        table._game_over_persisted = True
+        if table._shutdown_boundary is not None:
+            table._shutdown_boundary.set()
 
     finisher = asyncio.create_task(_finish_persist_soon())
 
     # grace_seconds=0, exactly this codebase's session-wide test pin -- must not abandon a
     # persist that's genuinely about to finish just because there's no grace window to spare.
-    reached = await asyncio.wait_for(room.wait_for_shutdown_boundary(0.0), timeout=1.0)
+    reached = await asyncio.wait_for(table.wait_for_shutdown_boundary(0.0), timeout=1.0)
     assert reached is True
     # the load-bearing assertion: proves this genuinely waited for the write, not just for the
     # phase flip (bug 1) or for `timeout=0` to elapse regardless (bug 2).
-    assert room._game_over_persisted is True
+    assert table._game_over_persisted is True
     await finisher
 
 
@@ -198,7 +198,7 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Regression: a `GAME_OVER` write that *raises* used to propagate straight out of
-    `process_one()` -> `Room.run()`, killing the room task with `_game_over_persisted` still
+    `process_one()` -> `Table.run()`, killing the table task with `_game_over_persisted` still
     `False` and the boundary event never set -- precisely the state
     `wait_for_shutdown_boundary` waits on *unbounded*, so every later drain (and the process,
     or the `TestClient` context, waiting on it) hung forever. Found for real: docker-compose
@@ -208,57 +208,57 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
     Driven through `process_one()` directly rather than a background task so the failing tick
     is observed, not raced: under the old code this call itself raises.
     """
-    room = Room(
+    table = Table(
         "shutdown-persist-fails",
         _NO_REPEAT_RULESET,
         game_seed=7,
         session_factory=_broken_session_factory(),
     )
-    room.state = _rig_final_hand_state(seed=7)
-    _bind_fake_seats(room)
-    room.submit(0, Discard(tile_id=_SEAT0_DISCARD))
+    table.state = _rig_final_hand_state(seed=7)
+    _bind_fake_seats(table)
+    table.submit(0, Discard(tile_id=_SEAT0_DISCARD))
 
     with caplog.at_level(logging.ERROR):
         # first tick: the discard lands HAND_OVER and opens the hand-end hold (arms the
         # hand_end_seconds=0 timer, doesn't advance yet -- no seat here is bot/autoplay, so
         # nothing pre-acks it). Second tick: that timer has already expired, so this call
         # processes it and actually advances into GAME_OVER, running the persist attempt.
-        await asyncio.wait_for(room.process_one(), timeout=2.0)
-        assert room.state.phase == Phase.HAND_OVER
-        await asyncio.wait_for(room.process_one(), timeout=2.0)
+        await asyncio.wait_for(table.process_one(), timeout=2.0)
+        assert table.state.phase == Phase.HAND_OVER
+        await asyncio.wait_for(table.process_one(), timeout=2.0)
 
-    # mypy narrows room.state.phase to Literal[HAND_OVER] from the assert two ticks up and
-    # doesn't see that the second `await room.process_one()` above reassigns `room.state` to a
+    # mypy narrows table.state.phase to Literal[HAND_OVER] from the assert two ticks up and
+    # doesn't see that the second `await table.process_one()` above reassigns `table.state` to a
     # new GameState -- flags this as non-overlapping/unreachable, but it's real and correct.
-    assert room.state.phase == Phase.GAME_OVER  # the game still ended for real
-    assert room._game_over_persisted is True  # the attempt returned: nothing left to wait on
+    assert table.state.phase == Phase.GAME_OVER  # the game still ended for real
+    assert table._game_over_persisted is True  # the attempt returned: nothing left to wait on
     assert any("persist failed" in r.message for r in caplog.records)
 
     # and the drain that used to hang on it now resolves immediately, without abandoning it.
-    assert await asyncio.wait_for(room.wait_for_shutdown_boundary(0.0), timeout=1.0) is True
+    assert await asyncio.wait_for(table.wait_for_shutdown_boundary(0.0), timeout=1.0) is True
 
 
-async def test_room_never_reaching_boundary_is_abandoned_not_hung(
+async def test_table_never_reaching_boundary_is_abandoned_not_hung(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    registry = RoomRegistry()
-    room = registry.get_or_create("shutdown-timeout", DEFAULT_RULESET, seed=2, require_ready=False)
-    room.state = _rig_uncontested_state(seed=2)
-    _bind_fake_seats(room)
+    registry = TableRegistry()
+    table = registry.get_or_create("shutdown-timeout", DEFAULT_RULESET, seed=2, require_ready=False)
+    table.state = _rig_uncontested_state(seed=2)
+    _bind_fake_seats(table)
 
-    # nobody ever submits the finishing discard -- the room sits mid-hand forever. The drain
+    # nobody ever submits the finishing discard -- the table sits mid-hand forever. The drain
     # must still return promptly, bounded by grace_seconds, not hang.
     with caplog.at_level(logging.WARNING):
         await asyncio.wait_for(registry.begin_shutdown(grace_seconds=0.05), timeout=2.0)
 
-    assert room.state.phase != Phase.GAME_OVER  # genuinely never finished
+    assert table.state.phase != Phase.GAME_OVER  # genuinely never finished
     assert any(
         "shutdown-timeout" in r.message and "abandoning" in r.message for r in caplog.records
     )
 
 
-async def test_begin_shutdown_is_a_noop_when_no_room_has_any_seat_bound() -> None:
-    registry = RoomRegistry()
+async def test_begin_shutdown_is_a_noop_when_no_table_has_any_seat_bound() -> None:
+    registry = TableRegistry()
     registry.get_or_create("shutdown-empty", DEFAULT_RULESET, seed=3, require_ready=False)
     # no seat_bindings at all -- nothing to warn, nothing to wait on.
     await asyncio.wait_for(registry.begin_shutdown(grace_seconds=90.0), timeout=1.0)
@@ -278,8 +278,8 @@ def test_healthz_reflects_draining_state() -> None:
 
 
 def test_new_connections_rejected_while_draining() -> None:
-    room_id = f"draining-{uuid.uuid4()}"
+    table_id = f"draining-{uuid.uuid4()}"
     with TestClient(app) as client:
         ws.registry().draining = True
-        with pytest.raises(WebSocketDisconnect), client.websocket_connect(f"/ws?room={room_id}"):
+        with pytest.raises(WebSocketDisconnect), client.websocket_connect(f"/ws?table={table_id}"):
             pass

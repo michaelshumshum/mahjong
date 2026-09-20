@@ -29,7 +29,7 @@ async def save_game_record(
 ) -> GameRecord:
     """Persist a finished game. `state.phase` must be `Phase.GAME_OVER` -- this is the
     durable record of a *finished* game (docs/07-infra.md §6), not a mid-game snapshot;
-    `app/room.py` has no mid-game durability story yet (docs/00-architecture.md §7).
+    `app/table.py` has no mid-game durability story yet (docs/00-architecture.md §7).
     """
     if state.phase != Phase.GAME_OVER:
         raise ValueError(f"save_game_record requires Phase.GAME_OVER, got {state.phase}")

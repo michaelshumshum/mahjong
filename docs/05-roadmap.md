@@ -23,14 +23,14 @@ mahjong/
 │   ├── app/
 │   │   ├── main.py             # FastAPI app, lifespan, uvicorn entry, /healthz
 │   │   ├── ws.py               # WebSocket endpoint, Session
-│   │   ├── room.py             # Room actor: task loop, timers, claim windows, seq/ring
-│   │   ├── registry.py         # RoomRegistry, matchmaking, graceful-shutdown drain
+│   │   ├── table.py             # Table actor: task loop, timers, claim windows, seq/ring
+│   │   ├── registry.py         # TableRegistry, matchmaking, graceful-shutdown drain
 │   │   ├── views.py            # seat_view() + redact_event() — redaction
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (02-protocol.md §1)
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
 │   │   └── db/                 # SQLAlchemy models, migrations
-│   │       # no REST router yet beyond /healthz — room list, replays, leaderboard
+│   │       # no REST router yet beyond /healthz — table list, replays, leaderboard
 │   │       # (02-protocol.md's REST mention) are not built; matchmaking/presence/rate-
 │   │       # limiting are the in-process dicts 00-architecture.md §6 describes, not a
 │   │       # separate app/infra/ module
@@ -104,19 +104,19 @@ Also: the fixed 109-action space + `legal_mask` + type-level round-trip property
 ([06-ml §1](06-ml.md)) — ~1 day, painful to retrofit; the bots share the mask.
 
 ### M3 — Server (≈1 week)
-Room actor + task loop, sessions, claim windows with early exit, per-seat redaction, timers with
+Table actor + task loop, sessions, claim windows with early exit, per-seat redaction, timers with
 deadline broadcast, seq + ring buffer, reconnect/resync, disconnect→bot handover, Postgres
 persistence of finished games.
 **Done when:** four scripted WS clients play a full game; killing one mid-hand and reconnecting
 resumes correctly from `last_seq`; `test_redaction` proves no seat ever receives a tile identity
 it isn't entitled to. **Met.**
 
-Postgres persistence of finished `Room`-driven games and the graceful-shutdown drain
+Postgres persistence of finished `Table`-driven games and the graceful-shutdown drain
 ([00-architecture.md §6](00-architecture.md)/[§8.1](00-architecture.md)) are both implemented —
 see those sections. `server/tests/test_full_game_e2e.py` drives four real WS clients through a
 complete `EAST_ONLY` game (4 hands, dealer rotating 0→1→2→3) covering a real claim exchange, a
 self-draw win, and a mid-claim-window disconnect/reconnect, checking every frame against
-`app/views.py`'s `Entitlement` rules live. Turn timeout is also closed: `app/room.py`'s
+`app/views.py`'s `Entitlement` rules live. Turn timeout is also closed: `app/table.py`'s
 `_arm_turn_timer`/`_handle_turn_timeout` enforce `RuleSet.turn_seconds`/`turn_timeout_strikes`
 for both human and bot-driven seats identically (00-architecture.md §8 "Turn timeout"). M3 is
 fully complete; no gaps remain beyond what's tracked elsewhere in this doc set (§4, §7, §8, §9).
@@ -149,10 +149,10 @@ wins at a normal rate rather than perpetual exhaustive draws, and it feels good.
 point at which shipping single-player-only is a live, cheap option — given the M5 cost below,
 treat it as a real decision point, not a formality.
 
-**Backend mechanism: built.** The live room path (disconnect-handover's `autoplay` seats) runs
-the real bot tiers ([04-bots.md §1](04-bots.md)), and a room can also be started with bots
+**Backend mechanism: built.** The live table path (disconnect-handover's `autoplay` seats) runs
+the real bot tiers ([04-bots.md §1](04-bots.md)), and a table can also be started with bots
 filling the other three seats from creation (`?practice=true` on the WS endpoint →
-`Room.__init__(practice=True)`), defaulting to `T2`/`FaanBot`. Proven end to end: one human
+`Table.__init__(practice=True)`), defaulting to `T2`/`FaanBot`. Proven end to end: one human
 client, three real `FaanBot`s, unscripted play to `Phase.GAME_OVER`
 (`server/tests/test_practice_mode_e2e.py`). **What's left for this milestone is entirely
 frontend** — a lobby entry point for practice mode and bot-seat visual treatment.
@@ -164,7 +164,7 @@ cookie) so it survives a reload, and sent once at `join` (docs/02-protocol.md §
 `JoinPayload` grows a sibling `name` field alongside `seat` — no new wire concept, just one more
 client-asserted field on the message that actually claims a seat for the first time; a later
 `hello{seat}` reconnect never resends it — see docs/00-architecture.md §2.1's note on why `join`,
-not `hello`, is the right message). Matchmaking, private rooms with invite codes, mid-game bot
+not `hello`, is the right message). Matchmaking, private tables with invite codes, mid-game bot
 takeover for disconnects, spectating (spectating backend built — see below; frontend wiring
 still open, matchmaking/invite codes not started).
 
@@ -263,18 +263,18 @@ milestones' `EfficiencyBot`/`FaanBot`) worth re-measuring once they exist.
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
-| **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer room loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
+| **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer table loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
 | **Scoring disputes** — HK house rules differ from what you implemented | High | `RuleSet` from day one; show a per-pattern faan breakdown at hand end so players can see *why*; ship named presets |
 | **Efficiency bots can't win under 3-faan minimum** | **Partially mitigated (M4)** | [04-bots §4/§8](04-bots.md); `FaanBot` built and arena-proven to cut `tenpai_rate_on_sub_minimum_hand` well below T1's; raw-points parity not yet fully closed (paired-diff CI still includes zero) — further self-play weight tuning against the same arena harness is the concrete next step |
 | Rules scope creep (pao, aborts, regional variants) | High | Ship the default `hand_sets` (`CLASSIC + NEW_6 + NEW_18`) + `min_faan=3` only. NEW_18 is in scope, not creep: Seven Pairs lives there and the bot shanten parser requires it ([01-rules-spec §7](01-rules-spec.md)). Everything else is a config flag behind a flag. |
 | Mobile ergonomics (13 tiles on a 390px screen) | Medium | Design the mobile layout in M4, not M6. Test on a real phone early. |
 | Information leak via message size/timing | Low | Redact server-side (already). The obvious further mitigation — padding `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer — is **not done**: it's incompatible with the early-exit claim window that [00-architecture.md §4](00-architecture.md) requires for UX, since early exit necessarily reveals timing. Accepted as a known, low-severity leak rather than mitigated. |
-| **Python perf — server** | Low | Turn-based, ~5 msg/s/room; I/O-bound, not CPU-bound. |
+| **Python perf — server** | Low | Turn-based, ~5 msg/s/table; I/O-bound, not CPU-bound. |
 | **Python perf — bots** | Medium–High | Bots run in-process, not gated by network I/O the way the server's message rate is: each decision is roughly 470 pure-Python shanten evaluations, against a stated target of 200 concurrent tables × 3 bot seats. That's a CPU-bound hot loop at real concurrency, not "turn-based so it's fine" — the server row above does not cover it. **Partially mitigated (M4):** `mahjong_core/shanten.py`'s per-suit `functools.cache` turns repeat shapes into O(1) lookups instead of a fresh recursive scan every time — but this is single-process caching, not the 200-concurrent-table load test itself, which still hasn't run. Still worth doing before this becomes a scaling wall for real. |
-| Someone "uses all the cores" by raising `--workers`, silently splitting rooms across processes | Medium | Comment in Compose + Dockerfile, and a startup assertion in `main.py` ([07-infra §2](07-infra.md)) |
+| Someone "uses all the cores" by raising `--workers`, silently splitting tables across processes | Medium | Comment in Compose + Dockerfile, and a startup assertion in `main.py` ([07-infra §2](07-infra.md)) |
 | ML retrofit turns into an engine rewrite | Low, if M1/M2 items land | [06-ml §5](06-ml.md) checklist — ~1 day total, all of it useful for heuristic bots anyway |
-| **Cold start — nobody's online at the same time** | High | No current mitigation beyond "bring your own group" via M5's invite-code private rooms. See §6; this is the primary product risk for a 4-player realtime game and was missing from this table entirely before this revision. |
-| **Silent room failure** — a wedged room destroys a game with no signal to anyone | Unrated — there is currently no way to detect it, which is the problem | See §8; minimum viable fix is per-room structured logs plus a liveness check, not just process-level `/healthz`. |
+| **Cold start — nobody's online at the same time** | High | No current mitigation beyond "bring your own group" via M5's invite-code private tables. See §6; this is the primary product risk for a 4-player realtime game and was missing from this table entirely before this revision. |
+| **Silent table failure** — a wedged table destroys a game with no signal to anyone | Unrated — there is currently no way to detect it, which is the problem | See §8; minimum viable fix is per-table structured logs plus a liveness check, not just process-level `/healthz`. |
 
 ## 5. Resolved decisions
 
@@ -304,7 +304,7 @@ anywhere. Bots cover it partially (M4.5 ships single-player against bots as a re
 artifact), but M5's "real multiplayer" done gate ("four browsers on four devices finish a game")
 says nothing about how those four humans found each other or why they were online at once.
 
-Minimum viable answer for v1: private rooms with invite codes (already in M5 scope), aimed at
+Minimum viable answer for v1: private tables with invite codes (already in M5 scope), aimed at
 existing friend groups who already coordinate a real-world game time — this sidesteps needing a
 public lobby with real matchmaking density. Public-lobby matchmaking (a queue, skill-based
 pairing, always-on presence of strangers online at the same time) is a distinct, harder problem
@@ -326,21 +326,21 @@ against what real usage actually asks for instead of guessing now.
 
 ## 8. Observability
 
-There is none, anywhere in this doc set. The server is a single stateful process where each room
+There is none, anywhere in this doc set. The server is a single stateful process where each table
 is an in-memory actor ([00-architecture.md](00-architecture.md); `docker-compose.yml` runs the
-API with `--workers 1`) — one wedged room silently destroys a game in progress, and nothing
+API with `--workers 1`) — one wedged table silently destroys a game in progress, and nothing
 currently described here would tell anyone it happened. Minimum for v1, not something to push to
 M6:
 
-- Structured logs per room (`room_id`, `seq`, phase transitions) shipped somewhere off-box.
-- A liveness check per room, not just the process-level `/healthz` compose already has — a
-  process can be up while one specific room's task loop is stuck.
-- An alert, even a crude one, on "room hasn't advanced `seq` in N minutes while players are
+- Structured logs per table (`table_id`, `seq`, phase transitions) shipped somewhere off-box.
+- A liveness check per table, not just the process-level `/healthz` compose already has — a
+  process can be up while one specific table's task loop is stuck.
+- An alert, even a crude one, on "table hasn't advanced `seq` in N minutes while players are
   connected."
-- Basic visibility into crash recovery: when a room dies, does anyone find out before the players
+- Basic visibility into crash recovery: when a table dies, does anyone find out before the players
   do?
 
-See the "Silent room failure" risk row in §4.
+See the "Silent table failure" risk row in §4.
 
 ## 9. Deployment target and cost
 
@@ -348,7 +348,7 @@ Not specified anywhere in this doc set. Needed before M5, since M5's done gate r
 browsers on the open internet, not four local `docker-compose` clients:
 
 - **Host.** Pick one. A single VM is consistent with the `--workers 1` single-process design in
-  `docker-compose.yml`; don't reach for anything that implies horizontally scaling the room
+  `docker-compose.yml`; don't reach for anything that implies horizontally scaling the table
   registry, since the architecture doesn't support that ([07-infra.md](07-infra.md)).
 - **TLS + domain.** WebSocket over `wss://` needs a real certificate; decide the domain before M5,
   not during it.

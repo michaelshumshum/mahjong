@@ -2,14 +2,14 @@
 docs/05-roadmap.md M3 sub-task 5) -- M3's literal done-when gate: "killing one mid-hand and
 reconnecting resumes correctly from last_seq".
 
-Each scenario drives a real `Room` over real WebSocket connections
+Each scenario drives a real `Table` over real WebSocket connections
 (`fastapi.testclient`, same style `tests/test_ws_gameplay.py` established): a seat's connection
 is closed to simulate a disconnect (its `SeatBinding` -- idempotency cache, ready flag, ring
 buffer -- survives that; only the live-socket half is gone, 02-protocol.md §1/§5), fresh events
-are driven through the room while that seat has no live socket, then a new connection re-`hello`s
+are driven through the table while that seat has no live socket, then a new connection re-`hello`s
 with `seat` + `last_seq` and the result is checked against what was actually missed. Timer-heap
-assertions read `Room`'s private per-seat tracking dicts directly, the same white-box style
-`tests/test_room_claims.py` already uses on `room.deadlines`/`_armed_window_id`.
+assertions read `Table`'s private per-seat tracking dicts directly, the same white-box style
+`tests/test_table_claims.py` already uses on `table.deadlines`/`_armed_window_id`.
 
 **A real, CI-only race lived in this white-box style -- fixed, not previously documented.**
 `starlette.testclient.TestClient` runs the ASGI app's event loop on its own OS thread (an
@@ -19,23 +19,23 @@ this file's `ws.send_json(...)` helper calls) is fire-and-forget from the *test'
 view: it hands the frame to the app's incoming `anyio` stream and returns as soon as that
 handoff itself completes -- it does not wait for the app's own `ws_endpoint` loop, running on
 the portal's thread, to actually dequeue the frame, dispatch it through `Session.handle`, and
-run whatever `Room` method (`reconnect`/`resume`/...) that entails. `receive`, by contrast,
-genuinely blocks until the app produces a frame, which -- since `Room.reconnect`/`Room.resume`
+run whatever `Table` method (`reconnect`/`resume`/...) that entails. `receive`, by contrast,
+genuinely blocks until the app produces a frame, which -- since `Table.reconnect`/`Table.resume`
 have no `await` anywhere in them, see `resume`'s own docstring -- can only happen *after* that
 handler has already run to completion, rearms and all.
 
-Two scenarios below used to assert directly against `Room`'s own attributes (`seat_seq`,
+Two scenarios below used to assert directly against `Table`'s own attributes (`seat_seq`,
 `ring`, `_active_seat_timer`, `_claim_deadline_ms`) immediately after a `hello` `send_json`,
 with no `receive_json` in between -- nothing here actually waited for the server's own
 event-loop thread to have processed that `hello` yet, so the assertion was racing it. On this
 repo's own fast, idle dev machine the event loop (blocked on nothing else) almost always won
 that race well before the next Python bytecode on the test thread ran; on a loaded/shared CI
 runner, thread-scheduling latency was occasionally large enough for the test thread to read
-Room's pre-reconnect state instead, failing an assertion that was, a moment later, actually
+Table's pre-reconnect state instead, failing an assertion that was, a moment later, actually
 true. Every other scenario in this file already happened to have a real `receive_json` between
 the `hello` send and its own direct-state assertions (forcing the same synchronization as a
 side effect) -- purely by how each was written, not by design -- which is why only these two
-ever flaked, and only ever on CI. Fix: order every direct `Room`-state assertion after at least
+ever flaked, and only ever on CI. Fix: order every direct `Table`-state assertion after at least
 one `receive_json` produced by that same `hello`'s handling, never before.
 """
 
@@ -51,7 +51,7 @@ from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
@@ -195,7 +195,7 @@ def _rig_uncontested_state(seed: int) -> GameState:
 
 def _rig_claim_window_state(seed: int) -> GameState:
     """Seat 0 on turn holding 5m plus junk; seat 1 can chow it (4m/6m), seat 2 can pung it (two
-    more 5m), seat 3 holds nothing relevant -- same shape tests/test_room_claims.py's fixture
+    more 5m), seat 3 holds nothing relevant -- same shape tests/test_table_claims.py's fixture
     uses, reproduced locally (each test module here owns its own fixtures)."""
     state = new_game(DEFAULT_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
@@ -220,22 +220,22 @@ def _rig_claim_window_state(seed: int) -> GameState:
 
 
 def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupes() -> None:
-    room_id = f"reconnect-replay-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_uncontested_state(seed=1)
+    table_id = f"reconnect-replay-{uuid.uuid4()}"
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_uncontested_state(seed=1)
 
         with (
-            client.websocket_connect(f"/ws?room={room_id}") as ws1,
-            client.websocket_connect(f"/ws?room={room_id}") as ws2,
-            client.websocket_connect(f"/ws?room={room_id}") as ws3,
+            client.websocket_connect(f"/ws?table={table_id}") as ws1,
+            client.websocket_connect(f"/ws?table={table_id}") as ws2,
+            client.websocket_connect(f"/ws?table={table_id}") as ws3,
         ):
             wss = [ws0, ws1, ws2, ws3]
             last_seq = _join_and_ready_all(wss)
             seat1_last_seq = last_seq[1]
 
-        # ws1's `with` block just exited -- the socket is gone, but Room's SeatBinding for
+        # ws1's `with` block just exited -- the socket is gone, but Table's SeatBinding for
         # seat 1 survives untouched (this is what makes reconnect possible at all). Closing
         # ws1/ws2/ws3 together also marks all three seats `disconnected` (M3 sub-task 6),
         # broadcasting `seat_state` to the one connection still open to observe it.
@@ -254,11 +254,11 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
 
         # exactly 3 frames landed in seat 1's ring while it was offline: discard, draw, turn
         # (further back in the ring: the 3 disconnect `seat_state` broadcasts above).
-        missed = list(room.ring[1])[-3:]
+        missed = list(table.ring[1])[-3:]
         assert [e.event["t"] for e in missed] == ["discard", "draw", "turn"]
-        seat_seq_before_resume = room.seat_seq[1]
+        seat_seq_before_resume = table.seat_seq[1]
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
 
             # seat1_last_seq predates the 3 disconnect broadcasts too (captured back in
@@ -275,23 +275,23 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
 
             # replay itself never allocates a fresh seq -- it resends exactly what's already
             # buffered; the +1 is the live `seat_state{connected}` `resume()` sends afterward.
-            assert room.seat_seq[1] == seat_seq_before_resume + 1
+            assert table.seat_seq[1] == seat_seq_before_resume + 1
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
             assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
 
 def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
-    room_id = f"reconnect-stale-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_uncontested_state(seed=2)
+    table_id = f"reconnect-stale-{uuid.uuid4()}"
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_uncontested_state(seed=2)
 
         with (
-            client.websocket_connect(f"/ws?room={room_id}") as ws1,
-            client.websocket_connect(f"/ws?room={room_id}") as ws2,
-            client.websocket_connect(f"/ws?room={room_id}") as ws3,
+            client.websocket_connect(f"/ws?table={table_id}") as ws1,
+            client.websocket_connect(f"/ws?table={table_id}") as ws2,
+            client.websocket_connect(f"/ws?table={table_id}") as ws3,
         ):
             wss = [ws0, ws1, ws2, ws3]
             last_seq = _join_and_ready_all(wss)
@@ -308,10 +308,10 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
 
         # simulate ring eviction: `last_seq` (the ready cascade's `turn` frame) is now older
         # than anything left in the ring, exactly what a real 512-frame eviction would produce.
-        room.ring[1] = deque((e for e in room.ring[1] if e.seq > seat1_last_seq), maxlen=512)
-        assert room.ring[1] and room.ring[1][0].seq > seat1_last_seq
+        table.ring[1] = deque((e for e in table.ring[1] if e.seq > seat1_last_seq), maxlen=512)
+        assert table.ring[1] and table.ring[1][0].seq > seat1_last_seq
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
             frame = ws1b.receive_json()
             assert frame["t"] == "state_sync"
@@ -323,16 +323,16 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
 
 
 def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
-    room_id = f"reconnect-live-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_uncontested_state(seed=3)
+    table_id = f"reconnect-live-{uuid.uuid4()}"
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_uncontested_state(seed=3)
 
         with (
-            client.websocket_connect(f"/ws?room={room_id}") as ws1,
-            client.websocket_connect(f"/ws?room={room_id}") as ws2,
-            client.websocket_connect(f"/ws?room={room_id}") as ws3,
+            client.websocket_connect(f"/ws?table={table_id}") as ws1,
+            client.websocket_connect(f"/ws?table={table_id}") as ws2,
+            client.websocket_connect(f"/ws?table={table_id}") as ws3,
         ):
             wss = [ws0, ws1, ws2, ws3]
             _join_and_ready_all(wss)
@@ -343,28 +343,28 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
         # matching what "at head" actually means here: nothing happened *besides* the
         # disconnects this test isn't about.
         _drain_teardown_disconnects(ws0)
-        seat1_last_seq = room.seat_seq[1] - 1
-        seq_before = room.seat_seq[1]
-        ring_len_before = len(room.ring[1])
+        seat1_last_seq = table.seat_seq[1] - 1
+        seq_before = table.seat_seq[1]
+        ring_len_before = len(table.ring[1])
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
 
             # nothing missed -> no replay, no state_sync -- but reconnecting from `disconnected`
             # is itself real news: `resume()` announces it with one live `seat_state`, bumping
             # seq/ring by exactly that one frame, nothing more. Receive it *before* asserting on
-            # Room's own state directly -- `send_json` only enqueues `hello` onto the ASGI app's
+            # Table's own state directly -- `send_json` only enqueues `hello` onto the ASGI app's
             # anyio stream for the server's own event-loop thread (a separate OS thread under
             # `TestClient`) to pick up and process; nothing about it returning guarantees that
             # thread has actually run `resume()` yet. `receive_json` is this test's only real
             # synchronization point (a blocking round trip through the portal), so it has to
-            # come before, never after, any assertion reading `room.seat_seq`/`room.ring`
+            # come before, never after, any assertion reading `table.seat_seq`/`table.ring`
             # straight off the object -- see this module's own docstring.
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
             assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
-            assert room.seat_seq[1] == seq_before + 1
-            assert len(room.ring[1]) == ring_len_before + 1
+            assert table.seat_seq[1] == seq_before + 1
+            assert len(table.ring[1]) == ring_len_before + 1
 
             # the connection is genuinely live again: a fresh broadcast reaches it with the
             # very next seq, no gap.
@@ -378,17 +378,33 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             assert live_frame["seq"] == seq_before + 1
 
 
-def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
-    room_id = f"reconnect-claim-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
-        room.state = _rig_claim_window_state(seed=4)
+def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect() -> None:
+    """Superseded design (`app/table.py`'s `_handle_seat_disconnected` docstring): a seat that
+    disconnects while its own claim offer is still live used to just sit there until either it
+    reconnected (`Table.resume()`'s `_rearm_seat_claim_timer`, re-arming a fresh full window) or
+    the original deadline timed it out to Pass. That re-arm was never actually reachable through
+    a full-`state_sync` reconnect (the common case once a page reload persists its own seat,
+    docs/03-frontend.md) -- `StateSyncPayload.claim_options` carries no `window_id`, so the
+    client had nothing to render a dialog against or submit a `claim` with, even though the
+    server was still nominally waiting on it. Now a disconnect forfeits the offer immediately
+    instead, so there's nothing left for any later reconnect to hand back.
+
+    Proving the forfeit already landed *before* any reconnect, without racing the server's own
+    event-loop thread (this module's own docstring): seat 1's chow and seat 2's pung are the
+    window's only two offers, so it can only resolve once *both* have a response recorded.
+    Seat 2 sends a real `Pass` after seat 1 disconnects; seat 1 itself never sends anything at
+    all (it's offline). Seeing the window resolve regardless is only possible if seat 1's offer
+    was already forfeited -- there's no other way its response could exist."""
+    table_id = f"reconnect-claim-{uuid.uuid4()}"
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
+        table.state = _rig_claim_window_state(seed=4)
 
         with (
-            client.websocket_connect(f"/ws?room={room_id}") as ws1,
-            client.websocket_connect(f"/ws?room={room_id}") as ws2,
-            client.websocket_connect(f"/ws?room={room_id}") as ws3,
+            client.websocket_connect(f"/ws?table={table_id}") as ws1,
+            client.websocket_connect(f"/ws?table={table_id}") as ws2,
+            client.websocket_connect(f"/ws?table={table_id}") as ws3,
         ):
             wss = [ws0, ws1, ws2, ws3]
             _join_and_ready_all(wss)
@@ -404,67 +420,74 @@ def test_reconnect_mid_claim_window_rearms_only_this_seats_timer() -> None:
             assert offer1["t"] == "claim_offer"
             window_id = offer1["d"]["window_id"]
             seat1_last_seq = offer1["seq"]
-            original_deadline1 = offer1["d"]["deadline_ts"]
 
             ws2.receive_json()  # discard
             offer2 = ws2.receive_json()
             assert offer2["t"] == "claim_offer"
 
-            original_timer1 = room._active_seat_timer[(window_id, 1)]
-            original_timer2 = room._active_seat_timer[(window_id, 2)]
-            original_deadline2 = room._claim_deadline_ms[(window_id, 2)]
+            ws1.close()  # seat 1 disconnects with its chow offer still unanswered
 
-        # seat 1 disconnects with its chow offer still unanswered; seat 2's pung offer is also
-        # still live and untouched throughout.
+            seat1_disconnected = ws2.receive_json()
+            assert seat1_disconnected["t"] == "seat_state"
+            assert seat1_disconnected["d"] == {
+                "seat": 1,
+                "status": "disconnected",
+                "name": "Guest 2",
+            }
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+            # a real Pass from seat 2 -- the window's other, still-open offer -- with seat 1
+            # never sending anything itself (this module's own docstring, above).
+            claim_id = _next_id()
+            ws2.send_json(_msg("claim", {"window_id": window_id, "choice": "pass"}, id_=claim_id))
+            ack = ws2.receive_json()
+            assert ack["d"] == {"id": claim_id, "ok": True}
+
+            resolved = ws2.receive_json()
+            assert resolved["t"] == "claim_resolved"
+            assert resolved["d"] == {
+                "window_id": window_id,
+                "claim_kind": "discard",
+                "seat": None,
+                "action_kind": None,
+            }
+            assert table.state.claim_window is None  # fully resolved, nobody claimed
+
+        # seat 1 reconnects only now, after its offer was already forfeited (and the whole
+        # window already resolved) while it was still offline -- nothing claim-shaped left to
+        # hand back, so no `claim_offer` follows the replay. ws2/ws3 also disconnected at the
+        # `with` block's own exit above (in reverse declaration order, `_drain_teardown_
+        # disconnects`'s own docstring), *after* the resolution -- so seat 1's ring holds, in
+        # order: its own disconnect, the resolution cascade (claim_resolved/draw/turn), then
+        # seat 2's and seat 3's disconnects. Rather than hardcode that exact cascade, just drain
+        # the replay until `resume()`'s own reconnect announcement (always the last frame it
+        # sends, after any replay -- `resume()`'s docstring) and check `claim_offer` never
+        # showed up anywhere in between.
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
 
-            # seat_1_last_seq (captured from the claim_offer, before teardown) is now behind
-            # the 3 disconnect broadcasts closing ws1/ws2/ws3 together produced -- replay picks
-            # those up first, exactly like the non-claim-window reconnect tests above. Draining
-            # them here is also this test's synchronization point, and deliberately comes
-            # *before* any assertion against Room's own state below: `send_json` only enqueues
-            # `hello` onto the ASGI app's anyio stream for the server's own event-loop thread (a
-            # separate OS thread under `TestClient`) to process, with no guarantee it has
-            # actually run `resume()` -- which does the real rearm -- by the time this thread's
-            # next line executes. `resume()` itself has no `await` anywhere in it, so once any
-            # one frame it produced has actually been received here, the rearm is guaranteed
-            # done too -- see this module's own docstring.
-            _drain_teardown_disconnects(ws1b)
-
-            # only seat 1's timer entry moved -- a new heap id, a later deadline.
-            assert room._active_seat_timer[(window_id, 1)] != original_timer1
-            new_deadline1 = room._claim_deadline_ms[(window_id, 1)]
-            assert new_deadline1 > original_deadline1
-
-            # seat 2's own entry is completely undisturbed.
-            assert room._active_seat_timer[(window_id, 2)] == original_timer2
-            assert room._claim_deadline_ms[(window_id, 2)] == original_deadline2
-
-            # the reconnect announcement (`resume()`'s `announce_reconnect`) comes next, then
-            # the fresh claim_offer `rearmed` triggers.
-            reconnected = ws1b.receive_json()
-            assert reconnected["t"] == "seat_state"
-            assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
-
-            refreshed = ws1b.receive_json()
-            assert refreshed["t"] == "claim_offer"
-            assert refreshed["d"]["window_id"] == window_id
-            assert refreshed["d"]["deadline_ts"] == new_deadline1
-            assert refreshed["d"]["deadline_ts"] > original_deadline1
+            seen_types: list[str] = []
+            while True:
+                frame = ws1b.receive_json()
+                seen_types.append(frame["t"])
+                if frame["t"] == "seat_state" and frame["d"] == {
+                    "seat": 1,
+                    "status": "connected",
+                    "name": "Guest 2",
+                }:
+                    break
+            assert "claim_offer" not in seen_types
 
 
 def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
     """M5 (docs/02-protocol.md §2/§5): `join.name` is set once and lives on `SeatBinding.name`
     for the rest of the game -- a `hello` reconnect carries only `seat`/`last_seq`, never
     `name`, and the server must still know it (and broadcast it) without a resend."""
-    room_id = f"reconnect-name-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?room={room_id}") as ws0:
-        room = get_room(room_id)
-        assert room is not None
+    table_id = f"reconnect-name-{uuid.uuid4()}"
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+        table = get_table(table_id)
+        assert table is not None
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1:
             ws0.send_json(_hello())
             ws1.send_json(_hello())
             ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
@@ -482,7 +505,7 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
             ack1 = ws1.receive_json()
             assert ack1["t"] == "ack"
 
-            binding = room.seat_bindings[1]
+            binding = table.seat_bindings[1]
             assert binding is not None
             assert binding.name == "Carol"
             seat1_last_seq = ack1["seq"]
@@ -492,7 +515,7 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
         assert disconnect["t"] == "seat_state"
         assert disconnect["d"] == {"seat": 1, "status": "disconnected", "name": "Carol"}
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws1b:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             # reconnect carries no `name` at all -- the server still knows it.
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq))
             # its own disconnect broadcast landed in its own ring too (same seat, same stream)
@@ -508,5 +531,5 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
             assert reconnected["t"] == "seat_state"
             assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Carol"}
 
-        assert room.seat_bindings[1] is not None
-        assert room.seat_bindings[1].name == "Carol"
+        assert table.seat_bindings[1] is not None
+        assert table.seat_bindings[1].name == "Carol"

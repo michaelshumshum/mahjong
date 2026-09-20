@@ -2,10 +2,10 @@
 docs/05-roadmap.md §1).
 
 `lifespan` builds the DB engine/session factory from `DATABASE_URL` (unset -> no persistence,
-matching every bare `Room()`/`RoomRegistry()` test that never passes one) and installs a fresh
-`RoomRegistry` for this server lifetime via `app.ws.reset_registry` -- see that function's own
+matching every bare `Table()`/`TableRegistry()` test that never passes one) and installs a fresh
+`TableRegistry` for this server lifetime via `app.ws.reset_registry` -- see that function's own
 docstring for why "fresh per startup" matters, not just "mutate the existing one": a previous
-lifetime's `draining` flag and rooms must never leak into this one, and that includes a
+lifetime's `draining` flag and tables must never leak into this one, and that includes a
 `TestClient(app)` context in tests, which runs this exact same ASGI lifespan protocol.
 
 Graceful shutdown (docs/00-architecture.md §8.1) hooks `lifespan`'s shutdown phase (the code
@@ -16,13 +16,13 @@ function past `yield` -- installing a second, competing handler here would fight
 rather than extend it.
 
 Verified empirically, not assumed: ran a real `uvicorn.run(app.main:app)` process, joined a real
-WS seat into a room (so it has a bound seat and never reaches a hand boundary), sent it a real
+WS seat into a table (so it has a bound seat and never reaches a hand boundary), sent it a real
 `SIGTERM` from another process, and confirmed (a) `/healthz` had been serving `200 ok` right up
 to the signal, (b) the process's own logs show uvicorn's "Waiting for application shutdown" step
 actually running -- proving SIGTERM really does route through this `lifespan` by default, not
-just under `TestClient` -- (c) `RoomRegistry.begin_shutdown`'s "abandoning" warning fires for
-that room once its grace window elapses, and (d) the process still exits cleanly afterward,
-bounded by the configured grace window rather than hanging. Also ran the equivalent with no rooms
+just under `TestClient` -- (c) `TableRegistry.begin_shutdown`'s "abandoning" warning fires for
+that table once its grace window elapses, and (d) the process still exits cleanly afterward,
+bounded by the configured grace window rather than hanging. Also ran the equivalent with no tables
 at all, confirming a `SIGTERM` with nothing to drain exits near-instantly.
 
 The one real consequence of hooking a *generic* ASGI-shutdown signal rather than a SIGTERM-
@@ -62,9 +62,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         grace_seconds = float(
             os.environ.get("SHUTDOWN_GRACE_SECONDS", _DEFAULT_SHUTDOWN_GRACE_SECONDS)
         )
-        # begin_shutdown awaits every affected room's own drain wait to completion before
+        # begin_shutdown awaits every affected table's own drain wait to completion before
         # returning (docs/00-architecture.md §8.1 steps 3-5) -- only then is it safe to dispose
-        # the engine (app/room.py's process_one() docstring: a room's GAME_OVER persist is
+        # the engine (app/table.py's process_one() docstring: a table's GAME_OVER persist is
         # guaranteed finished by the time its own wait resolves, never in flight).
         await registry.begin_shutdown(grace_seconds=grace_seconds)
         if engine is not None:
@@ -85,5 +85,5 @@ async def healthz() -> JSONResponse:
 
 
 if __name__ == "__main__":
-    # workers=1: rooms are in-memory, owned by one process. docs/07-infra.md §2
+    # workers=1: tables are in-memory, owned by one process. docs/07-infra.md §2
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, workers=1)

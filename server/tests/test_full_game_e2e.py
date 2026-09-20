@@ -5,18 +5,18 @@ ever receives a tile identity it isn't entitled to." `tests/test_ws_gameplay.py`
 hand over the wire, `tests/test_reconnect.py` proves reconnect in isolation on hand 1, and
 `tests/test_redaction.py` proves redaction by construction -- none of the three ever run
 together across more than one hand. This module is the thing that actually does: four WS
-clients, one continuous `Room`, four real hands (`EAST_ONLY`, both dealer-repeat flags off, so
+clients, one continuous `Table`, four real hands (`EAST_ONLY`, both dealer-repeat flags off, so
 the deal rotates 0 -> 1 -> 2 -> 3 unconditionally and the round wrapping back to seat 0
 reaches `Phase.GAME_OVER` deterministically -- the cheapest ruleset config that reaches a real
 terminal condition), a real claim exchange, a real self-draw win, a real mid-claim-window
 disconnect/reconnect in hand 3 (not hand 1 -- closing the actual "reachable only in a later
 hand" gap `test_reconnect.py` structurally can't cover on its own), and a `GameRecord` persist
-check spanning the whole game's `Room.actions` log, not one hand's worth.
+check spanning the whole game's `Table.actions` log, not one hand's worth.
 
-Every hand *after* the first is dealt for real by `Room`'s own `start_next_hand()` -> `_apply`
+Every hand *after* the first is dealt for real by `Table`'s own `start_next_hand()` -> `_apply`
 chain (dealer/prevailing/hand_no/hand_seed all genuinely engine-computed, verified below against
 `derive_hand_seed`) -- only each hand's concealed tiles and wall tail are then overwritten with
-`room.state = ...` (this repo's established white-box rig convention, `tests/test_room_claims.
+`table.state = ...` (this repo's established white-box rig convention, `tests/test_table_claims.
 py` on) so the rest of that hand can be scripted deterministically over the real wire, the same
 way `tests/test_ws_gameplay.py`/`tests/test_game_record_ws.py` already rig one hand each.
 
@@ -53,7 +53,7 @@ from starlette.testclient import WebSocketTestSession
 from app.db.models import Base, GameRecord
 from app.db.session import make_engine, make_session_factory
 from app.main import app
-from app.ws import get_room
+from app.ws import get_table
 from mahjong_core.actions import action_from_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game
@@ -71,9 +71,9 @@ _GAME_RULESET = dataclasses.replace(
     dealer_repeat_on_win=False,
     dealer_repeat_on_draw=False,
     # hand-end hold (docs/00-architecture.md §3): every seat bound here is a real "connected"
-    # join, not bot/autoplay, so `Room._open_hand_end_window` won't pre-ack any of them and
+    # join, not bot/autoplay, so `Table._open_hand_end_window` won't pre-ack any of them and
     # nothing in this test ever sends a real `hand_end_ack` -- 0 lets the real background
-    # `Room.run()` task advance past each hold on its own very next tick (no real wait), so the
+    # `Table.run()` task advance past each hold on its own very next tick (no real wait), so the
     # existing per-hand frame sequences below don't need restructuring around an ack step
     # (unlike tests/test_ws_gameplay.py, which exercises that real ack round trip instead).
     hand_end_seconds=0,
@@ -207,17 +207,17 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
     asyncio.run(_create_schema())
     monkeypatch.setenv("DATABASE_URL", database_url)
 
-    room_id = f"full-game-{uuid.uuid4()}"
+    table_id = f"full-game-{uuid.uuid4()}"
     seed = 20260916001
 
     with (
         TestClient(app) as client,
-        client.websocket_connect(f"/ws?room={room_id}") as ws0,
-        client.websocket_connect(f"/ws?room={room_id}") as ws1,
-        client.websocket_connect(f"/ws?room={room_id}") as ws2,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
+        client.websocket_connect(f"/ws?table={table_id}") as ws1,
+        client.websocket_connect(f"/ws?table={table_id}") as ws2,
     ):
-        room = get_room(room_id)
-        assert room is not None
+        table = get_table(table_id)
+        assert table is not None
 
         # --- hand 1 rig: seat 0 dealer, a real claim exchange (matches
         # tests/test_ws_gameplay.py's fixture) ending in exhaustive draw.
@@ -235,7 +235,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             TileType.WIND_NORTH,
             count=13,
         )
-        room.state = _rig_hands(
+        table.state = _rig_hands(
             state,
             {
                 0: (*seat0_junk, _MAN_5[0]),
@@ -248,7 +248,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         # seat 3's own connection is scoped to this nested `with` -- it ends deliberately right
         # after hand 3's `turn` frames land, standing in for a real mid-hand disconnect (see
         # module docstring for why this is a nested `with`, not a mid-scenario `.close()`).
-        with client.websocket_connect(f"/ws?room={room_id}") as ws3:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws3:
             wss: list[WebSocketTestSession] = [ws0, ws1, ws2, ws3]
             for ws in wss:
                 ws.send_json(_msg("hello", {"client_version": "test"}))
@@ -289,7 +289,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 assert hand_starts[seat]["d"]["dealer"] == 0
                 assert sorted(deals[seat]["d"]["your_hand"]) == sorted(expected_hands_1[seat])
                 assert turns[seat]["d"]["seat"] == 0
-            assert room.state.hand_seed == derive_hand_seed(seed, 1)
+            assert table.state.hand_seed == derive_hand_seed(seed, 1)
 
             # --- hand 1 play: seat 0 discards 5m; seat 2's pung beats seat 1's un-answered
             # chow (early exit), seat 2 then discards uncontested -> wall empty -> exh. draw.
@@ -341,11 +341,11 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert hand_start_2["prevailing"] == "EAST"
             turn_2 = frames_h1[0][5]["d"]
             assert turn_2["seat"] == 1
-            assert room.state.phase == Phase.AWAIT_ACTION
-            assert room.state.dealer == 1
-            assert room.state.turn == 1
-            assert room.state.claim_window is None
-            assert room.state.hand_seed == derive_hand_seed(seed, 2)
+            assert table.state.phase == Phase.AWAIT_ACTION
+            assert table.state.dealer == 1
+            assert table.state.turn == 1
+            assert table.state.claim_window is None
+            assert table.state.hand_seed == derive_hand_seed(seed, 2)
 
             # --- hand 2 rig: seat 1 (dealer) self-draw wins immediately on a standard hand.
             seat0_junk_2 = _tiles(
@@ -366,7 +366,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 count=13,
             )
             rigged_2 = _rig_hands(
-                room.state,
+                table.state,
                 {
                     0: seat0_junk_2,
                     1: _standard_winning_hand(),
@@ -378,7 +378,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             # would score as a (different, still-legit) Heavenly Hand instead of the fixture's
             # 缺一門/自摸/無花 breakdown asserted below (mahjong_core/actions.py's
             # `won_before_any_discard`).
-            room.state = dataclasses.replace(rigged_2, total_discards=1)
+            table.state = dataclasses.replace(rigged_2, total_discards=1)
 
             wss[1].send_json(_msg("declare", {"kind": "win"}, id_=_next_id()))
             assert _recv(wss[1], 1)["d"]["ok"] is True
@@ -410,9 +410,9 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert hand_start_3["hand_no"] == 3
             assert hand_start_3["dealer"] == 2
             assert frames_h2[0][4]["d"]["seat"] == 2
-            assert room.state.hand_seed == derive_hand_seed(seed, 3)
+            assert table.state.hand_seed == derive_hand_seed(seed, 3)
             # carried onto the fresh hand 3 state, not reset:
-            assert room.state.seats[1].score == int(score_2["1"])
+            assert table.state.seats[1].score == int(score_2["1"])
 
             # --- hand 3 rig: seat 2 (dealer) discards a tile only seat 3 can chow (no pung
             # available to anyone), so the window stays open on seat 3's response alone -- the
@@ -429,11 +429,11 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             seat3_junk_3 = _tiles(
                 TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_WHITE, count=11
             )
-            assert room.state.phase == Phase.AWAIT_ACTION  # real deal already landed here
-            assert room.state.turn == 2
-            assert room.state.dealer == 2
-            room.state = _rig_hands(
-                room.state,
+            assert table.state.phase == Phase.AWAIT_ACTION  # real deal already landed here
+            assert table.state.turn == 2
+            assert table.state.dealer == 2
+            table.state = _rig_hands(
+                table.state,
                 {
                     0: seat0_junk_3,
                     1: seat1_junk_3,
@@ -463,15 +463,15 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert _recv(ws, seat)["t"] == "discard"
         # only seat 3 holds a claim option here (see the rig above) -- seats 0/1/2 have
         # nothing further queued until the window resolves, so re-fetch the offer's window_id
-        # off Room's own state instead of reading a 4th frame off a bystander connection.
+        # off Table's own state instead of reading a 4th frame off a bystander connection.
 
-        room = get_room(room_id)
-        assert room is not None
-        window = room.state.claim_window
+        table = get_table(table_id)
+        assert table is not None
+        window = table.state.claim_window
         assert window is not None and len(window.offers) == 1 and window.offers[0].seat == 3
         window_id_3 = window.window_id
 
-        with client.websocket_connect(f"/ws?room={room_id}") as ws3b:
+        with client.websocket_connect(f"/ws?table={table_id}") as ws3b:
             ws3b.send_json(
                 _msg("hello", {"client_version": "test", "seat": 3, "last_seq": seat3_last_seq})
             )
@@ -530,7 +530,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert hand_start_4["hand_no"] == 4
             assert hand_start_4["dealer"] == 3
             assert frames_h3[0][5]["d"]["seat"] == 3
-            assert room.state.hand_seed == derive_hand_seed(seed, 4)
+            assert table.state.hand_seed == derive_hand_seed(seed, 4)
 
             score_after_h3 = frames_h3[0][2]["d"]["totals"]
 
@@ -554,10 +554,10 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             seat3_junk_4 = _tiles(
                 TileType.DRAGON_GREEN, TileType.DRAGON_WHITE, TileType.MAN_2, count=12
             )
-            assert room.state.dealer == 3
-            assert room.state.turn == 3
-            room.state = _rig_hands(
-                room.state,
+            assert table.state.dealer == 3
+            assert table.state.turn == 3
+            table.state = _rig_hands(
+                table.state,
                 {
                     0: seat0_junk_4,
                     1: seat1_junk_4,
@@ -588,21 +588,21 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert game_end["hand_no"] == 4
             assert list(game_end["scores"]) == [int(score_after_h4[str(s)]) for s in range(4)]
 
-            assert room.state.phase == Phase.GAME_OVER
+            assert table.state.phase == Phase.GAME_OVER
 
-        # room.actions spans exactly the real Action-bound submissions across all 4 hands: h1
+        # table.actions spans exactly the real Action-bound submissions across all 4 hands: h1
         # (discard, claim_pung, discard) + h2 (declare_win) + h3 (discard, pass) + h4 (discard)
         # = 7 -- no drift, gap, or duplication introduced by any of the 3 hand boundaries or the
         # mid-hand-3 disconnect/reconnect.
-        assert len(room.actions) == 7
+        assert len(table.actions) == 7
 
     record = _fetch_latest_record(database_url)
     assert record is not None
     assert record.engine_version == ENGINE_VERSION
     assert record.seed == seed
     assert RuleSet.from_dict(record.ruleset) == _GAME_RULESET
-    assert record.result["hand_count"] == room.state.hand_no == 4
-    assert record.result["final_scores"] == [s.score for s in room.state.seats]
+    assert record.result["hand_count"] == table.state.hand_no == 4
+    assert record.result["final_scores"] == [s.score for s in table.state.seats]
     assert sum(record.result["final_scores"]) == 0
-    assert len(record.action_log) == len(room.actions) == 7
-    assert [action_from_dict(d) for d in record.action_log] == room.actions
+    assert len(record.action_log) == len(table.actions) == 7
+    assert [action_from_dict(d) for d in record.action_log] == table.actions
