@@ -153,7 +153,8 @@ class Room:
         self.state = new_game(ruleset, game_seed)
         self.event_id = 0                     # internal monotonic id: logging/replay only, NEVER on the wire
         self.seat_seq: list[int] = [0, 0, 0, 0]        # per-seat outbound seq: dense, gapless, per stream (D1)
-        self.spectator_seq: dict[str, int] = {}        # per spectator-session, same discipline
+        self.spectator_seq: dict[str, int] = {}        # per spectator-session, same discipline (built -- see below)
+        self.spectators: dict[str, Callable] = {}      # session_id -> push callback (no SeatBinding to hang it on)
         self.ring: dict[int | str, deque[Envelope]] = {  # per-seat/spectator, holds ALREADY-REDACTED frames
             seat: deque(maxlen=512) for seat in range(4)
         }
@@ -199,6 +200,44 @@ serialized to a client. The ring buffer (`self.ring`) is per-seat, and it stores
 `redact_event()` has already run — never raw `Event` objects — so a reconnect replay
 (§8, [02-protocol.md §5](02-protocol.md)) can never accidentally hand a redacted-out tile back to
 a seat because the redaction step ran once, at publish time, not at replay time.
+
+**Spectating: built ("Spectating" sub-task).** This sketch's `self.spectator_seq`/the `int | str`
+half of `self.ring` are real now, not aspirational — `app/room.py`'s `Room.register_spectator`/
+`unregister_spectator`/`publish_to_spectator` mirror the seat mechanism as closely as sensibly
+possible, with two deliberate, documented differences:
+
+- **Trigger: an explicit `?spectate=true` connect-time flag (`app/ws.py`'s `ws_endpoint`), not
+  the literal passive default [02-protocol.md §2](02-protocol.md) describes** ("a socket that
+  never sends `join` is a spectator"). Registering *every* connection as a spectator the instant
+  it's accepted — the naive passive reading — races the handshake every real and test client
+  already uses: `hello{client_version}` (no `seat`) is sent immediately after connecting, before
+  `join`, and an eagerly-sent spectator `state_sync` would land on that same connection's stream
+  before its own `join` response, breaking the ordering every existing WS-integration test
+  assumes. `?spectate=true` (mirroring `?practice=true`'s existing shape on the same endpoint)
+  sidesteps the race entirely: a real spectator client opts in at connect time, so registration
+  never has to guess whether a `join` is coming. `join`/`reconnect` still promote a spectating
+  connection away the moment it actually claims a seat (`unregister_spectator`, called from
+  both) — so "a socket that never sends `join` [while marked `?spectate=true`] is a spectator"
+  holds exactly as intended, just resolved by a connect-time flag instead of a race-prone
+  passive default.
+- **No reconnect/reclaim for a spectator session, by design.** A seat's `SeatBinding`/ring
+  persist forever so a disconnected human can reclaim the same seat later (§6's `RoomRegistry`
+  note); a spectator has no such binding and no seat number a later connection could present to
+  ask for "this exact spectator session, again" — there is nothing shaped like `hello{seat}` for
+  it. `unregister_spectator` therefore drops a spectator's `ring`/`spectator_seq` entry outright
+  the moment its connection closes (wired into `app/ws.py`'s existing disconnect `finally`
+  block, the same call site `mark_disconnected` uses for a seat), and a spectator that connects
+  again later is, correctly, a brand-new spectator session with a fresh `state_sync` — not an
+  attempted resume. This also bounds memory for a long-running room with many transient
+  spectators, unlike a seat's binding.
+
+Once registered, a spectator gets the same spectator-redacted `state_sync` (`seat_view(state,
+None)`, §5) a fresh `join` gets, then every subsequent broadcast (`_broadcast_wire` — `seat_
+state`, `chat`, `hand_start`, `server_shutdown`, `score`) and every `redact_event(state, None,
+event)`-redacted event `_publish` produces, plus the public half of `turn` (`{seat, phase,
+deadline_ts}`, never `legal`). `claim_offer` is deliberately never sent to spectators — unlike
+every other synthesized event, it would name the offered seat's own concealed tiles used to
+form a candidate meld, which is exactly the private information §5 exists to withhold.
 
 **Timer race (D17).** The naive `asyncio.wait_for(inbox.get(), timeout)` or
 `asyncio.wait({get_task, timer_task}, return_when=FIRST_COMPLETED)` pattern is wrong here: when
@@ -538,7 +577,10 @@ Invariants this enforces:
   identity is revealed only at hand end.
 - Flowers, melds, discard pool, scores: fully public — send them.
 - A spectator sees the union of what all four players show publicly, **not** their private
-  hands. Showing hands to spectators requires a 30–60s delay.
+  hands. Showing hands to spectators requires a 30–60s delay -- **not built** (deliberately out
+  of scope for the "Spectating" sub-task, §3 above: a spectator seeing zero private hand info,
+  full stop, is a correct v1, same guarantee `seat_view(state, None)` already gave before a real
+  connection ever consumed it).
 
 **Bots consume the identical `seat_view` output a human's client would render from** — proof
 they can't cheat, and any bot is runnable as a client against a real server for integration

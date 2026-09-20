@@ -504,6 +504,17 @@ class Room:
         self.ring: dict[int | str, deque[Envelope]] = {
             seat: deque[Envelope](maxlen=512) for seat in range(4)
         }
+        # Spectators (docs/00-architecture.md §3/§5, "Spectating" sub-task): a connection
+        # registered via `register_spectator` gets its own entry in `self.ring` (a string
+        # `session_id` key -- this dict's `int | str` annotation always allowed for one, it just
+        # never had one land in it before this) and its own dense, gapless `seq` counter here,
+        # independent of every seat's and every other spectator's own stream (D1). `spectators`
+        # maps a registered session id to its live push callback -- the spectator analogue of
+        # `SeatBinding.send`, but there is no `SeatBinding`-shaped object for a spectator (no
+        # seat to bind, no ready/pre-arm/idempotency state a read-only connection could ever
+        # use) so a bare callable is enough.
+        self.spectator_seq: dict[str, int] = {}
+        self.spectators: dict[str, Callable[[int, dict[str, Any]], None]] = {}
         self.deadlines = TimerHeap()  # claim + disconnect + turn deadlines -- see module docstring
         self._getter: asyncio.Task[Command | BotResult | _WakeUp] | None = None  # long-lived (D17)
         self._armed_window_id: int | None = None  # last claim_window.window_id given a deadline
@@ -599,6 +610,12 @@ class Room:
         self.seat_bindings[chosen] = SeatBinding(
             session_id=session_id, send=send, name=resolved_name
         )
+        # This session_id may have been registered as a spectator (`app/ws.py`'s
+        # `?spectate=true`, `register_spectator`) before this `join` -- promote it to a real
+        # seat stream now, before broadcasting below, so it stops receiving the duplicate
+        # spectator-shaped stream and doesn't see `seat_state` twice (once as a spectator, once
+        # as the newly-bound seat).
+        self.unregister_spectator(session_id)
         self._broadcast_wire(
             {"t": "seat_state", "seat": chosen, "status": "connected", "name": resolved_name}
         )
@@ -712,6 +729,10 @@ class Room:
             raise SeatNotBoundError(seat)
         if binding.status == "bot":
             raise SeatTakenError(seat)
+        # Same promotion as `join` above: a `?spectate=true` connection that turns out to be
+        # reclaiming a seat (`hello{seat}`) stops receiving the spectator-shaped stream here,
+        # before `resume()` sends anything on the real seat stream.
+        self.unregister_spectator(session_id)
         binding.session_id = session_id
         binding.send = send
         was_status = binding.status
@@ -822,6 +843,83 @@ class Room:
     def _broadcast_wire(self, wire: dict[str, Any]) -> None:
         for seat in range(4):
             self.publish_to_seat(seat, dict(wire))
+        self._broadcast_to_spectators(wire)
+
+    # --- spectators (docs/00-architecture.md §3/§5, "Spectating" sub-task) -----------------
+
+    def register_spectator(
+        self, session_id: str, send: Callable[[int, dict[str, Any]], None]
+    ) -> None:
+        """Start treating `session_id` as an active spectator: seed its own `spectator_seq`/
+        `ring` entry (D1 -- dense, gapless, independent of every seat's and every *other*
+        spectator's own stream) and immediately send a spectator-redacted `state_sync`
+        (`seat=None`, docs/00-architecture.md §5), matching the real `state_sync` a fresh `join`
+        already gets (docs/02-protocol.md §3).
+
+        **Trigger, and why it isn't purely passive (docs/02-protocol.md §2's "a socket that
+        never sends `join` is a spectator").** The literal passive reading -- register every
+        connection as a spectator the instant it's accepted, `join` promotes it away -- races
+        the handshake every real *and every test* client already uses: `hello{client_version}`
+        (no `seat`) is sent immediately after connecting, *before* `join`, in the normal flow
+        (docs/02-protocol.md §2's own table), and would otherwise unavoidably deliver an
+        unsolicited spectator `state_sync` to every about-to-join connection before its own
+        `join` response -- there is no way to register "eagerly, but only for connections that
+        turn out not to join" without either an actual signal or a race. `app/ws.py`'s
+        `ws_endpoint` resolves this with an explicit, connection-level `?spectate=true` query
+        parameter (mirroring `?practice=true`'s existing shape on the same endpoint) rather than
+        a new wire message -- a real spectator client opts in at connect time, so registration
+        never has to guess whether a `join` is coming. `join`/`reconnect` still promote a
+        spectating connection away the moment it actually claims a seat (`unregister_spectator`,
+        called from both), so "a socket that never sends `join` [while marked `spectate=true`]
+        is a spectator" holds exactly as intended -- just resolved by an explicit connect-time
+        flag instead of a race-prone passive default.
+        """
+        self.spectator_seq[session_id] = 0
+        self.ring[session_id] = deque[Envelope](maxlen=512)
+        self.spectators[session_id] = send
+        self.publish_to_spectator(session_id, self.state_sync_wire(None))
+
+    def unregister_spectator(self, session_id: str) -> None:
+        """Drop `session_id`'s spectator bookkeeping outright -- called when its connection
+        actually closes (`app/ws.py`'s `ws_endpoint` `finally` block, the spectator analogue of
+        `mark_disconnected`'s seat-side cleanup call site) or when it's promoted to a seat
+        (`join`/`reconnect`), so a promoted connection stops receiving the duplicate
+        spectator-shaped stream and gets the real seated stream instead. A `session_id` that was
+        never registered (every non-`spectate` connection) is a silent no-op.
+
+        **Deliberately not reconnectable, unlike a seat.** A spectator has no `SeatBinding` to
+        reclaim and no seat number a later connection could present to ask for this exact
+        session back -- there is nothing in this protocol shaped like `hello{seat}` for "the
+        same spectator, again" (a spectator session id isn't a value a client could even present
+        back on a fresh connection). So a spectator's ring/seq bookkeeping isn't preserved for a
+        future reconnect the way a seat's is (docs/00-architecture.md §6's `RoomRegistry` note:
+        a `SeatBinding` persists forever for reconnect) -- it's removed outright here, and a
+        spectator that reconnects later is, correctly, a brand-new spectator session with a
+        fresh `state_sync` (a fresh `register_spectator` call from `app/ws.py`, same as its
+        first connection). This also bounds memory for a long-running room with many transient
+        spectators, which `SeatBinding`'s own "persists forever" story would not.
+        """
+        self.spectators.pop(session_id, None)
+        self.spectator_seq.pop(session_id, None)
+        self.ring.pop(session_id, None)
+
+    def publish_to_spectator(self, session_id: str, wire: dict[str, Any]) -> None:
+        """Spectator analogue of `publish_to_seat`: stamp `wire` with this spectator session's
+        own next `seq`, append it to its own ring buffer, and push it out over the live
+        connection. A `session_id` not currently registered (never registered, or already
+        unregistered -- promoted to a seat, or its connection closed) is silently ignored."""
+        seq = self.spectator_seq.get(session_id)
+        if seq is None:
+            return
+        self.spectator_seq[session_id] = seq + 1
+        self.ring[session_id].append(Envelope(seq=seq, event=wire))
+        send = self.spectators.get(session_id)
+        if send is not None:
+            send(seq, wire)
+
+    def _broadcast_to_spectators(self, wire: dict[str, Any]) -> None:
+        for session_id in list(self.spectators):
+            self.publish_to_spectator(session_id, dict(wire))
 
     def broadcast_server_shutdown(self, deadline_ts: int) -> None:
         """docs/00-architecture.md §8.1 step 2: tell every seat a drain has started -- clients
@@ -869,24 +967,32 @@ class Room:
             {"t": "chat", "seat": seat, "text": text[:_CHAT_MAX_LEN], "name": binding.name}
         )
 
-    def state_sync_wire(self, seat: int) -> dict[str, Any]:
+    def state_sync_wire(self, seat: int | None) -> dict[str, Any]:
         """Full redacted snapshot for `seat` (02-protocol.md §3 `state_sync`) -- sent on join,
-        and (sub-task 5) on reconnect-with-gap; also what `app/outbox.py`'s backpressure
-        collapse resyncs to when a connection falls behind (§9). `turn_deadline_ts` is this
-        seat's real armed `AWAIT_ACTION` deadline (`_turn_deadline_ms`, 00-architecture.md §8
-        "Turn timeout") -- `seat_view()` only actually uses it when `seat == state.turn` and
-        `state.phase == Phase.AWAIT_ACTION`, so passing it unconditionally here is harmless."""
+        (sub-task 5) on reconnect-with-gap, and (the "Spectating" sub-task) on spectator
+        registration (`seat=None`); also what `app/outbox.py`'s backpressure collapse resyncs to
+        when a connection falls behind (§9). `turn_deadline_ts` is this seat's real armed
+        `AWAIT_ACTION` deadline (`_turn_deadline_ms`, 00-architecture.md §8 "Turn timeout") --
+        `seat_view()` only actually uses it when `seat == state.turn` and `state.phase ==
+        Phase.AWAIT_ACTION`, so passing it unconditionally here is harmless. Both deadline
+        lookups are skipped outright for `seat=None` (a spectator never holds a claim/turn
+        deadline of its own) rather than probing `dict[tuple[int, int], int]`/`dict[int, int]`
+        with a `None`-shaped key, which is also what keeps this typed cleanly under `seat: int |
+        None` instead of relying on a lookup that would just always miss."""
         window = self.state.claim_window
         claim_deadline_ts = (
-            self._claim_deadline_ms.get((window.window_id, seat)) if window else None
+            self._claim_deadline_ms.get((window.window_id, seat))
+            if window is not None and seat is not None
+            else None
         )
+        turn_deadline_ts = self._turn_deadline_ms.get(seat) if seat is not None else None
         view = seat_view(
             self.state,
             seat,
             seat_status=self._seat_status_tuple(),
             names=self._names_tuple(),
             claim_deadline_ts=claim_deadline_ts,
-            turn_deadline_ts=self._turn_deadline_ms.get(seat),
+            turn_deadline_ts=turn_deadline_ts,
             hand_end_deadline_ts=self._hand_end_deadline_ms,
         )
         wire = seat_view_wire(view)
@@ -1704,48 +1810,63 @@ class Room:
 
         `deadline_ts` is now a real, enforced `TimerHeap` deadline (`_arm_turn_timer`), not
         merely advisory -- see that method and `_handle_turn_timeout`. `legal` is unicast to
-        the acting seat only, matching `turn.legal`'s own "unicast to the acting seat" contract.
+        the acting seat only, matching `turn.legal`'s own "unicast to the acting seat" contract
+        -- spectators get the same public `{seat, phase, deadline_ts}` shape every non-acting
+        seat does, never `legal` (it would name the acting seat's own concealed tile ids).
         """
         if self.state.phase != Phase.AWAIT_ACTION:
             return
         seat = self.state.turn
         deadline_ts = self._arm_turn_timer(seat)
         legal = [action_to_dict(a) for a in legal_actions(self.state, seat)]
+        public_wire: dict[str, Any] = {
+            "t": "turn",
+            "seat": seat,
+            "phase": self.state.phase.value,
+            "deadline_ts": deadline_ts,
+        }
         for s in range(4):
-            wire: dict[str, Any] = {
-                "t": "turn",
-                "seat": seat,
-                "phase": self.state.phase.value,
-                "deadline_ts": deadline_ts,
-            }
+            wire: dict[str, Any] = dict(public_wire)
             if s == seat:
                 wire["legal"] = legal
             self.publish_to_seat(s, wire)
+        self._broadcast_to_spectators(public_wire)
+
+    def _augment_event_wire(self, wire: dict[str, Any], event: Event) -> None:
+        """The two fields `redact_event` alone can't derive from `state` in general (see that
+        function's own module docstring): `discard.tile`/`pool_index` (this Room still holds
+        `state` from immediately after the `reduce()` call that produced the event, before any
+        *later* command could claim that discard away) and `hand_end.deadline_ts` (this
+        `HAND_OVER` landing's own hold, already computed by `_open_hand_end_window` before
+        `_apply` calls `_publish`). Identical for every recipient -- seats and spectators alike
+        -- so `_publish` computes it once per event, not once per recipient."""
+        if isinstance(event, Discarded):
+            pool = self.state.seats[event.seat].discards
+            wire["tile"] = tile_code(tile_id_type(event.tile_id))
+            wire["pool_index"] = len(pool) - 1
+        if isinstance(event, HandEnded):
+            wire["deadline_ts"] = self._hand_end_deadline_ms
 
     def _publish(self, events: list[Event]) -> None:
         """`redact_event()` per recipient seat, appended to that seat's ring buffer with a fresh
-        per-seat `seq`, and pushed out over each seat's live connection (`publish_to_seat`).
-        `Discarded` gets `tile`/`pool_index` filled in here -- `redact_event` alone can't in
-        general (`app/views.py`'s `DiscardWire` docstring), but this Room always redacts a
-        `Discarded` event using `self.state` from immediately after the very `reduce()` call
-        that produced it, before any *later*, separate command could claim that discard and
-        remove it from the pool -- so `self.state.seats[event.seat].discards` still has it at
-        its correct tail position every time this runs. A `HandEnded` also gets `deadline_ts`
-        filled in (the hand-end hold this same `HAND_OVER` landing just opened --
-        `_open_hand_end_window` already set `self._hand_end_deadline_ms` before `_apply` called
-        this, see that method's docstring for why the ordering matters) and a broadcast `score`
-        alongside it -- `state.seats[*].score` already reflects `_apply_payments()`'s result by
-        the time `self.state` was reassigned above `_publish`'s own caller."""
+        per-seat `seq`, and pushed out over each seat's live connection (`publish_to_seat`) --
+        plus one more `redact_event(state, None, event)` pass, spectator-redacted exactly like
+        `seat_view(state, None)`'s "union of what all four players show publicly" (docs/00-
+        architecture.md §5), fanned out to every currently-registered spectator session
+        (`_broadcast_to_spectators`) the same way `_augment_event_wire` augments it -- skipped
+        entirely when there are no spectators to avoid redacting an event nobody will receive.
+        A `HandEnded` also gets a broadcast `score` alongside it -- `state.seats[*].score`
+        already reflects `_apply_payments()`'s result by the time `self.state` was reassigned
+        above `_publish`'s own caller; `_broadcast_wire` itself reaches spectators too."""
         for event in events:
             for seat in range(4):
                 wire = redact_event(self.state, seat, event)
-                if isinstance(event, Discarded):
-                    pool = self.state.seats[event.seat].discards
-                    wire["tile"] = tile_code(tile_id_type(event.tile_id))
-                    wire["pool_index"] = len(pool) - 1
-                if isinstance(event, HandEnded):
-                    wire["deadline_ts"] = self._hand_end_deadline_ms
+                self._augment_event_wire(wire, event)
                 self.publish_to_seat(seat, wire)
+            if self.spectators:
+                spectator_wire = redact_event(self.state, None, event)
+                self._augment_event_wire(spectator_wire, event)
+                self._broadcast_to_spectators(spectator_wire)
             if isinstance(event, HandEnded):
                 self._broadcast_wire(
                     {"t": "score", "totals": {s: self.state.seats[s].score for s in range(4)}}

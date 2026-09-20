@@ -212,8 +212,8 @@ cookie) so it survives a reload, and sent once at `join` (docs/02-protocol.md §
 client-asserted field on the message that actually claims a seat for the first time; a later
 `hello{seat}` reconnect never resends it — see docs/00-architecture.md §2.1's note on why `join`,
 not `hello`, is the right message). Matchmaking, private rooms with invite codes, mid-game bot
-takeover for disconnects, spectating, chat with canned phrases (backend built — see below;
-frontend wiring still open).
+takeover for disconnects, spectating, chat with canned phrases (spectating and chat backend
+built — see below; frontend wiring still open for both, matchmaking/invite codes not started).
 
 This is a deliberate rescope, not a placeholder for auth done later: `docs/00-architecture.md
 §2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
@@ -240,8 +240,35 @@ chosen name exists, `docs/00-architecture.md §6`). Practice-mode bot seats (M4.
 name too, sourced from the room's `bot_tier` (`"RandomBot"`/`"EfficiencyBot"`/`"FaanBot"`), not a
 placeholder -- `_persist_game_record` still records `None` for them, same as before, since a bot
 was never a human player regardless of what it displays as. What's left for this milestone is
-everything client-side (name-entry UI, `localStorage`, rendering) plus matchmaking, invite codes,
-and spectating -- not scoped to this backend sub-task.
+everything client-side (name-entry UI, `localStorage`, rendering) plus matchmaking and invite
+codes -- not scoped to this backend sub-task.
+
+**Spectating: backend built ("Spectating" sub-task).** A connection opts in with `?spectate=true`
+on the WS URL (`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`'s existing shape on the
+same endpoint -- not docs/02-protocol.md §2's originally-sketched literal passive default, which
+turned out to race every real client's own `hello`-then-`join` handshake; see
+docs/00-architecture.md §3's "Spectating: built" note for the full reasoning) and immediately
+gets a spectator-redacted `state_sync` (`seat_view(state, None)`, docs/00-architecture.md §5 --
+already fully correct before this sub-task, just never consumed by a real connection), then
+every live broadcast and public-shaped event a real seat gets, minus anything that would name a
+seat's own concealed tiles (`claim_offer`, `turn.legal`, the private per-seat `deal`). Each
+spectator session gets its own `Room.ring`/`spectator_seq` entry, keyed by `Session.session_id`
+(a string, disjoint from the four integer seat keys already sharing `Room.ring`), giving the
+same dense-and-gapless-per-stream guarantee (D1) a seat already has. Deliberately **not**
+reconnectable, unlike a seat: dropped outright on disconnect (`unregister_spectator`) rather
+than kept around for a reunion `hello{seat}` could never express for a spectator anyway (no
+seat number, no `SeatBinding`) -- see docs/02-protocol.md §5's own note. `join`/a `hello{seat}`
+reconnect from a spectating connection promotes it to a seat and stops the duplicate
+spectator-shaped stream. Proven end to end by a real WS-driven test
+(`server/tests/test_spectator.py`): a spectator connection receives the initial `state_sync`
+with no send of its own, then a real discard/claim/hand-end sequence redacted exactly like
+`seat_view(state, None)`, multiple simultaneous spectators keep independent seq streams, a
+`join` mid-stream promotes and stops the duplicate feed, and a closed connection's ring/seq
+bookkeeping is actually removed (checked directly against `Room`'s internal state). What's left
+is entirely frontend (a "watch" entry point, a spectator-mode table render with no own-hand
+section) -- not scoped to this backend sub-task. Showing hands to spectators after a delay
+(docs/00-architecture.md §5) remains a real, un-built future enhancement, not required for a
+correct v1: showing zero private hand info is already correct.
 
 **Chat: backend built.** `chat{text}` (§2) rebroadcasts to every bound seat, sender included, as
 a server `chat{seat, text, name}` event (`docs/02-protocol.md §3`) -- direct `_broadcast_wire`,

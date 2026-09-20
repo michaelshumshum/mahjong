@@ -96,6 +96,21 @@ join, not just on its next `state_sync`. `join` is for first entry only — a re
 `hello{last_seq}` on an already-bound seat reclaims it directly (§5). Once all four seats are
 filled the room waits for `ready` from each before dealing.
 
+**Spectating: built ("Spectating" sub-task), trigger reconciled from this section's original
+framing.** "A socket that never sends `join` is a spectator" turned out not to be implementable
+as a literal passive default: registering *every* connection as a spectator the instant it's
+accepted races the `hello{client_version}`-then-`join` handshake every real and test client
+already uses, delivering an unsolicited spectator `state_sync` before that connection's own
+`join` response. The real trigger is an explicit, connection-level `?spectate=true` query
+parameter on the WS URL (`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`'s existing
+shape on the same endpoint) — not a new envelope message, so this section's message tables are
+otherwise unchanged. A `?spectate=true` connection gets a spectator-redacted `state_sync`
+(`seat_view(state, None)`, [00-architecture.md §5](00-architecture.md)) the moment it's
+registered, then every broadcast event and the public half of `turn`; `join`/a `hello{seat}`
+reconnect from that same connection promotes it to a seat and it stops receiving the
+spectator-shaped stream. See [00-architecture.md §3](00-architecture.md)'s "Spectating: built"
+note for the full mechanism and why a spectator session, unlike a seat, is never reconnectable.
+
 ### Declining a claim on purpose
 
 `auto` has no `auto_win` toggle. Declining a winning claim is a real strategic choice under
@@ -233,8 +248,17 @@ client reconnects
 ```
 
 The ring buffer lives on the `Room`: one `deque[Envelope]` (`maxlen=512`) **per seat** (and per
-active spectator session), holding *already-redacted* frames exactly as sent. That's the only
-implementable option — `redact_event(state, seat, event)` takes the current `state`, and by
+active spectator session — built, "Spectating" sub-task: `Room.ring` is keyed by seat number
+*or* a spectator's `session_id` string, `app/room.py`'s `register_spectator`/
+`publish_to_spectator`), holding *already-redacted* frames exactly as sent. **A spectator session
+is deliberately never reconnectable, unlike a seat** — there is nothing shaped like `hello{seat}`
+for "the same spectator, again" (no seat number, no `SeatBinding` to reclaim, and a spectator's
+own `session_id` isn't a value a client could present back on a fresh connection), so the
+three-way branch above only ever applies to a seat. A spectator's ring/seq entry is dropped
+outright the moment its connection closes (`unregister_spectator`) rather than kept for a future
+reconnect the way a seat's is; reconnecting later is, correctly, a brand-new spectator session
+with a fresh `state_sync`, not a resumed one. That's the only implementable option —
+`redact_event(state, seat, event)` takes the current `state`, and by
 replay time `state` has moved on to wherever the game is now, so re-redacting a buffered event
 against today's state would produce wrong, and potentially leaky, output. Pre-redacting once at
 send time and buffering the result is correct and cheap enough: 512 frames × ~150 bytes × 4

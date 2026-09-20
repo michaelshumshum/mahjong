@@ -13,7 +13,10 @@ docs/00-architecture.md §6, not a new abstraction layer. One `RuleSet` (`DEFAUL
 every room -- `?seed=` exists only so tests can pin a room's deal. `?practice=true` (M4.5,
 docs/05-roadmap.md) binds seats 1-3 to bots at room creation, before any human ever joins --
 see `app/room.py`'s `Room.__init__(practice=...)`/`_bind_bot_seat`; only meaningful the first
-time a given `room` id is created (`RoomRegistry.get_or_create`'s own note).
+time a given `room` id is created (`RoomRegistry.get_or_create`'s own note). `?spectate=true`
+("Spectating" sub-task, docs/05-roadmap.md M5) registers this connection as an active spectator
+at accept time -- see `app/room.py`'s `Room.register_spectator` for why this is an explicit,
+per-connection opt-in rather than the literal passive default docs/02-protocol.md §2 describes.
 
 **DB wiring + graceful shutdown (a later sub-task).** `_registry` is no longer a fixed
 module-import-time singleton: `reset_registry()` swaps in a fresh `RoomRegistry` (optionally
@@ -173,9 +176,15 @@ class Session:
     def _resync(self) -> None:
         """`BoundedOutbox`'s overflow callback (docs/02-protocol.md §9) -- re-publishes a fresh
         `state_sync` through `Room`, which allocates a real, correctly-ordered `seq` for it
-        (see `app/outbox.py`'s module docstring for why this can't fabricate one locally)."""
+        (see `app/outbox.py`'s module docstring for why this can't fabricate one locally). A
+        registered spectator (`self.seat is None`) gets the spectator-shaped equivalent
+        (`Room.publish_to_spectator`/`state_sync_wire(None)`) -- a no-op if this session was
+        never registered as one (`?spectate=true`), same tolerance `publish_to_spectator`
+        already documents."""
         if self.seat is not None:
             self.room.publish_to_seat(self.seat, self.room.state_sync_wire(self.seat))
+        else:
+            self.room.publish_to_spectator(self.session_id, self.room.state_sync_wire(None))
 
     def _push(self, seq: int, wire: dict[str, Any]) -> None:
         """Registered with `Room` as this seat's `SeatBinding.send` once joined."""
@@ -430,6 +439,7 @@ async def ws_endpoint(
     room: str = "default",
     seed: int | None = None,
     practice: bool = False,
+    spectate: bool = False,
 ) -> None:
     if _registry.draining:
         # docs/00-architecture.md §8.1 step 1: stop accepting new connections (reconnects
@@ -442,6 +452,13 @@ async def ws_endpoint(
     await websocket.accept()
     room_obj = _get_or_create_room(room, seed, practice)
     session = Session(websocket, room_obj)
+    if spectate:
+        # Explicit, connection-level opt-in ("Spectating" sub-task; `Room.register_spectator`'s
+        # own docstring explains why this can't be the literal passive default docs/02-
+        # protocol.md §2 describes -- it would race every real client's own hello-before-join
+        # handshake). Mirrors `?practice=true`'s existing shape on this same endpoint rather
+        # than adding a new wire message.
+        room_obj.register_spectator(session.session_id, session._push)
     writer_task = asyncio.create_task(session.writer())
     try:
         while True:
@@ -466,6 +483,12 @@ async def ws_endpoint(
         # seat before this connection's own `finally` runs -- see `Room.mark_disconnected`.
         if session.seat is not None:
             room_obj.mark_disconnected(session.seat, session.session_id)
+        else:
+            # A no-op for a connection never registered as a spectator (no `?spectate=true`) --
+            # see `Room.unregister_spectator`'s own docstring for why a spectator's bookkeeping
+            # is dropped outright on close rather than kept around for reconnect the way a
+            # seat's is.
+            room_obj.unregister_spectator(session.session_id)
         session.outbox.close()
         with contextlib.suppress(Exception):
             await writer_task
