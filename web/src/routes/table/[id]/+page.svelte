@@ -24,7 +24,6 @@
 		type Standing,
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
-	import Chat, { type ChatEntry } from '$lib/ui/Chat.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 	import {
 		loadAutoArm,
@@ -389,10 +388,9 @@
 		liveStore.socket.claim(gameState.claimWindow.windowId, option.kind, tiles);
 	}
 
-	// minimal chrome to prove ScoreSheet/Chat/Settings/Toast compose into the scene without
+	// minimal chrome to prove ScoreSheet/Settings/Toast compose into the scene without
 	// layout collision (this sub-task's scope) — not the final chrome, just reachability.
 	let showScoreSheet = $state(false);
-	let showChat = $state(false);
 	let showSettings = $state(false);
 
 	let scoreSeats: SeatInfo[] = $derived(
@@ -438,19 +436,6 @@
 					.sort((a, b) => b.total - a.total || a.seat - b.seat)
 			: undefined
 	);
-
-	let chatMessages: ChatEntry[] = $state(
-		page.url.searchParams.has('mock')
-			? [{ seat: 1, phrase: 'Good game', ts: Date.now() - 60_000 }]
-			: []
-	);
-	function sendChat(phrase: string): void {
-		chatMessages = [...chatMessages, { seat: 0, phrase, ts: Date.now() }];
-		// rate-limited server-side; not yet rebroadcast to other seats (server/app/ws.py's
-		// `_apply_chat` comment) -- sent anyway so this is a real intent, not a dead end, and the
-		// local echo above is what lets you see your own message today.
-		if (!isMock) liveStore?.socket.chat(phrase);
-	}
 
 	// Persisted to localStorage (lib/ui/settings-storage.ts) so a reload doesn't reset either
 	// one back to these defaults. `autoArm` is "this client's last known intent," not verified
@@ -727,7 +712,6 @@
 			<div class="chrome-toggles">
 				<button type="button" onclick={() => (showScoreSheet = !showScoreSheet)}>Score sheet</button
 				>
-				<button type="button" onclick={() => (showChat = !showChat)}>Chat</button>
 				<button type="button" onclick={() => (showSettings = !showSettings)}>Settings</button>
 				<button type="button" onclick={() => pushToast('Reconnecting…')}>Toast</button>
 				{#if isMock}
@@ -886,15 +870,6 @@
 						hands={scoreHands}
 						standings={scoreStandings}
 					/>
-				</div>
-			</div>
-		{/if}
-
-		{#if showChat}
-			<div class="panel-overlay">
-				<div class="panel">
-					<CloseButton onclick={() => (showChat = false)} />
-					<Chat messages={chatMessages} onSend={sendChat} />
 				</div>
 			</div>
 		{/if}
@@ -1684,7 +1659,7 @@
 		}
 	}
 
-	// hugs whatever dialog content it wraps (ScoreSheet/Chat/Settings/hand-end result) so the
+	// hugs whatever dialog content it wraps (ScoreSheet/Settings/hand-end result) so the
 	// CloseButton it contains is positioned against that panel's own corner, not the fullscreen
 	// scrim's.
 	.panel {

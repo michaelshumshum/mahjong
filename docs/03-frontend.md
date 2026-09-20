@@ -18,7 +18,7 @@ Answers [05-roadmap.md §5](05-roadmap.md) open question #1 (rendering): **DOM/C
 │                        │  overlay (Svelte):                  │
 │                        │   claim buttons, timer ring,         │
 │                        │   faan breakdown, score sheet,       │
-│                        │   chat, settings, toasts             │
+│                        │   settings, toasts                   │
 │                                                                │
 │  lib/net/     ws client, seq tracking, reconnect, reducer     │
 │  lib/game/    client state store ($state runes)                │
@@ -254,7 +254,7 @@ store's own `seq` field is just a read-model mirror of whatever the socket alrea
 **`lib/net/socket.ts`** (`MahjongSocket`) owns the wire-level correctness rules:
 
 - Every real client intent (`join`/`ready`/`discard`/`claim`/`declare` + the `declareWin`/
-  `declareConcealedKong`/`declareAddedKong` convenience wrappers/`auto`/`chat`/`ping`), each
+  `declareConcealedKong`/`declareAddedKong` convenience wrappers/`auto`/`ping`), each
   building its own envelope with a fresh idempotency `id` (`crypto.randomUUID()`-derived —
   satisfies docs/02-protocol.md §1's per-seat-binding uniqueness; no client-side retry logic
   exists to need de-duplication beyond that).

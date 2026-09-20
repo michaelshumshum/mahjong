@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MahjongSocket } from './socket';
-import type { Hello, Ping, Discard, Claim, Declare, Join, Chat } from './protocol';
+import type { Hello, Ping, Discard, Claim, Declare, Join } from './protocol';
 
 type Listener = (ev: { data: string }) => void;
 
@@ -191,13 +191,11 @@ describe('MahjongSocket', () => {
 			expect(ak.d).toEqual({ kind: 'added_kong', tiles: [2, 2, 2, 9] });
 		});
 
-		it('ready and chat send their documented payloads', async () => {
+		it('ready sends its documented payload', async () => {
 			const { socket, ws } = await openSocket();
 			socket.ready();
-			socket.chat('gg');
-			const [, ready, chat] = sentMessages(ws) as [unknown, { d: unknown }, Chat];
+			const [, ready] = sentMessages(ws) as [unknown, { d: unknown }];
 			expect(ready.d).toEqual({});
-			expect(chat.d).toEqual({ text: 'gg' });
 		});
 
 		it('every client message carries a unique idempotency id', async () => {

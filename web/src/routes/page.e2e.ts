@@ -19,17 +19,6 @@ test('claim buttons demo: choosing an option reports the right one, disambiguate
 	await expect(page.getByTestId('claim-choice')).toHaveText('chose: pass');
 });
 
-test('chat demo: picking a canned phrase appends it to the scrollback', async ({ page }) => {
-	await page.goto('/');
-	await page.waitForLoadState('networkidle');
-
-	const chat = page.locator('.chat');
-	await expect(chat.locator('.entry-phrase', { hasText: 'Good game' })).toBeVisible(); // seeded
-
-	await chat.getByRole('button', { name: 'Nice hand!' }).click();
-	await expect(chat.locator('.entry-phrase', { hasText: 'Nice hand!' })).toBeVisible();
-});
-
 test('settings demo: toggling pre-arm and motion prefs fires onChange with the new values', async ({
 	page
 }) => {

@@ -15,7 +15,6 @@
 		type Standing,
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
-	import Chat, { type ChatEntry } from '$lib/ui/Chat.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 	import Toast from '$lib/ui/Toast.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
@@ -132,16 +131,6 @@
 		{ seat: 0, total: -30 },
 		{ seat: 2, total: -30 }
 	];
-
-	// Chat demo (this sub-task): mock scrollback, no real `chat`/socket wiring. Sending appends
-	// locally with the current time — a stand-in for the eventual server echo.
-	let chatMessages = $state<ChatEntry[]>([
-		{ seat: 1, phrase: 'Good game', ts: Date.now() - 60_000 },
-		{ seat: 2, phrase: 'Thanks', ts: Date.now() - 30_000 }
-	]);
-	function sendChat(phrase: string): void {
-		chatMessages = [...chatMessages, { seat: 0, phrase, ts: Date.now() }];
-	}
 
 	// Settings demo (this sub-task): mock `auto` pre-arm state plus client-only prefs, no real
 	// `auto` message sent and no prefs persisted anywhere yet.
@@ -288,15 +277,6 @@
 		hands={scoreHands}
 		standings={scoreStandings}
 	/>
-</section>
-
-<section>
-	<h2>Chat demo</h2>
-	<p class="hint">
-		Canned-phrase picker only, per docs/02-protocol.md §2 (`chat` is rate-limited; no freeform text
-		box). Sending appends to the scrollback with the current time; no socket involved.
-	</p>
-	<Chat messages={chatMessages} onSend={sendChat} />
 </section>
 
 <section>

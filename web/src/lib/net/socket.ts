@@ -2,7 +2,6 @@ import { env } from '$env/dynamic/public';
 import type {
 	Auto,
 	AutoPayload,
-	Chat,
 	Claim,
 	ClaimPayload,
 	ClientMessage,
@@ -233,11 +232,6 @@ export class MahjongSocket {
 
 	auto(opts: AutoPayload): void {
 		const msg: Auto = { v: 1, id: nextId(), ts: Date.now(), t: 'auto', d: opts };
-		this.#send(msg);
-	}
-
-	chat(text: string): void {
-		const msg: Chat = { v: 1, id: nextId(), ts: Date.now(), t: 'chat', d: { text } };
 		this.#send(msg);
 	}
 
