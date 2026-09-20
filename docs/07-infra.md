@@ -160,16 +160,55 @@ the asset is actually vendored in.
 
 ## 9. CI
 
-`.github/workflows/ci.yml`, on push and PR to `main`. Three jobs, all native tooling (`uv`,
-`pnpm`) rather than `docker compose run` — nothing here touches Postgres, so the containers buy
-nothing but slower cold starts:
+`.github/workflows/ci.yml` triggers on push and PR to `main` and calls three **reusable
+workflows** (`workflow_call`), one per concern:
 
-| Job | Runs |
+| File | Calls into | Runs |
+| --- | --- | --- |
+| `.github/workflows/server.yml` | one `server` job | `uv sync --locked`, then `ruff check`, `ruff format --check`, the mypy baseline gate, `pytest -q -m "not slow"` |
+| `.github/workflows/web.yml` | one `web` job | `pnpm install --frozen-lockfile`, then `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
+| `.github/workflows/proto-check.yml` | one `proto-check` job | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
+
+All native tooling (`uv`, `pnpm`) rather than `docker compose run` — nothing here touches
+Postgres, so the containers buy nothing but slower cold starts. `docker compose`-based
+`make test` / `make proto-check` stay the local dev path; CI reimplements their commands
+directly against the toolchain instead of shelling through Compose. Revisit if a job ever needs
+Postgres.
+
+**Job graph**: GitHub Actions can't `needs:` across independent top-level workflow files, only
+within one workflow's own jobs — reusable workflows are the way to get real separate files while
+keeping the option to chain a job that has a genuine dependency. Here, none do: `server`, `web`,
+and `proto-check` are independent domains with no shared artifact, so root `ci.yml` calls all
+three with no `needs:` — they run in parallel. Within `server.yml`/`web.yml`, lint, typecheck and
+test also don't depend on each other's *output*, but are sequential steps inside one job rather
+than three separate jobs, so the dependency install (`uv sync` / `pnpm install`) happens once per
+pipeline instead of 2-3x or needing an artifact handoff between jobs.
+
+**Gates**:
+
+| Check | Tolerance |
 | --- | --- |
-| `test-server` | `uv sync --locked` + `uv run pytest -q -m "not slow"` |
-| `test-web` | `pnpm install --frozen-lockfile`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
-| `proto-check` | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
+| `ruff check`, `ruff format --check` | hard — any finding fails the job |
+| mypy (`server/scripts/mypy-baseline-check.sh`) | soft/baseline — see below |
+| `pytest -q -m "not slow"` | hard |
+| `pnpm lint` (oxlint + oxfmt) | hard |
+| `pnpm check` (svelte-check) | hard |
+| `pnpm test` (vitest + Playwright) | hard |
 
-`docker compose`-based `make test` / `make proto-check` stay the local dev path; CI reimplements
-their commands directly against the toolchain instead of shelling through Compose. Revisit if a
-job ever needs Postgres.
+**mypy baseline tolerance**: `mahjong_core`/`app`/`bots`/`tools` are `mypy --strict` clean, but
+the test suite carries pre-existing debt (narrow mypy-narrowing false positives and untyped-`Any`
+edges in test helpers) that isn't worth fixing as a side effect of unrelated changes. A hard
+`mypy .` gate would make CI permanently red, so `server/scripts/mypy-baseline-check.sh` runs
+`mypy .`, counts the errors, and fails only if the count exceeds a `BASELINE` constant recorded
+in the script — an *increase* fails the build, holding steady or improving doesn't. Both CI
+(`server.yml`) and the `mypy-baseline` pre-commit hook (`.pre-commit-config.yaml`, wired into
+`lefthook.yml`'s `server` job) call this same script, so the threshold exists in exactly one
+place. Lowering `BASELINE` as debt is paid down is expected; raising it needs justification in
+the commit that does so — never bump it silently just to turn a red check green.
+
+**Pre-commit** (`lefthook.yml`): alongside the existing `web-lint`/`web-format` (oxlint/oxfmt on
+staged files) and `server` (ruff via `.pre-commit-config.yaml`) jobs, `web-typecheck` runs `pnpm
+check` (svelte-check) and the `server` job's pre-commit config also runs the mypy baseline
+script. Both inherently check the whole project graph, not just staged files — unlike
+oxlint/oxfmt's `{staged_files}` — so they're slower and there's no meaningful way to scope them
+down without producing wrong (missing-context) results.
