@@ -28,7 +28,7 @@ from mahjong_core.actions import (
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.state import GameState, Phase
-from mahjong_core.tiles import TileType, tile_id_type
+from mahjong_core.tiles import TileId, TileType, tile_id_type
 
 _STEP_CAP = 2000  # generous vs. test_selfplay.py's observed ~450-step max for a 4-hand game
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
@@ -68,7 +68,7 @@ def test_discard_ids_span_all_34_tile_types_directly() -> None:
     """Directed sanity check, independent of self-play: `action_id` on a hand-built `Discard`
     lands at exactly `tile_type`'s ordinal, for every type."""
     for tile_type in TileType:
-        tile_id = tile_type * 4  # canonical id 0 of that type, tiles.py's numbering
+        tile_id = TileId(tile_type * 4)  # canonical id 0 of that type, tiles.py's numbering
         aid = ml.action_id(Discard(tile_id=tile_id), state=_dummy_state())
         assert aid == int(tile_type)
 

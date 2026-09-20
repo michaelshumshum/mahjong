@@ -1,4 +1,5 @@
 import re
+from typing import Any
 
 from app.protocol import AnyMessage, ClientMessage, ServerMessage
 from tools.gen_protocol import (
@@ -10,7 +11,7 @@ from tools.gen_protocol import (
 )
 
 
-def _kwargs() -> dict:
+def _kwargs() -> dict[str, Any]:
     return {
         "client_message": ClientMessage,
         "server_message": ServerMessage,

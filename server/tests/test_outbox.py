@@ -21,7 +21,7 @@ def test_push_under_capacity_keeps_everything_in_order() -> None:
     for i in range(3):
         outbox.push(_frame("draw", i))
     assert not outbox.dead
-    assert [f["seq"] for f in outbox._frames] == [0, 1, 2]  # type: ignore[attr-defined]
+    assert [f["seq"] for f in outbox._frames] == [0, 1, 2]
 
 
 def test_overflow_drops_non_critical_frames_and_collapses_to_a_resynced_state_sync() -> None:
@@ -41,7 +41,7 @@ def test_overflow_drops_non_critical_frames_and_collapses_to_a_resynced_state_sy
     outbox.push(_frame("draw", 5))  # 5th frame over a maxsize-4 queue -- triggers overflow
 
     assert resynced == [True]
-    remaining = list(outbox._frames)  # type: ignore[attr-defined]
+    remaining = list(outbox._frames)
     types = [f["t"] for f in remaining]
     # every non-critical frame queued before the overflow is gone -- replaced by exactly one
     # fresh state_sync; the ack (critical) survived.
@@ -65,11 +65,11 @@ def test_push_after_dead_is_a_noop() -> None:
     outbox.push({"v": 1, "t": "ack", "seq": 1, "ts": 0, "d": {"id": "a", "ok": True}})
     outbox.push({"v": 1, "t": "ack", "seq": 2, "ts": 0, "d": {"id": "b", "ok": True}})
     assert outbox.dead
-    before = list(outbox._frames)  # type: ignore[attr-defined]
+    before = list(outbox._frames)
 
     outbox.push({"v": 1, "t": "ack", "seq": 3, "ts": 0, "d": {"id": "c", "ok": True}})
 
-    assert list(outbox._frames) == before  # type: ignore[attr-defined]
+    assert list(outbox._frames) == before
 
 
 async def test_get_drains_in_order_then_returns_none_after_close() -> None:

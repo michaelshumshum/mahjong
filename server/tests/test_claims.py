@@ -173,7 +173,7 @@ def test_resolve_claims_rejects_response_from_unoffered_seat() -> None:
 def test_resolve_claims_rejects_seat_key_mismatch() -> None:
     window = _window(0, (ClaimOffer(seat=1, can_win=True),))
     with pytest.raises(ValueError):
-        resolve_claims(window, {1: ClaimWin(window_id=1, seat=2)})  # type: ignore[dict-item]
+        resolve_claims(window, {1: ClaimWin(window_id=1, seat=2)})
 
 
 def test_resolve_claims_rejects_stale_window_id() -> None:

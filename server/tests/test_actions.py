@@ -28,7 +28,7 @@ from mahjong_core.state import (
     SeatState,
     new_game,
 )
-from mahjong_core.tiles import Flower, TileType, tile_ids_for_type
+from mahjong_core.tiles import Flower, TileId, TileType, tile_ids_for_type
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)
 _MAN_2 = tile_ids_for_type(TileType.MAN_2)
@@ -63,7 +63,7 @@ def _base_state(**overrides: object) -> GameState:
     return dataclasses.replace(state, **overrides)  # type: ignore[arg-type]
 
 
-def _standard_winning_hand() -> tuple[int, ...]:
+def _standard_winning_hand() -> tuple[TileId, ...]:
     # 111m 456m 789m 22m 33m -- wait that's only pairs; build a clean 4-melds+pair 14-tile hand.
     return (
         *_MAN_1[:3],
@@ -79,7 +79,7 @@ def _standard_winning_hand() -> tuple[int, ...]:
     )
 
 
-def _seven_pairs_hand() -> tuple[int, ...]:
+def _seven_pairs_hand() -> tuple[TileId, ...]:
     return (
         _MAN_1[0],
         _MAN_1[1],
@@ -98,7 +98,7 @@ def _seven_pairs_hand() -> tuple[int, ...]:
     )
 
 
-def _thirteen_orphans_hand() -> tuple[int, ...]:
+def _thirteen_orphans_hand() -> tuple[TileId, ...]:
     return (
         _MAN_1[0],
         _MAN_9[0],
@@ -117,7 +117,7 @@ def _thirteen_orphans_hand() -> tuple[int, ...]:
     )
 
 
-def _not_winning_hand() -> tuple[int, ...]:
+def _not_winning_hand() -> tuple[TileId, ...]:
     return (
         _MAN_1[0],
         _MAN_2[0],
@@ -196,7 +196,7 @@ def test_added_kong_offered_when_matching_exposed_pung() -> None:
     pung = Meld(MeldKind.PUNG, tuple(_MAN_1[:3]), from_seat=1)
     state = _base_state(phase=Phase.AWAIT_ACTION, turn=0)
     seats = list(state.seats)
-    seats[0] = dataclasses.replace(seats[0], concealed=(_MAN_1[3], _MAN_2[0]), melds=(pung,))  # type: ignore[arg-type]
+    seats[0] = dataclasses.replace(seats[0], concealed=(_MAN_1[3], _MAN_2[0]), melds=(pung,))
     state = dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
     actions = legal_actions(state, 0)
     added = [a for a in actions if isinstance(a, DeclareAddedKong)]
@@ -251,7 +251,7 @@ def test_declare_win_not_offered_for_incomplete_hand() -> None:
     assert not any(isinstance(a, DeclareWin) for a in actions)
 
 
-def _below_min_faan_hand() -> tuple[int, ...]:
+def _below_min_faan_hand() -> tuple[TileId, ...]:
     """A real, structurally complete 14-tile hand that scores exactly 2 faan under
     `DEFAULT_RULESET` for a self-declared win: 平糊 (all sequences, 1) + 自摸 (1). Three suits
     used (man/pin/sou) so 缺一門/half/full-flush all miss; a plain 9s pair so no wind/dragon
@@ -284,7 +284,7 @@ def test_declare_win_not_offered_below_min_faan() -> None:
     assert DEFAULT_RULESET.min_faan == 3
     state = _base_state(phase=Phase.AWAIT_ACTION, turn=1)
     seats = list(state.seats)
-    seats[1] = dataclasses.replace(  # type: ignore[arg-type]
+    seats[1] = dataclasses.replace(
         seats[1], concealed=_below_min_faan_hand(), flowers=(Flower.FLOWER_1,)
     )
     state = dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]

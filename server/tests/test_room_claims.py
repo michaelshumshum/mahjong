@@ -179,6 +179,9 @@ async def test_claim_timeout_defaults_every_absent_seat_to_pass() -> None:
     await room.process_one()
 
     assert room.state.claim_window is None
+    # mypy narrows room.state.phase to Literal[AWAIT_CLAIMS] from the assert above and doesn't
+    # see that `await room.process_one()` reassigns `room.state` to a new GameState in between --
+    # flags this as a non-overlapping/unreachable comparison, but it's real and correct.
     assert room.state.phase == Phase.AWAIT_ACTION
     assert room.state.turn == 1  # nobody claimed -> play continues past the discarder
     assert not any(m.kind == MeldKind.PUNG for m in room.state.seats[2].melds)

@@ -77,7 +77,9 @@ _ALL_TYPES_NO_MAN1 = [t for t in TileType if t != TileType.MAN_1]
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+        # getsockname()'s return type is the untyped _RetAddress in typeshed; for AF_INET
+        # it's always (host, port).
+        return int(s.getsockname()[1])
 
 
 def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:

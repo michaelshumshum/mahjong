@@ -23,10 +23,11 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.websockets import WebSocketDisconnect
 
 from app import ws
+from app.db.session import make_engine, make_session_factory
 from app.main import app
 from app.registry import RoomRegistry
 from app.room import Room, SeatBinding
@@ -97,10 +98,13 @@ def _rig_final_hand_state(seed: int) -> GameState:
     return dataclasses.replace(state, ruleset=_NO_REPEAT_RULESET, dealer=3, hand_no=4)
 
 
-def _exploding_session_factory() -> AsyncSession:
-    """Stands in for `app/main.py`'s real `async_sessionmaker` against a database that refuses
-    the write -- an unapplied migration (no `games` table) is the failure that actually bit."""
-    raise RuntimeError('relation "games" does not exist')
+def _broken_session_factory() -> async_sessionmaker[AsyncSession]:
+    """A real `async_sessionmaker` (not a bare stand-in callable, which fails the same type
+    check `Room` enforces against the real one from `app/main.py`) against a schema-less
+    in-memory SQLite DB -- no `Base.metadata.create_all`, so a write against it fails exactly
+    like an unapplied migration would (no `games` table): the failure that actually bit."""
+    engine = make_engine("sqlite+aiosqlite:///:memory:")
+    return make_session_factory(engine)
 
 
 class _FakeSocket:
@@ -208,7 +212,7 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
         "shutdown-persist-fails",
         _NO_REPEAT_RULESET,
         game_seed=7,
-        session_factory=_exploding_session_factory,
+        session_factory=_broken_session_factory(),
     )
     room.state = _rig_final_hand_state(seed=7)
     _bind_fake_seats(room)
@@ -223,6 +227,9 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
         assert room.state.phase == Phase.HAND_OVER
         await asyncio.wait_for(room.process_one(), timeout=2.0)
 
+    # mypy narrows room.state.phase to Literal[HAND_OVER] from the assert two ticks up and
+    # doesn't see that the second `await room.process_one()` above reassigns `room.state` to a
+    # new GameState -- flags this as non-overlapping/unreachable, but it's real and correct.
     assert room.state.phase == Phase.GAME_OVER  # the game still ended for real
     assert room._game_over_persisted is True  # the attempt returned: nothing left to wait on
     assert any("persist failed" in r.message for r in caplog.records)

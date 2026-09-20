@@ -236,6 +236,9 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
                 assert frame["t"] == "seat_state"
                 assert frame["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
+            # mypy narrows this status to Literal["autoplay"] from the assert at line 194 and
+            # doesn't see the reconnect handling above (driven through real websocket frames)
+            # flip it back -- flags this as non-overlapping/unreachable, but it's real and correct.
             assert room.seat_bindings[1].status == "connected"
             assert 1 not in room._pending_bot
 

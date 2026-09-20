@@ -80,6 +80,12 @@ def _next_id() -> str:
     return f"c-{next(_id_gen)}"
 
 
+def _payload(frame: dict[str, object]) -> dict[str, object]:
+    data = frame["d"]
+    assert isinstance(data, dict)
+    return data
+
+
 def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
     seats = list(state.seats)
     seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
@@ -264,7 +270,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             for seat in range(4):
                 assert [f["t"] for f in frames[seat]] == expected_types
 
-            hand_end = frames[0][1]["d"]
+            hand_end = _payload(frames[0][1])
             assert hand_end["outcome"] == "exhaustive_draw"
             assert hand_end["hand_no"] == 1
             assert hand_end["winner"] is None
@@ -272,7 +278,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             # held until all four ack (below) or it elapses, whichever first.
             assert isinstance(hand_end["deadline_ts"], int)
 
-            score = frames[0][2]["d"]
+            score = _payload(frames[0][2])
             assert score["totals"] == {"0": 0, "1": 0, "2": 0, "3": 0}
 
             # --- hand-end hold: DEFAULT_RULESET's real hand_end_seconds (10s) would otherwise
@@ -308,11 +314,11 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             for seat in range(4):
                 assert [f["t"] for f in next_frames[seat]] == next_types
 
-            next_hand_start = next_frames[0][0]["d"]
+            next_hand_start = _payload(next_frames[0][0])
             assert next_hand_start["hand_no"] == 2
             assert next_hand_start["dealer"] == 0  # dealer repeats on exhaustive draw (default)
 
-            next_turn = next_frames[0][2]["d"]
+            next_turn = _payload(next_frames[0][2])
             assert next_turn["seat"] == 0
 
 
