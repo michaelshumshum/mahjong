@@ -653,8 +653,6 @@
 				>{WIND_CHAR[seatWind(seat.seat)]}</span
 			>
 			{#if seat.seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
-			{#if seat.seat === gameState.turn}<span class="turn-badge" title="Current turn">turn</span
-				>{/if}
 			{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat (FaanBot)"
 					>Bot</span
 				>{/if}
@@ -662,22 +660,21 @@
 		</header>
 
 		<div class="seat-hand-strip seat-hand-strip--{position}">
-			{#if seat.flowers.length}
-				<div class="tile-row flower-row" aria-label="{seat.name}'s flowers">
-					{#each seat.flowers as code, i (i)}
-						<div class="mini-tile"><TileFace {code} /></div>
-					{/each}
-				</div>
-			{/if}
-
 			<div class="tile-row backs-row" aria-label="{seat.concealedCount} concealed tiles">
 				{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
 					<div class="mini-tile back"><TileFace code={null} /></div>
 				{/each}
 			</div>
 
-			{#if seat.melds.length}
+			{#if seat.flowers.length || seat.melds.length}
 				<div class="tile-row meld-row" aria-label="{seat.name}'s melds">
+					{#if seat.flowers.length}
+						<div class="meld" aria-label="{seat.name}'s flowers">
+							{#each seat.flowers as code, i (i)}
+								<div class="mini-tile"><TileFace {code} /></div>
+							{/each}
+						</div>
+					{/if}
 					{#each seat.melds as meld, mi (mi)}
 						<div class="meld">
 							{#each meld.tiles as code, ti (ti)}
@@ -776,30 +773,26 @@
 						{#if seatAt(0).seat === gameState.dealer}<span class="dealer-badge" title="Dealer"
 								>D</span
 							>{/if}
-						{#if seatAt(0).seat === gameState.turn}<span class="turn-badge" title="Current turn"
-								>turn</span
-							>{/if}
-						{#if gameState.turnDurationMs !== null}
-							{#key gameState.turn}
-								<div class="turn-timer">
+						<div class="turn-timer">
+							{#if gameState.turnDurationMs !== null}
+								{#key gameState.turn}
 									<TimerRing durationMs={gameState.turnDurationMs} size={24} />
-								</div>
-							{/key}
-						{/if}
+								{/key}
+							{/if}
+						</div>
 						<span class="seat-score">{seatAt(0).score}</span>
 					</header>
 
 					<div class="your-hand">
-						{#if seatAt(0).flowers.length}
-							<div class="tile-row flower-row" aria-label="Your flowers">
-								{#each seatAt(0).flowers as code, i (i)}
-									<div class="mini-tile"><TileFace {code} /></div>
-								{/each}
-							</div>
-						{/if}
-
-						{#if seatAt(0).melds.length}
+						{#if seatAt(0).flowers.length || seatAt(0).melds.length}
 							<div class="tile-row meld-row" aria-label="Your melds">
+								{#if seatAt(0).flowers.length}
+									<div class="meld" aria-label="Your flowers">
+										{#each seatAt(0).flowers as code, i (i)}
+											<div class="mini-tile"><TileFace {code} /></div>
+										{/each}
+									</div>
+								{/if}
 								{#each seatAt(0).melds as meld, mi (mi)}
 									<div class="meld">
 										{#each meld.tiles as code, ti (ti)}
@@ -1387,7 +1380,7 @@
 
 	// wall/prevailing: was `.center-info` on the table surface itself (see `.table-center`
 	// below for what took its place there) -- dealer/turn moved with it but aren't reproduced
-	// here, since `.dealer-badge`/`.turn-badge` on each seat already say that.
+	// here, since `.dealer-badge`/`.seat-region--turn`'s outline on each seat already say that.
 	.table-status {
 		display: flex;
 		align-items: center;
@@ -1476,7 +1469,12 @@
 		color: var(--color-text-muted);
 	}
 
+	// fixed footprint (matches the `TimerRing size={24}` passed above) so the header doesn't
+	// reflow -- `seat-score`'s `margin-inline-start: auto` shifts position with any preceding
+	// sibling that mounts/unmounts, and this one toggles every time the turn changes.
 	.turn-timer {
+		width: 24px;
+		height: 24px;
 		pointer-events: none;
 	}
 
@@ -1491,12 +1489,6 @@
 		color: var(--color-text);
 		font-size: 0.7rem;
 		font-weight: 700;
-	}
-
-	.turn-badge {
-		color: var(--color-accent);
-		font-size: var(--font-size-sm);
-		text-transform: uppercase;
 	}
 
 	// bot-controlled seat (M4.5 practice mode) -- a persistent identity marker, not a transient
@@ -1623,7 +1615,8 @@
 	// sitting at its own seat's table edge (docs/03-frontend.md §3 "Discard pool geometry") --
 	// matches the physical pile-in-front-of-you layout, and the space is free now that
 	// wall/prevailing moved up to `.table-status` and dealer/turn dropped out entirely
-	// (`.dealer-badge`/`.turn-badge` on the seat headers already say both). Below tablet-up
+	// (`.dealer-badge`/`.seat-region--turn`'s outline on the seat headers already say both). Below
+	// tablet-up
 	// there's no room for a literal box, so the four pools just stack.
 	.table-center {
 		grid-area: center;
@@ -1672,10 +1665,13 @@
 	// horizontal-scroll override) needs to win, and it matches these pools the same as any other
 	// via the plain `.discard-pool` class -- gating this to tablet-up keeps that override's
 	// lower-specificity `.discard-pool` selector from silently losing to these on phone.
+	// wider than the 6-column default so a long hand's discards wrap onto fewer rows -- unbounded
+	// row growth here pushes `.seat-region--self` (`auto`-height row below `center`) down the page,
+	// off-screen, since `.table-center`'s own middle column is `1fr` and has room to spare.
 	.table-center .discard-pool {
 		@include layout.tablet-up {
-			grid-template-columns: repeat(6, minmax(24px, 32px));
-			max-width: 16rem;
+			grid-template-columns: repeat(12, minmax(20px, 28px));
+			max-width: 26rem;
 		}
 	}
 

@@ -62,7 +62,10 @@ instead of a scaled logical space.
 
 Seats are always rendered relative to **your** seat, at the bottom. Wall count and prevailing
 wind live in the page header, not the table surface — dealer/turn aren't reproduced there since
-the dealer badge and turn badge on each seat header already say both. Desktop/tablet (≥768px):
+the dealer badge and the current-turn seat's outline (`.seat-region--turn`) already say both.
+No "turn" text badge: a text label that mounts/unmounts every turn change shifted the seat
+header's `margin-inline-start: auto`-positioned score, so the indicator is a non-layout-affecting
+outline instead. Desktop/tablet (≥768px):
 
 ```
   header: room/scenario · wall count · prevailing wind (東南西北) · chrome toggles
@@ -511,9 +514,9 @@ default tier, named plainly, not a difficulty picker.
 **Bot seat badge.** `MockSeatState` grew an optional `status?: string` field (`mock-game-state.ts`)
 that `live-view.ts`'s `viewFromClientState` populates from `ClientGameState.seatStatus[seat]` —
 mock fixtures never set it, so this is a no-op there. `+page.svelte`'s opponent seat header renders
-a small `.bot-badge` chip ("Bot") next to the existing dealer/turn badges whenever `status ===
-'bot'`, styled as a quiet persistent-identity chip (bordered, muted text) rather than borrowing
-`--color-accent` the way the transient dealer/turn badges do — a bot seat's status doesn't change
+a small `.bot-badge` chip ("Bot") next to the existing dealer badge whenever `status === 'bot'`,
+styled as a quiet persistent-identity chip (bordered, muted text) rather than borrowing
+`--color-accent` the way the transient dealer badge does — a bot seat's status doesn't change
 mid-hand the way whose turn it is does. Other `seat_status` values (`connected`/`disconnected`/
 `autoplay`/`empty`) have no visual treatment yet; this sub-task only covers `bot`, the one value
 that just gained real backend meaning.
