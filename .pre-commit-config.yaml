@@ -8,3 +8,17 @@ repos:
         files: ^server/
       - id: ruff-check
         files: ^server/
+
+  - repo: local
+    hooks:
+      # mypy inherently type-checks the whole project graph, not just staged files
+      # (unlike ruff above) — pass_filenames: false so pre-commit doesn't hand it the
+      # staged-file subset (the script always checks the whole project regardless).
+      # Same script and baseline CI uses (server/scripts/mypy-baseline-check.sh) so the
+      # threshold lives in one place.
+      - id: mypy-baseline
+        name: mypy (baseline-tolerant)
+        entry: server/scripts/mypy-baseline-check.sh
+        language: script
+        files: ^server/
+        pass_filenames: false
