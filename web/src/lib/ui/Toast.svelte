@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { scheduleAutoDismiss } from './toasts';
+	import { scheduleAutoDismiss } from './auto-close';
 
 	let {
 		message,

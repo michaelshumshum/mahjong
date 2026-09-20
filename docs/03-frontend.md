@@ -191,8 +191,17 @@ The server closes claim windows **early** — as soon as no better claim is poss
 | `claim_resolved` names another seat while this seat's buttons were still live (e.g. a higher-priority win beat your pending pung) | Remove buttons immediately, no fade-out — the option didn't get declined, it stopped existing. Toast only for a non-obvious loss (someone else won/konged the tile); a plain timeout-to-PASS needs no toast. |
 | `claim_resolved` with no seat (sole eligible claim passed, or all eligible seats passed) | Remove buttons immediately; play continues without waiting out the full deadline. |
 | Local `claim` sent but arrives after the window already closed | Server drops it by stale `window_id`, or acks `{ok:false}`. Client shows a brief "too slow" toast and changes nothing else — no local state was ever applied. |
-| CSS ring visually completes, no `claim_resolved`/`turn` yet (latency) | Buttons stay up but go visually inert (dimmed, non-interactive) until the authoritative event arrives. The ring is cosmetic; it never triggers client-side resolution. |
+| Dialog's own timer runs out, no `claim_resolved`/`turn` yet (latency) | Client auto-selects `pass` through the same `onChoose` path a manual click uses (`DialogTimer.svelte`, below), sending `claim{window_id, choice:'pass'}`. Mirrors what the server already does on its own claim-window timeout ([02-protocol.md §4](02-protocol.md), "PASS on claim timeout"), so this isn't a decision the server wasn't already going to make — it's just not waiting for the round trip. |
 | A pre-armed toggle covers this offer (`auto`) | No buttons render — the server already resolves it as an instant choice. |
+
+Deliberate tradeoff in the row above: a real click landing in the last few ms before the local
+timer fires can lose to the auto-pass if the server treats a seat's first-received choice as
+final. Accepted in favor of a dialog that actually closes on its own — see `DialogTimer.svelte`
+below and [02-protocol.md §4](02-protocol.md)'s timer note. `hand_end_ack` gets the same
+auto-close treatment with none of this risk: it's an acknowledgment, not a choice with
+alternatives, and the room already advances at the same `deadline_ts` with or without it
+([00-architecture.md §3](00-architecture.md) "Hand-end hold") — the client firing it early just
+lets the *other* seats stop waiting on this one sooner.
 
 ### Countdown mechanics
 
@@ -200,8 +209,13 @@ The server closes claim windows **early** — as soon as no better claim is poss
   not a `setInterval`/`requestAnimationFrame` loop. Background tabs clamp JS timers to ≥1000ms,
   so a JS-ticked ring visibly stalls when the tab loses focus (e.g. during an opponent's long
   think); a CSS animation keeps compositing and is correct the instant the tab regains focus.
-- The ring is cosmetic only; the authoritative close is the server event (claim table above, or
-  `turn` for your own timeout).
+- The ring itself is still cosmetic — it never drives anything on its own. `DialogTimer.svelte`
+  (`web/src/lib/ui/`) pairs it with a real one-shot `setTimeout` (`auto-close.ts`'s
+  `scheduleAutoDismiss`, also used standalone by `Toast.svelte`) anchored off the same
+  `durationMs`, so the *timeout*, not the ring, is what calls the dialog's `onClose`. Used by the
+  claim dialog (auto-pass, above) and the hand-end hold (auto-ack). The turn ring (your own
+  discard/draw deadline) stays purely cosmetic with no `DialogTimer` behind it — the server alone
+  handles tsumogiri on expiry, and there's no local dialog for the client to close.
 - **Not implemented: clock-offset correction.** `deadline_ts - now` uses local `Date.now()`
   directly — `ping`/`pong` exists on the wire ([02-protocol.md §4](02-protocol.md)) but nothing
   in the client calls it, so there's no `performance.now()`-based offset measurement to anchor

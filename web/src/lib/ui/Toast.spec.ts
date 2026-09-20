@@ -3,7 +3,7 @@ import { render } from 'svelte/server';
 import Toast from './Toast.svelte';
 
 // Auto-dismiss firing (the scheduled setTimeout calling onDismiss) is covered without real
-// elapsed time in toasts.spec.ts (vi.useFakeTimers around scheduleAutoDismiss) and end-to-end
+// elapsed time in auto-close.spec.ts (vi.useFakeTimers around scheduleAutoDismiss) and end-to-end
 // with Playwright's clock in routes/page.e2e.ts. svelte/server can't run `$effect` or dispatch a
 // real click, so this file only covers rendered markup.
 describe('Toast', () => {

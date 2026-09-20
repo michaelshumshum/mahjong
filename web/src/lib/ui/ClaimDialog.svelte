@@ -3,7 +3,7 @@
 	import type { TileCode } from '../table/tile-code';
 	import type { ClaimOption } from './ClaimButtons.svelte';
 	import { claimOptionKey, claimOptionLabel } from './claim-option';
-	import TimerRing from './TimerRing.svelte';
+	import DialogTimer from './DialogTimer.svelte';
 
 	let {
 		discardTile,
@@ -37,10 +37,21 @@
 		if (option.kind === 'chow') tiles.sort((a, b) => a.code.localeCompare(b.code));
 		return tiles;
 	}
+
+	// deadline reached with no explicit choice: resolve the same way the server does on its own
+	// claim-window timeout (docs/02-protocol.md §4, "PASS on claim timeout") -- `options` always
+	// carries a `pass` entry (docs/02-protocol.md's `claim_offer` row), so this reuses the exact
+	// `onChoose` path a manual Pass click already takes, rather than inventing a second one.
+	function handleTimeout(): void {
+		const passOption = options.find((option) => option.kind === 'pass');
+		if (passOption) onChoose(passOption);
+	}
 </script>
 
 <div class="claim-dialog" role="dialog" aria-label="Claim options">
-	<div class="claim-dialog-timer"><TimerRing {durationMs} size={40} /></div>
+	<div class="claim-dialog-timer">
+		<DialogTimer {durationMs} size={40} onClose={handleTimeout} />
+	</div>
 
 	<div class="claim-dialog-header">
 		<h2>Claim</h2>

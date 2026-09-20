@@ -1,7 +1,7 @@
-// pure queue helpers behind Toast.svelte, split out so id assignment and dismiss-scheduling are
-// testable without a DOM or real elapsed time — same pure-logic-extraction pattern as
-// timer-ring.ts. The reactive `$state<ToastEntry[]>` list itself lives in whichever .svelte file
-// owns the queue (e.g. the demo page), not here: a plain .ts module can't hold runes.
+// pure queue helpers behind Toast.svelte, split out so id assignment is testable without a DOM.
+// Auto-close scheduling lives in ./auto-close (shared with every other timer-driven closable
+// dialog, not toast-specific). The reactive `$state<ToastEntry[]>` list itself lives in whichever
+// .svelte file owns the queue (e.g. the demo page), not here: a plain .ts module can't hold runes.
 
 export interface ToastEntry {
 	id: number;
@@ -21,12 +21,4 @@ export function createToast(message: string, durationMs = DEFAULT_DURATION_MS): 
 
 export function removeToast(toasts: ToastEntry[], id: number): ToastEntry[] {
 	return toasts.filter((toast) => toast.id !== id);
-}
-
-// one-shot timeout, not a ticker (docs/03-frontend.md §5 bans a JS ticker for *animation*; this
-// is dismiss scheduling, not motion). Returns a disposer so the caller's effect can cancel it —
-// a manually-dismissed toast must not also fire `onExpire` later.
-export function scheduleAutoDismiss(durationMs: number, onExpire: () => void): () => void {
-	const handle = setTimeout(onExpire, durationMs);
-	return () => clearTimeout(handle);
 }

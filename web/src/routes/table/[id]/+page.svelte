@@ -18,6 +18,7 @@
 	import type { ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import TimerRing from '$lib/ui/TimerRing.svelte';
+	import DialogTimer from '$lib/ui/DialogTimer.svelte';
 	import ScoreSheet, {
 		type HandRecord,
 		type SeatInfo,
@@ -837,7 +838,11 @@
 			<div class="faan-overlay" data-testid="faan-overlay">
 				{#key gameState.handNo}
 					<div class="hand-end-timer">
-						<TimerRing durationMs={gameState.handEndHoldMs ?? 0} size={40} />
+						<DialogTimer
+							durationMs={gameState.handEndHoldMs ?? 0}
+							size={40}
+							onClose={dismissHandEnd}
+						/>
 					</div>
 				{/key}
 				<div class="panel">

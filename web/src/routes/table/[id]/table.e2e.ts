@@ -41,6 +41,19 @@ test('switching to the claim-window scenario surfaces claim buttons, and choosin
 	await expect(page.getByTestId('claim-choice')).toHaveText('chose: win');
 });
 
+test('leaving the claim window untouched auto-passes once its timer runs out', async ({ page }) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Claim window open (you)' }).click();
+	const overlay = page.getByTestId('claim-overlay');
+	await expect(overlay).toBeVisible();
+
+	// claimWindowOpenForYou's fixed durationMs is 5000ms (mock-game-state.ts) -- no click, just
+	// wait it out to prove the dialog's own timer (not a manual choice) fires the pass.
+	await expect(page.getByTestId('claim-choice')).toHaveText('chose: pass', { timeout: 7000 });
+});
+
 test('switching to the hand-ended scenario shows the faan breakdown', async ({ page }) => {
 	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
@@ -82,6 +95,21 @@ test('dismissing the hand-end hold in mock mode closes it locally with no socket
 	// switching scenarios resets the local dismiss -- a fresh hand-end always starts open.
 	await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
 	await expect(page.getByTestId('faan-overlay')).toBeVisible();
+});
+
+test('leaving the hand-end hold untouched auto-closes it once its timer runs out', async ({
+	page
+}) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Hand just ended' }).click();
+	const overlay = page.getByTestId('faan-overlay');
+	await expect(overlay).toBeVisible();
+
+	// handJustEnded's fixed handEndHoldMs is 8000ms (mock-game-state.ts) -- no Close click, just
+	// wait it out to prove the dialog's own timer dismisses it the same way the button would.
+	await expect(overlay).toHaveCount(0, { timeout: 10000 });
 });
 
 test('phone-width viewport applies the sub-768px collapse to the self hand region', async ({
