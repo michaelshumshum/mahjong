@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import FaanBreakdown from './FaanBreakdown.svelte';
-import type { FaanPattern, Payments } from './FaanBreakdown.svelte';
+import type { FaanPattern, Payments, WinningMeld } from './FaanBreakdown.svelte';
 
 describe('FaanBreakdown', () => {
 	const patterns: FaanPattern[] = [
@@ -66,5 +66,50 @@ describe('FaanBreakdown', () => {
 			props: { winner: 3, winningHand: [], patterns, totalFaan: 5, payments: { 3: 24, 1: -24 } }
 		});
 		expect(body).toContain('North wins');
+	});
+
+	it('sorts the concealed hand by suit and rank regardless of wire order', () => {
+		const { body } = render(FaanBreakdown, {
+			props: {
+				winner: 2,
+				winningHand: ['9s', '1m', 'z5', '1s', '5p'],
+				patterns,
+				totalFaan: 5,
+				payments
+			}
+		});
+		const order = [...body.matchAll(/alt="([^"]+) tile"/g)].map((m) => m[1]);
+		expect(order).toEqual(['1m', '5p', '1s', '9s', 'z5']);
+	});
+
+	it('renders claimed melds separately from, and before, the concealed hand', () => {
+		const melds: WinningMeld[] = [{ kind: 'pung', tiles: ['9s', '9s', '9s'] }];
+		const { body } = render(FaanBreakdown, {
+			props: { winner: 2, winningHand: ['1m', '2m', '3m'], melds, patterns, totalFaan: 5, payments }
+		});
+		expect(body).toMatch(/class="melds\b/);
+		expect(body).toMatch(/class="concealed-hand\b/);
+		expect(body).toContain('Claimed');
+		expect(body).toContain('In hand');
+		const order = [...body.matchAll(/alt="([^"]+) tile"/g)].map((m) => m[1]);
+		expect(order).toEqual(['9s', '9s', '9s', '1m', '2m', '3m']);
+	});
+
+	it('omits the claimed/in-hand labels when there are no claimed melds', () => {
+		const { body } = render(FaanBreakdown, {
+			props: { winner: 2, winningHand: ['1m', '2m', '3m'], patterns, totalFaan: 5, payments }
+		});
+		expect(body).not.toMatch(/class="melds\b/);
+		expect(body).not.toContain('Claimed');
+		expect(body).not.toContain('In hand');
+	});
+
+	it('renders a concealed_kong meld as backs, matching the in-play convention', () => {
+		const melds: WinningMeld[] = [{ kind: 'concealed_kong', tiles: ['z1', 'z1', 'z1', 'z1'] }];
+		const { body } = render(FaanBreakdown, {
+			props: { winner: 2, winningHand: [], melds, patterns, totalFaan: 5, payments }
+		});
+		expect(body).toContain('concealed tile');
+		expect(body).not.toContain('alt="z1 tile"');
 	});
 });

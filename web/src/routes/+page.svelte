@@ -8,7 +8,11 @@
 	import type { TileCode } from '$lib/table/tile-code';
 	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 	import TimerRing from '$lib/ui/TimerRing.svelte';
-	import FaanBreakdown, { type FaanPattern, type Payments } from '$lib/ui/FaanBreakdown.svelte';
+	import FaanBreakdown, {
+		type FaanPattern,
+		type Payments,
+		type WinningMeld
+	} from '$lib/ui/FaanBreakdown.svelte';
 	import ScoreSheet, {
 		type HandRecord,
 		type SeatInfo,
@@ -104,6 +108,10 @@
 		{ name: 'No Flowers', faan: 1 }
 	];
 	const cappedPayments: Payments = { 0: -64, 1: -64, 2: 192, 3: -64 };
+	// one of the four pungs was claimed off a discard earlier in the hand -- All Pungs doesn't
+	// care whether a set is concealed or exposed, so this stays a valid capped hand while also
+	// exercising FaanBreakdown's claimed/in-hand split.
+	const cappedMelds: WinningMeld[] = [{ kind: 'pung', tiles: ['1s', '1s', '1s'] }];
 
 	// ScoreSheet demo (this sub-task): mock score/game_end data — like hand_end above, still
 	// doc-only sketches with no server model yet (docs/02-protocol.md §3). EAST_ONLY (一圈,
@@ -240,22 +248,8 @@
 		/>
 		<FaanBreakdown
 			winner={2}
-			winningHand={[
-				'1s',
-				'1s',
-				'1s',
-				'3s',
-				'3s',
-				'3s',
-				'5s',
-				'5s',
-				'5s',
-				'7s',
-				'7s',
-				'7s',
-				'9s',
-				'9s'
-			]}
+			winningHand={['3s', '3s', '3s', '5s', '5s', '5s', '7s', '7s', '7s', '9s', '9s']}
+			melds={cappedMelds}
 			patterns={cappedPatterns}
 			totalFaan={10}
 			payments={cappedPayments}

@@ -270,7 +270,7 @@ export const handJustEnded: MockGameState = {
 		}),
 		emptySeat(2, {
 			concealedCount: 0,
-			melds: [],
+			melds: [{ kind: 'chow', tiles: ['2s', '3s', '4s'], fromSeat: 1 }],
 			discards: ['9m', '1p', '5s'],
 			flowers: ['f2'],
 			score: 10 + 48
@@ -285,22 +285,9 @@ export const handJustEnded: MockGameState = {
 		outcome: 'win',
 		winner: 2,
 		winType: 'self_draw',
-		winningHand: [
-			'1s',
-			'2s',
-			'3s',
-			'4s',
-			'5s',
-			'6s',
-			'7s',
-			'8s',
-			'9s',
-			'2s',
-			'3s',
-			'4s',
-			'z5',
-			'z5'
-		],
+		// concealed portion only -- the meld's 2s-3s-4s chow (seat 2's `melds` above) was already
+		// claimed earlier in the hand, so it's not part of the concealed tiles at hand-end.
+		winningHand: ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', 'z5', 'z5'],
 		patterns: [
 			{ name: 'All Sequences', faan: 1 },
 			{ name: 'No Flowers', faan: 1 },

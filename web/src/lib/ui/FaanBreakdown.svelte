@@ -4,6 +4,16 @@
 
 	export type Seat = 0 | 1 | 2 | 3;
 
+	// mirrors melds.MeldKind, minus PAIR (mock-game-state.ts's MockMeld) -- kept as a local type
+	// rather than importing MockMeld itself, since this component only needs `kind`/`tiles`, not
+	// the seat-relative fixture shape.
+	export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong';
+
+	export interface WinningMeld {
+		kind: MeldKind;
+		tiles: TileCode[];
+	}
+
 	export interface FaanPattern {
 		name: string;
 		faan: number;
@@ -22,16 +32,40 @@
 	let {
 		winner,
 		winningHand,
+		melds = [],
 		patterns,
 		totalFaan,
 		payments
 	}: {
 		winner: Seat;
 		winningHand: TileCode[];
+		melds?: WinningMeld[];
 		patterns: FaanPattern[];
 		totalFaan: number;
 		payments: Payments;
 	} = $props();
+
+	// reading order within a suit (docs/01-rules-spec.md §1's index layout: m, p, s, then
+	// honors) -- winningHand/meld tiles arrive in claim/draw order, not sorted, so the raw wire
+	// order would scatter identical/sequential tiles across the display.
+	const SUIT_ORDER: Record<string, number> = { m: 0, p: 1, s: 2 };
+	function tileSortKey(code: TileCode): number {
+		return code[0] === 'z'
+			? 30 + Number(code[1])
+			: (SUIT_ORDER[code[1]] ?? 9) * 9 + Number(code[0]);
+	}
+	function sortTiles(tiles: TileCode[]): TileCode[] {
+		return tiles.slice().sort((a, b) => tileSortKey(a) - tileSortKey(b));
+	}
+
+	// melds themselves sorted by their first tile too, so a hand with several claimed sets reads
+	// left-to-right in the same suit order as the concealed tiles beside them.
+	let sortedMelds = $derived(
+		melds
+			.map((meld) => ({ ...meld, tiles: sortTiles(meld.tiles) }))
+			.sort((a, b) => tileSortKey(a.tiles[0]) - tileSortKey(b.tiles[0]))
+	);
+	let sortedConcealedHand = $derived(sortTiles(winningHand));
 
 	// docs/01-rules-spec.md §7 clamps the total to `RuleSet.faan_cap` server-side ("Total is
 	// clamped") but still reports every matched pattern at its full value — comparing the raw
@@ -50,11 +84,34 @@
 <section class="faan-breakdown" aria-labelledby="faan-breakdown-heading">
 	<h2 id="faan-breakdown-heading">{SEAT_LABEL[winner]} wins</h2>
 
-	{#if winningHand.length > 0}
+	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
 		<div class="winning-hand">
-			{#each winningHand as code, index (`${index}:${code}`)}
-				<div class="tile"><TileFace {code} /></div>
-			{/each}
+			{#if sortedMelds.length > 0}
+				<div class="tile-group">
+					<span class="group-label">Claimed</span>
+					<div class="melds">
+						{#each sortedMelds as meld, mi (mi)}
+							<div class="meld">
+								{#each meld.tiles as code, ti (`${mi}:${ti}:${code}`)}
+									<div class="tile">
+										<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+									</div>
+								{/each}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+			{#if sortedConcealedHand.length > 0}
+				<div class="tile-group">
+					{#if sortedMelds.length > 0}<span class="group-label">In hand</span>{/if}
+					<div class="concealed-hand">
+						{#each sortedConcealedHand as code, index (`${index}:${code}`)}
+							<div class="tile"><TileFace {code} /></div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -108,8 +165,31 @@
 
 	.winning-hand {
 		display: flex;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
+	.tile-group {
+		display: flex;
+		flex-direction: column;
 		gap: var(--space-1);
+	}
+
+	.group-label {
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+	}
+
+	.melds,
+	.concealed-hand {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+
+	.meld {
+		display: flex;
+		gap: 2px;
 	}
 
 	.tile :global(.tile-face) {

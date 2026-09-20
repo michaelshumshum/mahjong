@@ -846,6 +846,7 @@
 						<FaanBreakdown
 							winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
 							winningHand={gameState.handResult.winningHand ?? []}
+							melds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
 							patterns={gameState.handResult.patterns ?? []}
 							totalFaan={gameState.handResult.totalFaan ?? 0}
 							payments={gameState.handResult.payments ?? {}}
