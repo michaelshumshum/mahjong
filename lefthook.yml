@@ -1,38 +1,29 @@
-# the single installed git hook manager for this repo (see .pre-commit-config.yaml —
-# that file is invoked by the "server" job below, never installed on its own).
 pre-commit:
   parallel: true
   jobs:
-    # oxlint only understands JS/TS/Svelte(-script); oxfmt covers a much wider set
-    # (json/scss/css/md included) — kept as separate jobs so a JSON-only change
-    # doesn't make oxlint fail with "no files found to lint".
     - name: web-lint
       root: "web/"
       glob: "*.{js,ts,svelte}"
       run: pnpm exec oxlint {staged_files}
 
-    # exclude must be a glob, not a bare filename: {staged_files} renders top-level
-    # matches as "./AGENTS.md", and a bare "AGENTS.md" pattern silently never matched
-    # it — oxfmt's own ignorePatterns was doing the real exclusion invisibly, which
-    # only broke visibly once AGENTS.md was the *only* file the glob matched.
     - name: web-format
       root: "web/"
       glob: "*.{js,ts,svelte,json,scss,css,md}"
       exclude: "**/AGENTS.md"
       run: pnpm exec oxfmt --check {staged_files}
 
-    # svelte-check type-checks the whole project graph, not just staged files (unlike
-    # oxlint/oxfmt above) — there's no meaningful "staged files only" mode for a type
-    # checker, so {staged_files} is never used here. Triggered by the same glob as
-    # web-lint; slower than the other web jobs since it always walks the full project.
     - name: web-typecheck
       root: "web/"
       glob: "*.{js,ts,svelte}"
       run: pnpm check
 
-    - name: server
-      glob: "server/**"
-      run: uv run --project server pre-commit run --config .pre-commit-config.yaml --files {staged_files}
+    - name: server-format
+      glob: "server/**/*.py"
+      run: cd server && uv run ruff format {staged_files}
+
+    - name: server-check
+      glob: "server/**/*.py"
+      run: cd server && uv run ruff check {staged_files}
 
 commit-msg:
   commands:
