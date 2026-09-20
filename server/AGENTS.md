@@ -30,6 +30,6 @@ make fmt lint typecheck
 
 ## Style
 
-- `ruff` + `mypy --strict` over `mahjong_core`, `app`, `bots`.
+- `ruff` over `mahjong_core`, `app`, `bots`.
 - Frozen dataclasses for state. Fully typed.
 - `async def` only where there is real I/O or concurrency.

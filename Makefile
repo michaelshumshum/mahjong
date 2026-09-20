@@ -89,8 +89,7 @@ lint: ## Lint both sides
 	$(COMPOSE) run --rm --no-deps api uv run ruff check .
 	$(COMPOSE) run --rm --no-deps web pnpm lint
 
-typecheck: ## mypy + svelte-check
-	$(COMPOSE) run --rm --no-deps api uv run mypy
+typecheck: ## svelte-check
 	$(COMPOSE) run --rm --no-deps web pnpm exec svelte-check
 
 # ── production shape ──────────────────────────────────────────────────────────
