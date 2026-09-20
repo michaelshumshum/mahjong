@@ -18,12 +18,14 @@ pre-commit:
       run: pnpm check
 
     - name: server-format
-      glob: "server/**/*.py"
-      run: cd server && uv run ruff format {staged_files}
+      root: "server/"
+      glob: "*.py"
+      run: uv run ruff format {staged_files}
 
     - name: server-check
-      glob: "server/**/*.py"
-      run: cd server && uv run ruff check {staged_files}
+      root: "server/"
+      glob: "*.py"
+      run: uv run ruff check {staged_files}
 
 commit-msg:
   commands:
