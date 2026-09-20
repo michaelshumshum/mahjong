@@ -21,6 +21,15 @@ pre-commit:
       exclude: "**/AGENTS.md"
       run: pnpm exec oxfmt --check {staged_files}
 
+    # svelte-check type-checks the whole project graph, not just staged files (unlike
+    # oxlint/oxfmt above) — there's no meaningful "staged files only" mode for a type
+    # checker, so {staged_files} is never used here. Triggered by the same glob as
+    # web-lint; slower than the other web jobs since it always walks the full project.
+    - name: web-typecheck
+      root: "web/"
+      glob: "*.{js,ts,svelte}"
+      run: pnpm check
+
     - name: server
       glob: "server/**"
       run: uv run --project server pre-commit run --config .pre-commit-config.yaml --files {staged_files}
