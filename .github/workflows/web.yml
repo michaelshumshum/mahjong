@@ -1,0 +1,35 @@
+name: web
+
+on:
+  workflow_call:
+
+jobs:
+  web:
+    name: lint + typecheck + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # one job, sequential steps sharing the installed node_modules -- lint/typecheck/test
+      # have no dependency on each other's *output*, but splitting them into separate jobs
+      # would mean paying `pnpm install` three times (or plumbing an artifact between jobs)
+      # for no real gain.
+      - name: lint
+        working-directory: web
+        run: pnpm lint
+      - name: type check
+        working-directory: web
+        run: pnpm check
+      - name: Install Playwright browsers
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: test
+        working-directory: web
+        run: pnpm test

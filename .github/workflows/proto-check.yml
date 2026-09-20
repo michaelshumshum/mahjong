@@ -1,0 +1,36 @@
+name: proto-check
+
+on:
+  workflow_call:
+
+jobs:
+  proto-check:
+    name: proto-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.4.2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - working-directory: server
+        run: uv sync --locked
+      - run: pnpm install --frozen-lockfile
+      # native equivalent of `make proto` (avoids spinning up docker compose for a
+      # generator that only needs uv + pnpm) followed by `make proto-check`'s diff gate.
+      - working-directory: server
+        run: >
+          uv run python -m tools.gen_protocol
+          --ts-out ../web/src/lib/net/protocol.d.ts
+          --schema-out ../shared/protocol.schema.json
+      - working-directory: web
+        run: pnpm exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts
+      - run: >
+          git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts
+          || (echo "Protocol types changed — run 'make proto' and commit them." && exit 1)
