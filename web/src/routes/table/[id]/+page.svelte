@@ -9,10 +9,10 @@
 		type Seat
 	} from '$lib/table/mock-game-state';
 	import { tileIdToCode } from '$lib/table/tile-code';
-	import { viewFromClientState, wireWindToCode } from '$lib/table/live-view';
+	import { meldToView, viewFromClientState, wireWindToCode } from '$lib/table/live-view';
 	import { MahjongSocket, defaultWsUrl } from '$lib/net/socket';
 	import { GameStore } from '$lib/game/store.svelte';
-	import type { ClientGameState, ConnectionStatus } from '$lib/game/state';
+	import type { ClientGameState, ConnectionStatus, HandHistoryEntry } from '$lib/game/state';
 	import type { ServerEvent } from '$lib/net/protocol';
 	import ClaimDialog from '$lib/ui/ClaimDialog.svelte';
 	import type { ClaimOption } from '$lib/ui/ClaimButtons.svelte';
@@ -21,10 +21,12 @@
 	import DialogTimer from '$lib/ui/DialogTimer.svelte';
 	import ScoreSheet, {
 		type HandRecord,
+		type RoundResult,
 		type SeatInfo,
 		type Standing,
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
+	import GameEndScreen from '$lib/ui/GameEndScreen.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 	import {
 		loadAutoArm,
@@ -431,27 +433,71 @@
 	let scoreTotals: Totals = $derived(
 		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.score])) as Totals
 	);
-	// Mock path: MOCK_SCENARIOS is always one frozen, already-dealt hand (no real hand_end
-	// stream behind it), so a single row synthesized from the current snapshot is the correct
-	// (and only possible) rendering here — unchanged by the live-history work below.
+	// this hand's per-round detail (ScoreSheet's expandable-row capability): `null` for a mock's
+	// single synthesized row when the frozen scenario has no `handResult` (mid-game scenarios),
+	// otherwise built straight off the same fields the live FaanBreakdown overlay above reads.
+	function mockRoundResult(): RoundResult | undefined {
+		const result = gameState.handResult;
+		if (!result) return undefined;
+		if (result.outcome !== 'win') return { outcome: 'exhaustive_draw' };
+		return {
+			outcome: 'win',
+			winner: result.winner,
+			winningHand: result.winningHand ?? [],
+			melds: gameState.seats[result.winner!]?.melds ?? [],
+			patterns: result.patterns ?? [],
+			totalFaan: result.totalFaan ?? 0,
+			payments: result.payments ?? {}
+		};
+	}
+
+	// past-round detail off `HandHistoryEntry` (lib/game/state.ts): `winnerMelds`/`winningHand`
+	// are real tile_ids, converted here the same way `live-view.ts`'s own seat mapping does
+	// (`meldToView`/`tileIdToCode`) — this is the one place a *past* round's full winning hand
+	// (melds included, not just the concealed tiles) is reconstructed, since `state.melds` itself
+	// has long since reset by the time a player looks at game-end history (state.ts's
+	// `winnerMelds` doc).
+	function liveRoundResult(h: HandHistoryEntry): RoundResult | undefined {
+		if (h.outcome !== 'win' || h.winner === null) {
+			return h.outcome === 'exhaustive_draw' ? { outcome: 'exhaustive_draw' } : undefined;
+		}
+		return {
+			outcome: 'win',
+			winner: h.winner as RoundResult['winner'],
+			winningHand: h.winningHand ? h.winningHand.map(tileIdToCode) : [],
+			melds: h.winnerMelds ? h.winnerMelds.map(meldToView) : [],
+			patterns: h.faanBreakdown
+				? Object.entries(h.faanBreakdown).map(([name, faan]) => ({ name, faan }))
+				: [],
+			totalFaan: h.faan ?? 0,
+			payments: (h.payments ?? {}) as RoundResult['payments']
+		};
+	}
+
+	// Mock path: either a fixed multi-hand `gameEnd` fixture (the one scenario that's actually
+	// reached game end, `mock-game-state.ts`), or -- every other scenario -- one frozen,
+	// already-dealt hand with no real `hand_end` stream behind it, so a single row synthesized
+	// from the current snapshot is the correct (and only possible) rendering.
 	// Live path: real accumulated history off `handHistory` (lib/game/state.ts), built by
 	// lib/net/reducer.ts from every `hand_end` this session has actually seen — growing across a
 	// live multi-hand game rather than showing just the latest hand.
 	let scoreHands: HandRecord[] = $derived(
 		isMock
-			? [
+			? (gameState.gameEnd?.rounds ?? [
 					{
 						handNo: gameState.handNo,
 						dealer: gameState.dealer as HandRecord['dealer'],
 						prevailing: gameState.prevailing,
-						deltas: gameState.handResult?.payments ?? {}
+						deltas: gameState.handResult?.payments ?? {},
+						result: mockRoundResult()
 					}
-				]
+				])
 			: (liveStore?.state.handHistory.map((h): HandRecord => ({
 					handNo: h.handNo,
 					dealer: h.dealer as HandRecord['dealer'],
 					prevailing: wireWindToCode(h.prevailing),
-					deltas: (h.payments ?? {}) as HandRecord['deltas']
+					deltas: (h.payments ?? {}) as HandRecord['deltas'],
+					result: liveRoundResult(h)
 				})) ?? [])
 	);
 
@@ -459,14 +505,29 @@
 	// `{hand_no, scores}` — absolute final totals, no placement rules. Ranking by raw total is
 	// the "straightforward" case ScoreSheet.svelte's `standings` doc comment calls out; anything
 	// beyond that (tiebreak rules, etc.) isn't specified on the wire, so this doesn't invent one
-	// beyond a deterministic seat-order tiebreak. Mock path never has a real `game_end`, so this
-	// stays unset there, same as before.
+	// beyond a deterministic seat-order tiebreak. Mock path reuses the one `gameEnd` scenario's
+	// own fixed standings instead (there's no real `game_end` event behind it to derive from).
 	let scoreStandings: Standing[] | undefined = $derived(
-		!isMock && liveStore?.state.gameEnd
-			? liveStore.state.gameEnd.scores
-					.map((total, seat) => ({ seat: seat as Standing['seat'], total }))
-					.sort((a, b) => b.total - a.total || a.seat - b.seat)
-			: undefined
+		isMock
+			? gameState.gameEnd?.standings
+			: liveStore?.state.gameEnd
+				? liveStore.state.gameEnd.scores
+						.map((total, seat) => ({ seat: seat as Standing['seat'], total }))
+						.sort((a, b) => b.total - a.total || a.seat - b.seat)
+				: undefined
+	);
+
+	// the actual game-end trigger (scope item 1): once real, this replaces the last hand's own
+	// hold-and-ack overlay rather than following it. On the wire, `game_end` only ever fires
+	// *after* that hold has already resolved (every seat acked, or the hold's own timeout) --
+	// `app/table.py`'s `_apply`/`_advance_to_next_hand`, which is what actually calls
+	// `start_next_hand()` (the only place `GameEnded` is produced) -- so there's no real "still
+	// mid-hold" moment this ever preempts. But the client-side hold overlay has no other way to
+	// know that hold is over: it normally clears on the *next* `hand_start` (reducer.ts), and for
+	// the final hand there isn't one -- left alone, `gameState.handResult` would stay truthy
+	// forever. Gating the hold overlay on `!gameEndReached` (below) is what actually closes it.
+	let gameEndReached = $derived(
+		isMock ? gameState.gameEnd != null : liveStore?.state.gameEnd != null
 	);
 
 	// Persisted to localStorage (lib/ui/settings-storage.ts) so a reload doesn't reset either
@@ -903,7 +964,7 @@
 			</div>
 		{/if}
 
-		{#if gameState.handResult && !(isMock && mockHandEndDismissed)}
+		{#if gameState.handResult && !gameEndReached && !(isMock && mockHandEndDismissed)}
 			<div class="faan-overlay" data-testid="faan-overlay">
 				{#key gameState.handNo}
 					<div class="hand-end-timer">
@@ -931,6 +992,19 @@
 							<p>Draw</p>
 						</section>
 					{/if}
+				</div>
+			</div>
+		{/if}
+
+		{#if gameEndReached && scoreStandings}
+			<div class="panel-overlay" data-testid="game-end-overlay">
+				<div class="panel">
+					<GameEndScreen
+						seats={scoreSeats}
+						totals={scoreTotals}
+						hands={scoreHands}
+						standings={scoreStandings}
+					/>
 				</div>
 			</div>
 		{/if}

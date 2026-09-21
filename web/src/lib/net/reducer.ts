@@ -360,7 +360,11 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				// state.dealer/prevailing are still this hand's values, since only hand_start (which
 				// always precedes the matching hand_end) changes them.
 				dealer: state.dealer,
-				prevailing: state.prevailing
+				prevailing: state.prevailing,
+				// snapshotted now, not read later off `state.melds` -- the next `hand_start` clears
+				// that array (state.ts's `HandHistoryEntry.winnerMelds` doc), so this is the only
+				// point where the winner's melds are still available to capture for history.
+				winnerMelds: d.winner !== null ? state.melds[d.winner].slice() : null
 			};
 			// socket.ts already drops a replayed frame by seq before it reaches here (a frame with
 			// seq <= lastSeq never dispatches); this is defense in depth against the same hand_no

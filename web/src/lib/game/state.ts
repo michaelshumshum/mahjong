@@ -51,6 +51,15 @@ export interface GameEndState {
 export interface HandHistoryEntry extends HandEndState {
 	dealer: number;
 	prevailing: string;
+	/** The winning seat's `melds` at the moment `hand_end` fired, snapshotted off
+	 * `ClientGameState.melds[winner]` — `null` for a non-win outcome. `state.melds` resets on
+	 * the next `hand_start` and the live hand-end overlay reads it straight off `gameState.seats`
+	 * (`+page.svelte`'s `FaanBreakdown` invocation), which is fine for the *just-finished* hand
+	 * but leaves nothing for a past round once another hand has been dealt. `hand_end`'s own wire
+	 * payload has no meld field (only `winning_hand`, the concealed portion) — this is a client-
+	 * side capture, not a wire gap, so a game-end summary can still show every past round's full
+	 * winning hand (melds + concealed tiles), not just the latest one. */
+	winnerMelds: MeldState[] | null;
 }
 
 export interface ClientGameState {

@@ -1,5 +1,11 @@
 <script lang="ts">
-	import type { Seat } from './FaanBreakdown.svelte';
+	import FaanBreakdown, {
+		type FaanPattern,
+		type Payments,
+		type Seat,
+		type WinningMeld
+	} from './FaanBreakdown.svelte';
+	import type { TileCode } from '../table/tile-code';
 
 	export type Wind = 'E' | 'S' | 'W' | 'N';
 
@@ -21,6 +27,22 @@
 		dealer: Seat;
 		prevailing: Wind;
 		deltas: Partial<Record<Seat, number>>;
+		/** Optional per-round detail (the game-end summary's "more detail per round" — a caller
+		 * with nothing to show for a round, e.g. the mid-game manual toggle's mock-single-row
+		 * case, just omits this). Present, this round's row becomes expandable: clicking it
+		 * reveals the winning hand (win) or a plain draw note (exhaustive draw) inline, reusing
+		 * `FaanBreakdown`'s own tile-rendering rather than a second implementation of it. */
+		result?: RoundResult;
+	}
+
+	export interface RoundResult {
+		outcome: 'win' | 'exhaustive_draw';
+		winner?: Seat;
+		winningHand?: TileCode[];
+		melds?: WinningMeld[];
+		patterns?: FaanPattern[];
+		totalFaan?: number;
+		payments?: Payments;
 	}
 
 	// `score`/`game_end` are real, shipped wire events (docs/02-protocol.md §3;
@@ -81,6 +103,21 @@
 				return last?.[s.seat] === totals[s.seat];
 			})
 	);
+
+	// which rounds' detail panel is open, keyed by handNo — plain component-local presentation
+	// state (docs/03-frontend.md §1's "components own presentation state only"), not game truth.
+	let expandedHands = $state<Set<number>>(new Set());
+
+	function toggleExpanded(handNo: number): void {
+		const next = new Set(expandedHands);
+		if (next.has(handNo)) next.delete(handNo);
+		else next.add(handNo);
+		expandedHands = next;
+	}
+
+	// Hand/Wind/Dealer + two columns per seat -- the exact column count the detail row's colspan
+	// needs to actually span the full table width instead of leaving it under just the first cell.
+	let columnCount = $derived(3 + seats.length * 2);
 </script>
 
 <section class="score-sheet" aria-labelledby="score-sheet-heading">
@@ -106,8 +143,24 @@
 			</thead>
 			<tbody>
 				{#each hands as hand, index (hand.handNo)}
+					{@const isExpanded = expandedHands.has(hand.handNo)}
 					<tr>
-						<td>{hand.handNo}</td>
+						<td>
+							{#if hand.result}
+								<button
+									type="button"
+									class="round-expand"
+									aria-expanded={isExpanded}
+									aria-controls="round-detail-{hand.handNo}"
+									onclick={() => toggleExpanded(hand.handNo)}
+								>
+									<span class="round-expand-icon" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+									{hand.handNo}
+								</button>
+							{:else}
+								{hand.handNo}
+							{/if}
+						</td>
 						<td>{WIND_LABEL[hand.prevailing]}</td>
 						<td>{seatName(hand.dealer)}</td>
 						{#each seats as seat (seat.seat)}
@@ -123,6 +176,24 @@
 							<td class="running">{runningTotals[index][seat.seat]}</td>
 						{/each}
 					</tr>
+					{#if hand.result && isExpanded}
+						<tr class="round-detail-row" id="round-detail-{hand.handNo}">
+							<td colspan={columnCount}>
+								{#if hand.result.outcome === 'win' && hand.result.winner !== undefined}
+									<FaanBreakdown
+										winner={hand.result.winner}
+										winningHand={hand.result.winningHand ?? []}
+										melds={hand.result.melds ?? []}
+										patterns={hand.result.patterns ?? []}
+										totalFaan={hand.result.totalFaan ?? 0}
+										payments={hand.result.payments ?? {}}
+									/>
+								{:else}
+									<p class="draw-note">Exhaustive draw — no winning hand.</p>
+								{/if}
+							</td>
+						</tr>
+					{/if}
 				{/each}
 			</tbody>
 			<tfoot>
@@ -229,6 +300,39 @@
 	}
 
 	.running {
+		color: var(--color-text-muted);
+	}
+
+	.round-expand {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		border: none;
+		background: transparent;
+		padding: 0;
+		color: inherit;
+		font: inherit;
+		font-variant-numeric: tabular-nums;
+		cursor: pointer;
+
+		&:hover {
+			color: var(--color-accent);
+		}
+	}
+
+	.round-expand-icon {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+	}
+
+	.round-detail-row td {
+		padding: var(--space-3) var(--space-2);
+		background: var(--color-bg);
+		text-align: start;
+	}
+
+	.draw-note {
+		margin: 0;
 		color: var(--color-text-muted);
 	}
 

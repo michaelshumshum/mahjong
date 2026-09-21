@@ -54,7 +54,7 @@ stable once they're referenced from `README.md`.
 ## Current notable pages
 
 `lobby`, `demo`, `table-your-turn`, `table-claim-window`, `table-hand-ended`,
-`table-hand-ended-draw`, `table-pregame-connecting`, `table-pregame-join`,
+`table-hand-ended-draw`, `table-game-ended`, `table-pregame-connecting`, `table-pregame-join`,
 `table-pregame-waiting` — see `README.md`'s
 Screenshots section for the embedded images.
 

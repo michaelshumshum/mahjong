@@ -58,6 +58,16 @@ const PAGES = [
 			await page.waitForTimeout(150);
 		}
 	},
+	// Auto-shown once a real `game_end` lands (docs/03-frontend.md §6 "Game-end summary") --
+	// genuinely distinct from `table-hand-ended` above: a full-game score summary with
+	// expandable per-round detail and a link back to the lobby, not a single hand's overlay.
+	{
+		name: 'table-game-ended',
+		url: '/table/demo123?mock=1',
+		async before(page) {
+			await page.getByRole('button', { name: 'Game just ended' }).click();
+		}
+	},
 	// Pre-game states (docs/03-frontend.md's "/table/[id] wiring") only ever occur on the real
 	// `liveStore`-driven path -- `?mock=` always renders a fully-seated, already-dealt table
 	// (`tableReady` is unconditionally true when `isMock`), so there's no MOCK_SCENARIOS entry

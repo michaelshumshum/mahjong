@@ -101,6 +101,39 @@ export interface MockHandResult {
 	payments?: Partial<Record<Seat, number>>;
 }
 
+// mirrors ScoreSheet.svelte's own `RoundResult`, kept as a separate parallel type rather than
+// importing it (same reasoning as `FaanPatternMock` above: this module has no UI-component
+// dependency, mirrors server/mahjong_core shapes only) -- `live-view.ts`'s `meldToView` already
+// does the equivalent tile_id -> `TileCode` conversion for the live path; a mock fixture has
+// no ids to begin with, so it writes `TileCode`s directly, same as `MockHandResult` above.
+export interface MockRoundResult {
+	outcome: HandOutcome;
+	winner?: Seat;
+	winningHand?: TileCode[];
+	melds?: MockMeld[];
+	patterns?: FaanPatternMock[];
+	totalFaan?: number;
+	payments?: Partial<Record<Seat, number>>;
+}
+
+// mirrors ScoreSheet.svelte's `HandRecord`, minus the seat-name resolution ScoreSheet itself
+// does from its own `seats` prop.
+export interface MockScoreRound {
+	handNo: number;
+	dealer: Seat;
+	prevailing: Wind;
+	deltas: Partial<Record<Seat, number>>;
+	result?: MockRoundResult;
+}
+
+// a completed game's full history + final ranking (ScoreSheet's own `standings`) -- present
+// only on the one scenario that's actually reached `game_end` (below); every other scenario is
+// mid-game and has no game-end summary to show.
+export interface MockGameEndSummary {
+	rounds: MockScoreRound[];
+	standings: { seat: Seat; total: number }[];
+}
+
 // mirrors state.GameState, redacted to one seat's point of view. `you` names which seat that
 // is -- always 0 in the scenarios below, but kept as a field (not hardcoded downstream) since
 // the real per-seat redacted stream will vary it.
@@ -126,6 +159,11 @@ export interface MockGameState {
 	// "already-computed remaining ms" shape.
 	turnDurationMs: number | null;
 	you: Seat;
+	/** Set only on the one scenario that's actually reached `game_end` -- `+page.svelte`'s
+	 * `GameEndScreen` wiring reads this the same way it reads `liveStore.state.gameEnd` on the
+	 * live path (docs/03-frontend.md's `/table/[id]` wiring section), so the auto-shown summary
+	 * screen is reachable/screenshot-able with no backend running. */
+	gameEnd?: MockGameEndSummary;
 }
 
 // (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left
@@ -327,6 +365,110 @@ export const handJustEndedDraw: MockGameState = {
 	turnDurationMs: null
 };
 
+// Scenario 5: a full EAST_ONLY game (一圈) just reached `game_end` -- GAME_OVER, no more hold
+// (`handResult`/`handEndHoldMs` null, unlike scenarios 3/4 above: the real wire sequence only
+// ever reaches `game_end` *after* the final hand's own hold has already resolved, docs/03
+// -frontend.md's `/table/[id]` wiring section, so there's no lingering per-hand overlay to show
+// alongside this one). Four hands is EAST_ONLY's minimum length (dealer 0->1->2->3, wrapping
+// back to 0 ends the round): a discard win, a self-draw, an exhaustive draw, and a second
+// discard win, deltas hand-checked to sum to zero per hand and accumulate to `standings`.
+export const gameJustEnded: MockGameState = {
+	phase: 'GAME_OVER',
+	turn: 3,
+	dealer: 3,
+	prevailing: 'E',
+	handNo: 4,
+	wallCount: 0,
+	you: 0,
+	claimWindow: null,
+	handResult: null,
+	handEndHoldMs: null,
+	turnDurationMs: null,
+	seats: [
+		emptySeat(0, { discards: ['1s', '9p', 'z2', '4m'], score: -30 }),
+		emptySeat(1, { discards: ['2p', '3p', '7s'], score: 50 }),
+		emptySeat(2, { discards: ['9m', '1p', '5s'], score: -30 }),
+		emptySeat(3, { discards: ['8p', '2m'], score: 10 })
+	],
+	gameEnd: {
+		rounds: [
+			{
+				handNo: 1,
+				dealer: 0,
+				prevailing: 'E',
+				deltas: { 0: -24, 2: 24 },
+				result: {
+					outcome: 'win',
+					winner: 2,
+					winningHand: ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', 'z5', 'z5'],
+					melds: [{ kind: 'chow', tiles: ['2s', '3s', '4s'] }],
+					patterns: [{ name: 'Half Flush', faan: 3 }],
+					totalFaan: 3,
+					payments: { 0: -24, 2: 24 }
+				}
+			},
+			{
+				handNo: 2,
+				dealer: 1,
+				prevailing: 'E',
+				deltas: { 0: -16, 1: 48, 2: -16, 3: -16 },
+				result: {
+					outcome: 'win',
+					winner: 1,
+					winningHand: [
+						'z1',
+						'z1',
+						'z1',
+						'z2',
+						'z2',
+						'z2',
+						'z3',
+						'z3',
+						'z3',
+						'z4',
+						'z4',
+						'z4',
+						'z6'
+					],
+					patterns: [
+						{ name: 'Self-Draw', faan: 1 },
+						{ name: 'All Pungs', faan: 3 }
+					],
+					totalFaan: 4,
+					payments: { 0: -16, 1: 48, 2: -16, 3: -16 }
+				}
+			},
+			{
+				handNo: 3,
+				dealer: 2,
+				prevailing: 'E',
+				deltas: { 0: 10, 1: 10, 2: -30, 3: 10 },
+				result: { outcome: 'exhaustive_draw' }
+			},
+			{
+				handNo: 4,
+				dealer: 3,
+				prevailing: 'E',
+				deltas: { 1: -8, 2: -8, 3: 16 },
+				result: {
+					outcome: 'win',
+					winner: 3,
+					winningHand: ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', 'z7', 'z7'],
+					patterns: [{ name: 'Chicken Hand', faan: 1 }],
+					totalFaan: 1,
+					payments: { 1: -8, 2: -8, 3: 16 }
+				}
+			}
+		],
+		standings: [
+			{ seat: 1, total: 50 },
+			{ seat: 3, total: 10 },
+			{ seat: 0, total: -30 },
+			{ seat: 2, total: -30 }
+		]
+	}
+};
+
 export interface MockScenario {
 	id: string;
 	label: string;
@@ -337,5 +479,6 @@ export const MOCK_SCENARIOS: MockScenario[] = [
 	{ id: 'your-turn', label: 'Your turn to discard', state: yourTurnToDiscard },
 	{ id: 'claim-window', label: 'Claim window open (you)', state: claimWindowOpenForYou },
 	{ id: 'hand-ended', label: 'Hand just ended', state: handJustEnded },
-	{ id: 'hand-ended-draw', label: 'Hand ended in a draw', state: handJustEndedDraw }
+	{ id: 'hand-ended-draw', label: 'Hand ended in a draw', state: handJustEndedDraw },
+	{ id: 'game-ended', label: 'Game just ended', state: gameJustEnded }
 ];

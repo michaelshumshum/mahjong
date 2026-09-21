@@ -61,3 +61,44 @@ test('toast demo: a short-duration toast auto-dismisses without manual interacti
 	await expect(toast).toBeVisible();
 	await expect(toast).toHaveCount(0, { timeout: 3000 });
 });
+
+test('score sheet demo: expanding a win round reveals its winning hand, a draw round shows no winning hand', async ({
+	page
+}) => {
+	await page.goto('/demo');
+	await page.waitForLoadState('networkidle');
+
+	const scoreSheet = page.locator('.score-sheet');
+	// row order is deterministic (hand 1, 2, 3, 4) -- indexing by row avoids matching a
+	// substring of some other row's delta/running-total figures (e.g. "2" inside "-24").
+	const rows = scoreSheet.locator('tbody tr');
+
+	// hand 2 (row index 1) has no per-round detail -- no expand affordance for it at all.
+	await expect(rows.nth(1).locator('.round-expand')).toHaveCount(0);
+
+	// hand 1 (row index 0): a real win -- expanding reveals FaanBreakdown's own tile rendering
+	// (melds + concealed hand) and pattern/payment detail, not a second, separately-implemented
+	// display.
+	const round1Toggle = rows.nth(0).locator('.round-expand');
+	await expect(scoreSheet.locator('#round-detail-1')).toHaveCount(0);
+	await round1Toggle.click();
+	const detail1 = scoreSheet.locator('#round-detail-1');
+	await expect(detail1).toBeVisible();
+	await expect(detail1).toContainText('West wins');
+	await expect(detail1).toContainText('Half Flush');
+	await expect(detail1.locator('.tile')).not.toHaveCount(0);
+	await expect(round1Toggle).toHaveAttribute('aria-expanded', 'true');
+
+	// collapsing hides it again.
+	await round1Toggle.click();
+	await expect(scoreSheet.locator('#round-detail-1')).toHaveCount(0);
+	await expect(round1Toggle).toHaveAttribute('aria-expanded', 'false');
+
+	// hand 3 (row index 2): an exhaustive draw -- expandable, but with a plain note instead of a
+	// winning hand.
+	const round3Toggle = rows.nth(2).locator('.round-expand');
+	await round3Toggle.click();
+	const detail3 = scoreSheet.locator('#round-detail-3');
+	await expect(detail3).toContainText('Exhaustive draw');
+	await expect(detail3.locator('.tile')).toHaveCount(0);
+});

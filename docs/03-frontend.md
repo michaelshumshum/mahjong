@@ -404,6 +404,47 @@ Rules:
   into `ScoreSheet`'s `HandRecord[]`; the mock path (`MOCK_SCENARIOS`) still synthesizes a single
   row from the current snapshot, unaffected — a mock scenario is always one frozen, already-dealt
   hand with no real `hand_end` stream behind it.
+  - **`HandHistoryEntry.winnerMelds`** snapshots `state.melds[winner]` at the exact moment
+    `hand_end` fires (`null` for a non-win outcome). `hand_end`'s own wire payload only carries
+    `winning_hand` (the winner's *concealed* tiles) — the winner's melds are never redacted, so
+    the live hand-end overlay just reads them straight off `gameState.seats[winner].melds`
+    (`+page.svelte`'s `FaanBreakdown` invocation) at the moment it renders. That live seat data
+    resets on the next `hand_start`, so it's gone by the time a player looks at a *past* round in
+    a game-end summary — `winnerMelds` is the client-side capture that keeps it around past the
+    hand it belonged to. Not a wire gap: nothing here needed a protocol change.
+
+### Game-end summary
+
+`ClientGameState.gameEnd` (from the terminal `game_end` event) triggers an auto-shown, non-
+dismissable screen (`GameEndScreen.svelte`) once the game is genuinely over — unlike the per-hand
+hold overlay, there's no next hand to advance back into. On the wire, `game_end` only ever fires
+*after* the final hand's own hold has already resolved (every seat acked, or the hold's own
+timeout — `app/table.py`'s `_apply`/`_open_hand_end_window`/`_advance_to_next_hand`, which is the
+only path that calls `start_next_hand()`, the sole producer of `GameEnded`). So the game-end
+screen doesn't preempt anything genuinely still in progress — but the client's own hold overlay
+has no other way to know that hold is over (it normally clears on the *next* `hand_start`, and
+there isn't one for the final hand), so `+page.svelte` gates that overlay on `!gameEndReached` and
+lets the game-end screen replace it outright once `gameEnd` lands.
+
+`GameEndScreen` reuses `ScoreSheet` wholesale (score table, running totals, `standings`) rather
+than a second table implementation, adding only the "game over" framing and a plain `<a href="/">`
+back to the home page — the game is over, and the home page's create/join/practice panels already
+cover starting a new one; no dedicated rematch/new-game flow.
+
+`ScoreSheet.svelte` itself grew an optional per-round expand: `HandRecord.result` (a
+`RoundResult`), when present, turns that row's hand number into a toggle button revealing the
+round's winning hand inline, reusing `FaanBreakdown`'s own tile rendering rather than a second
+implementation of it — or a plain "Exhaustive draw" note when the round has no winner. One
+capability serves both call sites: the manual mid-game "Score sheet" toggle (`+page.svelte`'s
+`mockRoundResult`/current-hand-only detail) and the new auto-shown game-end screen (past rounds,
+`liveRoundResult`, converting `HandHistoryEntry.winnerMelds`/`winningHand` tile_ids to `TileCode`s
+the same way `live-view.ts` already does for the live seats).
+
+The mock path gets its own scenario (`mock-game-state.ts`'s `gameJustEnded`, `?mock=game-ended`):
+a frozen `GAME_OVER` snapshot carrying a `MockGameState.gameEnd` summary (rounds + standings) —
+the one field only this scenario sets, mirroring `liveStore.state.gameEnd` closely enough that
+`+page.svelte`'s `gameEndReached`/`scoreHands`/`scoreStandings` derivations branch on `isMock`
+rather than forking into a second render path.
 
 ### SSR
 

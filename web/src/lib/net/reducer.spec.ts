@@ -506,6 +506,103 @@ describe('reduce', () => {
 		expect(next.handHistory).toEqual([{ ...next.lastHandEnd, dealer: 2, prevailing: 'SOUTH' }]);
 	});
 
+	it("hand_end snapshots the winner's melds off state.melds at the moment it fires", () => {
+		const winnerMelds = [{ kind: 'pung', tiles: [4, 5, 6], count: null, fromSeat: 1 }];
+		const s = state({ melds: [winnerMelds, [], [], []] });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'hand_end',
+			d: {
+				hand_no: 1,
+				outcome: 'win',
+				winner: 0,
+				win_type: 'discard',
+				discarder: 1,
+				faan: 3,
+				faan_breakdown: { chicken_hand: 1 },
+				points: 100,
+				payments: { 0: 300, 1: -300 },
+				revealed: true,
+				winning_hand: [8, 9, 10],
+				deadline_ts: 9000
+			}
+		});
+
+		expect(next.handHistory[0].winnerMelds).toEqual(winnerMelds);
+		// a losing seat's own melds never leak into the winner's history entry.
+		expect(next.handHistory[0].winnerMelds).not.toBe(s.melds[1]);
+	});
+
+	it('winnerMelds is null for an exhaustive draw (no winner to snapshot)', () => {
+		const s = state({
+			melds: [[{ kind: 'chow', tiles: [0, 1, 2], count: null, fromSeat: 1 }], [], [], []]
+		});
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'hand_end',
+			d: {
+				hand_no: 1,
+				outcome: 'exhaustive_draw',
+				winner: null,
+				win_type: null,
+				discarder: null,
+				faan: null,
+				faan_breakdown: null,
+				points: null,
+				payments: null,
+				revealed: false,
+				winning_hand: null,
+				deadline_ts: 9000
+			}
+		});
+
+		expect(next.handHistory[0].winnerMelds).toBeNull();
+	});
+
+	it("winnerMelds survives the next hand_start clearing state.melds, since it's a copy taken at hand_end", () => {
+		const winnerMelds = [{ kind: 'exposed_kong', tiles: [4, 5, 6, 7], count: null, fromSeat: 2 }];
+		let s = state({ melds: [winnerMelds, [], [], []] });
+		s = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'hand_end',
+			d: {
+				hand_no: 1,
+				outcome: 'win',
+				winner: 0,
+				win_type: 'self_draw',
+				discarder: null,
+				faan: 3,
+				faan_breakdown: null,
+				points: 100,
+				payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+				revealed: true,
+				winning_hand: [8, 9, 10],
+				deadline_ts: 9000
+			}
+		});
+		s = reduce(s, {
+			v: 1,
+			ts: 2,
+			seq: 2,
+			t: 'hand_start',
+			d: {
+				hand_no: 2,
+				prevailing: 'E',
+				dealer: 1,
+				seats: ['connected', 'connected', 'connected', 'connected']
+			}
+		});
+
+		expect(s.melds).toEqual([[], [], [], []]);
+		expect(s.handHistory[0].winnerMelds).toEqual(winnerMelds);
+	});
+
 	it('multiple hand_end events across a sequence grow handHistory rather than overwrite it', () => {
 		const handEnd = (handNo: number): ServerEvent => ({
 			v: 1,
@@ -586,7 +683,8 @@ describe('reduce', () => {
 					revealed: true,
 					winningHand: null,
 					dealer: 0,
-					prevailing: 'EAST'
+					prevailing: 'EAST',
+					winnerMelds: null
 				}
 			]
 		});

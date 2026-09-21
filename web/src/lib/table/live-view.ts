@@ -79,7 +79,10 @@ function splitOwnHand(state: ClientGameState): LiveOwnHand {
 	};
 }
 
-function meldToView(m: MeldState): MockMeld {
+/** Exported for `+page.svelte`'s past-round detail mapping (`HandHistoryEntry.winnerMelds`,
+ * state.ts) — the same tile_id -> `TileCode` conversion (and concealed_kong backs placeholder)
+ * this module already needs for the live seats themselves. */
+export function meldToView(m: MeldState): MockMeld {
 	const tiles = m.tiles
 		? m.tiles.map(tileIdToCode)
 		: // another seat's still-concealed concealed_kong: no real tiles to show yet (redacted to

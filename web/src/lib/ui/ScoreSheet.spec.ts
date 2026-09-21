@@ -30,8 +30,12 @@ describe('ScoreSheet', () => {
 		const { body } = render(ScoreSheet, { props: { seats, totals, hands } });
 		const tbody = body.match(/<tbody>[\s\S]*?<\/tbody>/)?.[0] ?? '';
 		expect([...tbody.matchAll(/<tr>/g)]).toHaveLength(hands.length);
+		// none of these hands carry `result`, so the Hand cell's `{#if}` takes the plain-number
+		// branch -- strip the block's own hydration anchor comments before matching, since they
+		// sit between the `<td>` and the digit regardless of which branch actually rendered.
+		const stripped = body.replace(/<!--.*?-->/g, '');
 		for (const hand of hands) {
-			expect(body).toMatch(new RegExp(`<td[^>]*>${hand.handNo}</td>`));
+			expect(stripped).toMatch(new RegExp(`<td[^>]*>${hand.handNo}</td>`));
 		}
 	});
 
@@ -73,5 +77,37 @@ describe('ScoreSheet', () => {
 	it('omits standings when not at game end', () => {
 		const { body } = render(ScoreSheet, { props: { seats, totals, hands } });
 		expect(body).not.toContain('class="standings"');
+	});
+
+	describe('expandable round detail', () => {
+		const winResult: HandRecord['result'] = {
+			outcome: 'win',
+			winner: 2,
+			winningHand: ['1m', '2m', '3m'],
+			patterns: [{ name: 'Chicken Hand', faan: 1 }],
+			totalFaan: 1,
+			payments: { 0: -24, 2: 24 }
+		};
+		const drawResult: HandRecord['result'] = { outcome: 'exhaustive_draw' };
+		const handsWithResults: HandRecord[] = [
+			{ ...hands[0], result: winResult },
+			hands[1],
+			{ ...hands[2], result: drawResult }
+		];
+
+		it('renders an expand toggle only for a round that carries a result', () => {
+			const { body } = render(ScoreSheet, { props: { seats, totals, hands: handsWithResults } });
+			expect([...body.matchAll(/class="round-expand(?: [^"]*)?"/g)]).toHaveLength(2);
+		});
+
+		it('renders no detail row (server-rendered, collapsed by default) until expanded', () => {
+			const { body } = render(ScoreSheet, { props: { seats, totals, hands: handsWithResults } });
+			expect(body).not.toContain('id="round-detail-1"');
+			expect(body).toMatch(/aria-expanded="false"/);
+		});
+
+		// svelte/server only renders the initial (collapsed) markup -- see ClaimButtons.spec.ts's
+		// own note on why a real click has to be an e2e test (routes/demo/demo.e2e.ts covers
+		// clicking the toggle open, revealing the right winning hand/draw note per round).
 	});
 });

@@ -382,3 +382,86 @@ test('completing more than one real hand accumulates multi-hand history in the S
 		await browser.close();
 	}
 });
+
+test('a real game reaching game_end auto-shows the game-end summary, and a past round reveals its real winning hand', async () => {
+	// Real `game_end` (docs/03-frontend.md §6's "Game-end summary") only fires once EAST_ONLY's
+	// minimum 4 hands have played out (mahjong_core/engine.py's `start_next_hand`, dealer
+	// 0->1->2->3 wrapping back to 0) -- practice mode (one human seat, three real `FaanBot`
+	// seats) so only this seat's own turns need driving through Playwright; the bots run via the
+	// server's own `_poke_bots()` with no browser round trip at all, the same speed advantage
+	// `live.e2e.ts`'s "practice mode is reachable..." test above already relies on. `no_calls`/
+	// `auto_pass_chow` pre-armed so this seat's own claim windows never need a click either
+	// (server/app/table.py's `set_auto` -- persists on the seat binding for the life of the
+	// table, not just "this hand" despite the toggle's own label). Dealer repeats on a win or
+	// draw (`ruleset.dealer_repeat_on_win`/`dealer_repeat_on_draw`, both default `True`) mean
+	// this can run more than the 4-hand minimum -- bounded by a generous wall-clock budget, not
+	// a fixed hand count. Observed running against a real backend: a single no-dead-wall HK hand
+	// (wall_reserve=0, up to ~34 draws/seat) with zero repeats already takes several minutes
+	// end to end, so the budget below assumes at least one repeat on top of the 4-hand minimum.
+	test.setTimeout(1_800_000);
+	const browser = await chromium.launch();
+	try {
+		const page = await browser.newPage();
+		await page.goto(BASE, { waitUntil: 'networkidle' });
+		await page.getByRole('button', { name: 'Play vs bots' }).click();
+		await page.getByRole('button', { name: 'Open' }).click();
+		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
+
+		await page.getByRole('button', { name: 'Settings' }).click();
+		await page.getByLabel('No calls this hand').check();
+		await page.getByLabel('Auto-pass chow').check();
+		await page.getByRole('button', { name: 'Close' }).click();
+
+		const gameEndOverlay = page.getByTestId('game-end-overlay');
+		const deadline = Date.now() + 1_770_000;
+		while (Date.now() < deadline) {
+			if (await gameEndOverlay.count()) break;
+
+			const faanOverlay = page.getByTestId('faan-overlay');
+			if (await faanOverlay.count()) {
+				await faanOverlay
+					.getByRole('button', { name: 'Close' })
+					.click({ timeout: 800 })
+					.catch(() => {});
+				continue;
+			}
+
+			const pass = page.locator('.claim-btn--pass');
+			if (await pass.count()) {
+				await pass.click({ timeout: 800 }).catch(() => {});
+				continue;
+			}
+
+			const discard = page.locator('.hand-tile-btn').first();
+			if (await discard.count()) {
+				await discard.click({ timeout: 800 }).catch(() => {});
+				continue;
+			}
+
+			await page.waitForTimeout(150);
+		}
+
+		await expect(gameEndOverlay).toBeVisible({ timeout: 5_000 });
+		await expect(gameEndOverlay.getByRole('heading', { name: 'Game over' })).toBeVisible();
+		await expect(gameEndOverlay.locator('.standings li')).toHaveCount(4);
+
+		// past-round detail: this is the actual gap the melds-snapshotting sub-task closed
+		// (`HandHistoryEntry.winnerMelds`, lib/game/state.ts) -- expand hand 1's row and confirm
+		// it shows either a real winning hand (melds/concealed tiles rendered via TileFace) or
+		// the plain exhaustive-draw note, not blank/broken output for data that's since scrolled
+		// out of `state.melds`.
+		const round1Row = gameEndOverlay.locator('.score-sheet tbody tr').first();
+		const round1Toggle = round1Row.locator('.round-expand');
+		await round1Toggle.click();
+		const detail1 = gameEndOverlay.locator('#round-detail-1');
+		await expect(detail1).toBeVisible();
+		const hasWinner = (await detail1.getByRole('heading', { name: /wins$/ }).count()) > 0;
+		if (hasWinner) {
+			await expect(detail1.locator('.tile')).not.toHaveCount(0);
+		} else {
+			await expect(detail1).toContainText('Exhaustive draw');
+		}
+	} finally {
+		await browser.close();
+	}
+});

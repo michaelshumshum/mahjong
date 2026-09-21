@@ -79,6 +79,46 @@ test('switching to the hand-ended-in-a-draw scenario shows the plain draw summar
 	await expect(page.getByTestId('hand-end-draw').getByText('Draw')).toBeVisible();
 });
 
+test('switching to the game-ended scenario auto-shows the game-end summary, not the hand-end hold', async ({
+	page
+}) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Game just ended' }).click();
+
+	// the game-end screen replaces the last hand's own hold overlay outright (docs/03-frontend.md
+	// §6's "Game-end summary" -- `gameJustEnded`'s `handResult` is null, matching the real wire
+	// sequence where `game_end` only ever fires after that hold has already resolved).
+	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
+	const overlay = page.getByTestId('game-end-overlay');
+	await expect(overlay).toBeVisible();
+	await expect(overlay.getByRole('heading', { name: 'Game over' })).toBeVisible();
+	await expect(overlay.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+
+	// standings: 4 rounds, ranked by final total (mock-game-state.ts's `gameJustEnded.gameEnd`).
+	await expect(overlay.locator('.score-sheet tbody tr')).toHaveCount(4);
+	await expect(overlay.locator('.standings')).toContainText('1st');
+
+	// clicking into a past round (hand 2, a self-drawn All Pungs win) reveals that round's own
+	// winning hand, not just the most recent one -- the actual gap this sub-task closed
+	// (`HandHistoryEntry.winnerMelds`/the mock's own parallel `MockRoundResult.melds`).
+	const round2Toggle = overlay.locator('.score-sheet tbody tr').nth(1).locator('.round-expand');
+	await round2Toggle.click();
+	const detail2 = overlay.locator('#round-detail-2');
+	await expect(detail2).toContainText('South wins');
+	await expect(detail2).toContainText('All Pungs');
+	await expect(detail2.locator('.tile')).not.toHaveCount(0);
+	await round2Toggle.click(); // collapse before indexing into row 2 (hand 3) below
+
+	// an exhaustive-draw round (hand 3) expands to a plain note, no winning hand.
+	const round3Toggle = overlay.locator('.score-sheet tbody tr').nth(2).locator('.round-expand');
+	await round3Toggle.click();
+	const detail3 = overlay.locator('#round-detail-3');
+	await expect(detail3).toContainText('Exhaustive draw');
+	await expect(detail3.locator('.tile')).toHaveCount(0);
+});
+
 test('dismissing the hand-end hold in mock mode closes it locally with no socket round trip', async ({
 	page
 }) => {
