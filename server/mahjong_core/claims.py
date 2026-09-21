@@ -4,10 +4,10 @@ Scope (docs/01-rules-spec.md §6, canonical; docs/00-architecture.md §4, window
 given the claim responses a window has *already collected*, decide the winner
 (`resolve_claims`) and decide whether the window can close before every eligible seat has
 responded (`can_close_early`). Both are pure predicates over already-collected data — no
-clock, no inbox, no timer. `app/room.py` (M3, later) owns arming the deadline, gathering
+clock, no inbox, no timer. `app/table.py` (M3, later) owns arming the deadline, gathering
 responses off the wire, and turning an unanswered deadline into an implicit Pass; this module
 never reads a clock and treats a seat missing from `responses` the same as an explicit `Pass`
-from that seat, so `app/room.py` doesn't need to synthesize one just to call in here.
+from that seat, so `app/table.py` doesn't need to synthesize one just to call in here.
 """
 
 from __future__ import annotations

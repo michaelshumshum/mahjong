@@ -4,7 +4,7 @@ engine's state machine and to serve as the arena's incumbent baseline (§8), not
 **Two distinct things live here, deliberately not one.** `random_action(state, seat, rng)` is
 the raw, `GameState`-based self-play generator: fast, synchronous, no `SeatView`/mask/action-id
 machinery, used by `bots/selfplay.py` and by the handful of test modules
-(`tests/test_ml.py`, `tests/test_redaction.py`, `tests/test_room.py`) that just need "a policy
+(`tests/test_ml.py`, `tests/test_redaction.py`, `tests/test_table.py`) that just need "a policy
 that plays legally" to drive a self-play sweep for *other* code under test. `RandomBot` is the
 actual `bots.base.Bot`-protocol implementation (`docs/04-bots.md §1`'s
 `async def act(view, mask, deadline) -> int`), the T0 tier the arena harness compares candidates

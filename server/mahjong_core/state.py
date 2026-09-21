@@ -87,7 +87,7 @@ class ClaimWindow:
     """Live `AWAIT_CLAIMS`/`AWAIT_KONG_ROB` state (00-architecture.md §4): what's being
     offered to whom, so claims.py/engine.py (later sub-tasks) can resolve it. `deadline_ts`
     is carried as an opaque value only — the pure engine never reads a clock or compares it
-    against one; arming and enforcing the actual timer is app/room.py's job
+    against one; arming and enforcing the actual timer is app/table.py's job
     (server/AGENTS.md: "a clock, socket or random value... belongs in app/").
     """
 
@@ -199,10 +199,10 @@ class SeatState:
     derived from this (plus redaction) — every field a seat-visible view needs lives here.
 
     No `seat_status` field: connected/disconnected/autoplay/bot (00-architecture.md §5's
-    `SeatView.seat_status`) is session state owned by `app/room.py`'s `SeatBinding`
+    `SeatView.seat_status`) is session state owned by `app/table.py`'s `SeatBinding`
     (00-architecture.md §3), not the pure engine. `reduce()` never needs to know whether a
     seat is a human, a disconnected human, or a bot to compute the next `GameState` — only
-    `app/room.py` (which owns sockets, timers and bot dispatch) cares, and layering it in at
+    `app/table.py` (which owns sockets, timers and bot dispatch) cares, and layering it in at
     `seat_view()` time keeps `mahjong_core` free of exactly the "clock, socket, or random
     value" server/AGENTS.md reserves for `app/`.
     """
@@ -230,7 +230,7 @@ class GameState:
     # game_seed never leaves this process, not even redacted, not ever during play
     # (00-architecture.md §3, D2). Kept on GameState (not just passed to `new_game` and
     # dropped) because engine.py derives every later hand's `hand_seed` from it, and
-    # Room.__init__ (00-architecture.md §3) keeps no separate copy of its own — GameState is
+    # Table.__init__ (00-architecture.md §3) keeps no separate copy of its own — GameState is
     # the only place it lives, which is why it's a stdlib int and never touches app/protocol.
     hand_seed: bytes
     wall: Wall

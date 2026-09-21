@@ -80,7 +80,7 @@ real-looking seat wind — illustrative, not tied to any particular scenario's c
 If you need to see the *real* sequence (not the frozen preview) — e.g. after touching the
 `$effect` that opens the socket, or `GameStore`/`MahjongSocket` themselves — that still needs a
 real backend: `uv run uvicorn app.main:app` from `server/`, `PUBLIC_WS_URL` pointed at it, and
-`/table/<room>` opened in 1-4 browser contexts (`live.e2e.ts` already does exactly this, opt-in
+`/table/<id>` opened in 1-4 browser contexts (`live.e2e.ts` already does exactly this, opt-in
 via `RUN_LIVE_BACKEND_TESTS=1`). Not part of this script — too slow and too flaky (two extra
 real processes) to run on every screenshot regen.
 

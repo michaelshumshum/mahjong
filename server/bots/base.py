@@ -12,7 +12,7 @@ legal-action `mask` over the fixed 109-id space (`mahjong_core/ml.py`, docs/06-m
 returns one legal id; decoding that back into a concrete `Action` needs `decode_action(aid,
 state, seat)`, which needs the real `GameState` -- so decoding is always the *caller's* job
 (the self-play harness, the arena harness, or -- for the live disconnect-handover path -- the
-Room actor), never the bot's. `async` because a real tier (T2, learned policy) may eventually
+Table actor), never the bot's. `async` because a real tier (T2, learned policy) may eventually
 await a model call; the heuristic tiers here are synchronous under the hood and just return
 immediately.
 
@@ -24,7 +24,7 @@ It's resolved now, in favour of the state-based signature staying exactly as-is:
 `mahjong_core`, never the reverse; `SeatView` living in `app/` at all is because it's a
 per-recipient wire concern, not a game rule, per that module's own docstring). So `legal_mask`
 can't take a `SeatView` without breaking that. Instead: whoever drives a bot (self-play, the
-arena, the Room) computes `mask = mahjong_core.ml.legal_mask(state, seat)` from the real
+arena, the Table) computes `mask = mahjong_core.ml.legal_mask(state, seat)` from the real
 `GameState` it already holds, and hands `(view, mask, deadline)` to `Bot.act` together --
 docs/04-bots.md §1's own prose already says this ("`mask` is `legal_mask(view) ->
 list[bool]`... the engine-produced legal-action mask"), so this is a phrasing fix there, not a

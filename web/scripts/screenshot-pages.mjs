@@ -28,7 +28,7 @@ const PAGES = [
 	{ name: 'lobby', url: '/' },
 	{ name: 'demo', url: '/demo' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
-	// `[id]` as a room id (docs/03-frontend.md §6) -- there's no backend running during a
+	// `[id]` as a table id (docs/03-frontend.md §6) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
 	// rather than relying on it being the unauthenticated default.
 	{ name: 'table-your-turn', url: '/table/demo123?mock=1' },

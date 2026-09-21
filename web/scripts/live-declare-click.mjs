@@ -8,13 +8,13 @@
 // wire-level test never touches the button at all, so it can't regress here.
 //
 // Spawned as a subprocess by `server/tests/test_declare_actions_live_ui.py`, which needs to be
-// the one rigging the rare hand (`get_room()` + `dataclasses.replace`, same technique
+// the one rigging the rare hand (`get_table()` + `dataclasses.replace`, same technique
 // `server/tests/test_reconnect.py` uses) since that requires living in the same process as the
 // real backend -- a plain Node/Playwright test can't reach into that process's memory. This
 // script only drives the browser: 4 real seats (no bots), reading `PAGE_LOADED`/`GO` off
 // stdin/stdout as the handshake for "rig now, between everyone connecting and anyone joining".
 //
-// Usage: node scripts/live-declare-click.mjs <baseUrl> <roomId> <buttonNameRegex>
+// Usage: node scripts/live-declare-click.mjs <baseUrl> <tableId> <buttonNameRegex>
 // Prints one `PAGE_LOADED` line once all 4 pages have connected (before any joins), waits for
 // a `GO` line on stdin, then joins all 4 seats and clicks the named button on seat 0's page.
 // Prints one final `RESULT <json>` line: `{ framesSent: string[] }` -- every WS frame seat 0's
@@ -25,10 +25,10 @@ import readline from 'node:readline';
 
 const args = process.argv.slice(2);
 if (args.length !== 3) {
-	console.error('usage: live-declare-click.mjs <baseUrl> <roomId> <buttonNameRegex>');
+	console.error('usage: live-declare-click.mjs <baseUrl> <tableId> <buttonNameRegex>');
 	process.exit(2);
 }
-const [base, room, buttonNamePattern] = args;
+const [base, table, buttonNamePattern] = args;
 
 function waitForStdinLine(expected) {
 	return new Promise((resolve) => {
@@ -53,9 +53,9 @@ pages[0].on('websocket', (ws) => {
 	ws.on('framesent', (f) => wsFrames.push(f.payload));
 });
 
-await Promise.all(pages.map((p) => p.goto(`${base}/table/${room}`, { waitUntil: 'networkidle' })));
+await Promise.all(pages.map((p) => p.goto(`${base}/table/${table}`, { waitUntil: 'networkidle' })));
 
-// signal the rig point: every page has connected (creating the room) but none has joined yet.
+// signal the rig point: every page has connected (creating the table) but none has joined yet.
 console.log('PAGE_LOADED');
 await waitForStdinLine('GO');
 

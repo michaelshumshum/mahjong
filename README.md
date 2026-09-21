@@ -25,7 +25,7 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 
 | | |
 | --- | --- |
-| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create/join a room, or play solo vs bots | ![Demo](docs/screenshots/demo.png) Demo (`/demo`) — component demos |
+| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create/join a table, or play solo vs bots | ![Demo](docs/screenshots/demo.png) Demo (`/demo`) — component demos |
 | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
 | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw |
 | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
@@ -35,7 +35,7 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 
 | Doc | Contents |
 | --- | --- |
-| [00-architecture.md](docs/00-architecture.md) | System design, room-as-actor model, scaling path |
+| [00-architecture.md](docs/00-architecture.md) | System design, table-as-actor model, scaling path |
 | [01-rules-spec.md](docs/01-rules-spec.md) | Tiles, state machine, claim priority, faan table, payouts |
 | [02-protocol.md](docs/02-protocol.md) | WebSocket envelope, message catalog, redaction, reconnect/resync, timers |
 | [03-frontend.md](docs/03-frontend.md) | Svelte component layout, scene/DOM structure, asset pipeline, interaction model |
@@ -47,7 +47,7 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 ## Layout
 
 ```
-server/   Python. mahjong_core/ (pure rules, stdlib-only) + app/ (FastAPI, rooms, WS) + bots/
+server/   Python. mahjong_core/ (pure rules, stdlib-only) + app/ (FastAPI, tables, WS) + bots/
 web/      SvelteKit 2 + Svelte 5. Lobby and table, DOM throughout, styled with SCSS.
 shared/   Generated protocol JSON schema (make proto)
 docs/     Planning
@@ -65,7 +65,7 @@ docs/     Planning
 
 Only `ml` and `tools` profiles exist — no multi-node/`scale` profile yet ([docs/07-infra.md §3](docs/07-infra.md)).
 
-> `--workers 1` on the API is load-bearing: rooms are in-memory objects owned by one process. [docs/07-infra.md §2](docs/07-infra.md)
+> `--workers 1` on the API is load-bearing: tables are in-memory objects owned by one process. [docs/07-infra.md §2](docs/07-infra.md)
 
 ## License
 

@@ -1,5 +1,5 @@
 """`TableRegistry` -- module-level table lookup/creation/cleanup (M3 sub-task 6; replaces
-`app/ws.py`'s bare `_ROOMS`/`_ROOM_TASKS` dicts, which that module's own docstring already
+`app/ws.py`'s bare `_TABLES`/`_TABLE_TASKS` dicts, which that module's own docstring already
 flagged as a stand-in: "sub-task 6 replaces this wholesale").
 
 docs/00-architecture.md §6: matchmaking, presence, and session state are v1 "module-level dicts

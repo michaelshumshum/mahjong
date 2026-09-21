@@ -36,7 +36,7 @@ COPY . .
 RUN useradd --system --uid 1001 --no-create-home app && chown -R app:app /app
 USER app
 EXPOSE 8000
-# one worker only: rooms are in-memory, owned by one process. docs/07-infra.md §2
+# one worker only: tables are in-memory, owned by one process. docs/07-infra.md §2
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 
 # torch only in this target

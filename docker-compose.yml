@@ -22,7 +22,7 @@ services:
     build:
       context: ./server
       target: dev
-    # one worker only: rooms are in-memory, owned by one process. docs/07-infra.md §2
+    # one worker only: tables are in-memory, owned by one process. docs/07-infra.md §2
     command: >
       uv run uvicorn app.main:app
       --host 0.0.0.0 --port 8000 --workers 1

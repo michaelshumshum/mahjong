@@ -6,7 +6,7 @@ Python 3.13, FastAPI, asyncio. Architecture: `docs/00-architecture.md`.
 
 ```
 mahjong_core/   pure rules engine — no asyncio, no I/O, no unseeded randomness
-app/            FastAPI, room actors, WebSocket, redaction, protocol models
+app/            FastAPI, table actors, WebSocket, redaction, protocol models
 bots/           bot tiers + arena harness
 ```
 
@@ -14,7 +14,7 @@ bots/           bot tiers + arena harness
 
 - `mahjong_core` stays pure: `reduce(state, action) -> (state, events)`. Needing a clock,
   socket or random value there means the code belongs in `app/`.
-- One room = one `asyncio.Task` = one writer. Never mutate `GameState` from outside it.
+- One table = one `asyncio.Task` = one writer. Never mutate `GameState` from outside it.
 - `seat_view(state, seat)` and `redact_event(state, seat, event)` are the only paths to seat-visible state. Bots included.
 - The server computes the legal-action set. Never trust a client-supplied one.
 - `--workers 1` (`docs/07-infra.md §2`).

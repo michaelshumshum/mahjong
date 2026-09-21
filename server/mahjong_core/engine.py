@@ -15,7 +15,7 @@ Advancing from `HAND_OVER` to the next hand (or to `GAME_OVER`) is `start_next_h
 second pure function mirroring `state.new_game()` -- there is no `Action` for "deal the next
 hand" because it isn't a seat's decision (`actions.py`'s docstring: "server-computed
 transitions, no seat decision"), so it can't go through `reduce()`'s `(state, action)` shape.
-A caller (the M3 Room actor, or this module's own self-play test) checks
+A caller (the M3 Table actor, or this module's own self-play test) checks
 `state.phase == Phase.HAND_OVER` and calls `start_next_hand()` before offering anyone
 anything else.
 
@@ -798,7 +798,7 @@ def _deal_hand(state: GameState, *, dealer: int, prevailing: Wind, hand_no: int)
     """Deal hand `hand_no` (01-rules-spec.md §3), mirroring `state.new_game` but for hand 2+:
     scores and `next_window_id` carry over, everything else about a seat (concealed, melds,
     discards, flowers) starts fresh. `next_window_id` has to survive the hand boundary because
-    `window_id` is a whole-game identifier, not a per-hand one -- `app/room.py`'s per-window
+    `window_id` is a whole-game identifier, not a per-hand one -- `app/table.py`'s per-window
     bookkeeping (`_armed_window_id`, `_active_seat_timer`, `_claim_deadline_ms`) is keyed by
     `window_id` alone and is never reset between hands; resetting it to 0 here made hand 2's
     first claim window collide with hand 1's, which silently starved it of a `claim_offer`
