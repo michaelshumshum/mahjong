@@ -44,7 +44,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app import protocol as proto
 from app.outbox import BoundedOutbox
 from app.registry import TableRegistry
-from app.table import SeatNotBoundError, SeatTakenError, Table, TableFullError
+from app.table import (
+    NotHostError,
+    SeatNotBoundError,
+    SeatTakenError,
+    Table,
+    TableAlreadyStartedError,
+    TableFullError,
+)
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -234,6 +241,9 @@ class Session:
         if isinstance(message, proto.Ready):
             await self._dispatch(message, self._apply_ready)
             return
+        if isinstance(message, proto.StartWithBots):
+            await self._dispatch(message, self._apply_start_with_bots)
+            return
         if isinstance(message, proto.HandEndAck):
             await self._dispatch(message, self._apply_hand_end_ack)
             return
@@ -333,6 +343,17 @@ class Session:
 
     def _apply_ready(self, seat: int, _d: proto.ReadyPayload) -> tuple[bool, str | None]:
         self.table.mark_ready(seat)
+        return True, None
+
+    def _apply_start_with_bots(
+        self, seat: int, _d: proto.StartWithBotsPayload
+    ) -> tuple[bool, str | None]:
+        try:
+            self.table.start_with_bots(seat)
+        except NotHostError:
+            return False, "not_host"
+        except TableAlreadyStartedError:
+            return False, "already_started"
         return True, None
 
     def _apply_hand_end_ack(

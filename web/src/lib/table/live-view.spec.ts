@@ -27,6 +27,7 @@ describe('viewFromClientState own-hand split', () => {
 				wall_remaining: 50,
 				seat_status: ['bot', 'human', 'bot', 'bot'],
 				names: [null, null, null, null],
+				host_seat: null,
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
 				deadline_ts: null,

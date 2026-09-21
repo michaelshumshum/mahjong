@@ -28,6 +28,11 @@ export interface Ready extends Envelope {
 	d: ReadyPayload;
 }
 
+export interface StartWithBots extends Envelope {
+	t: 'start_with_bots';
+	d: StartWithBotsPayload;
+}
+
 export interface Discard extends Envelope {
 	t: 'discard';
 	d: DiscardPayload;
@@ -165,6 +170,8 @@ export interface JoinPayload {
 
 export interface ReadyPayload {}
 
+export interface StartWithBotsPayload {}
+
 export interface DiscardPayload {
 	tile_id: number;
 }
@@ -216,6 +223,7 @@ export interface StateSyncPayload {
 	legal_actions: Record<string, unknown>[];
 	claim_options: Record<string, unknown>[];
 	deadline_ts: number | null;
+	host_seat: number | null;
 }
 
 export interface HandStartPayload {
@@ -328,6 +336,7 @@ export type ClientMessage =
 	| Ping
 	| Join
 	| Ready
+	| StartWithBots
 	| Discard
 	| Claim
 	| Declare
@@ -366,6 +375,7 @@ export type AnyMessage =
 	| Ping
 	| Join
 	| Ready
+	| StartWithBots
 	| Discard
 	| Claim
 	| Declare

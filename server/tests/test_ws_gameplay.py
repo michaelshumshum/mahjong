@@ -409,3 +409,71 @@ def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
         assert sync1["d"]["names"] == ["Alice", "Bob", None, None]
         ack1 = ws1.receive_json()
         assert ack1["d"]["ok"] is True
+
+
+def test_host_is_first_joiner_and_start_with_bots_fills_and_starts() -> None:
+    """First `join` becomes host (docs' "Host definition": first-to-join, not seat 0) -- proven
+    here by having seat 2 join before seat 0. The host's `start_with_bots` binds every still-
+    empty seat to a bot (M4.5's `_bind_bot_seat`, invoked at runtime instead of only at table
+    construction), broadcasts `seat_state{status:"bot"}` for each, and starts the hand the
+    moment that makes every seat bound and ready -- exactly like a fourth human's `ready` would.
+    A non-host `start_with_bots` is rejected with `not_host`; a second one, once the hand's
+    already dealt, with `already_started`."""
+    table_id = f"start-with-bots-{uuid.uuid4()}"
+
+    with (
+        TestClient(app) as client,
+        client.websocket_connect(f"/ws?table={table_id}") as ws2,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
+    ):
+        ws2.send_json(_msg("hello", {"client_version": "test"}))
+        ws0.send_json(_msg("hello", {"client_version": "test"}))
+
+        # seat 2 joins first -> becomes host, even though it isn't seat 0.
+        ws2.send_json(_msg("join", {"seat": 2, "name": "Carol"}, id_=_next_id()))
+        assert ws2.receive_json()["t"] == "seat_state"
+        sync2 = ws2.receive_json()
+        assert sync2["t"] == "state_sync"
+        assert sync2["d"]["host_seat"] == 2
+        assert ws2.receive_json()["d"]["ok"] is True
+        ws2.send_json(_msg("ready", {}, id_=_next_id()))
+        assert ws2.receive_json()["d"]["ok"] is True  # seats 0/1/3 still open -- not started yet
+
+        # seat 0 joins second -> not host.
+        ws0.send_json(_msg("join", {"seat": 0, "name": "Alice"}, id_=_next_id()))
+        assert ws2.receive_json()["t"] == "seat_state"  # live update to the already-joined host
+        assert ws0.receive_json()["t"] == "seat_state"
+        sync0 = ws0.receive_json()
+        assert sync0["t"] == "state_sync"
+        assert sync0["d"]["host_seat"] == 2
+        assert ws0.receive_json()["d"]["ok"] is True
+
+        # a non-host start_with_bots is rejected outright -- nothing bound, nothing started.
+        ws0.send_json(_msg("start_with_bots", {}, id_=_next_id()))
+        not_host_ack = ws0.receive_json()
+        assert not_host_ack["t"] == "ack"
+        assert not_host_ack["d"]["ok"] is False
+        assert not_host_ack["d"]["error"] == "not_host"
+
+        ws0.send_json(_msg("ready", {}, id_=_next_id()))
+        assert ws0.receive_json()["d"]["ok"] is True
+
+        # the host fills seats 1 and 3 with bots and the hand starts immediately.
+        ws2.send_json(_msg("start_with_bots", {}, id_=_next_id()))
+        bot_seat_states = [ws2.receive_json(), ws2.receive_json()]
+        assert {f["d"]["seat"] for f in bot_seat_states} == {1, 3}
+        assert all(f["t"] == "seat_state" and f["d"]["status"] == "bot" for f in bot_seat_states)
+
+        assert ws2.receive_json()["t"] == "hand_start"
+        assert ws2.receive_json()["t"] == "deal"
+        assert ws2.receive_json()["t"] == "turn"
+        start_ack = ws2.receive_json()
+        assert start_ack["t"] == "ack"
+        assert start_ack["d"]["ok"] is True
+
+        # already started -- even the host's second start_with_bots is rejected.
+        ws2.send_json(_msg("start_with_bots", {}, id_=_next_id()))
+        already_ack = ws2.receive_json()
+        assert already_ack["t"] == "ack"
+        assert already_ack["d"]["ok"] is False
+        assert already_ack["d"]["error"] == "already_started"

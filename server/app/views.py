@@ -155,6 +155,10 @@ class SeatView:
     legal_actions: tuple[Action, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
     claim_options: tuple[ClaimOffer, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
     deadline_ts: int | None = field(metadata=_entitled(Entitlement.OWN_SEAT))
+    # whichever seat's `join` was this table's first (public: which seat is the host is not a
+    # secret) -- `None` for a caller with no `Table` behind it at all (bots/arena.py, every
+    # pre-M5-host caller).
+    host_seat: int | None = field(metadata=_entitled(Entitlement.PUBLIC))
 
 
 def seat_view(
@@ -166,6 +170,7 @@ def seat_view(
     claim_deadline_ts: int | None = None,
     turn_deadline_ts: int | None = None,
     hand_end_deadline_ts: int | None = None,
+    host_seat: int | None = None,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
     override point for the future `app/table.py` `SeatBinding` (see module docstring); omit it
@@ -186,7 +191,9 @@ def seat_view(
     means for a given seat/phase. `hand_end_deadline_ts` is the analogous override for
     `Phase.HAND_OVER`'s hand-end hold (`app/table.py`'s `_hand_end_deadline_ms`) -- unlike the
     other two, it's the same value for every seat (a whole-table wait, not a per-seat one), so
-    it applies regardless of `seat`.
+    it applies regardless of `seat`. `host_seat` is the analogous override for `SeatView.host_seat`
+    -- `app/table.py` passes its own `Table.host_seat`; omit it (every caller with no `Table`
+    behind it) and it defaults to `None`.
     """
     own_hand = state.seats[seat].concealed if seat is not None else ()
     legal = compute_legal_actions(state, seat) if seat is not None else ()
@@ -225,6 +232,7 @@ def seat_view(
         legal_actions=legal,
         claim_options=claim_options,
         deadline_ts=deadline_ts,
+        host_seat=host_seat,
     )
 
 
@@ -512,6 +520,7 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "legal_actions": [action_to_dict(a) for a in view.legal_actions],
         "claim_options": [_claim_offer_wire(o, view.seat) for o in view.claim_options],
         "deadline_ts": view.deadline_ts,
+        "host_seat": view.host_seat,
     }
 
 

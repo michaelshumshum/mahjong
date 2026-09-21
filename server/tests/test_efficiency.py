@@ -68,6 +68,7 @@ def _build_view(
         legal_actions=(),
         claim_options=(),
         deadline_ts=None,
+        host_seat=None,
     )
 
 

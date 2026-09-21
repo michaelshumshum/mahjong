@@ -15,7 +15,8 @@ import type {
 	JoinPayload,
 	Ping,
 	Ready,
-	ServerEvent
+	ServerEvent,
+	StartWithBots
 } from './protocol';
 import type { ConnectionStatus } from '../game/state';
 
@@ -177,6 +178,21 @@ export class MahjongSocket {
 
 	ready(): void {
 		const msg: Ready = { v: 1, id: nextId(), ts: Date.now(), t: 'ready', d: {} };
+		this.#send(msg);
+	}
+
+	/** Host-only (`ClientGameState.hostSeat === state.seat`); the server rejects a non-host
+	 * sender with `error:'not_host'` and a call once the table's already started with
+	 * `error:'already_started'` -- this method sends unconditionally and lets the UI gate on
+	 * `isHost`/`tableReady` instead of duplicating that check here. */
+	startWithBots(): void {
+		const msg: StartWithBots = {
+			v: 1,
+			id: nextId(),
+			ts: Date.now(),
+			t: 'start_with_bots',
+			d: {}
+		};
 		this.#send(msg);
 	}
 

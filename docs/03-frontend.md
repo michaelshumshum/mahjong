@@ -313,7 +313,7 @@ store's own `seq` field is just a read-model mirror of whatever the socket alrea
   persists this seat per table (`lib/ui/settings-storage.ts`'s `saveSeatForTable`/`loadSeatForTable`,
   `mahjong:seat:v1:<tableId>`) the moment `state_sync` confirms one, and feeds it back into
   `connect()` on mount — without this, a fresh page load has `seat: null` and falls into the
-  "Sit down" screen's `join`, which fails with `table_full` once all four seats are already bound
+  seat-picker screen's `join`, which fails with `table_full` once all four seats are already bound
   to this game's players, the same seat included. `lastSeq` is intentionally not persisted:
   omitting it just means a full `state_sync` instead of ring-buffer replay (docs/02-protocol.md
   §5's "too old / new session" branch), which a page reload needs anyway since the in-memory
@@ -454,34 +454,51 @@ are bare `TileCode`s, no id); `viewFromClientState`'s `LiveTableView.ownHand` ca
 `tile_id`s alongside, index-aligned with the view's `concealedHand`/`drawn`, so the page can wire
 a real `discard`/`claim`/`declare` intent off a tile the user actually clicked.
 
-**Join flow.** No auto-join, no assumed seat: a live table shows a "Sit down" screen (sends
-`join{seat?, name?}`, first open seat) until seated, matching the standing "intent, not silent
-state" rule. The screen carries a plain text field for the M5 guest display name (above),
-prefilled from `localStorage` — editable right up until the click, since `join` is what actually
-sends it. Sitting down implies readiness (`ready` fires right behind a successful join) — there's
-no strategic reason to gate it behind a second button once the player already made the one real
-decision. Until all four seats are joined and ready, the page shows a waiting screen.
+**Join flow.** No auto-join, no assumed seat: a live table shows a seat picker (sends
+`join{seat, name?}` for the specific seat clicked) until seated, matching the standing "intent,
+not silent state" rule. The screen carries a plain text field for the M5 guest display name
+(above), prefilled from `localStorage` — editable right up until the click, since `join` is what
+actually sends it. Sitting down implies readiness (`ready` fires right behind a successful join)
+— there's no strategic reason to gate it behind a second button once the player already made the
+one real decision. Until all four seats are joined and ready, the page shows a waiting screen.
 
-**Pre-game states** — connecting, sit-down, and waiting are real, recurring moments in a
+Picking a specific seat (rather than the old "first open seat" button) needs real occupancy data
+before you've joined anything — the socket-setup effect connects with `&spectate=true` whenever
+there's no persisted seat to resume (`lib/net/socket.ts`'s connect URL), which gets an immediate
+spectator-shaped `state_sync` (`seat=None`, `app/table.py`'s `register_spectator`) carrying real
+`seat_status`/`names` for all four seats. `join` promotes the connection off spectator status the
+moment a seat is actually clicked (`docs/00-architecture.md §3`'s "Spectating" note), so this
+never blocks becoming a real seat — it's a strict improvement on data available, not a new state
+to reconcile.
+
+**Pre-game states** — connecting, seat-picker, and waiting are real, recurring moments in a
 genuinely multiplayer game (arriving at a table, waiting for others to show up), not filler
 between "real" screens, so they use the same `panel-elevated`/button vocabulary as the rest of
 the app (`_buttons.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (table code +
 a "copy invite link" button — the table's URL *is* the invite, and waiting-for-players is exactly
-when you need to hand it to someone) and a seat-preview ring: four slots arranged
-across/left/right/self, the same relative arrangement `layout.seat-region-grid` uses for the real
-table, so the pre-game screen visually foreshadows the seats you're about to sit at.
+when you need to hand it to someone) and a seat ring: four slots arranged across/left/right/self,
+the same relative arrangement `layout.seat-region-grid` uses for the real table, so the pre-game
+screen visually foreshadows the seats you're about to sit at. Pre-join, each slot is a real
+`<button>` (`seatPicker`/`seatPickerSlot`) reading `seatStatus`/`names` off the spectator snapshot
+above — "Open" and clickable, or the occupant's name/"Bot" and disabled; once seated, the same
+ring geometry (`seatRing`) switches to showing every seat's real *wind* instead (the dealer is
+fixed at table construction, before any `ready`, so `seatWind()` works unchanged here) — occupancy
+isn't re-shown post-join, since the ring's one job there is orienting you to the table, not
+re-answering "who's here yet."
 
-The ring is deliberately honest about what it doesn't know. Seat *wind* is real information the
-moment you're seated — the dealer is fixed at table construction, before any `ready`, so
-`seatWind()` (already used for the real table's own badges) works unchanged here — but seat
-*occupancy* is not: `server/app/table.py`'s `_seat_status_tuple()` docstring spells out that an
-unbound seat reads `"connected"`, identical to one that's actually taken, so `seatStatus`
-(`lib/game/state.ts`) cannot tell "3 of 4 joined" from "1 of 4 joined" today. The ring never
-claims it can — the three non-self slots are always rendered identically (ghosted, breathing),
-regardless of real occupancy, and the copy only ever says "waiting for the rest of the table,"
-never a count. A real per-seat join signal on the wire would be a cleaner fix; filed here as the
-same class of gap `state_sync`'s "has this table started" note below already documents, not a
-new one.
+**Host: start with bots (M5.1).** Whichever seat's `join` was this table's first is that table's
+host (`app/table.py`'s `Table.host_seat`, mirrored on the wire as `state_sync.host_seat`) — the
+simplest rule that needs no extra client-asserted identity, matching this design's existing
+guest-only, client-asserted-seat posture (`00-architecture.md §2.1`). While the waiting screen is
+up, the host alone sees a "Start with bots" button (`ClientGameState.hostSeat === state.seat`)
+that sends `start_with_bots {}`: the server binds every still-empty seat to a bot (the same
+`_bind_bot_seat` M4.5 practice mode already uses, just invoked at runtime instead of only at table
+construction) and deals immediately once that makes every seat bound and ready — exactly as if a
+fourth human had clicked `ready`. Lets a table start with fewer than four humans without forcing
+everyone through practice mode's separate solo-vs-bots entry point. A non-host sender gets
+`error{code:'not_host'}`; a call after the table's already started gets `error{code:'already_started'}`
+— both are asserted server-side (`Table.start_with_bots`), the client button is a convenience, not
+the actual gate.
 
 **There is no backend "has this table started" field to gate that screen on.** `new_game()` deals
 hand 1 into `Table.state` immediately at table construction, before any `ready` — so a `state_sync`
@@ -498,13 +515,15 @@ to fold into whoever next touches `state_sync`'s payload.
 
 **Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) has a third panel, "Practice,"
 alongside create/join: its "Play vs bots" button generates a table id the same way "Create table"
-does and navigates straight to `/table/<id>?practice=1` — no invite code to share, so it skips the
-create/copy step entirely. `?practice=1` is this route's own query param, unrelated in spelling to
+does and navigates straight to `/table/<id>?practice=1` — no invite code to share, but "Create
+table" has no copy step to skip either (below): both buttons go straight from the lobby to the
+table. `?practice=1` is this route's own query param, unrelated in spelling to
 the wire's own `&practice=true`; `/table/[id]`'s live-connect effect appends the latter to the
 `MahjongSocket` URL when the former is present, which is what actually binds seats 1-3 to real
 `FaanBot`s at table creation server-side (`server/app/ws.py`'s `ws_endpoint`, `app/table.py`'s
-`Table.__init__(practice=...)`). The human's own `join`/`ready` — the existing "Sit down" flow — is
-unchanged; a practice table's bot seats are already bound and auto-ready the instant the table
+`Table.__init__(practice=...)`). The human's own `join`/`ready` — the existing seat-picker flow —
+is unchanged (seat 0 is the only "Open" slot in the picker, since seats 1-3 already read `bot`); a
+practice table's bot seats are already bound and auto-ready the instant the table
 exists, so the "waiting for the rest of the table" screen should almost never show for long, though
 the client still goes through it structurally since there's still no real "has this table started"
 signal (below). The table label in the live table's dev toolbar appends "· practice vs FaanBot" when

@@ -70,7 +70,7 @@
 	// spelling is unrelated to the wire's own `&practice=true`) opens the live socket in M4.5
 	// practice mode: seats 1-3 are bot-bound at table *creation* (server/app/ws.py's
 	// `ws_endpoint`/`app/table.py`'s `Table.__init__(practice=...)`), so the human's own `join`
-	// (still a real intent, same "Sit down" flow below) is the only one this page ever sends.
+	// (still a real intent, same seat-picker flow below) is the only one this page ever sends.
 	let isPractice = $derived(page.url.searchParams.has('practice'));
 
 	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket
@@ -140,9 +140,20 @@
 
 	$effect(() => {
 		if (isMock || pregamePreview !== null) return;
+		// a page reload builds a fresh MahjongSocket with no memory of which seat this browser
+		// held -- resume it from localStorage so `hello{seat}` reclaims the seat (docs/02
+		// -protocol.md §5) instead of falling into the seat-picker's `join`, which fails
+		// with `table_full` once all four seats are already bound to this game's players.
+		const persistedSeat = loadSeatForTable(tableId);
 		const practiceParam = isPractice ? '&practice=true' : '';
+		// no persisted seat yet -- connect as a spectator first so the seat picker below can
+		// show real occupancy (`state_status`/`names`) instead of four identical "Open" slots.
+		// `join` promotes this connection off spectator status the moment a seat is chosen
+		// (docs/00-architecture.md §3's "Spectating" note), so this never blocks becoming a
+		// real seat.
+		const spectateParam = persistedSeat === null ? '&spectate=true' : '';
 		const socket = new MahjongSocket(
-			`${defaultWsUrl()}?table=${encodeURIComponent(tableId)}${practiceParam}`
+			`${defaultWsUrl()}?table=${encodeURIComponent(tableId)}${practiceParam}${spectateParam}`
 		);
 		const store = new GameStore(socket);
 		handEverStarted = false;
@@ -158,11 +169,6 @@
 				pushToast(`Server error: ${event.d.message}`);
 			}
 		});
-		// a page reload builds a fresh MahjongSocket with no memory of which seat this browser
-		// held -- resume it from localStorage so `hello{seat}` reclaims the seat (docs/02
-		// -protocol.md §5) instead of falling into the "Sit down" screen's `join`, which fails
-		// with `table_full` once all four seats are already bound to this game's players.
-		const persistedSeat = loadSeatForTable(tableId);
 		socket.connect(persistedSeat !== null ? { seat: persistedSeat } : undefined);
 		return () => {
 			offEvent();
@@ -234,6 +240,14 @@
 			: pregamePreview !== null
 				? null
 				: (liveStore?.state.seat ?? null)
+	);
+	// host = whichever seat's `join` was this table's first (docs/02-protocol.md §2's "Host
+	// definition") -- gates the "Start with bots" shortcut below. `?pregame=` previews have no
+	// real `hostSeat` to compare against, so they never show it.
+	let isHost = $derived(
+		liveStore !== null &&
+			liveStore.state.hostSeat !== null &&
+			liveStore.state.hostSeat === liveStore.state.seat
 	);
 
 	// --- pre-game invite link (live mode only) ----------------------------------------------
@@ -615,28 +629,63 @@
 	</div>
 {/snippet}
 
-<!-- Pre-game seat preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
+<!-- Seated pre-game preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
 	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
-	before any hand exists. `you === null` (not seated yet) shows four identical "Open" seats --
-	there is genuinely nothing else true to say pre-join. Seated, every seat's *wind* is already
-	real (the dealer is fixed at table creation, before any `ready` -- docs/03-frontend.md's
-	"There is no backend has this table started field" note) even though which seats are actually
-	occupied is not: `seat_status` reads every unbound seat as "connected", identical to a seat
-	that really is (`server/app/table.py`'s `_seat_status_tuple` docstring) -- so this deliberately
-	never claims occupancy for a seat that isn't yours. -->
-{#snippet seatRing(you: Seat | null)}
+	before any hand exists. Every seat's *wind* is already real (the dealer is fixed at table
+	creation, before any `ready`) -- this only ever shows wind, never occupancy, so it's silent
+	about whether the other three seats are actually filled yet (`seatPicker` below, shown before
+	you've joined, is the one that needs and has real occupancy). -->
+{#snippet seatRing(you: Seat)}
 	<div class="seat-ring" aria-hidden="true">
 		<div class="seat-ring-pos seat-ring-pos--across">
-			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(((you + 2) % 4) as Seat)] : 'Open')}
+			{@render seatRingSlot(WIND_CHAR[seatWind(((you + 2) % 4) as Seat)])}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--left">
-			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(((you + 3) % 4) as Seat)] : 'Open')}
+			{@render seatRingSlot(WIND_CHAR[seatWind(((you + 3) % 4) as Seat)])}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--right">
-			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(((you + 1) % 4) as Seat)] : 'Open')}
+			{@render seatRingSlot(WIND_CHAR[seatWind(((you + 1) % 4) as Seat)])}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
-			{@render seatRingSlot(you !== null ? WIND_CHAR[seatWind(you)] : 'Open', you !== null)}
+			{@render seatRingSlot(WIND_CHAR[seatWind(you)], true)}
+		</div>
+	</div>
+{/snippet}
+
+<!-- Pre-join seat picker: connected as a spectator (the socket-setup effect above), so real
+	`seatStatus`/`names` are already known -- unlike the old "Sit down" button (any open seat),
+	each slot here is a specific seat you can click to `join` it directly. Absolute seats 0-3 are
+	assigned to the same across/left/right/self layout `seatRing` uses for seat 0, purely so the
+	picker's geometry doesn't jump once you're actually seated. -->
+{#snippet seatPickerSlot(seat: Seat, self: boolean = false)}
+	{@const status = liveStore?.state.seatStatus[seat] ?? 'empty'}
+	{@const name = liveStore?.state.names[seat] ?? null}
+	{@const open = status === 'empty'}
+	<button
+		type="button"
+		class="seat-ring-slot seat-ring-slot--pickable"
+		class:seat-ring-slot--self={self}
+		class:seat-ring-slot--open={open}
+		disabled={!open}
+		onclick={() => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+	>
+		<span>{open ? 'Open' : status === 'bot' ? 'Bot' : (name ?? 'Taken')}</span>
+	</button>
+{/snippet}
+
+{#snippet seatPicker()}
+	<div class="seat-ring">
+		<div class="seat-ring-pos seat-ring-pos--across">
+			{@render seatPickerSlot(2 as Seat)}
+		</div>
+		<div class="seat-ring-pos seat-ring-pos--left">
+			{@render seatPickerSlot(3 as Seat)}
+		</div>
+		<div class="seat-ring-pos seat-ring-pos--right">
+			{@render seatPickerSlot(1 as Seat)}
+		</div>
+		<div class="seat-ring-pos seat-ring-pos--self">
+			{@render seatPickerSlot(0 as Seat, true)}
 		</div>
 	</div>
 {/snippet}
@@ -1059,9 +1108,8 @@
 				<div class="pretable-spinner"></div>
 				<p class="pretable-status">Connecting…</p>
 			{:else if effectiveSeat === null}
-				{@render seatRing(null)}
 				<h2>Take a seat</h2>
-				<p>Join an open seat to sit down at this table.</p>
+				<p>Choose an open seat to sit down at this table.</p>
 				<div class="pretable-name-field">
 					<label class="pretable-name-label" for="display-name-input">Your name</label>
 					<input
@@ -1075,13 +1123,7 @@
 						oninput={(e) => updateDisplayName(e.currentTarget.value)}
 					/>
 				</div>
-				<button
-					type="button"
-					class="pretable-cta"
-					onclick={() => liveStore?.socket.join(undefined, displayName.trim() || undefined)}
-				>
-					Sit down
-				</button>
+				{@render seatPicker()}
 			{:else}
 				{@render seatRing(effectiveSeat as Seat)}
 				<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat as Seat)]}</h2>
@@ -1089,6 +1131,16 @@
 					Waiting for the rest of the table to join. The hand starts automatically once all four
 					seats are ready.
 				</p>
+				{#if isHost}
+					<button
+						type="button"
+						class="pretable-cta"
+						onclick={() => liveStore?.socket.startWithBots()}
+					>
+						Start with bots
+					</button>
+					<p class="pretable-hint">Fills every open seat with a bot and starts right away.</p>
+				{/if}
 			{/if}
 		</div>
 	</div>
@@ -1333,6 +1385,36 @@
 			animation: none;
 			opacity: 0.85;
 		}
+	}
+
+	// the picker knows real occupancy (spectator `state_sync`, unlike `.seat-ring-slot`'s own
+	// "can't tell" note above), so a taken seat reads as solid/inert rather than breathing, and
+	// an open one is a real, obviously-clickable button.
+	.seat-ring-slot--pickable {
+		font: inherit;
+		background: none;
+		animation: none;
+		opacity: 1;
+
+		&:disabled {
+			cursor: default;
+			opacity: 0.7;
+		}
+	}
+
+	.seat-ring-slot--open {
+		border: 1px solid var(--color-accent);
+		color: var(--color-text);
+		cursor: pointer;
+
+		&:hover {
+			background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		}
+	}
+
+	.pretable-hint {
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
 	}
 
 	.dev-toolbar {

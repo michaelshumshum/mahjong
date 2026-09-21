@@ -88,6 +88,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				wallRemaining: d.wall_remaining,
 				seatStatus: d.seat_status.slice(),
 				names: d.names.slice(),
+				hostSeat: d.host_seat,
 				scores: d.scores.slice(),
 				legalActions: d.legal_actions,
 				deadlineTs: d.deadline_ts,

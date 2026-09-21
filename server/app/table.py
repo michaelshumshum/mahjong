@@ -138,11 +138,13 @@ __all__ = [
     "BotResult",
     "Command",
     "Envelope",
+    "NotHostError",
     "SeatBinding",
     "SeatNotBoundError",
     "SeatStatus",
     "SeatTakenError",
     "Table",
+    "TableAlreadyStartedError",
     "TableFullError",
     "TimerHeap",
     "WireSeatStatus",
@@ -262,6 +264,22 @@ class SeatNotBoundError(Exception):
     def __init__(self, seat: int) -> None:
         super().__init__(f"seat {seat} has never been joined")
         self.seat = seat
+
+
+class NotHostError(Exception):
+    """Raised by `Table.start_with_bots(seat)` when `seat` isn't `self.host_seat` (wire
+    `error{code:'not_host'}`). Host is whichever seat's `join` was this table's first --
+    the simplest rule that needs no extra client-asserted state, consistent with this design's
+    existing "seat identity is permanently client-asserted" posture (00-architecture.md §2.1)."""
+
+    def __init__(self, seat: int) -> None:
+        super().__init__(f"seat {seat} is not the host")
+        self.seat = seat
+
+
+class TableAlreadyStartedError(Exception):
+    """Raised by `Table.start_with_bots(seat)` once `self.started` (wire
+    `error{code:'already_started'}`) -- nothing left to shortcut past."""
 
 
 @dataclass
@@ -565,6 +583,11 @@ class Table:
         self.require_ready = require_ready
         self.started = not require_ready
         self.seat_bindings: list[SeatBinding | None] = [None, None, None, None]
+        # whichever seat's `join` was first (docs' "Host definition": simplest rule, no extra
+        # client-asserted state) -- `None` until someone actually joins. `practice=True` doesn't
+        # set this itself (seats 1-3 below are bound directly, not through `join`), so the human's
+        # own first `join` still becomes host, same as a real four-human table.
+        self.host_seat: int | None = None
 
         # M4.5 practice mode (docs/05-roadmap.md): seat 0 is left open for the human `join`;
         # seats 1-3 are bound to `self._bot_tier` bots immediately, before anyone ever connects
@@ -610,6 +633,8 @@ class Table:
                 raise TableFullError()
             chosen = open_seats[0]
 
+        if self.host_seat is None:
+            self.host_seat = chosen
         resolved_name = _normalize_name(name, chosen)
         self.seat_bindings[chosen] = SeatBinding(
             session_id=session_id, send=send, name=resolved_name
@@ -656,12 +681,39 @@ class Table:
         if binding is None:
             raise ValueError(f"seat {seat} has not joined")
         binding.ready = True
+        self._maybe_start()
+
+    def _maybe_start(self) -> None:
+        """Shared tail of `mark_ready`/`start_with_bots`: once every seat is bound *and* ready,
+        deal hand 1. A no-op otherwise, and idempotent once `self.started` is already true."""
         if self.started:
             return
         if all(b is not None and b.ready for b in self.seat_bindings):
             self.started = True
             self._publish_hand_start_and_deal()
             self._publish_turn_if_active()
+
+    def start_with_bots(self, seat: int) -> None:
+        """Host-only shortcut past waiting for a full human table: bind every still-empty seat
+        to a bot (the same `_bind_bot_seat` M4.5 practice mode already uses for its seats 1-3,
+        just invoked at runtime against whichever seats are actually still open instead of only
+        ever at construction) and start the hand immediately once that makes every seat bound
+        and ready. `NotHostError` for a non-host caller, `TableAlreadyStartedError` once
+        `self.started` -- `app/ws.py` turns both into `error{code:...}`."""
+        if seat != self.host_seat:
+            raise NotHostError(seat)
+        if self.started:
+            raise TableAlreadyStartedError()
+        for s in range(4):
+            if self.seat_bindings[s] is not None:
+                continue
+            self._bind_bot_seat(s)
+            binding = self.seat_bindings[s]
+            assert binding is not None
+            self._broadcast_wire(
+                {"t": "seat_state", "seat": s, "status": "bot", "name": binding.name}
+            )
+        self._maybe_start()
 
     def mark_hand_end_ack(self, seat: int) -> None:
         """`hand_end_ack` (hand-end hold): this seat dismissed the hand-end overlay early.
@@ -969,6 +1021,7 @@ class Table:
             claim_deadline_ts=claim_deadline_ts,
             turn_deadline_ts=turn_deadline_ts,
             hand_end_deadline_ts=self._hand_end_deadline_ms,
+            host_seat=self.host_seat,
         )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"

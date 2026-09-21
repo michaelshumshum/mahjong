@@ -112,6 +112,14 @@ class ReadyPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class StartWithBotsPayload(BaseModel):
+    """`start_with_bots`: host-only, no fields -- the server already knows which seat is host
+    (`app/table.py`'s `Table.host_seat`) and which seat this session is bound to, so there is
+    nothing for the client to assert here beyond sending the message at all."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class HandEndAckPayload(BaseModel):
     """`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current
     hand_no)` server-side (`app/table.py`'s `Table.mark_hand_end_ack`), same shape as `ReadyPayload`
@@ -156,6 +164,11 @@ class Join(Envelope):
 class Ready(Envelope):
     t: Literal["ready"] = "ready"
     d: ReadyPayload
+
+
+class StartWithBots(Envelope):
+    t: Literal["start_with_bots"] = "start_with_bots"
+    d: StartWithBotsPayload
 
 
 class HandEndAck(Envelope):
@@ -217,6 +230,9 @@ class StateSyncPayload(BaseModel):
     legal_actions: list[dict[str, Any]]
     claim_options: list[dict[str, Any]]
     deadline_ts: int | None
+    # whichever seat's `join` was this table's first -- `None` before anyone has joined (never
+    # actually observable on the wire, since `state_sync` is only ever sent once someone has).
+    host_seat: int | None
 
 
 class HandStartPayload(BaseModel):
@@ -457,7 +473,7 @@ class Ack(Envelope):
 
 
 ClientMessage = Annotated[
-    Hello | Ping | Join | Ready | Discard | Claim | Declare | Auto | HandEndAck,
+    Hello | Ping | Join | Ready | StartWithBots | Discard | Claim | Declare | Auto | HandEndAck,
     Field(discriminator="t"),
 ]
 ServerMessage = Annotated[

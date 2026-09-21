@@ -2225,6 +2225,67 @@
       "title": "ServerShutdownPayload",
       "type": "object"
     },
+    "StartWithBots": {
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seq"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "integer"
+        },
+        "t": {
+          "const": "start_with_bots",
+          "default": "start_with_bots",
+          "title": "T",
+          "type": "string"
+        },
+        "d": {
+          "$ref": "#/$defs/StartWithBotsPayload"
+        }
+      },
+      "required": [
+        "ts",
+        "d"
+      ],
+      "title": "StartWithBots",
+      "type": "object"
+    },
+    "StartWithBotsPayload": {
+      "additionalProperties": false,
+      "description": "`start_with_bots`: host-only, no fields -- the server already knows which seat is host\n(`app/table.py`'s `Table.host_seat`) and which seat this session is bound to, so there is\nnothing for the client to assert here beyond sending the message at all.",
+      "properties": {},
+      "title": "StartWithBotsPayload",
+      "type": "object"
+    },
     "StateSync": {
       "additionalProperties": false,
       "properties": {
@@ -2417,6 +2478,17 @@
             }
           ],
           "title": "Deadline Ts"
+        },
+        "host_seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Host Seat"
         }
       },
       "required": [
@@ -2437,7 +2509,8 @@
         "scores",
         "legal_actions",
         "claim_options",
-        "deadline_ts"
+        "deadline_ts",
+        "host_seat"
       ],
       "title": "StateSyncPayload",
       "type": "object"
@@ -2549,7 +2622,8 @@
           "hello": "#/$defs/Hello",
           "join": "#/$defs/Join",
           "ping": "#/$defs/Ping",
-          "ready": "#/$defs/Ready"
+          "ready": "#/$defs/Ready",
+          "start_with_bots": "#/$defs/StartWithBots"
         },
         "propertyName": "t"
       },
@@ -2565,6 +2639,9 @@
         },
         {
           "$ref": "#/$defs/Ready"
+        },
+        {
+          "$ref": "#/$defs/StartWithBots"
         },
         {
           "$ref": "#/$defs/Discard"

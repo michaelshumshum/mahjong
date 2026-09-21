@@ -80,6 +80,11 @@ export interface ClientGameState {
 	 * seat. Kept live by `seat_state`'s own `name` field, mirroring how `seatStatus` above is
 	 * kept live from the same event. */
 	names: (string | null)[];
+	/** Whichever seat's `join` was this table's first (docs/02-protocol.md §3's
+	 * `state_sync.host_seat`) — `null` before anyone has joined (never actually observable,
+	 * since `state_sync` is only ever sent once someone has). Never changes for the life of a
+	 * table, so a full resync is the only event that ever needs to set it. */
+	hostSeat: number | null;
 	scores: number[];
 	legalActions: Record<string, unknown>[];
 	deadlineTs: number | null;
@@ -126,6 +131,7 @@ export function initialClientGameState(): ClientGameState {
 		wallRemaining: 0,
 		seatStatus: ['disconnected', 'disconnected', 'disconnected', 'disconnected'],
 		names: [null, null, null, null],
+		hostSeat: null,
 		scores: [0, 0, 0, 0],
 		legalActions: [],
 		deadlineTs: null,

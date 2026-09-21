@@ -113,11 +113,11 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		// playing" (docs/03-frontend.md §6 sub-task's own finding), so this is the one point that
 		// actually exercises it -- has a real moment to render before the last `ready` starts the
 		// hand and every client moves on together.
-		await pages[0].getByRole('button', { name: 'Sit down' }).click();
+		await pages[0].getByRole('button', { name: 'Open' }).first().click();
 		await expect(pages[0].getByText(/You're seated as/)).toBeVisible();
 		for (const p of pages.slice(1)) {
-			await expect(p.getByRole('button', { name: 'Sit down' })).toBeVisible();
-			await p.getByRole('button', { name: 'Sit down' }).click();
+			await expect(p.getByRole('button', { name: 'Open' }).first()).toBeVisible();
+			await p.getByRole('button', { name: 'Open' }).first().click();
 		}
 
 		await Promise.all(
@@ -207,7 +207,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 		// seat's `ready` lands) that the intermediate "You're seated as" text often never renders
 		// at all before `tableReady` flips -- so this only asserts the eventual, stable state
 		// (the table scene itself), not the transient one in between.
-		await page.getByRole('button', { name: 'Sit down' }).click();
+		await page.getByRole('button', { name: 'Open' }).click();
 		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
 
 		// three opponent seats, all bot-controlled -- the visual treatment this sub-task added.
@@ -274,10 +274,10 @@ test('completing more than one real hand accumulates multi-hand history in the S
 		await Promise.all(
 			pages.map((p) => p.goto(`${BASE}/table/${table}`, { waitUntil: 'networkidle' }))
 		);
-		await pages[0].getByRole('button', { name: 'Sit down' }).click();
+		await pages[0].getByRole('button', { name: 'Open' }).first().click();
 		for (const p of pages.slice(1)) {
-			await expect(p.getByRole('button', { name: 'Sit down' })).toBeVisible();
-			await p.getByRole('button', { name: 'Sit down' }).click();
+			await expect(p.getByRole('button', { name: 'Open' }).first()).toBeVisible();
+			await p.getByRole('button', { name: 'Open' }).first().click();
 		}
 		await Promise.all(
 			pages.map((p) => p.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 20_000 }))
