@@ -46,3 +46,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 @pytest.fixture
 def games(request: pytest.FixtureRequest) -> int:
     return int(request.config.getoption("--games"))
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark all non-slow tests as 'fast' for convenient filtering."""
+    fast_marker = pytest.mark.fast
+    for item in items:
+        if not any(mark.name == "slow" for mark in item.iter_markers()):
+            item.add_marker(fast_marker)

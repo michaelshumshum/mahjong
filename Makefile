@@ -40,8 +40,8 @@ sh-web: ## Shell into the web container
 # ── tests ─────────────────────────────────────────────────────────────────────
 test: test-server test-web ## Run all tests
 
-test-server: ## pytest (excludes slow self-play; use `make selfplay` for that)
-	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m "not slow"
+test-server: ## pytest (fast tests only; use `make selfplay` for slow tests)
+	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m fast -n auto
 
 # CI=true: vitest browser mode and playwright both default to *headed* off-CI, and the
 # container has no X server. Set here, not in the compose service, so `make up`'s dev server
