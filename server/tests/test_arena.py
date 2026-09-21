@@ -1,7 +1,7 @@
 """`bots.arena` (docs/04-bots.md §8): a fast, small smoke test that the harness runs end to end
 and produces sane output. The full N-duplicate-set validation run (T1 vs T0, enough sets for the
 paired-difference CI to mean something) is manual/report-only per this sub-task's scope -- not
-CI-gated here, matching this repo's `-m "not slow"` convention for expensive runs.
+CI-gated here, matching this repo's `-m slow` convention for expensive runs.
 """
 
 from __future__ import annotations
