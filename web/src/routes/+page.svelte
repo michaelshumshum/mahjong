@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 
-	// invite codes are entirely client-generated mock data (docs/05-roadmap.md §6: v1 lobby is
-	// private-table + invite-code, not a public table list). there is no table API yet (M1 is the
-	// rules engine, M5 is real multiplayer) — this proves the create/join navigation flow only.
+	// invite codes are entirely client-generated (docs/03-frontend.md's "/table/[id] wiring":
+	// `[id]` is a real table id, auto-created against the backend on first WS connect -- no
+	// table-listing API needed), so there is nothing to validate client-side before navigating.
 	const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I — avoids look-alikes
 	const CODE_LENGTH = 6;
 
@@ -15,31 +15,11 @@
 		return code;
 	}
 
-	let hostedCode = $state<string | null>(null);
-	let copied = $state(false);
-	let copyFailed = $state(false);
-
+	// Straight to the table, no intermediate copy-code step: the table's own pre-game panel
+	// already has a "copy invite link" button (docs/03-frontend.md's "Pre-game states"), so
+	// showing the code here too would just be the same one decision rendered twice.
 	function createTable(): void {
-		hostedCode = generateMockCode();
-		copied = false;
-		copyFailed = false;
-	}
-
-	async function copyCode(): Promise<void> {
-		if (!hostedCode) return;
-		try {
-			await navigator.clipboard.writeText(hostedCode);
-			copied = true;
-			copyFailed = false;
-		} catch {
-			copied = false;
-			copyFailed = true;
-		}
-	}
-
-	function enterHostedTable(): void {
-		if (!hostedCode) return;
-		goto(`/table/${hostedCode}`);
+		goto(`/table/${generateMockCode()}`);
 	}
 
 	let joinCode = $state('');
@@ -53,10 +33,10 @@
 
 	// practice mode (docs/05-roadmap.md M4.5): a solo table with seats 1-3 bot-bound from table
 	// creation (`?practice=true` on the WS endpoint -- server/app/ws.py's `ws_endpoint`). No
-	// invite code to share, so this skips the create/copy step entirely -- generate a table id the
-	// same way "create table" does and go straight to the table, tagged so `/table/[id]` knows to
-	// connect in practice mode. `?practice=1` is this route's own query param, translated into
-	// `&practice=true` on the actual WS URL by `/table/[id]` -- the two spellings are unrelated.
+	// invite code to share, so this generates a table id the same way "Create table" does and
+	// goes straight to the table, tagged so `/table/[id]` knows to connect in practice mode.
+	// `?practice=1` is this route's own query param, translated into `&practice=true` on the
+	// actual WS URL by `/table/[id]` -- the two spellings are unrelated.
 	function startPractice(): void {
 		goto(`/table/${generateMockCode()}?practice=1`);
 	}
@@ -65,29 +45,10 @@
 <div class="panels">
 	<section class="panel">
 		<h2>Create a table</h2>
-
-		{#if !hostedCode}
-			<button type="button" class="primary" onclick={createTable}>Create table</button>
-		{:else}
-			<div class="code-display">
-				<span class="code" data-testid="hosted-code">{hostedCode}</span>
-				<button type="button" onclick={copyCode}>{copied ? 'Copied' : 'Copy'}</button>
-			</div>
-			{#if copyFailed}
-				<p class="status status-error">
-					Couldn't copy automatically — select and copy the code above.
-				</p>
-			{/if}
-			<p class="mock-note">
-				Mock code, generated in your browser — there's no table server yet, so nobody else can
-				actually join this. It's here to prove the create → share → enter flow ahead of the real
-				backend (see docs/05-roadmap.md M5).
-			</p>
-			<div class="actions">
-				<button type="button" class="primary" onclick={enterHostedTable}>Enter table</button>
-				<button type="button" onclick={createTable}>New code</button>
-			</div>
-		{/if}
+		<p class="hint">
+			Generates a table and takes you straight there — invite others once you're seated.
+		</p>
+		<button type="button" class="primary" onclick={createTable}>Create table</button>
 	</section>
 
 	<section class="panel">
@@ -105,9 +66,9 @@
 			/>
 			<button type="submit" class="primary" disabled={!joinCodeValid}>Join table</button>
 		</form>
-		<p class="mock-note">
-			Not wired to a real backend yet — this just takes you to the table route with the code you
-			entered, it doesn't check the code is real or connect you to other players.
+		<p class="hint">
+			Any code works — the table is created automatically the moment someone connects to it, so this
+			is a real invite, not a preview.
 		</p>
 	</section>
 
@@ -171,38 +132,6 @@
 		margin: 0;
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
-	}
-
-	.mock-note {
-		margin: 0;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-		border-left: 2px solid var(--color-border);
-		padding-left: var(--space-3);
-	}
-
-	.status-error {
-		color: var(--color-status-error);
-	}
-
-	.code-display {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-	}
-
-	.code {
-		font-family: monospace;
-		font-size: var(--font-size-xl);
-		letter-spacing: 0.15em;
-		background: var(--color-surface-raised);
-		border-radius: var(--radius-sm);
-		padding: var(--space-2) var(--space-3);
-	}
-
-	.actions {
-		display: flex;
-		gap: var(--space-3);
 	}
 
 	form {

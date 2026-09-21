@@ -6,18 +6,13 @@ test('home page loads and has a title', async ({ page }) => {
 	await expect(page).toHaveTitle(/Mahjong/);
 });
 
-test('lobby create table shows a mock invite code', async ({ page }) => {
+test('lobby create table navigates straight to a freshly generated table', async ({ page }) => {
 	await page.goto('/');
 	// wait past hydration: the create button is server-rendered but its click handler only
 	// attaches once svelte-kit finishes loading, so an immediate click can race it.
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Create table' }).click();
 
-	const code = page.getByTestId('hosted-code');
-	await expect(code).toBeVisible();
-	await expect(code).toHaveText(/^[A-Z0-9]{6}$/);
-
-	await page.getByRole('button', { name: 'Enter table' }).click();
 	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}$/);
 });
 
