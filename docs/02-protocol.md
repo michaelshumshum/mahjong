@@ -253,10 +253,13 @@ that was never joined gets `error{code:"no_such_seat"}`. `hello.seat` is trusted
 permanently — there is no ticket or credential anywhere in this design to check it against (the
 Auth note above); a malicious client can claim any seat.
 
-**Mid-claim-window reconnect re-arms a timer** (00-architecture.md §8). If the reconnecting seat
-holds a live, unresolved claim offer, `Table.resume()` re-arms *that seat's own* entry in the
-claim-window timer heap (one entry per offered seat) to a fresh `ruleset.claim_seconds` window
-from the reconnect moment, untouched by any other offered seat's deadline.
+**Mid-claim-window disconnect forfeits, not re-arms** (00-architecture.md §8). A seat that
+disconnects while it holds a live, unresolved claim offer forfeits it immediately (`Pass`),
+rather than a reconnect later re-arming a fresh window for it — `state_sync`'s `claim_options`
+(§3) carries no `window_id`, so a reconnect mid-window had nothing to actually hand a client back
+to act on even when the server was still nominally waiting. By the time any reconnect happens,
+there is nothing claim-shaped left for it to resolve; `hello.seat` above is ordinary replay/
+`state_sync`, same as any other reconnect.
 
 ## 6. Schema generation
 
