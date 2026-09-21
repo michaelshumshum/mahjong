@@ -244,7 +244,7 @@ top of it.
 | Bots | Arena: candidate must beat incumbent over 20k seeded games to merge. |
 | Load | Replay bot sessions as real WS clients; target 200 concurrent tables on one node. |
 
-`.github/workflows/ci.yml` runs on push/PR to `main`: `pytest -m "not slow"`, the web test suite
+`.github/workflows/ci.yml` runs on push/PR to `main`: `pytest -m fast -n auto`, the web test suite
 (vitest + Playwright), and `proto-check` (`git diff --exit-code` after regenerating) — see
 [07-infra.md §9](07-infra.md). The "CI fails if stale" promise here and in
 [02-protocol.md](02-protocol.md) is now enforced, not aspirational.

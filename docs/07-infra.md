@@ -166,7 +166,7 @@ workflows** (`workflow_call`), one per concern:
 
 | File | Calls into | Runs |
 | --- | --- | --- |
-| `.github/workflows/server.yml` | one `server` job | `uv sync --locked`, then `ruff check`, `ruff format --check`, `pytest -q -m "not slow"` |
+| `.github/workflows/server.yml` | one `server` job | `uv sync --locked`, then `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto` |
 | `.github/workflows/web.yml` | one `web` job | `pnpm install --frozen-lockfile`, then `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
 | `.github/workflows/proto-check.yml` | one `proto-check` job | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
 
@@ -190,7 +190,7 @@ once per pipeline instead of 2-3x or needing an artifact handoff between jobs.
 | Check | Tolerance |
 | --- | --- |
 | `ruff check`, `ruff format --check` | hard — any finding fails the job |
-| `pytest -q -m "not slow"` | hard |
+| `pytest -q -m fast -n auto` | hard |
 | `pnpm lint` (oxlint + oxfmt) | hard |
 | `pnpm check` (svelte-check) | hard |
 | `pnpm test` (vitest + Playwright) | hard |
