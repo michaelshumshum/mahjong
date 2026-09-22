@@ -1902,6 +1902,10 @@ class Table:
                     "wall_remaining": len(state.wall.tiles),
                 },
             )
+        if self.settings.spectators_see_hands:
+            # spectators get no `deal`; a fresh snapshot is how they learn the new hands
+            for session_id in list(self.spectators):
+                self.publish_to_spectator(session_id, self.state_sync_wire(None))
 
     def _publish_turn_if_active(self) -> None:
         """Synthesize `turn` (02-protocol.md §3) whenever `self.state` is sitting in
@@ -1918,10 +1922,6 @@ class Table:
         merely advisory -- see that method and `_handle_turn_timeout`. `legal` is unicast to
         the acting seat only, matching `turn.legal`'s own "unicast to the acting seat" contract
         -- spectators get the same public `{seat, phase, deadline_ts}` shape every non-acting
-        if self.settings.spectators_see_hands:
-            # spectators get no `deal`; a fresh snapshot is how they learn the new hands
-            for session_id in list(self.spectators):
-                self.publish_to_spectator(session_id, self.state_sync_wire(None))
         seat does, never `legal` (it would name the acting seat's own concealed tile ids).
         """
         if self.state.phase != Phase.AWAIT_ACTION:

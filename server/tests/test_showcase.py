@@ -80,6 +80,12 @@ async def test_showcase_plays_itself_and_shows_spectators_every_hand() -> None:
     draw = next(f for f in spectator.frames if f["t"] == "draw")
     assert draw["tile_id"] is not None
 
+    # spectators get no `deal` -- each hand_start is followed by a snapshot with the new hands
+    kinds = [f["t"] for f in spectator.frames]
+    after_deal = spectator.frames[kinds.index("hand_start") + 1]
+    assert after_deal["t"] == "state_sync"
+    assert all(len(hand) >= 13 for hand in after_deal["hands"])
+
     await _shutdown(registry)
 
 
