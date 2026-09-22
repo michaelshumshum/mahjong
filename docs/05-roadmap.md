@@ -193,8 +193,10 @@ client-side (name-entry UI, `localStorage`, rendering) plus matchmaking and invi
 (`server/tests/test_spectator.py`). **Frontend built:** `/tables` lists running tables
 (`GET /tables`, [02-protocol.md §10](02-protocol.md)) with "Sit down" for open ones and "Watch" for
 ones in progress, and `/table/[id]` renders a spectator view whenever no seat is left to take
-([03-frontend.md §6](03-frontend.md)). Showing hands to spectators after a delay
-remains a real, un-built future enhancement — not required for a correct v1.
+([03-frontend.md §6](03-frontend.md)). **Open-hands spectating: built** as a per-table
+`TableSettings.spectators_see_hands` flag, used by the always-on all-bot `BOTS` showcase table
+([00-architecture.md §3](00-architecture.md), `server/tests/test_showcase.py`). Not built: a
+host-facing settings UI / wire message to toggle it, and a delayed reveal for human tables.
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer

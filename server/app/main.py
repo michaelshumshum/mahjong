@@ -32,6 +32,10 @@ whole test session) is this codebase's usual test-time-control answer to that --
 `disconnect_grace_seconds=0` idea `tests/test_disconnect_bot_handover.py` already established,
 applied here via env var instead of a `RuleSet` field since this is process-level, not per-game
 config.
+
+`SHOWCASE_TABLE_ID` (default `BOTS`, empty disables) names the always-on all-bot table
+(`TableRegistry.start_showcase`). Four characters, so it can never collide with a generated
+six-character invite code.
 """
 
 from __future__ import annotations
@@ -50,8 +54,10 @@ from pydantic import BaseModel
 from app import ws
 from app.db.session import make_engine, make_session_factory
 from app.table import WireSeatStatus
+from mahjong_core.config import DEFAULT_RULESET
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # docs/00-architecture.md §8.1 step 3, tunable via env
+_DEFAULT_SHOWCASE_TABLE_ID = "BOTS"
 
 
 @asynccontextmanager
@@ -60,6 +66,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine = make_engine(database_url) if database_url else None
     session_factory = make_session_factory(engine) if engine is not None else None
     registry = ws.reset_registry(session_factory=session_factory)
+    showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
+    if showcase_id:
+        registry.start_showcase(showcase_id, DEFAULT_RULESET)
     try:
         yield
     finally:

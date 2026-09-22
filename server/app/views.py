@@ -49,6 +49,10 @@ predates several fields added since M1/M2):
   engine never reads a clock") -- so both are override points a caller with a real `Table` behind
   it supplies; a bare `seat_view()` call with neither gets `None` for a seat with no live claim
   offer, matching every pre-Table-integration caller.
+- `reveal_hands` (`app/table.py`'s `TableSettings.spectators_see_hands`) is the open-hands
+  spectator: `seat=None` entitled to every seat's concealed tiles -- `SeatView.hands`, every
+  `OWN_SEAT` event field, and concealed-kong tiles. Spectator-only; passing it with a real seat
+  raises, so no seat can ever be handed another seat's tiles through this switch.
 """
 
 from __future__ import annotations
@@ -105,6 +109,7 @@ class Entitlement(Enum):
     OWN_SEAT = "own_seat"
     COUNT_ONLY = "count_only"
     HAND_END = "hand_end"
+    OPEN_HANDS = "open_hands"  # only an open-hands spectator (`reveal_hands`)
 
 
 def _entitled(entitlement: Entitlement) -> dict[str, Any]:
@@ -159,6 +164,19 @@ class SeatView:
     # secret) -- `None` for a caller with no `Table` behind it at all (bots/arena.py, every
     # pre-M5-host caller).
     host_seat: int | None = field(metadata=_entitled(Entitlement.PUBLIC))
+    # every seat's concealed tiles, open-hands spectator only (`reveal_hands`); `None` otherwise
+    hands: tuple[tuple[TileId, ...], ...] | None = field(
+        default=None, metadata=_entitled(Entitlement.OPEN_HANDS)
+    )
+
+
+def _check_reveal(seat: int | None, reveal_hands: bool) -> None:
+    if reveal_hands and seat is not None:
+        raise ValueError(f"reveal_hands is spectator-only, got seat {seat}")
+
+
+def _sees_concealed(viewer: int | None, owner: int, reveal_hands: bool) -> bool:
+    return viewer == owner or (reveal_hands and viewer is None)
 
 
 def seat_view(
@@ -171,6 +189,7 @@ def seat_view(
     turn_deadline_ts: int | None = None,
     hand_end_deadline_ts: int | None = None,
     host_seat: int | None = None,
+    reveal_hands: bool = False,
 ) -> SeatView:
     """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
     override point for the future `app/table.py` `SeatBinding` (see module docstring); omit it
@@ -193,8 +212,10 @@ def seat_view(
     other two, it's the same value for every seat (a whole-table wait, not a per-seat one), so
     it applies regardless of `seat`. `host_seat` is the analogous override for `SeatView.host_seat`
     -- `app/table.py` passes its own `Table.host_seat`; omit it (every caller with no `Table`
-    behind it) and it defaults to `None`.
+    behind it) and it defaults to `None`. `reveal_hands` fills `hands` for a spectator (module
+    docstring).
     """
+    _check_reveal(seat, reveal_hands)
     own_hand = state.seats[seat].concealed if seat is not None else ()
     legal = compute_legal_actions(state, seat) if seat is not None else ()
 
@@ -233,6 +254,7 @@ def seat_view(
         claim_options=claim_options,
         deadline_ts=deadline_ts,
         host_seat=host_seat,
+        hands=tuple(s.concealed for s in state.seats) if reveal_hands else None,
     )
 
 
@@ -366,15 +388,17 @@ WireEvent = (
 )
 
 
-def _build_event_wire(state: GameState, seat: int | None, event: Event) -> WireEvent:
+def _build_event_wire(
+    state: GameState, seat: int | None, event: Event, *, reveal_hands: bool = False
+) -> WireEvent:
     """The actual per-event redaction decision, as a typed, `Entitlement`-annotated instance.
     `redact_event` just serializes this; `tests/test_redaction.py` imports this function
     directly so the schema walker checks the same object that ships, not a re-derivation of it.
     """
+    _check_reveal(seat, reveal_hands)
     if isinstance(event, Drawn):
-        return DrawWire(
-            t="draw", seat=event.seat, tile_id=event.tile_id if seat == event.seat else None
-        )
+        sees = _sees_concealed(seat, event.seat, reveal_hands)
+        return DrawWire(t="draw", seat=event.seat, tile_id=event.tile_id if sees else None)
 
     if isinstance(event, FlowerReplaced):
         return FlowerReplaceWire(
@@ -387,7 +411,7 @@ def _build_event_wire(state: GameState, seat: int | None, event: Event) -> WireE
     if isinstance(event, MeldFormed):
         meld = event.meld
         if meld.kind == MeldKind.CONCEALED_KONG:
-            owns = seat == event.seat
+            owns = _sees_concealed(seat, event.seat, reveal_hands)
             return ConcealedKongWire(
                 t="meld",
                 seat=event.seat,
@@ -413,8 +437,9 @@ def _build_event_wire(state: GameState, seat: int | None, event: Event) -> WireE
         )
 
     if isinstance(event, KongReplacementDrawn):
+        sees = _sees_concealed(seat, event.seat, reveal_hands)
         return KongReplaceWire(
-            t="kong_replace", seat=event.seat, tile_id=event.tile_id if seat == event.seat else None
+            t="kong_replace", seat=event.seat, tile_id=event.tile_id if sees else None
         )
 
     if isinstance(event, HandEnded):
@@ -458,14 +483,16 @@ def _wire_value(value: Any) -> Any:
     return value
 
 
-def _meld_wire(meld: Meld, *, owner: int, viewer: int | None) -> dict[str, Any]:
+def _meld_wire(
+    meld: Meld, *, owner: int, viewer: int | None, reveal_hands: bool = False
+) -> dict[str, Any]:
     """Redact exactly like `_build_event_wire`'s `ConcealedKongWire` branch: a concealed kong's
     tiles go only to the declaring seat (`owner`) for the rest of the hand, `count` to everyone
     else -- `SeatView.melds`' field-level `PUBLIC` annotation is right in aggregate (which seats
     hold which meld kinds is public) but wrong for concealed-kong tile identity specifically,
     which needs this per-viewer check instead."""
     if meld.kind == MeldKind.CONCEALED_KONG:
-        owns = viewer == owner
+        owns = _sees_concealed(viewer, owner, reveal_hands)
         return {
             "kind": meld.kind.value,
             "tiles": list(meld.tiles) if owns else None,
@@ -508,7 +535,12 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "own_hand": list(view.own_hand),
         "concealed_counts": list(view.concealed_counts),
         "melds": [
-            [_meld_wire(m, owner=owner_seat, viewer=view.seat) for m in seat_melds]
+            [
+                _meld_wire(
+                    m, owner=owner_seat, viewer=view.seat, reveal_hands=view.hands is not None
+                )
+                for m in seat_melds
+            ]
             for owner_seat, seat_melds in enumerate(view.melds)
         ],
         "discard_pools": [list(pool) for pool in view.discard_pools],
@@ -521,10 +553,13 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "claim_options": [_claim_offer_wire(o, view.seat) for o in view.claim_options],
         "deadline_ts": view.deadline_ts,
         "host_seat": view.host_seat,
+        "hands": [list(h) for h in view.hands] if view.hands is not None else None,
     }
 
 
-def redact_event(state: GameState, seat: int | None, event: Event) -> dict[str, Any]:
+def redact_event(
+    state: GameState, seat: int | None, event: Event, *, reveal_hands: bool = False
+) -> dict[str, Any]:
     """Per-event wire redaction: the JSON-safe payload for one logical `Event`, to one
     recipient (`seat=None` -> spectator). One dict key per field of the wire form
     `_build_event_wire` chose; this is the logical payload, not a minified wire frame -- keys
@@ -532,5 +567,5 @@ def redact_event(state: GameState, seat: int | None, event: Event) -> dict[str, 
     rather than omitted, leaving the final envelope/omission policy to the Session layer that
     actually assembles `{v,t,seq,id,ts,d}` (02-protocol.md §1).
     """
-    wire = _build_event_wire(state, seat, event)
+    wire = _build_event_wire(state, seat, event, reveal_hands=reveal_hands)
     return {f.name: _wire_value(getattr(wire, f.name)) for f in fields(wire)}

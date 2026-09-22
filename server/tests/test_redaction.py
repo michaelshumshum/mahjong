@@ -244,10 +244,12 @@ def event_samples() -> list[tuple[GameState, Event]]:
 # --- the schema walker itself ---------------------------------------------------------------
 
 
-def _assert_wire_entitlement(wire: Any, viewer: int | None) -> None:
+def _assert_wire_entitlement(wire: Any, viewer: int | None, *, reveal_hands: bool = False) -> None:
     """Walk one produced wire instance's `Entitlement`-annotated fields structurally
     (00-architecture.md §5). Every field must carry an annotation -- a field with none fails
-    loudly rather than silently passing (see `test_walker_rejects_unannotated_field`)."""
+    loudly rather than silently passing (see `test_walker_rejects_unannotated_field`).
+    `reveal_hands` walks it as the open-hands spectator (`app/views.py`'s module docstring)."""
+    open_spectator = reveal_hands and viewer is None
     owner = getattr(wire, "seat", None)
     revealed = getattr(wire, "revealed", None)
     for f in fields(wire):
@@ -268,7 +270,9 @@ def _assert_wire_entitlement(wire: Any, viewer: int | None) -> None:
             continue
 
         if entitlement is Entitlement.OWN_SEAT:
-            entitled = viewer is not None and owner is not None and viewer == owner
+            entitled = open_spectator or (
+                viewer is not None and owner is not None and viewer == owner
+            )
             if not entitled:
                 assert value is None, (
                     f"{type(wire).__name__}.{f.name} leaked to seat {viewer} "
@@ -280,6 +284,13 @@ def _assert_wire_entitlement(wire: Any, viewer: int | None) -> None:
             if not revealed:
                 assert value is None, (
                     f"{type(wire).__name__}.{f.name} leaked before hand end: {value!r}"
+                )
+            continue
+
+        if entitlement is Entitlement.OPEN_HANDS:
+            if not open_spectator:
+                assert value is None, (
+                    f"{type(wire).__name__}.{f.name} leaked to non-open viewer {viewer}: {value!r}"
                 )
             continue
 
@@ -331,6 +342,8 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
         )
     else:
         assert view.own_hand == (), "spectator own_hand must be empty"
+    assert view.hands is None, f"hands populated without reveal_hands for seat {seat}"
+    assert seat_view_wire(view)["hands"] is None
 
     for action in view.legal_actions:
         leaked = _action_tile_ids(action) - allowed
@@ -519,3 +532,68 @@ def test_public_wire_forms_never_declare_hand_end_or_own_seat_for_group_fields()
             assert f.metadata.get("entitlement") in (Entitlement.PUBLIC, None) or f.name == "t", (
                 f"{cls.__name__}.{f.name} unexpectedly restricted"
             )
+
+
+# --- open-hands spectator (`reveal_hands`) --------------------------------------------------
+
+
+def test_open_hands_spectator_event_redaction(
+    event_samples: list[tuple[GameState, Event]],
+) -> None:
+    for state, event in event_samples:
+        wire = _build_event_wire(state, None, event, reveal_hands=True)
+        _assert_wire_entitlement(wire, None, reveal_hands=True)
+        d = redact_event(state, None, event, reveal_hands=True)
+        assert d == {f.name: _wire_value(getattr(wire, f.name)) for f in fields(wire)}
+
+        if isinstance(event, Drawn):
+            assert isinstance(wire, DrawWire)
+            assert wire.tile_id == event.tile_id
+        if isinstance(event, KongReplacementDrawn):
+            assert isinstance(wire, KongReplaceWire)
+            assert wire.tile_id == event.tile_id
+        if isinstance(event, MeldFormed) and event.meld.kind == MeldKind.CONCEALED_KONG:
+            assert isinstance(wire, ConcealedKongWire)
+            assert wire.tiles == tuple(event.meld.tiles)
+            assert wire.count is None
+
+
+def test_open_hands_spectator_seat_view(event_samples: list[tuple[GameState, Event]]) -> None:
+    seen_states = {id(state): state for state, _ in event_samples}
+    for state in seen_states.values():
+        view = seat_view(state, None, reveal_hands=True)
+        assert view.hands == tuple(s.concealed for s in state.seats)
+        assert view.own_hand == ()
+        assert view.legal_actions == ()
+        assert view.claim_options == ()
+
+        wire = seat_view_wire(view)
+        assert wire["hands"] == [list(s.concealed) for s in state.seats]
+        for owner_seat, seat_state in enumerate(state.seats):
+            for meld, wire_meld in zip(seat_state.melds, wire["melds"][owner_seat], strict=True):
+                assert wire_meld["tiles"] == list(meld.tiles)
+
+
+def test_reveal_hands_is_spectator_only() -> None:
+    state, event = _concealed_kong_sample()
+    for seat in range(4):
+        with pytest.raises(ValueError, match="spectator-only"):
+            seat_view(state, seat, reveal_hands=True)
+        with pytest.raises(ValueError, match="spectator-only"):
+            redact_event(state, seat, event, reveal_hands=True)
+
+
+def test_walker_catches_open_hands_leak() -> None:
+    @dataclass(frozen=True)
+    class _Snapshot:
+        seat: int | None = dataclasses.field(metadata={"entitlement": Entitlement.PUBLIC})
+        hands: tuple[tuple[int, ...], ...] | None = dataclasses.field(
+            metadata={"entitlement": Entitlement.OPEN_HANDS}
+        )
+
+    snapshot = _Snapshot(seat=None, hands=((1, 2), (3,), (), ()))
+    _assert_wire_entitlement(snapshot, None, reveal_hands=True)
+    with pytest.raises(AssertionError, match="leaked to non-open viewer"):
+        _assert_wire_entitlement(snapshot, None)
+    with pytest.raises(AssertionError, match="leaked to non-open viewer"):
+        _assert_wire_entitlement(dataclasses.replace(snapshot, seat=0), 0)

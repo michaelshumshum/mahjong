@@ -42,7 +42,12 @@ __init__`) picks the real tier (`T0`/`T1`/`T2`, default `T2`/`FaanBot`) every su
 binds seats 1-3 to `bot_tier` bots immediately, before seat 0's human ever `join`s -- a `bot`
 `SeatBinding.status`, distinct from `autoplay` (a seat that *was* human and lost its connection)
 but driven through the exact same `_poke_bots`/`BotJobTag`/`ProcessPoolExecutor` machinery, not
-a parallel code path. See `SeatBinding`'s docstring and `_bind_bot_seat`.
+a parallel code path. See `SeatBinding`'s docstring and `_bind_bot_seat`. `all_bots=True` binds
+all four and deals as soon as `run()` starts -- `app/registry.py`'s always-on showcase table.
+
+**Table settings.** `TableSettings` holds per-table options that aren't game rules (those live on
+`RuleSet`): `spectators_see_hands` switches spectators to the open-hands redaction
+(`app/views.py`'s `reveal_hands`). Swappable mid-game via `update_settings`.
 
 **Early exit is already inside `reduce()`.** `mahjong_core.engine._apply_claim_response`
 (landed in M2's engine-integration sub-task) calls `claims.can_close_early`/`resolve_claims`
@@ -146,6 +151,7 @@ __all__ = [
     "Table",
     "TableAlreadyStartedError",
     "TableFullError",
+    "TableSettings",
     "TimerHeap",
     "WireSeatStatus",
 ]
@@ -239,6 +245,11 @@ def _turn_draw_tile_for_current_turn(events: list[Event], state: GameState) -> T
         if isinstance(event, (Drawn, KongReplacementDrawn)) and event.seat == state.turn:
             return event.tile_id
     return None
+
+
+@dataclass(frozen=True, slots=True)
+class TableSettings:
+    spectators_see_hands: bool = False
 
 
 class SeatTakenError(Exception):
@@ -500,6 +511,8 @@ class Table:
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         bot_tier: str = DEFAULT_BOT_TIER,
         practice: bool = False,
+        all_bots: bool = False,
+        settings: TableSettings | None = None,
     ) -> None:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
@@ -535,6 +548,8 @@ class Table:
         # use) so a bare callable is enough.
         self.spectator_seq: dict[str, int] = {}
         self.spectators: dict[str, Callable[[int, dict[str, Any]], None]] = {}
+        self._spectator_close: dict[str, Callable[[], None]] = {}
+        self.settings = settings if settings is not None else TableSettings()
         self.deadlines = TimerHeap()  # claim + disconnect + turn deadlines -- see module docstring
         self._getter: asyncio.Task[Command | BotResult | SeatDisconnected | _WakeUp] | None = (
             None  # long-lived (D17)
@@ -593,8 +608,9 @@ class Table:
         # seats 1-3 are bound to `self._bot_tier` bots immediately, before anyone ever connects
         # -- see `_bind_bot_seat`'s docstring for why this is cleanest done here rather than on
         # a later "still empty after N seconds" trigger.
-        if practice:
-            for seat in range(1, 4):
+        self.all_bots = all_bots
+        if practice or all_bots:
+            for seat in range(0 if all_bots else 1, 4):
                 self._bind_bot_seat(seat)
 
     def submit(self, seat: int, action: Action) -> None:
@@ -912,7 +928,10 @@ class Table:
     # --- spectators (docs/00-architecture.md §3/§5, "Spectating" sub-task) -----------------
 
     def register_spectator(
-        self, session_id: str, send: Callable[[int, dict[str, Any]], None]
+        self,
+        session_id: str,
+        send: Callable[[int, dict[str, Any]], None],
+        close: Callable[[], None] | None = None,
     ) -> None:
         """Start treating `session_id` as an active spectator: seed its own `spectator_seq`/
         `ring` entry (D1 -- dense, gapless, independent of every seat's and every *other*
@@ -941,6 +960,8 @@ class Table:
         self.spectator_seq[session_id] = 0
         self.ring[session_id] = deque[Envelope](maxlen=512)
         self.spectators[session_id] = send
+        if close is not None:
+            self._spectator_close[session_id] = close
         self.publish_to_spectator(session_id, self.state_sync_wire(None))
 
     def unregister_spectator(self, session_id: str) -> None:
@@ -966,6 +987,23 @@ class Table:
         self.spectators.pop(session_id, None)
         self.spectator_seq.pop(session_id, None)
         self.ring.pop(session_id, None)
+        self._spectator_close.pop(session_id, None)
+
+    def close_spectators(self) -> None:
+        """Close every spectator connection registered with a `close` callback -- a showcase
+        table being replaced by its next game (`app/registry.py`). The client's own reconnect
+        lands it on whatever table now holds this id."""
+        for close in list(self._spectator_close.values()):
+            close()
+
+    def update_settings(self, settings: TableSettings) -> None:
+        """Swap this table's `TableSettings`; spectators get a fresh `state_sync` when what they
+        may see changed."""
+        reveal_changed = settings.spectators_see_hands != self.settings.spectators_see_hands
+        self.settings = settings
+        if reveal_changed:
+            for session_id in list(self.spectators):
+                self.publish_to_spectator(session_id, self.state_sync_wire(None))
 
     def publish_to_spectator(self, session_id: str, wire: dict[str, Any]) -> None:
         """Spectator analogue of `publish_to_seat`: stamp `wire` with this spectator session's
@@ -1022,6 +1060,7 @@ class Table:
             turn_deadline_ts=turn_deadline_ts,
             hand_end_deadline_ts=self._hand_end_deadline_ms,
             host_seat=self.host_seat,
+            reveal_hands=seat is None and self.settings.spectators_see_hands,
         )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
@@ -1061,6 +1100,10 @@ class Table:
         legally produce anything again (`_authorize` rejects everything once `legal_actions` is
         empty for every seat) -- stops.
         """
+        # an all-bot table has nobody to `ready` it -- deal and hand the first turn to its bot
+        # here, the first moment a running loop exists for `_arm_turn_timer`/bot jobs
+        self._maybe_start()
+        self._poke_bots()
         while True:
             await self.process_one()
             if self.state.phase == Phase.GAME_OVER:
@@ -1634,7 +1677,9 @@ class Table:
         }
         duration = self.state.ruleset.hand_end_seconds
         self._hand_end_deadline_ms = _now_ms() + round(duration * 1000)
-        if len(self._hand_end_acked) >= 4:
+        # an all-bot table rides out the full hold: nobody seated would dismiss it, and it's
+        # the spectators' only chance to read the result
+        if len(self._hand_end_acked) >= 4 and not self.all_bots:
             return True
         self._arm_hand_end_timer()
         return False
@@ -1873,6 +1918,10 @@ class Table:
         merely advisory -- see that method and `_handle_turn_timeout`. `legal` is unicast to
         the acting seat only, matching `turn.legal`'s own "unicast to the acting seat" contract
         -- spectators get the same public `{seat, phase, deadline_ts}` shape every non-acting
+        if self.settings.spectators_see_hands:
+            # spectators get no `deal`; a fresh snapshot is how they learn the new hands
+            for session_id in list(self.spectators):
+                self.publish_to_spectator(session_id, self.state_sync_wire(None))
         seat does, never `legal` (it would name the acting seat's own concealed tile ids).
         """
         if self.state.phase != Phase.AWAIT_ACTION:
@@ -1925,7 +1974,9 @@ class Table:
                 self._augment_event_wire(wire, event)
                 self.publish_to_seat(seat, wire)
             if self.spectators:
-                spectator_wire = redact_event(self.state, None, event)
+                spectator_wire = redact_event(
+                    self.state, None, event, reveal_hands=self.settings.spectators_see_hands
+                )
                 self._augment_event_wire(spectator_wire, event)
                 self._broadcast_to_spectators(spectator_wire)
             if isinstance(event, HandEnded):

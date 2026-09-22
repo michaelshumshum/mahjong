@@ -32,6 +32,13 @@ than a single eternal instance, specifically so this and `draining` below never 
 separate server lifetimes (a real process restart, or one `TestClient(app)` context in tests).
 `begin_shutdown` implements this registry's half of docs/00-architecture.md §8.1's drain
 sequence -- see its own docstring.
+
+**Showcase table.** `start_showcase` keeps one all-bot table (`Table(all_bots=True)`, open hands
+for spectators) running under a fixed id forever: when a game ends it holds the finished table
+for `restart_delay` seconds, then swaps in a fresh game under the same id and closes the old
+table's spectator sockets so their reconnect lands on the new one. The one exception to "a table
+id names one particular game". Never persisted (no `session_factory`) and not waited on by the
+shutdown drain -- bot-only, nothing to protect.
 """
 
 from __future__ import annotations
@@ -45,13 +52,16 @@ from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.table import Table, WireSeatStatus
+from app.table import Table, TableSettings, WireSeatStatus
 from bots.worker import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
 
 __all__ = ["TableRegistry", "TableSummary"]
 
 logger = logging.getLogger(__name__)
+
+
+SHOWCASE_RESTART_SECONDS = 30.0
 
 
 def _now_ms() -> int:
@@ -93,6 +103,8 @@ class TableRegistry:
         # docs/00-architecture.md §8.1 step 1: read by app/ws.py's connection accept and
         # app/main.py's /healthz once a drain has started (`begin_shutdown`).
         self.draining = False
+        self._showcase_id: str | None = None
+        self._showcase_task: asyncio.Task[None] | None = None
 
     def get(self, table_id: str) -> Table | None:
         """Lookup only -- `None` if no table with this id has ever been created."""
@@ -138,6 +150,61 @@ class TableRegistry:
         finally:
             self._tasks.pop(table_id, None)
 
+    def start_showcase(
+        self,
+        table_id: str,
+        ruleset: RuleSet,
+        *,
+        restart_delay: float = SHOWCASE_RESTART_SECONDS,
+        bot_tier: str = DEFAULT_BOT_TIER,
+    ) -> None:
+        """Start the always-on all-bot table under `table_id` (module docstring). The first game
+        is created before this returns, so no connection can race it into a plain table."""
+        if self._showcase_task is not None:
+            raise RuntimeError("showcase already started")
+        self._showcase_id = table_id
+        first = self._start_showcase_game(table_id, ruleset, bot_tier)
+        self._showcase_task = asyncio.create_task(
+            self._run_showcase(first, table_id, ruleset, restart_delay, bot_tier)
+        )
+
+    def _start_showcase_game(
+        self, table_id: str, ruleset: RuleSet, bot_tier: str
+    ) -> asyncio.Task[None]:
+        previous = self._tables.get(table_id)
+        table = Table(
+            table_id,
+            ruleset,
+            game_seed=time.time_ns(),
+            require_ready=True,
+            bot_pool=self._bot_pool,
+            bot_tier=bot_tier,
+            all_bots=True,
+            settings=TableSettings(spectators_see_hands=True),
+        )
+        self._tables[table_id] = table
+        if previous is not None:
+            previous.close_spectators()
+        task = asyncio.create_task(self._run(table_id, table))
+        self._tasks[table_id] = task
+        return task
+
+    async def _run_showcase(
+        self,
+        task: asyncio.Task[None],
+        table_id: str,
+        ruleset: RuleSet,
+        restart_delay: float,
+        bot_tier: str,
+    ) -> None:
+        while True:
+            try:
+                await task
+            except Exception:
+                logger.exception("showcase table %s crashed, restarting", table_id)
+            await asyncio.sleep(restart_delay)
+            task = self._start_showcase_game(table_id, ruleset, bot_tier)
+
     def is_running(self, table_id: str) -> bool:
         """Whether `table_id`'s background task is still alive -- `False` for an unknown table id
         or one whose game already reached `GAME_OVER` (`Table.run`'s own docstring)."""
@@ -145,16 +212,18 @@ class TableRegistry:
         return task is not None and not task.done()
 
     def list_tables(self) -> list[TableSummary]:
-        """Every still-running table at least one human has joined. Finished games (task gone)
+        """Every still-running table at least one human has joined, plus the showcase table
+        (even between games, while its finished table is still up). Finished games (task gone)
         are skipped since `_tables` never evicts them; so are tables nobody has sat at yet --
         every `/table/<id>` visit creates one, and a practice table is bot-only until its owner
         joins, so neither is a real table to browse."""
         summaries: list[TableSummary] = []
         for table_id, table in self._tables.items():
-            if not self.is_running(table_id):
-                continue
             bindings = table.seat_bindings
-            if not any(b is not None and b.status != "bot" for b in bindings):
+            if table_id != self._showcase_id and (
+                not self.is_running(table_id)
+                or not any(b is not None and b.status != "bot" for b in bindings)
+            ):
                 continue
             is_open = not table.started and any(b is None for b in bindings)
             summaries.append(
@@ -188,11 +257,15 @@ class TableRegistry:
         same "abandoned, same as a crash, but warned" §8.1 describes, not a second teardown path.
         """
         self.draining = True
+        if self._showcase_task is not None:
+            self._showcase_task.cancel()  # also cancels the game task it's awaiting
         ts = deadline_ts if deadline_ts is not None else _now_ms() + round(grace_seconds * 1000)
         targets = [
             (table_id, table)
             for table_id, table in self._tables.items()
-            if self.is_running(table_id) and any(b is not None for b in table.seat_bindings)
+            if table_id != self._showcase_id
+            and self.is_running(table_id)
+            and any(b is not None for b in table.seat_bindings)
         ]
         if not targets:
             return

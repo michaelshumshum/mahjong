@@ -99,6 +99,12 @@ registered, then every broadcast event and the public half of `turn`; a `join`/`
 that same connection promotes it to a seat. See [00-architecture.md §3](00-architecture.md) for
 why a spectator session, unlike a seat, is never reconnectable.
 
+On a table with `spectators_see_hands` set ([00-architecture.md §3](00-architecture.md)),
+spectators get the open-hands view instead: `state_sync.hands` is every seat's concealed tiles,
+`draw`/`kong_replace` carry `tile_id`, and concealed-kong `meld`s carry `tiles`. Spectators get no
+`deal`, so each new hand is followed by a fresh `state_sync` to every spectator. Seats' own streams
+are unchanged (`hands` is always `null` for a seat).
+
 ### Declining a claim on purpose
 
 `auto` has no `auto_win` toggle. Declining a winning claim is a real strategic choice under
@@ -115,7 +121,7 @@ Payload shapes below match `server/app/protocol.py` (§6) exactly.
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen). `d.names` (M5) is each seat's resolved guest display name, same indexing — `null` for an `empty` seat, always a real non-empty string for any bound seat, human or bot |
+| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen). `d.names` (M5) is each seat's resolved guest display name, same indexing — `null` for an `empty` seat, always a real non-empty string for any bound seat, human or bot. `d.hands` is every seat's concealed tiles for an open-hands spectator (§2 "Spectating"), `null` otherwise |
 | `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (same vocabulary as `state_sync` above, `empty` included — unreachable for a `require_ready=True` table, where dealing gates on all four seats bound, but a direct-construction `require_ready=False` table can reach hand 2+ with seats that were never joined at all); see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/table.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
 | `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; same "no backing `Event`" note as `hand_start` |
 | `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not yet emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event` to redact for those; mid-hand flower reveals (a normal draw) go through `reduce()` normally and *are* emitted |
@@ -427,6 +433,7 @@ GET /tables
 | --- | --- |
 | Only still-running tables (`TableRegistry.is_running`) | finished `Table`s are never evicted from the registry |
 | Only tables with at least one non-bot seat bound | every `/table/<id>` visit creates a table, and a practice table is bot-only until its owner joins |
+| …except the showcase table (`BOTS`), always listed, even between games | it's bot-only by design ([00-architecture.md §3](00-architecture.md)) |
 | `open` = not started and some seat `empty`; anything else is `in_progress` | an `in_progress` table can only be spectated (`?spectate=true`, §2) |
 
 `seats[i].status` is the same vocabulary as `state_sync.seat_status`.

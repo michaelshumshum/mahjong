@@ -233,6 +233,9 @@ class StateSyncPayload(BaseModel):
     # whichever seat's `join` was this table's first -- `None` before anyone has joined (never
     # actually observable on the wire, since `state_sync` is only ever sent once someone has).
     host_seat: int | None
+    # every seat's concealed tiles -- spectators of a `spectators_see_hands` table only
+    # (`app/table.py`'s `TableSettings`), `null` everywhere else
+    hands: list[list[int]] | None = None
 
 
 class HandStartPayload(BaseModel):

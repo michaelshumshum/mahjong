@@ -33,6 +33,8 @@ os.environ.setdefault("BOT_THINK_MIN_SECONDS", "0")
 os.environ.setdefault("BOT_THINK_MAX_SECONDS", "0")
 # read once when `app.main` builds its CORS middleware -- tests/test_main.py asserts against it
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
+# no always-on bot table: every `TestClient(app)` would otherwise start a real all-bot game
+os.environ.setdefault("SHOWCASE_TABLE_ID", "")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

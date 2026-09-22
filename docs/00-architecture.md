@@ -181,6 +181,18 @@ spectator gets `seat_view(state, None)`, every broadcast, and every `redact_even
 event)` output — except `claim_offer`, which is never sent to spectators since it would name the
 offered seat's own concealed tiles.
 
+**Table settings.** `TableSettings` (`app/table.py`) holds per-table options that aren't game rules
+(those are `RuleSet`). `spectators_see_hands` switches every spectator to the open-hands view (§5);
+`Table.update_settings` swaps it mid-game and resyncs spectators. No wire message sets it yet.
+
+**Showcase table.** `TableRegistry.start_showcase` (`app/registry.py`, started from `lifespan` for
+`SHOWCASE_TABLE_ID`, default `BOTS`, empty disables) keeps one all-bot, open-hands table running
+forever. `Table(all_bots=True)` binds all four seats and deals when `run()` starts; its hand-end
+hold runs the full `hand_end_seconds` (no human to ack, and it's the spectators' only time to read
+the result). After `GAME_OVER` the finished table stays up for 30s, then a fresh game replaces it
+under the same id and the old table's spectator sockets are closed so their reconnect lands on
+the new one. Not persisted, not waited on by the shutdown drain (§8.1).
+
 **Timer race.** `asyncio.wait_for(inbox.get(), timeout)` is wrong here: when the timer wins, the
 cancelled `get()` can silently drop an item that arrived in the same scheduler tick. `_next()`
 holds one long-lived `_inbox_getter()` task for the table's entire lifetime and only ever awaits
@@ -401,8 +413,13 @@ Invariants this enforces:
   identity is revealed only at hand end.
 - Flowers, melds, discard pool, scores: fully public — send them.
 - A spectator sees the union of what all four players show publicly, **not** their private
-  hands. Showing hands to spectators with a delay is deliberately out of scope — a spectator
-  seeing zero private hand info, full stop, is a correct v1.
+  hands — unless the table sets `spectators_see_hands` (§3), in which case `seat_view(state,
+  None, reveal_hands=True)` adds `hands` (every seat's concealed tiles) and `redact_event(...,
+  reveal_hands=True)` hands the spectator every `OWN_SEAT` field (draw/kong-replace tile ids,
+  concealed-kong tiles). `reveal_hands` raises for a real seat, so no player can ever be handed
+  another seat's tiles through it; the schema walker checks it under its own `OPEN_HANDS`
+  entitlement. There is no delay: an open-hands table is for watching bots (or a table that
+  opted in), where a spectator relaying hands to a player isn't a concern.
 
 **Bots consume the identical `seat_view` output a human's client would render from** — proof they
 can't cheat, and any bot is runnable as a client against a real server for integration testing.

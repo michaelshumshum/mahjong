@@ -469,7 +469,7 @@ async def ws_endpoint(
         # protocol.md §2 describes -- it would race every real client's own hello-before-join
         # handshake). Mirrors `?practice=true`'s existing shape on this same endpoint rather
         # than adding a new wire message.
-        table_obj.register_spectator(session.session_id, session._push)
+        table_obj.register_spectator(session.session_id, session._push, session.outbox.close)
     writer_task = asyncio.create_task(session.writer())
     try:
         while True:

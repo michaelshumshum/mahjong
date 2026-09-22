@@ -224,6 +224,7 @@ export interface StateSyncPayload {
 	claim_options: Record<string, unknown>[];
 	deadline_ts: number | null;
 	host_seat: number | null;
+	hands?: number[][] | null;
 }
 
 export interface HandStartPayload {
