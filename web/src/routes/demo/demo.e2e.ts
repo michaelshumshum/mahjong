@@ -84,7 +84,7 @@ test('score sheet demo: expanding a win round reveals its winning hand, a draw r
 	await round1Toggle.click();
 	const detail1 = scoreSheet.locator('#round-detail-1');
 	await expect(detail1).toBeVisible();
-	await expect(detail1).toContainText('West wins');
+	await expect(detail1).toContainText('Carol wins');
 	await expect(detail1).toContainText('Half Flush');
 	await expect(detail1.locator('.tile')).not.toHaveCount(0);
 	await expect(round1Toggle).toHaveAttribute('aria-expanded', 'true');

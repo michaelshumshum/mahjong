@@ -460,6 +460,12 @@
 	let scoreTotals: Totals = $derived(
 		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.score])) as Totals
 	);
+	let seatNames: Record<0 | 1 | 2 | 3, string> = $derived(
+		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.name])) as Record<
+			0 | 1 | 2 | 3,
+			string
+		>
+	);
 	// this hand's per-round detail (ScoreSheet's expandable-row capability): `null` for a mock's
 	// single synthesized row when the frozen scenario has no `handResult` (mid-game scenarios),
 	// otherwise built straight off the same fields the live FaanBreakdown overlay above reads.
@@ -807,11 +813,19 @@
 		</header>
 
 		<div class="seat-hand-strip seat-hand-strip--{position}">
-			<div class="tile-row backs-row" aria-label="{seat.concealedCount} concealed tiles">
-				{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
-					<div class="mini-tile back"><TileFace code={null} /></div>
-				{/each}
-			</div>
+			{#if seat.concealedHand}
+				<div class="tile-row backs-row" aria-label="{seat.name}'s concealed hand">
+					{#each seat.concealedHand as code, i (i)}
+						<div class="mini-tile"><TileFace {code} /></div>
+					{/each}
+				</div>
+			{:else}
+				<div class="tile-row backs-row" aria-label="{seat.concealedCount} concealed tiles">
+					{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
+						<div class="mini-tile back"><TileFace code={null} /></div>
+					{/each}
+				</div>
+			{/if}
 
 			{#if seat.flowers.length || seat.melds.length}
 				<div class="tile-row meld-row" aria-label="{seat.name}'s melds">
@@ -971,10 +985,20 @@
 							</div>
 						{/if}
 
-						{#if spectating}
-							<div class="hand-row" aria-label="{seatAt(0).concealedCount} concealed tiles">
+						<!-- spectators get the opponents' tile size: no seat here is "yours" -->
+						{#if spectating && seatAt(0).concealedHand}
+							<div class="tile-row backs-row" aria-label="{seatAt(0).name}'s concealed hand">
+								{#each seatAt(0).concealedHand ?? [] as code, i (i)}
+									<div class="mini-tile"><TileFace {code} /></div>
+								{/each}
+							</div>
+						{:else if spectating}
+							<div
+								class="tile-row backs-row"
+								aria-label="{seatAt(0).concealedCount} concealed tiles"
+							>
 								{#each Array.from({ length: seatAt(0).concealedCount }) as _, i (i)}
-									<div class="hand-tile"><TileFace code={null} /></div>
+									<div class="mini-tile back"><TileFace code={null} /></div>
 								{/each}
 							</div>
 						{:else}
@@ -1044,6 +1068,7 @@
 					{#if gameState.handResult.outcome === 'win'}
 						<FaanBreakdown
 							winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
+							{seatNames}
 							winningHand={gameState.handResult.winningHand ?? []}
 							melds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
 							patterns={gameState.handResult.patterns ?? []}
@@ -2177,7 +2202,7 @@
 			flex-direction: row;
 		}
 
-		.backs-row .mini-tile {
+		.backs-row .mini-tile.back {
 			margin-inline-end: -14px; // overlapping-backs strip, count-only
 
 			&:last-child {

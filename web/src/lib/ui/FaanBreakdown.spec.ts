@@ -9,12 +9,15 @@ describe('FaanBreakdown', () => {
 		{ name: 'No Flowers', faan: 1 },
 		{ name: 'Half Flush', faan: 3 }
 	];
+	// player names, not seat direction -- the win screen shows who won/lost.
+	const seatNames = { 0: 'Alice', 1: 'Bob', 2: 'Carol', 3: 'Dave' };
+
 	// discard win: seat 0 discarded into seat 2's 5-faan hand, half_spicy P(5) = 24
 	const payments: Payments = { 0: -24, 2: 24 };
 
 	it('renders one row per matched pattern', () => {
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 2, winningHand: [], patterns, totalFaan: 5, payments }
+			props: { winner: 2, seatNames, winningHand: [], patterns, totalFaan: 5, payments }
 		});
 		expect([...body.matchAll(/class="pattern-row[^"]*"/g)]).toHaveLength(3);
 		expect(body).toContain('All Sequences');
@@ -23,7 +26,7 @@ describe('FaanBreakdown', () => {
 
 	it('shows the plain total when the pattern sum is within the cap', () => {
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 2, winningHand: [], patterns, totalFaan: 5, payments }
+			props: { winner: 2, seatNames, winningHand: [], patterns, totalFaan: 5, payments }
 		});
 		expect(body).toContain('5 faan');
 		expect(body).not.toContain('capped from');
@@ -42,6 +45,7 @@ describe('FaanBreakdown', () => {
 		const { body } = render(FaanBreakdown, {
 			props: {
 				winner: 2,
+				seatNames,
 				winningHand: [],
 				patterns: stacked,
 				totalFaan: 10,
@@ -54,24 +58,37 @@ describe('FaanBreakdown', () => {
 
 	it('renders payment rows with signed amounts per seat, winner and payer only', () => {
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 2, winningHand: [], patterns, totalFaan: 5, payments }
+			props: { winner: 2, seatNames, winningHand: [], patterns, totalFaan: 5, payments }
 		});
 		expect([...body.matchAll(/class="payment-row[^"]*"/g)]).toHaveLength(2);
 		expect(body).toContain('+24');
 		expect(body).toContain('-24');
+		expect(body).toContain('Alice');
+		expect(body).toContain('Carol');
+		expect(body).not.toContain('East');
+		expect(body).not.toContain('West');
 	});
 
-	it('names the winning seat in the heading', () => {
+	it('names the winning player, not their seat direction, in the heading', () => {
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 3, winningHand: [], patterns, totalFaan: 5, payments: { 3: 24, 1: -24 } }
+			props: {
+				winner: 3,
+				seatNames,
+				winningHand: [],
+				patterns,
+				totalFaan: 5,
+				payments: { 3: 24, 1: -24 }
+			}
 		});
-		expect(body).toContain('North wins');
+		expect(body).toContain('Dave wins');
+		expect(body).not.toContain('North');
 	});
 
 	it('sorts the concealed hand by suit and rank regardless of wire order', () => {
 		const { body } = render(FaanBreakdown, {
 			props: {
 				winner: 2,
+				seatNames,
 				winningHand: ['9s', '1m', 'z5', '1s', '5p'],
 				patterns,
 				totalFaan: 5,
@@ -85,7 +102,15 @@ describe('FaanBreakdown', () => {
 	it('renders claimed melds separately from, and before, the concealed hand', () => {
 		const melds: WinningMeld[] = [{ kind: 'pung', tiles: ['9s', '9s', '9s'] }];
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 2, winningHand: ['1m', '2m', '3m'], melds, patterns, totalFaan: 5, payments }
+			props: {
+				winner: 2,
+				seatNames,
+				winningHand: ['1m', '2m', '3m'],
+				melds,
+				patterns,
+				totalFaan: 5,
+				payments
+			}
 		});
 		expect(body).toMatch(/class="melds\b/);
 		expect(body).toMatch(/class="concealed-hand\b/);
@@ -95,7 +120,14 @@ describe('FaanBreakdown', () => {
 
 	it('renders no meld group when there are no claimed melds', () => {
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 2, winningHand: ['1m', '2m', '3m'], patterns, totalFaan: 5, payments }
+			props: {
+				winner: 2,
+				seatNames,
+				winningHand: ['1m', '2m', '3m'],
+				patterns,
+				totalFaan: 5,
+				payments
+			}
 		});
 		expect(body).not.toMatch(/class="melds\b/);
 		expect(body).toMatch(/class="concealed-hand\b/);
@@ -104,7 +136,7 @@ describe('FaanBreakdown', () => {
 	it('renders a concealed_kong meld as backs, matching the in-play convention', () => {
 		const melds: WinningMeld[] = [{ kind: 'concealed_kong', tiles: ['z1', 'z1', 'z1', 'z1'] }];
 		const { body } = render(FaanBreakdown, {
-			props: { winner: 2, winningHand: [], melds, patterns, totalFaan: 5, payments }
+			props: { winner: 2, seatNames, winningHand: [], melds, patterns, totalFaan: 5, payments }
 		});
 		expect(body).toContain('concealed tile');
 		expect(body).not.toContain('alt="z1 tile"');

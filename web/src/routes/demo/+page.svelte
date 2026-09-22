@@ -125,6 +125,9 @@
 		{ seat: 2, name: 'Carol' },
 		{ seat: 3, name: 'Dave' }
 	];
+	const seatNames: Record<0 | 1 | 2 | 3, string> = Object.fromEntries(
+		scoreSeats.map((s) => [s.seat, s.name])
+	) as Record<0 | 1 | 2 | 3, string>;
 	const scoreHands: HandRecord[] = [
 		{
 			handNo: 1,
@@ -249,6 +252,7 @@
 	<div class="breakdown-row">
 		<FaanBreakdown
 			winner={2}
+			{seatNames}
 			winningHand={[
 				'1s',
 				'2s',
@@ -271,6 +275,7 @@
 		/>
 		<FaanBreakdown
 			winner={2}
+			{seatNames}
 			winningHand={['3s', '3s', '3s', '5s', '5s', '5s', '7s', '7s', '7s', '9s', '9s']}
 			melds={cappedMelds}
 			patterns={cappedPatterns}

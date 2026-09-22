@@ -26,11 +26,11 @@
 	// simply has no entry rather than an explicit 0.
 	export type Payments = Partial<Record<Seat, number>>;
 
-	const SEAT_LABEL: Record<Seat, string> = { 0: 'East', 1: 'South', 2: 'West', 3: 'North' };
 	const ALL_SEATS: Seat[] = [0, 1, 2, 3];
 
 	let {
 		winner,
+		seatNames,
 		winningHand,
 		melds = [],
 		patterns,
@@ -38,6 +38,9 @@
 		payments
 	}: {
 		winner: Seat;
+		// player names, not seat direction (docs/03-frontend.md) -- the win screen is about who
+		// won/lost, not table geometry.
+		seatNames: Record<Seat, string>;
 		winningHand: TileCode[];
 		melds?: WinningMeld[];
 		patterns: FaanPattern[];
@@ -82,7 +85,7 @@
 </script>
 
 <section class="faan-breakdown" aria-labelledby="faan-breakdown-heading">
-	<h2 id="faan-breakdown-heading">{SEAT_LABEL[winner]} wins</h2>
+	<h2 id="faan-breakdown-heading">{seatNames[winner]} wins</h2>
 
 	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
 		<div class="winning-hand">
@@ -132,7 +135,7 @@
 				class:payment-row--gain={amount > 0}
 				class:payment-row--loss={amount < 0}
 			>
-				<span class="payment-seat">{SEAT_LABEL[seat]}</span>
+				<span class="payment-seat">{seatNames[seat]}</span>
 				<span class="payment-amount">{amount > 0 ? '+' : ''}{amount}</span>
 			</li>
 		{/each}

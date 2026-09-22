@@ -76,6 +76,10 @@
 		return seats.find((s) => s.seat === seat)?.name ?? `Seat ${seat}`;
 	}
 
+	let seatNames = $derived(
+		Object.fromEntries(seats.map((s) => [s.seat, s.name])) as Record<Seat, string>
+	);
+
 	// running total per seat after each hand, derived from `hands` rather than read off `totals`
 	// directly — this is the exact arithmetic bug class the component exists to catch: if a
 	// hand's deltas don't sum to what `totals` reports, that's wrong data, not a display choice.
@@ -182,6 +186,7 @@
 								{#if hand.result.outcome === 'win' && hand.result.winner !== undefined}
 									<FaanBreakdown
 										winner={hand.result.winner}
+										{seatNames}
 										winningHand={hand.result.winningHand ?? []}
 										melds={hand.result.melds ?? []}
 										patterns={hand.result.patterns ?? []}
