@@ -18,8 +18,8 @@ Enforced for `server/`, `web/`, `shared/`, and infra files by
 `.claude/hooks/enforce-routing-table.sh` (Edit/Write/Bash) — it denies the write until the
 matching doc has shown up in this session (Read, or referenced in a Bash command/prompt).
 
-Compliance: start every task by replying with `Context read: <docs>` listing the trigger docs
-read this session, or `Context read: none` if no trigger applied.
+Compliance: start every task by replying with `**Context read: <docs>**` listing the trigger docs
+read this session, or `**Context read: N/A**` if no trigger applied.
 
 ## Communication
 
