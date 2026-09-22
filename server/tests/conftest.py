@@ -31,6 +31,8 @@ import pytest
 os.environ.setdefault("SHUTDOWN_GRACE_SECONDS", "0")
 os.environ.setdefault("BOT_THINK_MIN_SECONDS", "0")
 os.environ.setdefault("BOT_THINK_MAX_SECONDS", "0")
+# read once when `app.main` builds its CORS middleware -- tests/test_main.py asserts against it
+os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

@@ -98,7 +98,7 @@ def get_table(table_id: str) -> Table | None:
 
 def registry() -> TableRegistry:
     """Accessor for `app/main.py`'s `lifespan` (wiring a DB session factory at startup, running
-    the graceful-shutdown drain at shutdown) and `/healthz` (reading `.draining`)."""
+    the graceful-shutdown drain at shutdown), `/healthz` (reading `.draining`), and `/tables`."""
     return _registry
 
 

@@ -39,13 +39,17 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Literal
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app import ws
 from app.db.session import make_engine, make_session_factory
+from app.table import WireSeatStatus
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # docs/00-architecture.md §8.1 step 3, tunable via env
 
@@ -73,6 +77,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(ws.router)
+# the lobby fetches `/tables` cross-origin (web and api are separate origins in every compose
+# setup); comma-separated, unset -> no cross-origin reads.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
+    allow_methods=["GET"],
+)
+
+
+class SeatSummary(BaseModel):
+    status: WireSeatStatus
+    name: str | None
+
+
+class TableSummaryOut(BaseModel):
+    id: str
+    status: Literal["open", "in_progress"]
+    hand_no: int
+    seats: list[SeatSummary]
+
+
+class TableList(BaseModel):
+    tables: list[TableSummaryOut]
 
 
 @app.get("/healthz")
@@ -82,6 +109,25 @@ async def healthz() -> JSONResponse:
     if ws.registry().draining:
         return JSONResponse({"status": "draining"}, status_code=503)
     return JSONResponse({"status": "ok"})
+
+
+@app.get("/tables")
+async def list_tables() -> TableList:
+    """Lobby table browser (docs/02-protocol.md §10) -- `TableRegistry.list_tables`."""
+    return TableList(
+        tables=[
+            TableSummaryOut(
+                id=t.table_id,
+                status=t.status,
+                hand_no=t.hand_no,
+                seats=[
+                    SeatSummary(status=status, name=name)
+                    for status, name in zip(t.seat_status, t.names, strict=True)
+                ],
+            )
+            for t in ws.registry().list_tables()
+        ]
+    )
 
 
 if __name__ == "__main__":

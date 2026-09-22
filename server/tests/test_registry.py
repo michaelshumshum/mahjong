@@ -4,8 +4,8 @@
 `app/ws.py`'s own module-level `_registry` is exactly this class, already covered indirectly by
 every WS-integration test (`tests/test_ws_gameplay.py`, `tests/test_reconnect.py`,
 `tests/test_disconnect_bot_handover.py`). This file's own job is the registry's *own* behavior:
-dedup on repeated `get_or_create`, `get` on an unknown id, and the task-cleanup-on-`GAME_OVER`
-lifecycle `app/registry.py`'s module docstring documents.
+dedup on repeated `get_or_create`, `get` on an unknown id, the task-cleanup-on-`GAME_OVER`
+lifecycle `app/registry.py`'s module docstring documents, and the lobby's `list_tables`.
 """
 
 from __future__ import annotations
@@ -79,3 +79,44 @@ async def test_table_task_stops_and_is_cleaned_up_on_game_over() -> None:
     same_table = registry.get_or_create("table-gameover", DEFAULT_RULESET, seed=2)
     assert same_table is table
     assert not registry.is_running("table-gameover")
+
+
+def _noop_send(_seq: int, _frame: dict[str, object]) -> None:
+    pass
+
+
+async def test_list_tables_skips_tables_nobody_has_joined() -> None:
+    registry = TableRegistry()
+    registry.get_or_create("visited-only", DEFAULT_RULESET, seed=1, require_ready=True)
+    registry.get_or_create("practice", DEFAULT_RULESET, seed=1, require_ready=True, practice=True)
+    assert registry.list_tables() == []
+
+
+async def test_list_tables_reports_open_then_in_progress() -> None:
+    registry = TableRegistry()
+    table = registry.get_or_create("lobby-a", DEFAULT_RULESET, seed=1, require_ready=True)
+    table.join("s-alice", _noop_send, seat=2, name="Alice")
+
+    [summary] = registry.list_tables()
+    assert summary.table_id == "lobby-a"
+    assert summary.status == "open"
+    assert summary.hand_no == 1
+    assert summary.seat_status == ("empty", "empty", "connected", "empty")
+    assert summary.names == (None, None, "Alice", None)
+
+    table.start_with_bots(2)
+    [summary] = registry.list_tables()
+    assert summary.status == "in_progress"
+    assert summary.seat_status.count("bot") == 3
+
+
+async def test_list_tables_drops_finished_games() -> None:
+    registry = TableRegistry()
+    table = registry.get_or_create("lobby-done", DEFAULT_RULESET, seed=1, require_ready=False)
+    table.join("s-bob", _noop_send, seat=0, name="Bob")
+    assert [t.table_id for t in registry.list_tables()] == ["lobby-done"]
+
+    table.state = dataclasses.replace(table.state, phase=Phase.GAME_OVER, claim_window=None)
+    table.submit(0, Pass(window_id=0, seat=0))
+    await _wait_until_stopped(registry, "lobby-done")
+    assert registry.list_tables() == []

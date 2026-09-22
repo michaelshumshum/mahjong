@@ -40,20 +40,35 @@ import asyncio
 import logging
 import time
 from concurrent.futures import Executor
+from dataclasses import dataclass
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.table import Table
+from app.table import Table, WireSeatStatus
 from bots.worker import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
 
-__all__ = ["TableRegistry"]
+__all__ = ["TableRegistry", "TableSummary"]
 
 logger = logging.getLogger(__name__)
 
 
 def _now_ms() -> int:
     return time.time_ns() // 1_000_000
+
+
+@dataclass(frozen=True, slots=True)
+class TableSummary:
+    """One row of the lobby's table browser (`GET /tables`). `open` = still has an empty seat
+    and hasn't dealt; `in_progress` = everything else still running (join-able only as a
+    spectator)."""
+
+    table_id: str
+    status: Literal["open", "in_progress"]
+    hand_no: int
+    seat_status: tuple[WireSeatStatus, WireSeatStatus, WireSeatStatus, WireSeatStatus]
+    names: tuple[str | None, str | None, str | None, str | None]
 
 
 class TableRegistry:
@@ -128,6 +143,30 @@ class TableRegistry:
         or one whose game already reached `GAME_OVER` (`Table.run`'s own docstring)."""
         task = self._tasks.get(table_id)
         return task is not None and not task.done()
+
+    def list_tables(self) -> list[TableSummary]:
+        """Every still-running table at least one human has joined. Finished games (task gone)
+        are skipped since `_tables` never evicts them; so are tables nobody has sat at yet --
+        every `/table/<id>` visit creates one, and a practice table is bot-only until its owner
+        joins, so neither is a real table to browse."""
+        summaries: list[TableSummary] = []
+        for table_id, table in self._tables.items():
+            if not self.is_running(table_id):
+                continue
+            bindings = table.seat_bindings
+            if not any(b is not None and b.status != "bot" for b in bindings):
+                continue
+            is_open = not table.started and any(b is None for b in bindings)
+            summaries.append(
+                TableSummary(
+                    table_id=table_id,
+                    status="open" if is_open else "in_progress",
+                    hand_no=table.state.hand_no,
+                    seat_status=table.seat_status_tuple(),
+                    names=table.names_tuple(),
+                )
+            )
+        return summaries
 
     async def begin_shutdown(
         self, *, grace_seconds: float = 90.0, deadline_ts: int | None = None
