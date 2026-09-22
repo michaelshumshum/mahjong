@@ -42,11 +42,15 @@ class HelloPayload(BaseModel):
 
     last_seq: int | None = None
     client_version: str
-    # reconnect target on an already-bound seat (02-protocol.md §2/§5) -- client-asserted,
-    # permanently (00-architecture.md §2.1 cuts real accounts/tickets entirely; there is no
-    # verified identity to bind this to instead). Omit for a fresh connection awaiting `join`,
-    # unchanged M0 behavior.
+    # reconnect target on an already-bound seat (02-protocol.md §2/§5) -- client-asserted (which
+    # seat), but possession of it is checked via `secret` below (00-architecture.md §2.1). Omit
+    # for a fresh connection awaiting `join`, unchanged M0 behavior.
     seat: int | None = None
+    # the `reconnect_secret` this seat's original `join` ack returned (`AckPayload`, below) --
+    # required to actually reclaim `seat`; `Table.reconnect` refuses a missing or wrong one
+    # (`error{code:'bad_secret'}') via `secrets.compare_digest`. Omitted/`None` whenever `seat`
+    # is (this is the M0 no-op path with nothing to authenticate).
+    secret: str | None = None
     # deliberately no `name` field here -- `hello` is the reconnect/session message (`seat` only
     # ever makes sense for an already-bound seat reclaiming itself, per the field above), and the
     # server already has this seat's chosen name from its original `join`. `JoinPayload.name`
@@ -388,6 +392,11 @@ class AckPayload(BaseModel):
     id: str
     ok: bool
     error: str | None = None
+    # populated only on a successful `join`'s own ack -- the one-time reconnect credential
+    # (00-architecture.md §2.1) this seat must present back on every later `hello{seat, secret}`
+    # (`HelloPayload.secret`, above). `ack` is sender-only, never broadcast (§3 below), so this
+    # never reaches any connection but the one that just joined.
+    reconnect_secret: str | None = None
 
 
 class StateSync(Envelope):

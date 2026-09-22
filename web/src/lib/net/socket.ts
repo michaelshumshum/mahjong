@@ -69,6 +69,7 @@ type StatusListener = (status: ConnectionStatus) => void;
 export interface ResumeInfo {
 	lastSeq?: number | null;
 	seat?: number | null;
+	secret?: string | null;
 }
 
 /**
@@ -89,6 +90,7 @@ export class MahjongSocket {
 	#status: ConnectionStatus = 'idle';
 	#lastSeq: number | null = null;
 	#seat: number | null = null;
+	#secret: string | null = null;
 
 	#closedByUser = false;
 	#reconnectAttempts = 0;
@@ -114,21 +116,31 @@ export class MahjongSocket {
 		return this.#seat;
 	}
 
+	/** This seat's `reconnect_secret` (00-architecture.md §2.1), once its `join` ack has landed —
+	 * `null` before then, or for a connection that's never joined a seat. Callers persist it
+	 * (`lib/ui/settings-storage.ts`'s `saveSecretForTable`) so a later page load can feed it back
+	 * in via `connect({seat, secret})`. */
+	get secret(): string | null {
+		return this.#secret;
+	}
+
 	/** Learn (or clear) this connection's own seat once the reducer sees it in a `state_sync`
 	 * (StateSyncPayload.seat) — needed here so a later reconnect/resync `hello` can carry it. */
 	setSeat(seat: number | null): void {
 		this.#seat = seat;
 	}
 
-	/** `resume` seeds `last_seq`/`seat` before the first `hello` of this call — the page-reload
-	 * case, where a fresh `MahjongSocket` has no memory of a previous connection's stream.
-	 * Omit it for a plain fresh connect, or to just resume whatever this instance already
-	 * tracked itself (an unexpected mid-session close already resumes automatically). */
+	/** `resume` seeds `last_seq`/`seat`/`secret` before the first `hello` of this call — the
+	 * page-reload case, where a fresh `MahjongSocket` has no memory of a previous connection's
+	 * stream. Omit it for a plain fresh connect, or to just resume whatever this instance already
+	 * tracked itself (an unexpected mid-session close already resumes automatically — `#secret`
+	 * is captured on the fly from `join`'s own ack, below). */
 	connect(resume?: ResumeInfo): void {
 		this.#closedByUser = false;
 		if (resume) {
 			if (resume.lastSeq !== undefined) this.#lastSeq = resume.lastSeq;
 			if (resume.seat !== undefined) this.#seat = resume.seat;
+			if (resume.secret !== undefined) this.#secret = resume.secret;
 		}
 		if (this.#reconnectTimer !== null) {
 			clearTimeout(this.#reconnectTimer);
@@ -289,6 +301,7 @@ export class MahjongSocket {
 		const d: HelloPayload = { client_version: CLIENT_VERSION };
 		if (this.#lastSeq !== null) d.last_seq = this.#lastSeq;
 		if (this.#seat !== null) d.seat = this.#seat;
+		if (this.#secret !== null) d.secret = this.#secret;
 		const msg: Hello = { v: 1, id: nextId(), ts: Date.now(), t: 'hello', d };
 		this.#send(msg);
 	}
@@ -333,6 +346,16 @@ export class MahjongSocket {
 	 * frame with `seq <= lastSeq` is a stale replay duplicate and is silently ignored. */
 	#ingest(event: ServerEvent): void {
 		const seq = typeof event.seq === 'number' ? event.seq : null;
+
+		// `join`'s own ack carries this seat's one-time reconnect credential
+		// (00-architecture.md §2.1) — captured here, not just left for a caller to persist, so
+		// this same socket instance can already present it on a later automatic reconnect
+		// (`#scheduleReconnect` → `#doConnect` → `#sendHello`) within this page's lifetime,
+		// same as `#lastSeq` self-tracks. `saveSecretForTable` (settings-storage.ts) is a
+		// separate, caller-driven step for surviving a page reload.
+		if (event.t === 'ack' && event.d.reconnect_secret != null) {
+			this.#secret = event.d.reconnect_secret;
+		}
 
 		if (event.t === 'state_sync') {
 			if (seq !== null) this.#lastSeq = seq;

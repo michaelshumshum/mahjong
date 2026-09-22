@@ -46,6 +46,7 @@ from app.outbox import BoundedOutbox
 from app.registry import TableRegistry
 from app.table import (
     NotHostError,
+    SeatAuthError,
     SeatNotBoundError,
     SeatTakenError,
     Table,
@@ -205,12 +206,21 @@ class Session:
         self._local_seq += 1
         self.outbox.push({"v": 1, "t": t, "seq": self._local_seq, "ts": _now_ms(), "d": payload})
 
-    def _ack(self, msg: _IdempotentMessage, *, ok: bool, error: str | None = None) -> None:
+    def _ack(
+        self,
+        msg: _IdempotentMessage,
+        *,
+        ok: bool,
+        error: str | None = None,
+        reconnect_secret: str | None = None,
+    ) -> None:
         if msg.id is None:
             return  # ack is keyed on id (02-protocol.md §1) -- no id, nothing to acknowledge
         payload: dict[str, Any] = {"id": msg.id, "ok": ok}
         if error is not None:
             payload["error"] = error
+        if reconnect_secret is not None:
+            payload["reconnect_secret"] = reconnect_secret
         if self.seat is not None:
             self.table.publish_to_seat(self.seat, {"t": "ack", **payload})
         else:
@@ -264,12 +274,14 @@ class Session:
         # wrong-direction handling M0's own comment described).
 
     async def _handle_hello(self, msg: proto.Hello) -> None:
-        """`hello{last_seq, seat}` on an already-bound seat is 02-protocol.md §2's reconnect
-        path ("a reconnecting player doesn't re-join... hello{last_seq} on an already-bound
-        seat reclaims it directly"). `seat` (not part of the wire table before this sub-task)
-        is client-asserted, permanently -- see `HelloPayload`'s own docstring; there is no
-        ticket or account system in this design to bind it to instead. `d.seat is None` is the
-        unchanged M0 no-op (a bare `hello` ahead of a fresh `join`)."""
+        """`hello{last_seq, seat, secret}` on an already-bound seat is 02-protocol.md §2's
+        reconnect path ("a reconnecting player doesn't re-join... hello{last_seq} on an
+        already-bound seat reclaims it directly"). `seat` is still client-asserted (which seat),
+        but `secret` -- the one-time credential that seat's own `join` ack returned
+        (`HelloPayload`/`AckPayload` docstrings) -- is checked against `SeatBinding.
+        reconnect_secret` before the reclaim happens (00-architecture.md §2.1); there is still no
+        account system behind it, only proof of having been handed this seat's `join` ack.
+        `d.seat is None` is the unchanged M0 no-op (a bare `hello` ahead of a fresh `join`)."""
         if msg.d.seat is None:
             return
         if self.seat is not None:
@@ -278,7 +290,9 @@ class Session:
             )
             return
         try:
-            was_disconnected = self.table.reconnect(msg.d.seat, self.session_id, self._push)
+            was_disconnected = self.table.reconnect(
+                msg.d.seat, self.session_id, self._push, msg.d.secret
+            )
         except SeatNotBoundError:
             self._send_local(
                 "error", {"code": "no_such_seat", "message": f"seat {msg.d.seat} is not bound"}
@@ -290,6 +304,11 @@ class Session:
             # own docstring). Same wire error `join` gives a seat someone else already holds.
             self._send_local(
                 "error", {"code": "seat_taken", "message": f"seat {msg.d.seat} is a bot seat"}
+            )
+            return
+        except SeatAuthError:
+            self._send_local(
+                "error", {"code": "bad_secret", "message": f"wrong secret for seat {msg.d.seat}"}
             )
             return
         self.seat = msg.d.seat
@@ -308,7 +327,9 @@ class Session:
             self._ack(msg, ok=False, error="table_full")
             return
         self.seat = seat
-        self._ack(msg, ok=True)
+        binding = self.table.seat_bindings[seat]
+        assert binding is not None
+        self._ack(msg, ok=True, reconnect_secret=binding.reconnect_secret)
 
     # --- idempotent gameplay intents (02-protocol.md §1/§2) ---------------------------------
 

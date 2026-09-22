@@ -54,12 +54,16 @@ def _next_id() -> str:
     return f"c-{next(_id_gen)}"
 
 
-def _hello(*, last_seq: int | None = None, seat: int | None = None) -> dict[str, object]:
+def _hello(
+    *, last_seq: int | None = None, seat: int | None = None, secret: str | None = None
+) -> dict[str, object]:
     d: dict[str, object] = {"client_version": "test"}
     if last_seq is not None:
         d["last_seq"] = last_seq
     if seat is not None:
         d["seat"] = seat
+    if secret is not None:
+        d["secret"] = secret
     return _msg("hello", d)
 
 
@@ -74,13 +78,16 @@ def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
     return tuple(ids[:count])
 
 
-def _join_and_ready_all(wss: list) -> None:  # type: ignore[type-arg]
+def _join_and_ready_all(wss: list) -> dict[int, str]:  # type: ignore[type-arg]
     """Join all four seats (seat i on connection i) and ready them up -- same choreography
     `tests/test_reconnect.py`'s helper of the same name established, minus its `last_seq`
-    bookkeeping (this file never needs a gap-replay `last_seq`)."""
+    bookkeeping (this file never needs a gap-replay `last_seq`). Returns each seat's
+    `reconnect_secret` from its own `join` ack (00-architecture.md §2.1), needed by this file's
+    own `_hello(seat=..., secret=...)` reconnect."""
     for ws in wss:
         ws.send_json(_hello())
     bound = [False, False, False, False]
+    secret: dict[int, str] = {}
     for seat, ws in enumerate(wss):
         ws.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
         bound[seat] = True
@@ -92,6 +99,7 @@ def _join_and_ready_all(wss: list) -> None:  # type: ignore[type-arg]
         assert sync["t"] == "state_sync"
         ack = ws.receive_json()
         assert ack["t"] == "ack"
+        secret[seat] = ack["d"]["reconnect_secret"]
 
     for seat in range(3):
         wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
@@ -108,6 +116,7 @@ def _join_and_ready_all(wss: list) -> None:  # type: ignore[type-arg]
         assert turn["t"] == "turn"
     ack3 = wss[3].receive_json()
     assert ack3["t"] == "ack"
+    return secret
 
 
 def _rig_disconnect_state(seed: int) -> GameState:
@@ -171,7 +180,8 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
         table.state = _rig_disconnect_state(seed=1)
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws1:
-            _join_and_ready_all([ws0, ws1, ws2, ws3])
+            secret = _join_and_ready_all([ws0, ws1, ws2, ws3])
+            seat1_secret = secret[1]
         # ws1's `with` block just exited -- only seat 1 disconnects; ws0/ws2/ws3 stay live.
 
         observers = (ws0, ws2, ws3)
@@ -229,7 +239,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
         # --- reconnect: status flips back, the bot stops acting for the seat (D12 staleness
         # drop doubling as "stop", app/table.py's reconnect() docstring).
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
-            ws1b.send_json(_hello(seat=1))
+            ws1b.send_json(_hello(seat=1, secret=seat1_secret))
 
             for ws in observers:
                 frame = ws.receive_json()

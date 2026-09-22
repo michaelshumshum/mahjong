@@ -80,14 +80,30 @@ already-bound seat on reconnect, and the server already has the name from that s
 `join`; `SeatBinding.name` holds it for the game).
 
 ```
-client ──ws://…/ws?table=…──────────────────────────────────────────► WS endpoint
-client ──join{seat?, name?}──────────────────────────────────────────► Session binds this seat
-client ──hello{seat}──(a later reconnect, same seat)─────────────────► Session reclaims it
+client ──ws://…/ws?table=…────────────────────────────────────────────► WS endpoint
+client ──join{seat?, name?}────────────────────────────────────────────► Session binds this seat,
+                                                                          ack carries a fresh
+                                                                          reconnect_secret
+client ──hello{seat, secret}──(a later reconnect, same seat)──────────► Session reclaims it iff
+                                                                          secret matches
 ```
 
-Seat identity is permanently client-asserted: a `join{seat, name}` or `hello{seat}` is trusted at
-face value, nothing verifies the connection is who bound that seat first. Accepted for a
-guest-only game with no real stakes and no credential anywhere in this design to check against.
+**Seat identity (which seat, whose name) is client-asserted; seat *possession* is not.** `join`
+mints a random per-seat credential — `SeatBinding.reconnect_secret`, `secrets.token_urlsafe(16)`
+— and hands it back exactly once, in that `join`'s own `ack` (`AckPayload.reconnect_secret`;
+`ack` is sender-only, never broadcast, `docs/02-protocol.md §3`). The client persists it in
+`localStorage` alongside the seat number (`web/src/lib/ui/settings-storage.ts`'s
+`saveSecretForTable`/`loadSecretForTable`) and presents it on every later `hello{seat, secret}`;
+`Table.reconnect` compares it against the binding with `secrets.compare_digest` (constant-time)
+and refuses the reclaim — `error{code:'bad_secret'}` — on any mismatch, including a missing
+secret. This closes a real seat-hijack gap an earlier version of this design accepted: previously
+any `hello{seat}` reclaimed that seat outright, so a second browser — or a malicious client that
+simply guessed a live seat number, 0-3 — could silently steal a live seat mid-game, same
+display name or not, with the original connection never notified. Still no account behind any of
+this: the secret authenticates "the browser `join` handed this seat to," not a person, so a
+player who loses their `localStorage` (new device, cleared storage, a private-browsing tab) loses
+the seat exactly as before this change — the guest-only, no-real-stakes tradeoff is unchanged,
+only the hijack path is closed instead of open.
 
 ## 3. Core model
 

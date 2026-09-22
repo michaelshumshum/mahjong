@@ -470,10 +470,21 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         window = table.state.claim_window
         assert window is not None and len(window.offers) == 1 and window.offers[0].seat == 3
         window_id_3 = window.window_id
+        seat3_binding = table.seat_bindings[3]
+        assert seat3_binding is not None
+        seat3_secret = seat3_binding.reconnect_secret
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws3b:
             ws3b.send_json(
-                _msg("hello", {"client_version": "test", "seat": 3, "last_seq": seat3_last_seq})
+                _msg(
+                    "hello",
+                    {
+                        "client_version": "test",
+                        "seat": 3,
+                        "last_seq": seat3_last_seq,
+                        "secret": seat3_secret,
+                    },
+                )
             )
 
             missed_disconnect = _recv(ws3b, 3)

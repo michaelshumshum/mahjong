@@ -6,6 +6,7 @@ export const CLIENT_PREFS_STORAGE_KEY = 'mahjong:clientPrefs:v1';
 export const AUTO_ARM_STORAGE_KEY = 'mahjong:autoArm:v1';
 export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v1:';
+const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v1:';
 
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 
@@ -103,4 +104,20 @@ export function loadSeatForTable(tableId: string): number | null {
 
 export function saveSeatForTable(tableId: string, seat: number): void {
 	writeRaw(SEAT_STORAGE_KEY_PREFIX + tableId, JSON.stringify(seat));
+}
+
+function isReconnectSecret(value: unknown): value is string {
+	return typeof value === 'string' && value.length > 0;
+}
+
+/** The per-seat reconnect credential `join`'s own ack returns (00-architecture.md §2.1,
+ * `AckPayload.reconnect_secret`) -- required on every later `hello{seat, secret}` or the server
+ * refuses the reclaim (`error{code:'bad_secret'}'`). Keyed per-table, same as the seat number
+ * above, since it only means something for that table's own seat binding. */
+export function loadSecretForTable(tableId: string): string | null {
+	return load(RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId, isReconnectSecret);
+}
+
+export function saveSecretForTable(tableId: string, secret: string): void {
+	writeRaw(RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId, JSON.stringify(secret));
 }

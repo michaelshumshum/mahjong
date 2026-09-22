@@ -76,6 +76,18 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "reconnect_secret": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reconnect Secret"
         }
       },
       "required": [
@@ -1501,6 +1513,18 @@
           ],
           "default": null,
           "title": "Seat"
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secret"
         }
       },
       "required": [

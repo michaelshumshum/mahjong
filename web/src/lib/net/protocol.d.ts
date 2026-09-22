@@ -157,6 +157,7 @@ export interface HelloPayload {
 	last_seq?: number | null;
 	client_version: string;
 	seat?: number | null;
+	secret?: string | null;
 }
 
 export interface PingPayload {
@@ -329,6 +330,7 @@ export interface AckPayload {
 	id: string;
 	ok: boolean;
 	error?: string | null;
+	reconnect_secret?: string | null;
 }
 
 /** Client -> server intents (docs/02-protocol.md §2). */

@@ -108,6 +108,7 @@ import itertools
 import logging
 import os
 import random
+import secrets
 import time
 from collections import deque
 from collections.abc import Callable
@@ -277,11 +278,25 @@ class SeatNotBoundError(Exception):
         self.seat = seat
 
 
+class SeatAuthError(Exception):
+    """Raised by `Table.reconnect(seat, ..., secret=...)` when `seat` is bound but the presented
+    `secret` doesn't match `SeatBinding.reconnect_secret` (wire `error{code:'bad_secret'}',
+    `app/ws.py`) -- including a missing/`None` secret. Distinct from `SeatNotBoundError`: that
+    one fires when there's no binding to reclaim at all; this one fires when there is one but the
+    caller hasn't proven it's the seat's own reconnecting browser (00-architecture.md §2.1)."""
+
+    def __init__(self, seat: int) -> None:
+        super().__init__(f"seat {seat} secret mismatch")
+        self.seat = seat
+
+
 class NotHostError(Exception):
     """Raised by `Table.start_with_bots(seat)` when `seat` isn't `self.host_seat` (wire
     `error{code:'not_host'}`). Host is whichever seat's `join` was this table's first --
     the simplest rule that needs no extra client-asserted state, consistent with this design's
-    existing "seat identity is permanently client-asserted" posture (00-architecture.md §2.1)."""
+    existing "which seat, whose name" client-asserted posture (00-architecture.md §2.1) -- seat
+    *possession* is a separate, secret-verified concern (`SeatAuthError`) that doesn't bear on
+    host selection at all."""
 
     def __init__(self, seat: int) -> None:
         super().__init__(f"seat {seat} is not the host")
@@ -335,6 +350,14 @@ class SeatBinding:
     `JoinPayload`) or `_bind_bot_seat` and never touched again: a `hello` reconnect doesn't
     resend it (02-protocol.md §2/§5 -- the server already has it), so there is nothing for
     `reconnect()` to update on this field.
+
+    `reconnect_secret` (00-architecture.md §2.1) is a random per-seat credential, minted once
+    here and handed back exactly once, in `join`'s own `ack` (`app/ws.py`'s `_handle_join`,
+    `AckPayload.reconnect_secret`) -- never resent on `state_sync` or any broadcast. Every later
+    `hello{seat, secret}` must present it back; `reconnect()` compares with
+    `secrets.compare_digest` and refuses the reclaim on any mismatch (`SeatAuthError`). A bot
+    seat's secret (`_bind_bot_seat`) is never handed to anyone -- `reconnect()` already refuses a
+    bot seat before it would check.
     """
 
     session_id: str
@@ -346,6 +369,7 @@ class SeatBinding:
     auto_pass_chow: bool = False
     idempotency: IdempotencyCache = field(default_factory=IdempotencyCache)
     turn_timeout_strikes: int = 0
+    reconnect_secret: str = field(default_factory=lambda: secrets.token_urlsafe(16))
 
 
 @dataclass(frozen=True)
@@ -762,7 +786,11 @@ class Table:
     # --- reconnect / resync (docs/02-protocol.md §5, docs/00-architecture.md §8) -----------
 
     def reconnect(
-        self, seat: int, session_id: str, send: Callable[[int, dict[str, Any]], None]
+        self,
+        seat: int,
+        session_id: str,
+        send: Callable[[int, dict[str, Any]], None],
+        secret: str | None,
     ) -> bool:
         """Rebind an already-bound seat's live connection to a fresh socket
         (02-protocol.md §2: "hello{last_seq} on an already-bound seat reclaims it directly").
@@ -775,7 +803,10 @@ class Table:
         mode, `_bind_bot_seat`) rather than a human -- there is no prior human occupant to hand
         the seat back to, so a `hello{seat}` naming it is refused the same way `join` refuses a
         seat someone else already holds (`app/ws.py`'s `_handle_hello` turns this into the same
-        `error{code:'seat_taken'}` `join` would).
+        `error{code:'seat_taken'}` `join` would). Raises `SeatAuthError` (00-architecture.md
+        §2.1) if `secret` doesn't match `binding.reconnect_secret` -- checked with
+        `secrets.compare_digest` (constant-time) before anything about the binding changes, so a
+        wrong or missing secret never rebinds the live connection, not even transiently.
 
         Also flips `status` back to `connected` (00-architecture.md §8 "Player reconnects": "Bot
         relinquishes the seat") if this seat was `disconnected`/`autoplay` -- and drops any
@@ -801,6 +832,8 @@ class Table:
             raise SeatNotBoundError(seat)
         if binding.status == "bot":
             raise SeatTakenError(seat)
+        if not secrets.compare_digest(binding.reconnect_secret, secret or ""):
+            raise SeatAuthError(seat)
         # Same promotion as `join` above: a `?spectate=true` connection that turns out to be
         # reclaiming a seat (`hello{seat}`) stops receiving the spectator-shaped stream here,
         # before `resume()` sends anything on the real seat stream.
@@ -1390,7 +1423,15 @@ class Table:
         `_handle_claim_timeout` already uses for claim timers) -- or the seat somehow isn't
         `disconnected` anymore for any other reason. Otherwise flips the seat to `autoplay` and
         broadcasts `seat_state`; `_poke_bots()` (this tick's own tail, `process_one()`) picks up
-        the transition and submits a job if this seat currently has a decision to make."""
+        the transition and submits a job if this seat currently has a decision to make.
+
+        Pre-start (`not self.started`), there's no hand for a bot to play, so `AUTOPLAY` would
+        just mean "occupied forever, doing nothing" -- the seat frees back to `None` instead,
+        so it can be rejoined and an abandoned waiting-room table stops showing up in
+        `TableRegistry.list_tables()` as taken with nobody actually there. This only fires once
+        the grace window has fully elapsed with no reconnect, so a brief disconnect during
+        lobby setup (a reload, a network blip) still resolves via the ordinary reconnect path
+        (`reconnect()`/`resume()`) same as it does mid-game."""
         seat = self._disconnect_timer_seat.get(timer_id)
         if seat is None:
             return
@@ -1398,6 +1439,14 @@ class Table:
             return
         binding = self.seat_bindings[seat]
         if binding is None or binding.status != "disconnected":
+            return
+        if not self.started:
+            self.seat_bindings[seat] = None
+            self._pending_bot.pop(seat, None)
+            self._active_disconnect_timer.pop(seat, None)
+            if self.host_seat == seat:
+                self.host_seat = None
+            self._broadcast_wire({"t": "seat_state", "seat": seat, "status": "empty", "name": None})
             return
         binding.status = "autoplay"
         self._broadcast_wire(

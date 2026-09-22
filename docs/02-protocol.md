@@ -10,8 +10,10 @@ leaderboard.
 (`docs/00-architecture.md §2.1`). A player picks a display name client-side, persisted in
 `localStorage` so it survives a reload, and sends it once as a plain field on `join` (§2's
 table) — not `hello`: `hello.seat` only ever means "reclaim an already-bound seat", and the
-server already has the name from that seat's original `join` (`JoinPayload.name`). Seat identity
-is permanently client-asserted, not verified against anything — see §5's reconnect note.
+server already has the name from that seat's original `join` (`JoinPayload.name`). **Seat
+possession**, unlike seat/name choice, *is* verified: `join`'s own `ack` carries a one-time
+`reconnect_secret` (`AckPayload.reconnect_secret`), and every later `hello{seat, secret}` must
+present it back or the reclaim is refused — see §5's reconnect note.
 
 ## 1. Envelope
 
@@ -63,7 +65,7 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `hello` | `{last_seq?, client_version, seat?}` | first frame after connect. `seat` present + already bound -> reconnect (§5); omitted -> the M0 no-op ahead of `join`. No `name` field — the server already has it from that seat's original `join`, so a reconnect never resends it |
+| `hello` | `{last_seq?, client_version, seat?, secret?}` | first frame after connect. `seat` present + already bound -> reconnect (§5), authenticated by `secret` (Auth note above) -- a missing or wrong one refuses the reclaim (`error{code:'bad_secret'}`); omitted -> the M0 no-op ahead of `join`. No `name` field — the server already has it from that seat's original `join`, so a reconnect never resends it |
 | `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` (M5) is a client-chosen guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty/omitted; never hard-rejected (`server/app/table.py`'s `_normalize_name`). A `hello` reconnect never resends it |
 | `ready` | `{}` | lobby → start; only valid once seated |
 | `hand_end_ack` | `{}` | dismiss the hand-end hold early ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — every hand end (win or exhaustive draw) holds the table at `HAND_OVER` until all four seats send this or `ruleset.hand_end_seconds` elapses, whichever first |
@@ -137,7 +139,7 @@ Payload shapes below match `server/app/protocol.py` (§6) exactly.
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand actually played; `scores` are final absolute per-seat totals |
 | `seat_state` | `{seat, status: connected\|disconnected\|autoplay\|bot, name?}` | `connected`/`disconnected`/`autoplay` transitions are real as of M3 sub-task 6 (`app/table.py`'s `mark_disconnected`/`reconnect`/the disconnect-grace timer); `bot` is unused — every seat here started as a human `join`, so there's no seat that was *never* human to label `bot` instead of `autoplay`. `empty` (`state_sync`/`hand_start` above) never appears here either — a seat only ever gets a `seat_state` frame once it's bound (`join`'s own broadcast is what announces the empty→`connected` transition live to every already-bound seat), and nothing ever unbinds a seat afterward. `name` (M5) is this seat's resolved guest display name, carried on every `seat_state` broadcast for that seat, not just its first |
 | `server_shutdown` | `{deadline_ts}` | broadcast once, to every seat ever bound in the table, when a graceful-shutdown drain starts (`00-architecture.md §8.1`); `deadline_ts` is the shared grace-window deadline every table in the drain gets. Clients show a "reconnect shortly" banner instead of reading the eventual dropped socket as an error |
-| `ack` | `{id, ok, error?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Table` silently drops a well-formed but currently-illegal command the same as before this existed |
+| `ack` | `{id, ok, error?, reconnect_secret?}` | **sender-only**, never broadcast: it would leak another player's client-chosen `id`. Acknowledges receipt/idempotency outcome, not eventual game legality — `Table` silently drops a well-formed but currently-illegal command the same as before this existed. `reconnect_secret` is populated only on a successful `join`'s own ack — the one-time credential `hello{seat, secret}` must present back on every later reconnect (§5, `docs/00-architecture.md §2.1`) |
 | `error` | `{code, message}` |
 | `pong` | `{t0, t1}` |
 
@@ -253,11 +255,15 @@ The client applies events through a reducer, so live play, gap replay, and the r
 are one code path.
 
 `hello.seat` (§2's table) is how the server knows which seat is reconnecting: a
-`hello{last_seq, seat}` where `seat` is already bound is treated as that seat reconnecting —
-`Table.reconnect()` rebinds the live connection, `Table.resume()` runs the branch above. A `seat`
-that was never joined gets `error{code:"no_such_seat"}`. `hello.seat` is trusted at face value,
-permanently — there is no ticket or credential anywhere in this design to check it against (the
-Auth note above); a malicious client can claim any seat.
+`hello{last_seq, seat, secret}` where `seat` is already bound is treated as that seat
+reconnecting — `Table.reconnect()` checks `secret` against `SeatBinding.reconnect_secret`
+(`secrets.compare_digest`, constant-time) before rebinding the live connection, and only then
+does `Table.resume()` run the branch above. A `seat` that was never joined gets
+`error{code:"no_such_seat"}`; a bound seat with a missing or wrong `secret` gets
+`error{code:"bad_secret"}` and the reclaim never happens — whatever connection already held the
+seat keeps it. `hello.seat` itself is still client-asserted (the Auth note above) — `secret` is
+what turns "which seat" from a bare assertion into a checked credential; there is still no
+account behind it, only proof of having received this seat's own `join` ack.
 
 **Mid-claim-window disconnect forfeits, not re-arms** (00-architecture.md §8). A seat that
 disconnects while it holds a live, unresolved claim offer forfeits it immediately (`Pass`),

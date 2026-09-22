@@ -172,13 +172,15 @@ This is a deliberate rescope, not a placeholder for auth done later: `docs/00-ar
 §2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
 top) is cut, not deferred — cutting it removes the one M5 line item that pulled in
 infrastructure (email deliverability, SPF/DKIM, a transactional provider) unlike anything else in
-this project. A consequence worth stating plainly: seat identity stays permanently
-client-asserted (a `join{seat: 2, name: "..."}` claiming seat 2, or a later `hello{seat: 2}`
-reclaiming it, is trusted at face value, same as the stand-in `hello.seat` mechanism already
-ships today) — there's no ticket to bind a seat to a verified identity, so nothing stops a
-malicious client from claiming a seat it didn't join. Accepted for a guest-only, no-real-stakes
-game; revisit only if real accounts ever become an actual goal, which is explicitly not scoped
-anywhere in this document.
+this project. A consequence worth stating plainly: seat *choice* stays permanently
+client-asserted (a `join{seat: 2, name: "..."}` claiming seat 2 is trusted at face value — there's
+no ticket to bind a seat to a verified identity, so nothing stops a malicious client from joining
+any open seat) — but seat *possession* on reconnect is not: `join`'s ack returns a one-time
+`reconnect_secret`, and a later `hello{seat: 2, secret}` reclaiming seat 2 must present it back or
+the reclaim is refused (`docs/00-architecture.md §2.1`). No account behind it either way — the
+secret authenticates "the browser `join` handed this seat to," not a person. Accepted for a
+guest-only, no-real-stakes game; revisit only if real accounts ever become an actual goal, which
+is explicitly not scoped anywhere in this document.
 **Done when:** four browsers on four devices finish a game with one deliberate disconnect, each
 seeing the other three players' chosen names throughout.
 

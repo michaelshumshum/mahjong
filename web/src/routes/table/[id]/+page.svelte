@@ -34,10 +34,12 @@
 		loadClientPrefs,
 		loadDisplayName,
 		loadSeatForTable,
+		loadSecretForTable,
 		saveAutoArm,
 		saveClientPrefs,
 		saveDisplayName,
-		saveSeatForTable
+		saveSeatForTable,
+		saveSecretForTable
 	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
@@ -148,6 +150,7 @@
 		// -protocol.md §5) instead of falling into the seat-picker's `join`, which fails
 		// with `table_full` once all four seats are already bound to this game's players.
 		const persistedSeat = loadSeatForTable(tableId);
+		const persistedSecret = loadSecretForTable(tableId);
 		const practiceParam = isPractice ? '&practice=true' : '';
 		// no persisted seat yet -- connect as a spectator first so the seat picker below can
 		// show real occupancy (`state_status`/`names`) instead of four identical "Open" slots.
@@ -168,6 +171,12 @@
 			if (event.t === 'ack' && event.d.ok === false) {
 				pushToast(`Action failed: ${event.d.error ?? 'unknown error'}`);
 			}
+			// join's own ack carries this seat's one-time reconnect credential
+			// (00-architecture.md §2.1) -- persist it alongside the seat number so a later page
+			// reload can present it back on `hello{seat, secret}` instead of losing the seat.
+			if (event.t === 'ack' && event.d.reconnect_secret != null) {
+				saveSecretForTable(tableId, event.d.reconnect_secret);
+			}
 			if (event.t === 'error') {
 				pushToast(`Server error: ${event.d.message}`);
 			}
@@ -182,7 +191,9 @@
 				pushToast(`${event.d.name ?? 'A player'} took a seat.`);
 			}
 		});
-		socket.connect(persistedSeat !== null ? { seat: persistedSeat } : undefined);
+		socket.connect(
+			persistedSeat !== null ? { seat: persistedSeat, secret: persistedSecret } : undefined
+		);
 		return () => {
 			offEvent();
 			store.destroy();
