@@ -521,11 +521,16 @@ when you need to hand it to someone) and a seat ring: four slots arranged across
 the same relative arrangement `layout.seat-region-grid` uses for the real table, so the pre-game
 screen visually foreshadows the seats you're about to sit at. Pre-join, each slot is a real
 `<button>` (`seatPicker`/`seatPickerSlot`) reading `seatStatus`/`names` off the spectator snapshot
-above — "Open" and clickable, or the occupant's name/"Bot" and disabled; once seated, the same
-ring geometry (`seatRing`) switches to showing every seat's real *wind* instead (the dealer is
-fixed at table construction, before any `ready`, so `seatWind()` works unchanged here) — occupancy
-isn't re-shown post-join, since the ring's one job there is orienting you to the table, not
-re-answering "who's here yet."
+above — "Open" and clickable, or the occupant's name/"Bot" and disabled; once seated, the ring
+geometry (`seatRing`) keeps the self slot on real *wind* (the dealer is fixed at table
+construction, before any `ready`, so `seatWind()` works unchanged here) but the other three switch
+to a non-interactive occupancy readout (`seatOccupancySlot`, same `seatStatus`/`names` fields,
+kept current post-join via `seat_state` broadcasts) — a seated player waiting for the table to
+fill can watch the next arrival land instead of staring at a ring that can never change. A toast
+("`{name} took a seat.`") fires alongside it the first time each seat flips to `connected`/`bot`
+while `!handEverStarted`, so the arrival is noticed even if this screen isn't being watched;
+`disconnected`/`autoplay` churn and any `seat_state` for this browser's own seat are excluded —
+not "a new player," and not news about yourself.
 
 **Host: start with bots (M5.1).** Whichever seat's `join` was this table's first is that table's
 host (`app/table.py`'s `Table.host_seat`, mirrored on the wire as `state_sync.host_seat`) — the

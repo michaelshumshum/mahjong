@@ -170,6 +170,16 @@
 			if (event.t === 'error') {
 				pushToast(`Server error: ${event.d.message}`);
 			}
+			// Waiting-room arrivals only -- once the table has actually started, seat_state
+			// churns on every disconnect/autoplay/reconnect, which isn't "a new player" news.
+			if (
+				event.t === 'seat_state' &&
+				!handEverStarted &&
+				(event.d.status === 'connected' || event.d.status === 'bot') &&
+				event.d.seat !== liveStore?.state.seat
+			) {
+				pushToast(`${event.d.name ?? 'A player'} took a seat.`);
+			}
 		});
 		socket.connect(persistedSeat !== null ? { seat: persistedSeat } : undefined);
 		return () => {
@@ -692,24 +702,34 @@
 
 <!-- Seated pre-game preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
 	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
-	before any hand exists. Every seat's *wind* is already real (the dealer is fixed at table
-	creation, before any `ready`) -- this only ever shows wind, never occupancy, so it's silent
-	about whether the other three seats are actually filled yet (`seatPicker` below, shown before
-	you've joined, is the one that needs and has real occupancy). -->
+	before any hand exists. Self is the one seat this screen already knows a real wind for (the
+	dealer is fixed at table construction, before any `ready`). The other three show real live
+	occupancy instead (`seatStatus`/`names`, kept current via `seat_state` broadcasts the same
+	way `seatPicker` below reads them pre-join) -- so a seated player watching this screen sees
+	the next arrival land, not just a placeholder that never changes. -->
 {#snippet seatRing(you: Seat)}
 	<div class="seat-ring" aria-hidden="true">
 		<div class="seat-ring-pos seat-ring-pos--across">
-			{@render seatRingSlot(WIND_CHAR[seatWind(((you + 2) % 4) as Seat)])}
+			{@render seatOccupancySlot(((you + 2) % 4) as Seat)}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--left">
-			{@render seatRingSlot(WIND_CHAR[seatWind(((you + 3) % 4) as Seat)])}
+			{@render seatOccupancySlot(((you + 3) % 4) as Seat)}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--right">
-			{@render seatRingSlot(WIND_CHAR[seatWind(((you + 1) % 4) as Seat)])}
+			{@render seatOccupancySlot(((you + 1) % 4) as Seat)}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
 			{@render seatRingSlot(WIND_CHAR[seatWind(you)], true)}
 		</div>
+	</div>
+{/snippet}
+
+{#snippet seatOccupancySlot(seat: Seat)}
+	{@const status = liveStore?.state.seatStatus[seat] ?? 'empty'}
+	{@const name = liveStore?.state.names[seat] ?? null}
+	{@const open = status === 'empty'}
+	<div class="seat-ring-slot" class:seat-ring-slot--filled={!open}>
+		<span>{open ? 'Open' : status === 'bot' ? 'Bot' : (name ?? 'Taken')}</span>
 	</div>
 {/snippet}
 
@@ -1428,11 +1448,19 @@
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
 		font-weight: 600;
-		// "waiting, alive" -- not stalled. Honest about what it doesn't know: this pulses
-		// identically whether or not that seat actually has anyone in it (server/app/table.py's
-		// `_seat_status_tuple` can't tell us -- an unbound seat reads the same as a connected
-		// one), so it never claims occupancy, only that the table is open and listening.
+		// "waiting, alive" -- the base/default treatment for a genuinely open seat
+		// (server/app/table.py's `_seat_status_tuple` reports `empty` for one, distinct from
+		// `connected`/`bot`/`disconnected`/`autoplay`), so this animation now means what it
+		// looks like: nobody's here yet, but the table is open and listening.
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
+	}
+
+	// occupancy is real (see above) -- a filled seat reads solid/inert rather than still
+	// breathing "open," same visual language `.seat-ring-slot--self` already uses.
+	.seat-ring-slot--filled {
+		border: 1px solid var(--color-border);
+		color: var(--color-text);
+		animation: none;
 	}
 
 	// the one seat this screen actually knows something real about: dealer is fixed at table
