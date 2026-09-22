@@ -31,12 +31,12 @@ predates several fields added since M1/M2):
   `act()` needs actions during a claim window too).
 - `seat_status`'s wire vocabulary is connected/disconnected/autoplay/bot/empty.
   `mahjong_core/state.py` deliberately excludes all of it from `SeatState` (see that module's own
-  docstring): `app/table.py`'s `SeatBinding`/`Table._seat_status_tuple()` own it instead, without a
+  docstring): `app/table.py`'s `SeatBinding`/`Table.seat_status_tuple()` own it instead, without a
   pure-engine round-trip. `seat_view()` itself just takes an optional `seat_status` override and
   defaults to `("connected",) * 4` when the caller has nothing real to pass -- correct for a
   caller with no `Table` behind it at all (bots/arena.py, bots/selfplay.py, tests calling
   `seat_view()` directly), where every seat is a live simulated player, never a lobby seat that
-  may genuinely be unjoined. Only `Table._seat_status_tuple()` ever produces `empty`, for a seat
+  may genuinely be unjoined. Only `Table.seat_status_tuple()` ever produces `empty`, for a seat
   nobody has joined yet; `bot` remains unused (`SeatBinding.status`'s docstring).
 - `names` (M5, docs/00-architecture.md §2.1) is the same shape of override as `seat_status`:
   `app/table.py`'s `SeatBinding.name` (set at `join`, or synthesized for a `bot` seat) is the

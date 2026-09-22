@@ -152,9 +152,9 @@ __all__ = [
 
 SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 
-# Wire-level vocabulary for `_seat_status_tuple()`/`seat_view()`'s `seat_status`. `empty` has no
+# Wire-level vocabulary for `seat_status_tuple()`/`seat_view()`'s `seat_status`. `empty` has no
 # `SeatBinding` counterpart: a binding only exists once a seat *is* bound, so "nobody has ever
-# joined this seat" isn't a `SeatBinding.status` value, only something `_seat_status_tuple()`
+# joined this seat" isn't a `SeatBinding.status` value, only something `seat_status_tuple()`
 # reports for a `None` slot in `Table.seat_bindings`. `bot` *is* a real `SeatBinding.status` now
 # (M4.5 practice mode, `_bind_bot_seat`) -- see `SeatBinding`'s docstring.
 WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
@@ -294,7 +294,7 @@ class SeatBinding:
     `auto_pass_chow` are the lobby/pre-arm state 02-protocol.md §2 describes. `status`
     (`connected`/`disconnected`/`autoplay`/`bot` -- `empty` can never apply to a `SeatBinding`:
     a binding only exists once a seat *is* bound, so "nobody has ever joined this seat" is
-    reported by `_seat_status_tuple()` for a `None` slot in `Table.seat_bindings`, never as a
+    reported by `seat_status_tuple()` for a `None` slot in `Table.seat_bindings`, never as a
     value of this field) transitions via `mark_disconnected`/`reconnect`/the disconnect-grace
     timer (M3 sub-task 6) for a seat that started as a human `join` -- see
     `Table.mark_disconnected`.
@@ -1016,8 +1016,8 @@ class Table:
         view = seat_view(
             self.state,
             seat,
-            seat_status=self._seat_status_tuple(),
-            names=self._names_tuple(),
+            seat_status=self.seat_status_tuple(),
+            names=self.names_tuple(),
             claim_deadline_ts=claim_deadline_ts,
             turn_deadline_ts=turn_deadline_ts,
             hand_end_deadline_ts=self._hand_end_deadline_ms,
@@ -1027,7 +1027,7 @@ class Table:
         wire["t"] = "state_sync"
         return wire
 
-    def _seat_status_tuple(
+    def seat_status_tuple(
         self,
     ) -> tuple[WireSeatStatus, WireSeatStatus, WireSeatStatus, WireSeatStatus]:
         """Every bound seat's real `status`; an unbound seat reads `empty` -- distinct from
@@ -1043,9 +1043,9 @@ class Table:
             tuple(b.status if b is not None else "empty" for b in self.seat_bindings),
         )
 
-    def _names_tuple(self) -> tuple[str | None, str | None, str | None, str | None]:
+    def names_tuple(self) -> tuple[str | None, str | None, str | None, str | None]:
         """Every bound seat's resolved `SeatBinding.name` (M5); `None` for an unbound seat --
-        same "empty" convention `_seat_status_tuple()` uses, one level down (a `null` name
+        same "empty" convention `seat_status_tuple()` uses, one level down (a `null` name
         rather than a wire-vocabulary string, since there's no name to report at all)."""
         return cast(
             "tuple[str | None, str | None, str | None, str | None]",
@@ -1437,8 +1437,8 @@ class Table:
             view = seat_view(
                 self.state,
                 seat,
-                seat_status=self._seat_status_tuple(),
-                names=self._names_tuple(),
+                seat_status=self.seat_status_tuple(),
+                names=self.names_tuple(),
                 claim_deadline_ts=claim_deadline_ts,
                 turn_deadline_ts=turn_deadline_ts,
             )
@@ -1844,7 +1844,7 @@ class Table:
                 "hand_no": state.hand_no,
                 "prevailing": state.prevailing.name,
                 "dealer": state.dealer,
-                "seats": list(self._seat_status_tuple()),
+                "seats": list(self.seat_status_tuple()),
             }
         )
         for seat in range(4):
