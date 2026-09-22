@@ -16,8 +16,15 @@ test('lobby create table navigates straight to a freshly generated table', async
 	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}$/);
 });
 
-test('lobby join table navigates to the table route with the entered code', async ({ page }) => {
+test('lobby browse link opens the tables page', async ({ page }) => {
 	await page.goto('/');
+	await page.getByRole('link', { name: 'Browse tables' }).click();
+	await expect(page).toHaveURL('/tables');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tables');
+});
+
+test('tables page join navigates to the table route with the entered code', async ({ page }) => {
+	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
 	await page.getByPlaceholder('ABC123').fill('ABC123');
 	await page.getByRole('button', { name: 'Join table' }).click();
@@ -44,11 +51,13 @@ test('profile route renders', async ({ page }) => {
 	await expect(page.locator('h1')).toHaveText('Profile');
 });
 
-test('lobby lists tables with sit-down for open ones and watch for ones in progress', async ({
+test('tables page lists tables with sit-down for open ones and watch for ones in progress', async ({
 	page
 }) => {
-	await page.route('**/tables', (route) =>
-		route.fulfill({
+	// fetch-only: the `/tables` page navigation matches the same glob
+	await page.route('**/tables', (route) => {
+		if (route.request().resourceType() !== 'fetch') return route.fallback();
+		return route.fulfill({
 			json: {
 				tables: [
 					{
@@ -75,22 +84,22 @@ test('lobby lists tables with sit-down for open ones and watch for ones in progr
 					}
 				]
 			}
-		})
-	);
-	await page.goto('/');
+		});
+	});
+	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
 
-	const rows = page.getByTestId('table-row');
-	await expect(rows).toHaveCount(2);
+	const cards = page.getByTestId('table-card');
+	await expect(cards).toHaveCount(2);
 	// open tables sort first
-	await expect(rows.nth(0)).toContainText('OPEN11');
-	await expect(rows.nth(0)).toContainText('Open · 1/4 seated');
-	await expect(rows.nth(1)).toContainText('In progress · hand 3');
+	await expect(cards.nth(0)).toContainText('OPEN11');
+	await expect(cards.nth(0)).toContainText('Open · 1/4');
+	await expect(cards.nth(1)).toContainText('In progress · hand 3');
 
-	await rows.nth(1).getByRole('button', { name: 'Watch' }).click();
+	await cards.nth(1).getByRole('button', { name: 'Watch' }).click();
 	await expect(page).toHaveURL('/table/LIVE22');
 
-	await page.goto('/');
+	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Sit down' }).click();
 	await expect(page).toHaveURL('/table/OPEN11');

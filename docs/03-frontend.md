@@ -11,11 +11,11 @@ Answers [05-roadmap.md §5](05-roadmap.md) open question #1 (rendering): **DOM/C
 │                                                                │
 │  Routes                │  Table route                        │
 │  /            lobby    │  ┌──────────────────────────────┐   │
-│  /demo        dev demos│  │ table surface (DOM/CSS)       │   │
-│  /table/[id]  game     │  │   felt, wall, 4 hands, melds, │   │
-│  /replay/[id] viewer   │  │   discard pools, dice, hints  │   │
-│  /profile     stats    │  └──────────────────────────────┘   │
-│                        │  overlay (Svelte):                  │
+│  /tables      browser  │  │ table surface (DOM/CSS)       │   │
+│  /demo        dev demos│  │   felt, wall, 4 hands, melds, │   │
+│  /table/[id]  game     │  │   discard pools, dice, hints  │   │
+│  /replay/[id] viewer   │  └──────────────────────────────┘   │
+│  /profile     stats    │  overlay (Svelte):                  │
 │                        │   claim buttons, timer ring,         │
 │                        │   faan breakdown, score sheet,       │
 │                        │   settings, toasts                   │
@@ -428,7 +428,7 @@ lets the game-end screen replace it outright once `gameEnd` lands.
 
 `GameEndScreen` reuses `ScoreSheet` wholesale (score table, running totals, `standings`) rather
 than a second table implementation, adding only the "game over" framing and a plain `<a href="/">`
-back to the home page — the game is over, and the home page's create/join/practice panels already
+back to the home page — the game is over, and the home page's create/browse/practice panels already
 cover starting a new one; no dedicated rematch/new-game flow.
 
 `ScoreSheet.svelte` itself grew an optional per-round expand: `HandRecord.result` (a
@@ -451,7 +451,8 @@ rather than forking into a second render path.
 `web/Dockerfile` builds with `pnpm build` and runs `node build` — adapter-node, so SvelteKit SSR
 is on by default for every route unless opted out. Posture:
 
-- `/`, `/demo`, `/profile` — SSR stays on; cheap, no live-socket dependency.
+- `/`, `/tables`, `/demo`, `/profile` — SSR stays on; cheap, no live-socket dependency (`/tables`
+  fetches its listing client-side, in an `$effect`).
 - `/table/[id]`, `/replay/[id]` — `export const ssr = false` in `+page.ts`. Auth token, WebSocket
   connection, and per-seat redacted state are all client-only; pre-rendering a stale or empty
   table just to hydrate over it a moment later has no SEO benefit and is wasted work.
@@ -560,7 +561,7 @@ wire would be a cleaner fix, filed as a gap here rather than a roadmap doc since
 to fold into whoever next touches `state_sync`'s payload.
 
 **Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) has a third panel, "Practice,"
-alongside create/join: its "Play vs bots" button generates a table id the same way "Create table"
+alongside create/find: its "Play vs bots" button generates a table id the same way "Create table"
 does and navigates straight to `/table/<id>?practice=1` — no invite code to share, but "Create
 table" has no copy step to skip either (below): both buttons go straight from the lobby to the
 table. `?practice=1` is this route's own query param, unrelated in spelling to
@@ -576,9 +577,11 @@ signal (below). The table label in the live table's dev toolbar appends "· prac
 this flag is set, matching this milestone's "don't invent a tier selector" scope — one fixed
 default tier, named plainly, not a difficulty picker.
 
-**Table browser.** The lobby's "Tables" panel polls `GET /tables` every 5s
-([02-protocol.md §10](02-protocol.md), `lib/net/lobby.ts`), open tables first. "Sit down" (open)
-and "Watch" (in progress) both navigate to the same `/table/<id>` — the route itself decides
+**Table browser (`/tables`).** Reached from the lobby's "Find a table" panel; holds the
+join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(16rem, 1fr))`),
+each showing its code, open/in-progress state and all four seats. The grid polls `GET /tables`
+every 5s ([02-protocol.md §10](02-protocol.md), `lib/net/lobby.ts`), open tables first. "Sit
+down" (open) and "Watch" (in progress) both navigate to the same `/table/<id>` — the route itself decides
 picker vs. spectator view (below), so a table that fills between the poll and the click still
 lands somewhere sensible.
 

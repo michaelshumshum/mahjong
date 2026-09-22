@@ -51,6 +51,7 @@ const LOBBY_TABLES = [
 // app; don't add every mock scenario or every intermediate dev-toolbar state.
 const PAGES = [
 	{ name: 'lobby', url: '/' },
+	{ name: 'tables', url: '/tables' },
 	{ name: 'demo', url: '/demo' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/03-frontend.md §6) -- there's no backend running during a
@@ -146,9 +147,14 @@ async function main() {
 			if (msg.type() === 'error') errors.push(msg.text());
 		});
 
-		// no backend runs during capture -- the lobby's table browser gets a fixed listing instead
-		// of a failed fetch (which would also trip the console-error check below).
-		await page.route('**/tables', (route) => route.fulfill({ json: { tables: LOBBY_TABLES } }));
+		// no backend runs during capture -- `/tables` gets a fixed listing instead of a failed
+		// fetch (which would also trip the console-error check below). fetch-only: the `/tables`
+		// page navigation matches the same glob.
+		await page.route('**/tables', (route) =>
+			route.request().resourceType() === 'fetch'
+				? route.fulfill({ json: { tables: LOBBY_TABLES } })
+				: route.fallback()
+		);
 
 		for (const { name, url, before } of PAGES) {
 			await page.goto(BASE + url, { waitUntil: 'networkidle' });

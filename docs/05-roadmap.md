@@ -165,8 +165,8 @@ cookie) so it survives a reload, and sent once at `join` (docs/02-protocol.md §
 client-asserted field on the message that actually claims a seat for the first time; a later
 `hello{seat}` reconnect never resends it — see docs/00-architecture.md §2.1's note on why `join`,
 not `hello`, is the right message). Matchmaking, private tables with invite codes, mid-game bot
-takeover for disconnects, spectating (spectating built end to end — see below; the lobby's
-table browser covers discovery, matchmaking not started).
+takeover for disconnects, spectating (spectating built end to end — see below; the `/tables`
+browser covers discovery, matchmaking not started).
 
 This is a deliberate rescope, not a placeholder for auth done later: `docs/00-architecture.md
 §2.1`'s earlier ticket/JWT design (guest-first, with an *optional* account upgrade layered on
@@ -190,7 +190,7 @@ client-side (name-entry UI, `localStorage`, rendering) plus matchmaking and invi
 **Spectating: built.** `?spectate=true` on the WS URL gets a spectator-redacted
 `state_sync` and every subsequent broadcast, minus anything naming a seat's own concealed tiles
 ([00-architecture.md §3](00-architecture.md)). Proven end to end
-(`server/tests/test_spectator.py`). **Frontend built:** the lobby lists running tables
+(`server/tests/test_spectator.py`). **Frontend built:** `/tables` lists running tables
 (`GET /tables`, [02-protocol.md §10](02-protocol.md)) with "Sit down" for open ones and "Watch" for
 ones in progress, and `/table/[id]` renders a spectator view whenever no seat is left to take
 ([03-frontend.md §6](03-frontend.md)). Showing hands to spectators after a delay
