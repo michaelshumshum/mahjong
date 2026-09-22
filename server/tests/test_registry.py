@@ -110,6 +110,34 @@ async def test_list_tables_reports_open_then_in_progress() -> None:
     assert summary.seat_status.count("bot") == 3
 
 
+async def test_disconnect_pre_start_frees_seat_after_grace_period() -> None:
+    """A seat still disconnected once its grace period elapses, on a table that hasn't started,
+    frees back to empty instead of flipping to `AUTOPLAY` (`Table._handle_disconnect_timeout`) --
+    there's no hand for a bot to play pre-start, so an abandoned waiting-room seat would otherwise
+    sit `autoplay` forever and keep the table listed to the lobby as taken with nobody actually
+    there. `disconnect_grace_seconds=0` is the same test-time-control pattern
+    `tests/test_disconnect_bot_handover.py` uses -- the deadline is due the instant it's armed."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, disconnect_grace_seconds=0)
+    registry = TableRegistry()
+    table = registry.get_or_create("lobby-abandoned", ruleset, seed=1, require_ready=True)
+    table.join("s-carol", _noop_send, seat=1, name="Carol")
+    assert table.host_seat == 1
+    assert registry.list_tables() != []
+
+    table.mark_disconnected(1, "s-carol")
+    assert table.seat_bindings[1] is not None
+    assert table.seat_bindings[1].status == "disconnected"
+
+    async def _poll() -> None:
+        while table.seat_bindings[1] is not None:
+            await asyncio.sleep(0.01)
+
+    await asyncio.wait_for(_poll(), timeout=2.0)
+
+    assert table.host_seat is None
+    assert registry.list_tables() == []
+
+
 async def test_list_tables_drops_finished_games() -> None:
     registry = TableRegistry()
     table = registry.get_or_create("lobby-done", DEFAULT_RULESET, seed=1, require_ready=False)
