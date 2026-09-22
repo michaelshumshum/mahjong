@@ -189,6 +189,7 @@
 	}
 </script>
 
+<a class="back-link" href="/">← Lobby</a>
 <h1>Welcome to SvelteKit</h1>
 <p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
 
@@ -353,6 +354,17 @@
 <style lang="scss">
 	// proves the styles/ partials are usable from a page — not real component styling (M4).
 	@use '$lib/styles/layout';
+
+	.back-link {
+		display: inline-block;
+		margin-bottom: var(--space-3);
+		color: var(--color-text-muted);
+		text-decoration: none;
+
+		&:hover {
+			color: var(--color-text);
+		}
+	}
 
 	section {
 		border: 1px solid var(--color-border);

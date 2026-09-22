@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import {
 		MOCK_SCENARIOS,
@@ -268,6 +269,23 @@
 				? null
 				: (liveStore?.state.seat ?? null)
 	);
+	// holding a seat (incl. the pre-start waiting room) means leaving costs something -- an
+	// autoplay handover, a seat someone else might take -- so that path gets a confirmation;
+	// spectating (this connection has no seat, above) and mock/pregame previews don't.
+	let isPlayer = $derived(!isMock && effectiveSeat !== null);
+
+	let showLeaveConfirm = $state(false);
+	function handleLeaveClick(): void {
+		if (isPlayer) {
+			showLeaveConfirm = true;
+		} else {
+			goto('/');
+		}
+	}
+	function confirmLeaveGame(): void {
+		showLeaveConfirm = false;
+		goto('/');
+	}
 	// host = whichever seat's `join` was this table's first (docs/02-protocol.md §2's "Host
 	// definition") -- gates the "Start with bots" shortcut below. `?pregame=` previews have no
 	// real `hostSeat` to compare against, so they never show it.
@@ -889,7 +907,7 @@
 				</div>
 			{:else if spectating}
 				<p class="table-label">
-					Table <strong>{tableId}</strong> · spectating · <a href="/">Back to lobby</a>
+					Table <strong>{tableId}</strong> · spectating
 				</p>
 			{:else}
 				<p class="table-label">
@@ -904,6 +922,7 @@
 			</div>
 
 			<div class="chrome-toggles">
+				<button type="button" onclick={handleLeaveClick}>Leave game</button>
 				<button type="button" onclick={() => (showScoreSheet = !showScoreSheet)}>Score sheet</button
 				>
 				{#if !spectating}
@@ -1256,6 +1275,7 @@
 	<h1 class="sr-only">Table</h1>
 	<div class="pretable-page">
 		<div class="pretable-panel">
+			<button type="button" class="pretable-leave" onclick={handleLeaveClick}>Leave game</button>
 			<div class="pretable-info">
 				<span>Table</span>
 				<span class="pretable-code">{tableId}</span>
@@ -1318,6 +1338,24 @@
 	</div>
 {/if}
 
+{#if showLeaveConfirm}
+	<div class="panel-overlay">
+		<div
+			class="confirm-dialog"
+			role="alertdialog"
+			aria-label="Leave game"
+			aria-describedby="leave-confirm-desc"
+		>
+			<h2>Leave this table?</h2>
+			<p id="leave-confirm-desc">Your seat switches to autoplay until you reconnect.</p>
+			<div class="confirm-actions">
+				<button type="button" onclick={() => (showLeaveConfirm = false)}>Cancel</button>
+				<button type="button" class="confirm-leave" onclick={confirmLeaveGame}>Leave game</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style lang="scss">
 	@use '$lib/styles/layout';
 	@use '$lib/styles/buttons';
@@ -1376,6 +1414,16 @@
 			max-width: 40ch;
 			color: var(--color-text-muted);
 		}
+	}
+
+	.pretable-leave {
+		align-self: flex-start;
+		min-height: 36px;
+		padding: var(--space-1) var(--space-3);
+		font: inherit;
+		font-size: var(--font-size-sm);
+		cursor: pointer;
+		@include buttons.btn-ghost;
 	}
 
 	.pretable-info {
@@ -1629,10 +1677,6 @@
 		align-self: center;
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
-
-		a {
-			color: var(--color-text);
-		}
 	}
 
 	// wall/prevailing: was `.center-info` on the table surface itself (see `.table-center`
@@ -2092,6 +2136,46 @@
 	// scrim's.
 	.panel {
 		position: relative;
+	}
+
+	.confirm-dialog {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		width: 100%;
+		max-width: 22rem;
+		padding: var(--space-4);
+		background: var(--color-surface-raised);
+		text-align: center;
+		@include buttons.panel-elevated;
+
+		h2 {
+			margin: 0;
+			font-size: var(--font-size-lg);
+		}
+
+		p {
+			margin: 0;
+			color: var(--color-text-muted);
+		}
+	}
+
+	.confirm-actions {
+		display: flex;
+		justify-content: center;
+		gap: var(--space-3);
+
+		button {
+			min-height: 44px;
+			padding: var(--space-2) var(--space-4);
+			font: inherit;
+			cursor: pointer;
+			@include buttons.btn-secondary;
+		}
+
+		.confirm-leave {
+			@include buttons.btn-primary;
+		}
 	}
 
 	.toast-stack {

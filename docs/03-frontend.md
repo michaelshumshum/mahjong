@@ -594,9 +594,19 @@ unless the table shows spectators every hand (`state_sync.hands`, docs/02-protoc
 which case the reducer keeps `ClientGameState.hands` live from `draw`/`kong_replace`/`discard`/
 `meld` and every seat, bottom and opponents alike, renders its hand face-up and sorted —
 with no discard/declare/claim controls (`legalActions`/`claimOffer` are always empty for a
-spectator), no Settings (auto-arm is per-seat), and a "Back to lobby" link in the toolbar. The
+spectator), no Settings (auto-arm is per-seat), and a "Leave game" link in the toolbar. The
 hand-end overlay dismisses locally instead of sending `hand_end_ack` — the hold only waits on
 seats.
+
+**Leave game.** Every `/table/[id]` view — pre-game and live — gets a "Leave game" control instead
+of a plain "back" link, since navigating away can have a real effect on a seat, not just close a
+tab. Whether it confirms first turns on holding a seat (`isPlayer`: not mock, `effectiveSeat !==
+null`) — the pre-start waiting room counts, since `join`/`ready` already fired there, but the
+pre-join connecting/seat-picker screens and spectating don't, since there's no seat to lose yet or
+at all. A held seat confirms via a dialog first ("Your seat switches to autoplay until you
+reconnect," matching the real `AUTOPLAY` handover, §6); everything else navigates to `/`
+straight away. Either path ends at the same `goto('/')` — the socket-setup effect's own cleanup
+(§6) disconnects it, the same as closing the tab already did.
 
 **Bot seat badge.** `MockSeatState` grew an optional `status?: string` field (`mock-game-state.ts`)
 that `live-view.ts`'s `viewFromClientState` populates from `ClientGameState.seatStatus[seat]` —
