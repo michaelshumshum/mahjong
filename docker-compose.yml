@@ -7,6 +7,7 @@ x-pg-env: &pg-env
 
 services:
   postgres:
+    container_name: mahjong-postgres
     image: postgres:17-alpine
     environment: *pg-env
     ports: ["${POSTGRES_PORT:-5432}:5432"]
@@ -19,6 +20,7 @@ services:
       retries: 10
 
   api:
+    container_name: mahjong-api
     build:
       context: ./server
       target: dev
@@ -49,6 +51,7 @@ services:
       start_period: 20s
 
   web:
+    container_name: mahjong-web
     build:
       context: .                      # needs root pnpm-workspace.yaml + lockfile
       dockerfile: web/Dockerfile
@@ -67,6 +70,7 @@ services:
 
   # torch lives in this image, not in api
   trainer:
+    container_name: mahjong-trainer
     profiles: ["ml"]
     build:
       context: ./server
@@ -86,6 +90,7 @@ services:
     #   resources: {reservations: {devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]}}
 
   arena:
+    container_name: mahjong-arena
     profiles: ["tools"]
     build:
       context: ./server
