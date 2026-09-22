@@ -589,7 +589,10 @@ lands somewhere sensible.
 seat, a real `state_sync` has landed (`handNo > 0`), and no seat is `empty` — i.e. nothing left
 to pick. No separate URL flag: the socket already connects with `&spectate=true` whenever
 there's no persisted seat (Join flow, above). The view is `viewFromClientState(state, 0)`: seat
-0 is drawn at the bottom as a hand of backs (a spectator snapshot carries no concealed tiles),
+0 is drawn at the bottom as a hand of backs (a spectator snapshot carries no concealed tiles) —
+unless the table shows spectators every hand (`state_sync.hands`, docs/02-protocol.md §2), in
+which case the reducer keeps `ClientGameState.hands` live from `draw`/`kong_replace`/`discard`/
+`meld` and every seat, bottom and opponents alike, renders its hand face-up and sorted —
 with no discard/declare/claim controls (`legalActions`/`claimOffer` are always empty for a
 spectator), no Settings (auto-arm is per-seat), and a "Back to lobby" link in the toolbar. The
 hand-end overlay dismisses locally instead of sending `hand_end_ack` — the hold only waits on

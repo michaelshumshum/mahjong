@@ -31,6 +31,15 @@ function removeMany(hand: readonly number[], tileIds: readonly number[]): number
 	return next;
 }
 
+/** `ClientGameState.hands` update for one seat — a no-op when this isn't an open-hands view. */
+function updateHand(
+	hands: number[][] | null,
+	seat: number,
+	update: (hand: number[]) => number[]
+): number[][] | null {
+	return hands === null ? null : replaceAt(hands, seat, update(hands[seat]));
+}
+
 /** `state_sync.melds[seat][i]` (`app/views.py`'s `_meld_wire`) keys the meld kind as `kind`;
  * the live `meld` event (`MeldPayload`) keys it as `meld_kind`. Two different upstream
  * serializers for the same concept — see `views.py`'s `_meld_wire` vs `_build_event_wire`. */
@@ -82,6 +91,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 						? (d.own_hand[d.own_hand.length - 1] ?? null)
 						: null,
 				concealedCounts: d.concealed_counts.slice(),
+				hands: d.hands ? d.hands.map((hand) => hand.slice()) : null,
 				melds: d.melds.map((seatMelds) => seatMelds.map(mapMeldDict)),
 				discardPools: d.discard_pools.map((pool) => pool.slice()),
 				flowers: d.flowers.map((fl) => fl.slice()),
@@ -120,6 +130,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				ownHand: [],
 				drawnTileId: null,
 				concealedCounts: [0, 0, 0, 0],
+				// an open-hands spectator gets a fresh state_sync right after this, not a `deal`
+				hands: state.hands === null ? null : [[], [], [], []],
 				melds: [[], [], [], []],
 				discardPools: [[], [], [], []],
 				flowers: [[], [], [], []],
@@ -172,6 +184,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 		case 'draw': {
 			const d = event.d;
 			const isOwn = d.seat === state.seat;
+			const tileId = d.tile_id;
 			return {
 				...state,
 				concealedCounts: replaceAt(
@@ -179,6 +192,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					d.seat,
 					state.concealedCounts[d.seat] + 1
 				),
+				hands:
+					tileId != null ? updateHand(state.hands, d.seat, (h) => [...h, tileId]) : state.hands,
 				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
 				drawnTileId: isOwn && d.tile_id != null ? d.tile_id : state.drawnTileId,
 				wallRemaining: Math.max(0, state.wallRemaining - 1)
@@ -198,6 +213,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					Math.max(0, state.concealedCounts[d.seat] - 1)
 				),
 				ownHand: isOwn ? removeOne(state.ownHand, d.tile_id) : state.ownHand,
+				hands: updateHand(state.hands, d.seat, (h) => removeOne(h, d.tile_id)),
 				drawnTileId: isOwn ? null : state.drawnTileId,
 				// a discard claimed later in the same server-side reduce() is removed from the
 				// discarder's pool server-side (docs/02-protocol.md §3); this client-side pool can
@@ -270,6 +286,10 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					),
 					ownHand:
 						isOwn && addedTile !== undefined ? removeOne(state.ownHand, addedTile) : state.ownHand,
+					hands:
+						addedTile !== undefined
+							? updateHand(state.hands, d.seat, (h) => removeOne(h, addedTile))
+							: state.hands,
 					// declaring a kong consumes the held-apart tile into the meld; `kong_replace`
 					// supplies the next one.
 					drawnTileId: isOwn ? null : state.drawnTileId
@@ -288,6 +308,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 						Math.max(0, state.concealedCounts[d.seat] - 4)
 					),
 					ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
+					hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles ?? [])),
 					drawnTileId: isOwn ? null : state.drawnTileId
 				};
 			}
@@ -306,6 +327,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					Math.max(0, state.concealedCounts[d.seat] - fromHandCount)
 				),
 				ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
+				// the claimed discard was never in this seat's hand, so removeOne skips it
+				hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles ?? [])),
 				// a claimed chow/pung/kong is formed straight from the discard plus concealed tiles --
 				// this seat never drew for it, so there's nothing held apart (the bug this field
 				// exists to prevent: without it, whatever tile happened to end up last in `ownHand`
@@ -317,6 +340,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 		case 'kong_replace': {
 			const d = event.d;
 			const isOwn = d.seat === state.seat;
+			const tileId = d.tile_id;
 			return {
 				...state,
 				concealedCounts: replaceAt(
@@ -324,6 +348,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					d.seat,
 					state.concealedCounts[d.seat] + 1
 				),
+				hands:
+					tileId != null ? updateHand(state.hands, d.seat, (h) => [...h, tileId]) : state.hands,
 				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
 				drawnTileId: isOwn && d.tile_id != null ? d.tile_id : state.drawnTileId,
 				wallRemaining: Math.max(0, state.wallRemaining - 1)

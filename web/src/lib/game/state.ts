@@ -78,6 +78,11 @@ export interface ClientGameState {
 	 * spare tile sitting in `ownHand` for the client to guess at. */
 	drawnTileId: number | null;
 	concealedCounts: number[];
+	/** Every seat's concealed tile_ids — only for a spectator of an open-hands table
+	 * (`state_sync.hands`, `TableSettings.spectators_see_hands` server-side); `null` otherwise.
+	 * Kept live from `draw`/`kong_replace`/`discard`/`meld`, which all carry real tile ids to
+	 * such a spectator. */
+	hands: number[][] | null;
 	melds: MeldState[][];
 	discardPools: number[][];
 	flowers: string[][];
@@ -134,6 +139,7 @@ export function initialClientGameState(): ClientGameState {
 		ownHand: [],
 		drawnTileId: null,
 		concealedCounts: [0, 0, 0, 0],
+		hands: null,
 		melds: [[], [], [], []],
 		discardPools: [[], [], [], []],
 		flowers: [[], [], [], []],

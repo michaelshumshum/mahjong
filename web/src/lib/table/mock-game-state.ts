@@ -45,7 +45,7 @@ export interface MockSeatState {
 	seat: Seat;
 	name: string;
 	concealedCount: number;
-	concealedHand?: TileCode[]; // present only for the "you" seat
+	concealedHand?: TileCode[]; // the "you" seat, or every seat for an open-hands spectator
 	drawn?: TileCode | null; // held-apart 14th tile; "you" seat only, real events redact this too
 	melds: MockMeld[];
 	discards: TileCode[];

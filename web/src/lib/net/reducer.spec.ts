@@ -782,3 +782,73 @@ describe('reduce', () => {
 		expect(next.shutdownDeadlineTs).toBe(123456);
 	});
 });
+
+describe('reduce open-hands spectator', () => {
+	const ev = (t: string, d: Record<string, unknown>) =>
+		({ v: 1, ts: 1, seq: 1, t, d }) as unknown as ServerEvent;
+
+	it('state_sync carries every hand, and live events keep each seat in step', () => {
+		let s = reduce(
+			state(),
+			ev('state_sync', {
+				seat: null,
+				hand_no: 1,
+				prevailing: 'EAST',
+				dealer: 0,
+				turn: 0,
+				phase: 'AWAIT_ACTION',
+				own_hand: [],
+				concealed_counts: [3, 2, 2, 2],
+				melds: [[], [], [], []],
+				discard_pools: [[], [], [], []],
+				flowers: [[], [], [], []],
+				wall_remaining: 50,
+				seat_status: ['bot', 'bot', 'bot', 'bot'],
+				names: [null, null, null, null],
+				host_seat: null,
+				scores: [0, 0, 0, 0],
+				legal_actions: [],
+				deadline_ts: null,
+				claim_options: [],
+				hands: [
+					[0, 1, 40],
+					[4, 5],
+					[8, 9],
+					[12, 13]
+				]
+			})
+		);
+		expect(s.hands).toEqual([
+			[0, 1, 40],
+			[4, 5],
+			[8, 9],
+			[12, 13]
+		]);
+
+		s = reduce(s, ev('discard', { seat: 0, tile_id: 40, tile: '2s', pool_index: 0 }));
+		expect(s.hands![0]).toEqual([0, 1]);
+
+		// seat 1 pungs the discard: the claimed tile was never in seat 1's hand
+		s = reduce(s, ev('meld', { seat: 1, meld_kind: 'pung', tiles: [4, 5, 40], from_seat: 0 }));
+		expect(s.hands![1]).toEqual([]);
+
+		s = reduce(s, ev('draw', { seat: 2, tile_id: 77 }));
+		expect(s.hands![2]).toEqual([8, 9, 77]);
+
+		s = reduce(s, ev('kong_replace', { seat: 3, tile_id: 88 }));
+		expect(s.hands![3]).toEqual([12, 13, 88]);
+
+		s = reduce(s, ev('hand_start', { hand_no: 2, prevailing: 'EAST', dealer: 0, seats: [] }));
+		expect(s.hands).toEqual([[], [], [], []]);
+	});
+
+	it('leaves hands null for a seated player or a normal spectator', () => {
+		const s = reduce(state({ seat: 0, ownHand: [1] }), ev('draw', { seat: 0, tile_id: 2 }));
+		expect(s.hands).toBeNull();
+		const next = reduce(
+			s,
+			ev('hand_start', { hand_no: 2, prevailing: 'EAST', dealer: 0, seats: [] })
+		);
+		expect(next.hands).toBeNull();
+	});
+});

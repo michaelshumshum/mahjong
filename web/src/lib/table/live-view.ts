@@ -164,7 +164,9 @@ function handResultToView(state: ClientGameState): MockHandResult | null {
 
 /** `null` before this seat is known (pre-join/pre-`state_sync`) -- there's no `you` to build a
  * seat-relative view around yet. A spectator (`seat === null`) passes `spectateFrom` instead: the
- * seat drawn at the bottom, with no concealed tiles (a spectator snapshot carries none). */
+ * seat drawn at the bottom, with no concealed tiles (a spectator snapshot carries none) unless
+ * the table shows spectators every hand (`state.hands`), in which case every seat gets its
+ * `concealedHand`. */
 export function viewFromClientState(
 	state: ClientGameState,
 	spectateFrom: Seat | null = null
@@ -177,6 +179,7 @@ export function viewFromClientState(
 
 	const seats = [0, 1, 2, 3].map((seat): MockSeatState => {
 		const isYou = state.seat !== null && seat === you;
+		const openHand = state.hands?.[seat];
 		return {
 			seat: seat as Seat,
 			// `state.names` (docs/02-protocol.md §3's `state_sync.names`/`seat_state.name`, M5) is
@@ -185,7 +188,11 @@ export function viewFromClientState(
 			// actually arrived, which shouldn't outlast the first state_sync for a bound seat.
 			name: state.names[seat] ?? (isYou ? 'You' : `Seat ${seat}`),
 			concealedCount: state.concealedCounts[seat],
-			concealedHand: isYou ? concealedCodes : undefined,
+			concealedHand: isYou
+				? concealedCodes
+				: openHand
+					? sortByTileType(openHand).map(tileIdToCode)
+					: undefined,
 			drawn: isYou ? drawnCode : undefined,
 			melds: state.melds[seat].map(meldToView),
 			discards: state.discardPools[seat]

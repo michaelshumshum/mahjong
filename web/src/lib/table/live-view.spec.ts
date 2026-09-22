@@ -194,4 +194,11 @@ describe('viewFromClientState spectator', () => {
 		expect(live!.view.turnDurationMs).toBeNull();
 		expect(live!.ownHand).toEqual({ concealedIds: [], drawnId: null });
 	});
+
+	it('shows every seat face-up, sorted, when the table reveals hands to spectators', () => {
+		const live = viewFromClientState({ ...spectatorState(), hands: [[36, 0], [4], [8], [12]] }, 0);
+		expect(live!.view.seats[0].concealedHand).toEqual(['1m', '1p']);
+		expect(live!.view.seats[2].concealedHand).toEqual(['3m']);
+		expect(live!.ownHand).toEqual({ concealedIds: [], drawnId: null });
+	});
 });
