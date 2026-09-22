@@ -21,6 +21,31 @@ const OUT_DIR = path.join(REPO_ROOT, 'docs', 'screenshots');
 const PORT = 5199; // scratch port, distinct from the normal dev port (5173) to avoid collisions
 const BASE = `http://localhost:${PORT}`;
 
+const LOBBY_TABLES = [
+	{
+		id: 'K7QM2P',
+		status: 'open',
+		hand_no: 1,
+		seats: [
+			{ status: 'connected', name: 'Alice' },
+			{ status: 'empty', name: null },
+			{ status: 'connected', name: 'Wing' },
+			{ status: 'empty', name: null }
+		]
+	},
+	{
+		id: 'R4HX9T',
+		status: 'in_progress',
+		hand_no: 5,
+		seats: [
+			{ status: 'connected', name: 'Mei' },
+			{ status: 'bot', name: 'FaanBot' },
+			{ status: 'connected', name: 'Chris' },
+			{ status: 'bot', name: 'FaanBot' }
+		]
+	}
+];
+
 // The "notable pages" list — keep this curated and small (this is what ends up in the
 // README), not exhaustive. Add a page here when it becomes a meaningful, stable part of the
 // app; don't add every mock scenario or every intermediate dev-toolbar state.
@@ -120,6 +145,10 @@ async function main() {
 		page.on('console', (msg) => {
 			if (msg.type() === 'error') errors.push(msg.text());
 		});
+
+		// no backend runs during capture -- the lobby's table browser gets a fixed listing instead
+		// of a failed fetch (which would also trip the console-error check below).
+		await page.route('**/tables', (route) => route.fulfill({ json: { tables: LOBBY_TABLES } }));
 
 		for (const { name, url, before } of PAGES) {
 			await page.goto(BASE + url, { waitUntil: 'networkidle' });

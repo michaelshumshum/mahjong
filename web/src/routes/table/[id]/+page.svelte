@@ -223,7 +223,21 @@
 		if (hasStartActivity(store.state)) handEverStarted = true;
 	});
 
-	let live = $derived(!isMock && liveStore ? viewFromClientState(liveStore.state) : null);
+	// no seat of our own and none left to take (docs/03-frontend.md's "Spectating"): watch from
+	// seat 0's side instead of showing a picker with nothing to pick. `handNo > 0` = a real
+	// `state_sync` has landed; before that `seatStatus` is just the initial placeholder.
+	let spectating = $derived(
+		!isMock &&
+			pregamePreview === null &&
+			liveStore !== null &&
+			liveStore.state.seat === null &&
+			liveStore.state.handNo > 0 &&
+			liveStore.state.seatStatus.every((status) => status !== 'empty')
+	);
+
+	let live = $derived(
+		!isMock && liveStore ? viewFromClientState(liveStore.state, spectating ? 0 : null) : null
+	);
 	// falls back to the mock fixture when there's no live view yet (pre-join/pre-start) --
 	// never actually rendered in that case, since `tableReady` below gates the whole template;
 	// this just keeps `gameState` non-null so the rest of the (unchanged) template below doesn't
@@ -234,7 +248,8 @@
 			(pregamePreview === null &&
 				liveStore !== null &&
 				liveStore.state.seat !== null &&
-				handEverStarted)
+				handEverStarted) ||
+			spectating
 	);
 
 	// unifies the real `liveStore`-driven pre-game states with the static `?pregame=` preview
@@ -385,17 +400,19 @@
 		void gameState.handNo;
 		handEndAckSent = false;
 	});
-	// mock mode has no real hand_end_ack round trip to hide the overlay behind -- dismissing
-	// there just closes it locally, reset whenever the scenario picker jumps to a fresh one.
-	let mockHandEndDismissed = $state(false);
+	// mock mode and spectators have no hand_end_ack round trip to hide the overlay behind (a
+	// spectator isn't a seat the hold waits on) -- dismissing just closes it locally, reset
+	// whenever the scenario picker jumps to a fresh one or the next hand starts.
+	let handEndDismissedLocally = $state(false);
 	$effect(() => {
 		void scenarioId;
-		mockHandEndDismissed = false;
+		void gameState.handNo;
+		handEndDismissedLocally = false;
 	});
 
 	function dismissHandEnd(): void {
-		if (isMock) {
-			mockHandEndDismissed = true;
+		if (isMock || spectating) {
+			handEndDismissedLocally = true;
 			return;
 		}
 		if (handEndAckSent || !liveStore) return;
@@ -856,6 +873,10 @@
 						</button>
 					{/each}
 				</div>
+			{:else if spectating}
+				<p class="table-label">
+					Table <strong>{tableId}</strong> · spectating · <a href="/">Back to lobby</a>
+				</p>
 			{:else}
 				<p class="table-label">
 					Table <strong>{tableId}</strong> · seat {liveStore?.state.seat}{#if isPractice}
@@ -871,7 +892,9 @@
 			<div class="chrome-toggles">
 				<button type="button" onclick={() => (showScoreSheet = !showScoreSheet)}>Score sheet</button
 				>
-				<button type="button" onclick={() => (showSettings = !showSettings)}>Settings</button>
+				{#if !spectating}
+					<button type="button" onclick={() => (showSettings = !showSettings)}>Settings</button>
+				{/if}
 				<button type="button" onclick={() => pushToast('Reconnecting…')}>Toast</button>
 				{#if isMock}
 					<button type="button" onclick={() => (showAnimationDemo = !showAnimationDemo)}
@@ -891,10 +914,17 @@
 					{@render centerDiscardPool(seatAt(2), 'across', `${seatAt(2).name}'s discards`)}
 					{@render centerDiscardPool(seatAt(3), 'left', `${seatAt(3).name}'s discards`)}
 					{@render centerDiscardPool(seatAt(1), 'right', `${seatAt(1).name}'s discards`)}
-					{@render centerDiscardPool(seatAt(0), 'self', 'Your discards')}
+					{@render centerDiscardPool(
+						seatAt(0),
+						'self',
+						spectating ? `${seatAt(0).name}'s discards` : 'Your discards'
+					)}
 				</div>
 
-				<section class="seat-region seat-region--self" aria-label="Your hand">
+				<section
+					class="seat-region seat-region--self"
+					aria-label={spectating ? `${seatAt(0).name}'s seat` : 'Your hand'}
+				>
 					<header class="seat-meta">
 						<span class="seat-name">{seatAt(0).name}</span>
 						<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seatAt(0).seat)]} wind"
@@ -915,9 +945,15 @@
 
 					<div class="your-hand">
 						{#if seatAt(0).flowers.length || seatAt(0).melds.length}
-							<div class="tile-row meld-row" aria-label="Your melds">
+							<div
+								class="tile-row meld-row"
+								aria-label={spectating ? `${seatAt(0).name}'s melds` : 'Your melds'}
+							>
 								{#if seatAt(0).flowers.length}
-									<div class="meld" aria-label="Your flowers">
+									<div
+										class="meld"
+										aria-label={spectating ? `${seatAt(0).name}'s flowers` : 'Your flowers'}
+									>
 										{#each seatAt(0).flowers as code, i (i)}
 											<div class="mini-tile"><TileFace {code} /></div>
 										{/each}
@@ -935,25 +971,33 @@
 							</div>
 						{/if}
 
-						<div class="hand-row" aria-label="Your concealed hand">
-							{#each ownHandTiles as tile (tile.key)}
-								{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
-									<button
-										type="button"
-										class="hand-tile hand-tile-btn"
-										class:hand-tile--drawn={tile.drawn}
-										aria-label="Discard {tile.code}"
-										onclick={() => discardTile(tile.tileId)}
-									>
-										<TileFace code={tile.code} />
-									</button>
-								{:else}
-									<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
-										<TileFace code={tile.code} />
-									</div>
-								{/if}
-							{/each}
-						</div>
+						{#if spectating}
+							<div class="hand-row" aria-label="{seatAt(0).concealedCount} concealed tiles">
+								{#each Array.from({ length: seatAt(0).concealedCount }) as _, i (i)}
+									<div class="hand-tile"><TileFace code={null} /></div>
+								{/each}
+							</div>
+						{:else}
+							<div class="hand-row" aria-label="Your concealed hand">
+								{#each ownHandTiles as tile (tile.key)}
+									{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
+										<button
+											type="button"
+											class="hand-tile hand-tile-btn"
+											class:hand-tile--drawn={tile.drawn}
+											aria-label="Discard {tile.code}"
+											onclick={() => discardTile(tile.tileId)}
+										>
+											<TileFace code={tile.code} />
+										</button>
+									{:else}
+										<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
+											<TileFace code={tile.code} />
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
 
 						{#if declareOptions.length}
 							<div class="declare-actions" role="group" aria-label="Declare options">
@@ -984,7 +1028,7 @@
 			</div>
 		{/if}
 
-		{#if gameState.handResult && !gameEndReached && !(isMock && mockHandEndDismissed)}
+		{#if gameState.handResult && !gameEndReached && !handEndDismissedLocally}
 			<div class="faan-overlay" data-testid="faan-overlay">
 				{#key gameState.handNo}
 					<div class="hand-end-timer">
@@ -1560,6 +1604,10 @@
 		align-self: center;
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
+
+		a {
+			color: var(--color-text);
+		}
 	}
 
 	// wall/prevailing: was `.center-info` on the table surface itself (see `.table-center`

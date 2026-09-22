@@ -148,3 +148,50 @@ describe('viewFromClientState turnDurationMs', () => {
 		expect(live!.view.turnDurationMs).toBeNull();
 	});
 });
+
+describe('viewFromClientState spectator', () => {
+	function spectatorState() {
+		return reduce(initialClientGameState(), {
+			v: 1,
+			ts: 1,
+			seq: 0,
+			t: 'state_sync',
+			d: {
+				seat: null,
+				hand_no: 2,
+				prevailing: 'E',
+				dealer: 1,
+				turn: 2,
+				phase: 'AWAIT_ACTION',
+				own_hand: [],
+				concealed_counts: [13, 13, 14, 13],
+				melds: [[], [], [], []],
+				discard_pools: [[0], [], [], []],
+				flowers: [[], [], [], []],
+				wall_remaining: 50,
+				seat_status: ['connected', 'bot', 'bot', 'bot'],
+				names: ['Alice', 'FaanBot', 'FaanBot', 'FaanBot'],
+				host_seat: 0,
+				scores: [0, 0, 0, 0],
+				legal_actions: [],
+				deadline_ts: 9999,
+				claim_options: []
+			}
+		} as ServerEvent);
+	}
+
+	it('stays null without a perspective seat', () => {
+		expect(viewFromClientState(spectatorState())).toBeNull();
+	});
+
+	it('anchors on spectateFrom with no concealed tiles for any seat', () => {
+		const live = viewFromClientState(spectatorState(), 0);
+		expect(live).not.toBeNull();
+		expect(live!.view.you).toBe(0);
+		expect(live!.view.seats.every((s) => s.concealedHand === undefined)).toBe(true);
+		expect(live!.view.seats[0].name).toBe('Alice');
+		expect(live!.view.seats[2].concealedCount).toBe(14);
+		expect(live!.view.turnDurationMs).toBeNull();
+		expect(live!.ownHand).toEqual({ concealedIds: [], drawnId: null });
+	});
+});

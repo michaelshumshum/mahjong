@@ -576,6 +576,22 @@ signal (below). The table label in the live table's dev toolbar appends "· prac
 this flag is set, matching this milestone's "don't invent a tier selector" scope — one fixed
 default tier, named plainly, not a difficulty picker.
 
+**Table browser.** The lobby's "Tables" panel polls `GET /tables` every 5s
+([02-protocol.md §10](02-protocol.md), `lib/net/lobby.ts`), open tables first. "Sit down" (open)
+and "Watch" (in progress) both navigate to the same `/table/<id>` — the route itself decides
+picker vs. spectator view (below), so a table that fills between the poll and the click still
+lands somewhere sensible.
+
+**Spectating.** `/table/[id]` renders the table as a spectator whenever this connection has no
+seat, a real `state_sync` has landed (`handNo > 0`), and no seat is `empty` — i.e. nothing left
+to pick. No separate URL flag: the socket already connects with `&spectate=true` whenever
+there's no persisted seat (Join flow, above). The view is `viewFromClientState(state, 0)`: seat
+0 is drawn at the bottom as a hand of backs (a spectator snapshot carries no concealed tiles),
+with no discard/declare/claim controls (`legalActions`/`claimOffer` are always empty for a
+spectator), no Settings (auto-arm is per-seat), and a "Back to lobby" link in the toolbar. The
+hand-end overlay dismisses locally instead of sending `hand_end_ack` — the hold only waits on
+seats.
+
 **Bot seat badge.** `MockSeatState` grew an optional `status?: string` field (`mock-game-state.ts`)
 that `live-view.ts`'s `viewFromClientState` populates from `ClientGameState.seatStatus[seat]` —
 mock fixtures never set it, so this is a no-op there. `+page.svelte`'s opponent seat header renders

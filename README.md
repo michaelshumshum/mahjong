@@ -25,7 +25,7 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 
 | | |
 | --- | --- |
-| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create/join a table, or play solo vs bots | ![Demo](docs/screenshots/demo.png) Demo (`/demo`) — component demos |
+| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create/join a table, play solo vs bots, or browse tables to sit down or watch | ![Demo](docs/screenshots/demo.png) Demo (`/demo`) — component demos |
 | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
 | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw |
 | ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended, score summary with standings | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting |

@@ -163,16 +163,20 @@ function handResultToView(state: ClientGameState): MockHandResult | null {
 }
 
 /** `null` before this seat is known (pre-join/pre-`state_sync`) -- there's no `you` to build a
- * seat-relative view around yet. */
-export function viewFromClientState(state: ClientGameState): LiveTableView | null {
-	if (state.seat === null) return null;
-	const you = state.seat as Seat;
+ * seat-relative view around yet. A spectator (`seat === null`) passes `spectateFrom` instead: the
+ * seat drawn at the bottom, with no concealed tiles (a spectator snapshot carries none). */
+export function viewFromClientState(
+	state: ClientGameState,
+	spectateFrom: Seat | null = null
+): LiveTableView | null {
+	const you = (state.seat ?? spectateFrom) as Seat | null;
+	if (you === null) return null;
 	const ownHand = splitOwnHand(state);
 	const concealedCodes = ownHand.concealedIds.map(tileIdToCode);
 	const drawnCode = ownHand.drawnId !== null ? tileIdToCode(ownHand.drawnId) : null;
 
 	const seats = [0, 1, 2, 3].map((seat): MockSeatState => {
-		const isYou = seat === you;
+		const isYou = state.seat !== null && seat === you;
 		return {
 			seat: seat as Seat,
 			// `state.names` (docs/02-protocol.md §3's `state_sync.names`/`seat_state.name`, M5) is

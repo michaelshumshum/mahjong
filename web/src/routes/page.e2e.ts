@@ -43,3 +43,55 @@ test('profile route renders', async ({ page }) => {
 	expect(response?.status()).toBe(200);
 	await expect(page.locator('h1')).toHaveText('Profile');
 });
+
+test('lobby lists tables with sit-down for open ones and watch for ones in progress', async ({
+	page
+}) => {
+	await page.route('**/tables', (route) =>
+		route.fulfill({
+			json: {
+				tables: [
+					{
+						id: 'LIVE22',
+						status: 'in_progress',
+						hand_no: 3,
+						seats: [
+							{ status: 'connected', name: 'Mei' },
+							{ status: 'bot', name: 'FaanBot' },
+							{ status: 'bot', name: 'FaanBot' },
+							{ status: 'bot', name: 'FaanBot' }
+						]
+					},
+					{
+						id: 'OPEN11',
+						status: 'open',
+						hand_no: 1,
+						seats: [
+							{ status: 'connected', name: 'Alice' },
+							{ status: 'empty', name: null },
+							{ status: 'empty', name: null },
+							{ status: 'empty', name: null }
+						]
+					}
+				]
+			}
+		})
+	);
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+
+	const rows = page.getByTestId('table-row');
+	await expect(rows).toHaveCount(2);
+	// open tables sort first
+	await expect(rows.nth(0)).toContainText('OPEN11');
+	await expect(rows.nth(0)).toContainText('Open · 1/4 seated');
+	await expect(rows.nth(1)).toContainText('In progress · hand 3');
+
+	await rows.nth(1).getByRole('button', { name: 'Watch' }).click();
+	await expect(page).toHaveURL('/table/LIVE22');
+
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Sit down' }).click();
+	await expect(page).toHaveURL('/table/OPEN11');
+});
