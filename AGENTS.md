@@ -5,11 +5,11 @@ Project outline lives in `docs/`.
 
 ## Context triggers
 
-| Working on                                  | Read first                                                       |
-| -------------------------------------------- | ----------------------------------------------------------------- |
+| Working on                                  | Read first                                                      |
+| ------------------------------------------- | --------------------------------------------------------------- |
 | `core game logic, server mechanics`         | [server/AGENTS.md](server/AGENTS.md), `docs/00-architecture.md` |
 | `user interface, gameplay`                  | [web/AGENTS.md](web/AGENTS.md), `docs/03-frontend.md`           |
-| `shared/protocol.schema.json`               | `docs/02-protocol.md`                                            |
+| `shared/protocol.schema.json`               | `docs/02-protocol.md`                                           |
 | `bots and machine learning`                 | `docs/04-bots.md`, `docs/06-ml.md`                              |
 | `Dockerfile`, `docker-compose*`, `Makefile` | `docs/07-infra.md`                                              |
 | Milestones, scope, what to build next       | `docs/05-roadmap.md`                                            |
@@ -17,6 +17,9 @@ Project outline lives in `docs/`.
 Enforced for `server/`, `web/`, `shared/`, and infra files by
 `.claude/hooks/enforce-routing-table.sh` (Edit/Write/Bash) — it denies the write until the
 matching doc has shown up in this session (Read, or referenced in a Bash command/prompt).
+
+Compliance: start every task by replying with `Context read: <docs>` listing the trigger docs
+read this session, or `Context read: none` if no trigger applied.
 
 ## Communication
 
