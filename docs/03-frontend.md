@@ -54,13 +54,20 @@ Known costs:
 
 **Exception: the lobby background mural.** `/`'s background (`lib/ui/TileMuralBackground.svelte`)
 is a real `<canvas>` — the one deliberate deviation from "no canvas" above. It's a continuously
-vertically-scrolling grid of randomized tile faces sitting behind the two lobby buttons, purely
-decorative: `aria-hidden`, `pointer-events: none`, no hit-testing/focus/tab-order/CJK-flow to lose
-since nothing on it is ever interactive. A DOM version would mean animating ~200 elements'
+vertically-scrolling grid of randomized tile faces (the 34 playable faces plus the tile back,
+rendered with the same ivory `--color-tile` box `TileFace.svelte` uses, back included with no box
+per that component's own `.tile-face--back` treatment) sitting behind the two lobby buttons,
+purely decorative: `aria-hidden`, `pointer-events: none`, no hit-testing/focus/tab-order/CJK-flow
+to lose since nothing on it is ever interactive. A DOM version would mean animating ~200 elements'
 `transform` every frame for a background that's never the size ~150 the "known costs" budget above
 was set for; canvas's per-frame cost here is one `drawImage` blit of a pre-rendered off-screen
-buffer (rebuilt only on resize, debounced), not per-tile draws. Respects
-`prefers-reduced-motion` (renders the grid once, statically, no scroll).
+buffer, not per-tile draws every frame. Respects `prefers-reduced-motion` (renders the grid once,
+statically, no scroll). Adjacent cells never share a suit (honors and the back are exempt on both
+sides of that check). The grid is persistent, not rebuilt from scratch on resize — a resize only
+grows it to cover the new viewport, appending new cells without touching already-placed ones, so a
+spurious `resize` (a webfont swap reflowing the page, a scrollbar toggling) can't read as the whole
+mural "switching"; genuinely unchanged `window.innerWidth`/`innerHeight` short-circuits the handler
+before that even matters.
 
 ## 3. Scene layout and responsive layout
 
