@@ -42,15 +42,13 @@
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import type { TileCode } from '$lib/table/tile-code';
-	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
-	import SeatRing from '$lib/table/SeatRing.svelte';
-	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
 	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 	import DevToolbar from './_components/DevToolbar.svelte';
+	import PretableScreen from './_components/PretableScreen.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -781,67 +779,23 @@
 {:else}
 	<h1 class="sr-only">Table</h1>
 	<div class="pretable-page">
-		<div class="pretable-panel">
-			<button type="button" class="pretable-leave" onclick={handleLeaveClick}>Leave game</button>
-			<div class="pretable-info">
-				<span>Table</span>
-				<span class="pretable-code">{tableId}</span>
-				<button type="button" class="pretable-link-btn" onclick={copyInviteLink}>
-					{copiedInviteLink ? 'Copied' : 'Copy invite link'}
-				</button>
-			</div>
-			{#if copyInviteLinkFailed}
-				<p class="pretable-error">Couldn't copy automatically — copy the address bar instead.</p>
-			{/if}
-
-			{#if !effectiveConnection || effectiveConnection === 'idle' || effectiveConnection === 'connecting'}
-				<div class="pretable-spinner"></div>
-				<p class="pretable-status">Connecting…</p>
-			{:else if effectiveSeat === null}
-				<h2>Take a seat</h2>
-				<p>Choose an open seat to sit down at this table.</p>
-				<div class="pretable-name-field">
-					<label class="pretable-name-label" for="display-name-input">Your name</label>
-					<input
-						id="display-name-input"
-						type="text"
-						class="pretable-name-input"
-						maxlength="24"
-						placeholder="Guest"
-						autocomplete="off"
-						value={displayName}
-						oninput={(e) => updateDisplayName(e.currentTarget.value)}
-					/>
-				</div>
-				<SeatPicker
-					seatStatus={liveStore?.state.seatStatus ?? []}
-					names={liveStore?.state.names ?? []}
-					onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
-				/>
-			{:else}
-				<SeatRing
-					you={effectiveSeat as Seat}
-					dealer={gameState.dealer as Seat}
-					seatStatus={liveStore?.state.seatStatus ?? []}
-					names={liveStore?.state.names ?? []}
-				/>
-				<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat as Seat, gameState.dealer)]}</h2>
-				<p>
-					Waiting for the rest of the table to join. The hand starts automatically once all four
-					seats are ready.
-				</p>
-				{#if isHost}
-					<button
-						type="button"
-						class="pretable-cta"
-						onclick={() => liveStore?.socket.startWithBots()}
-					>
-						Start with bots
-					</button>
-					<p class="pretable-hint">Fills every open seat with a bot and starts right away.</p>
-				{/if}
-			{/if}
-		</div>
+		<PretableScreen
+			{tableId}
+			onLeaveClick={handleLeaveClick}
+			{copiedInviteLink}
+			{copyInviteLinkFailed}
+			onCopyInviteLink={copyInviteLink}
+			{effectiveConnection}
+			effectiveSeat={effectiveSeat as Seat | null}
+			dealer={gameState.dealer as Seat}
+			{displayName}
+			onDisplayNameChange={updateDisplayName}
+			seatStatus={liveStore?.state.seatStatus ?? []}
+			names={liveStore?.state.names ?? []}
+			onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+			{isHost}
+			onStartWithBots={() => liveStore?.socket.startWithBots()}
+		/>
 	</div>
 	<ToastStack queue={toastQueue} onDismiss={dismissToast} />
 {/if}
@@ -900,142 +854,6 @@
 		justify-content: center;
 		min-height: 100dvh;
 		padding: var(--space-5);
-	}
-
-	.pretable-panel {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-3);
-		width: 100%;
-		max-width: 26rem;
-		padding: var(--space-6) var(--space-5);
-		background: var(--color-surface);
-		text-align: center;
-		@include buttons.panel-elevated;
-
-		h2 {
-			margin: 0;
-			font-size: var(--font-size-lg);
-		}
-
-		p {
-			margin: 0;
-			max-width: 40ch;
-			color: var(--color-text-muted);
-		}
-	}
-
-	.pretable-leave {
-		align-self: flex-start;
-		min-height: 36px;
-		padding: var(--space-1) var(--space-3);
-		font: inherit;
-		font-size: var(--font-size-sm);
-		cursor: pointer;
-		@include buttons.btn-ghost;
-	}
-
-	.pretable-info {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-2);
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
-	.pretable-code {
-		font-family: monospace;
-		font-size: var(--font-size-base);
-		letter-spacing: 0.08em;
-		color: var(--color-text);
-		background: var(--color-surface-raised);
-		border-radius: var(--radius-sm);
-		padding: var(--space-1) var(--space-2);
-	}
-
-	.pretable-link-btn {
-		min-height: 36px;
-		padding: var(--space-1) var(--space-3);
-		font: inherit;
-		font-size: var(--font-size-sm);
-		cursor: pointer;
-		@include buttons.btn-ghost;
-	}
-
-	.pretable-error {
-		font-size: var(--font-size-sm);
-		color: var(--color-status-error);
-	}
-
-	.pretable-status {
-		font-size: var(--font-size-sm);
-	}
-
-	.pretable-cta {
-		min-height: 44px;
-		padding: var(--space-2) var(--space-5);
-		font: inherit;
-		cursor: pointer;
-		@include buttons.btn-primary;
-	}
-
-	.pretable-name-field {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--space-1);
-		width: 100%;
-		max-width: 16rem;
-	}
-
-	.pretable-name-label {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
-	.pretable-name-input {
-		width: 100%;
-		min-height: 44px;
-		padding: var(--space-2) var(--space-3);
-		font: inherit;
-		color: var(--color-text);
-		@include buttons.input-recessed;
-
-		&::placeholder {
-			color: var(--color-text-muted);
-		}
-	}
-
-	// indeterminate connection spinner -- no durationMs to anchor a TimerRing to (§5's
-	// countdown mechanics are for a known deadline; this is "unknown, still trying").
-	.pretable-spinner {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		border: 3px solid var(--color-border);
-		border-top-color: var(--color-accent);
-		animation: pretable-spin 900ms linear infinite;
-	}
-
-	@keyframes pretable-spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.pretable-spinner {
-			animation: none;
-			opacity: 0.6;
-		}
-	}
-
-	.pretable-hint {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
 	}
 
 	.table-tilt {
