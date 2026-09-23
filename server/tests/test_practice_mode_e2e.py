@@ -7,11 +7,19 @@ every hand's tiles): proving the mechanism means letting `_poke_bots()`/the real
 `ProcessPoolExecutor` round-trip actually decide the bots' moves, turn after turn, for a whole
 game -- see `_play_practice_game`'s docstring for the (always-legal, deliberately simple) human
 policy that keeps this deterministic-enough to assert on without needing to predict what three
-real heuristic bots do with an unrigged wall. Not marked `slow` (like
-`tests/test_full_game_e2e.py`'s own comparable real 4-hand WS-driven game): a fixed seed keeps
-this one fast in practice (a couple of seconds, including `ProcessPoolExecutor` worker
-start-up) -- unlike `tests/test_selfplay.py`'s genuinely heavy 10,000-game/200-hypothesis-example
-sweeps, this is a single deterministic run.
+real heuristic bots do with an unrigged wall.
+
+Marked `slow`, unlike `tests/test_full_game_e2e.py`'s own comparable real 4-hand WS-driven game:
+that file scripts every seat itself, but this one lets three real `FaanBot`s decide ~150-250
+turns across the game, each a real `ProcessPoolExecutor` round-trip against
+`mahjong_core.shanten`'s per-process, lazily-warmed frontier cache (docs/04-bots.md §"Built
+(M4)") -- 20-50ms/decision once warm, slower while cold, and a fresh test process never gets the
+sustained multi-table load that keeps the cache warm in production. Measured at ~45s standalone;
+capping the shared pool's worker count to force faster warm-up was tried and made it *worse*
+(~270s -- concurrent claim-window decisions queue behind `_BOT_JOB_TIMEOUT_SECONDS`). Real,
+correctness-relevant coverage (the only test exercising the real bot-pool/WS path end to end),
+just not fast-suite material -- run explicitly with `pytest -m slow` or
+`pytest tests/test_practice_mode_e2e.py`.
 
 `_GAME_RULESET` (dealer-repeat off, same as `test_full_game_e2e.py`'s own) is applied by
 directly overwriting `table.state` with a freshly-dealt `GameState` right after the table is
@@ -28,6 +36,7 @@ import time
 import uuid
 from typing import Any, cast
 
+import pytest
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
@@ -96,6 +105,7 @@ def _play_practice_game(ws: WebSocketTestSession) -> list[dict[str, Any]]:
             )
 
 
+@pytest.mark.slow
 def test_practice_mode_full_game_against_real_faanbots() -> None:
     table_id = f"practice-{uuid.uuid4()}"
     seed = 20260918001
