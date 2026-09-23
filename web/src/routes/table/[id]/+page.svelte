@@ -41,7 +41,7 @@
 		saveSeatForTable,
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
-	import Toast from '$lib/ui/Toast.svelte';
+	import ToastStack from '$lib/ui/ToastStack.svelte';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
@@ -1275,15 +1275,7 @@
 			</div>
 		{/if}
 
-		<div class="toast-stack">
-			{#each toastQueue as toast (toast.id)}
-				<Toast
-					message={toast.message}
-					durationMs={toast.durationMs}
-					onDismiss={() => dismissToast(toast.id)}
-				/>
-			{/each}
-		</div>
+		<ToastStack queue={toastQueue} onDismiss={dismissToast} />
 	</div>
 {:else}
 	<h1 class="sr-only">Table</h1>
@@ -1341,15 +1333,7 @@
 			{/if}
 		</div>
 	</div>
-	<div class="toast-stack">
-		{#each toastQueue as toast (toast.id)}
-			<Toast
-				message={toast.message}
-				durationMs={toast.durationMs}
-				onDismiss={() => dismissToast(toast.id)}
-			/>
-		{/each}
-	</div>
+	<ToastStack queue={toastQueue} onDismiss={dismissToast} />
 {/if}
 
 {#if showLeaveConfirm}
@@ -2192,17 +2176,6 @@
 		.confirm-leave {
 			@include buttons.btn-primary;
 		}
-	}
-
-	.toast-stack {
-		position: fixed;
-		top: var(--space-4);
-		right: var(--space-4);
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		max-width: 20rem;
-		z-index: var(--z-overlay);
 	}
 
 	// --- Live animation demo (docs/03-frontend.md §2: transform/opacity only, no JS ticker) ---
