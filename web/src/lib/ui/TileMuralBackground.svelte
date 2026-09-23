@@ -35,12 +35,13 @@
 
 	// css px; buffer is pre-rendered, then just blitted with a y offset each frame -- drawing
 	// ~200 tile images individually every frame was the first approach and visibly dropped
-	// frames on a phone-class GPU. Exact 3:4 ratio (not 64x84) to match TileFace.svelte's
+	// frames on a phone-class GPU. Exact 3:4 ratio to match TileFace.svelte's
 	// `aspect-ratio: 3 / 4` precisely -- see `drawTile`'s padding/radius math below, which
-	// depends on this being exact.
-	const TILE_W = 63;
-	const TILE_H = 84;
-	const GAP = 14;
+	// depends on this being exact. 51x68 + a 12px gap packs the grid ~50% denser (by cell area)
+	// than the previous 63x84 + 14px.
+	const TILE_W = 51;
+	const TILE_H = 68;
+	const GAP = 12;
 	const CELL_W = TILE_W + GAP;
 	const CELL_H = TILE_H + GAP;
 	const SPEED_PX_PER_SEC = 14;
