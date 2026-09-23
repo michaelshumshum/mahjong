@@ -26,6 +26,8 @@
 	import GameEndScreen from '$lib/ui/GameEndScreen.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 	import {
+		clearSeatForTable,
+		clearSecretForTable,
 		loadAutoArm,
 		loadClientPrefs,
 		loadDisplayName,
@@ -170,6 +172,18 @@
 			}
 			if (event.t === 'error') {
 				pushToast(`Server error: ${event.d.message}`);
+				// a stale or wrong secret can never reclaim the seat; drop it so the next connect
+				// falls back to spectator/seat-picker instead of retrying a known-bad credential.
+				if (event.d.code === 'bad_secret') {
+					clearSeatForTable(tableId);
+					clearSecretForTable(tableId);
+				}
+			}
+			// the game is over -- the per-table reconnect credential is no longer valid, so don't
+			// leave it in localStorage forever (docs/00-architecture.md §2.1).
+			if (event.t === 'game_end') {
+				clearSeatForTable(tableId);
+				clearSecretForTable(tableId);
 			}
 			// Waiting-room arrivals only -- once the table has actually started, seat_state
 			// churns on every disconnect/autoplay/reconnect, which isn't "a new player" news.

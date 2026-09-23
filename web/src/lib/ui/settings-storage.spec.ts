@@ -4,12 +4,21 @@ import {
 	AUTO_ARM_STORAGE_KEY,
 	CLIENT_PREFS_STORAGE_KEY,
 	DISPLAY_NAME_STORAGE_KEY,
+	TABLE_CREDS_TTL_MS,
+	clearSeatForTable,
+	clearSecretForTable,
+	cleanupStaleTableCredentials,
+	hasJoinedTable,
 	loadAutoArm,
 	loadClientPrefs,
 	loadDisplayName,
+	loadSeatForTable,
+	loadSecretForTable,
 	saveAutoArm,
 	saveClientPrefs,
-	saveDisplayName
+	saveDisplayName,
+	saveSeatForTable,
+	saveSecretForTable
 } from './settings-storage';
 
 // In-memory fake -- this file runs under the 'server' vitest project (plain node, no jsdom/
@@ -136,6 +145,99 @@ describe('settings-storage', () => {
 		});
 	});
 
+	describe('seat and reconnect secret', () => {
+		it('round-trips per-table seat and secret', () => {
+			saveSeatForTable('abc123', 2);
+			saveSecretForTable('abc123', 'shhh');
+			expect(loadSeatForTable('abc123')).toBe(2);
+			expect(loadSecretForTable('abc123')).toBe('shhh');
+		});
+
+		it('hasJoinedTable is true when a seat or secret is stored', () => {
+			expect(hasJoinedTable('abc123')).toBe(false);
+			saveSeatForTable('abc123', 2);
+			expect(hasJoinedTable('abc123')).toBe(true);
+			clearSeatForTable('abc123');
+			expect(hasJoinedTable('abc123')).toBe(false);
+			saveSecretForTable('abc123', 'shhh');
+			expect(hasJoinedTable('abc123')).toBe(true);
+		});
+
+		it('hasJoinedTable is false for stale credentials', () => {
+			const stale = Date.now() - TABLE_CREDS_TTL_MS - 1;
+			localStorage.setItem('mahjong:seat:v2:old', JSON.stringify({ seat: 2, savedAt: stale }));
+			expect(hasJoinedTable('old')).toBe(false);
+		});
+
+		it('keys are isolated per table', () => {
+			saveSeatForTable('abc123', 2);
+			saveSecretForTable('abc123', 'shhh');
+			saveSeatForTable('xyz789', 0);
+			saveSecretForTable('xyz789', 'other');
+			expect(loadSeatForTable('abc123')).toBe(2);
+			expect(loadSecretForTable('abc123')).toBe('shhh');
+			expect(loadSeatForTable('xyz789')).toBe(0);
+			expect(loadSecretForTable('xyz789')).toBe('other');
+		});
+
+		it('clear removes only the requested table', () => {
+			saveSeatForTable('abc123', 2);
+			saveSecretForTable('abc123', 'shhh');
+			saveSeatForTable('xyz789', 0);
+			saveSecretForTable('xyz789', 'other');
+			clearSeatForTable('abc123');
+			clearSecretForTable('abc123');
+			expect(loadSeatForTable('abc123')).toBeNull();
+			expect(loadSecretForTable('abc123')).toBeNull();
+			expect(loadSeatForTable('xyz789')).toBe(0);
+			expect(loadSecretForTable('xyz789')).toBe('other');
+		});
+
+		it('clear is a no-op when nothing is stored', () => {
+			expect(() => clearSeatForTable('missing')).not.toThrow();
+			expect(() => clearSecretForTable('missing')).not.toThrow();
+		});
+
+		it('returns null and clears stale credentials past the TTL', () => {
+			const stale = Date.now() - TABLE_CREDS_TTL_MS - 1;
+			localStorage.setItem('mahjong:seat:v2:old', JSON.stringify({ seat: 2, savedAt: stale }));
+			localStorage.setItem(
+				'mahjong:reconnectSecret:v2:old',
+				JSON.stringify({ secret: 'shhh', savedAt: stale })
+			);
+			expect(loadSeatForTable('old')).toBeNull();
+			expect(loadSecretForTable('old')).toBeNull();
+			expect(localStorage.getItem('mahjong:seat:v2:old')).toBeNull();
+			expect(localStorage.getItem('mahjong:reconnectSecret:v2:old')).toBeNull();
+		});
+
+		it('cleanup removes stale v2 credentials and legacy v1 keys', () => {
+			const stale = Date.now() - TABLE_CREDS_TTL_MS - 1;
+			localStorage.setItem('mahjong:seat:v2:stale', JSON.stringify({ seat: 2, savedAt: stale }));
+			localStorage.setItem(
+				'mahjong:reconnectSecret:v2:stale',
+				JSON.stringify({ secret: 'shhh', savedAt: stale })
+			);
+			localStorage.setItem('mahjong:seat:v1:legacy', JSON.stringify(2));
+			localStorage.setItem('mahjong:reconnectSecret:v1:legacy', JSON.stringify('shhh'));
+			localStorage.setItem(
+				'mahjong:seat:v2:fresh',
+				JSON.stringify({ seat: 0, savedAt: Date.now() })
+			);
+			cleanupStaleTableCredentials();
+			expect(localStorage.getItem('mahjong:seat:v2:stale')).toBeNull();
+			expect(localStorage.getItem('mahjong:reconnectSecret:v2:stale')).toBeNull();
+			expect(localStorage.getItem('mahjong:seat:v1:legacy')).toBeNull();
+			expect(localStorage.getItem('mahjong:reconnectSecret:v1:legacy')).toBeNull();
+			expect(localStorage.getItem('mahjong:seat:v2:fresh')).not.toBeNull();
+		});
+
+		it('cleanup is a no-op when localStorage is absent', () => {
+			delete (globalThis as { localStorage?: Storage }).localStorage;
+			expect(() => cleanupStaleTableCredentials()).not.toThrow();
+		});
+	});
+
 	describe('graceful degradation when localStorage throws or is absent', () => {
 		it('save and load never throw when getItem/setItem throw', () => {
 			const throwing: Storage = {
@@ -148,13 +250,17 @@ describe('settings-storage', () => {
 				setItem: () => {
 					throw new DOMException('blocked', 'SecurityError');
 				},
-				removeItem: () => {}
+				removeItem: () => {
+					throw new DOMException('blocked', 'SecurityError');
+				}
 			};
 			(globalThis as { localStorage?: Storage }).localStorage = throwing;
 
 			expect(() => saveClientPrefs({ soundEnabled: true, motion: 'full' })).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
 			expect(() => saveDisplayName('Alice')).not.toThrow();
+			expect(() => clearSeatForTable('x')).not.toThrow();
+			expect(() => clearSecretForTable('x')).not.toThrow();
 			expect(loadClientPrefs()).toBeNull();
 			expect(loadAutoArm()).toBeNull();
 			expect(loadDisplayName()).toBeNull();
@@ -166,6 +272,8 @@ describe('settings-storage', () => {
 			expect(() => saveClientPrefs({ soundEnabled: true, motion: 'full' })).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
 			expect(() => saveDisplayName('Alice')).not.toThrow();
+			expect(() => clearSeatForTable('x')).not.toThrow();
+			expect(() => clearSecretForTable('x')).not.toThrow();
 			expect(loadClientPrefs()).toBeNull();
 			expect(loadAutoArm()).toBeNull();
 			expect(loadDisplayName()).toBeNull();

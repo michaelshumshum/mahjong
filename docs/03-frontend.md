@@ -660,7 +660,9 @@ each showing its code, open/in-progress state and all four seats. The grid polls
 every 5s ([02-protocol.md §10](02-protocol.md), `lib/net/lobby.ts`), open tables first. "Sit
 down" (open) and "Watch" (in progress) both navigate to the same `/table/<id>` — the route itself decides
 picker vs. spectator view (below), so a table that fills between the poll and the click still
-lands somewhere sensible.
+lands somewhere sensible. If the browser still holds a reconnect credential for a table
+(`lib/ui/settings-storage.ts`), the card shows "Rejoin" instead because the player already sat
+there.
 
 **Spectating.** `/table/[id]` renders the table as a spectator whenever this connection has no
 seat, a real `state_sync` has landed (`handNo > 0`), and no seat is `empty` — i.e. nothing left

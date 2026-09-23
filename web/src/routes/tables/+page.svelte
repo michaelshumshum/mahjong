@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { fetchTables, type TableSummary } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
+	import { hasJoinedTable } from '$lib/ui/settings-storage';
 	import JoinByCodePanel from './_components/JoinByCodePanel.svelte';
 	import TableCard from './_components/TableCard.svelte';
 
@@ -57,7 +58,11 @@
 	{:else}
 		<ul class="table-grid" aria-label="Tables">
 			{#each tables as table (table.id)}
-				<TableCard {table} onOpen={(id) => goto(`/table/${id}`)} />
+				<TableCard
+					{table}
+					hasJoined={hasJoinedTable(table.id)}
+					onOpen={(id) => goto(`/table/${id}`)}
+				/>
 			{/each}
 		</ul>
 	{/if}

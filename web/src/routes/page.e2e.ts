@@ -163,3 +163,40 @@ test('tables page lists tables with sit-down for open ones and watch for ones in
 	await page.getByRole('button', { name: 'Sit down' }).click();
 	await expect(page).toHaveURL('/table/OPEN11');
 });
+
+test('tables page shows Rejoin for a table this browser has joined before', async ({ page }) => {
+	await page.route('**/tables', (route) => {
+		if (route.request().resourceType() !== 'fetch') return route.fallback();
+		return route.fulfill({
+			json: {
+				tables: [
+					{
+						id: 'REJOIN',
+						status: 'in_progress',
+						hand_no: 2,
+						seats: [
+							{ status: 'disconnected', name: 'Alice' },
+							{ status: 'connected', name: 'Bob' },
+							{ status: 'empty', name: null },
+							{ status: 'empty', name: null }
+						]
+					}
+				]
+			}
+		});
+	});
+	// seed a persisted seat so the card treats this table as already joined
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			'mahjong:seat:v2:REJOIN',
+			JSON.stringify({ seat: 0, savedAt: Date.now() })
+		);
+	});
+	await page.goto('/tables');
+	await page.waitForLoadState('networkidle');
+
+	const card = page.getByTestId('table-card');
+	await expect(card).toContainText('REJOIN');
+	await card.getByRole('button', { name: 'Rejoin' }).click();
+	await expect(page).toHaveURL('/table/REJOIN');
+});

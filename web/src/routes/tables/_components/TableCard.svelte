@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { seatedCount, type TableSummary } from '$lib/net/lobby';
 
-	let { table, onOpen }: { table: TableSummary; onOpen: (id: string) => void } = $props();
+	let {
+		table,
+		hasJoined,
+		onOpen
+	}: { table: TableSummary; hasJoined: boolean; onOpen: (id: string) => void } = $props();
 </script>
 
 <li class="panel table-card" data-testid="table-card">
@@ -21,7 +25,9 @@
 			</li>
 		{/each}
 	</ul>
-	{#if table.status === 'open'}
+	{#if hasJoined}
+		<button type="button" class="primary" onclick={() => onOpen(table.id)}>Rejoin</button>
+	{:else if table.status === 'open'}
 		<button type="button" class="primary" onclick={() => onOpen(table.id)}>Sit down</button>
 	{:else}
 		<button type="button" onclick={() => onOpen(table.id)}>Watch</button>

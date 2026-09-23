@@ -5,8 +5,13 @@ import type { AutoArm, ClientPrefs, MotionPref } from './Settings.svelte';
 export const CLIENT_PREFS_STORAGE_KEY = 'mahjong:clientPrefs:v1';
 export const AUTO_ARM_STORAGE_KEY = 'mahjong:autoArm:v1';
 export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
-const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v1:';
-const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v1:';
+const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
+const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
+
+/** How long a per-table reconnect credential stays in `localStorage`. A game can run for hours
+ * and a player may reload/return across a long session, but a day is plenty -- and it stops
+ * abandoned tables from leaving secrets behind forever. */
+export const TABLE_CREDS_TTL_MS = 24 * 60 * 60 * 1000;
 
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 
@@ -45,6 +50,15 @@ function writeRaw(key: string, value: string): void {
 		localStorage.setItem(key, value);
 	} catch {
 		// storage unavailable/full/blocked -- the in-memory value still works this session
+	}
+}
+
+function clearRaw(key: string): void {
+	try {
+		if (typeof localStorage === 'undefined') return;
+		localStorage.removeItem(key);
+	} catch {
+		// storage unavailable/blocked -- nothing to clear anyway
 	}
 }
 
@@ -90,8 +104,22 @@ export function saveDisplayName(name: string): void {
 	writeRaw(DISPLAY_NAME_STORAGE_KEY, JSON.stringify(name));
 }
 
-function isSeat(value: unknown): value is number {
-	return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 3;
+interface StoredSeat {
+	seat: number;
+	savedAt: number;
+}
+
+function isStoredSeat(value: unknown): value is StoredSeat {
+	if (typeof value !== 'object' || value === null) return false;
+	const v = value as Record<string, unknown>;
+	return (
+		typeof v.seat === 'number' &&
+		Number.isInteger(v.seat) &&
+		v.seat >= 0 &&
+		v.seat <= 3 &&
+		typeof v.savedAt === 'number' &&
+		Number.isFinite(v.savedAt)
+	);
 }
 
 /** Which seat this browser last held in a given table, keyed per-table since a seat number only
@@ -99,15 +127,37 @@ function isSeat(value: unknown): value is number {
  * `hello{seat}` (docs/02-protocol.md §5) instead of falling back to `join`, which fails with
  * `table_full` once all four seats are already bound -- the bug this persistence exists to fix. */
 export function loadSeatForTable(tableId: string): number | null {
-	return load(SEAT_STORAGE_KEY_PREFIX + tableId, isSeat);
+	const raw = load<StoredSeat>(SEAT_STORAGE_KEY_PREFIX + tableId, isStoredSeat);
+	if (raw === null) return null;
+	if (Date.now() - raw.savedAt > TABLE_CREDS_TTL_MS) {
+		clearSeatForTable(tableId);
+		return null;
+	}
+	return raw.seat;
 }
 
 export function saveSeatForTable(tableId: string, seat: number): void {
-	writeRaw(SEAT_STORAGE_KEY_PREFIX + tableId, JSON.stringify(seat));
+	writeRaw(SEAT_STORAGE_KEY_PREFIX + tableId, JSON.stringify({ seat, savedAt: Date.now() }));
 }
 
-function isReconnectSecret(value: unknown): value is string {
-	return typeof value === 'string' && value.length > 0;
+export function clearSeatForTable(tableId: string): void {
+	clearRaw(SEAT_STORAGE_KEY_PREFIX + tableId);
+}
+
+interface StoredReconnectSecret {
+	secret: string;
+	savedAt: number;
+}
+
+function isStoredReconnectSecret(value: unknown): value is StoredReconnectSecret {
+	if (typeof value !== 'object' || value === null) return false;
+	const v = value as Record<string, unknown>;
+	return (
+		typeof v.secret === 'string' &&
+		v.secret.length > 0 &&
+		typeof v.savedAt === 'number' &&
+		Number.isFinite(v.savedAt)
+	);
 }
 
 /** The per-seat reconnect credential `join`'s own ack returns (00-architecture.md §2.1,
@@ -115,9 +165,76 @@ function isReconnectSecret(value: unknown): value is string {
  * refuses the reclaim (`error{code:'bad_secret'}'`). Keyed per-table, same as the seat number
  * above, since it only means something for that table's own seat binding. */
 export function loadSecretForTable(tableId: string): string | null {
-	return load(RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId, isReconnectSecret);
+	const raw = load<StoredReconnectSecret>(
+		RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId,
+		isStoredReconnectSecret
+	);
+	if (raw === null) return null;
+	if (Date.now() - raw.savedAt > TABLE_CREDS_TTL_MS) {
+		clearSecretForTable(tableId);
+		return null;
+	}
+	return raw.secret;
 }
 
 export function saveSecretForTable(tableId: string, secret: string): void {
-	writeRaw(RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId, JSON.stringify(secret));
+	writeRaw(
+		RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId,
+		JSON.stringify({ secret, savedAt: Date.now() })
+	);
+}
+
+export function clearSecretForTable(tableId: string): void {
+	clearRaw(RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId);
+}
+
+/** True when this browser has a non-expired reconnect credential for the table, meaning the
+ * player sat there earlier and can reclaim the seat instead of joining fresh. */
+export function hasJoinedTable(tableId: string): boolean {
+	return loadSeatForTable(tableId) !== null || loadSecretForTable(tableId) !== null;
+}
+
+/** Remove per-table seat/secret entries older than `maxAgeMs` (default `TABLE_CREDS_TTL_MS`)
+ * and any legacy `v1` per-table keys. Safe to call on every app startup. */
+export function cleanupStaleTableCredentials(maxAgeMs: number = TABLE_CREDS_TTL_MS): void {
+	try {
+		if (typeof localStorage === 'undefined') return;
+		const now = Date.now();
+		const keysToRemove: string[] = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key === null) continue;
+			if (
+				key.startsWith(SEAT_STORAGE_KEY_PREFIX) ||
+				key.startsWith(RECONNECT_SECRET_STORAGE_KEY_PREFIX)
+			) {
+				const raw = localStorage.getItem(key);
+				if (raw === null) continue;
+				try {
+					const parsed: unknown = JSON.parse(raw);
+					const savedAt = (parsed as Record<string, unknown> | null)?.savedAt ?? null;
+					if (
+						typeof savedAt !== 'number' ||
+						!Number.isFinite(savedAt) ||
+						now - savedAt > maxAgeMs
+					) {
+						keysToRemove.push(key);
+					}
+				} catch {
+					// corrupted -- drop it
+					keysToRemove.push(key);
+				}
+			} else if (
+				key.startsWith('mahjong:seat:v1:') ||
+				key.startsWith('mahjong:reconnectSecret:v1:')
+			) {
+				keysToRemove.push(key);
+			}
+		}
+		for (const key of keysToRemove) {
+			localStorage.removeItem(key);
+		}
+	} catch {
+		// storage unavailable/blocked -- ignore
+	}
 }

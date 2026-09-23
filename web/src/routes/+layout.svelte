@@ -10,6 +10,11 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
 	import { muralVisibility } from '$lib/ui/mural-visibility.svelte';
+	import { cleanupStaleTableCredentials } from '$lib/ui/settings-storage';
+
+	// clear abandoned per-table reconnect credentials on every app load so a disconnect-and-never
+	// return doesn't leave secrets in localStorage forever.
+	cleanupStaleTableCredentials();
 
 	let { children } = $props();
 </script>
