@@ -48,6 +48,7 @@
 	import type { TileCode } from '$lib/table/tile-code';
 	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
 	import SeatRingSlot from '$lib/table/SeatRingSlot.svelte';
+	import SeatOccupancySlot from '$lib/table/SeatOccupancySlot.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -626,26 +627,26 @@
 {#snippet seatRing(you: Seat)}
 	<div class="seat-ring" aria-hidden="true">
 		<div class="seat-ring-pos seat-ring-pos--across">
-			{@render seatOccupancySlot(((you + 2) % 4) as Seat)}
+			<SeatOccupancySlot
+				status={liveStore?.state.seatStatus[((you + 2) % 4) as Seat] ?? 'empty'}
+				name={liveStore?.state.names[((you + 2) % 4) as Seat] ?? null}
+			/>
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--left">
-			{@render seatOccupancySlot(((you + 3) % 4) as Seat)}
+			<SeatOccupancySlot
+				status={liveStore?.state.seatStatus[((you + 3) % 4) as Seat] ?? 'empty'}
+				name={liveStore?.state.names[((you + 3) % 4) as Seat] ?? null}
+			/>
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--right">
-			{@render seatOccupancySlot(((you + 1) % 4) as Seat)}
+			<SeatOccupancySlot
+				status={liveStore?.state.seatStatus[((you + 1) % 4) as Seat] ?? 'empty'}
+				name={liveStore?.state.names[((you + 1) % 4) as Seat] ?? null}
+			/>
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
 			<SeatRingSlot label={WIND_CHAR[seatWind(you, gameState.dealer)]} self={true} />
 		</div>
-	</div>
-{/snippet}
-
-{#snippet seatOccupancySlot(seat: Seat)}
-	{@const status = liveStore?.state.seatStatus[seat] ?? 'empty'}
-	{@const name = liveStore?.state.names[seat] ?? null}
-	{@const open = status === 'empty'}
-	<div class="seat-ring-slot" class:seat-ring-slot--filled={!open}>
-		<span>{open ? 'Open' : status === 'bot' ? 'Bot' : (name ?? 'Taken')}</span>
 	</div>
 {/snippet}
 
@@ -1330,14 +1331,6 @@
 		// `connected`/`bot`/`disconnected`/`autoplay`), so this animation now means what it
 		// looks like: nobody's here yet, but the table is open and listening.
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
-	}
-
-	// occupancy is real (see above) -- a filled seat reads solid/inert rather than still
-	// breathing "open," same visual language `.seat-ring-slot--self` already uses.
-	.seat-ring-slot--filled {
-		border: 1px solid var(--color-border);
-		color: var(--color-text);
-		animation: none;
 	}
 
 	// the one seat this screen actually knows something real about: dealer is fixed at table
