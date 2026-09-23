@@ -41,9 +41,10 @@ six-character invite code.
 from __future__ import annotations
 
 import os
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI
@@ -55,9 +56,15 @@ from app import ws
 from app.db.session import make_engine, make_session_factory
 from app.table import WireSeatStatus
 from mahjong_core.config import DEFAULT_RULESET
+from mahjong_core.presets import DEFAULT_PRESET_ID, preset_id_for, resolve_ruleset
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # docs/00-architecture.md §8.1 step 3, tunable via env
 _DEFAULT_SHOWCASE_TABLE_ID = "BOTS"
+# matches web/src/lib/table/table-code.ts's TABLE_CODE_ALPHABET -- no 0/O/1/I look-alikes.
+# Four-character SHOWCASE_TABLE_ID (above) can never collide with a generated six-character one.
+_TABLE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_TABLE_CODE_LENGTH = 6
+_TABLE_ID_GENERATION_ATTEMPTS = 10  # astronomically unlikely to ever retry once, let alone exhaust
 
 
 @asynccontextmanager
@@ -91,7 +98,10 @@ app.include_router(ws.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
+    # POST /tables sends a JSON body -- `application/json` isn't a CORS-safelisted content type,
+    # so the browser preflights it and refuses without this even though GET never needed it.
+    allow_headers=["Content-Type"],
 )
 
 
@@ -109,6 +119,65 @@ class TableSummaryOut(BaseModel):
 
 class TableList(BaseModel):
     tables: list[TableSummaryOut]
+
+
+class CreateTableRequest(BaseModel):
+    # `mahjong_core.presets.RULESET_PRESETS` key, or "custom" to take `rules` below instead.
+    ruleset: str = DEFAULT_PRESET_ID
+    # `RuleSet.from_dict`-shaped; only read when `ruleset == "custom"`. A structured JSON body
+    # field here, not the URL-encoded text `?rules=` on `/ws` has to be (docs/02-protocol.md
+    # "Ruleset selection") -- this is the one-request path that shim exists as a fallback for.
+    rules: dict[str, Any] | None = None
+    practice: bool = False
+
+
+class CreateTableResponse(BaseModel):
+    table_id: str
+    # the resolved ruleset, same shape `state_sync.ruleset`/`ruleset_preset` carry
+    # (docs/02-protocol.md §3) -- a client gets this back without needing its own WS connection
+    # first, e.g. to render "Rules: HK Classic" on the pretable screen immediately.
+    ruleset_preset: str | None
+    ruleset: dict[str, Any]
+
+
+def _generate_table_id() -> str:
+    """A fresh, never-yet-used table id -- six characters from the same look-alike-free alphabet
+    `web/src/lib/table/table-code.ts` used to generate client-side before table creation moved
+    server-side (`POST /tables` below). `secrets.choice`, not `random.choice`: this id doubles as
+    an invite code gating who can join a specific game without spectating every table
+    (`docs/02-protocol.md`'s "Auth" note -- guest-only, so this is the only real access control a
+    table has), so it should resist guessing, not just collisions. Collision-checked against the
+    registry anyway (astronomically unlikely at 33^6 combinations, but a `Table` actor lives for
+    the rest of the process's life once created, so silently colliding into someone else's game
+    would be a real, if vanishingly rare, bug -- `TableRegistry.get_or_create`'s own "never
+    creates a second `Table` for an id that already has one" would otherwise hand the second
+    caller a table it didn't ask for)."""
+    registry = ws.registry()
+    for _ in range(_TABLE_ID_GENERATION_ATTEMPTS):
+        candidate = "".join(secrets.choice(_TABLE_CODE_ALPHABET) for _ in range(_TABLE_CODE_LENGTH))
+        if registry.get(candidate) is None:
+            return candidate
+    raise RuntimeError("could not generate a unique table id")
+
+
+@app.post("/tables")
+async def create_table(body: CreateTableRequest) -> CreateTableResponse:
+    """One-request table creation: resolve the ruleset and mint the id together, so a client
+    configuring custom rules (docs/05-roadmap.md "Ruleset presets") sends one POST and gets back
+    everything it needs to navigate straight to `/table/<id>` -- no more threading a full
+    `RuleSet.to_dict()` payload through two nested URL query strings (the lobby page's own URL,
+    then the WS connect URL it builds from that). `?ruleset=`/`?rules=` on `/ws`
+    (`app/ws.py`'s `_resolve_ruleset_query`) still exist as a fallback for a direct WS connect to
+    an unclaimed table id -- this endpoint just resolves the same way
+    (`mahjong_core.presets.resolve_ruleset`) and is the primary path a real client should use."""
+    resolved = resolve_ruleset(body.ruleset, body.rules)
+    table_id = _generate_table_id()
+    ws.registry().get_or_create(table_id, resolved, practice=body.practice)
+    return CreateTableResponse(
+        table_id=table_id,
+        ruleset_preset=preset_id_for(resolved),
+        ruleset=resolved.to_dict(),
+    )
 
 
 @app.get("/healthz")

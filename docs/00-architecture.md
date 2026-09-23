@@ -202,14 +202,21 @@ offered seat's own concealed tiles.
 `Table.update_settings` swaps it mid-game and resyncs spectators. No wire message sets it yet.
 
 **Ruleset selection.** Unlike `TableSettings`, `RuleSet` is fixed once at table construction —
-`mahjong_core` has no path to change it mid-game — so it's chosen at connect time instead of over
-the envelope: `?ruleset=<preset_id>` (`mahjong_core.presets.RULESET_PRESETS`, default
-`hk_classic`) or `?ruleset=custom&rules=<RuleSet.to_dict() JSON>` on the WS URL, resolved by
-`app/ws.py`'s `_resolve_ruleset` and threaded into `TableRegistry.get_or_create` the same way
-`?practice=`/`?seed=` already are — only meaningful the first time a given table id is created.
-`state_sync.ruleset`/`ruleset_preset` (`docs/02-protocol.md` "Ruleset selection") surface the
-resolved value so a client can render it. No table-creation UI reads/writes these yet — see
-`docs/05-roadmap.md`.
+`mahjong_core` has no path to change it mid-game — so it's chosen at creation time, not over the
+envelope. The primary path is `POST /tables` (`app/main.py`'s `create_table`, `docs/02-protocol.md
+§10`): a client sends `{ruleset, rules?, practice?}` and gets back a freshly generated table id
+plus the resolved ruleset in one request, replacing what used to be client-side id generation
+(`web/src/lib/table/table-code.ts`) followed by threading a full `RuleSet.to_dict()` payload
+through two nested URL query strings. `?ruleset=<preset_id>`/`?ruleset=custom&rules=<json>` on
+the WS URL (`app/ws.py`'s `_resolve_ruleset_query`) still exist as a fallback for a direct WS
+connect to an unclaimed table id — both paths call the same
+`mahjong_core.presets.resolve_ruleset`, and `TableRegistry.get_or_create`'s "first creation wins"
+rule means whichever happens first for a given table id is the one that sticks, same as
+`?practice=`/`?seed=` already worked. `state_sync.ruleset`/`ruleset_preset`
+(`docs/02-protocol.md` "Ruleset selection") surface the resolved value so a client can render it
+after the fact too (a reconnect, a spectator). Client-side: the lobby's "Create a table" button
+opens `CreateTableDialog.svelte` (preset radios, or a full custom `RuleSet` form) before calling
+`POST /tables` and navigating — see `docs/05-roadmap.md`.
 
 **Showcase table.** `TableRegistry.start_showcase` (`app/registry.py`, started from `lifespan` for
 `SHOWCASE_TABLE_ID`, default `BOTS`, empty disables) keeps one all-bot, open-hands table running

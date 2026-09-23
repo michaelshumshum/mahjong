@@ -10,7 +10,12 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
-from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS, preset_id_for
+from mahjong_core.presets import (
+    DEFAULT_PRESET_ID,
+    RULESET_PRESETS,
+    preset_id_for,
+    resolve_ruleset,
+)
 
 
 def test_default_preset_id_is_hk_classic() -> None:
@@ -25,6 +30,32 @@ def test_preset_id_for_matches_known_preset() -> None:
 def test_preset_id_for_custom_ruleset_is_none() -> None:
     custom = RuleSet(min_faan=0, turn_seconds=30)
     assert preset_id_for(custom) is None
+
+
+def test_resolve_ruleset_named_preset() -> None:
+    assert resolve_ruleset("hk_casual", None) == RULESET_PRESETS["hk_casual"]
+
+
+def test_resolve_ruleset_unknown_preset_falls_back_to_default() -> None:
+    assert resolve_ruleset("does_not_exist", None) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_dict() -> None:
+    custom = RuleSet(min_faan=1, wall_reserve=8)
+    assert resolve_ruleset("custom", custom.to_dict()) == custom
+
+
+def test_resolve_ruleset_custom_with_no_rules_falls_back_to_default() -> None:
+    assert resolve_ruleset("custom", None) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_with_invalid_rules_falls_back_to_default() -> None:
+    bad = {**DEFAULT_RULESET.to_dict(), "min_faan": 2}
+    assert resolve_ruleset("custom", bad) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_with_missing_keys_falls_back_to_default() -> None:
+    assert resolve_ruleset("custom", {"min_faan": 1}) == DEFAULT_RULESET
 
 
 def _connect_and_join(client: TestClient, table_id: str, query: str) -> dict:

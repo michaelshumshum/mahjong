@@ -12,10 +12,13 @@ singleton (`_registry` below) -- `TableRegistry` itself stays an in-process dict
 docs/00-architecture.md §6, not a new abstraction layer. `?ruleset=` picks a
 `mahjong_core.presets.RULESET_PRESETS` key (default `DEFAULT_PRESET_ID`) for the table's
 `RuleSet`, or `custom` to take a full `RuleSet.from_dict`-shaped JSON body from `?rules=`
-instead -- see `_resolve_ruleset`. Only meaningful the first time a given `table` id is
-created, same as `?practice=` below (`TableRegistry.get_or_create`'s own note): an existing
-table's ruleset was already decided at its own construction. `?seed=` exists only so tests can
-pin a table's deal. `?practice=true` (M4.5,
+instead -- see `_resolve_ruleset_query`. This is a fallback path for a direct WS connect to an
+unclaimed table id, not the primary one: a real client creates the table via `POST /tables`
+(`app/main.py`'s `create_table`), which resolves the ruleset and mints the id in one request and
+is what these query params' resolution logic (`mahjong_core.presets.resolve_ruleset`) is shared
+with. Only meaningful the first time a given `table` id is created, same as `?practice=` below
+(`TableRegistry.get_or_create`'s own note): an existing table's ruleset was already decided at
+its own construction. `?seed=` exists only so tests can pin a table's deal. `?practice=true` (M4.5,
 docs/05-roadmap.md) binds seats 1-3 to bots at table creation, before any human ever joins --
 see `app/table.py`'s `Table.__init__(practice=...)`/`_bind_bot_seat`; only meaningful the first
 time a given `table` id is created (`TableRegistry.get_or_create`'s own note). `?spectate=true`
@@ -70,9 +73,9 @@ from mahjong_core.actions import (
     Pass,
 )
 from mahjong_core.actions import Discard as DiscardAction
-from mahjong_core.config import DEFAULT_RULESET, RuleSet
+from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, MeldKind, legal_self_melds
-from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
+from mahjong_core.presets import DEFAULT_PRESET_ID, resolve_ruleset
 from mahjong_core.tiles import TileId
 
 router = APIRouter()
@@ -124,20 +127,24 @@ def reset_registry(
     return _registry
 
 
-def _resolve_ruleset(ruleset: str, rules: str | None) -> RuleSet:
-    """`?ruleset=`/`?rules=` on `/ws` -> the `RuleSet` a new table should construct with.
-    `ruleset` is a `RULESET_PRESETS` key, or `"custom"` to take the full `RuleSet.from_dict`
-    payload in `rules` (JSON text) instead. Matches this endpoint's existing never-hard-reject
-    posture (`?practice=`'s bool coercion, `_normalize_name`'s default-instead-of-error) rather
-    than refusing the connection: an unknown preset id, a missing/malformed `rules` payload, or
-    one that fails `RuleSet.__post_init__`'s own validation (e.g. `min_faan` outside its enum)
-    all silently fall back to the default preset instead of erroring the handshake."""
-    if ruleset == "custom" and rules is not None:
+def _resolve_ruleset_query(ruleset: str, rules: str | None) -> RuleSet:
+    """`?ruleset=`/`?rules=` on `/ws` -> the `RuleSet` a new table should construct with. This is
+    the WS-connect fallback path -- the primary, one-request path is `POST /tables`
+    (`app/main.py`'s `create_table`), which already gets `rules` as a structured JSON body rather
+    than URL-encoded text and calls `mahjong_core.presets.resolve_ruleset` directly. A direct WS
+    connect to an unclaimed table id skips that REST call entirely (matching this endpoint's
+    existing "no table API needed, auto-create on first connect" posture,
+    docs/03-frontend.md's "/table/[id] wiring") and needs its own text -> dict step first: `rules`
+    arrives as raw query-string JSON, so a malformed/non-JSON value is folded into
+    `resolve_ruleset`'s already-lenient fallback (unknown preset id, failed `RuleSet` validation)
+    rather than treated separately."""
+    parsed: dict[str, Any] | None = None
+    if rules is not None:
         try:
-            return RuleSet.from_dict(json.loads(rules))
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-            pass
-    return RULESET_PRESETS.get(ruleset, DEFAULT_RULESET)
+            parsed = json.loads(rules)
+        except json.JSONDecodeError:
+            parsed = None
+    return resolve_ruleset(ruleset, parsed)
 
 
 def _get_or_create_table(
@@ -145,7 +152,7 @@ def _get_or_create_table(
 ) -> Table:
     return _registry.get_or_create(
         table_id,
-        _resolve_ruleset(ruleset, rules),
+        _resolve_ruleset_query(ruleset, rules),
         seed=seed,
         require_ready=True,
         practice=practice,
