@@ -19,7 +19,7 @@ const WEB_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = path.dirname(WEB_DIR);
 const OUT_DIR = path.join(REPO_ROOT, 'docs', 'screenshots');
 const PORT = 5199; // scratch port, distinct from the normal dev port (5173) to avoid collisions
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://127.0.0.1:${PORT}`;
 
 const LOBBY_TABLES = [
 	{
@@ -51,6 +51,15 @@ const LOBBY_TABLES = [
 // app; don't add every mock scenario or every intermediate dev-toolbar state.
 const PAGES = [
 	{ name: 'lobby', url: '/' },
+	// the ruleset picker `POST /tables` (docs/02-protocol.md §10) needs before a table can be
+	// created -- genuinely distinct from the plain lobby buttons above.
+	{
+		name: 'lobby-create-dialog',
+		url: '/',
+		async before(page) {
+			await page.getByRole('button', { name: 'Create a table' }).click();
+		}
+	},
 	{ name: 'tables', url: '/tables' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/03-frontend.md §6) -- there's no backend running during a
@@ -126,11 +135,19 @@ async function main() {
 	// forward SIGTERM to the real vite process it spawns, so killing just this PID leaves vite
 	// (and the event loop it holds open via its stdio pipes) running forever. Killing the group
 	// (negative pid) reaches vite's actual process too.
-	const server = spawn('pnpm', ['exec', 'vite', 'dev', '--port', String(PORT), '--strictPort'], {
-		cwd: WEB_DIR,
-		stdio: ['ignore', 'pipe', 'pipe'],
-		detached: true
-	});
+	// `--host 127.0.0.1`, not vite's bare default: unset, vite/node's `localhost` resolution can
+	// bind IPv6-only (`::1`) depending on the host's resolver order, which then refuses a plain
+	// `fetch('http://localhost:...')` connect below on a system that resolves `localhost` to
+	// `127.0.0.1` first -- explicit means this can't depend on that order either way.
+	const server = spawn(
+		'pnpm',
+		['exec', 'vite', 'dev', '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
+		{
+			cwd: WEB_DIR,
+			stdio: ['ignore', 'pipe', 'pipe'],
+			detached: true
+		}
+	);
 	let serverOutput = '';
 	server.stdout.on('data', (d) => (serverOutput += d));
 	server.stderr.on('data', (d) => (serverOutput += d));
