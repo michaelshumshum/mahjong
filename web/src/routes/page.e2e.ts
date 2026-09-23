@@ -24,6 +24,13 @@ test('lobby practice vs bots navigates straight to a practice table', async ({ p
 	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}\?practice=1$/);
 });
 
+test('lobby join a game link opens the tables page', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('link', { name: 'Join a game' }).click();
+	await expect(page).toHaveURL('/tables');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tables');
+});
+
 test('tables page join navigates to the table route with the entered code', async ({ page }) => {
 	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');

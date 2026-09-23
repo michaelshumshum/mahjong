@@ -27,6 +27,7 @@
 	<h1 class="sr-only">Mahjong</h1>
 	<div class="actions">
 		<button type="button" class="primary" onclick={createTable}>Create a table</button>
+		<a class="secondary" href="/tables">Join a game</a>
 		<button type="button" class="secondary" onclick={startPractice}>Practice vs Bots</button>
 	</div>
 </div>
@@ -80,5 +81,12 @@
 
 	.secondary {
 		@include buttons.btn-secondary;
+	}
+
+	a.secondary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		text-decoration: none;
 	}
 </style>

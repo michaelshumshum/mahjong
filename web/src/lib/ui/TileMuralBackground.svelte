@@ -18,11 +18,15 @@
 		return code.slice(-1) as 'm' | 'p' | 's';
 	}
 
-	// avoids two same-suit tiles sharing an edge; honors and the back have no suit, so they're
-	// exempt on both sides of the check -- they can sit next to anything, and anything can sit
-	// next to them.
-	function pickTile(leftSuit: string | null, topSuit: string | null): MuralTile {
+	// two rules: no two same-suit tiles share an edge (honors and the back have no suit, so
+	// they're exempt on both sides of that check -- they can sit next to anything, and anything
+	// can sit next to them), and no two backs share an edge either (backs are visually identical,
+	// so a cluster of them reads as a "hole" in the mural).
+	function pickTile(leftCode: MuralTile | null, topCode: MuralTile | null): MuralTile {
+		const leftSuit = leftCode ? suitOf(leftCode) : null;
+		const topSuit = topCode ? suitOf(topCode) : null;
 		const candidates = MURAL_CODES.filter((code) => {
+			if (code === 'back') return leftCode !== 'back' && topCode !== 'back';
 			const suit = suitOf(code);
 			return suit === null || (suit !== leftSuit && suit !== topSuit);
 		});
@@ -31,13 +35,22 @@
 
 	// css px; buffer is pre-rendered, then just blitted with a y offset each frame -- drawing
 	// ~200 tile images individually every frame was the first approach and visibly dropped
-	// frames on a phone-class GPU.
-	const TILE_W = 64;
+	// frames on a phone-class GPU. Exact 3:4 ratio (not 64x84) to match TileFace.svelte's
+	// `aspect-ratio: 3 / 4` precisely -- see `drawTile`'s padding/radius math below, which
+	// depends on this being exact.
+	const TILE_W = 63;
 	const TILE_H = 84;
 	const GAP = 14;
 	const CELL_W = TILE_W + GAP;
 	const CELL_H = TILE_H + GAP;
 	const SPEED_PX_PER_SEC = 14;
+
+	// the vendored tile SVGs (web/static/tiles/*.svg) are 300x400 -- the same 3:4 ratio as the
+	// tile box itself, not square. `object-fit: contain` on that source inside a box padded 7%
+	// of *width* on every side (CSS percentage padding is always width-relative, even for
+	// top/bottom) ends up width-constrained, not height-constrained -- getting this wrong drew
+	// the art shrunk into a square, visibly less padding-accurate than the real TileFace.svelte.
+	const ART_ASPECT = 300 / 400;
 
 	let canvasEl: HTMLCanvasElement | undefined = $state();
 
@@ -89,16 +102,16 @@
 			for (let r = 0; r < grid.length; r++) {
 				const row = grid[r];
 				for (let c = row.length; c < cols; c++) {
-					const left = c > 0 ? suitOf(row[c - 1]) : null;
-					const top = r > 0 ? suitOf(grid[r - 1][c]) : null;
+					const left = c > 0 ? row[c - 1] : null;
+					const top = r > 0 ? grid[r - 1][c] : null;
 					row.push(pickTile(left, top));
 				}
 			}
 			for (let r = grid.length; r < rows; r++) {
 				const row: MuralTile[] = [];
 				for (let c = 0; c < cols; c++) {
-					const left = c > 0 ? suitOf(row[c - 1]) : null;
-					const top = r > 0 ? suitOf(grid[r - 1][c]) : null;
+					const left = c > 0 ? row[c - 1] : null;
+					const top = r > 0 ? grid[r - 1][c] : null;
 					row.push(pickTile(left, top));
 				}
 				grid.push(row);
@@ -117,22 +130,30 @@
 
 			bufferCtx.fillStyle = tileColor;
 			bufferCtx.beginPath();
-			bufferCtx.roundRect(x, y, TILE_W, TILE_H, Math.min(TILE_W, TILE_H) * 0.12);
+			// TileFace.svelte's `border-radius: calc(var(--radius-tile) * 4/3) / var(--radius-tile)`
+			// (--radius-tile: 10%) is elliptical -- 13.33% of width, 10% of height -- but those two
+			// converge to the same px value whenever the box is an exact 3:4 ratio (as TILE_W/H are
+			// above), so a single radius is exact here, not an approximation.
+			bufferCtx.roundRect(x, y, TILE_W, TILE_H, TILE_H * 0.1);
 			bufferCtx.fill();
 
-			// mirrors TileFace.svelte's 7% padding + object-fit: contain (art centered in a
-			// square within the padded box, since the vendored SVGs are square but the tile
-			// box isn't).
+			// mirrors TileFace.svelte's 7%-of-width padding + object-fit: contain, using the art's
+			// real 3:4 aspect (ART_ASPECT) rather than assuming it's square.
 			const pad = TILE_W * 0.07;
 			const availW = TILE_W - pad * 2;
 			const availH = TILE_H - pad * 2;
-			const size = Math.min(availW, availH);
+			let drawW = availW;
+			let drawH = drawW / ART_ASPECT;
+			if (drawH > availH) {
+				drawH = availH;
+				drawW = drawH * ART_ASPECT;
+			}
 			bufferCtx.drawImage(
 				img,
-				x + pad + (availW - size) / 2,
-				y + pad + (availH - size) / 2,
-				size,
-				size
+				x + pad + (availW - drawW) / 2,
+				y + pad + (availH - drawH) / 2,
+				drawW,
+				drawH
 			);
 		}
 
@@ -211,6 +232,7 @@
 </script>
 
 <canvas bind:this={canvasEl} class="mural" aria-hidden="true"></canvas>
+<div class="mural-scrim" aria-hidden="true"></div>
 
 <style lang="scss">
 	.mural {
@@ -218,5 +240,18 @@
 		inset: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
+	}
+
+	// sits in front of the canvas (later in DOM, same z-index) and blurs + darkens it, so the
+	// lobby buttons and any future foreground text stay legible regardless of what tiles happen
+	// to scroll underneath, without touching the canvas's own draw calls.
+	.mural-scrim {
+		position: fixed;
+		inset: 0;
+		z-index: var(--z-table);
+		pointer-events: none;
+		backdrop-filter: blur(3px) brightness(0.55);
+		-webkit-backdrop-filter: blur(3px) brightness(0.55);
+		background: rgb(0 0 0 / 0.25);
 	}
 </style>

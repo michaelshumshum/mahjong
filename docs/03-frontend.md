@@ -56,8 +56,12 @@ Known costs:
 is a real `<canvas>` — the one deliberate deviation from "no canvas" above. It's a continuously
 vertically-scrolling grid of randomized tile faces (the 34 playable faces plus the tile back,
 rendered with the same ivory `--color-tile` box `TileFace.svelte` uses, back included with no box
-per that component's own `.tile-face--back` treatment) sitting behind the two lobby buttons,
-purely decorative: `aria-hidden`, `pointer-events: none`, no hit-testing/focus/tab-order/CJK-flow
+per that component's own `.tile-face--back` treatment, and no two backs sharing an edge either —
+a cluster of visually-identical backs would otherwise read as a hole in the mural) sitting behind
+the lobby's three buttons, topped with a `backdrop-filter: blur() brightness()` scrim (a sibling
+element in front of the canvas, not a filter on the canvas itself) so the buttons stay legible
+regardless of what's scrolling underneath. Purely decorative: `aria-hidden`, `pointer-events: none`,
+no hit-testing/focus/tab-order/CJK-flow
 to lose since nothing on it is ever interactive. A DOM version would mean animating ~200 elements'
 `transform` every frame for a background that's never the size ~150 the "known costs" budget above
 was set for; canvas's per-frame cost here is one `drawImage` blit of a pre-rendered off-screen
@@ -445,8 +449,8 @@ lets the game-end screen replace it outright once `gameEnd` lands.
 
 `GameEndScreen` reuses `ScoreSheet` wholesale (score table, running totals, `standings`) rather
 than a second table implementation, adding only the "game over" framing and a plain `<a href="/">`
-back to the home page — the game is over, and the home page's create/practice buttons already cover
-starting a new one; no dedicated rematch/new-game flow.
+back to the home page — the game is over, and the home page's create/join/practice buttons already
+cover starting a new one; no dedicated rematch/new-game flow.
 
 `ScoreSheet.svelte` itself grew an optional per-round expand: `HandRecord.result` (a
 `RoundResult`), when present, turns that row's hand number into a toggle button revealing the
@@ -577,9 +581,9 @@ cannot exist before `Table.started`). Good enough for v1; a real `started`/seat-
 wire would be a cleaner fix, filed as a gap here rather than a roadmap doc since it's small enough
 to fold into whoever next touches `state_sync`'s payload.
 
-**Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) is two buttons over a
-scrolling tile-mural background (`lib/ui/TileMuralBackground.svelte`, §2's canvas exception), "Create
-a table" and "Practice vs Bots" — no separate table-browser entry point on this screen (below).
+**Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) is three buttons over a
+scrolling tile-mural background (`lib/ui/TileMuralBackground.svelte`, §2's canvas exception): "Create
+a table", "Join a game" (a plain link to the table browser, below), and "Practice vs Bots".
 "Practice vs Bots" generates a table id the same way "Create a table" does and navigates straight to
 `/table/<id>?practice=1` — no invite code to share, but "Create a table" has no copy step to skip
 either (below): both buttons go straight from the lobby to the table. `?practice=1` is this route's
@@ -596,7 +600,7 @@ signal (below). The table label in the live table's dev toolbar appends "· prac
 this flag is set, matching this milestone's "don't invent a tier selector" scope — one fixed
 default tier, named plainly, not a difficulty picker.
 
-**Table browser (`/tables`).** Not linked from the lobby (above) — reached by direct URL only; holds
+**Table browser (`/tables`).** Reached from the lobby's "Join a game" link (above); holds
 the join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(16rem, 1fr))`),
 each showing its code, open/in-progress state and all four seats. The grid polls `GET /tables`
 every 5s ([02-protocol.md §10](02-protocol.md), `lib/net/lobby.ts`), open tables first. "Sit
