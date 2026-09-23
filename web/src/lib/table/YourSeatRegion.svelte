@@ -52,7 +52,7 @@
 		<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat, dealer)]} wind"
 			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
 		>
-		{#if seat.seat === dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
+		{#if seat.seat === dealer}<span class="dealer-badge" title="Dealer">莊</span>{/if}
 		<div class="turn-timer">
 			{#if turnDurationMs !== null}
 				{#key turn}
@@ -184,6 +184,7 @@
 		color: var(--color-text);
 		font-size: 0.7rem;
 		font-weight: 700;
+		aspect-ratio: 1/1;
 	}
 
 	.seat-score {

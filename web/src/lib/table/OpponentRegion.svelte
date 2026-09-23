@@ -22,7 +22,7 @@
 		<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat, dealer)]} wind"
 			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
 		>
-		{#if seat.seat === dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
+		{#if seat.seat === dealer}<span class="dealer-badge" title="Dealer">莊</span>{/if}
 		{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat">Bot</span>{/if}
 		<span class="seat-score">{seat.score}</span>
 	</header>
@@ -120,6 +120,7 @@
 		color: var(--color-text);
 		font-size: 0.7rem;
 		font-weight: 700;
+		aspect-ratio: 1/1;
 	}
 
 	// bot-controlled seat (M4.5 practice mode) -- a persistent identity marker, not a transient
