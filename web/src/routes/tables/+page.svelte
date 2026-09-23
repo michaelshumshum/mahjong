@@ -2,6 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { fetchTables, seatedCount, type TableSummary } from '$lib/net/lobby';
 	import { TABLE_CODE_LENGTH } from '$lib/table/table-code';
+	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
+
+	claimMuralVisible();
 
 	let joinCode = $state('');
 	const joinCodeValid = $derived(joinCode.trim().length > 0);
@@ -107,6 +110,8 @@
 	@use '$lib/styles/buttons';
 
 	.tables-page {
+		position: relative;
+		z-index: var(--z-hud);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);

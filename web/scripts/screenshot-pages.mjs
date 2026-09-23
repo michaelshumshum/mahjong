@@ -52,7 +52,6 @@ const LOBBY_TABLES = [
 const PAGES = [
 	{ name: 'lobby', url: '/' },
 	{ name: 'tables', url: '/tables' },
-	{ name: 'demo', url: '/demo' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/03-frontend.md §6) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly

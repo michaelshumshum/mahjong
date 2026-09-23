@@ -52,26 +52,45 @@ Known costs:
 - DOM order still matters for keyboard tab order and stacking; keep it stable so Svelte's keyed
   `{#each}` (§4, §6) reconciles elements instead of tearing down and remounting them.
 
-**Exception: the lobby background mural.** `/`'s background (`lib/ui/TileMuralBackground.svelte`)
-is a real `<canvas>` — the one deliberate deviation from "no canvas" above. It's a continuously
-vertically-scrolling grid of randomized tile faces (the 34 playable faces plus the tile back,
-rendered with the same ivory `--color-tile` box `TileFace.svelte` uses, back included with no box
-per that component's own `.tile-face--back` treatment, and no two backs sharing an edge either —
-a cluster of visually-identical backs would otherwise read as a hole in the mural) sitting behind
-the lobby's three buttons, topped with a `backdrop-filter: blur() brightness()` scrim (a sibling
-element in front of the canvas, not a filter on the canvas itself) so the buttons stay legible
-regardless of what's scrolling underneath. Purely decorative: `aria-hidden`, `pointer-events: none`,
-no hit-testing/focus/tab-order/CJK-flow
-to lose since nothing on it is ever interactive. A DOM version would mean animating ~200 elements'
-`transform` every frame for a background that's never the size ~150 the "known costs" budget above
-was set for; canvas's per-frame cost here is one `drawImage` blit of a pre-rendered off-screen
-buffer, not per-tile draws every frame. Respects `prefers-reduced-motion` (renders the grid once,
-statically, no scroll). Adjacent cells never share a suit (honors and the back are exempt on both
-sides of that check). The grid is persistent, not rebuilt from scratch on resize — a resize only
-grows it to cover the new viewport, appending new cells without touching already-placed ones, so a
-spurious `resize` (a webfont swap reflowing the page, a scrollbar toggling) can't read as the whole
-mural "switching"; genuinely unchanged `window.innerWidth`/`innerHeight` short-circuits the handler
-before that even matters.
+**Exception: the background mural.** `lib/ui/TileMuralBackground.svelte` is a real `<canvas>` — the
+one deliberate deviation from "no canvas" above. It's a continuously vertically-scrolling grid of
+randomized tile faces (the 34 playable faces plus the tile back, rendered with the same ivory
+`--color-tile` box `TileFace.svelte` uses, back included with no box per that component's own
+`.tile-face--back` treatment, and no two backs sharing an edge either — a cluster of
+visually-identical backs would otherwise read as a hole in the mural), topped with a
+`backdrop-filter: blur() brightness()` scrim (a sibling element in front of the canvas, not a
+filter on the canvas itself) so foreground content stays legible regardless of what's scrolling
+underneath. Purely decorative: `aria-hidden`, `pointer-events: none`, no hit-testing/focus/tab-
+order/CJK-flow to lose since nothing on it is ever interactive. A DOM version would mean animating
+~200 elements' `transform` every frame for a background that's never the size ~150 the "known
+costs" budget above was set for; canvas's per-frame cost here is one `drawImage` blit of a
+pre-rendered off-screen buffer, not per-tile draws every frame. Respects `prefers-reduced-motion`
+(renders the grid once, statically, no scroll). Adjacent cells never share a suit (honors and the
+back are exempt on both sides of that check). The grid is persistent, not rebuilt from scratch on
+resize — a resize only grows it to cover the new viewport, appending new cells without touching
+already-placed ones, so a spurious `resize` (a webfont swap reflowing the page, a scrollbar
+toggling) can't read as the whole mural "switching"; genuinely unchanged
+`window.innerWidth`/`innerHeight` short-circuits the handler before that even matters.
+
+**Shared across routes, mounted once.** The mural appears on `/`, `/tables`, and `/table/[id]`'s
+pregame states (connecting, seat picker, waiting-for-players) — never on the actual game table,
+mock or live, spectator included. It's mounted exactly once, in the root `+layout.svelte`, for the
+whole app session; individual routes never render their own `<TileMuralBackground>` instance. A
+per-route instance would mean the canvas tearing down and remounting on every navigation between
+two mural routes (lobby → tables → table pregame), rebuilding its grid and restarting its scroll
+position each time — visibly non-"seamless" navigation, the same class of bug the persistent-grid
+fix above addresses for resize. Instead, `lib/ui/mural-visibility.svelte.ts` holds one shared
+`visible` flag the mounted-once canvas reads; a page that wants the mural calls
+`claimMuralVisible()` (or `claimMuralVisible(() => someCondition)` for a route like `/table/[id]`
+whose need varies while mounted) once from its own `<script>`, which claims the flag in an
+`$effect` and releases it (back to `false`) on unmount. `visible` only ever toggles the canvas's
+CSS opacity (`transition: opacity 220ms`, skipped under `prefers-reduced-motion`) — the draw loop
+itself keeps running underneath regardless, so there's no pause/resume state to resync when a page
+shows it again. Each mural-visible page's own content needs `position: relative` plus a real
+`z-index` (`var(--z-hud)`, matching the lobby's own `.lobby`) — a plain static-positioned element
+always paints *below* a `position: fixed` `z-index: 0` element in CSS stacking order regardless of
+DOM order or the z-index value itself, so without this the mural would sit on top of, not behind,
+that page's own content.
 
 ## 3. Scene layout and responsive layout
 

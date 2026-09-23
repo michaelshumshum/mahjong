@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { generateTableCode } from '$lib/table/table-code';
-	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
+	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
+
+	claimMuralVisible();
 
 	// Straight to the table, no intermediate copy-code step: the table's own pre-game panel
 	// already has a "copy invite link" button (docs/03-frontend.md's "Pre-game states"), so
@@ -20,8 +22,6 @@
 		goto(`/table/${generateTableCode()}?practice=1`);
 	}
 </script>
-
-<TileMuralBackground />
 
 <div class="lobby">
 	<h1 class="sr-only">Mahjong</h1>

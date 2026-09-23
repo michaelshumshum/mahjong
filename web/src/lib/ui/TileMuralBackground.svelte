@@ -52,6 +52,12 @@
 	// the art shrunk into a square, visibly less padding-accurate than the real TileFace.svelte.
 	const ART_ASPECT = 300 / 400;
 
+	// mounted once in the root layout for the whole app session (`lib/ui/mural-visibility.svelte.ts`)
+	// -- `visible` only toggles opacity, never unmounts the canvas, so route changes never restart
+	// the scroll position or reshuffle the grid. The draw loop keeps running while hidden (one
+	// cheap blit/frame) rather than pausing/resuming, so there's nothing to resync on show.
+	let { visible = true }: { visible?: boolean } = $props();
+
 	let canvasEl: HTMLCanvasElement | undefined = $state();
 
 	$effect(() => {
@@ -231,8 +237,9 @@
 	});
 </script>
 
-<canvas bind:this={canvasEl} class="mural" aria-hidden="true"></canvas>
-<div class="mural-scrim" aria-hidden="true"></div>
+<canvas bind:this={canvasEl} class="mural" class:mural--hidden={!visible} aria-hidden="true"
+></canvas>
+<div class="mural-scrim" class:mural--hidden={!visible} aria-hidden="true"></div>
 
 <style lang="scss">
 	.mural {
@@ -240,6 +247,7 @@
 		inset: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
+		transition: opacity 220ms ease;
 	}
 
 	// sits in front of the canvas (later in DOM, same z-index) and blurs + darkens it, so the
@@ -253,5 +261,19 @@
 		backdrop-filter: blur(3px) brightness(0.55);
 		-webkit-backdrop-filter: blur(3px) brightness(0.55);
 		background: rgb(0 0 0 / 0.25);
+		transition: opacity 220ms ease;
+	}
+
+	// routes that don't want the mural (the live game table, profile, demo, ...) still have it
+	// mounted underneath -- see the module comment above for why -- just invisible.
+	.mural--hidden {
+		opacity: 0;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.mural,
+		.mural-scrim {
+			transition: none;
+		}
 	}
 </style>

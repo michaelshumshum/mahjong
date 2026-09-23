@@ -8,6 +8,8 @@
 	import '@fontsource/schibsted-grotesk/700.css';
 	import '$lib/styles/app.scss';
 	import favicon from '$lib/assets/favicon.svg';
+	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
+	import { muralVisibility } from '$lib/ui/mural-visibility.svelte';
 
 	let { children } = $props();
 </script>
@@ -15,5 +17,7 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<TileMuralBackground visible={muralVisibility.visible} />
 
 {@render children()}

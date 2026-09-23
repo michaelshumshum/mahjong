@@ -43,6 +43,7 @@
 	} from '$lib/ui/settings-storage';
 	import Toast from '$lib/ui/Toast.svelte';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
+	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import {
 		initialSlotState,
@@ -263,6 +264,10 @@
 				handEverStarted) ||
 			spectating
 	);
+
+	// the mural shows on this route's pregame states (connecting, seat picker, waiting-for-players
+	// -- `tableReady` false) but never on the actual game table, mock or live, spectator included.
+	claimMuralVisible(() => !tableReady);
 
 	// unifies the real `liveStore`-driven pre-game states with the static `?pregame=` preview
 	// (above) so the template below branches on one pair of values regardless of which is
@@ -1396,6 +1401,8 @@
 	// centered-panel chrome as the lobby's own `.panel` (routes/+page.svelte), not a new
 	// visual language: panel-elevated, --color-surface, the same button/code-pill vocabulary.
 	.pretable-page {
+		position: relative;
+		z-index: var(--z-hud);
 		display: flex;
 		align-items: center;
 		justify-content: center;
