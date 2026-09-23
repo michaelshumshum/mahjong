@@ -131,12 +131,7 @@
 </script>
 
 <section class="score-sheet" aria-labelledby="score-sheet-heading">
-	<header class="score-sheet-header">
-		<h2 id="score-sheet-heading">Score sheet</h2>
-		{#if standings}
-			<span class="game-end-badge">Final</span>
-		{/if}
-	</header>
+	<header class="score-sheet-header"></header>
 
 	<div class="table-scroll">
 		<table>

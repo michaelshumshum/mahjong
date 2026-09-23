@@ -72,7 +72,7 @@
 
 <div class="panel-overlay">
 	<div class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-table-heading">
-		<PanelHeader title="Create a table" badge="New" titleId="create-table-heading" />
+		<PanelHeader title="Create a table" titleId="create-table-heading" />
 
 		<FormGroup legend="Rules">
 			{#each RULESET_PRESET_OPTIONS as option (option.id)}
