@@ -32,6 +32,7 @@ from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
 from app.main import app
+from app.table import _BOT_NAME_POOL
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
@@ -115,9 +116,14 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
             assert binding.status == "bot"
             assert binding.ready is True
             # M5: a bot seat still gets a real, sensible display name -- never null/empty --
-            # sourced from the table's real tier, not a generic "Bot" placeholder.
-            assert binding.name == "FaanBot"
+            # drawn from the random pun pool (app/table.py's `_BOT_NAME_POOL`), not a generic
+            # "Bot" placeholder.
+            assert binding.name in _BOT_NAME_POOL
         assert table._bot_tier == "T2"  # M4.5's default -- FaanBot, not a weaker tier
+        # bots choosing names independently could still coincide by chance -- `_draw_bot_name`
+        # guards against exactly that, so this table's three bot seats never collide.
+        bot_names = [table.seat_bindings[seat].name for seat in (1, 2, 3)]
+        assert len(set(bot_names)) == 3
 
         # override to a repeat-off ruleset (module docstring) -- before any message is sent, so
         # every frame the human ever receives (including its own join's state_sync) reflects it.
@@ -138,7 +144,10 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
     # --- the human's own join state_sync already shows every bot's real display name, not
     # null/empty -- proof M5 names are wired through to the human before the game even starts.
     join_sync = next(f for f in frames if f["t"] == "state_sync")
-    assert join_sync["d"]["names"] == ["Dave", "FaanBot", "FaanBot", "FaanBot"]
+    names = cast("list[str]", join_sync["d"]["names"])
+    assert names[0] == "Dave"
+    assert all(n in _BOT_NAME_POOL for n in names[1:])
+    assert len(set(names[1:])) == 3  # no two bot seats share a name
 
     # --- the human acted on its own turns (at least one real discard from seat 0)...
     assert any(f["t"] == "discard" and f["d"]["seat"] == 0 for f in frames)

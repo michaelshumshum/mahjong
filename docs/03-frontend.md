@@ -405,8 +405,9 @@ array) carries every seat's *resolved* name back down: populated from `state_syn
 every full snapshot, kept live from `seat_state.name` the same way `seatStatus` is kept live from
 `seat_state.status` (`lib/net/reducer.ts`'s `seat_state` case). `lib/table/live-view.ts`'s
 `viewFromClientState` reads this array for every seat's `MockSeatState.name` in the live path —
-including a practice-mode bot seat, whose name is its real server-assigned tier name (e.g.
-"FaanBot"), rendered alongside the existing `.bot-badge` chip, not in place of it. `null` until a
+including a practice-mode bot seat, whose name is a random per-table-unique display name
+(`server/app/table.py`'s `_draw_bot_name`, drawn from `_BOT_NAME_POOL` — cosmetic only, not the
+bot's tier), rendered alongside the existing `.bot-badge` chip, not in place of it. `null` until a
 seat's own name has actually arrived; the mock scenarios (`mock-game-state.ts`) are untouched —
 they hardcode their own fixed sample names and have no `ClientGameState` behind them at all.
 
@@ -615,9 +616,9 @@ is unchanged (seat 0 is the only "Open" slot in the picker, since seats 1-3 alre
 practice table's bot seats are already bound and auto-ready the instant the table
 exists, so the "waiting for the rest of the table" screen should almost never show for long, though
 the client still goes through it structurally since there's still no real "has this table started"
-signal (below). The table label in the live table's dev toolbar appends "· practice vs FaanBot" when
-this flag is set, matching this milestone's "don't invent a tier selector" scope — one fixed
-default tier, named plainly, not a difficulty picker.
+signal (below). The table label in the live table's dev toolbar appends "· practice vs bots" when
+this flag is set — not a per-bot name, since each of the three bot seats draws its own random,
+distinct display name (`_BOT_NAME_POOL`, above) rather than sharing one fixed tier label.
 
 **Table browser (`/tables`).** Reached from the lobby's "Join a game" link (above); holds
 the join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(16rem, 1fr))`),

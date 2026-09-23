@@ -212,16 +212,19 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 
 		// three opponent seats, all bot-controlled -- the visual treatment this sub-task added.
 		await expect(page.locator('.bot-badge')).toHaveCount(3);
-		await expect(page.locator('.table-label')).toContainText('practice vs FaanBot');
+		await expect(page.locator('.table-label')).toContainText('practice vs bots');
 
-		// each bot seat's real server-assigned name (M5's `names` array, docs/02-protocol.md
-		// §3: "Practice-mode bot seats get a tier-based name like 'FaanBot'") renders alongside
-		// the badge, not in place of it -- both are real DOM text in the same seat-meta header.
+		// each bot seat's real server-assigned name (M5's `names` array) renders alongside the
+		// badge, not in place of it -- both are real DOM text in the same seat-meta header. Each
+		// bot draws its own random pun name (`app/table.py`'s `_draw_bot_name`), so this only
+		// asserts non-empty and distinct, not a fixed literal.
 		const botSeatNames = page.locator('.seat-meta:has(.bot-badge) .seat-name');
 		await expect(botSeatNames).toHaveCount(3);
-		for (let i = 0; i < 3; i++) {
-			await expect(botSeatNames.nth(i)).toContainText('FaanBot');
+		const names = await botSeatNames.allTextContents();
+		for (const name of names) {
+			expect(name.trim().length).toBeGreaterThan(0);
 		}
+		expect(new Set(names).size).toBe(3);
 
 		// hand 1's dealer is fixed at table construction and can be this human seat -- unlike the
 		// four-real-seats test above, there's only one human here, so nothing discards on this

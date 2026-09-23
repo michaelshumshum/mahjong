@@ -90,7 +90,7 @@ export interface ClientGameState {
 	seatStatus: string[];
 	/** Each seat's resolved guest display name (docs/02-protocol.md §3's `state_sync.names`),
 	 * length 4, same indexing as every other per-seat array here. `null` for an `empty` seat;
-	 * a real non-empty string (human-chosen or a bot's tier name, e.g. "FaanBot") for any bound
+	 * a real non-empty string (human-chosen, or a bot's random pun display name) for any bound
 	 * seat. Kept live by `seat_state`'s own `name` field, mirroring how `seatStatus` above is
 	 * kept live from the same event. */
 	names: (string | null)[];

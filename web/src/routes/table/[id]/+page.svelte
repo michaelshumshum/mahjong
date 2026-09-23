@@ -840,9 +840,7 @@
 				>{WIND_CHAR[seatWind(seat.seat)]}</span
 			>
 			{#if seat.seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
-			{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat (FaanBot)"
-					>Bot</span
-				>{/if}
+			{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat">Bot</span>{/if}
 			<span class="seat-score">{seat.score}</span>
 		</header>
 
@@ -928,7 +926,7 @@
 			{:else}
 				<p class="table-label">
 					Table <strong>{tableId}</strong> · seat {liveStore?.state.seat}{#if isPractice}
-						· practice vs FaanBot{/if}
+						· practice vs bots{/if}
 				</p>
 			{/if}
 

@@ -189,10 +189,29 @@ _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 
 _MAX_NAME_LENGTH = 24  # guest display name cap (M5, docs/02-protocol.md §2 `join.name`)
 
-# M4.5 practice-mode bot seats (`_bind_bot_seat`) get a display name from their real tier
-# (`bots/worker.py`'s `BOT_TIERS`), not a generic "Bot" placeholder -- matches the class a
-# curious player could actually go look up.
-_BOT_DISPLAY_NAMES = {"T0": "RandomBot", "T1": "EfficiencyBot", "T2": "FaanBot"}
+# Every bot seat (`_bind_bot_seat`) gets a random Cantonese-pun display name instead of a
+# generic "Bot" placeholder or its tier's class name -- cosmetic only: `_draw_bot_name` picks
+# one per seat, unique within the table, but `self._bot_tier` still governs actual strength and
+# is unaffected (still directly queryable, e.g. by tests). Not 04-bots.md §6's deferred "bot
+# personas" (99-deferred.md) -- no play-style bias, no avatar, no think-time change.
+_BOT_NAME_POOL = (
+    "自摸俠",
+    "三索雀王",
+    "摸魚大師",
+    "東成西就",
+    "詐糊皇",
+    "放銃西施",
+    "打雀高手",
+    "東南西北通",
+    "一筒天下",
+    "八萬富翁",
+    "大三元帥",
+    "九萬鵬程",
+    "六六筒順",
+    "十三么后",
+    "大四喜嫂",
+    "過水英雄",
+)
 
 
 def _normalize_name(raw: str | None, seat: int) -> str:
@@ -548,6 +567,13 @@ class Table:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
         self._bot_tier = bot_tier
+        # `_draw_bot_name`'s RNG: seeded off `game_seed` (server/AGENTS.md's no-unseeded-
+        # randomness rule), not `random.Random()`, so which pun name each bot seat gets is
+        # reproducible from (ruleset, seed, actions) same as everything else about this table.
+        # XORed with a constant so this stream doesn't just echo the wall shuffle `new_game`
+        # below also derives from `game_seed`.
+        self._bot_name_rng = random.Random(game_seed ^ 0x8888)
+        self._bot_names_used: set[str] = set()
         self.table_id = table_id
         self.inbox: asyncio.Queue[Command | BotResult | SeatDisconnected | _WakeUp] = (
             asyncio.Queue()
@@ -721,10 +747,22 @@ class Table:
         self.seat_bindings[seat] = SeatBinding(
             session_id=f"bot-seat-{seat}",
             send=lambda seq, wire: None,
-            name=_BOT_DISPLAY_NAMES.get(self._bot_tier, "Bot"),
+            name=self._draw_bot_name(),
             status="bot",
             ready=True,
         )
+
+    def _draw_bot_name(self) -> str:
+        """A random display name for a newly bound bot seat, unique among every bot this table
+        has ever bound (`self._bot_names_used`) -- two bot seats at the same table never read as
+        the same player. Drawn from `_BOT_NAME_POOL` via `self._bot_name_rng` (seeded off
+        `game_seed`, see `__init__`), not `random.choice`, for the same reproducibility reason.
+        Falls back to allowing a repeat only once the pool itself is exhausted -- unreachable
+        with 4 seats against a 16-name pool, kept only so this can never raise."""
+        available = [n for n in _BOT_NAME_POOL if n not in self._bot_names_used]
+        name = self._bot_name_rng.choice(available or list(_BOT_NAME_POOL))
+        self._bot_names_used.add(name)
+        return name
 
     def mark_ready(self, seat: int) -> None:
         """`ready` (02-protocol.md §2): once every seat is joined *and* ready, the table deals

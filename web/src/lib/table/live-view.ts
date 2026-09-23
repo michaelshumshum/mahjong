@@ -183,7 +183,7 @@ export function viewFromClientState(
 		return {
 			seat: seat as Seat,
 			// `state.names` (docs/02-protocol.md §3's `state_sync.names`/`seat_state.name`, M5) is
-			// this seat's real guest display name (or a bot's tier name, e.g. "FaanBot") once
+			// this seat's real guest display name (or a bot's random pun display name) once
 			// bound -- the `isYou`/`Seat N` fallback only covers the moment before that name has
 			// actually arrived, which shouldn't outlast the first state_sync for a bound seat.
 			name: state.names[seat] ?? (isYou ? 'You' : `Seat ${seat}`),
