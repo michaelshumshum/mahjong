@@ -48,6 +48,7 @@
 	import type { TileCode } from '$lib/table/tile-code';
 	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
 	import SeatRing from '$lib/table/SeatRing.svelte';
+	import SeatPickerSlot from '$lib/table/SeatPickerSlot.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -616,40 +617,40 @@
 	let showAnimationDemo = $state(false);
 </script>
 
-<!-- Pre-join seat picker: connected as a spectator (the socket-setup effect above), so real
-	`seatStatus`/`names` are already known -- unlike the old "Sit down" button (any open seat),
-	each slot here is a specific seat you can click to `join` it directly. Absolute seats 0-3 are
-	assigned to the same across/left/right/self layout `seatRing` uses for seat 0, purely so the
-	picker's geometry doesn't jump once you're actually seated. -->
-{#snippet seatPickerSlot(seat: Seat, self: boolean = false)}
-	{@const status = liveStore?.state.seatStatus[seat] ?? 'empty'}
-	{@const name = liveStore?.state.names[seat] ?? null}
-	{@const open = status === 'empty'}
-	<button
-		type="button"
-		class="seat-ring-slot seat-ring-slot--pickable"
-		class:seat-ring-slot--self={self}
-		class:seat-ring-slot--open={open}
-		disabled={!open}
-		onclick={() => liveStore?.socket.join(seat, displayName.trim() || undefined)}
-	>
-		<span>{open ? 'Open' : status === 'bot' ? 'Bot' : (name ?? 'Taken')}</span>
-	</button>
-{/snippet}
-
 {#snippet seatPicker()}
 	<div class="seat-ring">
 		<div class="seat-ring-pos seat-ring-pos--across">
-			{@render seatPickerSlot(2 as Seat)}
+			<SeatPickerSlot
+				seat={2 as Seat}
+				status={liveStore?.state.seatStatus[2] ?? 'empty'}
+				name={liveStore?.state.names[2] ?? null}
+				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+			/>
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--left">
-			{@render seatPickerSlot(3 as Seat)}
+			<SeatPickerSlot
+				seat={3 as Seat}
+				status={liveStore?.state.seatStatus[3] ?? 'empty'}
+				name={liveStore?.state.names[3] ?? null}
+				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+			/>
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--right">
-			{@render seatPickerSlot(1 as Seat)}
+			<SeatPickerSlot
+				seat={1 as Seat}
+				status={liveStore?.state.seatStatus[1] ?? 'empty'}
+				name={liveStore?.state.names[1] ?? null}
+				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+			/>
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
-			{@render seatPickerSlot(0 as Seat, true)}
+			<SeatPickerSlot
+				seat={0 as Seat}
+				self={true}
+				status={liveStore?.state.seatStatus[0] ?? 'empty'}
+				name={liveStore?.state.names[0] ?? null}
+				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+			/>
 		</div>
 	</div>
 {/snippet}
@@ -1284,75 +1285,6 @@
 
 	.seat-ring-pos--self {
 		grid-area: self;
-	}
-
-	.seat-ring-slot {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 2.75rem;
-		height: 2.75rem;
-		border-radius: 50%;
-		border: 1px dashed var(--color-border);
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
-		font-weight: 600;
-		// "waiting, alive" -- the base/default treatment for a genuinely open seat
-		// (server/app/table.py's `_seat_status_tuple` reports `empty` for one, distinct from
-		// `connected`/`bot`/`disconnected`/`autoplay`), so this animation now means what it
-		// looks like: nobody's here yet, but the table is open and listening.
-		animation: seat-ring-breathe 2.4s ease-in-out infinite;
-	}
-
-	// the one seat this screen actually knows something real about: dealer is fixed at table
-	// creation, so once you're seated your own wind is true today, not a guess.
-	.seat-ring-slot--self {
-		border: 1px solid var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-		color: var(--color-text);
-		animation: none;
-	}
-
-	@keyframes seat-ring-breathe {
-		0%,
-		100% {
-			opacity: 0.5;
-		}
-		50% {
-			opacity: 1;
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.seat-ring-slot {
-			animation: none;
-			opacity: 0.85;
-		}
-	}
-
-	// the picker knows real occupancy (spectator `state_sync`, unlike `.seat-ring-slot`'s own
-	// "can't tell" note above), so a taken seat reads as solid/inert rather than breathing, and
-	// an open one is a real, obviously-clickable button.
-	.seat-ring-slot--pickable {
-		font: inherit;
-		background: none;
-		animation: none;
-		opacity: 1;
-
-		&:disabled {
-			cursor: default;
-			opacity: 0.7;
-		}
-	}
-
-	.seat-ring-slot--open {
-		border: 1px solid var(--color-accent);
-		color: var(--color-text);
-		cursor: pointer;
-
-		&:hover {
-			background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-		}
 	}
 
 	.pretable-hint {
