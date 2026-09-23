@@ -214,7 +214,12 @@ host-facing settings UI / wire message to toggle it, and a delayed reveal for hu
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
-(reusing the client reducer). Sound. Ruleset presets. Stats, rating, hand history. i18n
+(reusing the client reducer). Sound. **Ruleset presets: server/protocol built** — `?ruleset=`/
+`?rules=` table-creation query params, `mahjong_core.presets.RULESET_PRESETS` (`hk_classic`/
+`hk_casual`/`hk_strict`) plus a `custom` `RuleSet.from_dict` path, `state_sync.ruleset`/
+`ruleset_preset` (`docs/00-architecture.md §3` "Ruleset selection", `docs/02-protocol.md`). Not
+built: any client UI to choose a preset or edit custom fields — table creation still defaults to
+`hk_classic` with nothing to override it from the lobby. Stats, rating, hand history. i18n
 (zh-Hant/en). Mobile layout pass. M6 has no done gate by design — see §7 for what actually has to
 ship before that's okay.
 

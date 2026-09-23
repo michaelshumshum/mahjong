@@ -92,6 +92,21 @@ join, not just on its next `state_sync`. `join` is for first entry only — a re
 `hello{last_seq}` on an already-bound seat reclaims it directly (§5). Once all four seats are
 filled the table waits for `ready` from each before dealing.
 
+### Ruleset selection
+
+Also a WS-connect query parameter, not an envelope message — same reasoning as `?practice=`/
+`?spectate=` below: it's a table-*creation*-time choice, not something a live client asks for
+mid-session. `?ruleset=<preset_id>` picks one of `mahjong_core.presets.RULESET_PRESETS`
+(default `hk_classic`); `?ruleset=custom&rules=<json>` takes a full `RuleSet.from_dict`-shaped
+JSON body instead, for a client exposing every field as editable. Only meaningful the first time
+a given `table` id is created — an existing table's ruleset was already fixed at construction,
+same "first connect wins" rule `?practice=` has. Never hard-rejected: an unknown preset id, or a
+`rules` payload that's malformed JSON or fails `RuleSet`'s own validation, silently falls back to
+`hk_classic` rather than refusing the connection (`app/ws.py`'s `_resolve_ruleset`). The
+resolved ruleset comes back on every `state_sync` (§3) as `ruleset` (full `RuleSet.to_dict()`)
+and `ruleset_preset` (the matching preset id, or `null` for a custom one) — a client has no other
+way to learn what rules a table it's joining (or reconnecting to) is actually running.
+
 **Spectating** is triggered by an explicit `?spectate=true` query parameter on the WS URL
 (`app/ws.py`'s `ws_endpoint`, mirroring `?practice=true`) — not a new envelope message. A passive
 "never sent `join`" trigger would race the `hello{client_version}`-then-`join` handshake every
@@ -123,7 +138,7 @@ Payload shapes below match `server/app/protocol.py` (§6) exactly.
 
 | `t` | payload | notes |
 | --- | --- | --- |
-| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen). `d.names` (M5) is each seat's resolved guest display name, same indexing — `null` for an `empty` seat, always a real non-empty string for any bound seat, human or bot. `d.hands` is every seat's concealed tiles for an open-hands spectator (§2 "Spectating"), `null` otherwise. `d.hand_history` is every hand this table has completed so far, oldest first — same fields as `hand_end` below plus `dealer`/`prevailing`/`winner_melds` (none of which are on `hand_end`'s own payload; a live client derives them itself at the moment it sees that event, but a client with no earlier live stream to derive them from — a spectator joining mid-game, a reconnect-with-gap, a backpressure-collapse resync — needs them supplied). `winner_melds` gets the same per-viewer concealed-kong redaction a live `meld` event would; every other field is already public once a hand's `revealed` is true. Optional on the wire (defaults to `[]`) for compatibility with fixtures predating this field |
+| `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any resync (§9); `d.seat_status` is `connected\|disconnected\|autoplay\|empty` per seat (`bot` is reserved, unused) — `empty` means nobody has ever joined that seat yet, real from the moment a client can see `state_sync` before all four seats join (a lobby/"waiting for the rest of the table" screen). `d.names` (M5) is each seat's resolved guest display name, same indexing — `null` for an `empty` seat, always a real non-empty string for any bound seat, human or bot. `d.hands` is every seat's concealed tiles for an open-hands spectator (§2 "Spectating"), `null` otherwise. `d.hand_history` is every hand this table has completed so far, oldest first — same fields as `hand_end` below plus `dealer`/`prevailing`/`winner_melds` (none of which are on `hand_end`'s own payload; a live client derives them itself at the moment it sees that event, but a client with no earlier live stream to derive them from — a spectator joining mid-game, a reconnect-with-gap, a backpressure-collapse resync — needs them supplied). `winner_melds` gets the same per-viewer concealed-kong redaction a live `meld` event would; every other field is already public once a hand's `revealed` is true. Optional on the wire (defaults to `[]`) for compatibility with fixtures predating this field. `d.ruleset` is this table's full `RuleSet.to_dict()`, fixed at construction (see "Ruleset selection" above) — never changes for the life of the table, so this is the same on every `state_sync` a given table ever sends. `d.ruleset_preset` is the `RULESET_PRESETS` key it matches, or `null` for a custom ruleset |
 | `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (same vocabulary as `state_sync` above, `empty` included — unreachable for a `require_ready=True` table, where dealing gates on all four seats bound, but a direct-construction `require_ready=False` table can reach hand 2+ with seats that were never joined at all); see Fairness below for `seed_commit`. No backing engine `Event` — synthesized by `app/table.py` at the hand boundary (ready-triggered for hand 1, chained off `start_next_hand()` after) |
 | `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; same "no backing `Event`" note as `hand_start` |
 | `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not yet emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event` to redact for those; mid-hand flower reveals (a normal draw) go through `reduce()` normally and *are* emitted |

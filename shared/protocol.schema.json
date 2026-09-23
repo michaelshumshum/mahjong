@@ -2695,6 +2695,24 @@
           },
           "title": "Hand History",
           "type": "array"
+        },
+        "ruleset_preset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ruleset Preset"
+        },
+        "ruleset": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Ruleset",
+          "type": "object"
         }
       },
       "required": [

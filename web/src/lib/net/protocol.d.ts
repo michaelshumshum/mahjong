@@ -227,6 +227,8 @@ export interface StateSyncPayload {
 	host_seat: number | null;
 	hands?: number[][] | null;
 	hand_history?: HandHistoryEntryPayload[];
+	ruleset_preset?: string | null;
+	ruleset?: Record<string, unknown>;
 }
 
 export interface HandStartPayload {

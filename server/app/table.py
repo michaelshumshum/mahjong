@@ -143,6 +143,7 @@ from mahjong_core.engine import (
 )
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.presets import preset_id_for
 from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
@@ -1154,6 +1155,15 @@ class Table:
             viewer=seat,
             reveal_hands=seat is None and self.settings.spectators_see_hands,
         )
+        # this table's ruleset, fixed at construction (docs/00-architecture.md §7's "no
+        # mid-game durability" applies equally to rules: nothing here ever changes after
+        # `new_game()`). `ruleset_preset` is the `RULESET_PRESETS` key it matches, or `null`
+        # for a custom ruleset -- lets a client render "HK Classic" instead of a raw field dump
+        # without a second lookup, while `ruleset` always carries the full resolved values so a
+        # "custom" editor has something real to prefill from regardless of which preset (if any)
+        # it started from.
+        wire["ruleset_preset"] = preset_id_for(self.state.ruleset)
+        wire["ruleset"] = self.state.ruleset.to_dict()
         return wire
 
     def seat_status_tuple(

@@ -276,6 +276,13 @@ class StateSyncPayload(BaseModel):
     # `_render_field`, gen_protocol.py), keeping every `state_sync` test fixture written before
     # this field existed valid -- a real `Table.state_sync_wire` always populates it for real.
     hand_history: list[HandHistoryEntryPayload] = []
+    # this table's ruleset, fixed at construction (docs/00-architecture.md §3 "Table settings"
+    # applies to `TableSettings`, not `RuleSet` -- nothing here is mutable mid-game).
+    # `ruleset_preset` is the `mahjong_core.presets.RULESET_PRESETS` key it matches, `null` for
+    # a custom ruleset; `ruleset` is always the full resolved `RuleSet.to_dict()` regardless, so
+    # a "custom" editor has real values to prefill from either way.
+    ruleset_preset: str | None = None
+    ruleset: dict[str, Any] = {}
 
 
 class HandStartPayload(BaseModel):

@@ -201,6 +201,16 @@ offered seat's own concealed tiles.
 (those are `RuleSet`). `spectators_see_hands` switches every spectator to the open-hands view (§5);
 `Table.update_settings` swaps it mid-game and resyncs spectators. No wire message sets it yet.
 
+**Ruleset selection.** Unlike `TableSettings`, `RuleSet` is fixed once at table construction —
+`mahjong_core` has no path to change it mid-game — so it's chosen at connect time instead of over
+the envelope: `?ruleset=<preset_id>` (`mahjong_core.presets.RULESET_PRESETS`, default
+`hk_classic`) or `?ruleset=custom&rules=<RuleSet.to_dict() JSON>` on the WS URL, resolved by
+`app/ws.py`'s `_resolve_ruleset` and threaded into `TableRegistry.get_or_create` the same way
+`?practice=`/`?seed=` already are — only meaningful the first time a given table id is created.
+`state_sync.ruleset`/`ruleset_preset` (`docs/02-protocol.md` "Ruleset selection") surface the
+resolved value so a client can render it. No table-creation UI reads/writes these yet — see
+`docs/05-roadmap.md`.
+
 **Showcase table.** `TableRegistry.start_showcase` (`app/registry.py`, started from `lifespan` for
 `SHOWCASE_TABLE_ID`, default `BOTS`, empty disables) keeps one all-bot, open-hands table running
 forever. `Table(all_bots=True)` binds all four seats and deals when `run()` starts; its hand-end
