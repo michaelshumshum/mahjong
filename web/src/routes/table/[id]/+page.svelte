@@ -46,13 +46,7 @@
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import type { TileCode } from '$lib/table/tile-code';
-
-	const WIND_LABEL: Record<string, string> = { E: 'East', S: 'South', W: 'West', N: 'North' };
-	// table-view wind glyphs (revamp: seat/prevailing badges show these instead of the E/S/W/N
-	// letter) — WIND_LABEL above stays in use for the one full-sentence spot ("You're seated as
-	// East") where a bare glyph would read as unlabelled to a screen reader.
-	const WIND_CHAR: Record<string, string> = { E: '東', S: '南', W: '西', N: '北' };
-	const SEAT_WINDS = ['E', 'S', 'W', 'N'] as const;
+	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -406,12 +400,6 @@
 		return options;
 	});
 
-	// seat wind badge: the dealer holds East for the current hand, remaining seats follow
-	// clockwise in seat-index space — a badge only, never position (§10 "What stays").
-	function seatWind(seat: Seat): (typeof SEAT_WINDS)[number] {
-		return SEAT_WINDS[(seat - gameState.dealer + 4) % 4];
-	}
-
 	let claimOptions: ClaimOption[] | null = $derived(
 		gameState.claimWindow?.yourOptions
 			? gameState.claimWindow.yourOptions.map((o) => ({ kind: o.kind, tiles: o.tiles }))
@@ -652,7 +640,7 @@
 			{@render seatOccupancySlot(((you + 1) % 4) as Seat)}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
-			{@render seatRingSlot(WIND_CHAR[seatWind(you)], true)}
+			{@render seatRingSlot(WIND_CHAR[seatWind(you, gameState.dealer)], true)}
 		</div>
 	</div>
 {/snippet}
@@ -712,8 +700,8 @@
 	>
 		<header class="seat-meta">
 			<span class="seat-name">{seat.name}</span>
-			<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat)]} wind"
-				>{WIND_CHAR[seatWind(seat.seat)]}</span
+			<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat, gameState.dealer)]} wind"
+				>{WIND_CHAR[seatWind(seat.seat, gameState.dealer)]}</span
 			>
 			{#if seat.seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
 			{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat">Bot</span>{/if}
@@ -850,8 +838,10 @@
 				>
 					<header class="seat-meta">
 						<span class="seat-name">{seatAt(0).name}</span>
-						<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seatAt(0).seat)]} wind"
-							>{WIND_CHAR[seatWind(seatAt(0).seat)]}</span
+						<span
+							class="seat-wind"
+							aria-label="{WIND_LABEL[seatWind(seatAt(0).seat, gameState.dealer)]} wind"
+							>{WIND_CHAR[seatWind(seatAt(0).seat, gameState.dealer)]}</span
 						>
 						{#if seatAt(0).seat === gameState.dealer}<span class="dealer-badge" title="Dealer"
 								>D</span
@@ -1090,7 +1080,7 @@
 				{@render seatPicker()}
 			{:else}
 				{@render seatRing(effectiveSeat as Seat)}
-				<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat as Seat)]}</h2>
+				<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat as Seat, gameState.dealer)]}</h2>
 				<p>
 					Waiting for the rest of the table to join. The hand starts automatically once all four
 					seats are ready.
