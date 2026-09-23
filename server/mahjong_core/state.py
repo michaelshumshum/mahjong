@@ -255,6 +255,10 @@ class GameState:
     last_draw_was_kong_replacement: bool = False
     # whether the most recent draw was a kong replacement (back-of-wall) rather than a normal
     # front draw -- 槓上開花's flag, read only together with a self-draw win on that same turn.
+    self_draw_win_allowed: bool = True
+    # whether the current AWAIT_ACTION turn may end by self-draw win. True at the start of a
+    # hand (heavenly hand) and after any draw; False after a chow/pung claim, since the claimer
+    # did not draw the tile and already passed on claiming it as a win.
 
     def __post_init__(self) -> None:
         if len(self.seats) != 4:

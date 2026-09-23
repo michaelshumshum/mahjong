@@ -452,6 +452,7 @@ def _draw_for_turn(
         claim_window=None,
         wall_exhausted_at_last_draw=_wall_exhausted(state),
         last_draw_was_kong_replacement=kong,
+        self_draw_win_allowed=True,
     )
     draw_event: Event = (
         KongReplacementDrawn(seat=seat, tile_id=tile) if kong else Drawn(seat=seat, tile_id=tile)
@@ -696,7 +697,13 @@ def _apply_claim_response(
         more_state, more_events = _draw_for_turn(state, winner, from_front=False, kong=True)
         return more_state, events + more_events
 
-    state = dataclasses.replace(state, turn=winner, phase=Phase.AWAIT_ACTION, claim_window=None)
+    state = dataclasses.replace(
+        state,
+        turn=winner,
+        phase=Phase.AWAIT_ACTION,
+        claim_window=None,
+        self_draw_win_allowed=False,
+    )
     return state, events
 
 

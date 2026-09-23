@@ -589,6 +589,84 @@ def test_claim_win_gated_by_min_faan_even_when_window_opens_for_another_seat() -
 # --- real timing-flag contexts, from actual gameplay sequences -------------------------------
 
 
+def _pung_claim_into_winning_hand() -> tuple[int, ...]:
+    """13 concealed tiles: `_standard_winning_hand()` minus one copy of MAN_1, so claiming
+    a discarded MAN_1 as a pung completes the standard winning shape with one exposed meld."""
+    return (
+        _MAN_1[0],
+        _MAN_1[1],
+        _MAN_4[0],
+        _MAN_5[0],
+        _MAN_6[0],
+        _MAN_7[0],
+        _MAN_8[0],
+        _MAN_9[0],
+        *_PIN_1[:3],
+        _MAN_2[0],
+        _MAN_2[1],
+    )
+
+
+def _chow_claim_into_winning_hand() -> tuple[int, ...]:
+    """13 concealed tiles: `_standard_winning_hand()` with the MAN_1 pung reduced to a
+    MAN_4-5-6 chow waiting on MAN_4, so claiming a discarded MAN_4 as a chow completes the
+    standard winning shape with one exposed meld."""
+    return (
+        _MAN_5[0],
+        _MAN_6[0],
+        _MAN_1[0],
+        _MAN_1[1],
+        _MAN_1[2],
+        _MAN_7[0],
+        _MAN_8[0],
+        _MAN_9[0],
+        *_PIN_1[:3],
+        _MAN_2[0],
+        _MAN_2[1],
+    )
+
+
+def test_pung_claim_into_winning_hand_cannot_be_redeclared_as_self_draw() -> None:
+    """Regression: claiming a discard as a pung uses up the win opportunity on that tile.
+    The claimer must discard next; they may not press the self-draw win button and collect
+    the extra self-draw faan on a tile they did not draw."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
+    state = _with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_1[2]), flowers=())
+    state = _all_junk(state, except_seat=1)
+    state = _with_seat(state, 3, concealed=_pung_claim_into_winning_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_1[2]))
+    pung_action = next(a for a in legal_actions(state, 3) if isinstance(a, ClaimPung))
+    state, _ = reduce(state, pung_action)
+
+    assert state.phase == Phase.AWAIT_ACTION
+    assert state.turn == 3
+    assert not state.self_draw_win_allowed
+    assert not any(isinstance(a, DeclareWin) for a in legal_actions(state, 3))
+    with pytest.raises(IllegalActionError):
+        reduce(state, DeclareWin())
+
+
+def test_chow_claim_into_winning_hand_cannot_be_redeclared_as_self_draw() -> None:
+    """Same regression as the pung case: a chow claim that happens to complete the hand
+    must not be convertible into a self-draw win on the next action."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
+    state = _with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_4[1]), flowers=())
+    state = _all_junk(state, except_seat=1)
+    state = _with_seat(state, 2, concealed=_chow_claim_into_winning_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_4[1]))
+    chow_action = next(a for a in legal_actions(state, 2) if isinstance(a, ClaimChow))
+    state, _ = reduce(state, chow_action)
+
+    assert state.phase == Phase.AWAIT_ACTION
+    assert state.turn == 2
+    assert not state.self_draw_win_allowed
+    assert not any(isinstance(a, DeclareWin) for a in legal_actions(state, 2))
+    with pytest.raises(IllegalActionError):
+        reduce(state, DeclareWin())
+
+
 def test_heavenly_hand_win_before_any_discard() -> None:
     """天糊: the dealer's own dealt hand is already complete before anyone has discarded --
     `_state()`'s fresh `new_game()` output already has `total_discards == 0` and `turn ==

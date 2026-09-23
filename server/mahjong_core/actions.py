@@ -293,8 +293,11 @@ def build_scoring_context(
 def can_declare_win(state: GameState, seat: int) -> bool:
     """Whether `seat` may `DeclareWin` right now: structurally complete (`hand_is_winning_shape`)
     *and* clears `state.ruleset.min_faan` under real scoring -- the M1/M2 boundary this
-    module's docstring describes. A self-declared win is always self-drawn, off no discarder.
+    module's docstring describes. A self-declared win is always self-drawn, off no discarder,
+    and is only allowed on a turn that reached AWAIT_ACTION via a draw (or the initial deal).
     """
+    if not state.self_draw_win_allowed:
+        return False
     seat_state = state.seats[seat]
     if not hand_is_winning_shape(seat_state):
         return False
