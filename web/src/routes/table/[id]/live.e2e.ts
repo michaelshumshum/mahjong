@@ -184,7 +184,7 @@ test('four real seats join, ready, and play real discards/claims through the liv
 });
 
 test('practice mode is reachable from the lobby and reaches real gameplay with bot seats marked', async () => {
-	// M4.5 (docs/05-roadmap.md): the lobby's "Play vs bots" button generates its own table id and
+	// M4.5 (docs/05-roadmap.md): the lobby's "Practice vs Bots" button generates its own table id and
 	// tags the table route `?practice=1`, which `/table/[id]` translates into `&practice=true` on
 	// the real WS URL -- server-side, that binds seats 1-3 to real `FaanBot`s at table creation
 	// (server/app/ws.py's `ws_endpoint`/`app/table.py`'s `Table.__init__(practice=...)`), before
@@ -196,7 +196,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 	try {
 		const page = await browser.newPage();
 		await page.goto(BASE, { waitUntil: 'networkidle' });
-		await page.getByRole('button', { name: 'Play vs bots' }).click();
+		await page.getByRole('button', { name: 'Practice vs Bots' }).click();
 
 		await expect(page).toHaveURL(/\/table\/[A-Z0-9]+\?practice=1$/);
 
@@ -406,7 +406,7 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 	try {
 		const page = await browser.newPage();
 		await page.goto(BASE, { waitUntil: 'networkidle' });
-		await page.getByRole('button', { name: 'Play vs bots' }).click();
+		await page.getByRole('button', { name: 'Practice vs Bots' }).click();
 		await page.getByRole('button', { name: 'Open' }).click();
 		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
 
