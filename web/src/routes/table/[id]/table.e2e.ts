@@ -106,8 +106,8 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 	const round2Toggle = overlay.locator('.score-sheet tbody tr').nth(1).locator('.round-expand');
 	await round2Toggle.click();
 	const detail2 = overlay.locator('#round-detail-2');
-	await expect(detail2).toContainText('Bob wins');
 	await expect(detail2).toContainText('All Pungs');
+	await expect(detail2).toContainText('Total 4 faan');
 	await expect(detail2.locator('.tile')).not.toHaveCount(0);
 	await round2Toggle.click(); // collapse before indexing into row 2 (hand 3) below
 

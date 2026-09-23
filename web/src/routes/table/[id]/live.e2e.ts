@@ -458,11 +458,12 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 		await round1Toggle.click();
 		const detail1 = gameEndOverlay.locator('#round-detail-1');
 		await expect(detail1).toBeVisible();
-		const hasWinner = (await detail1.getByRole('heading', { name: /wins$/ }).count()) > 0;
-		if (hasWinner) {
-			await expect(detail1.locator('.tile')).not.toHaveCount(0);
-		} else {
+		const isDraw = (await detail1.textContent())?.includes('Exhaustive draw') ?? false;
+		if (isDraw) {
 			await expect(detail1).toContainText('Exhaustive draw');
+		} else {
+			await expect(detail1).toContainText('Total');
+			await expect(detail1.locator('.tile')).not.toHaveCount(0);
 		}
 	} finally {
 		await browser.close();

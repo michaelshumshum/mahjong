@@ -1,13 +1,12 @@
 <script lang="ts">
-	import FaanBreakdown, {
-		type FaanPattern,
-		type Payments,
-		type Seat,
-		type WinningMeld
-	} from './FaanBreakdown.svelte';
+	import WinningHand, { type FaanPattern, type WinningMeld } from './WinningHand.svelte';
 	import type { TileCode } from '../table/tile-code';
 
+	export type Seat = 0 | 1 | 2 | 3;
 	export type Wind = 'E' | 'S' | 'W' | 'N';
+
+	// mirrors hand_end.payments (docs/02-protocol.md §3): per-seat point delta for one hand.
+	export type Payments = Partial<Record<Seat, number>>;
 
 	export interface SeatInfo {
 		seat: Seat;
@@ -30,8 +29,8 @@
 		/** Optional per-round detail (the game-end summary's "more detail per round" — a caller
 		 * with nothing to show for a round, e.g. the mid-game manual toggle's mock-single-row
 		 * case, just omits this). Present, this round's row becomes expandable: clicking it
-		 * reveals the winning hand (win) or a plain draw note (exhaustive draw) inline, reusing
-		 * `FaanBreakdown`'s own tile-rendering rather than a second implementation of it. */
+		 * reveals the winning hand (win) or a plain draw note (exhaustive draw) inline, rendered
+		 * by `WinningHand` so the full `FaanBreakdown` overlay stays unchanged. */
 		result?: RoundResult;
 	}
 
@@ -59,6 +58,11 @@
 
 	const WIND_LABEL: Record<Wind, string> = { E: 'East', S: 'South', W: 'West', N: 'North' };
 	const RANK_LABEL = ['1st', '2nd', '3rd', '4th'];
+	const RANK_TONE: Record<number, string> = {
+		0: '#d4af37',
+		1: '#a8a8a8',
+		2: '#cd7f32'
+	};
 
 	let {
 		seats,
@@ -127,17 +131,24 @@
 </script>
 
 <section class="score-sheet" aria-labelledby="score-sheet-heading">
-	<h2 id="score-sheet-heading">Score sheet</h2>
+	<header class="score-sheet-header">
+		<h2 id="score-sheet-heading">Score sheet</h2>
+		{#if standings}
+			<span class="game-end-badge">Final</span>
+		{/if}
+	</header>
 
 	<div class="table-scroll">
 		<table>
 			<thead>
 				<tr>
-					<th rowspan="2" scope="col">Hand</th>
-					<th rowspan="2" scope="col">Wind</th>
-					<th rowspan="2" scope="col">Dealer</th>
+					<th rowspan="2" scope="col" class="col-hand">Hand</th>
+					<th rowspan="2" scope="col" class="col-wind">Wind</th>
+					<th rowspan="2" scope="col" class="col-dealer">Dealer</th>
 					{#each seats as seat (seat.seat)}
-						<th colspan="2" scope="col">{seat.name}</th>
+						<th colspan="2" scope="colgroup" class="col-seat">
+							{seat.name}
+						</th>
 					{/each}
 				</tr>
 				<tr>
@@ -151,7 +162,7 @@
 				{#each hands as hand, index (hand.handNo)}
 					{@const isExpanded = expandedHands.has(hand.handNo)}
 					<tr>
-						<td>
+						<td class="col-hand">
 							{#if hand.result}
 								<button
 									type="button"
@@ -161,39 +172,43 @@
 									onclick={() => toggleExpanded(hand.handNo)}
 								>
 									<span class="round-expand-icon" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
-									{hand.handNo}
+									<span class="round-expand-label">{hand.handNo}</span>
 								</button>
 							{:else}
 								{hand.handNo}
 							{/if}
 						</td>
-						<td>{WIND_LABEL[hand.prevailing]}</td>
-						<td>{seatName(hand.dealer)}</td>
+						<td class="col-wind">{WIND_LABEL[hand.prevailing]}</td>
+						<td class="col-dealer">
+							{#if seatName(hand.dealer)}
+								<span class="dealer-badge">{seatName(hand.dealer)}</span>
+							{/if}
+						</td>
 						{#each seats as seat (seat.seat)}
 							{@const delta = hand.deltas[seat.seat] ?? 0}
+							{@const isDealer = seat.seat === hand.dealer}
 							<td
 								class="delta"
 								class:delta--gain={delta > 0}
 								class:delta--loss={delta < 0}
-								class:delta--dealer={seat.seat === hand.dealer}
+								class:delta--dealer={isDealer}
 							>
 								{delta > 0 ? '+' : ''}{delta}
 							</td>
-							<td class="running">{runningTotals[index][seat.seat]}</td>
+							<td class="running" class:running--dealer={isDealer}>
+								{runningTotals[index][seat.seat]}
+							</td>
 						{/each}
 					</tr>
 					{#if hand.result && isExpanded}
 						<tr class="round-detail-row" id="round-detail-{hand.handNo}">
 							<td colspan={columnCount}>
 								{#if hand.result.outcome === 'win' && hand.result.winner !== undefined}
-									<FaanBreakdown
-										winner={hand.result.winner}
-										{seatNames}
+									<WinningHand
 										winningHand={hand.result.winningHand ?? []}
 										melds={hand.result.melds ?? []}
 										patterns={hand.result.patterns ?? []}
 										totalFaan={hand.result.totalFaan ?? 0}
-										payments={hand.result.payments ?? {}}
 									/>
 								{:else}
 									<p class="draw-note">Exhaustive draw — no winning hand.</p>
@@ -205,7 +220,7 @@
 			</tbody>
 			<tfoot>
 				<tr>
-					<td colspan="3">Total</td>
+					<td colspan="3" class="footer-label">Total</td>
 					{#each seats as seat (seat.seat)}
 						<td colspan="2" class="footer-total">{totals[seat.seat]}</td>
 					{/each}
@@ -222,107 +237,201 @@
 	{/if}
 
 	{#if standings}
-		<ol class="standings">
-			{#each standings as standing, index (standing.seat)}
-				<li>
-					<span class="rank">{RANK_LABEL[index] ?? `${index + 1}th`}</span>
-					<span class="standing-name">{seatName(standing.seat)}</span>
-					<span class="standing-total">{standing.total}</span>
-				</li>
-			{/each}
-		</ol>
+		<div class="standings">
+			<h3 class="standings-heading">Final standings</h3>
+			<ol class="standings-list">
+				{#each standings as standing, index (standing.seat)}
+					<li class="standing-card" class:standing-card--top={index < 3}>
+						<span
+							class="rank"
+							style:background={RANK_TONE[index] ?? 'transparent'}
+							style:color={index < 3 ? '#1c1410' : 'var(--color-text-muted)'}
+						>
+							{RANK_LABEL[index] ?? `${index + 1}th`}
+						</span>
+						<span class="standing-name">{seatName(standing.seat)}</span>
+						<span
+							class="standing-total"
+							class:standing-total--positive={standing.total > 0}
+							class:standing-total--negative={standing.total < 0}
+						>
+							{standing.total > 0 ? '+' : ''}{standing.total}
+						</span>
+					</li>
+				{/each}
+			</ol>
+		</div>
 	{/if}
 </section>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.score-sheet {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-3);
-		max-width: 36rem;
-		padding: var(--space-4);
+		gap: var(--space-5);
+		width: min(90vw, 56rem);
+		max-width: 90vw;
+		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
+
+		@include layout.tablet-up {
+			padding: var(--space-6);
+		}
+	}
+
+	.score-sheet-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
 	}
 
 	h2 {
 		margin: 0;
-		font-size: var(--font-size-lg);
+		font-size: var(--font-size-xl);
+		font-weight: 800;
+		letter-spacing: -0.02em;
+	}
+
+	.game-end-badge {
+		padding: var(--space-1) var(--space-3);
+		border-radius: 999px;
+		background: var(--color-accent);
+		color: var(--color-text);
+		font-size: var(--font-size-sm);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
 
 	.table-scroll {
 		overflow-x: auto;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
 	}
 
 	table {
 		width: 100%;
 		border-collapse: collapse;
 		font-variant-numeric: tabular-nums;
+		font-size: var(--font-size-base);
 	}
 
 	th,
 	td {
-		padding: var(--space-1) var(--space-2);
+		padding: var(--space-2) var(--space-3);
 		text-align: end;
 		white-space: nowrap;
 	}
 
-	th:first-child,
+	.col-hand,
+	.col-wind,
+	.col-dealer,
 	td:first-child,
-	th:nth-child(2),
 	td:nth-child(2),
-	th:nth-child(3),
 	td:nth-child(3) {
 		text-align: start;
 	}
 
+	thead {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		background: var(--color-surface-raised);
+	}
+
 	thead th {
 		border-bottom: 1px solid var(--color-border);
+		font-weight: 700;
 	}
 
 	thead th.sub {
-		font-weight: normal;
+		font-weight: 600;
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
 	}
 
+	tbody tr:nth-child(even of :not(.round-detail-row)) {
+		background: rgb(255 255 255 / 0.02);
+	}
+
+	tbody tr:hover:not(.round-detail-row) {
+		background: rgb(255 255 255 / 0.05);
+	}
+
 	tfoot td {
-		border-top: 1px solid var(--color-border);
-		font-weight: bold;
+		border-top: 2px solid var(--color-border);
+		font-weight: 800;
+		font-size: var(--font-size-lg);
+	}
+
+	.footer-label {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-base);
+	}
+
+	.footer-total {
+		color: var(--color-text);
 	}
 
 	.delta--gain {
 		color: var(--color-accent-jade);
+		font-weight: 700;
 	}
 
 	.delta--loss {
 		color: var(--color-accent);
+		font-weight: 700;
 	}
 
 	.delta--dealer {
-		text-decoration: underline;
-		text-decoration-style: dotted;
+		background: rgb(187 157 88 / 0.12);
 	}
 
 	.running {
 		color: var(--color-text-muted);
 	}
 
+	.running--dealer {
+		background: rgb(187 157 88 / 0.12);
+	}
+
+	.dealer-badge {
+		display: inline-block;
+		padding: var(--space-1) var(--space-2);
+		border-radius: var(--radius-sm);
+		background: rgb(187 157 88 / 0.18);
+		color: var(--color-seat-self);
+		font-size: var(--font-size-sm);
+		font-weight: 700;
+	}
+
 	.round-expand {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-1);
-		border: none;
-		background: transparent;
-		padding: 0;
+		gap: var(--space-2);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface-raised);
+		padding: var(--space-1) var(--space-2);
 		color: inherit;
 		font: inherit;
 		font-variant-numeric: tabular-nums;
+		font-weight: 700;
 		cursor: pointer;
+		transition:
+			background-color 130ms ease,
+			border-color 130ms ease,
+			color 130ms ease;
 
 		&:hover {
+			border-color: var(--color-accent);
+			background: var(--color-bg);
 			color: var(--color-accent);
 		}
 	}
@@ -333,18 +442,24 @@
 	}
 
 	.round-detail-row td {
-		padding: var(--space-3) var(--space-2);
+		padding: var(--space-4) var(--space-3);
 		background: var(--color-bg);
 		text-align: start;
 	}
 
 	.draw-note {
 		margin: 0;
+		padding: var(--space-4);
 		color: var(--color-text-muted);
+		font-size: var(--font-size-lg);
+		text-align: center;
 	}
 
 	.notice {
 		margin: 0;
+		padding: var(--space-3);
+		border-radius: var(--radius-sm);
+		background: rgb(231 126 64 / 0.12);
 		font-size: var(--font-size-sm);
 		color: var(--color-status-error);
 	}
@@ -352,26 +467,75 @@
 	.standings {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-1);
+		gap: var(--space-3);
+		border-top: 1px solid var(--color-border);
+		padding-block-start: var(--space-4);
+	}
+
+	.standings-heading {
+		margin: 0;
+		font-size: var(--font-size-lg);
+		font-weight: 700;
+		color: var(--color-text-muted);
+	}
+
+	.standings-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+		gap: var(--space-3);
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		border-top: 1px solid var(--color-border);
-		padding-block-start: var(--space-2);
 	}
 
-	.standings li {
+	.standing-card {
 		display: flex;
+		align-items: center;
 		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
 		font-variant-numeric: tabular-nums;
+		transition: background-color 130ms ease;
+
+		&:hover {
+			background: rgb(255 255 255 / 0.03);
+		}
+	}
+
+	.standing-card--top {
+		border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-accent) 30%);
+		background: rgb(255 255 255 / 0.04);
 	}
 
 	.rank {
-		width: 2.5rem;
-		color: var(--color-text-muted);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: 50%;
+		font-weight: 800;
+		font-size: var(--font-size-base);
 	}
 
 	.standing-name {
 		flex: 1;
+		font-weight: 700;
+		font-size: var(--font-size-lg);
+	}
+
+	.standing-total {
+		font-size: var(--font-size-xl);
+		font-weight: 800;
+	}
+
+	.standing-total--positive {
+		color: var(--color-accent-jade);
+	}
+
+	.standing-total--negative {
+		color: var(--color-accent);
 	}
 </style>

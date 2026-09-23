@@ -28,8 +28,8 @@ describe('ScoreSheet', () => {
 
 	it('renders one row per hand', () => {
 		const { body } = render(ScoreSheet, { props: { seats, totals, hands } });
-		const tbody = body.match(/<tbody>[\s\S]*?<\/tbody>/)?.[0] ?? '';
-		expect([...tbody.matchAll(/<tr>/g)]).toHaveLength(hands.length);
+		const tbody = body.match(/<tbody[^>]*>[\s\S]*?<\/tbody>/)?.[0] ?? '';
+		expect([...tbody.matchAll(/<tr[\s>]/g)]).toHaveLength(hands.length);
 		// none of these hands carry `result`, so the Hand cell's `{#if}` takes the plain-number
 		// branch -- strip the block's own hydration anchor comments before matching, since they
 		// sit between the `<td>` and the digit regardless of which branch actually rendered.

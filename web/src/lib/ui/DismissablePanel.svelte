@@ -28,5 +28,9 @@
 	// that panel's own corner, not the fullscreen scrim's.
 	.panel {
 		position: relative;
+		max-height: calc(100vh - var(--space-6));
+		max-width: calc(100vw - var(--space-6));
+		overflow-y: auto;
+		overflow-x: hidden;
 	}
 </style>

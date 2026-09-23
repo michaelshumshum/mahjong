@@ -739,8 +739,8 @@
 		{/if}
 
 		{#if gameEndReached && scoreStandings}
-			<div class="panel-overlay" data-testid="game-end-overlay">
-				<div class="panel">
+			<div class="panel-overlay panel-overlay--scrollable" data-testid="game-end-overlay">
+				<div class="panel panel--scrollable">
 					<GameEndScreen
 						seats={scoreSeats}
 						totals={scoreTotals}
@@ -926,11 +926,22 @@
 		padding: var(--space-3);
 	}
 
+	// game-end content can be tall (podium + full score sheet + standings), so let the overlay
+	// itself scroll rather than clipping inside a fixed-height panel.
+	.panel-overlay--scrollable {
+		align-items: flex-start;
+		overflow-y: auto;
+	}
+
 	// hugs whatever dialog content it wraps (ScoreSheet/Settings/game-end) so the
 	// CloseButton it contains is positioned against that panel's own corner, not the fullscreen
 	// scrim's.
 	.panel {
 		position: relative;
+	}
+
+	.panel--scrollable {
+		margin-block: auto;
 	}
 
 	// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip,
