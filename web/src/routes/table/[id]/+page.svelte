@@ -47,6 +47,7 @@
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import type { TileCode } from '$lib/table/tile-code';
 	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
+	import SeatRingSlot from '$lib/table/SeatRingSlot.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -615,12 +616,6 @@
 	let showAnimationDemo = $state(false);
 </script>
 
-{#snippet seatRingSlot(label: string, self: boolean = false)}
-	<div class="seat-ring-slot" class:seat-ring-slot--self={self}>
-		<span>{label}</span>
-	</div>
-{/snippet}
-
 <!-- Seated pre-game preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
 	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
 	before any hand exists. Self is the one seat this screen already knows a real wind for (the
@@ -640,7 +635,7 @@
 			{@render seatOccupancySlot(((you + 1) % 4) as Seat)}
 		</div>
 		<div class="seat-ring-pos seat-ring-pos--self">
-			{@render seatRingSlot(WIND_CHAR[seatWind(you, gameState.dealer)], true)}
+			<SeatRingSlot label={WIND_CHAR[seatWind(you, gameState.dealer)]} self={true} />
 		</div>
 	</div>
 {/snippet}
