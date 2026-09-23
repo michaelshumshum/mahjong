@@ -33,7 +33,6 @@
 	.discard-pool {
 		display: grid;
 		grid-template-columns: repeat(6, minmax(20px, 28px));
-		justify-content: start;
 		gap: 2px;
 		max-width: 14rem;
 	}
@@ -49,6 +48,8 @@
 	.discard-pool--across {
 		@include layout.tablet-up {
 			grid-area: across;
+			align-self: start;
+			justify-self: center;
 		}
 	}
 
@@ -97,6 +98,40 @@
 			grid-template-columns: none;
 			grid-template-rows: repeat(6, minmax(24px, 32px));
 			grid-auto-flow: column;
+		}
+	}
+
+	// grid auto-placement always advances new implicit columns toward higher indices, which for
+	// `--left` already reads as "toward the table centre" (its box sits at the screen's left
+	// edge) but for `--right` reads as "away from it" (new columns push further off the right
+	// edge instead of toward centre). `direction: rtl` flips which side a new column lands on
+	// without touching the rotated tile-face positioning below -- that's absolute, keyed off the
+	// box's own centre, not text direction -- so it only changes the wrap direction, matching
+	// `--left`'s.
+	.discard-pool--right {
+		@include layout.tablet-up {
+			direction: rtl;
+		}
+	}
+
+	// self's default row-major wrap (shared with across, below) pushes each overflow row further
+	// down the page. Fine for across -- the table's top edge, where "down" already means "toward
+	// the centre" -- but wrong for self, the bottom edge, where it means further off-screen (the
+	// concern the 12-column override above was only ever able to reduce, not remove). Flex's
+	// `wrap-reverse` does what grid's row-major auto-placement can't: keep the first line
+	// anchored to self's own edge and grow later, overflow lines toward the centre (upward)
+	// instead of away from it.
+	.discard-pool--self {
+		@include layout.tablet-up {
+			transform: scaleY(-1);
+			align-self: end;
+			justify-self: center;
+		}
+	}
+
+	.discard-pool--self .discard-tile {
+		@include layout.tablet-up {
+			transform: scaleY(-1);
 		}
 	}
 

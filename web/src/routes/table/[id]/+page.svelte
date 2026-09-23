@@ -886,7 +886,6 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: var(--space-2);
 
 		@include layout.tablet-up {
 			display: grid;
@@ -894,9 +893,8 @@
 				'.    across .'
 				'left .      right'
 				'.    self   .';
-			grid-template-columns: auto 1fr auto;
-			grid-template-rows: auto 1fr auto;
-			place-items: center;
+			grid-template-columns: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
+			grid-template-rows: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
 		}
 	}
 
