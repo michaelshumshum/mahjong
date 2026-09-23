@@ -14,7 +14,6 @@
 		onLeaveClick,
 		onToggleScoreSheet,
 		onToggleSettings,
-		onToast,
 		onToggleAnimationDemo
 	}: {
 		isMock: boolean;
@@ -28,12 +27,11 @@
 		onLeaveClick: () => void;
 		onToggleScoreSheet: () => void;
 		onToggleSettings: () => void;
-		onToast: () => void;
 		onToggleAnimationDemo: () => void;
 	} = $props();
 </script>
 
-<header class="dev-toolbar">
+<header class="table-toolbar">
 	{#if isMock}
 		<div class="scenario-picker" role="group" aria-label="Mock scenario">
 			{#each MOCK_SCENARIOS as scenario (scenario.id)}
@@ -70,7 +68,6 @@
 		{#if !spectating}
 			<button type="button" onclick={onToggleSettings}>Settings</button>
 		{/if}
-		<button type="button" onclick={onToast}>Toast</button>
 		{#if isMock}
 			<button type="button" onclick={onToggleAnimationDemo}>Animate a turn</button>
 		{/if}
@@ -80,7 +77,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 
-	.dev-toolbar {
+	.table-toolbar {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: space-between;

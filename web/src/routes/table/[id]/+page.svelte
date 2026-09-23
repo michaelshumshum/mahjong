@@ -47,7 +47,7 @@
 	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
-	import DevToolbar from './_components/DevToolbar.svelte';
+	import TableToolbar from './_components/TableToolbar.svelte';
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 
@@ -622,7 +622,7 @@
 	<h1 class="sr-only">Table</h1>
 
 	<div class="table-page">
-		<DevToolbar
+		<TableToolbar
 			{isMock}
 			bind:scenarioId
 			{spectating}
@@ -634,7 +634,6 @@
 			onLeaveClick={handleLeaveClick}
 			onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
 			onToggleSettings={() => (showSettings = !showSettings)}
-			onToast={() => pushToast('Reconnecting…')}
 			onToggleAnimationDemo={() => (showAnimationDemo = !showAnimationDemo)}
 		/>
 

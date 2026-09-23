@@ -29,7 +29,7 @@ Answers [05-roadmap.md §5](05-roadmap.md) open question #1 (rendering): **DOM/C
 **One-way data flow.** Server events → reducer → `$state` store → components read it. Components
 own presentation state only (pending/lifted/hover classes, CSS transition state), never game
 truth. Input goes `DOM event → intent → WebSocket`, never `DOM → local mutation` — the one
-deliberate exception is a *pending visual* state, not a state mutation (§5).
+deliberate exception is a _pending visual_ state, not a state mutation (§5).
 
 No tick loop: state changes are discrete server events. All motion is CSS transitions/animations
 driven by class/attribute changes, never a JS ticker or a tween library.
@@ -92,7 +92,7 @@ CSS opacity (`transition: opacity 220ms`, skipped under `prefers-reduced-motion`
 itself keeps running underneath regardless, so there's no pause/resume state to resync when a page
 shows it again. Each mural-visible page's own content needs `position: relative` plus a real
 `z-index` (`var(--z-hud)`, matching the lobby's own `.lobby`) — a plain static-positioned element
-always paints *below* a `position: fixed` `z-index: 0` element in CSS stacking order regardless of
+always paints _below_ a `position: fixed` `z-index: 0` element in CSS stacking order regardless of
 DOM order or the z-index value itself, so without this the mural would sit on top of, not behind,
 that page's own content.
 
@@ -166,7 +166,7 @@ footprint can extend outside its grid area into whatever sits past its edge. `wr
 reflows the flex axes instead, so the element's own width/height already reflect the vertical
 footprint the grid cell needs to reserve. The individual tiles inside are rotated 90° to face the
 table (the physically-correct read for a side seat): each `.mini-tile` keeps an unrotated box
-already sized to the *post*-rotation (landscape) footprint, and only the tile face inside it is
+already sized to the _post_-rotation (landscape) footprint, and only the tile face inside it is
 absolutely-positioned and rotated — paint-only, so it never changes what the strip/grid measure.
 Same avoid-rotating-the-sized-box principle as the strip-level decision above, just applied one
 level deeper. The left/right discard pools in the centre box reuse the identical technique (an
@@ -204,7 +204,7 @@ The client assigns a **positional** identity instead — stable per seat, opaque
 
 - Each opponent hand is a fixed slot array: `seat:0..12` (concealed) plus `seat:drawn` for a 14th
   tile. Slot index is a DOM/array position, not a tile value — backs are visually interchangeable,
-  so *which* slot holds *which* physical tile doesn't matter, only that a slot stays a stable
+  so _which_ slot holds _which_ physical tile doesn't matter, only that a slot stays a stable
   element across a diff.
 - `draw {seat}` (count 13→14): append `seat:drawn`, same "held apart" convention as your own hand.
 - A discard from that seat carries the real identity (`discard {seat, tile_id, tile}`). Resolve
@@ -225,13 +225,13 @@ always matches the redacted `count` the server already sends.
 
 ## 5. Interaction model
 
-| Action | Desktop | Touch |
-| --- | --- | --- |
-| Select tile | hover lifts it, click selects | tap lifts |
-| Discard | click a lifted tile (pending state, below), or drag up past a threshold | tap again, or swipe up (gesture note below) |
-| Claim | DOM buttons, bottom-center, with CSS countdown ring | same, ≥44px targets |
-| Sort hand | auto by default, no manual reorder in v1 | auto |
-| Inspect discard pool | hover shows who discarded and when | long-press |
+| Action               | Desktop                                                                 | Touch                                       |
+| -------------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
+| Select tile          | hover lifts it, click selects                                           | tap lifts                                   |
+| Discard              | click a lifted tile (pending state, below), or drag up past a threshold | tap again, or swipe up (gesture note below) |
+| Claim                | DOM buttons, bottom-center, with CSS countdown ring                     | same, ≥44px targets                         |
+| Sort hand            | auto by default, no manual reorder in v1                                | auto                                        |
+| Inspect discard pool | hover shows who discarded and when                                      | long-press                                  |
 
 - Faan preview on hover: deferred — see [99-deferred.md](99-deferred.md). No protocol message
   carries shanten/ukeire, and a client-side TypeScript reimplementation duplicates the one
@@ -269,15 +269,15 @@ Rule: still no local mutation of game truth. Add a **pending** presentation stat
 The server closes claim windows **early** — as soon as no better claim is possible
 ([00-architecture.md §4](00-architecture.md)) — so "buttons are up" is not a stable client state:
 
-| Scenario | Client behaviour |
-| --- | --- |
-| `claim_offer` received | Render offered options + PASS, keyed by `window_id`. Start the CSS countdown ring (below). A new `window_id` always fully replaces the previous button set. |
-| `claim_resolved` names this seat | Remove buttons immediately, play the meld/win animation. |
-| `claim_resolved` names another seat while this seat's buttons were still live (e.g. a higher-priority win beat your pending pung) | Remove buttons immediately, no fade-out — the option didn't get declined, it stopped existing. Toast only for a non-obvious loss (someone else won/konged the tile); a plain timeout-to-PASS needs no toast. |
-| `claim_resolved` with no seat (sole eligible claim passed, or all eligible seats passed) | Remove buttons immediately; play continues without waiting out the full deadline. |
-| Local `claim` sent but arrives after the window already closed | Server drops it by stale `window_id`, or acks `{ok:false}`. Client shows a brief "too slow" toast and changes nothing else — no local state was ever applied. |
-| Dialog's own timer runs out, no `claim_resolved`/`turn` yet (latency) | Client auto-selects `pass` through the same `onChoose` path a manual click uses (`DialogTimer.svelte`, below), sending `claim{window_id, choice:'pass'}`. Mirrors what the server already does on its own claim-window timeout ([02-protocol.md §4](02-protocol.md), "PASS on claim timeout"), so this isn't a decision the server wasn't already going to make — it's just not waiting for the round trip. |
-| A pre-armed toggle covers this offer (`auto`) | No buttons render — the server already resolves it as an instant choice. |
+| Scenario                                                                                                                          | Client behaviour                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `claim_offer` received                                                                                                            | Render offered options + PASS, keyed by `window_id`. Start the CSS countdown ring (below). A new `window_id` always fully replaces the previous button set.                                                                                                                                                                                                                                                 |
+| `claim_resolved` names this seat                                                                                                  | Remove buttons immediately, play the meld/win animation.                                                                                                                                                                                                                                                                                                                                                    |
+| `claim_resolved` names another seat while this seat's buttons were still live (e.g. a higher-priority win beat your pending pung) | Remove buttons immediately, no fade-out — the option didn't get declined, it stopped existing. Toast only for a non-obvious loss (someone else won/konged the tile); a plain timeout-to-PASS needs no toast.                                                                                                                                                                                                |
+| `claim_resolved` with no seat (sole eligible claim passed, or all eligible seats passed)                                          | Remove buttons immediately; play continues without waiting out the full deadline.                                                                                                                                                                                                                                                                                                                           |
+| Local `claim` sent but arrives after the window already closed                                                                    | Server drops it by stale `window_id`, or acks `{ok:false}`. Client shows a brief "too slow" toast and changes nothing else — no local state was ever applied.                                                                                                                                                                                                                                               |
+| Dialog's own timer runs out, no `claim_resolved`/`turn` yet (latency)                                                             | Client auto-selects `pass` through the same `onChoose` path a manual click uses (`DialogTimer.svelte`, below), sending `claim{window_id, choice:'pass'}`. Mirrors what the server already does on its own claim-window timeout ([02-protocol.md §4](02-protocol.md), "PASS on claim timeout"), so this isn't a decision the server wasn't already going to make — it's just not waiting for the round trip. |
+| A pre-armed toggle covers this offer (`auto`)                                                                                     | No buttons render — the server already resolves it as an instant choice.                                                                                                                                                                                                                                                                                                                                    |
 
 Deliberate tradeoff in the row above: a real click landing in the last few ms before the local
 timer fires can lose to the auto-pass if the server treats a seat's first-received choice as
@@ -286,7 +286,7 @@ below and [02-protocol.md §4](02-protocol.md)'s timer note. `hand_end_ack` gets
 auto-close treatment with none of this risk: it's an acknowledgment, not a choice with
 alternatives, and the table already advances at the same `deadline_ts` with or without it
 ([00-architecture.md §3](00-architecture.md) "Hand-end hold") — the client firing it early just
-lets the *other* seats stop waiting on this one sooner.
+lets the _other_ seats stop waiting on this one sooner.
 
 ### Countdown mechanics
 
@@ -297,7 +297,7 @@ lets the *other* seats stop waiting on this one sooner.
 - The ring itself is still cosmetic — it never drives anything on its own. `DialogTimer.svelte`
   (`web/src/lib/ui/`) pairs it with a real one-shot `setTimeout` (`auto-close.ts`'s
   `scheduleAutoDismiss`, also used standalone by `Toast.svelte`) anchored off the same
-  `durationMs`, so the *timeout*, not the ring, is what calls the dialog's `onClose`. Used by the
+  `durationMs`, so the _timeout_, not the ring, is what calls the dialog's `onClose`. Used by the
   claim dialog (auto-pass, above) and the hand-end hold (auto-ack). The turn ring (your own
   discard/draw deadline) stays purely cosmetic with no `DialogTimer` behind it — the server alone
   handles tsumogiri on expiry, and there's no local dialog for the client to close.
@@ -315,32 +315,51 @@ lets the *other* seats stop waiting on this one sooner.
 ```ts
 // lib/game/state.ts — plain data, no runes, so lib/net/reducer.spec.ts can test it directly
 interface ClientGameState {
-  seat: number | null;                 // learned from state_sync.seat once joined
-  handNo: number; prevailing: string; dealer: number; turn: number; phase: string;
-  ownHand: number[];                   // real tile_ids — this seat's own concealed hand only
-  concealedCounts: number[];           // length-4, count-only for every seat incl. this one
-  melds: MeldState[][];                // length-4; concealed_kong is {tiles:null,count} until reveal
-  discardPools: number[][];            // length-4, append-only, indexed by pool_index
+  seat: number | null; // learned from state_sync.seat once joined
+  handNo: number;
+  prevailing: string;
+  dealer: number;
+  turn: number;
+  phase: string;
+  ownHand: number[]; // real tile_ids — this seat's own concealed hand only
+  concealedCounts: number[]; // length-4, count-only for every seat incl. this one
+  melds: MeldState[][]; // length-4; concealed_kong is {tiles:null,count} until reveal
+  discardPools: number[][]; // length-4, append-only, indexed by pool_index
   flowers: string[][];
-  wallRemaining: number; seatStatus: string[]; names: (string | null)[]; scores: number[];
-  legalActions: Record<string, unknown>[];     // this seat's turn options, else []
+  wallRemaining: number;
+  seatStatus: string[];
+  names: (string | null)[];
+  scores: number[];
+  legalActions: Record<string, unknown>[]; // this seat's turn options, else []
   deadlineTs: number | null;
-  claimOffer: { windowId: number | null; options: Record<string, unknown>[]; deadlineTs: number | null } | null;
-  lastHandEnd: HandEndState | null;    // latest hand_end only — the just-finished-hand overlay
-  handHistory: HandHistoryEntry[];     // every hand_end this session has seen, oldest first (below)
-  gameEnd: GameEndState | null; shutdownDeadlineTs: number | null;
+  claimOffer: {
+    windowId: number | null;
+    options: Record<string, unknown>[];
+    deadlineTs: number | null;
+  } | null;
+  lastHandEnd: HandEndState | null; // latest hand_end only — the just-finished-hand overlay
+  handHistory: HandHistoryEntry[]; // every hand_end this session has seen, oldest first (below)
+  gameEnd: GameEndState | null;
+  shutdownDeadlineTs: number | null;
 }
 
 // lib/game/store.svelte.ts
 class GameStore {
-  state      = $state<ClientGameState>(initialClientGameState());
-  connection = $state<ConnectionStatus>('idle');   // mirrors the socket's own status
-  seq        = $state<number | null>(null);        // last seq applied — UI/debug bookkeeping only
-  version    = $state(0);                          // bumped every apply(); non-reactive-consumer signal
+  state = $state<ClientGameState>(initialClientGameState());
+  connection = $state<ConnectionStatus>("idle"); // mirrors the socket's own status
+  seq = $state<number | null>(null); // last seq applied — UI/debug bookkeeping only
+  version = $state(0); // bumped every apply(); non-reactive-consumer signal
 
-  constructor(socket: MahjongSocket) { /* $effect.root(() => { $effect(() => socket.onEvent(...)); ... }) */ }
-  #apply(event: ServerEvent) { this.state = reduce(this.state, event); this.version++; }
-  destroy(): void { /* disposes the $effect.root */ }
+  constructor(socket: MahjongSocket) {
+    /* $effect.root(() => { $effect(() => socket.onEvent(...)); ... }) */
+  }
+  #apply(event: ServerEvent) {
+    this.state = reduce(this.state, event);
+    this.version++;
+  }
+  destroy(): void {
+    /* disposes the $effect.root */
+  }
 }
 ```
 
@@ -356,7 +375,7 @@ store's own `seq` field is just a read-model mirror of whatever the socket alrea
   satisfies docs/02-protocol.md §1's per-seat-binding uniqueness; no client-side retry logic
   exists to need de-duplication beyond that).
 - **Seq-gap detection**: tracks `lastSeq` for this stream; `state_sync` is always accepted
-  as a full replace regardless of its own seq (that *is* the resync mechanism); a frame with
+  as a full replace regardless of its own seq (that _is_ the resync mechanism); a frame with
   `seq <= lastSeq` is a stale replay duplicate and is ignored; a frame with `seq > lastSeq + 1`
   is a real gap — it's dropped (never forwarded to listeners) and triggers `#requestResync()`
   (re-sends `hello{last_seq, seat}` on the live connection — docs/02-protocol.md §5's three-way
@@ -416,7 +435,7 @@ in the box, or omit it if empty" — the server trims/caps/defaults it (`JoinPay
 there's nothing to duplicate here.
 
 `ClientGameState.names: (string | null)[]` (length 4, same indexing as every other per-seat
-array) carries every seat's *resolved* name back down: populated from `state_sync.names` on
+array) carries every seat's _resolved_ name back down: populated from `state_sync.names` on
 every full snapshot, kept live from `seat_state.name` the same way `seatStatus` is kept live from
 `seat_state.status` (`lib/net/reducer.ts`'s `seat_state` case). `lib/table/live-view.ts`'s
 `viewFromClientState` reads this array for every seat's `MockSeatState.name` in the live path —
@@ -430,7 +449,7 @@ Rules:
 
 - The reducer is pure and exhaustively switched over the generated `ServerEvent` union, so
   TypeScript flags unhandled events.
-- **Sequence numbers are per-seat**, dense and gapless within *your own* stream — not per-table. A
+- **Sequence numbers are per-seat**, dense and gapless within _your own_ stream — not per-table. A
   table-wide seq would advance on every unicast `claim_offer`/`turn.legal` sent to other seats, so
   under that scheme a gap would fire on essentially every claim window. A gap on your own stream
   triggers a resync request, never a silent patch.
@@ -462,10 +481,10 @@ Rules:
   hand with no real `hand_end` stream behind it.
   - **`HandHistoryEntry.winnerMelds`** snapshots `state.melds[winner]` at the exact moment
     `hand_end` fires (`null` for a non-win outcome). `hand_end`'s own wire payload only carries
-    `winning_hand` (the winner's *concealed* tiles) — the winner's melds are never redacted, so
+    `winning_hand` (the winner's _concealed_ tiles) — the winner's melds are never redacted, so
     the live hand-end overlay just reads them straight off `gameState.seats[winner].melds`
     (`+page.svelte`'s `FaanBreakdown` invocation) at the moment it renders. That live seat data
-    resets on the next `hand_start`, so it's gone by the time a player looks at a *past* round in
+    resets on the next `hand_start`, so it's gone by the time a player looks at a _past_ round in
     a game-end summary — `winnerMelds` is the client-side capture that keeps it around past the
     hand it belonged to. Not a wire gap: nothing here needed a protocol change.
 
@@ -474,11 +493,11 @@ Rules:
 `ClientGameState.gameEnd` (from the terminal `game_end` event) triggers an auto-shown, non-
 dismissable screen (`GameEndScreen.svelte`) once the game is genuinely over — unlike the per-hand
 hold overlay, there's no next hand to advance back into. On the wire, `game_end` only ever fires
-*after* the final hand's own hold has already resolved (every seat acked, or the hold's own
+_after_ the final hand's own hold has already resolved (every seat acked, or the hold's own
 timeout — `app/table.py`'s `_apply`/`_open_hand_end_window`/`_advance_to_next_hand`, which is the
 only path that calls `start_next_hand()`, the sole producer of `GameEnded`). So the game-end
 screen doesn't preempt anything genuinely still in progress — but the client's own hold overlay
-has no other way to know that hold is over (it normally clears on the *next* `hand_start`, and
+has no other way to know that hold is over (it normally clears on the _next_ `hand_start`, and
 there isn't one for the final hand), so `+page.svelte` gates that overlay on `!gameEndReached` and
 lets the game-end screen replace it outright once `gameEnd` lands.
 
@@ -573,13 +592,13 @@ to reconcile.
 genuinely multiplayer game (arriving at a table, waiting for others to show up), not filler
 between "real" screens, so they use the same `panel-elevated`/button vocabulary as the rest of
 the app (`_buttons.scss`) rather than bare text and an unstyled `<button>`. All three share one panel (table code +
-a "copy invite link" button — the table's URL *is* the invite, and waiting-for-players is exactly
+a "copy invite link" button — the table's URL _is_ the invite, and waiting-for-players is exactly
 when you need to hand it to someone) and a seat ring: four slots arranged across/left/right/self,
 the same relative arrangement `layout.seat-region-grid` uses for the real table, so the pre-game
 screen visually foreshadows the seats you're about to sit at. Pre-join, each slot is a real
 `<button>` (`seatPicker`/`seatPickerSlot`) reading `seatStatus`/`names` off the spectator snapshot
 above — "Open" and clickable, or the occupant's name/"Bot" and disabled; once seated, the ring
-geometry (`seatRing`) keeps the self slot on real *wind* (the dealer is fixed at table
+geometry (`seatRing`) keeps the self slot on real _wind_ (the dealer is fixed at table
 construction, before any `ready`, so `seatWind()` works unchanged here) but the other three switch
 to a non-interactive occupancy readout (`seatOccupancySlot`, same `seatStatus`/`names` fields,
 kept current post-join via `seat_state` broadcasts) — a seated player waiting for the table to
@@ -607,7 +626,7 @@ the actual gate.
 hand 1 into `Table.state` immediately at table construction, before any `ready` — so a `state_sync`
 sent to the very first joiner already shows a fully dealt hand, computed `legal_actions`, all of
 it indistinguishable on the wire from "already playing." (`app/table.py`'s `require_ready` gate
-blocks *processing* an early command, but the redacted view was never told to hide the
+blocks _processing_ an early command, but the redacted view was never told to hide the
 already-dealt state behind it.) The client works around this itself: a local flag flips
 permanently once either the current snapshot already shows unambiguous play-in-progress evidence
 (a reconnect mid-game — non-empty discard pools/melds, `hand_no > 1`, a nonzero score) or a
@@ -631,7 +650,7 @@ is unchanged (seat 0 is the only "Open" slot in the picker, since seats 1-3 alre
 practice table's bot seats are already bound and auto-ready the instant the table
 exists, so the "waiting for the rest of the table" screen should almost never show for long, though
 the client still goes through it structurally since there's still no real "has this table started"
-signal (below). The table label in the live table's dev toolbar appends "· practice vs bots" when
+signal (below). The table label in the live table's toolbar appends "· practice vs bots" when
 this flag is set — not a per-bot name, since each of the three bot seats draws its own random,
 distinct display name (`_BOT_NAME_POOL`, above) rather than sharing one fixed tier label.
 
@@ -684,8 +703,8 @@ doesn't actually send this way):
   `ownHand` after this seat had already acted, and clicking one sends a command the server
   silently drops as out-of-turn ([02-protocol.md §1](02-protocol.md)'s `ack` note). Pinned by a
   `reducer.spec.ts` regression test.
-- `state.prevailing`/`hand_start.prevailing` go over the wire as the `Wind` `IntEnum`'s *member
-  name* (`app/views.py`/`app/table.py`: `.name` — `"EAST"`/`"SOUTH"`/`"WEST"`/`"NORTH"`), not the
+- `state.prevailing`/`hand_start.prevailing` go over the wire as the `Wind` `IntEnum`'s _member
+  name_ (`app/views.py`/`app/table.py`: `.name` — `"EAST"`/`"SOUTH"`/`"WEST"`/`"NORTH"`), not the
   single-letter code (`'E'|'S'|'W'|'N'`) mock scenarios use and `WIND_LABEL` indexes by.
   `live-view.ts`'s `wireWindToCode()` maps it — the one enum-shaped wire field that needs this;
   `phase`/meld `kind`/claim `kind` already serialize through a `StrEnum`'s `.value`, the same
@@ -755,7 +774,7 @@ should stay one class plus custom properties.
   [05-roadmap.md](05-roadmap.md) M6, which already places i18n in the ongoing bucket ("from day
   one" was wrong).
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
-  regardless. A switchable high-contrast theme *system* is deferred — see
+  regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).
 - Discard pools are real DOM now, not canvas-only — free a11y that used to need a parallel text
   representation. Each discard is a focusable element (`role="listitem"` within a per-seat
@@ -777,7 +796,7 @@ should stay one class plus custom properties.
 
 "Same reducer, fed from a recorded event log" doesn't match what's persisted:
 [00-architecture.md §6](00-architecture.md) stores finished games as `(ruleset, seed,
-action_log)` — *actions*, not a redacted event stream for any particular seat. A client can't
+action_log)` — _actions_, not a redacted event stream for any particular seat. A client can't
 replay that directly: an action log has no seat-of-view baked in, and actions aren't redacted at
 all (`redact_event()` is applied server-side, per outbound message, at play time, not stored).
 

@@ -41,7 +41,7 @@ top of `web/scripts/screenshot-pages.mjs`.
    it documents.
 3. **Update `README.md`'s Screenshots section** if you added, removed, or meaningfully changed
    what a page shows. Keep the embedded set curated (the entries listed below), not exhaustive —
-   don't add a screenshot for every mock scenario or dev-toolbar state, only for genuinely
+   don't add a screenshot for every mock scenario, only for genuinely
    distinct, notable pages.
 
 ## Editing the notable-pages list
@@ -77,7 +77,7 @@ the same template branches a real `liveStore` would drive. The `waiting` variant
 `MOCK_SCENARIOS[0]`'s dealer happens to be (via the existing `gameState` fallback) to compute a
 real-looking seat wind — illustrative, not tied to any particular scenario's content.
 
-If you need to see the *real* sequence (not the frozen preview) — e.g. after touching the
+If you need to see the _real_ sequence (not the frozen preview) — e.g. after touching the
 `$effect` that opens the socket, or `GameStore`/`MahjongSocket` themselves — that still needs a
 real backend: `uv run uvicorn app.main:app` from `server/`, `PUBLIC_WS_URL` pointed at it, and
 `/table/<id>` opened in 1-4 browser contexts (`live.e2e.ts` already does exactly this, opt-in
@@ -93,7 +93,7 @@ real processes) to run on every screenshot regen.
   runs — the missing system libs it warns about aren't needed for chromium to launch and render
   correctly on this host.
 - **Script hangs after printing the last "captured" line**: this bit us once — `pnpm exec vite
-  dev` is a wrapper that doesn't forward `SIGTERM` to the real vite process it spawns, so
+dev` is a wrapper that doesn't forward `SIGTERM` to the real vite process it spawns, so
   killing just the wrapper's PID leaves vite (and the event loop it holds open via its stdio
   pipes) running forever. The script spawns the dev server `detached: true` and kills the whole
   process group (`process.kill(-pid, 'SIGTERM')`) plus calls `process.exit()` explicitly at the
