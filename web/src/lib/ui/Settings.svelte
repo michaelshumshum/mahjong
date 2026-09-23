@@ -1,4 +1,8 @@
 <script lang="ts">
+	import PanelHeader from './PanelHeader.svelte';
+	import FormGroup from './FormGroup.svelte';
+	import OptionRow from './OptionRow.svelte';
+
 	// pre-arm toggles sent via `auto` (docs/02-protocol.md §2): `{no_calls?, auto_pass_chow?}`,
 	// enforced server-side. No `auto_win` here on purpose — declining a winning claim is a real
 	// strategic choice under min_faan rulesets (docs/02-protocol.md "Declining a claim on
@@ -40,119 +44,62 @@
 </script>
 
 <section class="settings" aria-labelledby="settings-heading">
-	<h2 id="settings-heading">Settings</h2>
+	<PanelHeader title="Settings" badge="Preferences" />
 
-	<fieldset class="group">
-		<legend>Pre-arm this hand</legend>
-		<label class="toggle">
-			<input
-				type="checkbox"
-				checked={autoArm.noCalls}
-				onchange={(e) => onAutoArmChange({ ...autoArm, noCalls: e.currentTarget.checked })}
-			/>
-			No calls this hand
-		</label>
-		<label class="toggle">
-			<input
-				type="checkbox"
-				checked={autoArm.autoPassChow}
-				onchange={(e) => onAutoArmChange({ ...autoArm, autoPassChow: e.currentTarget.checked })}
-			/>
-			Auto-pass chow
-		</label>
-	</fieldset>
+	<FormGroup legend="Pre-arm this hand">
+		<OptionRow
+			type="checkbox"
+			label="No calls this hand"
+			checked={autoArm.noCalls}
+			onChange={(checked) => onAutoArmChange({ ...autoArm, noCalls: checked })}
+		/>
+		<OptionRow
+			type="checkbox"
+			label="Auto-pass chow"
+			checked={autoArm.autoPassChow}
+			onChange={(checked) => onAutoArmChange({ ...autoArm, autoPassChow: checked })}
+		/>
+	</FormGroup>
 
-	<fieldset class="group">
-		<legend>Sound</legend>
-		<label class="toggle">
-			<input
-				type="checkbox"
-				checked={prefs.soundEnabled}
-				onchange={(e) => onPrefsChange({ ...prefs, soundEnabled: e.currentTarget.checked })}
-			/>
-			Sound effects
-		</label>
-	</fieldset>
+	<FormGroup legend="Sound">
+		<OptionRow
+			type="checkbox"
+			label="Sound effects"
+			checked={prefs.soundEnabled}
+			onChange={(checked) => onPrefsChange({ ...prefs, soundEnabled: checked })}
+		/>
+	</FormGroup>
 
-	<fieldset class="group">
-		<legend>Motion</legend>
+	<FormGroup legend="Motion">
 		{#each MOTION_OPTIONS as option (option.value)}
-			<label class="toggle">
-				<input
-					type="radio"
-					name="motion"
-					value={option.value}
-					checked={prefs.motion === option.value}
-					onchange={() => onPrefsChange({ ...prefs, motion: option.value })}
-				/>
-				{option.label}
-			</label>
+			<OptionRow
+				type="radio"
+				name="motion"
+				value={option.value}
+				label={option.label}
+				checked={prefs.motion === option.value}
+				onChange={() => onPrefsChange({ ...prefs, motion: option.value })}
+			/>
 		{/each}
-	</fieldset>
+	</FormGroup>
 </section>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.settings {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-4);
-		max-width: 20rem;
-		padding: var(--space-4);
+		gap: var(--space-5);
+		width: min(90vw, 28rem);
+		max-width: 90vw;
+		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
-	}
 
-	h2 {
-		margin: 0;
-		font-size: var(--font-size-lg);
-	}
-
-	.group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		border: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	legend {
-		padding: 0;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
-	.toggle {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		min-height: 44px;
-		padding-inline: var(--space-2);
-		margin-inline: calc(var(--space-2) * -1);
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-		transition: background-color 130ms ease;
-
-		&:hover {
-			background: rgb(255 255 255 / 0.06);
+		@include layout.tablet-up {
+			padding: var(--space-6);
 		}
-
-		&:active {
-			background: rgb(255 255 255 / 0.03);
-		}
-	}
-
-	input {
-		accent-color: var(--color-accent);
-		width: 1.05em;
-		height: 1.05em;
-		cursor: pointer;
-	}
-
-	input:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
 	}
 </style>

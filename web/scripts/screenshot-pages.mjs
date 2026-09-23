@@ -102,6 +102,15 @@ const PAGES = [
 			await page.getByRole('button', { name: 'Game just ended' }).click();
 		}
 	},
+	// Settings panel: a distinct chrome surface (pre-arm toggles, sound, motion) now styled to
+	// match the score sheet's panel/cards look.
+	{
+		name: 'table-settings',
+		url: '/table/demo123?mock=1',
+		async before(page) {
+			await page.getByRole('button', { name: 'Settings' }).click();
+		}
+	},
 	// Pre-game states (docs/03-frontend.md's "/table/[id] wiring") only ever occur on the real
 	// `liveStore`-driven path -- `?mock=` always renders a fully-seated, already-dealt table
 	// (`tableReady` is unconditionally true when `isMock`), so there's no MOCK_SCENARIOS entry

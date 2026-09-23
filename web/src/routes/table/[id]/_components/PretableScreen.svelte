@@ -4,6 +4,7 @@
 	import { seatWind, WIND_LABEL } from '$lib/table/wind';
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import SeatRing from '$lib/table/SeatRing.svelte';
+	import FormGroup from '$lib/ui/FormGroup.svelte';
 
 	let {
 		tableId,
@@ -84,13 +85,13 @@
 	{/if}
 
 	{#if !effectiveConnection || effectiveConnection === 'idle' || effectiveConnection === 'connecting'}
-		<div class="pretable-spinner"></div>
-		<p class="pretable-status">Connecting…</p>
+		<div class="pretable-center">
+			<div class="pretable-spinner"></div>
+			<p class="pretable-status">Connecting…</p>
+		</div>
 	{:else if effectiveSeat === null}
 		<h2>Take a seat</h2>
-		<p>Choose an open seat to sit down at this table.</p>
-		<div class="pretable-name-field">
-			<label class="pretable-name-label" for="display-name-input">Your name</label>
+		<FormGroup legend="Your name">
 			<input
 				id="display-name-input"
 				type="text"
@@ -101,7 +102,7 @@
 				value={displayName}
 				oninput={(e) => onDisplayNameChange(e.currentTarget.value)}
 			/>
-		</div>
+		</FormGroup>
 		<SeatPicker {seatStatus} {names} {onJoin} />
 	{:else}
 		<SeatRing you={effectiveSeat} {dealer} {seatStatus} {names} />
@@ -121,18 +122,23 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.pretable-panel {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: var(--space-3);
-		width: 100%;
-		max-width: 26rem;
-		padding: var(--space-6) var(--space-5);
-		background: var(--color-surface);
+		width: min(90vw, 28rem);
+		max-width: 90vw;
+		padding: var(--space-5);
+		background: var(--color-surface-raised);
 		text-align: center;
 		@include buttons.panel-elevated;
+
+		@include layout.tablet-up {
+			padding: var(--space-6);
+		}
 
 		h2 {
 			margin: 0;
@@ -171,7 +177,7 @@
 		font-size: var(--font-size-base);
 		letter-spacing: 0.08em;
 		color: var(--color-text);
-		background: var(--color-surface-raised);
+		background: var(--color-surface);
 		border-radius: var(--radius-sm);
 		padding: var(--space-1) var(--space-2);
 	}
@@ -191,12 +197,21 @@
 	}
 
 	.pretable-error {
+		margin: 0;
 		font-size: var(--font-size-sm);
 		color: var(--color-status-error);
 	}
 
+	.pretable-center {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
 	.pretable-status {
 		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
 	}
 
 	.pretable-cta {
@@ -207,26 +222,13 @@
 		@include buttons.btn-primary;
 	}
 
-	.pretable-name-field {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--space-1);
-		width: 100%;
-		max-width: 16rem;
-	}
-
-	.pretable-name-label {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
 	.pretable-name-input {
 		width: 100%;
 		min-height: 44px;
 		padding: var(--space-2) var(--space-3);
 		font: inherit;
 		color: var(--color-text);
+		text-align: start;
 		@include buttons.input-recessed;
 
 		&::placeholder {
@@ -262,5 +264,12 @@
 	.pretable-hint {
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
+	}
+
+	// center the FormGroup legend and body inside the centered pre-table panel.
+	:global(.pretable-panel .form-group) {
+		width: 100%;
+		max-width: 16rem;
+		text-align: start;
 	}
 </style>

@@ -11,6 +11,9 @@
 		type HandSet,
 		type RuleSet
 	} from '$lib/net/ruleset';
+	import PanelHeader from './PanelHeader.svelte';
+	import FormGroup from './FormGroup.svelte';
+	import OptionRow from './OptionRow.svelte';
 
 	let { onCreated, onCancel }: { onCreated: (tableId: string) => void; onCancel: () => void } =
 		$props();
@@ -69,28 +72,32 @@
 
 <div class="panel-overlay">
 	<div class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-table-heading">
-		<h2 id="create-table-heading">Create a table</h2>
+		<PanelHeader title="Create a table" badge="New" titleId="create-table-heading" />
 
-		<fieldset class="preset-group">
-			<legend>Rules</legend>
+		<FormGroup legend="Rules">
 			{#each RULESET_PRESET_OPTIONS as option (option.id)}
-				<label class="preset-option">
-					<input type="radio" name="preset" value={option.id} bind:group={presetId} />
-					<span class="preset-label">{option.label}</span>
-					<span class="preset-description">{option.description}</span>
-				</label>
+				<OptionRow
+					type="radio"
+					name="preset"
+					value={option.id}
+					label={option.label}
+					checked={presetId === option.id}
+					onChange={() => (presetId = option.id)}
+				/>
 			{/each}
-			<label class="preset-option">
-				<input type="radio" name="preset" value={CUSTOM_PRESET_ID} bind:group={presetId} />
-				<span class="preset-label">Custom</span>
-				<span class="preset-description">choose every rule yourself</span>
-			</label>
-		</fieldset>
+			<OptionRow
+				type="radio"
+				name="preset"
+				value={CUSTOM_PRESET_ID}
+				label="Custom"
+				checked={presetId === CUSTOM_PRESET_ID}
+				onChange={() => (presetId = CUSTOM_PRESET_ID)}
+			/>
+		</FormGroup>
 
 		{#if presetId === CUSTOM_PRESET_ID}
 			<div class="custom-form">
-				<fieldset class="group">
-					<legend>Scoring</legend>
+				<FormGroup legend="Scoring">
 					<label class="field">
 						Minimum faan
 						<select bind:value={custom.min_faan}>
@@ -118,14 +125,12 @@
 						Hand sets
 						<div class="checkbox-row">
 							{#each HAND_SET_OPTIONS as option (option.value)}
-								<label class="toggle">
-									<input
-										type="checkbox"
-										checked={custom.hand_sets.includes(option.value)}
-										onchange={(e) => toggleHandSet(option.value, e.currentTarget.checked)}
-									/>
-									{option.label}
-								</label>
+								<OptionRow
+									type="checkbox"
+									label={option.label}
+									checked={custom.hand_sets.includes(option.value)}
+									onChange={(checked) => toggleHandSet(option.value, checked)}
+								/>
 							{/each}
 						</div>
 					</div>
@@ -140,22 +145,30 @@
 						Self-draw multiplier
 						<input type="number" step="0.1" min="1" bind:value={custom.self_draw_multiplier} />
 					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.flowers_score} />
-						Seat flowers score
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.seven_flowers_instant_win} />
-						Seven flowers instant win
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.eight_flowers_instant_win} />
-						Eight flowers instant win
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.thirteen_orphans_wait_bonus} />
-						Thirteen orphans wait bonus
-					</label>
+					<OptionRow
+						type="checkbox"
+						label="Seat flowers score"
+						checked={custom.flowers_score}
+						onChange={(checked) => (custom.flowers_score = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Seven flowers instant win"
+						checked={custom.seven_flowers_instant_win}
+						onChange={(checked) => (custom.seven_flowers_instant_win = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Eight flowers instant win"
+						checked={custom.eight_flowers_instant_win}
+						onChange={(checked) => (custom.eight_flowers_instant_win = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Thirteen orphans wait bonus"
+						checked={custom.thirteen_orphans_wait_bonus}
+						onChange={(checked) => (custom.thirteen_orphans_wait_bonus = checked)}
+					/>
 
 					<div class="field">
 						Faan overrides
@@ -174,10 +187,9 @@
 						<button type="button" class="add-override" onclick={addOverrideRow}>Add override</button
 						>
 					</div>
-				</fieldset>
+				</FormGroup>
 
-				<fieldset class="group">
-					<legend>Flow</legend>
+				<FormGroup legend="Flow">
 					<label class="field">
 						Game length
 						<select bind:value={custom.game_length}>
@@ -186,62 +198,79 @@
 							<option value="FULL">Full (four rounds)</option>
 						</select>
 					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.dealer_repeat_on_win} />
-						Dealer repeats on win
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.dealer_repeat_on_draw} />
-						Dealer repeats on draw
-					</label>
+					<OptionRow
+						type="checkbox"
+						label="Dealer repeats on win"
+						checked={custom.dealer_repeat_on_win}
+						onChange={(checked) => (custom.dealer_repeat_on_win = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Dealer repeats on draw"
+						checked={custom.dealer_repeat_on_draw}
+						onChange={(checked) => (custom.dealer_repeat_on_draw = checked)}
+					/>
 					<label class="field">
 						Wall reserve
 						<input type="number" min="0" step="1" bind:value={custom.wall_reserve} />
 					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.four_kong_abort} />
-						Four kong abort
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.nine_terminals_abort} />
-						Nine terminals abort
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.tenpai_payments} />
-						Tenpai payments on draw
-					</label>
-				</fieldset>
+					<OptionRow
+						type="checkbox"
+						label="Four kong abort"
+						checked={custom.four_kong_abort}
+						onChange={(checked) => (custom.four_kong_abort = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Nine terminals abort"
+						checked={custom.nine_terminals_abort}
+						onChange={(checked) => (custom.nine_terminals_abort = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Tenpai payments on draw"
+						checked={custom.tenpai_payments}
+						onChange={(checked) => (custom.tenpai_payments = checked)}
+					/>
+				</FormGroup>
 
-				<fieldset class="group">
-					<legend>Variants</legend>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.flowers_enabled} />
-						Flowers enabled
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.kong_rob_enabled} />
-						Robbing the kong
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.concealed_kong_robbable} />
-						Concealed kong robbable
-					</label>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.pao_rules} />
-						Pao (liability) rules
-					</label>
-				</fieldset>
+				<FormGroup legend="Variants">
+					<OptionRow
+						type="checkbox"
+						label="Flowers enabled"
+						checked={custom.flowers_enabled}
+						onChange={(checked) => (custom.flowers_enabled = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Robbing the kong"
+						checked={custom.kong_rob_enabled}
+						onChange={(checked) => (custom.kong_rob_enabled = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Concealed kong robbable"
+						checked={custom.concealed_kong_robbable}
+						onChange={(checked) => (custom.concealed_kong_robbable = checked)}
+					/>
+					<OptionRow
+						type="checkbox"
+						label="Pao (liability) rules"
+						checked={custom.pao_rules}
+						onChange={(checked) => (custom.pao_rules = checked)}
+					/>
+				</FormGroup>
 
-				<fieldset class="group">
-					<legend>Fairness</legend>
-					<label class="toggle">
-						<input type="checkbox" bind:checked={custom.provable_fairness} />
-						Provable fairness (seed commitment)
-					</label>
-				</fieldset>
+				<FormGroup legend="Fairness">
+					<OptionRow
+						type="checkbox"
+						label="Provable fairness (seed commitment)"
+						checked={custom.provable_fairness}
+						onChange={(checked) => (custom.provable_fairness = checked)}
+					/>
+				</FormGroup>
 
-				<fieldset class="group">
-					<legend>Timing</legend>
+				<FormGroup legend="Timing">
 					<label class="field">
 						Turn seconds
 						<input type="number" min="1" step="1" bind:value={custom.turn_seconds} />
@@ -262,7 +291,7 @@
 						Disconnect grace seconds
 						<input type="number" min="0" step="1" bind:value={custom.disconnect_grace_seconds} />
 					</label>
-				</fieldset>
+				</FormGroup>
 			</div>
 		{/if}
 
@@ -296,7 +325,7 @@
 	.create-dialog {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-4);
+		gap: var(--space-5);
 		width: 100%;
 		max-width: 32rem;
 		max-height: 90vh;
@@ -304,53 +333,6 @@
 		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
-
-		h2 {
-			margin: 0;
-			font-size: var(--font-size-lg);
-		}
-	}
-
-	fieldset {
-		border: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	legend {
-		padding: 0 0 var(--space-2);
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
-	.preset-group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-	}
-
-	.preset-option {
-		display: grid;
-		grid-template-columns: auto 1fr;
-		column-gap: var(--space-2);
-		align-items: baseline;
-		padding: var(--space-2);
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-
-		&:hover {
-			background: rgb(255 255 255 / 0.06);
-		}
-	}
-
-	.preset-label {
-		font-weight: 600;
-	}
-
-	.preset-description {
-		grid-column: 2;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
 	}
 
 	.custom-form {
@@ -361,16 +343,10 @@
 		border-top: 1px solid var(--color-border);
 	}
 
-	.group {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-	}
-
 	.field {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-1);
+		gap: var(--space-2);
 		font-size: var(--font-size-sm);
 	}
 
@@ -387,23 +363,7 @@
 	.checkbox-row {
 		display: flex;
 		flex-wrap: wrap;
-		gap: var(--space-3);
-	}
-
-	.toggle {
-		display: flex;
-		align-items: center;
 		gap: var(--space-2);
-		min-height: 36px;
-		font-size: var(--font-size-sm);
-		cursor: pointer;
-	}
-
-	.toggle input {
-		accent-color: var(--color-accent);
-		width: 1.05em;
-		height: 1.05em;
-		cursor: pointer;
 	}
 
 	.override-row {
