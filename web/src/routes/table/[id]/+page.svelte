@@ -796,6 +796,7 @@
 			onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
 			{isHost}
 			onStartWithBots={() => liveStore?.socket.startWithBots()}
+			rulesetPreset={liveStore?.state.rulesetPreset ?? null}
 		/>
 	</div>
 	<ToastStack queue={toastQueue} onDismiss={dismissToast} />

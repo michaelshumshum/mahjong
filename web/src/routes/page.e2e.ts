@@ -6,22 +6,73 @@ test('home page loads and has a title', async ({ page }) => {
 	await expect(page).toHaveTitle(/Mahjong/);
 });
 
-test('lobby create table navigates straight to a freshly generated table', async ({ page }) => {
+// Table ids are minted server-side now (POST /tables, docs/02-protocol.md §10) -- this suite has
+// no real backend behind it (playwright.config.ts's webServer is `pnpm dev` alone, see
+// live.e2e.ts's own module doc for the opt-in suite that spins up a real one), so every test
+// that creates a table mocks the response the same way the "tables page lists tables" test below
+// already mocks `GET /tables`.
+function mockCreateTable(page: import('@playwright/test').Page, tableId: string) {
+	return page.route('**/tables', (route) => {
+		if (route.request().method() !== 'POST') return route.fallback();
+		return route.fulfill({
+			json: { table_id: tableId, ruleset_preset: 'hk_classic', ruleset: {} }
+		});
+	});
+}
+
+test('lobby create table opens a rules dialog, then navigates to the created table', async ({
+	page
+}) => {
+	await mockCreateTable(page, 'ABC123');
 	await page.goto('/');
 	// wait past hydration: the create button is server-rendered but its click handler only
 	// attaches once svelte-kit finishes loading, so an immediate click can race it.
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Create a table' }).click();
 
-	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}$/);
+	await expect(page.getByRole('dialog', { name: 'Create a table' })).toBeVisible();
+	await page.getByRole('button', { name: 'Create', exact: true }).click();
+
+	await expect(page).toHaveURL('/table/ABC123');
 });
 
-test('lobby practice vs bots navigates straight to a practice table', async ({ page }) => {
+test('lobby create table with custom rules sends the edited RuleSet, never multi_win', async ({
+	page
+}) => {
+	let sentBody: Record<string, unknown> | null = null;
+	await page.route('**/tables', (route) => {
+		if (route.request().method() !== 'POST') return route.fallback();
+		sentBody = route.request().postDataJSON();
+		return route.fulfill({
+			json: { table_id: 'CUSTOM1', ruleset_preset: null, ruleset: sentBody?.rules ?? {} }
+		});
+	});
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Create a table' }).click();
+
+	const dialog = page.getByRole('dialog', { name: 'Create a table' });
+	await dialog.locator('input[type="radio"][value="custom"]').check();
+	await dialog.getByLabel('Minimum faan').selectOption('0');
+	await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+
+	await expect(page).toHaveURL('/table/CUSTOM1');
+	expect(sentBody).toMatchObject({ ruleset: 'custom' });
+	expect((sentBody as unknown as { rules: Record<string, unknown> }).rules).toMatchObject({
+		min_faan: 0,
+		multi_win: false
+	});
+});
+
+test('lobby practice vs bots navigates straight to a practice table, no dialog', async ({
+	page
+}) => {
+	await mockCreateTable(page, 'XYZ789');
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
 
-	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}\?practice=1$/);
+	await expect(page).toHaveURL('/table/XYZ789?practice=1');
 });
 
 test('lobby join a game link opens the tables page', async ({ page }) => {

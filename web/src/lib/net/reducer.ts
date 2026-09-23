@@ -1,5 +1,6 @@
 import type { HandHistoryEntryPayload, ServerEvent } from './protocol';
 import { type ClientGameState, type HandHistoryEntry, type MeldState } from '../game/state';
+import type { RuleSet } from './ruleset';
 
 function assertNever(x: never): never {
 	throw new Error(`unhandled: ${JSON.stringify(x)}`);
@@ -142,6 +143,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				seatStatus: d.seat_status.slice(),
 				names: d.names.slice(),
 				hostSeat: d.host_seat,
+				ruleset: (d.ruleset as RuleSet | undefined) ?? null,
+				rulesetPreset: d.ruleset_preset ?? null,
 				scores: d.scores.slice(),
 				legalActions: d.legal_actions,
 				deadlineTs: d.deadline_ts,

@@ -214,12 +214,18 @@ host-facing settings UI / wire message to toggle it, and a delayed reveal for hu
 
 ### M6 — Depth (ongoing)
 Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
-(reusing the client reducer). Sound. **Ruleset presets: server/protocol built** — `?ruleset=`/
-`?rules=` table-creation query params, `mahjong_core.presets.RULESET_PRESETS` (`hk_classic`/
-`hk_casual`/`hk_strict`) plus a `custom` `RuleSet.from_dict` path, `state_sync.ruleset`/
-`ruleset_preset` (`docs/00-architecture.md §3` "Ruleset selection", `docs/02-protocol.md`). Not
-built: any client UI to choose a preset or edit custom fields — table creation still defaults to
-`hk_classic` with nothing to override it from the lobby. Stats, rating, hand history. i18n
+(reusing the client reducer). Sound. **Ruleset presets: built.**
+`mahjong_core.presets.RULESET_PRESETS` (`hk_classic`/`hk_casual`/`hk_strict`) plus a `custom`
+`RuleSet.from_dict` path, resolved by `POST /tables` (`docs/02-protocol.md §10`, the primary
+one-request table-creation path that also generates the table id server-side now — table ids are
+no longer client-generated, see `docs/00-architecture.md §3` "Ruleset selection") or the `/ws`
+query-param fallback; `state_sync.ruleset`/`ruleset_preset` surface the resolved value. The
+lobby's "Create a table" button opens `CreateTableDialog.svelte`: preset radios, or a "Custom"
+option exposing every `RuleSet` field except `multi_win` (reserved, see that component's own
+comment) grouped scoring/flow/variants/fairness/timing; "Practice vs Bots" stays one click,
+calling `POST /tables` with `practice: true` instead of generating an id client-side. The
+waiting room shows the resolved preset name (`PretableScreen.svelte`). Stats, rating, hand
+history. i18n
 (zh-Hant/en). Mobile layout pass. M6 has no done gate by design — see §7 for what actually has to
 ship before that's okay.
 

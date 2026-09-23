@@ -7,6 +7,8 @@
 // codebase's hand-written-TS convention — protocol.d.ts itself stays snake_case because it's
 // generated straight from the Python wire models (see that file's own header).
 
+import type { RuleSet } from '$lib/net/ruleset';
+
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'resyncing' | 'closed';
 
 /** A live claim offer (from `claim_offer`) or the claim options embedded in a `state_sync`
@@ -99,6 +101,12 @@ export interface ClientGameState {
 	 * since `state_sync` is only ever sent once someone has). Never changes for the life of a
 	 * table, so a full resync is the only event that ever needs to set it. */
 	hostSeat: number | null;
+	/** This table's ruleset, fixed at construction (docs/02-protocol.md §3's `state_sync.ruleset`)
+	 * — `null` only before the first `state_sync` ever lands, same as `hostSeat`. `rulesetPreset`
+	 * is the `mahjong_core.presets.RULESET_PRESETS` key it matches, `null` for a custom ruleset
+	 * (still distinct from "no state_sync yet" — `ruleset` itself is the signal for that case). */
+	ruleset: RuleSet | null;
+	rulesetPreset: string | null;
 	scores: number[];
 	legalActions: Record<string, unknown>[];
 	deadlineTs: number | null;
@@ -148,6 +156,8 @@ export function initialClientGameState(): ClientGameState {
 		seatStatus: ['disconnected', 'disconnected', 'disconnected', 'disconnected'],
 		names: [null, null, null, null],
 		hostSeat: null,
+		ruleset: null,
+		rulesetPreset: null,
 		scores: [0, 0, 0, 0],
 		legalActions: [],
 		deadlineTs: null,

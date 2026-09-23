@@ -20,7 +20,8 @@
 		names,
 		onJoin,
 		isHost,
-		onStartWithBots
+		onStartWithBots,
+		rulesetPreset
 	}: {
 		tableId: string;
 		onLeaveClick: () => void;
@@ -37,7 +38,27 @@
 		onJoin: (seat: Seat) => void;
 		isHost: boolean;
 		onStartWithBots: () => void;
+		// this table's ruleset preset (docs/02-protocol.md §3's `state_sync.ruleset_preset`) --
+		// `null` covers both "no state_sync yet" and "a custom ruleset", rendered identically here
+		// since neither has a preset name worth showing; a mock/pregame-preview render (no real
+		// `liveStore`) always passes `null` too, same fallback `seatStatus`/`names` above already
+		// use for those modes.
+		rulesetPreset: string | null;
 	} = $props();
+
+	const PRESET_LABELS: Record<string, string> = {
+		hk_classic: 'HK Classic',
+		hk_casual: 'Casual',
+		hk_strict: 'Strict'
+	};
+
+	// `rulesetPreset === null` means either "custom ruleset" or "no state_sync yet" -- only the
+	// spectator-shaped snapshot every pre-game connection gets (docs/00-architecture.md §3's
+	// "Spectating" note) disambiguates them, so this only renders once we're past the plain
+	// "Connecting…" spinner below, by which point that snapshot has already landed.
+	let rulesetKnown = $derived(
+		!!effectiveConnection && effectiveConnection !== 'idle' && effectiveConnection !== 'connecting'
+	);
 </script>
 
 <!-- All three pre-game states (connecting, seat-picker, waiting) are real, recurring moments in
@@ -52,6 +73,11 @@
 		<button type="button" class="pretable-link-btn" onclick={onCopyInviteLink}>
 			{copiedInviteLink ? 'Copied' : 'Copy invite link'}
 		</button>
+		{#if rulesetKnown}
+			<span class="pretable-rules">
+				Rules: {rulesetPreset ? (PRESET_LABELS[rulesetPreset] ?? rulesetPreset) : 'Custom'}
+			</span>
+		{/if}
 	</div>
 	{#if copyInviteLinkFailed}
 		<p class="pretable-error">Couldn't copy automatically — copy the address bar instead.</p>
@@ -148,6 +174,11 @@
 		background: var(--color-surface-raised);
 		border-radius: var(--radius-sm);
 		padding: var(--space-1) var(--space-2);
+	}
+
+	.pretable-rules {
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
 	}
 
 	.pretable-link-btn {

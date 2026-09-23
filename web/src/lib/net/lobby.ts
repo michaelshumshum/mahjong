@@ -1,7 +1,8 @@
 import { env } from '$env/dynamic/public';
+import type { RuleSet } from './ruleset';
 
-// hand-written: `GET /tables` is plain HTTP, outside the WS protocol `make proto` generates
-// (server/app/main.py's `TableList`).
+// hand-written: `GET /tables`/`POST /tables` are plain HTTP, outside the WS protocol `make proto`
+// generates (server/app/main.py's `TableList`/`CreateTableRequest`/`CreateTableResponse`).
 export interface SeatSummary {
 	status: 'connected' | 'disconnected' | 'autoplay' | 'bot' | 'empty';
 	name: string | null;
@@ -30,4 +31,34 @@ export async function fetchTables(
 
 export function seatedCount(table: TableSummary): number {
 	return table.seats.filter((s) => s.status !== 'empty').length;
+}
+
+export interface CreateTableRequest {
+	ruleset?: string;
+	rules?: RuleSet;
+	practice?: boolean;
+}
+
+export interface CreateTableResponse {
+	table_id: string;
+	ruleset_preset: string | null;
+	ruleset: RuleSet;
+}
+
+// The one-request table-creation path (docs/02-protocol.md §10): resolves the ruleset and mints
+// the table id together server-side, replacing what used to be client-side id generation
+// (`$lib/table/table-code.ts`) followed by threading a full `RuleSet` payload through two nested
+// URL query strings.
+export async function createTable(
+	body: CreateTableRequest = {},
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<CreateTableResponse> {
+	const response = await fetchFn(`${baseUrl}/tables`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+	if (!response.ok) throw new Error(`POST /tables failed: ${response.status}`);
+	return (await response.json()) as CreateTableResponse;
 }
