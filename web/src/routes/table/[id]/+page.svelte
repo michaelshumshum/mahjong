@@ -49,6 +49,7 @@
 	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
 	import SeatRing from '$lib/table/SeatRing.svelte';
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
+	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -617,61 +618,6 @@
 	let showAnimationDemo = $state(false);
 </script>
 
-{#snippet opponentRegion(seat: MockSeatState, position: 'across' | 'left' | 'right')}
-	<section
-		class="seat-region seat-region--{position}"
-		class:seat-region--turn={seat.seat === gameState.turn}
-		aria-label="{seat.name}'s seat"
-	>
-		<header class="seat-meta">
-			<span class="seat-name">{seat.name}</span>
-			<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat, gameState.dealer)]} wind"
-				>{WIND_CHAR[seatWind(seat.seat, gameState.dealer)]}</span
-			>
-			{#if seat.seat === gameState.dealer}<span class="dealer-badge" title="Dealer">D</span>{/if}
-			{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat">Bot</span>{/if}
-			<span class="seat-score">{seat.score}</span>
-		</header>
-
-		<div class="seat-hand-strip seat-hand-strip--{position}">
-			{#if seat.concealedHand}
-				<div class="tile-row backs-row" aria-label="{seat.name}'s concealed hand">
-					{#each seat.concealedHand as code, i (i)}
-						<div class="mini-tile"><TileFace {code} /></div>
-					{/each}
-				</div>
-			{:else}
-				<div class="tile-row backs-row" aria-label="{seat.concealedCount} concealed tiles">
-					{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
-						<div class="mini-tile back"><TileFace code={null} /></div>
-					{/each}
-				</div>
-			{/if}
-
-			{#if seat.flowers.length || seat.melds.length}
-				<div class="tile-row meld-row" aria-label="{seat.name}'s melds">
-					{#if seat.flowers.length}
-						<div class="meld" aria-label="{seat.name}'s flowers">
-							{#each seat.flowers as code, i (i)}
-								<div class="mini-tile"><TileFace {code} /></div>
-							{/each}
-						</div>
-					{/if}
-					{#each seat.melds as meld, mi (mi)}
-						<div class="meld">
-							{#each meld.tiles as code, ti (ti)}
-								<div class="mini-tile">
-									<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
-								</div>
-							{/each}
-						</div>
-					{/each}
-				</div>
-			{/if}
-		</div>
-	</section>
-{/snippet}
-
 <!-- All four discard pools live together in the centre (docs/03-frontend.md §3's "Discard pool
 	geometry"), forming a box around the middle of the table instead of sitting at each seat's own
 	edge -- matches the physical layout of discards piled in front of each player, in the shared
@@ -742,9 +688,24 @@
 
 		<div class="table-tilt">
 			<div class="table-surface" data-testid="table-scene">
-				{@render opponentRegion(seatAt(2), 'across')}
-				{@render opponentRegion(seatAt(3), 'left')}
-				{@render opponentRegion(seatAt(1), 'right')}
+				<OpponentRegion
+					seat={seatAt(2)}
+					position="across"
+					dealer={gameState.dealer as Seat}
+					turn={gameState.turn}
+				/>
+				<OpponentRegion
+					seat={seatAt(3)}
+					position="left"
+					dealer={gameState.dealer as Seat}
+					turn={gameState.turn}
+				/>
+				<OpponentRegion
+					seat={seatAt(1)}
+					position="right"
+					dealer={gameState.dealer as Seat}
+					turn={gameState.turn}
+				/>
 
 				<div class="table-center">
 					{@render centerDiscardPool(seatAt(2), 'across', `${seatAt(2).name}'s discards`)}
@@ -1324,18 +1285,6 @@
 		min-height: 0;
 	}
 
-	.seat-region--across {
-		grid-area: across;
-	}
-
-	.seat-region--left {
-		grid-area: left;
-	}
-
-	.seat-region--right {
-		grid-area: right;
-	}
-
 	.seat-region--self {
 		grid-area: self;
 	}
@@ -1407,12 +1356,6 @@
 		color: var(--color-text-muted);
 	}
 
-	.seat-hand-strip {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
 	.tile-row {
 		display: flex;
 		gap: 2px;
@@ -1431,60 +1374,6 @@
 		display: flex;
 		gap: 1px;
 		margin-inline-end: var(--space-2);
-	}
-
-	// vertical strip along the table edge (docs/03-frontend.md §3): `writing-mode` alone reflows
-	// the flex axes (a row's main axis becomes the block-progression axis) so the box's own
-	// width/height already account for the vertical footprint, unlike `transform: rotate()`,
-	// which only repaints the box in place and leaves the parent grid cell sized for the
-	// original unrotated (horizontal) footprint — that mismatch is what let the strip's content
-	// escape `.seat-region--left/--right` into whatever sat past the grid's edge.
-	.seat-hand-strip--left {
-		@include layout.tablet-up {
-			writing-mode: vertical-lr;
-		}
-	}
-
-	.seat-hand-strip--right {
-		@include layout.tablet-up {
-			writing-mode: vertical-rl;
-		}
-	}
-
-	// tiles themselves rotated 90° to face the table, same physical read as a real side seat.
-	// The mismatch that ruled out `transform: rotate()` on the *strip* above is still real, so
-	// it isn't reused here at the tile level either: `.mini-tile` keeps its normal (unrotated)
-	// box for layout purposes, already sized to the rotated footprint (width/height swapped from
-	// the portrait default) — the swap is what the grid/flex ancestors measure. Only the
-	// `.tile-face` inside is rotated, absolutely positioned off that stable box so the rotation
-	// is paint-only and never changes what its ancestors reserve space for.
-	.seat-hand-strip--left .mini-tile,
-	.seat-hand-strip--right .mini-tile {
-		@include layout.tablet-up {
-			position: relative;
-			width: clamp(24px, 4vw, 36px);
-			height: calc(clamp(24px, 4vw, 36px) * 3 / 4);
-		}
-	}
-
-	.seat-hand-strip--left .mini-tile :global(.tile-face) {
-		@include layout.tablet-up {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			height: clamp(24px, 4vw, 36px);
-			transform: translate(-50%, -50%) rotate(90deg);
-		}
-	}
-
-	.seat-hand-strip--right .mini-tile :global(.tile-face) {
-		@include layout.tablet-up {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			height: clamp(24px, 4vw, 36px);
-			transform: translate(-50%, -50%) rotate(-90deg);
-		}
 	}
 
 	.discard-pool {
@@ -1772,12 +1661,6 @@
 	// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip,
 	// discard pools to horizontal scroll, your hand pinned to the safe-area bottom.
 	@include layout.phone-only {
-		.seat-hand-strip--left,
-		.seat-hand-strip--right,
-		.seat-hand-strip--across {
-			flex-direction: row;
-		}
-
 		.backs-row .mini-tile.back {
 			margin-inline-end: -14px; // overlapping-backs strip, count-only
 
