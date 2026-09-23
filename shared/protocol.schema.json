@@ -1343,6 +1343,162 @@
       "title": "HandEndPayload",
       "type": "object"
     },
+    "HandHistoryEntryPayload": {
+      "additionalProperties": false,
+      "description": "One completed hand, as carried on `state_sync.hand_history` (`StateSyncPayload` below) --\n`app/views.py`'s `HandHistoryRecord`/`hand_history_wire`. Same fields as `HandEndPayload`\nminus its hand-end-hold `deadline_ts` (meaningless for a hand that's long since closed),\nplus `dealer`/`prevailing`/`winner_melds`, none of which are on `hand_end`'s own wire payload\n-- a live client derives them itself from current state at the moment it sees `hand_end`\n(`web/src/lib/net/reducer.ts`'s `HandHistoryEntry`); a client that only gets a fresh\n`state_sync` has no \"current state at the time\" to derive them from, so the server captures\nthem once, here, instead.",
+      "properties": {
+        "hand_no": {
+          "title": "Hand No",
+          "type": "integer"
+        },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string"
+        },
+        "winner": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Winner"
+        },
+        "win_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Win Type"
+        },
+        "discarder": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Discarder"
+        },
+        "faan": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Faan"
+        },
+        "faan_breakdown": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Faan Breakdown"
+        },
+        "points": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Points"
+        },
+        "payments": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Payments"
+        },
+        "revealed": {
+          "title": "Revealed",
+          "type": "boolean"
+        },
+        "winning_hand": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Winning Hand"
+        },
+        "dealer": {
+          "title": "Dealer",
+          "type": "integer"
+        },
+        "prevailing": {
+          "title": "Prevailing",
+          "type": "string"
+        },
+        "winner_melds": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Winner Melds"
+        }
+      },
+      "required": [
+        "hand_no",
+        "outcome",
+        "winner",
+        "win_type",
+        "discarder",
+        "faan",
+        "faan_breakdown",
+        "points",
+        "payments",
+        "revealed",
+        "winning_hand",
+        "dealer",
+        "prevailing",
+        "winner_melds"
+      ],
+      "title": "HandHistoryEntryPayload",
+      "type": "object"
+    },
     "HandStart": {
       "additionalProperties": false,
       "properties": {
@@ -2531,6 +2687,14 @@
           ],
           "default": null,
           "title": "Hands"
+        },
+        "hand_history": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/HandHistoryEntryPayload"
+          },
+          "title": "Hand History",
+          "type": "array"
         }
       },
       "required": [

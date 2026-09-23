@@ -120,7 +120,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.records import save_game_record
 from app.idempotency import IdempotencyCache
-from app.views import SeatView, redact_event, seat_view, seat_view_wire
+from app.views import (
+    HandHistoryRecord,
+    SeatView,
+    hand_history_wire,
+    redact_event,
+    seat_view,
+    seat_view_wire,
+)
 from bots.worker import BOT_TIERS, DEFAULT_BOT_TIER, compute_action
 from mahjong_core.actions import Action, Discard, Pass, action_to_dict, legal_actions
 from mahjong_core.config import RuleSet
@@ -605,6 +612,13 @@ class Table:
         # call in lockstep with `self.state` itself, so it's always describing *that* decision by
         # the time `_timeout_discard_action` reads it (see `_apply`'s own note).
         self._turn_draw_tile: TileId | None = None
+
+        # every completed hand this table has ever played, oldest first -- `state_sync.
+        # hand_history` (docs/02-protocol.md §3), populated by `_record_hand_history` the moment
+        # each `HandEnded` fires. Exists so a client that only gets a fresh `state_sync` (a
+        # spectator joining mid-game, a reconnect-with-gap, a backpressure-collapse resync) can
+        # still show the full scoresheet, not just hands it happened to be connected for live.
+        self._hand_history: list[HandHistoryRecord] = []
 
         # bot handover (M3 sub-task 6, D12): seat -> the BotJobTag currently in flight for it
         # (absent = no job outstanding). `_bot_tasks` holds strong refs to the asyncio.Tasks
@@ -1097,6 +1111,11 @@ class Table:
         )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
+        wire["hand_history"] = hand_history_wire(
+            self._hand_history,
+            viewer=seat,
+            reveal_hands=seat is None and self.settings.spectators_see_hands,
+        )
         return wire
 
     def seat_status_tuple(
@@ -2029,9 +2048,40 @@ class Table:
                 self._augment_event_wire(spectator_wire, event)
                 self._broadcast_to_spectators(spectator_wire)
             if isinstance(event, HandEnded):
+                self._record_hand_history(event)
                 self._broadcast_wire(
                     {"t": "score", "totals": {s: self.state.seats[s].score for s in range(4)}}
                 )
+
+    def _record_hand_history(self, event: HandEnded) -> None:
+        """Snapshot this just-ended hand into `self._hand_history` (`state_sync.hand_history`,
+        docs/02-protocol.md §3). Called from `_publish` while `self.state` is still this hand's
+        state -- `dealer`/`prevailing`/`seats[winner].melds` all get reset by the `hand_start`
+        that follows once `_advance_to_next_hand` runs, so this is the only point where they're
+        still readable for the hand that just ended. Reuses `redact_event`'s own `HandEnded`
+        redaction for every field but `winner_melds` (identical for any viewer -- `HandEndWire`'s
+        fields are all `PUBLIC`/`HAND_END`, never owner-gated) rather than re-deriving the same
+        `revealed`/`faan`/`payments` logic a second time."""
+        hand_end_wire = redact_event(self.state, None, event)
+        winner = cast("int | None", hand_end_wire["winner"])
+        self._hand_history.append(
+            HandHistoryRecord(
+                hand_no=cast("int", hand_end_wire["hand_no"]),
+                outcome=cast("str", hand_end_wire["outcome"]),
+                winner=winner,
+                win_type=cast("str | None", hand_end_wire["win_type"]),
+                discarder=cast("int | None", hand_end_wire["discarder"]),
+                faan=cast("int | None", hand_end_wire["faan"]),
+                faan_breakdown=cast("dict[str, int] | None", hand_end_wire["faan_breakdown"]),
+                points=cast("int | None", hand_end_wire["points"]),
+                payments=cast("dict[int, int] | None", hand_end_wire["payments"]),
+                revealed=cast("bool", hand_end_wire["revealed"]),
+                winning_hand=cast("list[int] | None", hand_end_wire["winning_hand"]),
+                dealer=self.state.dealer,
+                prevailing=self.state.prevailing.name,
+                winner_melds=self.state.seats[winner].melds if winner is not None else None,
+            )
+        )
 
     async def _persist_game_record(self) -> None:
         """`Phase.GAME_OVER` persistence (docs/06-ml.md §2, docs/00-architecture.md §6) -- a

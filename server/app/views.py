@@ -57,7 +57,7 @@ predates several fields added since M1/M2):
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from typing import Any, Literal, cast
@@ -88,9 +88,11 @@ __all__ = [
     "FlowerReplaceWire",
     "GameEndWire",
     "HandEndWire",
+    "HandHistoryRecord",
     "KongReplaceWire",
     "MeldWire",
     "SeatView",
+    "hand_history_wire",
     "redact_event",
     "seat_view",
     "seat_view_wire",
@@ -555,6 +557,71 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "host_seat": view.host_seat,
         "hands": [list(h) for h in view.hands] if view.hands is not None else None,
     }
+
+
+@dataclass(frozen=True)
+class HandHistoryRecord:
+    """One completed hand, captured once by `app/table.py`'s `Table` the moment its `HandEnded`
+    fires (`_record_hand_history`) -- backs `state_sync.hand_history` (docs/02-protocol.md §3),
+    the piece a client that only ever gets a fresh `state_sync` (a spectator joining mid-game, a
+    reconnect-with-gap, a backpressure-collapse resync, docs/02-protocol.md §9) needs to
+    reconstruct the same scoresheet a client accumulates live from `hand_end` events
+    (`web/src/lib/net/reducer.ts`'s `handHistory`). Every field except `winner_melds` is already
+    `HandEndWire`-public (safe for any recipient unconditionally); `winner_melds` is kept as raw
+    `Meld`s and redacted per viewer at `state_sync` time by `hand_history_wire`, exactly like a
+    live `meld` event -- a non-owner must still never learn a past hand's concealed-kong tile
+    identity just because that hand is now over."""
+
+    hand_no: int
+    outcome: str
+    winner: int | None
+    win_type: str | None
+    discarder: int | None
+    faan: int | None
+    faan_breakdown: Mapping[str, int] | None
+    points: int | None
+    payments: Mapping[int, int] | None
+    revealed: bool
+    winning_hand: Sequence[int] | None
+    dealer: int
+    prevailing: str
+    winner_melds: tuple[Meld, ...] | None
+
+
+def hand_history_wire(
+    records: Sequence[HandHistoryRecord], *, viewer: int | None, reveal_hands: bool = False
+) -> list[dict[str, Any]]:
+    """`state_sync.hand_history` -- one dict per completed hand, oldest first. Every field but
+    `winner_melds` is already public on the stored record (see `HandHistoryRecord`'s docstring);
+    `winner_melds` gets the same per-viewer concealed-kong redaction a live `meld` event would
+    (`_meld_wire`), so a viewer who never owned that meld still only ever gets `count`, never
+    `tiles`."""
+    return [
+        {
+            "hand_no": r.hand_no,
+            "outcome": r.outcome,
+            "winner": r.winner,
+            "win_type": r.win_type,
+            "discarder": r.discarder,
+            "faan": r.faan,
+            "faan_breakdown": dict(r.faan_breakdown) if r.faan_breakdown is not None else None,
+            "points": r.points,
+            "payments": dict(r.payments) if r.payments is not None else None,
+            "revealed": r.revealed,
+            "winning_hand": list(r.winning_hand) if r.winning_hand is not None else None,
+            "dealer": r.dealer,
+            "prevailing": r.prevailing,
+            "winner_melds": (
+                [
+                    _meld_wire(m, owner=r.winner, viewer=viewer, reveal_hands=reveal_hands)
+                    for m in r.winner_melds
+                ]
+                if r.winner_melds is not None and r.winner is not None
+                else None
+            ),
+        }
+        for r in records
+    ]
 
 
 def redact_event(

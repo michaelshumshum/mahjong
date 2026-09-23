@@ -203,6 +203,34 @@ class Auto(Envelope):
 # --- server -> client events (docs/02-protocol.md §3) ------------------------------------------
 
 
+class HandHistoryEntryPayload(BaseModel):
+    """One completed hand, as carried on `state_sync.hand_history` (`StateSyncPayload` below) --
+    `app/views.py`'s `HandHistoryRecord`/`hand_history_wire`. Same fields as `HandEndPayload`
+    minus its hand-end-hold `deadline_ts` (meaningless for a hand that's long since closed),
+    plus `dealer`/`prevailing`/`winner_melds`, none of which are on `hand_end`'s own wire payload
+    -- a live client derives them itself from current state at the moment it sees `hand_end`
+    (`web/src/lib/net/reducer.ts`'s `HandHistoryEntry`); a client that only gets a fresh
+    `state_sync` has no "current state at the time" to derive them from, so the server captures
+    them once, here, instead."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hand_no: int
+    outcome: str
+    winner: int | None
+    win_type: str | None
+    discarder: int | None
+    faan: int | None
+    faan_breakdown: dict[str, int] | None
+    points: int | None
+    payments: dict[int, int] | None
+    revealed: bool
+    winning_hand: list[int] | None
+    dealer: int
+    prevailing: str
+    winner_melds: list[dict[str, Any]] | None
+
+
 class StateSyncPayload(BaseModel):
     """Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for
     (`seat=None` for a spectator). `legal_actions`/`claim_options` are the JSON-safe dicts
@@ -240,6 +268,14 @@ class StateSyncPayload(BaseModel):
     # every seat's concealed tiles -- spectators of a `spectators_see_hands` table only
     # (`app/table.py`'s `TableSettings`), `null` everywhere else
     hands: list[list[int]] | None = None
+    # every hand this table has completed so far, oldest first (`app/table.py`'s
+    # `Table._hand_history`) -- lets a client whose only view of the game is this snapshot
+    # (a spectator joining mid-game, a reconnect-with-gap, a backpressure-collapse resync,
+    # docs/02-protocol.md §9) still show the full scoresheet, not just hands it was connected
+    # for live. Defaulted (`= []`) so the generated TS field is optional (`ts_type`/
+    # `_render_field`, gen_protocol.py), keeping every `state_sync` test fixture written before
+    # this field existed valid -- a real `Table.state_sync_wire` always populates it for real.
+    hand_history: list[HandHistoryEntryPayload] = []
 
 
 class HandStartPayload(BaseModel):

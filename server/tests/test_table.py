@@ -103,6 +103,58 @@ async def test_full_game_through_table_progresses_and_publishes_gapless_redacted
                 assert wire["count"] is not None
 
 
+async def test_hand_history_accumulates_across_full_game_and_reconciles_with_final_scores() -> None:
+    """`state_sync.hand_history` (docs/02-protocol.md §3) exists so a client with no live memory
+    of earlier hands can still reconstruct the full scoresheet -- same reconciliation check
+    `web/src/lib/ui/ScoreSheet.svelte`'s `historyComplete` runs client-side: summed per-hand
+    `payments` must reach the same totals `state.seats[*].score` already holds."""
+    rng = random.Random(20260917)
+    table = Table("table-hand-history-full", _BOUNDED_RULESET, game_seed=20260917)
+
+    steps = 0
+    while table.state.phase != Phase.GAME_OVER:
+        steps += 1
+        if steps > _STEP_CAP:
+            raise RuntimeError(f"exceeded {_STEP_CAP} steps -- possible deadlock")
+        await _drive_one_step(table, rng)
+
+    history = table.state_sync_wire(None)["hand_history"]
+    assert [h["hand_no"] for h in history] == [1, 2, 3, 4]
+
+    running = [0, 0, 0, 0]
+    for hand in history:
+        for seat, delta in (hand["payments"] or {}).items():
+            running[seat] += delta
+    assert running == [table.state.seats[s].score for s in range(4)]
+
+    # identical on every seat's own state_sync too -- HandEndWire's fields are all
+    # PUBLIC/HAND_END, never owner-gated, so there's nothing seat-specific to differ here.
+    for seat in range(4):
+        assert table.state_sync_wire(seat)["hand_history"] == history
+
+
+async def test_spectator_joining_mid_game_sees_completed_hand_history() -> None:
+    """The actual bug `hand_history` exists to fix: a spectator that only ever gets a fresh
+    `state_sync` (never having been connected for any earlier `hand_end`) must still see every
+    hand already played, not just whatever's in progress when it joins."""
+    rng = random.Random(20260918)
+    table = Table("table-spectator-history", _BOUNDED_RULESET, game_seed=20260918)
+
+    starting_hand_no = table.state.hand_no
+    while table.state.hand_no == starting_hand_no and table.state.phase != Phase.GAME_OVER:
+        await _drive_one_step(table, rng)
+    assert table.state.hand_no != starting_hand_no  # hand 1 has genuinely closed
+
+    received: list[dict[str, object]] = []
+    table.register_spectator("spec-1", lambda seq, wire: received.append(wire))
+
+    assert len(received) == 1
+    sync = received[0]
+    assert sync["t"] == "state_sync"
+    history = sync["hand_history"]
+    assert [h["hand_no"] for h in history] == [starting_hand_no]
+
+
 async def test_illegal_command_is_rejected_without_corrupting_state() -> None:
     table = Table("table-2", _BOUNDED_RULESET, game_seed=4242)
 

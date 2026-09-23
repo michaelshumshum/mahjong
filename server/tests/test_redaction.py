@@ -29,10 +29,12 @@ from app.views import (
     FlowerReplaceWire,
     GameEndWire,
     HandEndWire,
+    HandHistoryRecord,
     KongReplaceWire,
     MeldWire,
     _build_event_wire,
     _wire_value,
+    hand_history_wire,
     redact_event,
     seat_view,
     seat_view_wire,
@@ -497,6 +499,64 @@ def test_hand_end_reveals_full_winning_hand_for_claimed_win() -> None:
     assert wire.winning_hand == tuple(state.seats[event.winner].concealed)
     assert wire.winning_hand is not None
     assert len(wire.winning_hand) == 14
+
+
+def _concealed_kong_history_record() -> HandHistoryRecord:
+    """A completed hand won with a concealed kong in the winner's melds -- `hand_history_wire`'s
+    one genuinely per-viewer-redacted field (`HandHistoryRecord`'s own docstring)."""
+    kong = Meld(MeldKind.CONCEALED_KONG, (TileId(0), TileId(1), TileId(2), TileId(3)))
+    return HandHistoryRecord(
+        hand_no=1,
+        outcome="win",
+        winner=0,
+        win_type="self_draw",
+        discarder=None,
+        faan=5,
+        faan_breakdown={"kong": 1},
+        points=32,
+        payments={1: -32, 2: -32, 3: -32},
+        revealed=True,
+        winning_hand=[10, 11, 12],
+        dealer=0,
+        prevailing="EAST",
+        winner_melds=(kong,),
+    )
+
+
+def test_hand_history_wire_hides_winner_concealed_kong_from_non_owners() -> None:
+    """A hand ending doesn't retroactively make its winner's concealed-kong tile identity
+    public -- a non-owning viewer still only ever gets `count`, matching what a live `meld`
+    event would have shown them for the same meld while the hand was in progress."""
+    record = _concealed_kong_history_record()
+
+    owner_view = hand_history_wire([record], viewer=0)[0]
+    assert owner_view["winner_melds"][0]["tiles"] == [0, 1, 2, 3]
+    assert owner_view["winner_melds"][0]["count"] is None
+
+    other_seat_view = hand_history_wire([record], viewer=1)[0]
+    assert other_seat_view["winner_melds"][0]["tiles"] is None
+    assert other_seat_view["winner_melds"][0]["count"] == 4
+
+    plain_spectator_view = hand_history_wire([record], viewer=None)[0]
+    assert plain_spectator_view["winner_melds"][0]["tiles"] is None
+
+    open_hands_spectator_view = hand_history_wire([record], viewer=None, reveal_hands=True)[0]
+    assert open_hands_spectator_view["winner_melds"][0]["tiles"] == [0, 1, 2, 3]
+
+
+def test_hand_history_wire_omits_winner_melds_for_exhaustive_draw() -> None:
+    record = dataclasses.replace(
+        _concealed_kong_history_record(),
+        outcome="exhaustive_draw",
+        winner=None,
+        win_type=None,
+        revealed=False,
+        winning_hand=None,
+        winner_melds=None,
+    )
+    wire = hand_history_wire([record], viewer=None)[0]
+    assert wire["winner_melds"] is None
+    assert wire["winner"] is None
 
 
 def test_walker_rejects_unannotated_field() -> None:
