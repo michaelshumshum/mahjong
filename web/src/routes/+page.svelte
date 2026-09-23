@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { generateTableCode } from '$lib/table/table-code';
+	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
 
 	// Straight to the table, no intermediate copy-code step: the table's own pre-game panel
 	// already has a "copy invite link" button (docs/03-frontend.md's "Pre-game states"), so
@@ -20,76 +21,64 @@
 	}
 </script>
 
-<div class="panels">
-	<section class="panel">
-		<h2>Create a table</h2>
-		<p class="hint">
-			Generates a table and takes you straight there — invite others once you're seated.
-		</p>
-		<button type="button" class="primary" onclick={createTable}>Create table</button>
-	</section>
+<TileMuralBackground />
 
-	<section class="panel">
-		<h2>Find a table</h2>
-		<p class="hint">
-			Sit down at an open table, watch a game in progress, or join one by its invite code.
-		</p>
-		<a class="primary" href="/tables">Browse tables</a>
-	</section>
-
-	<section class="panel">
-		<h2>Practice</h2>
-		<p class="hint">Play solo against three bots. No one else needs a code for this one.</p>
-		<button type="button" class="primary" onclick={startPractice}>Play vs bots</button>
-	</section>
+<div class="lobby">
+	<h1 class="sr-only">Mahjong</h1>
+	<div class="actions">
+		<button type="button" class="primary" onclick={createTable}>Create a table</button>
+		<button type="button" class="secondary" onclick={startPractice}>Practice vs Bots</button>
+	</div>
 </div>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
-	.panels {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-5);
-		align-items: center;
-		justify-content: center;
-		min-height: 100vh;
-		padding: var(--space-5);
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 
-	.panel {
-		background: var(--color-surface);
-		padding: var(--space-5);
+	.lobby {
+		position: relative;
+		z-index: var(--z-hud);
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		min-height: 100dvh;
+		padding: var(--space-8) var(--space-5);
+
+		@include layout.phone-only {
+			align-items: center;
+		}
+	}
+
+	.actions {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
-		width: min(26rem, 100%);
-		@include buttons.panel-elevated;
+		width: min(20rem, 100%);
 	}
 
-	.panel h2 {
-		margin: 0;
+	.primary,
+	.secondary {
+		font: inherit;
 		font-size: var(--font-size-lg);
-	}
-
-	.hint {
-		margin: 0;
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
+		padding: var(--space-3) var(--space-4);
+		min-height: 44px;
+		cursor: pointer;
 	}
 
 	.primary {
-		font: inherit;
-		padding: var(--space-2) var(--space-4);
-		min-height: 44px;
-		cursor: pointer;
 		@include buttons.btn-primary;
 	}
 
-	a.primary {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		text-decoration: none;
+	.secondary {
+		@include buttons.btn-secondary;
 	}
 </style>

@@ -25,7 +25,7 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 
 | | |
 | --- | --- |
-| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create a table, find one, or play solo vs bots | ![Tables](docs/screenshots/tables.png) Tables (`/tables`) — join by code, or sit down / watch from the grid |
+| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create a table or play solo vs bots, over a scrolling tile-mural canvas background | ![Tables](docs/screenshots/tables.png) Tables (`/tables`) — join by code, or sit down / watch from the grid |
 | ![Demo](docs/screenshots/demo.png) Demo (`/demo`) — component demos | |
 | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
 | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw |

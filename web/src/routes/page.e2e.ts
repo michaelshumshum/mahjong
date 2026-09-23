@@ -11,16 +11,17 @@ test('lobby create table navigates straight to a freshly generated table', async
 	// wait past hydration: the create button is server-rendered but its click handler only
 	// attaches once svelte-kit finishes loading, so an immediate click can race it.
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Create table' }).click();
+	await page.getByRole('button', { name: 'Create a table' }).click();
 
 	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}$/);
 });
 
-test('lobby browse link opens the tables page', async ({ page }) => {
+test('lobby practice vs bots navigates straight to a practice table', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('link', { name: 'Browse tables' }).click();
-	await expect(page).toHaveURL('/tables');
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tables');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
+
+	await expect(page).toHaveURL(/\/table\/[A-Z0-9]{6}\?practice=1$/);
 });
 
 test('tables page join navigates to the table route with the entered code', async ({ page }) => {

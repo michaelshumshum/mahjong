@@ -16,7 +16,8 @@ src/lib/styles/ SCSS tokens, tile geometry, layout mixins (see docs/03-frontend.
 
 ## Rules
 
-- Svelte/DOM owns everything: chrome and the table surface, including the tiles on it. No canvas.
+- Svelte/DOM owns everything: chrome and the table surface, including the tiles on it. No canvas
+  — except the lobby's decorative background mural (`docs/03-frontend.md §2`'s canvas exception).
 - One-way flow: server event → reducer → store → components. Components never own game truth.
 - No optimistic local mutation of game truth. Send an intent, wait for the event — the one
   exception is a *pending* visual state on the tile you just discarded (`docs/03-frontend.md
