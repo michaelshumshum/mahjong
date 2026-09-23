@@ -39,7 +39,6 @@
 	} from '$lib/ui/settings-storage';
 	import ToastStack from '$lib/ui/ToastStack.svelte';
 	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
-	import CloseButton from '$lib/ui/CloseButton.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import type { TileCode } from '$lib/table/tile-code';
@@ -50,6 +49,7 @@
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
 	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
+	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -770,42 +770,36 @@
 		{/if}
 
 		{#if showScoreSheet}
-			<div class="panel-overlay">
-				<div class="panel">
-					<CloseButton onclick={() => (showScoreSheet = false)} />
-					<ScoreSheet
-						seats={scoreSeats}
-						totals={scoreTotals}
-						hands={scoreHands}
-						standings={scoreStandings}
-					/>
-				</div>
-			</div>
+			<DismissablePanel onClose={() => (showScoreSheet = false)}>
+				<ScoreSheet
+					seats={scoreSeats}
+					totals={scoreTotals}
+					hands={scoreHands}
+					standings={scoreStandings}
+				/>
+			</DismissablePanel>
 		{/if}
 
 		{#if showSettings}
-			<div class="panel-overlay">
-				<div class="panel">
-					<CloseButton onclick={() => (showSettings = false)} />
-					<Settings
-						{autoArm}
-						prefs={clientPrefs}
-						onAutoArmChange={(next) => {
-							autoArm = next;
-							saveAutoArm(next);
-							if (!isMock)
-								liveStore?.socket.auto({
-									no_calls: next.noCalls,
-									auto_pass_chow: next.autoPassChow
-								});
-						}}
-						onPrefsChange={(next) => {
-							clientPrefs = next;
-							saveClientPrefs(next);
-						}}
-					/>
-				</div>
-			</div>
+			<DismissablePanel onClose={() => (showSettings = false)}>
+				<Settings
+					{autoArm}
+					prefs={clientPrefs}
+					onAutoArmChange={(next) => {
+						autoArm = next;
+						saveAutoArm(next);
+						if (!isMock)
+							liveStore?.socket.auto({
+								no_calls: next.noCalls,
+								auto_pass_chow: next.autoPassChow
+							});
+					}}
+					onPrefsChange={(next) => {
+						clientPrefs = next;
+						saveClientPrefs(next);
+					}}
+				/>
+			</DismissablePanel>
 		{/if}
 
 		{#if showAnimationDemo}
