@@ -154,8 +154,15 @@ the real bot tiers ([04-bots.md §1](04-bots.md)), and a table can also be start
 filling the other three seats from creation (`?practice=true` on the WS endpoint →
 `Table.__init__(practice=True)`), defaulting to `T2`/`FaanBot`. Proven end to end: one human
 client, three real `FaanBot`s, unscripted play to `Phase.GAME_OVER`
-(`server/tests/test_practice_mode_e2e.py`). **What's left for this milestone is entirely
-frontend** — a lobby entry point for practice mode and bot-seat visual treatment.
+(`server/tests/test_practice_mode_e2e.py`).
+
+**Frontend: built too.** The lobby's "Practice vs Bots" button (`web/src/routes/+page.svelte`)
+starts a `?practice=1` table route, which `/table/[id]` translates to `&practice=true` on the WS
+connect; bot-controlled seats render a persistent `.bot-badge` marker
+(`web/src/lib/table/OpponentRegion.svelte`). Covered end to end by
+`web/src/routes/table/[id]/live.e2e.ts`. Nothing left on the checklist above the "Done when" line
+— what remains is the qualitative judgment call itself (does a solo game against three `FaanBot`s
+actually feel good, per the gate below), not a missing piece of UI.
 
 ### M5 — Real multiplayer (1–2 weeks)
 Guest identity only, by design — no accounts, no password, no email, no JWT, no REST auth
@@ -186,8 +193,13 @@ seeing the other three players' chosen names throughout.
 
 **Backend wire slice: built.** `join.name` is stored on `SeatBinding.name` for the seat's entire
 game and surfaced via `state_sync.names`, `seat_state.name`, and `GameRecord.players`
-([00-architecture.md §5](00-architecture.md)). What's left for this milestone is everything
-client-side (name-entry UI, `localStorage`, rendering) plus matchmaking and invite codes.
+([00-architecture.md §5](00-architecture.md)).
+
+**Client-side wire-up: also built.** `PretableScreen.svelte`'s `#display-name-input` collects the
+name; `web/src/lib/ui/settings-storage.ts`'s `DISPLAY_NAME_STORAGE_KEY`/`loadDisplayName()`
+persists it across reloads; `+page.svelte` passes it into `join()`. Covered end to end in
+`live.e2e.ts` (real, distinct per-seat names typed in and asserted against). What's left for this
+milestone is matchmaking and invite codes (§6) — neither has any code behind it yet.
 
 **Spectating: built.** `?spectate=true` on the WS URL gets a spectator-redacted
 `state_sync` and every subsequent broadcast, minus anything naming a seat's own concealed tiles
