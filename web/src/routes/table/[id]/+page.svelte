@@ -49,6 +49,7 @@
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 	import DevToolbar from './_components/DevToolbar.svelte';
 	import PretableScreen from './_components/PretableScreen.svelte';
+	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -801,21 +802,7 @@
 {/if}
 
 {#if showLeaveConfirm}
-	<div class="panel-overlay">
-		<div
-			class="confirm-dialog"
-			role="alertdialog"
-			aria-label="Leave game"
-			aria-describedby="leave-confirm-desc"
-		>
-			<h2>Leave this table?</h2>
-			<p id="leave-confirm-desc">Your seat switches to autoplay until you reconnect.</p>
-			<div class="confirm-actions">
-				<button type="button" onclick={() => (showLeaveConfirm = false)}>Cancel</button>
-				<button type="button" class="confirm-leave" onclick={confirmLeaveGame}>Leave game</button>
-			</div>
-		</div>
-	</div>
+	<LeaveGameDialog onCancel={() => (showLeaveConfirm = false)} onConfirm={confirmLeaveGame} />
 {/if}
 
 <style lang="scss">
@@ -932,46 +919,6 @@
 	// scrim's.
 	.panel {
 		position: relative;
-	}
-
-	.confirm-dialog {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-3);
-		width: 100%;
-		max-width: 22rem;
-		padding: var(--space-4);
-		background: var(--color-surface-raised);
-		text-align: center;
-		@include buttons.panel-elevated;
-
-		h2 {
-			margin: 0;
-			font-size: var(--font-size-lg);
-		}
-
-		p {
-			margin: 0;
-			color: var(--color-text-muted);
-		}
-	}
-
-	.confirm-actions {
-		display: flex;
-		justify-content: center;
-		gap: var(--space-3);
-
-		button {
-			min-height: 44px;
-			padding: var(--space-2) var(--space-4);
-			font: inherit;
-			cursor: pointer;
-			@include buttons.btn-secondary;
-		}
-
-		.confirm-leave {
-			@include buttons.btn-primary;
-		}
 	}
 
 	// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip,
