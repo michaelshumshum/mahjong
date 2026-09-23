@@ -48,7 +48,7 @@
 	import type { TileCode } from '$lib/table/tile-code';
 	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
 	import SeatRing from '$lib/table/SeatRing.svelte';
-	import SeatPickerSlot from '$lib/table/SeatPickerSlot.svelte';
+	import SeatPicker from '$lib/table/SeatPicker.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -617,44 +617,6 @@
 	let showAnimationDemo = $state(false);
 </script>
 
-{#snippet seatPicker()}
-	<div class="seat-ring">
-		<div class="seat-ring-pos seat-ring-pos--across">
-			<SeatPickerSlot
-				seat={2 as Seat}
-				status={liveStore?.state.seatStatus[2] ?? 'empty'}
-				name={liveStore?.state.names[2] ?? null}
-				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
-			/>
-		</div>
-		<div class="seat-ring-pos seat-ring-pos--left">
-			<SeatPickerSlot
-				seat={3 as Seat}
-				status={liveStore?.state.seatStatus[3] ?? 'empty'}
-				name={liveStore?.state.names[3] ?? null}
-				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
-			/>
-		</div>
-		<div class="seat-ring-pos seat-ring-pos--right">
-			<SeatPickerSlot
-				seat={1 as Seat}
-				status={liveStore?.state.seatStatus[1] ?? 'empty'}
-				name={liveStore?.state.names[1] ?? null}
-				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
-			/>
-		</div>
-		<div class="seat-ring-pos seat-ring-pos--self">
-			<SeatPickerSlot
-				seat={0 as Seat}
-				self={true}
-				status={liveStore?.state.seatStatus[0] ?? 'empty'}
-				name={liveStore?.state.names[0] ?? null}
-				onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
-			/>
-		</div>
-	</div>
-{/snippet}
-
 {#snippet opponentRegion(seat: MockSeatState, position: 'across' | 'left' | 'right')}
 	<section
 		class="seat-region seat-region--{position}"
@@ -1040,7 +1002,11 @@
 						oninput={(e) => updateDisplayName(e.currentTarget.value)}
 					/>
 				</div>
-				{@render seatPicker()}
+				<SeatPicker
+					seatStatus={liveStore?.state.seatStatus ?? []}
+					names={liveStore?.state.names ?? []}
+					onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+				/>
 			{:else}
 				<SeatRing
 					you={effectiveSeat as Seat}
@@ -1254,37 +1220,6 @@
 			animation: none;
 			opacity: 0.6;
 		}
-	}
-
-	// seat preview ring: across/left/right/self, same relative arrangement as the real table
-	// grid (§3, layout.seat-region-grid) at token scale -- foreshadows the seats you're about
-	// to sit at rather than inventing a second layout language for the pre-game screen.
-	.seat-ring {
-		display: grid;
-		grid-template-areas:
-			'.      across .'
-			'left   .      right'
-			'.      self   .';
-		grid-template-columns: repeat(3, 3.25rem);
-		grid-template-rows: repeat(3, 3.25rem);
-		gap: var(--space-1);
-		place-items: center;
-	}
-
-	.seat-ring-pos--across {
-		grid-area: across;
-	}
-
-	.seat-ring-pos--left {
-		grid-area: left;
-	}
-
-	.seat-ring-pos--right {
-		grid-area: right;
-	}
-
-	.seat-ring-pos--self {
-		grid-area: self;
 	}
 
 	.pretable-hint {
