@@ -47,8 +47,7 @@
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 	import type { TileCode } from '$lib/table/tile-code';
 	import { WIND_LABEL, WIND_CHAR, seatWind } from '$lib/table/wind';
-	import SeatRingSlot from '$lib/table/SeatRingSlot.svelte';
-	import SeatOccupancySlot from '$lib/table/SeatOccupancySlot.svelte';
+	import SeatRing from '$lib/table/SeatRing.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -617,39 +616,6 @@
 	let showAnimationDemo = $state(false);
 </script>
 
-<!-- Seated pre-game preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
-	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
-	before any hand exists. Self is the one seat this screen already knows a real wind for (the
-	dealer is fixed at table construction, before any `ready`). The other three show real live
-	occupancy instead (`seatStatus`/`names`, kept current via `seat_state` broadcasts the same
-	way `seatPicker` below reads them pre-join) -- so a seated player watching this screen sees
-	the next arrival land, not just a placeholder that never changes. -->
-{#snippet seatRing(you: Seat)}
-	<div class="seat-ring" aria-hidden="true">
-		<div class="seat-ring-pos seat-ring-pos--across">
-			<SeatOccupancySlot
-				status={liveStore?.state.seatStatus[((you + 2) % 4) as Seat] ?? 'empty'}
-				name={liveStore?.state.names[((you + 2) % 4) as Seat] ?? null}
-			/>
-		</div>
-		<div class="seat-ring-pos seat-ring-pos--left">
-			<SeatOccupancySlot
-				status={liveStore?.state.seatStatus[((you + 3) % 4) as Seat] ?? 'empty'}
-				name={liveStore?.state.names[((you + 3) % 4) as Seat] ?? null}
-			/>
-		</div>
-		<div class="seat-ring-pos seat-ring-pos--right">
-			<SeatOccupancySlot
-				status={liveStore?.state.seatStatus[((you + 1) % 4) as Seat] ?? 'empty'}
-				name={liveStore?.state.names[((you + 1) % 4) as Seat] ?? null}
-			/>
-		</div>
-		<div class="seat-ring-pos seat-ring-pos--self">
-			<SeatRingSlot label={WIND_CHAR[seatWind(you, gameState.dealer)]} self={true} />
-		</div>
-	</div>
-{/snippet}
-
 <!-- Pre-join seat picker: connected as a spectator (the socket-setup effect above), so real
 	`seatStatus`/`names` are already known -- unlike the old "Sit down" button (any open seat),
 	each slot here is a specific seat you can click to `join` it directly. Absolute seats 0-3 are
@@ -1075,7 +1041,12 @@
 				</div>
 				{@render seatPicker()}
 			{:else}
-				{@render seatRing(effectiveSeat as Seat)}
+				<SeatRing
+					you={effectiveSeat as Seat}
+					dealer={gameState.dealer as Seat}
+					seatStatus={liveStore?.state.seatStatus ?? []}
+					names={liveStore?.state.names ?? []}
+				/>
 				<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat as Seat, gameState.dealer)]}</h2>
 				<p>
 					Waiting for the rest of the table to join. The hand starts automatically once all four
