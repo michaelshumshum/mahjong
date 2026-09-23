@@ -13,13 +13,13 @@ describe('TileFace', () => {
 		expect(body).toContain('src="/tiles/Chun.svg"');
 	});
 
-	it('renders the tile back for a concealed (null) tile', () => {
-		const { body } = render(TileFace, { props: { code: null } });
-		expect(body).toContain('src="/tiles/Back.svg"');
+	it('renders flower/season faces from the same asset map', () => {
+		const { body } = render(TileFace, { props: { code: 'f1' } });
+		expect(body).toContain('src="/tiles/Flor1.svg"');
 	});
 
-	it('renders the tile back for a code with no vendored art (flower)', () => {
-		const { body } = render(TileFace, { props: { code: 'f1' } });
+	it('renders the tile back for a concealed (null) tile', () => {
+		const { body } = render(TileFace, { props: { code: null } });
 		expect(body).toContain('src="/tiles/Back.svg"');
 	});
 });

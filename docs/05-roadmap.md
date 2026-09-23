@@ -397,6 +397,6 @@ browsers on the open internet, not four local `docker-compose` clients:
 - [MahjongRepository/mahjong](https://github.com/MahjongRepository/mahjong) — shanten reference implementation
 - [A Fast Algorithm for Computing the Deficiency Number of a Mahjong Hand — arXiv:2108.06832](https://arxiv.org/pdf/2108.06832)
 - [Constructing AI Players with MDP Abstraction in Mahjong — arXiv:1904.07491](https://arxiv.org/pdf/1904.07491)
-- [FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles) — public-domain tile vectors
+- [samoheen/mahjong-tiles](https://github.com/samoheen/mahjong-tiles) — public-domain Hong Kong tile vectors
 - [Networking of a turn-based game — Longwelwind](https://longwelwind.net/blog/networking-turn-based-game/) — reducer/event pattern, seq resync
 - [Server-Authoritative Game Logic — AccelByte](https://accelbyte.io/blog/server-authoritative-logic-to-prevent-cheating)

@@ -714,13 +714,11 @@ doesn't actually send this way):
 
 ## 7. Asset pipeline
 
-- Tile art: **[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)**
-  — public domain SVG, regular and black variants. Vendored (`web/static/tiles/`, see `NOTICE`):
-  the 34 playable faces HK shares with riichi, "Regular" style, skipping the source repo's red-5
-  ("-Dora") variants — a riichi-only concept this ruleset has no use for. The source repo has **no
-  flower/season art** (it covers only the 34 riichi types) — the 8 flower/season faces
-  (`01-rules-spec.md §1`) still need a separate source; `TileFace.svelte` currently renders the
-  tile back for those codes.
+- Tile art: **[samoheen/mahjong-tiles](https://github.com/samoheen/mahjong-tiles)**
+  — public domain SVG Hong Kong set. Vendored (`web/static/tiles/`, see `NOTICE`): all 42 faces
+  (Man1-9, Pin1-9, Sou1-9, Ton, Nan, Shaa, Pei, Chun, Hatsu, Haku, Flor1-4, Seas1-4). The tile
+  back (Back.svg) is retained from the previous FluffyStuff/riichi-mahjong-tiles set, which is
+  also public domain.
 - Rendered via `<img src>` per face, not inlined/`<use>`: the vendored SVGs carry
   non-namespaced ids (clipPath/filter/gradient) that collide when the same or different tiles are
   inlined into the DOM more than once, which a hand of tiles does constantly. `<img>` isolates

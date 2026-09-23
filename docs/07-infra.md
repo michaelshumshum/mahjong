@@ -154,7 +154,7 @@ kills a game in progress, this is a gap, not a nice-to-have. Minimum bar before 
 
 Project code: MIT (`LICENSE`).
 
-Third-party assets bundled with the client — notably the FluffyStuff riichi tile set
+Third-party assets bundled with the client — notably the samoheen/mahjong-tiles Hong Kong set
 (`03-frontend.md`, public-domain-licensed) — need a `NOTICE` file crediting the source even
 though the license doesn't require it. Add `NOTICE` at the repo root alongside `LICENSE` when
 the asset is actually vendored in.

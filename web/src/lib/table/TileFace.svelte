@@ -6,11 +6,11 @@
 	let { code = null }: { code?: TileCode | null } = $props();
 
 	// plain <img src> rather than inlining the SVG markup (docs/03-frontend.md §7 suggests
-	// inline/`<use>`): the vendored FluffyStuff files carry non-namespaced ids
-	// (clipPath/filter/gradient) that collide across repeated inline copies of the same or
-	// different tiles — a hand has many duplicate tile codes on screen at once. <img> gives
-	// each instance an isolated rendering context, at the cost of not being stylable via
-	// currentColor/CSS — revisit if that's needed later.
+	// inline/`<use>`): the vendored files carry non-namespaced ids (clipPath/filter/gradient)
+	// that collide across repeated inline copies of the same or different tiles — a hand has
+	// many duplicate tile codes on screen at once. <img> gives each instance an isolated
+	// rendering context, at the cost of not being stylable via currentColor/CSS — revisit if
+	// that's needed later.
 	const BACK_SRC = '/tiles/Back.svg';
 
 	let isBack = $derived(!(code !== null && hasTileArt(code)));
