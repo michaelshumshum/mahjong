@@ -1,4 +1,4 @@
-import type { ServerEvent } from './protocol';
+import type { HandHistoryEntryPayload, ServerEvent } from './protocol';
 import { type ClientGameState, type HandHistoryEntry, type MeldState } from '../game/state';
 
 function assertNever(x: never): never {
@@ -50,6 +50,49 @@ function mapMeldDict(m: Record<string, unknown>): MeldState {
 		count: (m.count as number | null | undefined) ?? null,
 		fromSeat: (m.from_seat as number | null | undefined) ?? null
 	};
+}
+
+/** `state_sync.hand_history[i]` (`app/views.py`'s `hand_history_wire`) -> `HandHistoryEntry` --
+ * same field-name/casing translation `mapMeldDict` above does for one meld, plus the
+ * `winner_melds` -> `winnerMelds` array itself going through that same per-meld mapper. */
+function mapHandHistoryEntry(h: HandHistoryEntryPayload): HandHistoryEntry {
+	return {
+		handNo: h.hand_no,
+		outcome: h.outcome,
+		winner: h.winner,
+		winType: h.win_type,
+		discarder: h.discarder,
+		faan: h.faan,
+		faanBreakdown: h.faan_breakdown,
+		points: h.points,
+		payments: h.payments,
+		revealed: h.revealed,
+		winningHand: h.winning_hand,
+		dealer: h.dealer,
+		prevailing: h.prevailing,
+		winnerMelds: h.winner_melds ? h.winner_melds.map(mapMeldDict) : null
+	};
+}
+
+/** `state_sync.hand_history` (docs/02-protocol.md §3) exists precisely so a client with no
+ * live memory of earlier hands -- a spectator joining mid-game, a reconnect-with-gap, a
+ * backpressure-collapse resync -- can still show the full scoresheet. Merges it into whatever
+ * `handHistory` this session already accumulated live rather than replacing it outright:
+ * already-recorded hands (by `handNo`) keep their locally-captured entry (identical content in
+ * practice, since the server redacts `winner_melds` for this same seat the same way), so this
+ * never discards anything a live `hand_end` already built. Missing on older test fixtures
+ * (`HandHistoryEntryPayload[]` is optional on the wire, protocol.d.ts) -- `?? []` treats that
+ * exactly like "no hands to add," not an error. */
+function mergeHandHistory(
+	existing: readonly HandHistoryEntry[],
+	fromWire: readonly HandHistoryEntryPayload[] | undefined
+): HandHistoryEntry[] {
+	if (!fromWire || fromWire.length === 0) return existing.slice();
+	const known = new Set(existing.map((h) => h.handNo));
+	const merged = existing.concat(
+		fromWire.filter((h) => !known.has(h.hand_no)).map(mapHandHistoryEntry)
+	);
+	return merged.sort((a, b) => a.handNo - b.handNo);
 }
 
 /**
@@ -115,7 +158,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 								seat: d.turn,
 								tileId: d.discard_pools[d.turn][d.discard_pools[d.turn].length - 1]
 							}
-						: null
+						: null,
+				handHistory: mergeHandHistory(state.handHistory, d.hand_history)
 			};
 		}
 

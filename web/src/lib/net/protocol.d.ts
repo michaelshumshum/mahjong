@@ -226,6 +226,7 @@ export interface StateSyncPayload {
 	deadline_ts: number | null;
 	host_seat: number | null;
 	hands?: number[][] | null;
+	hand_history?: HandHistoryEntryPayload[];
 }
 
 export interface HandStartPayload {
@@ -331,6 +332,23 @@ export interface AckPayload {
 	ok: boolean;
 	error?: string | null;
 	reconnect_secret?: string | null;
+}
+
+export interface HandHistoryEntryPayload {
+	hand_no: number;
+	outcome: string;
+	winner: number | null;
+	win_type: string | null;
+	discarder: number | null;
+	faan: number | null;
+	faan_breakdown: Record<string, number> | null;
+	points: number | null;
+	payments: Record<number, number> | null;
+	revealed: boolean;
+	winning_hand: number[] | null;
+	dealer: number;
+	prevailing: string;
+	winner_melds: Record<string, unknown>[] | null;
 }
 
 /** Client -> server intents (docs/02-protocol.md §2). */

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { reduce } from './reducer';
-import { initialClientGameState, type ClientGameState } from '../game/state';
-import type { ServerEvent } from './protocol';
+import { initialClientGameState, type ClientGameState, type HandHistoryEntry } from '../game/state';
+import type { HandHistoryEntryPayload, ServerEvent } from './protocol';
 
 function state(patch: Partial<ClientGameState> = {}): ClientGameState {
 	return { ...initialClientGameState(), ...patch };
@@ -667,28 +667,25 @@ describe('reduce', () => {
 		expect(twice.handHistory).toHaveLength(1);
 	});
 
-	it('state_sync preserves accumulated handHistory (a redacted snapshot carries no hand history)', () => {
-		const s = state({
-			handHistory: [
-				{
-					handNo: 1,
-					outcome: 'win',
-					winner: 0,
-					winType: 'self_draw',
-					discarder: null,
-					faan: 3,
-					faanBreakdown: null,
-					points: 100,
-					payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
-					revealed: true,
-					winningHand: null,
-					dealer: 0,
-					prevailing: 'EAST',
-					winnerMelds: null
-				}
-			]
-		});
-		const event: ServerEvent = {
+	const _handHistoryEntry1: HandHistoryEntry = {
+		handNo: 1,
+		outcome: 'win',
+		winner: 0,
+		winType: 'self_draw',
+		discarder: null,
+		faan: 3,
+		faanBreakdown: null,
+		points: 100,
+		payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+		revealed: true,
+		winningHand: null,
+		dealer: 0,
+		prevailing: 'EAST',
+		winnerMelds: null
+	};
+
+	function stateSyncEvent(handHistory?: HandHistoryEntryPayload[]) {
+		return {
 			v: 1,
 			ts: 1,
 			seq: 5,
@@ -712,13 +709,134 @@ describe('reduce', () => {
 				scores: [300, -100, -100, -100],
 				legal_actions: [],
 				claim_options: [],
-				deadline_ts: null
+				deadline_ts: null,
+				hand_history: handHistory
 			}
-		};
+		} as ServerEvent;
+	}
 
-		const next = reduce(s, event);
+	it('state_sync with no hand_history field leaves accumulated handHistory untouched', () => {
+		const s = state({ handHistory: [_handHistoryEntry1] });
+
+		const next = reduce(s, stateSyncEvent(undefined));
 
 		expect(next.handHistory).toEqual(s.handHistory);
+	});
+
+	it('state_sync.hand_history fills in a hand this session never saw live (the spectator-joining-mid-game case)', () => {
+		const s = state({ handHistory: [] });
+
+		const next = reduce(
+			s,
+			stateSyncEvent([
+				{
+					hand_no: 1,
+					outcome: 'win',
+					winner: 0,
+					win_type: 'self_draw',
+					discarder: null,
+					faan: 3,
+					faan_breakdown: null,
+					points: 100,
+					payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+					revealed: true,
+					winning_hand: null,
+					dealer: 0,
+					prevailing: 'EAST',
+					winner_melds: null
+				}
+			])
+		);
+
+		expect(next.handHistory).toEqual([_handHistoryEntry1]);
+	});
+
+	it('state_sync.hand_history maps winner_melds through the same kind/meld_kind translation as live melds', () => {
+		const s = state({ handHistory: [] });
+
+		const next = reduce(
+			s,
+			stateSyncEvent([
+				{
+					hand_no: 1,
+					outcome: 'win',
+					winner: 0,
+					win_type: 'self_draw',
+					discarder: null,
+					faan: 3,
+					faan_breakdown: null,
+					points: 100,
+					payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+					revealed: true,
+					winning_hand: null,
+					dealer: 0,
+					prevailing: 'EAST',
+					winner_melds: [{ kind: 'pung', tiles: [1, 2, 3], from_seat: 1 }]
+				}
+			])
+		);
+
+		expect(next.handHistory[0].winnerMelds).toEqual([
+			{ kind: 'pung', tiles: [1, 2, 3], count: null, fromSeat: 1 }
+		]);
+	});
+
+	it("state_sync.hand_history doesn't clobber a hand already accumulated locally", () => {
+		const s = state({ handHistory: [_handHistoryEntry1] });
+
+		const next = reduce(
+			s,
+			stateSyncEvent([
+				{
+					hand_no: 1,
+					outcome: 'win',
+					winner: 0,
+					win_type: 'self_draw',
+					discarder: null,
+					// deliberately different from _handHistoryEntry1 -- proves the locally-known entry
+					// wins, not the wire's, when both exist for the same hand_no.
+					faan: 999,
+					faan_breakdown: null,
+					points: 999,
+					payments: { 0: 999 },
+					revealed: true,
+					winning_hand: null,
+					dealer: 0,
+					prevailing: 'EAST',
+					winner_melds: null
+				}
+			])
+		);
+
+		expect(next.handHistory).toEqual([_handHistoryEntry1]);
+	});
+
+	it('state_sync.hand_history merges alongside an already-accumulated hand and sorts by handNo', () => {
+		const s = state({ handHistory: [{ ..._handHistoryEntry1, handNo: 2 }] });
+
+		const next = reduce(
+			s,
+			stateSyncEvent([
+				{
+					hand_no: 1,
+					outcome: 'win',
+					winner: 0,
+					win_type: 'self_draw',
+					discarder: null,
+					faan: 3,
+					faan_breakdown: null,
+					points: 100,
+					payments: { 0: 300, 1: -100, 2: -100, 3: -100 },
+					revealed: true,
+					winning_hand: null,
+					dealer: 0,
+					prevailing: 'EAST',
+					winner_melds: null
+				}
+			])
+		);
+
+		expect(next.handHistory.map((h) => h.handNo)).toEqual([1, 2]);
 	});
 
 	it('game_end records final scores', () => {

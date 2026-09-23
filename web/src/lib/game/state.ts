@@ -116,13 +116,14 @@ export interface ClientGameState {
 	 * next `hand_start` (mirrors `lastHandEnd`'s own lifecycle, since both describe the same
 	 * held-open round). */
 	handEndDeadlineTs: number | null;
-	/** Every `hand_end` seen so far this session, oldest first — `lastHandEnd` above only ever
-	 * holds the latest one (used for the just-finished-hand overlay), so this is the running
-	 * history a score sheet needs. Append-only: never cleared by `hand_start` or `state_sync`
-	 * (a redacted snapshot carries no hand history to replace it with — reducer.ts's
-	 * `state_sync` case). Starts empty per `GameStore`/session; a reconnect that lands on a
-	 * full resync rather than gap-replay can leave it missing hands from before this session
-	 * began (`ScoreSheet.svelte`'s `historyComplete` flag exists for exactly that case). */
+	/** Every completed hand this session knows about, oldest first — `lastHandEnd` above only
+	 * ever holds the latest one (used for the just-finished-hand overlay), so this is the
+	 * running history a score sheet needs. Grown two ways: a live `hand_end` appends the hand
+	 * it just saw, and `state_sync.hand_history` (docs/02-protocol.md §3) fills in any hand this
+	 * session never saw live — a spectator joining mid-game, a reconnect-with-gap, a
+	 * backpressure-collapse resync — via `reducer.ts`'s `mergeHandHistory` (never clobbers an
+	 * already-recorded hand, just adds what's missing, by `handNo`). Starts empty per
+	 * `GameStore`/session. */
 	handHistory: HandHistoryEntry[];
 	gameEnd: GameEndState | null;
 	shutdownDeadlineTs: number | null;

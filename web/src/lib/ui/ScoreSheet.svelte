@@ -95,11 +95,13 @@
 		return rows;
 	});
 
-	// after a reconnect mid-game (docs/02-protocol.md §5) a client can hold `totals` from the
-	// latest `score` event while `hands` (assembled client-side from `hand_end` events actually
-	// seen) is missing earlier hands — `state_sync` replaces state, it doesn't replay history.
-	// Flag that instead of silently showing a running-total column that disagrees with the
-	// authoritative footer.
+	// Safety net, not the expected case: `state_sync.hand_history` (docs/02-protocol.md §3) now
+	// fills in any hand this session didn't see live (reconnect mid-game, spectator joining
+	// mid-game), so `hands` should normally already reconcile with the authoritative `totals`
+	// footer by the time this renders. Kept as a derived check rather than trusted blindly —
+	// flags it instead of silently showing a running-total column that disagrees with the
+	// footer, in case the two ever do diverge (e.g. a table older than this field, `winner_melds`
+	// aside, everything else here is still just addition a caller could get wrong).
 	let historyComplete = $derived(
 		hands.length === 0 ||
 			seats.every((s) => {
