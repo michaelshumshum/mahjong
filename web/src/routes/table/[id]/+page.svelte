@@ -50,6 +50,7 @@
 	import SeatRing from '$lib/table/SeatRing.svelte';
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
+	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -618,23 +619,6 @@
 	let showAnimationDemo = $state(false);
 </script>
 
-<!-- All four discard pools live together in the centre (docs/03-frontend.md §3's "Discard pool
-	geometry"), forming a box around the middle of the table instead of sitting at each seat's own
-	edge -- matches the physical layout of discards piled in front of each player, in the shared
-	space between hands. `position` picks the box side and, for left/right, the rotation that keeps
-	each pool parallel to that seat's own (already-rotated) hand. -->
-{#snippet centerDiscardPool(
-	seat: MockSeatState,
-	position: 'across' | 'left' | 'right' | 'self',
-	ariaLabel: string
-)}
-	<div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
-		{#each seat.discards as code, i (i)}
-			<div class="discard-tile" role="listitem"><TileFace {code} /></div>
-		{/each}
-	</div>
-{/snippet}
-
 {#if tableReady}
 	<h1 class="sr-only">Table</h1>
 
@@ -708,14 +692,26 @@
 				/>
 
 				<div class="table-center">
-					{@render centerDiscardPool(seatAt(2), 'across', `${seatAt(2).name}'s discards`)}
-					{@render centerDiscardPool(seatAt(3), 'left', `${seatAt(3).name}'s discards`)}
-					{@render centerDiscardPool(seatAt(1), 'right', `${seatAt(1).name}'s discards`)}
-					{@render centerDiscardPool(
-						seatAt(0),
-						'self',
-						spectating ? `${seatAt(0).name}'s discards` : 'Your discards'
-					)}
+					<CenterDiscardPool
+						seat={seatAt(2)}
+						position="across"
+						ariaLabel="{seatAt(2).name}'s discards"
+					/>
+					<CenterDiscardPool
+						seat={seatAt(3)}
+						position="left"
+						ariaLabel="{seatAt(3).name}'s discards"
+					/>
+					<CenterDiscardPool
+						seat={seatAt(1)}
+						position="right"
+						ariaLabel="{seatAt(1).name}'s discards"
+					/>
+					<CenterDiscardPool
+						seat={seatAt(0)}
+						position="self"
+						ariaLabel={spectating ? `${seatAt(0).name}'s discards` : 'Your discards'}
+					/>
 				</div>
 
 				<section
@@ -1289,12 +1285,6 @@
 		grid-area: self;
 	}
 
-	.seat-region--turn {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-		border-radius: var(--radius-sm);
-	}
-
 	.seat-meta {
 		display: flex;
 		align-items: center;
@@ -1332,24 +1322,6 @@
 		font-weight: 700;
 	}
 
-	// bot-controlled seat (M4.5 practice mode) -- a persistent identity marker, not a transient
-	// state like dealer/turn, so it reads as a quiet chip rather than borrowing --color-accent.
-	.bot-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: 1.25rem;
-		padding: 0 0.4rem;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		background: var(--color-surface-raised);
-		color: var(--color-text-muted);
-		font-size: 0.65rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-	}
-
 	.seat-score {
 		margin-inline-start: auto;
 		font-variant-numeric: tabular-nums;
@@ -1376,22 +1348,6 @@
 		margin-inline-end: var(--space-2);
 	}
 
-	.discard-pool {
-		display: grid;
-		grid-template-columns: repeat(6, minmax(20px, 28px));
-		justify-content: start;
-		gap: 2px;
-		max-width: 14rem;
-	}
-
-	.discard-tile {
-		height: clamp(22px, 3.5vw, 32px);
-	}
-
-	.discard-tile :global(.tile-face) {
-		height: 100%;
-	}
-
 	// all four discard pools live in the centre, forming a box around the middle instead of each
 	// sitting at its own seat's table edge (docs/03-frontend.md §3 "Discard pool geometry") --
 	// matches the physical pile-in-front-of-you layout, and the space is free now that
@@ -1415,94 +1371,6 @@
 			grid-template-columns: auto 1fr auto;
 			grid-template-rows: auto 1fr auto;
 			place-items: center;
-		}
-	}
-
-	.table-center .discard-pool--across {
-		@include layout.tablet-up {
-			grid-area: across;
-		}
-	}
-
-	.table-center .discard-pool--left {
-		@include layout.tablet-up {
-			grid-area: left;
-		}
-	}
-
-	.table-center .discard-pool--right {
-		@include layout.tablet-up {
-			grid-area: right;
-		}
-	}
-
-	.table-center .discard-pool--self {
-		@include layout.tablet-up {
-			grid-area: self;
-		}
-	}
-
-	// tablet-up only: below that, the phone-collapse block further down (`.discard-pool`'s
-	// horizontal-scroll override) needs to win, and it matches these pools the same as any other
-	// via the plain `.discard-pool` class -- gating this to tablet-up keeps that override's
-	// lower-specificity `.discard-pool` selector from silently losing to these on phone.
-	// wider than the 6-column default so a long hand's discards wrap onto fewer rows -- unbounded
-	// row growth here pushes `.seat-region--self` (`auto`-height row below `center`) down the page,
-	// off-screen, since `.table-center`'s own middle column is `1fr` and has room to spare.
-	.table-center .discard-pool {
-		@include layout.tablet-up {
-			grid-template-columns: repeat(12, minmax(20px, 28px));
-			max-width: 26rem;
-		}
-	}
-
-	.table-center .discard-tile {
-		@include layout.tablet-up {
-			height: clamp(26px, 4vw, 36px);
-		}
-	}
-
-	// left/right box pools rotated to read parallel to that seat's own already-rotated hand strip
-	// -- same box-stays-put/only-the-face-rotates technique as `.seat-hand-strip--left/--right
-	// .mini-tile` above (paint-only rotation, never changes what the grid measures), reused here
-	// for a grid of discards instead of a flex row of hand tiles. Declared after the shared
-	// `.table-center .discard-pool`/`.discard-tile` rules above so these equal-specificity
-	// overrides win on `grid-template-columns`/height.
-	.table-center .discard-pool--left,
-	.table-center .discard-pool--right {
-		@include layout.tablet-up {
-			grid-template-columns: none;
-			grid-template-rows: repeat(6, minmax(24px, 32px));
-			grid-auto-flow: column;
-		}
-	}
-
-	.table-center .discard-pool--left .discard-tile,
-	.table-center .discard-pool--right .discard-tile {
-		@include layout.tablet-up {
-			position: relative;
-			width: clamp(26px, 4vw, 36px);
-			height: calc(clamp(26px, 4vw, 36px) * 3 / 4);
-		}
-	}
-
-	.table-center .discard-pool--left .discard-tile :global(.tile-face) {
-		@include layout.tablet-up {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			height: clamp(26px, 4vw, 36px);
-			transform: translate(-50%, -50%) rotate(90deg);
-		}
-	}
-
-	.table-center .discard-pool--right .discard-tile :global(.tile-face) {
-		@include layout.tablet-up {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			height: clamp(26px, 4vw, 36px);
-			transform: translate(-50%, -50%) rotate(-90deg);
 		}
 	}
 
@@ -1667,14 +1535,6 @@
 			&:last-child {
 				margin-inline-end: 0;
 			}
-		}
-
-		.discard-pool {
-			grid-template-columns: none;
-			grid-auto-flow: column;
-			grid-auto-columns: minmax(22px, 28px);
-			overflow-x: auto;
-			max-width: 100%;
 		}
 
 		// `.table-tilt`'s `perspective` (unconditional, for the desktop rotateX) establishes a
