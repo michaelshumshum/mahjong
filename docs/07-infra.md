@@ -166,9 +166,21 @@ workflows** (`workflow_call`), one per concern:
 
 | File | Calls into | Runs |
 | --- | --- | --- |
-| `.github/workflows/server.yml` | one `server` job | `uv sync --locked`, then `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto` |
+| `.github/workflows/server.yml` | `server` + `server-slow` jobs | `server`: `uv sync --locked`, then `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `uv sync --locked`, then `pytest -q -m slow -n auto --games=1000` — soaks, the real-bot/`ProcessPoolExecutor` practice-mode e2e, hypothesis runs. Never skipped: this is the whole suite, not just the fast gate. |
 | `.github/workflows/web.yml` | one `web` job | `pnpm install --frozen-lockfile`, then `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
 | `.github/workflows/proto-check.yml` | one `proto-check` job | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
+
+**Local dev vs. CI split.** `make test` / `make test-server` / `make test-web` run the fast
+suite only — the loop a change actually blocks on. The slow suite (soaks, real-bot e2e,
+hypothesis property runs, `@pytest.mark.slow`) is real, correctness-relevant coverage, not a
+"nice to have when there's time" tier — it caught a genuine tile-conservation bug in
+`mahjong_core.engine`'s claimed-win path that the fast suite structurally can't reach (needs
+thousands of randomized games to hit). It's deliberately excluded from the everyday local loop
+because of its cost (~15 min for the full 10,000-game soak), not skipped: `make
+test-server-slow` runs it locally (`N=` overrides the game count, same as `make selfplay`), and
+`server-slow` above runs it on every push/PR in CI, capped at 1,000 games so it doesn't blow up
+per-push latency. CI is the backstop that guarantees this suite always actually runs somewhere,
+since nothing about `@pytest.mark.slow` runs it by default.
 
 All native tooling (`uv`, `pnpm`) rather than `docker compose run` — nothing here touches
 Postgres, so the containers buy nothing but slower cold starts. `docker compose`-based
@@ -178,12 +190,17 @@ Postgres.
 
 **Job graph**: GitHub Actions can't `needs:` across independent top-level workflow files, only
 within one workflow's own jobs — reusable workflows are the way to get real separate files while
-keeping the option to chain a job that has a genuine dependency. Here, none do: `server`, `web`,
-and `proto-check` are independent domains with no shared artifact, so root `ci.yml` calls all
-three with no `needs:` — they run in parallel. Within `server.yml`/`web.yml`, lint and test (plus
-typecheck, for `web`) also don't depend on each other's *output*, but are sequential steps inside
-one job rather than separate jobs, so the dependency install (`uv sync` / `pnpm install`) happens
-once per pipeline instead of 2-3x or needing an artifact handoff between jobs.
+keeping the option to chain a job that has a genuine dependency. Here, none do: `server`,
+`server-slow`, `web`, and `proto-check` are independent domains with no shared artifact, so root
+`ci.yml` calls all three files with no `needs:`, and `server.yml` itself declares `server` and
+`server-slow` as two separate jobs (also no `needs:` between them) rather than sequential steps —
+unlike lint/test below, which do share a venv and gain nothing from splitting, `server-slow`
+would otherwise sit on the fast job's own critical path for no reason, defeating the point of
+having a separate fast loop at all. All four jobs run in parallel. Within `server.yml`'s `server`
+job and `web.yml`, lint and test (plus typecheck, for `web`) also don't depend on each other's
+*output*, but are sequential steps inside one job rather than separate jobs, so the dependency
+install (`uv sync` / `pnpm install`) happens once per job instead of 2-3x or needing an artifact
+handoff.
 
 **Gates**:
 
@@ -191,6 +208,7 @@ once per pipeline instead of 2-3x or needing an artifact handoff between jobs.
 | --- | --- |
 | `ruff check`, `ruff format --check` | hard — any finding fails the job |
 | `pytest -q -m fast -n auto` | hard |
+| `pytest -q -m slow -n auto --games=1000` (`server-slow`) | hard |
 | `pnpm lint` (oxlint + oxfmt) | hard |
 | `pnpm check` (svelte-check) | hard |
 | `pnpm test` (vitest + Playwright) | hard |

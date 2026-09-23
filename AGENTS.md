@@ -44,6 +44,9 @@ read this session, or `**Context read: N/A**` if no trigger applied.
   - if the change is only relevant to `web`, run `make test-web` instead.
   - if the change is only relevant to `server`, run `make test-server` instead.
   - in most cases, one of the above is sufficient; if you have a reason to run all tests, do so.
+- Local dev runs the fast suite only (`@pytest.mark.slow` — soaks, real-bot e2e, hypothesis runs
+  — is excluded by default; `make test-server-slow` runs it explicitly). CI runs both, in
+  parallel, on every push/PR (`docs/07-infra.md §9`) — nothing is ever silently skipped there.
 - New behaviour gets a test in the same change; bugs get a failing regression test first.
 - `mahjong_core` is pure — test it directly. No mocks, no I/O. Golden fixtures (`tests/replays/`,
   the scoring hand suite) are data, not mocks, and are required — see `05-roadmap.md`.

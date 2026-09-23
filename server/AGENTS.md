@@ -22,9 +22,10 @@ bots/           bot tiers + arena harness
 ## Commands
 
 ```
-make test         pytest fast suite (parallelized across all cores)
-make selfplay     engine soak — N complete games, random bots
-make arena        bot evaluation
+make test              pytest fast suite (parallelized across all cores)
+make test-server-slow  pytest slow suite — soaks, real-bot e2e, hypothesis runs; CI runs this too
+make selfplay          engine soak — N complete games, random bots
+make arena             bot evaluation
 make fmt lint typecheck
 ```
 
