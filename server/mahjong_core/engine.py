@@ -631,7 +631,37 @@ def _apply_claim_response(
         # the local tuple ever saw it (docs/02-protocol.md §3's now-fixed "known gap").
         concealed_tiles = (*winner_state.concealed, window.tile)
         winner_state = dataclasses.replace(winner_state, concealed=concealed_tiles)
-        state = dataclasses.replace(state, seats=_with_seat(state.seats, winner, winner_state))
+        seats = _with_seat(state.seats, winner, winner_state)
+
+        # the claimed tile leaves wherever it came from -- otherwise it's double-counted, both
+        # there and in the winner's hand above. A plain discard win pops it off the discarder's
+        # discard pool, same as a claimed chow/pung/kong does below. A kong-rob win takes it back
+        # out of the declarer's kong meld: an added kong (加槓) reverts to the pung it upgraded
+        # from (the 4th tile never actually completed it); a concealed kong (暗槓, thirteen-orphans
+        # only) had never been exposed at all, so its other 3 tiles just return to the declarer's
+        # concealed hand rather than staying a meld.
+        source_state = state.seats[window.source_seat]
+        if window.kind == ClaimKind.KONG_ROB:
+            kong_meld = next(m for m in source_state.melds if window.tile in m.tiles)
+            remaining_tiles = tuple(t for t in kong_meld.tiles if t != window.tile)
+            if kong_meld.kind == MeldKind.ADDED_KONG:
+                reverted = Meld(MeldKind.PUNG, remaining_tiles, from_seat=kong_meld.from_seat)
+                source_melds = tuple(m for m in source_state.melds if m != kong_meld) + (reverted,)
+                source_state = dataclasses.replace(source_state, melds=source_melds)
+            else:
+                assert kong_meld.kind == MeldKind.CONCEALED_KONG
+                source_melds = tuple(m for m in source_state.melds if m != kong_meld)
+                source_state = dataclasses.replace(
+                    source_state,
+                    melds=source_melds,
+                    concealed=(*source_state.concealed, *remaining_tiles),
+                )
+        else:
+            assert source_state.discards[-1] == window.tile
+            source_state = dataclasses.replace(source_state, discards=source_state.discards[:-1])
+        seats = _with_seat(seats, window.source_seat, source_state)
+
+        state = dataclasses.replace(state, seats=seats)
         more_state, more_events = _end_win(
             state,
             winner=winner,

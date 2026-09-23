@@ -340,6 +340,11 @@ def test_robbing_the_kong_ends_the_hand_as_a_kong_rob_win() -> None:
         payments={0: -32, 1: 0, 2: 32, 3: 0},
     )
     assert any(isinstance(e, HandEnded) for e in events)
+    # regression, same shape as test_claim_win_off_discard_removes_the_tile_from_the_discarder_
+    # pool above: the robbed tile used to stay in the declarer's ADDED_KONG meld *and* get
+    # folded into the winner's concealed hand. Robbing means the 4th tile never actually
+    # completed the kong, so it reverts to the PUNG it was upgraded from.
+    assert state.seats[0].melds == (Meld(MeldKind.PUNG, _MAN_1[:3], from_seat=1),)
 
 
 def test_declining_to_rob_the_kong_lets_declarer_draw_replacement() -> None:
@@ -424,6 +429,11 @@ def test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win() -> None:
     assert result.win_type == WinType.KONG_ROB
     assert result.faan_breakdown == {"十三么": 10}  # default faan_cap
     assert any(isinstance(e, HandEnded) for e in events)
+    # regression, same shape as the added-kong case above: a concealed kong was never exposed
+    # at all, so robbing it doesn't revert to any meld -- the other 3 tiles just return to the
+    # declarer's concealed hand, and the meld disappears rather than staying a phantom kong.
+    assert state.seats[0].melds == ()
+    assert sorted(state.seats[0].concealed) == sorted((*_EAST[:3], *_JUNK_HAND[:10]))
 
 
 # --- self-draw win -----------------------------------------------------------------------------
@@ -529,6 +539,25 @@ def test_claim_win_off_discard_merges_winning_tile_into_concealed() -> None:
     assert len(state.seats[3].concealed) == 14
     assert _MAN_2[1] in state.seats[3].concealed
     assert sorted(state.seats[3].concealed) == sorted((*_claimable_standard_hand(), _MAN_2[1]))
+
+
+def test_claim_win_off_discard_removes_the_tile_from_the_discarder_pool() -> None:
+    """Regression: the winning tile used to stay in `discarder.discards` *and* get folded into
+    the winner's concealed hand (previous test) -- a real tile double-counted in two seats at
+    once, caught by tests/test_selfplay.py's tile-conservation invariant at seed=34. A claimed
+    win must pop the tile off the discard pool exactly like a claimed chow/pung/kong already
+    does (below in engine.py's `_apply_claim_response`)."""
+    state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
+    state = _with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = _all_junk(state, except_seat=1)
+    state = _with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
+
+    state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))
+    assert _MAN_2[1] in state.seats[1].discards
+    win_action = next(a for a in legal_actions(state, 3) if isinstance(a, ClaimWin))
+    state, _ = reduce(state, win_action)
+
+    assert _MAN_2[1] not in state.seats[1].discards
 
 
 def test_claim_win_gated_by_min_faan_even_when_window_opens_for_another_seat() -> None:
