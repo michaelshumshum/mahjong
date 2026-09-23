@@ -70,7 +70,11 @@ back are exempt on both sides of that check). The grid is persistent, not rebuil
 resize — a resize only grows it to cover the new viewport, appending new cells without touching
 already-placed ones, so a spurious `resize` (a webfont swap reflowing the page, a scrollbar
 toggling) can't read as the whole mural "switching"; genuinely unchanged
-`window.innerWidth`/`innerHeight` short-circuits the handler before that even matters.
+`window.innerWidth`/`innerHeight` short-circuits the handler before that even matters. The scroll
+itself grows the grid the same way: the pre-rendered buffer's row window advances by one grid row
+every time its leading row scrolls fully out of view, rather than wrapping back onto a fixed
+buffer — a fixed-size wraparound would redraw the same rows on a loop, which reads as the tile
+layout periodically snapping back or reshuffling instead of scrolling continuously.
 
 **Shared across routes, mounted once.** The mural appears on `/`, `/tables`, and `/table/[id]`'s
 pregame states (connecting, seat picker, waiting-for-players) — never on the actual game table,
@@ -139,6 +143,17 @@ discards across the pool's full width, and left the centre area sitting on redun
 (wall/prevailing/dealer/turn, moved to the header, dealer/turn dropped) once your own pool moved
 out of it. Moving the other three in too gives the box shape a real table has, rather than only
 half of it. Each pool keeps independent scroll/collapse behaviour on small screens (below).
+
+Each pool overflows toward the table's centre, never away from it: `left`/`across` already grow
+that way from plain grid/flex auto-placement (`left`'s `grid-auto-flow: column` advances toward
+higher indices, which is rightward/centreward for a box sitting at the screen's left edge; across
+wraps downward, correct as-is since across sits at the top edge). `right` and `self` needed an
+explicit flip since auto-placement's default direction reads as "away from centre" for an edge on
+the opposite side: `right` sets `direction: rtl` so its auto-placed columns advance leftward
+instead (the rotated tile-face positioning is unaffected — that's absolute, keyed off the box's
+own centre, not text direction); `self` switches from grid to flex with `flex-wrap: wrap-reverse`
+so an overflow line anchors upward (toward centre) instead of pushing further down the page, the
+concern the wide 12-column override above could only reduce, not remove.
 
 CSS: `grid-template-areas` for the four seat regions + centre; `perspective` + `rotateX` on the
 table container for the 2.5D tilt; `transform`/`opacity` only in animated paths. No global scale

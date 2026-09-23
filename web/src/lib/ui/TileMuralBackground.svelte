@@ -5,6 +5,7 @@
 	// animating ~200 elements' transforms at once. See docs/03-frontend.md §2's canvas exception
 	// note for the full rationale.
 	import { TILE_ASSET, type RenderableTileCode } from '$lib/table/tile-code';
+	import { muralBlitY, stepMuralScroll } from './mural-scroll';
 
 	// the tile back joins the pool as its own pseudo-code alongside the 34 playable faces --
 	// same "special, no suit" treatment as honors (below), and drawn the same way TileFace.svelte
@@ -95,15 +96,18 @@
 		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-		// persistent across resizes: cells already assigned a tile keep it, resize only grows
-		// the grid to cover the new viewport. Re-randomizing the whole grid on every resize
-		// (including spurious ones -- a scrollbar toggling, a webfont swap reflowing the page a
-		// couple seconds after load) read as the entire mural "switching," not scrolling.
+		// persistent across resizes and across scroll time: cells already assigned a tile keep
+		// it. Resize only grows the grid to cover the new viewport (never re-randomizes existing
+		// cells -- see below); the scroll loop in draw() grows it the same way, appending one new
+		// row every time the buffer's leading row scrolls fully out of view, so the mural never
+		// wraps back onto rows already shown. `topRow` is the grid row currently drawn at the
+		// buffer's own row 0.
 		let grid: MuralTile[][] = [];
 		let bufferRows = 0;
 		let bufferCssHeight = 0;
 		let viewW = 0;
 		let viewH = 0;
+		let topRow = 0;
 
 		function ensureGrid(cols: number, rows: number): void {
 			for (let r = 0; r < grid.length; r++) {
@@ -171,9 +175,11 @@
 
 			const cols = Math.ceil(viewW / CELL_W) + 1;
 			const visibleRows = Math.ceil(viewH / CELL_H) + 1;
-			bufferRows = visibleRows + 1; // one extra row so the vertical wrap has no seam
+			// one extra row of padding so the sub-row scroll offset never exposes empty space
+			// at the buffer's bottom edge.
+			bufferRows = visibleRows + 1;
 			bufferCssHeight = bufferRows * CELL_H;
-			ensureGrid(cols, bufferRows);
+			ensureGrid(cols, topRow + bufferRows);
 
 			buffer.width = cols * CELL_W * dpr;
 			buffer.height = bufferCssHeight * dpr;
@@ -181,7 +187,7 @@
 			bufferCtx.clearRect(0, 0, cols * CELL_W, bufferCssHeight);
 			for (let r = 0; r < bufferRows; r++) {
 				for (let c = 0; c < cols; c++) {
-					drawTile(c * CELL_W, r * CELL_H, grid[r][c]);
+					drawTile(c * CELL_W, r * CELL_H, grid[topRow + r][c]);
 				}
 			}
 
@@ -200,12 +206,21 @@
 			const dt = (now - last) / 1000;
 			last = now;
 			if (!reduceMotion) {
-				offset = (offset + SPEED_PX_PER_SEC * dt) % CELL_H;
+				// each full row scrolled out of view advances the window onto a freshly-grown
+				// grid row instead of wrapping back onto the same fixed buffer -- a plain
+				// `% CELL_H` here redraws the same rows on a loop, which reads as the mural's
+				// tiles periodically snapping back / reshuffling. See mural-scroll.ts.
+				const step = stepMuralScroll(offset, dt, SPEED_PX_PER_SEC, CELL_H);
+				offset = step.offset;
+				if (step.rowsAdvanced > 0) {
+					topRow += step.rowsAdvanced;
+					renderBuffer();
+				}
 			}
 
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			ctx.clearRect(0, 0, viewW, viewH);
-			ctx.drawImage(buffer, 0, offset - CELL_H, buffer.width / dpr, bufferCssHeight);
+			ctx.drawImage(buffer, 0, muralBlitY(offset), buffer.width / dpr, bufferCssHeight);
 
 			if (!reduceMotion) raf = requestAnimationFrame(draw);
 		}
