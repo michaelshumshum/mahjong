@@ -16,8 +16,6 @@
 	import type { ServerEvent } from '$lib/net/protocol';
 	import ClaimDialog from '$lib/ui/ClaimDialog.svelte';
 	import type { ClaimOption } from '$lib/ui/ClaimButtons.svelte';
-	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
-	import DialogTimer from '$lib/ui/DialogTimer.svelte';
 	import ScoreSheet, {
 		type HandRecord,
 		type RoundResult,
@@ -51,6 +49,7 @@
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
 	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
+	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 
 	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
 	// route) -----------------------------------------------------------------------------------
@@ -747,36 +746,14 @@
 		{/if}
 
 		{#if gameState.handResult && !gameEndReached && !handEndDismissedLocally}
-			<div class="faan-overlay" data-testid="faan-overlay">
-				{#key gameState.handNo}
-					<div class="hand-end-timer">
-						<DialogTimer
-							durationMs={gameState.handEndHoldMs ?? 0}
-							size={40}
-							onClose={dismissHandEnd}
-						/>
-					</div>
-				{/key}
-				<div class="panel">
-					<CloseButton onclick={dismissHandEnd} />
-					{#if gameState.handResult.outcome === 'win'}
-						<FaanBreakdown
-							winner={gameState.handResult.winner as 0 | 1 | 2 | 3}
-							{seatNames}
-							winningHand={gameState.handResult.winningHand ?? []}
-							melds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
-							patterns={gameState.handResult.patterns ?? []}
-							totalFaan={gameState.handResult.totalFaan ?? 0}
-							payments={gameState.handResult.payments ?? {}}
-						/>
-					{:else}
-						<section class="hand-end-summary" data-testid="hand-end-draw" aria-label="Hand result">
-							<h2>Hand {gameState.handNo}</h2>
-							<p>Draw</p>
-						</section>
-					{/if}
-				</div>
-			</div>
+			<HandEndOverlay
+				handResult={gameState.handResult}
+				handNo={gameState.handNo}
+				handEndHoldMs={gameState.handEndHoldMs}
+				{seatNames}
+				winnerMelds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
+				onDismiss={dismissHandEnd}
+			/>
 		{/if}
 
 		{#if gameEndReached && scoreStandings}
@@ -1212,11 +1189,10 @@
 		}
 	}
 
-	// centered, scrim-backed like `.faan-overlay`/`.panel-overlay` below -- a claim decision is
-	// as consequential as a hand result, so it gets the same modal weight, not a translucent
-	// button row that leaves the table interactive underneath it.
+	// centered, scrim-backed like `.panel-overlay` below -- a claim decision is as consequential
+	// as a hand result, so it gets the same modal weight, not a translucent button row that
+	// leaves the table interactive underneath it.
 	.claim-overlay,
-	.faan-overlay,
 	.panel-overlay {
 		position: fixed;
 		inset: 0;
@@ -1228,35 +1204,7 @@
 		padding: var(--space-3);
 	}
 
-	.faan-overlay {
-		flex-direction: column;
-		gap: var(--space-3);
-	}
-
-	.hand-end-summary {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		// wide enough that a short heading (e.g. "Hand 6") never sits under the CloseButton in
-		// the panel's top-right corner
-		min-width: 14rem;
-		max-width: 24rem;
-		padding: var(--space-4);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
-
-		h2 {
-			margin: 0;
-			font-size: var(--font-size-lg);
-		}
-
-		p {
-			margin: 0;
-			color: var(--color-text-muted);
-		}
-	}
-
-	// hugs whatever dialog content it wraps (ScoreSheet/Settings/hand-end result) so the
+	// hugs whatever dialog content it wraps (ScoreSheet/Settings/game-end) so the
 	// CloseButton it contains is positioned against that panel's own corner, not the fullscreen
 	// scrim's.
 	.panel {
