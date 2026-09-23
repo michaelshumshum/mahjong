@@ -93,12 +93,11 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
 	const overlay = page.getByTestId('game-end-overlay');
 	await expect(overlay).toBeVisible();
-	await expect(overlay.getByRole('heading', { name: 'Game over' })).toBeVisible();
 	await expect(overlay.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
 
-	// standings: 4 rounds, ranked by final total (mock-game-state.ts's `gameJustEnded.gameEnd`).
+	// score sheet shows all 4 rounds; final standings cards are omitted in favor of the podium.
 	await expect(overlay.locator('.score-sheet tbody tr')).toHaveCount(4);
-	await expect(overlay.locator('.standings')).toContainText('1st');
+	await expect(overlay.locator('.standings')).toHaveCount(0);
 
 	// clicking into a past round (hand 2, a self-drawn All Pungs win) reveals that round's own
 	// winning hand, not just the most recent one -- the actual gap this sub-task closed

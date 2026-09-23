@@ -36,12 +36,7 @@
 	}
 </script>
 
-<section class="game-end" aria-labelledby="game-end-heading">
-	<header class="game-end-header">
-		<h1 id="game-end-heading">Game over</h1>
-		<p class="game-end-subtitle">Thanks for playing</p>
-	</header>
-
+<section class="game-end" aria-label="Game end summary">
 	<div class="podium">
 		{#each standings.slice(0, 3) as standing, index (standing.seat)}
 			{@const rank = index}
@@ -63,7 +58,7 @@
 		{/each}
 	</div>
 
-	<ScoreSheet {seats} {totals} {hands} {standings} />
+	<ScoreSheet {seats} {totals} {hands} />
 	<a class="home-link" href="/">Back to home</a>
 </section>
 
@@ -81,28 +76,6 @@
 		@include layout.tablet-up {
 			padding: var(--space-6);
 		}
-	}
-
-	.game-end-header {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-1);
-		text-align: center;
-	}
-
-	h1 {
-		margin: 0;
-		font-size: clamp(2.5rem, 8vw, 4rem);
-		font-weight: 900;
-		letter-spacing: -0.04em;
-		line-height: 1;
-	}
-
-	.game-end-subtitle {
-		margin: 0;
-		color: var(--color-text-muted);
-		font-size: var(--font-size-lg);
 	}
 
 	.podium {
@@ -140,7 +113,7 @@
 	}
 
 	.podium-step--first {
-		background: rgb(255 255 255 / 0.05);
+		background: #3d3120;
 		box-shadow: 0 -8px 24px -4px rgb(212 175 55 / 0.15);
 	}
 

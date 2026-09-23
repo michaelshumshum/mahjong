@@ -28,9 +28,9 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 | ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create a table, join one, or play solo vs bots, over a scrolling tile-mural canvas background | ![Lobby, create-table dialog](docs/screenshots/lobby-create-dialog.png) Lobby — create-table dialog: named rules presets or a custom ruleset (`POST /tables`, `docs/02-protocol.md §10`) |
 | ![Tables](docs/screenshots/tables.png) Tables (`/tables`) — join by code, or sit down / watch from the grid | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard |
 | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown |
-| ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw | ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended, score summary with standings |
-| ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
-| ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | |
+| ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw | ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended, score summary with winner podium |
+| ![Table, settings](docs/screenshots/table-settings.png) Table — settings panel | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting |
+| ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players |
 
 ## Planning docs
 
