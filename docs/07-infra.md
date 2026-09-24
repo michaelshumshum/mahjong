@@ -173,16 +173,22 @@ workflows** (`workflow_call`), one per concern:
 `ci.yml` also has one job of its own, not a reusable-workflow call: `coverage-badge`, gated
 `if: push to main` (never a PR — a fork PR has no write access, and shouldn't mutate main anyway)
 and `needs: [server, web]`. It downloads the `coverage-server`/`coverage-web` artifacts those two
-jobs upload (`server.yml`'s `server` job runs pytest with `--cov=mahjong_core --cov=app --cov=bots
---cov-report=json:coverage.json`; `web.yml`'s `web` job runs the new `pnpm run test:coverage`
-script — `vitest --run --coverage`, `@vitest/coverage-v8`, `json-summary` reporter, both vitest
-projects — as a step ahead of the existing Playwright e2e step), turns each into a shields.io
-[endpoint-badge](https://shields.io/badges/endpoint-badge) JSON file
-(`.github/scripts/coverage_badge.py`), and commits `coverage-server.json`/`coverage-web.json` at
-the repo root if they changed. README's two coverage badges point at those files' raw GitHub URLs.
-No external service (Codecov etc.) — self-hosted so it needs no account/token, at the cost of no
-PR-diff coverage comments or trend graphs. `GITHUB_TOKEN`-authored pushes don't retrigger workflow
-runs, so this can't loop into itself.
+jobs upload, turns each into a shields.io [endpoint-badge](https://shields.io/badges/endpoint-badge)
+JSON file (`.github/scripts/coverage_badge.py`), and commits `coverage-server.json`/
+`coverage-web.json` at the repo root if they changed. README's two coverage badges point at those
+files' raw GitHub URLs. No external service (Codecov etc.) — self-hosted so it needs no
+account/token, at the cost of no PR-diff coverage comments or trend graphs. `GITHUB_TOKEN`-authored
+pushes don't retrigger workflow runs, so this can't loop into itself.
+
+Coverage collection is a **second, non-blocking pytest rerun** in `server.yml`'s `server` job
+(`pytest (coverage, informational)`, `continue-on-error: true`), not folded into the hard-gate
+`pytest` step above it — `coverage.py`'s line tracing adds enough overhead to trip
+`test_frontier_cache_warms_and_stays_fast`'s wall-clock ceiling (`tests/test_shanten.py`, a real
+cache-performance assertion, not a flaky test), and that test is deselected from the coverage
+rerun since the hard gate already exercised it for correctness. `web.yml`'s `web` job instead runs
+the new `pnpm run test:coverage` script (`vitest --run --coverage`, `@vitest/coverage-v8`,
+`json-summary` reporter, both vitest projects) as one step ahead of the existing Playwright e2e
+step — no wall-clock-timing tests there to trip, so no rerun needed.
 
 **Local dev vs. CI split.** `make test` / `make test-server` / `make test-web` run the fast
 suite only — the loop a change actually blocks on. The slow suite (soaks, real-bot e2e,

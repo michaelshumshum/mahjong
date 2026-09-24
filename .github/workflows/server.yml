@@ -24,8 +24,17 @@ jobs:
       - name: ruff format --check
         run: uv run ruff format --check .
       - name: pytest
+        run: uv run pytest -q -m fast -n auto
+      # Separate rerun, not folded into the hard gate above: coverage.py's line tracing adds
+      # enough overhead to trip test_frontier_cache_warms_and_stays_fast's wall-clock ceiling
+      # (a real cache-performance assertion, not a flaky test) -- deselected here since the
+      # step above already exercised it for correctness. continue-on-error because this step
+      # exists only to produce the coverage-badge artifact; it must never fail the job.
+      - name: pytest (coverage, informational)
+        continue-on-error: true
         run: >
           uv run pytest -q -m fast -n auto
+          --deselect tests/test_shanten.py::test_frontier_cache_warms_and_stays_fast
           --cov=mahjong_core --cov=app --cov=bots --cov-report=json:coverage.json
       - uses: actions/upload-artifact@v4
         with:
