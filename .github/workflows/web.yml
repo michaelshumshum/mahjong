@@ -33,7 +33,7 @@ jobs:
       - name: unit test + coverage
         working-directory: web
         run: pnpm run test:coverage
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: coverage-web
           path: web/coverage/coverage-summary.json
