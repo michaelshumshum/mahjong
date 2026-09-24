@@ -2,6 +2,11 @@
 
 [![server coverage](.github/badges/coverage-server.svg)](docs/07-infra.md#9-ci)
 [![web coverage](.github/badges/coverage-web.svg)](docs/07-infra.md#9-ci)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
+[![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Server-authoritative real-time multiplayer Hong Kong (Cantonese) mahjong. Bots fill empty seats
 and take over for disconnected players.
