@@ -1,31 +1,11 @@
-"""T1 `EfficiencyBot` (docs/04-bots.md §2/§3): shanten-minimising discard, ukeire tiebreak, no
-value-planning or safety model -- "Easy" difficulty, and the arena's shanten-only reference
-point once T2 exists to compare against (docs/04-bots.md §7).
+"""T1 `EfficiencyBot` (docs/04-bots.md §2/§3): shanten-minimising discard, ukeire tiebreak.
 
-**Discard rule (§3, verbatim):** minimise shanten; tiebreak on `tiles_accepted` (more is
-better); then `kinds_accepted` (more is better); then prefer discarding terminals/honors. Call
-chow/pung only if it strictly reduces shanten.
+Never claims/declares kongs: a kong always contributes 3 tiles to the shanten count array
+regardless of source, so doing so never changes shanten -- falls out of the shanten model, not a
+special case.
 
-**Claimed/self-declared kongs are never taken, by construction, not by special-casing.** A kong
-always contributes exactly 3 tiles to the `mahjong_core.shanten` count array regardless of
-source (`bots/features.py`'s `_add_meld`) -- claiming one leaves the array numerically
-*identical* to not claiming it (the 3 concealed/claimed tiles that back the kong were already
-contributing 3 to the array as a plain triplet), and self-declaring one only ever *drops* a
-count from 4 to 3, which `mahjong_core.shanten._frontier` already treats identically to a
-plain triplet in every case that matters for a real 13/14-tile hand (see that module's
-"four-copies" divergence note for the one narrow case where it doesn't, which is also exactly
-the case real kong-declaring resolves in the first place). So "only call if it strictly reduces
-shanten" resolves to "never call" for every kong here, structurally -- not hand-coded, and this
-module still runs the real comparison rather than skipping kongs outright, so a future change to
-the shanten model would automatically be picked up here with no edit needed.
-
-**All three chow options are numerically interchangeable for shanten purposes, and this module
-only ever evaluates one.** Whichever two of a chow's three tile types come from this seat's own
-concealed hand, they net to zero change in the count array (one concealed copy leaves, the
-meld's own representation adds one back) -- only the claimed tile's type ever changes the array,
-regardless of which of the three run positions it occupies. So `chow_low`/`chow_middle`/
-`chow_high` always evaluate to the identical resulting shanten when any is legal; this module
-computes it once and returns whichever specific id the mask actually offers.
+All three chow variants score identically (only the claimed tile's type affects the count array,
+not run position), so this evaluates once and returns whichever id the mask offers.
 """
 
 from __future__ import annotations
@@ -52,10 +32,8 @@ _WIN = 108
 
 
 def _best_after_discard(hand34: list[int], *, closed: bool) -> int:
-    """The best shanten reachable from `hand34` by discarding exactly one tile -- the same
-    "what's my base after this candidate action" step `mahjong_core.shanten.ukeire` computes
-    per discard, exposed here so claim evaluation (which must compare against the *best*
-    resulting hand, not just the meld's own shape) can reuse it."""
+    """Best shanten after discarding one tile -- exposed so claim evaluation can compare against
+    the best resulting hand, not just the meld's own shape."""
     best: int | None = None
     for t in range(34):
         if hand34[t] == 0:
@@ -70,14 +48,10 @@ def _best_after_discard(hand34: list[int], *, closed: bool) -> int:
 
 
 def _claimed_type(view: SeatView) -> int | None:
-    """The tile type up for claim, derived without needing `state.claim_window.tile` (a bot
-    never sees `GameState`): during a discard-triggered `AWAIT_CLAIMS` window, `view.turn`
-    still names the discarder (`engine._apply_discard` opens the window without advancing
-    `turn`), and that discard is exactly the last entry of their `discard_pools` -- it was just
-    appended in the same `reduce()` call that opened the window. `None` outside a discard claim
-    window (kong-rob offers are win-only, per `engine._kong_rob_offers` -- no meld to evaluate)
-    or if that pool is somehow empty (defensive; should never happen when `AWAIT_CLAIMS` is
-    live)."""
+    """Tile type up for claim, without `state.claim_window.tile` (a bot never sees `GameState`):
+    `view.turn` still names the discarder during `AWAIT_CLAIMS`, so their last discard is the
+    claimed tile. `None` outside a discard claim window (kong-rob is win-only) or on a
+    defensively-empty pool."""
     if view.phase != Phase.AWAIT_CLAIMS:
         return None
     pool = view.discard_pools[view.turn]
@@ -90,14 +64,12 @@ class EfficiencyBot:
     """T1: see module docstring. Never returns an id `mask` doesn't mark legal."""
 
     async def act(self, view: SeatView, mask: list[bool], deadline: float) -> int:
-        del deadline  # T1 has no search budget to spend; every decision is O(1) lookups
+        del deadline  # no search budget; every decision is O(1)
         if mask[_WIN]:
             return _WIN
         if view.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
             return self._act_on_claim(view, mask)
         return self._act_on_turn(view, mask)
-
-    # --- claim window (discard-triggered chow/pung/kong, or a kong-rob window) -------------
 
     def _act_on_claim(self, view: SeatView, mask: list[bool]) -> int:
         hand = own_hand34(view)
@@ -122,11 +94,8 @@ class EfficiencyBot:
                 if s < best_shanten:
                     best_shanten, best_aid = s, chow_aid
 
-        # mask[_KONG] (claiming an exposed kong) is deliberately not evaluated: see module
-        # docstring -- it is numerically identical to not claiming, so it can never win here.
+        # claiming an exposed kong never helps shanten (module docstring) -- skip it.
         return best_aid
-
-    # --- own turn: self-declared kongs, then the discard rule -------------------------------
 
     def _act_on_turn(self, view: SeatView, mask: list[bool]) -> int:
         hand = own_hand34(view)

@@ -1,19 +1,14 @@
-"""Shared self-play game loop (docs/05-roadmap.md §1 `bots/`; docs/06-ml.md §2's M1 gate:
-`GameRecord` persistence, bot-only included).
+"""Shared self-play game loop: plays a full game via the real `Bot` protocol and keeps the
+action log, for anywhere a real `GameRecord` is wanted or a non-`RandomBot` tier needs exercising
+end to end.
 
-`tests/test_selfplay.py`'s soak test plays games without keeping their action log, and drives
-`bots.random.random_action` directly rather than this module -- it only needs to prove the
-engine terminates cleanly and every invariant holds, and both logging 10,000 games' worth of
-actions and building a real `SeatView`/mask per decision would make that hot loop heavier for
-no benefit there. This module is the version that keeps the log and speaks the real `Bot`
-protocol (`bots/base.py`), used anywhere an actual `GameRecord` is wanted (see
-`app/db/records.py`) or a real (non-`RandomBot`) tier needs exercising end to end.
+Distinct from `tests/test_selfplay.py`'s soak test, which drives `bots.random.random_action`
+directly and keeps no log -- that test only needs to prove the engine terminates cleanly, and
+building a real `SeatView`/mask per decision would make its hot loop heavier for no benefit.
 
-**`Bot.act` needs `(view, mask, deadline)`; `reduce` needs a concrete `Action`.** This is the
-"someone must decode" caller `bots/base.py`'s docstring describes: this loop already holds the
-real `GameState`, so it builds `seat_view(state, seat)` and `ml.legal_mask(state, seat)` each
-turn, awaits `Bot.act`, then `ml.decode_action(aid, state, seat)` back to the concrete `Action`
-`reduce` and the persisted action log both need.
+This loop holds the real `GameState`, so it does the decode step `Bot.act` itself can't:
+`seat_view`/`legal_mask` in, `Bot.act` returns an id, `decode_action` turns it into the concrete
+`Action` `reduce` and the action log both need.
 """
 
 from __future__ import annotations
@@ -47,15 +42,13 @@ async def play_game(
     *,
     step_cap: int = _STEP_CAP,
 ) -> tuple[GameState, list[Action]]:
-    """Play one complete game to `Phase.GAME_OVER`. Returns `(final_state, actions)` -- the
-    ordered `Action` log that reproduces `final_state` from `new_game(ruleset, seed)` via
-    `reduce` (docs/00-architecture.md §3: "replays as `(game_seed, actions)`"), the shape
-    `docs/06-ml.md §2`'s `GameRecord.actions` needs. `start_next_hand` transitions are never
-    `Action`s (engine.py) so they aren't logged -- replaying the log reconstructs them
-    automatically off `Phase.HAND_OVER`, deterministically, the same way live play does.
+    """Plays one complete game to `Phase.GAME_OVER`. Returns `(final_state, actions)`, the action
+    log that reproduces `final_state` from `new_game(ruleset, seed)` via `reduce` --
+    `start_next_hand` transitions aren't `Action`s, so they're reconstructed from replay, not
+    logged.
 
-    `bots` defaults to four `RandomBot`s sharing one seeded `Random` stream, mirroring
-    `tests/test_selfplay.py`'s own setup so `(ruleset, seed)` alone reproduces the game.
+    `bots` defaults to four `RandomBot`s sharing one seeded `Random` stream, so `(ruleset, seed)`
+    alone reproduces the game.
     """
     rng = random.Random(seed)
     seats: Sequence[Bot] = bots if bots is not None else [RandomBot(rng=rng) for _ in range(4)]
@@ -103,9 +96,8 @@ async def play_and_record_game(
     *,
     players: Sequence[str | None] | None = None,
 ) -> GameRecord:
-    """Play one bot-only game and persist it -- the actual self-play-to-`GameRecord` path
-    (docs/05-roadmap.md §2's M1 gate: "persist `GameRecord` ... bot-only included"). `players`
-    defaults to labeling every seat by its bot's class name."""
+    """Plays one bot-only game and persists it. `players` defaults to labeling every seat by its
+    bot's class name."""
     state, actions = await play_game(seed, ruleset, bots)
     resolved_players = players
     if resolved_players is None:

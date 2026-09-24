@@ -2,40 +2,18 @@
 
     python -m bots.arena --a EfficiencyBot --b RandomBot --games 2000 --seed 1 --parallel 8
 
-**Duplicate seeding + paired difference, not raw win totals.** §8 is explicit that raw win
-counts over N games aren't a statistical test -- HK scoring's variance (limit hands swing points
-sharply) can hide a real edge inside the noise of thousands of games' worth of point totals. Each
-"game" here (`--games N`) is actually a *duplicate set*: one seed, played out 4 times with the
-same wall (`new_game(ruleset, seed)` is a pure function of `(ruleset, seed)`, independent of
-which bots occupy which seats), rotating which single seat candidate `--a` occupies (the other
-three seats always run `--b`) across the 4 rotations. Averaging the candidate's score across all
-4 seat positions for the same deal, then comparing against the incumbent's average score in that
-same deal, cancels both seat/dealer-order luck and which-bot-got-the-good-wall luck -- the two
-sources of variance a bare win-rate can't distinguish from real skill.
+Uses `dealer_repeat_on_win/draw=False`, not `DEFAULT_RULESET`: duplicate rotation only cancels
+seat/wall luck if hand count and dealer rotation are a pure function of `(ruleset, seed)`, never
+of who's playing or how a hand ends -- with repeats on, a stronger candidate winning more often in
+one rotation would make that rotation play a different number of hands than the others.
 
-**Why `dealer_repeat_on_win/draw=False`, not `DEFAULT_RULESET`.** Duplicate rotation only means
-what it's supposed to if hand-by-hand progression (`hand_no`, dealer rotation) is a function of
-`(ruleset, seed)` alone, never of who's playing or how a hand ends -- otherwise a stronger
-candidate winning more often in one rotation than another would make the 4 rotations play a
-*different number* of hands, breaking the "same wall, only the seat assignment differs"
-guarantee the whole method depends on. With repeats off (this module's own `RulesetChoice`,
-matching `bots/selfplay.py`/`tests/test_selfplay.py`'s established precedent), dealer rotation
-and hand count are unconditional every hand, so every rotation of every duplicate set plays
-exactly the same number of hands (4 for `EAST_ONLY`) regardless of outcome.
+`tenpai_rate_on_sub_minimum_hand` hypothesizes completing the hand off each of a tenpai seat's
+actual waits via `self_drawn=True` scoring -- a simplification (a real discard win can score
+differently) acceptable for a canary metric that only needs to move when play regresses toward
+pure efficiency (docs/04-bots.md §4).
 
-**Metrics** (§8): average points/hand, win rate, deal-in rate, average winning faan,
-tenpai-at-draw rate, average turns to win, and `tenpai_rate_on_sub_minimum_hand` -- tracked per
-bot (`--a`/`--b`), pooled across every seat instance that bot occupied. `tenpai_rate_on_sub_
-minimum_hand`'s "does this tenpai shape have a legal way to reach `min_faan`" check
-hypothesizes completing the hand off *each* of the seat's actual waiting tiles (found by asking
-`mahjong_core.shanten` which tile types would bring shanten to -1) via `self_drawn=True` scoring
-context -- a simplification (a real win off a discard can score differently, e.g. 接龍/rob-kong
-timing faan), acceptable for a canary metric that doesn't need to be exact, only to move when a
-policy actually regresses toward pure efficiency play (docs/04-bots.md §4).
-
-**`--parallel`** runs duplicate sets across a `ProcessPoolExecutor` -- each worker plays its own
-4-rotation set start to finish (own event loop via `asyncio.run`), so this needs no shared state
-and no pickling beyond `(seed, ruleset, bot_name, bot_name)`.
+`--parallel` runs duplicate sets across a `ProcessPoolExecutor`; each worker plays its own
+4-rotation set start to finish, so nothing needs pickling beyond `(seed, ruleset, bot, bot)`.
 """
 
 from __future__ import annotations
@@ -78,12 +56,12 @@ def _random_bot_factory(seed: int) -> Bot:
 
 
 def _efficiency_bot_factory(seed: int) -> Bot:
-    del seed  # stateless -- see module docstring's determinism note
+    del seed  # stateless; seed unused
     return EfficiencyBot()
 
 
 def _faan_bot_factory(seed: int) -> Bot:
-    del seed  # stateless, same as EfficiencyBot
+    del seed  # stateless; seed unused
     return FaanBot()
 
 
@@ -96,12 +74,8 @@ BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
 _STEP_CAP = 8000
 _NO_DEADLINE = float("inf")
 
-# See module docstring: duplicate rotation needs hand-by-hand progression independent of who's
-# playing or how a hand ends.
+# see module docstring: keeps hand count independent of who wins.
 _ARENA_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
-
-
-# --- per-hand / per-game records --------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -131,13 +105,9 @@ class GameRecord:
     final_scores: tuple[int, int, int, int]
 
 
-# --- shanten/scoring helpers (arena-side: full GameState access, not a bot) -------------------
-
-
 def _seat_hand34(seat_state: SeatState) -> list[int]:
-    """`mahjong_core.shanten`'s 34-array contract, straight from `SeatState` -- the arena has
-    real `GameState`, unlike `bots/features.py`'s `SeatView`-based equivalent, so it builds its
-    own rather than reaching into another module's redaction-respecting helper for no reason."""
+    """34-array contract, straight from `SeatState` -- the arena has real `GameState`, unlike
+    `bots/features.py`'s `SeatView`-based equivalent, so it builds its own."""
     counts = new_count_array()
     for t in seat_state.concealed:
         counts[int(tile_id_type(t))] += 1
@@ -172,8 +142,8 @@ def _unused_tile_id_for_type(tile_type_value: int, seat_state: SeatState) -> Til
 
 
 def _tenpai_can_reach_min_faan(state: GameState, seat: int) -> bool:
-    """Whether *any* of this (already-tenpai) seat's actual waits legally clears
-    `ruleset.min_faan` if completed self-drawn right now -- see module docstring."""
+    """Whether any of this seat's actual waits legally clears `min_faan` if completed self-drawn
+    right now."""
     seat_state = state.seats[seat]
     hand34 = _seat_hand34(seat_state)
     closed = not seat_state.melds
@@ -187,18 +157,10 @@ def _tenpai_can_reach_min_faan(state: GameState, seat: int) -> bool:
     return False
 
 
-# --- one instrumented game -----------------------------------------------------------------
-
-
 async def _play_instrumented_game(seed: int, ruleset: RuleSet, bots: Sequence[Bot]) -> GameRecord:
-    """Like `bots/selfplay.py`'s `play_game`, plus per-hand `HandRecord`s. Pending-claimant
-    order during a claim window is `min(pending)` (deterministic, no extra RNG needed) rather
-    than a seeded random choice -- claim *resolution* is correct regardless of response order
-    (00-architecture.md §4: "never resolve on first-arrival"), and the arena needs a
-    reproducible-per-seed run, not a specific arrival order preserved across rotations (each
-    rotation's trajectory necessarily differs anyway, since different bots occupy different
-    seats).
-    """
+    """Like `bots/selfplay.py`'s `play_game`, plus per-hand `HandRecord`s. Claim-window order is
+    `min(pending)`, not a seeded random choice -- resolution is correct regardless of response
+    order, and the arena just needs a reproducible-per-seed run."""
     state = new_game(ruleset, seed)
     hands: list[HandRecord] = []
     turns = 0
@@ -279,9 +241,6 @@ def _hand_record(state: GameState, event: HandEnded, turns: int) -> HandRecord:
     )
 
 
-# --- duplicate sets --------------------------------------------------------------------------
-
-
 def _roles_for_rotation(rotation: int) -> tuple[str, str, str, str]:
     roles = ["B", "B", "B", "B"]
     roles[rotation] = "A"
@@ -299,11 +258,8 @@ def _make_bot(name: str, seed: int) -> Bot:
 async def _run_duplicate_set_async(
     seed: int, ruleset: RuleSet, name_a: str, name_b: str
 ) -> tuple[GameRecord, ...]:
-    """`seed` also derives each seat's own bot-internal RNG seed (`seed * 4 + seat`) so a
-    given `--seed`/`--games` invocation is bit-for-bit reproducible end to end, not just the
-    wall -- `server/AGENTS.md`'s "a failing game is reproducible from (ruleset, seed, actions)"
-    convention, extended to stochastic bots (`RandomBot`) rather than only deterministic ones.
-    """
+    """`seed` also derives each seat's bot-internal RNG seed (`seed * 4 + seat`) so a run is
+    bit-for-bit reproducible end to end, including stochastic bots like `RandomBot`."""
     records = []
     for rotation in range(4):
         seat_bots: list[Bot] = [_make_bot(name_b, seed * 4 + i) for i in range(4)]
@@ -319,9 +275,6 @@ def _run_duplicate_set(
 ) -> tuple[GameRecord, ...]:
     """Top-level, picklable `ProcessPoolExecutor` entry point -- see module docstring."""
     return asyncio.run(_run_duplicate_set_async(seed, ruleset, name_a, name_b))
-
-
-# --- aggregation -----------------------------------------------------------------------------
 
 
 @dataclass
@@ -399,8 +352,7 @@ def _paired_differences(duplicate_sets: Sequence[tuple[GameRecord, ...]]) -> lis
 
 
 def _mean_ci95(values: Sequence[float]) -> tuple[float, float, float]:
-    """Normal-approximation 95% CI over the paired differences (docs/04-bots.md §8 step 3:
-    "bootstrap or normal-approximation... is fine given the sample size")."""
+    """Normal-approximation 95% CI over the paired differences."""
     n = len(values)
     mean = statistics.fmean(values)
     if n < 2:
@@ -408,9 +360,6 @@ def _mean_ci95(values: Sequence[float]) -> tuple[float, float, float]:
     sd = statistics.stdev(values)
     half = 1.96 * sd / (n**0.5)
     return mean, mean - half, mean + half
-
-
-# --- CLI -------------------------------------------------------------------------------------
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
