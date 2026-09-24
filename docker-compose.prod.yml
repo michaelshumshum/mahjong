@@ -23,10 +23,15 @@ services:
       PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL must be set}
       PUBLIC_WS_URL: ${PUBLIC_WS_URL:?PUBLIC_WS_URL must be set}
       PORT: 3000
-    ports: ["${WEB_PORT:-3000}:3000"]
+    # !override, not plain ports: — compose concatenates ports: across -f files
+    # rather than replacing them, so a bare list here would keep the dev
+    # 5173 mapping alongside this one instead of replacing it.
+    ports: !override ["${WEB_PORT:-3000}:3000"]
     volumes: []
     restart: unless-stopped
 
   postgres:
-    ports: []
+    # !reset, not ports: [] — same concatenation issue; a bare [] leaves the
+    # dev file's 5432:5432 mapping in place and republishes postgres to the host.
+    ports: !reset []
     restart: unless-stopped

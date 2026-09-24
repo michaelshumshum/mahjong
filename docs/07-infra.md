@@ -101,6 +101,10 @@ Not yet decided: hosting target, domain, and TLS termination. Minimum shape once
   `X-Forwarded-*`. `docker-compose.prod.yml` already requires `TRUSTED_PROXY_IPS` to be set to
   that proxy's address — never `*` (see §9.3 in `00-architecture.md`: wildcard-trusting
   `X-Forwarded-For` defeats per-session rate limiting).
+- `docker-compose.prod.yml` uses the `!override`/`!reset` YAML tags on `ports:`, not plain
+  values — Compose concatenates `ports:` lists across `-f` files rather than replacing them, so
+  a bare `ports: []` for `postgres` would leave the dev file's `5432:5432` mapping in place and
+  republish postgres to the host.
 - Postgres: no backup story exists. Finished games (`ruleset`, `seed`, `action_log`) are the
   only durable asset the server produces and currently have zero redundancy — a lost volume is a
   lost history. At minimum: scheduled `pg_dump` to off-box storage before this goes past a
