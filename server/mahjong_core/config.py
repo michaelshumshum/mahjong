@@ -1,8 +1,7 @@
-"""RuleSet — every configurable HK mahjong rule (docs/01-rules-spec.md §10).
+"""RuleSet — every configurable HK mahjong rule.
 
-stdlib-only: mahjong_core has no deps beyond stdlib (see server/AGENTS.md,
-pyproject.toml's mahjong_core comment), so this is a plain frozen dataclass,
-not a pydantic model, even though app/protocol.py uses pydantic elsewhere.
+Plain frozen dataclass, not pydantic: mahjong_core has no deps beyond stdlib, even though
+app/protocol.py uses pydantic elsewhere.
 """
 
 from __future__ import annotations
@@ -57,9 +56,8 @@ class RuleSet:
         default_factory=lambda: frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18})
     )
     faan_overrides: dict[str, int] = field(default_factory=dict)
-    # per-pattern faan overrides keyed by the Chinese name in §7 (e.g. {"雞糊": 0} to
-    # disable, {"清一色": 7}), applied after hand_sets selection, before stacking/caps.
-    # note: dataclass freezing is shallow, this dict is still mutable in place.
+    # per-pattern faan override keyed by Chinese name (e.g. {"雞糊": 0}), applied after
+    # hand_sets selection, before stacking/caps. dataclass freezing is shallow — still mutable.
     discard_payment: DiscardPayment = DiscardPayment.ALL
     self_draw_multiplier: float = 1.5
     flowers_score: bool = True  # 座位花: +1 faan per flower matching seat (§7)

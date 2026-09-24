@@ -1,7 +1,5 @@
-"""Faan -> points -> per-seat payments (docs/01-rules-spec.md §8; docs/05-roadmap.md §2,
-seventh sub-task). Pure arithmetic over `scoring.faan.FaanResult.total_faan` -- no I/O, no
-engine wiring. Sub-task 8 owns translating `state.WinType`/`HandResult.discarder` into this
-module's `WinType` and calling `payout()` from the engine.
+"""Faan -> points -> per-seat payments. Pure arithmetic over
+`scoring.faan.FaanResult.total_faan` -- no I/O, no engine wiring.
 """
 
 from __future__ import annotations
@@ -13,18 +11,16 @@ from mahjong_core.config import DiscardPayment, RuleSet, ScoreTable
 _MAX_FAAN = 13  # config.py's _VALID_FAAN_CAP tops out at 13
 
 _FULL_SPICY: tuple[int, ...] = tuple(2**faan for faan in range(_MAX_FAAN + 1))
-"""§8, 全辣: `2 ** faan`."""
+"""全辣: `2 ** faan`."""
 
 _HALF_SPICY: tuple[int, ...] = (1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384)
-"""§8, 半辣: matches full spicy through faan 4, then doubles every two faan with the odd faan
-in between at 1.5x the preceding even faan's value. The doc spells out faan 3-10 explicitly
-(`3->8, 4->16, ..., 10->128`); 11-13 continue the same stated rule -- needed since `faan_cap`
-can be 13 -- and are written out as a literal table entry per this module's own convention
-rather than re-derived at call time."""
+"""半辣: matches full spicy through faan 4, then doubles every two faan with the odd faan in
+between at 1.5x the preceding even faan's value. Written out as a literal table rather than
+re-derived at call time."""
 
 
 def points(faan: int, ruleset: RuleSet) -> int:
-    """§8 faan -> points lookup, table selected by `ruleset.score_table`."""
+    """Faan -> points lookup, table selected by `ruleset.score_table`."""
     if not 0 <= faan <= _MAX_FAAN:
         raise ValueError(f"faan must be 0..{_MAX_FAAN}, got {faan}")
     table = _FULL_SPICY if ruleset.score_table == ScoreTable.FULL_SPICY else _HALF_SPICY
@@ -39,9 +35,8 @@ class SelfDraw:
 @dataclass(frozen=True)
 class Discard:
     """Win by claiming a discard, or by robbing a kong (搶槓): the seat whose kong was robbed
-    pays as the discarder here. §7/§8 don't separately specify a robbing-the-kong payment
-    shape; treating it as a discard win off that seat is the only sensible reading -- it's the
-    one seat responsible for the winning tile reaching the winner, exactly like a discard.
+    pays as the discarder here -- it's the seat responsible for the winning tile reaching the
+    winner, exactly like a discard.
     """
 
     discarder_seat: int
@@ -52,9 +47,8 @@ WinType = SelfDraw | Discard
 
 def _round_half_up(numerator: int, denominator: int) -> int:
     """`numerator / denominator` rounded to the nearest integer, ties up. Only engages where
-    §8's payment fractions (P/2, P/4) don't divide evenly -- reachable at low faan (e.g.
-    faan=0 => P=1, a legal win when `min_faan=0` and Chicken Hand's `NEW_6` gate is off) that
-    the doc's worked examples don't cover (they all use an even P)."""
+    the payment fractions (P/2, P/4) don't divide evenly -- reachable at low faan (e.g. faan=0
+    => P=1, a legal win when `min_faan=0`)."""
     return (2 * numerator + denominator) // (2 * denominator)
 
 
@@ -71,14 +65,11 @@ def payout(
     ruleset: RuleSet,
 ) -> dict[int, int]:
     """Per-seat point deltas for one win, summing to zero. `points` is the caller's
-    `points(faan, ruleset)` result -- `faan` itself already clamped to `ruleset.faan_cap` by
-    `scoring.faan.score_winning_hand` before this is called.
+    `points(faan, ruleset)` result -- `faan` already clamped to `ruleset.faan_cap`.
 
-    **No dealer multiplier.** §8 has no dealer-doubling rule (unlike riichi scoring) -- a
-    dealer's payments/receipts here are plain `points()`, same as any other seat's. Dealer
-    advantage in this ruleset is entirely `dealer_repeat_on_win`/`dealer_repeat_on_draw`
-    (flow, not points -- see config.py). `dealer_seat` is still validated so a caller passing
-    the wrong seat frame fails loudly rather than silently mis-scoring.
+    No dealer multiplier: unlike riichi scoring, a dealer's payments/receipts here are plain
+    `points()`. Dealer advantage in this ruleset is entirely `dealer_repeat_on_win`/
+    `dealer_repeat_on_draw` (flow, not points).
     """
     _check_seat(winner_seat)
     _check_seat(dealer_seat)
@@ -105,12 +96,8 @@ def payout(
         deltas[winner_seat] = points
         return deltas
 
-    # DiscardPayment.HALF: discarder pays half, the other two pay a quarter each (§8). Split
-    # the discarder's half first; any remainder left over from splitting the other half
-    # between the two bystanders goes back onto the discarder rather than a bystander -- at
-    # odd point totals that keeps the discarder, not a bystander, absorbing the rounding,
-    # consistent with the doc's 包 penalty rules already making the discarder the more
-    # responsible party.
+    # DiscardPayment.HALF: discarder pays half, the other two pay a quarter each. any leftover
+    # from splitting the bystanders' half goes back onto the discarder, not a bystander.
     discarder_share = _round_half_up(points, 2)
     bystander_total = points - discarder_share
     bystander_share, leftover = divmod(bystander_total, 2)

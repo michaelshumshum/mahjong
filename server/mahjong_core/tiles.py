@@ -1,11 +1,7 @@
-"""Tile identity, the 34-array index scheme, and string parsing (docs/01-rules-spec.md §1).
+"""Tile identity, the 34-array index scheme, and string parsing.
 
-stdlib-only, see mahjong_core/config.py's note on pyproject.toml.
-
-No shuffling, no wall, no melds here — see wall.py (future) for the seeded deal and the
-random per-hand `TileId` relabeling the spec requires (§1: "TileId is not a wall slot").
-This module only defines the canonical, pre-shuffle 0..135 <-> TileType mapping that
-relabeling permutes.
+No shuffling, no wall, no melds here — just the canonical, pre-shuffle 0..135 <-> TileType
+mapping that wall.py's shuffle permutes.
 """
 
 from __future__ import annotations

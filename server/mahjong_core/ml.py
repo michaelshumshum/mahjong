@@ -1,18 +1,6 @@
-"""Fixed action-id space, `legal_mask`, and the id<->`Action` codec (docs/06-ml.md §1).
+"""Fixed action-id space, `legal_mask`, and the id<->`Action` codec.
 
-stdlib-only, see mahjong_core/config.py's note on pyproject.toml -- no numpy here, `legal_mask`
-returns a plain `list[bool]`.
-
-**Deviation from 06-ml.md §1's sketched signatures, recorded there too.** The doc's snippet
-types everything over `SeatView`/`Intent`, but both are still 99-deferred.md scope (06-ml.md §3:
-"the `SeatView` input-boundary writeup" hasn't landed). This module is built against what
-actually exists today -- `GameState`, `actions.Action`, `actions.legal_actions` -- and takes
-`state`/`seat` wherever the doc's version would have taken a `SeatView`.
-
-`action_id` also takes `state`, not just the action, which the doc's summary glossed over: a
-`ClaimChow`'s `meld` alone can't say whether the claimed discard was the run's low/mid/high tile,
-because `Meld.__post_init__` sorts `tiles` by physical id and drops which one came from the
-discard vs. the claimer's own hand. `state.claim_window.tile` is where that's actually recorded.
+No numpy: `legal_mask` returns a plain `list[bool]`.
 """
 
 from __future__ import annotations
@@ -49,8 +37,8 @@ _WIN = 108
 
 
 def action_id(action: Action, state: GameState) -> int:
-    """The fixed id for `action`, given the `state` it was legal in. `state` is only actually
-    read for `ClaimChow` (see module docstring) -- every other variant is self-describing."""
+    """The fixed id for `action`, given the `state` it was legal in. `state` is only read for
+    `ClaimChow` -- every other variant is self-describing."""
     if isinstance(action, Discard):
         return _DISCARD_BASE + int(tile_id_type(action.tile_id))
     if isinstance(action, DeclareConcealedKong):
@@ -192,9 +180,8 @@ def _decode_win(state: GameState, seat: int) -> Action:
 
 def legal_mask(state: GameState, seat: int) -> list[bool]:
     """Length-`N_ACTIONS` mask: `True` at every id some currently-legal action for `seat`
-    encodes to. Built straight from `actions.legal_actions` -- the mask never invents legality
-    the engine wouldn't offer, and a bug here breaks the heuristic bots immediately (06-ml.md
-    §1) rather than only showing up later against a network."""
+    encodes to. Built straight from `actions.legal_actions` -- never invents legality the
+    engine wouldn't offer."""
     mask = [False] * N_ACTIONS
     for action in legal_actions(state, seat):
         mask[action_id(action, state)] = True

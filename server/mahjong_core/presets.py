@@ -1,7 +1,5 @@
-"""Named `RuleSet` presets (docs/05-roadmap.md "Ruleset presets") -- the curated starting
-points a table-creation UI offers next to "custom" (an arbitrary `RuleSet.from_dict` payload,
-no preset id attached). Presets are plain data, not a new engine concept: each is just a
-`RuleSet` instance `mahjong_core` already knows how to construct and validate.
+"""Named `RuleSet` presets — curated starting points a table-creation UI offers next to
+"custom". Plain data, not a new engine concept: each is just a `RuleSet` instance.
 """
 
 from __future__ import annotations
@@ -25,9 +23,8 @@ DEFAULT_PRESET_ID = "hk_classic"
 
 
 def preset_id_for(ruleset: RuleSet) -> str | None:
-    """The `RULESET_PRESETS` key `ruleset` matches field-for-field, or `None` if it doesn't
-    match any of them -- a custom ruleset, whether or not it happens to equal a preset (that
-    case is indistinguishable from, and behaves identically to, actually picking the preset)."""
+    """The `RULESET_PRESETS` key `ruleset` matches field-for-field, or `None` for a custom
+    ruleset (including one that happens to equal a preset by coincidence)."""
     for preset_id, preset in RULESET_PRESETS.items():
         if ruleset == preset:
             return preset_id
@@ -36,15 +33,9 @@ def preset_id_for(ruleset: RuleSet) -> str | None:
 
 def resolve_ruleset(ruleset: str, rules: Mapping[str, Any] | None) -> RuleSet:
     """A table-creation ruleset choice -> the `RuleSet` to construct the table with. `ruleset`
-    is a `RULESET_PRESETS` key, or `"custom"` to build from `rules` (a `RuleSet.from_dict`-shaped
-    mapping) instead. Shared by every table-creation entry point (`app/main.py`'s `POST /tables`
-    body, `app/ws.py`'s `?ruleset=`/`?rules=` WS-connect fallback) so "what a ruleset choice
-    means" has exactly one implementation regardless of transport. Never raises: an unknown
-    preset id, a missing `rules` mapping, or one that fails `RuleSet`'s own validation
-    (`__post_init__`, e.g. `min_faan` outside its enum) all silently fall back to the default
-    preset rather than rejecting the request -- matches this codebase's existing posture toward
-    client input elsewhere (`?practice=`'s bool coercion, `_normalize_name`'s default-instead-
-    of-error)."""
+    is a `RULESET_PRESETS` key, or `"custom"` to build from `rules`. Never raises: an unknown
+    preset id or a `rules` mapping that fails validation silently falls back to the default
+    preset rather than rejecting the request."""
     if ruleset == "custom" and rules is not None:
         try:
             return RuleSet.from_dict(rules)

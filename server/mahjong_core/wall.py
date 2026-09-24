@@ -1,20 +1,14 @@
-"""Seeded wall shuffle, dice, dealing, and flower replacement (docs/01-rules-spec.md §3, §9).
+"""Seeded wall shuffle, dice, dealing, and flower replacement.
 
-Everything here is a pure function of an already-derived `hand_seed: bytes` — this module
-never touches `game_seed` (docs/00-architecture.md §3: `hand_seed = SHA256(game_seed ||
-hand_no)`, only `hand_seed` is ever passed down). `hand_seed` seeds one `random.Random`
-instance; the global `random` module is never used. Same `hand_seed` in -> byte-identical
+Pure function of an already-derived `hand_seed: bytes` — never touches `game_seed`, and seeds
+its own `random.Random` rather than the global module. Same `hand_seed` in -> byte-identical
 dice roll and wall out, always.
 
-Physical tiles keep the canonical pre-shuffle `TileId` from `tiles.py` (grouped 4-per-type,
-independent of any hand's shuffle). Shuffling permutes the *order* of that fixed id list, so
-a `TileId` value never encodes wall position — see tiles.py's "TileId is not a wall slot"
-note. No extra relabeling step is needed on top of that.
+Shuffling permutes the *order* of `tiles.py`'s fixed id list; a `TileId` value itself never
+encodes wall position.
 
-`RuleSet.wall_reserve` is an exhaustion *threshold* ("wall exhausted with `wall_reserve`
-tiles left -> exhaustive draw", §9), not a fixed reservation carved out of the wall at
-shuffle/deal time — this module doesn't consume it. Whatever drives the turn state machine
-compares `len(wall.tiles)` against it.
+`RuleSet.wall_reserve` is an exhaustion threshold the turn state machine compares
+`len(wall.tiles)` against — not a reservation this module carves out at deal time.
 """
 
 from __future__ import annotations
@@ -32,9 +26,9 @@ WallTile = TileId | Flower
 
 @dataclass(frozen=True)
 class Wall:
-    """Immutable live wall, front-to-back draw order. `tiles[0]` is drawn next from the
-    front (normal draw); `tiles[-1]` is drawn next from the back (kong/flower replacement,
-    §5, §9 — HK has no separate dead wall, so both ends come off the same sequence)."""
+    """Immutable live wall, front-to-back draw order. `tiles[0]` draws next from the front
+    (normal draw); `tiles[-1]` from the back (kong/flower replacement) — HK has no separate
+    dead wall, so both ends come off the same sequence."""
 
     tiles: tuple[WallTile, ...]
 
@@ -57,14 +51,11 @@ def _physical_tiles(ruleset: RuleSet) -> list[WallTile]:
 
 
 def new_wall(hand_seed: bytes, ruleset: RuleSet) -> tuple[tuple[int, int], Wall]:
-    """Roll dice and shuffle the wall, both from one `random.Random(hand_seed)` stream (§3
-    steps 1-2). The dice roll is cosmetic — it does not affect dealing order, which is
-    already a full random permutation — but it's derived from the same seed so the whole
-    deal, dice included, is reproducible from `hand_seed` alone.
+    """Roll dice and shuffle the wall, both from one `random.Random(hand_seed)` stream. The
+    dice roll is cosmetic — it doesn't affect dealing order — but comes from the same seed so
+    the whole deal is reproducible from `hand_seed` alone.
 
-    144 tiles when `ruleset.flowers_enabled` (the default), 136 (no flowers/seasons)
-    otherwise — `01-rules-spec.md §3` only describes the 144-tile case; see the note added
-    there for the `flowers_enabled=False` variant.
+    144 tiles when `ruleset.flowers_enabled` (default), 136 otherwise.
     """
     rng = random.Random(hand_seed)
     dice = (rng.randint(1, 6), rng.randint(1, 6))
@@ -81,17 +72,17 @@ def draw_front(wall: Wall) -> tuple[WallTile, Wall]:
 
 
 def draw_back(wall: Wall) -> tuple[WallTile, Wall]:
-    """Kong/flower replacement draw, from the back of the same live wall (§5, §9: HK has no
-    separate dead wall)."""
+    """Kong/flower replacement draw, from the back of the same live wall (no separate dead
+    wall)."""
     if not wall.tiles:
         raise ValueError("wall is empty")
     return wall.tiles[-1], Wall(wall.tiles[:-1])
 
 
 def deal_hands(wall: Wall, dealer_seat: int) -> tuple[Hands, Wall]:
-    """13 tiles to each seat, 14 to the dealer (§3 step 3), dealt in seat order starting
-    from the dealer, three rounds of four tiles then a round of one, mirroring the physical
-    deal; the dealer draws one further tile at the end. All from the front of the wall."""
+    """13 tiles to each seat, 14 to the dealer: seat order starting from the dealer, three
+    rounds of four tiles then a round of one, mirroring the physical deal, then the dealer
+    draws one further tile. All from the front of the wall."""
     if not 0 <= dealer_seat < _SEATS:
         raise ValueError(f"dealer_seat must be 0..{_SEATS - 1}, got {dealer_seat}")
     needed = _HAND_SIZE * _SEATS + 1
@@ -124,11 +115,10 @@ def deal_hands(wall: Wall, dealer_seat: int) -> tuple[Hands, Wall]:
 def replace_flowers(
     hands: Hands, wall: Wall, dealer_seat: int
 ) -> tuple[Hands, Wall, SetAsideFlowers]:
-    """Flower replacement, in seat order starting from the dealer: each seat sets aside
-    every flower it holds and draws a replacement from the back of the wall, one at a time,
-    repeating until it holds none — a replacement that is itself a flower chains (§3 step 4,
-    §11.1). Order matters (it changes who gets which tile), which is why this resolves one
-    seat completely before moving to the next, rather than round-robin across seats."""
+    """Flower replacement, in seat order starting from the dealer: each seat sets aside every
+    flower it holds and draws a replacement from the back of the wall, one at a time, chaining
+    if the replacement is itself a flower. Resolves one seat completely before the next
+    (order changes who gets which tile) rather than round-robin."""
     if not 0 <= dealer_seat < _SEATS:
         raise ValueError(f"dealer_seat must be 0..{_SEATS - 1}, got {dealer_seat}")
 

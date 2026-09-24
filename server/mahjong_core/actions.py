@@ -1,36 +1,10 @@
-"""Action union and `legal_actions(state, seat)` (docs/05-roadmap.md §1).
+"""Action union and `legal_actions(state, seat)`: what one seat may do right now.
 
-Scope (docs/01-rules-spec.md §4, §6; docs/00-architecture.md §4): every action a seat may
-take from `GameState`, and the pure function enumerating which of them are legal for a given
-seat right now. `reduce(state, action) -> (state, events)` (engine.py, a later sub-task)
-applies one of these; claim *priority* between simultaneously-legal claims from different
-seats (claims.py) is a separate later sub-task too — this module only answers "what can this
-one seat do", the same scope `melds.py`'s `legal_claims`/`legal_self_melds` already have for
-melds specifically.
+`AWAIT_DRAW`/`SCORING`/`HAND_OVER`/`GAME_OVER` offer no actions — the engine drives those
+transitions itself, no seat decision involved.
 
-**`AWAIT_DRAW` offers no actions.** `docs/02-protocol.md §2` has no client intent for
-"draw" — a seat never *chooses* to draw, the engine advances it automatically (including any
-flower-replacement chain, 01-rules-spec.md §3 step 4) on the way to `AWAIT_ACTION`. So
-`AWAIT_DRAW` is never a phase where a seat is expected to decide anything, and
-`legal_actions` returning `()` for every seat in it does not violate the "`legal_actions`
-never empty in an active phase" invariant (05-roadmap.md §3) — that invariant is about seats
-*expected to act*, and nobody is, here. Same reasoning covers `SCORING`/`HAND_OVER`/
-`GAME_OVER`: server-computed transitions, no seat decision.
-
-**Win legality is structural shape plus `min_faan`.** `01-rules-spec.md §11.8` requires a
-mechanically-complete hand below `min_faan` to be unable to win, server-side. M1 offered
-`DeclareWin`/`ClaimWin` on shape alone (standard melds+pair via `melds.decompose`, Seven
-Pairs, Thirteen Orphans) because `scoring/` didn't exist yet to check faan for real; that gap
-closed in M2 sub-task 8 (`05-roadmap.md §2`) -- `can_declare_win` below runs the same
-`scoring.faan.score_winning_hand` the actual win will be scored with, and only offers
-`DeclareWin` when `clears_min_faan` is true. `engine.py`'s claim-offer construction
-(`_discard_claim_offers`/`_kong_rob_offers`) does the equivalent for `ClaimWin`, via
-`build_scoring_context` below -- offers live there, not here, since they're built while
-processing a *different* seat's discard/kong, not this seat's own turn. `hand_sets` gating
-of which shapes count is still not a factor here: `score_winning_hand` already applies
-`ruleset.hand_sets`/`faan_overrides` internally (faan.py), so a shape worth zero faan under
-the table's config (an unregistered hand_set, or every override zeroed) is naturally caught
-by the same `clears_min_faan` check, with no separate shape-gating needed here.
+Win legality is structural shape (`hand_is_winning_shape`) plus a real `min_faan` check via
+`score_winning_hand` — a mechanically-complete hand below `min_faan` cannot win.
 """
 
 from __future__ import annotations
@@ -49,9 +23,8 @@ from mahjong_core.tiles import TileId, TileType, tile_id_type
 
 
 class ActionKind(StrEnum):
-    """Discriminator tag, one per `Action` variant below — mirrors `melds.py`'s `MeldKind`
-    pattern, applied to a union of distinctly-shaped dataclasses instead of one shared shape,
-    since a `Discard` and a `ClaimChow` have nothing but the tag in common."""
+    """Discriminator tag for the `Action` union — variants are distinctly-shaped dataclasses
+    that share nothing but this tag."""
 
     DISCARD = "discard"
     CLAIM_CHOW = "claim_chow"
@@ -71,8 +44,7 @@ def _validate_seat(seat: int) -> None:
 
 @dataclass(frozen=True)
 class Discard:
-    """Discard a concealed tile on your own turn (`AWAIT_ACTION`).
-    `docs/02-protocol.md` §2 `discard{tile_id}`."""
+    """Discard a concealed tile on your own turn (`AWAIT_ACTION`)."""
 
     tile_id: TileId
     kind: Literal[ActionKind.DISCARD] = ActionKind.DISCARD
@@ -80,10 +52,8 @@ class Discard:
 
 @dataclass(frozen=True)
 class ClaimChow:
-    """Claim a discard to form a chow (`docs/02-protocol.md` §2 `claim{choice:"chow"}`).
-    `meld` already carries the exact concealed tiles plus the claimed discard — the same
-    `Meld` `melds.legal_claims` produces — so there's no separate `tiles` disambiguator the
-    way the wire `claim` message needs one; the meld itself is unambiguous."""
+    """`meld` already carries the concealed tiles plus the claimed discard, so no separate
+    `tiles` disambiguator is needed."""
 
     window_id: int
     seat: int
@@ -98,8 +68,6 @@ class ClaimChow:
 
 @dataclass(frozen=True)
 class ClaimPung:
-    """Claim a discard to form a pung (`claim{choice:"pung"}`)."""
-
     window_id: int
     seat: int
     meld: Meld
@@ -113,10 +81,9 @@ class ClaimPung:
 
 @dataclass(frozen=True)
 class ClaimKong:
-    """Claim a discard to complete an exposed kong — the 4th copy of a concealed triple
-    (`claim{choice:"kong"}`). 01-rules-spec.md §5's kong-vs-pung note means a holder of 3
-    concealed matches sees both `ClaimPung` and `ClaimKong` offered for the same discard and
-    picks; that's one seat's own choice, not the different-seats tiebreak in §6."""
+    """A holder of 3 concealed matches sees both `ClaimPung` and `ClaimKong` offered for the
+    same discard and picks — that's this seat's own choice, distinct from the cross-seat
+    tiebreak in `claims.resolve_claims`."""
 
     window_id: int
     seat: int
@@ -131,9 +98,8 @@ class ClaimKong:
 
 @dataclass(frozen=True)
 class ClaimWin:
-    """Win off someone else's tile — a discard (食糊) or a kong-robbing window (搶槓,
-    01-rules-spec.md §11.3). Structurally identical from the claimant's side; which one it is
-    lives on `state.claim_window.kind`, not duplicated onto this action."""
+    """Win off another seat's tile — a discard or a kong-rob window. Which one it is lives on
+    `state.claim_window.kind`, not duplicated onto this action."""
 
     window_id: int
     seat: int
@@ -145,9 +111,8 @@ class ClaimWin:
 
 @dataclass(frozen=True)
 class Pass:
-    """Decline every option on a live claim window, including a winning one —
-    `docs/02-protocol.md` §2 "Declining a claim on purpose": there's no `auto_win` pre-arm,
-    since declining a win is a real strategic choice under `min_faan`."""
+    """Decline every option on a live claim window, including a winning one — there's no
+    `auto_win` pre-arm, since declining a win is a real strategic choice under `min_faan`."""
 
     window_id: int
     seat: int
@@ -159,7 +124,7 @@ class Pass:
 
 @dataclass(frozen=True)
 class DeclareConcealedKong:
-    """暗槓 from your own concealed tiles, own turn only (`declare{kind:"concealed_kong"}`)."""
+    """暗槓 from your own concealed tiles, own turn only."""
 
     meld: Meld
     kind: Literal[ActionKind.DECLARE_CONCEALED_KONG] = ActionKind.DECLARE_CONCEALED_KONG
@@ -173,9 +138,8 @@ class DeclareConcealedKong:
 
 @dataclass(frozen=True)
 class DeclareAddedKong:
-    """加槓: add a matching concealed tile to your own exposed pung, own turn only
-    (`declare{kind:"added_kong"}`). Opens a robbing-the-kong window (§5, §11.3) — resolving
-    that is claims.py/engine.py's job, not this module's."""
+    """加槓: add a matching concealed tile to your own exposed pung, own turn only. Opens a
+    robbing-the-kong window — resolving that is claims.py/engine.py's job, not this module's."""
 
     meld: Meld
     kind: Literal[ActionKind.DECLARE_ADDED_KONG] = ActionKind.DECLARE_ADDED_KONG
@@ -187,9 +151,7 @@ class DeclareAddedKong:
 
 @dataclass(frozen=True)
 class DeclareWin:
-    """Self-draw win (自摸), own turn only (`declare{kind:"win"}`). No tile payload: the
-    whole hand (concealed + exposed melds) is the win, so there's nothing to disambiguate —
-    unlike the wire `declare` message, this doesn't need a `tiles` field."""
+    """Self-draw win (自摸), own turn only. No tile payload: the whole hand is the win."""
 
     kind: Literal[ActionKind.DECLARE_WIN] = ActionKind.DECLARE_WIN
 
@@ -227,9 +189,8 @@ _ORPHAN_TYPES = frozenset(
 
 
 def _is_seven_pairs(concealed: Sequence[TileId]) -> bool:
-    """Seven pairs (七對子): 14 concealed tiles as 7 *distinct* pairs. A table's
-    `hand_sets`/`faan_overrides` decide whether this scores anything — see the module
-    docstring's boundary note — this only checks the shape."""
+    """Seven pairs (七對子): 14 concealed tiles as 7 *distinct* pairs. Shape only — whether it
+    scores depends on the table's `hand_sets`/`faan_overrides`."""
     if len(concealed) != 14:
         return False
     counts = Counter(tile_id_type(t) for t in concealed)
@@ -245,10 +206,9 @@ def _is_thirteen_orphans(concealed: Sequence[TileId]) -> bool:
 
 
 def hand_is_winning_shape(seat: SeatState) -> bool:
-    """Whether `seat`'s current hand is a structurally complete winning hand right now —
-    standard melds+pair, Seven Pairs, or Thirteen Orphans. See the module docstring: this is
-    shape only, no `min_faan` check (deferred to M2). Seven Pairs and Thirteen Orphans both
-    require a fully concealed hand by definition — any exposed meld rules both out."""
+    """Structurally complete hand right now — standard melds+pair, Seven Pairs, or Thirteen
+    Orphans. Shape only, no `min_faan` check. Seven Pairs/Thirteen Orphans require a fully
+    concealed hand; any exposed meld rules both out."""
     if not seat.melds and (_is_seven_pairs(seat.concealed) or _is_thirteen_orphans(seat.concealed)):
         return True
     return decompose(seat.concealed) != ()
@@ -262,14 +222,9 @@ def build_scoring_context(
     is_robbing_kong: bool = False,
     discarder: int | None = None,
 ) -> ScoringContext:
-    """The `ScoringContext` for `seat` winning *right now*, real timing flags included --
-    shared by this module's own `can_declare_win` (self-declared, always `self_drawn=True`,
-    `discarder=None`) and `engine.py`'s claim-offer construction and actual win scoring
-    (`_discard_claim_offers`/`_kong_rob_offers`/`_end_win`), so there is exactly one place
-    that knows how a `GameState` maps to a `ScoringContext` -- see `GameState.total_discards`/
-    `wall_exhausted_at_last_draw`/`last_draw_was_kong_replacement`'s docstrings for what each
-    flag below reads.
-    """
+    """The `ScoringContext` for `seat` winning *right now*. Shared by `can_declare_win` here
+    and `engine.py`'s claim-offer construction/win scoring, so there's exactly one place that
+    maps a `GameState` to a `ScoringContext`."""
     seat_state = state.seats[seat]
     return ScoringContext(
         seat_wind=seat_wind_for(seat, state.dealer),
@@ -291,11 +246,8 @@ def build_scoring_context(
 
 
 def can_declare_win(state: GameState, seat: int) -> bool:
-    """Whether `seat` may `DeclareWin` right now: structurally complete (`hand_is_winning_shape`)
-    *and* clears `state.ruleset.min_faan` under real scoring -- the M1/M2 boundary this
-    module's docstring describes. A self-declared win is always self-drawn, off no discarder,
-    and is only allowed on a turn that reached AWAIT_ACTION via a draw (or the initial deal).
-    """
+    """Whether `seat` may `DeclareWin` right now: structurally complete
+    (`hand_is_winning_shape`) *and* clears `state.ruleset.min_faan` under real scoring."""
     if not state.self_draw_win_allowed:
         return False
     seat_state = state.seats[seat]
@@ -307,12 +259,8 @@ def can_declare_win(state: GameState, seat: int) -> bool:
 
 
 def legal_actions(state: GameState, seat: int) -> tuple[Action, ...]:
-    """Every action `seat` may legally take right now, given `state.phase`/`state.turn`/
-    `state.claim_window`. Pure: no mutation, no I/O. Returns `()` for a seat that isn't
-    currently expected to decide anything — see the module docstring for why that's correct
-    for `AWAIT_DRAW`, `SCORING`, `HAND_OVER`, `GAME_OVER`, and any seat other than the one
-    with a live decision in `AWAIT_ACTION`/`AWAIT_CLAIMS`/`AWAIT_KONG_ROB`.
-    """
+    """Every action `seat` may legally take right now. Returns `()` for a seat not currently
+    expected to decide anything (see module docstring)."""
     _validate_seat(seat)
 
     if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
@@ -362,9 +310,6 @@ def _turn_actions(state: GameState, seat: int) -> tuple[Action, ...]:
     return tuple(actions)
 
 
-# --- JSON-safe serialization, for the persisted action log (docs/06-ml.md §2) ----------------
-
-
 def _meld_to_dict(meld: Meld) -> dict[str, Any]:
     return {"kind": meld.kind.value, "tiles": list(meld.tiles), "from_seat": meld.from_seat}
 
@@ -378,10 +323,8 @@ def _meld_from_dict(data: Mapping[str, Any]) -> Meld:
 
 
 def action_to_dict(action: Action) -> dict[str, Any]:
-    """JSON-safe representation of one `Action`. Round-trips via `action_from_dict`. Used to
-    build the `action_log` a `GameRecord` persists (docs/06-ml.md §2) -- not the fixed
-    109-id action *encoding* (06-ml.md §1, M2), which is a distinct, more compact scheme for
-    ML consumption, not storage."""
+    """JSON-safe representation of one `Action`, round-trips via `action_from_dict`. Used for
+    the persisted action log — distinct from the compact fixed-id ML action encoding."""
     if isinstance(action, Discard):
         return {"kind": action.kind.value, "tile_id": action.tile_id}
     if isinstance(action, (ClaimChow, ClaimPung, ClaimKong)):

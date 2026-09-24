@@ -1,12 +1,6 @@
-"""Meld types, claim legality, and concealed-tile decomposition (docs/01-rules-spec.md §5, §6;
-docs/00-architecture.md §4).
-
-stdlib-only, see mahjong_core/config.py's note on pyproject.toml.
-
-Scope (docs/05-roadmap.md §1): the meld data model, what claims are legal against a discard
-or your own draw, and splitting a concealed hand into melds + a pair. Claim *priority*
-between simultaneously-legal claims (claims.py), the turn state machine (engine.py), and
-`legal_actions` (actions.py) are later sub-tasks that build on this one.
+"""Meld types, claim legality, and concealed-tile decomposition: the meld data model, what
+claims are legal against a discard or your own draw, and splitting a concealed hand into
+melds + a pair. Claim priority between simultaneously-legal claims lives in claims.py.
 """
 
 from __future__ import annotations
@@ -22,10 +16,10 @@ _SUIT_TYPE_COUNT = 27  # types 0-26 are suited (m/p/s), 27-33 are winds/dragons:
 
 
 class MeldKind(StrEnum):
-    """Every way three or more tiles can form a named group (§5). Kong is split into three
+    """Every way three or more tiles can form a named group. Kong is split into three
     distinct kinds rather than one kind + a flag: exposed/concealed/added differ in how
-    they're formed, how they're claimed (added kong alone opens 搶槓, §11.3), and — the part
-    that matters most here — whether their tiles are public (`Meld.concealed`)."""
+    they're formed, how they're claimed (added kong alone opens 搶槓), and whether their
+    tiles are public (`Meld.concealed`)."""
 
     CHOW = "chow"
     PUNG = "pung"
@@ -51,17 +45,12 @@ KONG_KINDS = frozenset({MeldKind.EXPOSED_KONG, MeldKind.CONCEALED_KONG, MeldKind
 class Meld:
     """One meld: a chow, pung, kong (of any of the three kinds), or a pair.
 
-    `tiles` always holds true tile identities — this module is inside `mahjong_core`, which
-    never redacts (00-architecture.md §5 redaction is `app/views.py`'s job, at the seat-view
-    layer, not the pure engine's). `concealed` is what that later layer reads to decide
-    whether it may reveal them: a concealed kong (暗槓) is laid face down and its identity
-    stays hidden from every other seat until hand end, unlike every other meld kind, which is
-    exposed the instant it's formed.
+    `tiles` always holds true tile identities — redaction happens in `app/views.py`, not here.
+    `concealed` is what that layer reads to decide whether it may reveal them.
 
-    `from_seat` records whose discard was claimed (chow/pung/exposed_kong). It's `None` for
-    concealed_kong and added_kong, both formed from your own draw rather than a claim, and for
-    any meld produced by `decompose()`, which reasons about concealed tiles with no claim
-    history attached.
+    `from_seat` records whose discard was claimed (chow/pung/exposed_kong). `None` for
+    concealed_kong/added_kong (formed from your own draw) and for anything `decompose()`
+    produces (no claim history attached).
     """
 
     kind: MeldKind
@@ -93,7 +82,7 @@ class Meld:
 
     @property
     def concealed(self) -> bool:
-        """Whether this meld's tile identities must stay hidden from other seats (§5)."""
+        """Whether this meld's tile identities must stay hidden from other seats."""
         return self.kind == MeldKind.CONCEALED_KONG
 
     @property
@@ -113,16 +102,13 @@ def legal_claims(
     claimer_seat: int,
 ) -> tuple[Meld, ...]:
     """Every meld `claimer_seat` could legally form by claiming `discarded_tile` off
-    `discarder_seat`'s discard, given only `claimer_seat`'s concealed hand (§5, §6;
-    00-architecture.md §4). Win claims aren't melds and aren't covered here. This answers
-    "is X a legal option for this one claimer" — it doesn't arbitrate between simultaneously
-    legal claims from different seats (claims.py's job, a later sub-task).
+    `discarder_seat`'s discard, given only `claimer_seat`'s concealed hand. Win claims aren't
+    melds and aren't covered here. Answers "is X a legal option for this one claimer" — it
+    doesn't arbitrate between simultaneous claims from different seats (claims.py's job).
 
-    A holder of 3 concealed matching tiles gets *both* a pung and an exposed-kong option:
-    the kong-vs-pung tiebreak in 01-rules-spec.md §6 is about two different players each
-    claiming the same discard as pung vs. kong, not about restricting one player's own
-    choice — a player may still elect the smaller meld. See the note added to
-    01-rules-spec.md §5.
+    A holder of 3 concealed matching tiles gets *both* a pung and an exposed-kong option: the
+    kong-vs-pung tiebreak is about two different players claiming the same discard, not about
+    restricting one player's own choice.
     """
     if not 0 <= discarder_seat < 4 or not 0 <= claimer_seat < 4:
         raise ValueError("seats must be 0..3")
@@ -186,10 +172,9 @@ def _chow_options(
 def legal_self_melds(
     concealed: Sequence[TileId], exposed_melds: Sequence[Meld] = ()
 ) -> tuple[Meld, ...]:
-    """Concealed-kong and added-kong options available on your own turn (§5). `concealed` is
-    the seat's full concealed hand including whatever tile was just drawn — legality only
-    depends on which tiles are currently held, not on which one arrived last, so there's no
-    separate `drawn_tile` parameter the way `legal_claims` has `discarded_tile`."""
+    """Concealed-kong and added-kong options available on your own turn. `concealed` is the
+    seat's full hand including whatever tile was just drawn — legality depends only on which
+    tiles are held, not which arrived last, so there's no separate `drawn_tile` parameter."""
     by_type: dict[TileType, list[TileId]] = {}
     for t in concealed:
         by_type.setdefault(tile_id_type(t), []).append(t)
@@ -212,16 +197,12 @@ def legal_self_melds(
 
 def decompose(tiles: Sequence[TileId]) -> tuple[tuple[Meld, ...], ...]:
     """Every way `tiles` can be fully partitioned into complete chow/pung melds plus exactly
-    one pair, using each tile exactly once (§5; the shanten/hand-validity building block
-    flagged in docs/05-roadmap.md §1). Returns one tuple-of-melds per valid split; empty if
-    `tiles` can't be decomposed this way at all — the normal case for a hand mid-shanten,
-    which is exactly what shanten.py needs to detect.
+    one pair, using each tile exactly once. Returns one tuple-of-melds per valid split; empty
+    if it can't be decomposed this way — the normal case for a hand mid-shanten.
 
-    Kongs never appear here: a declared kong already lives in a seat's exposed melds, never
-    in its concealed tiles, so this function only ever needs chows, pungs, and the one pair —
-    the shape every standard shanten algorithm decomposes into. Seven Pairs and Thirteen
-    Orphans are different hand shapes entirely (mahjong_core/shanten.py, a later sub-task),
-    not this function's concern.
+    Kongs never appear here: a declared kong lives in a seat's exposed melds, never its
+    concealed tiles. Seven Pairs and Thirteen Orphans are different hand shapes entirely
+    (shanten.py), not this function's concern.
     """
     if len(tiles) % 3 != 2:
         return ()

@@ -1,46 +1,29 @@
-"""`reduce(state, action) -> (state, events)` -- the turn/claim/hand/game state machine
-(docs/01-rules-spec.md §4; docs/00-architecture.md §3) wiring `config`, `tiles`, `wall`,
-`melds`, `state`, `actions`, `claims` together (docs/05-roadmap.md §1).
+"""`reduce(state, action) -> (state, events)` -- the turn/claim/hand/game state machine wiring
+`config`, `tiles`, `wall`, `melds`, `state`, `actions`, `claims` together.
 
-Pure: no asyncio, no I/O, no clock, no unseeded randomness (server/AGENTS.md). Every action
-is validated against `actions.legal_actions` before it's applied -- an action the server
-didn't already offer that seat is a hard error, never silently ignored.
+Pure: no asyncio, no I/O, no clock, no unseeded randomness. Every action is validated against
+`actions.legal_actions` before it's applied -- an action the server didn't already offer that
+seat is a hard error, never silently ignored.
 
-**Two entry points, not one.** `reduce()` applies exactly one `Action` and everything that
-automatically cascades from it with no further seat decision required (flower chains, a
-claim window with no legal claims, a kong's replacement draw, a resolved claim). It stops the
-moment either a real decision is needed from some seat (`AWAIT_ACTION`, or `AWAIT_CLAIMS`/
-`AWAIT_KONG_ROB` with live offers) or the hand ends (`Phase.HAND_OVER`, `hand_result` set).
-Advancing from `HAND_OVER` to the next hand (or to `GAME_OVER`) is `start_next_hand()`, a
-second pure function mirroring `state.new_game()` -- there is no `Action` for "deal the next
-hand" because it isn't a seat's decision (`actions.py`'s docstring: "server-computed
-transitions, no seat decision"), so it can't go through `reduce()`'s `(state, action)` shape.
-A caller (the M3 Table actor, or this module's own self-play test) checks
-`state.phase == Phase.HAND_OVER` and calls `start_next_hand()` before offering anyone
-anything else.
+Two entry points: `reduce()` applies one `Action` and everything that automatically cascades
+from it with no further seat decision (flower chains, an empty claim window, a kong
+replacement draw, a resolved claim), stopping the moment a real decision is needed or the hand
+ends (`Phase.HAND_OVER`). Advancing from `HAND_OVER` to the next hand (or `GAME_OVER`) is
+`start_next_hand()` -- there's no `Action` for "deal the next hand" since it isn't a seat's
+decision, so it can't go through `reduce()`'s `(state, action)` shape.
 
-**Hang-safety.** The only place this module loops at all is the flower-replacement cascade,
-and it's bounded by the fixed 8-physical-flower count (`_MAX_FLOWERS`) with an assertion, not
-a "should terminate eventually" comment. Hand-to-hand and game-to-game bookkeeping
-(`start_next_hand`) is straight-line arithmetic -- `hand_no` strictly increments every call,
-dealer/prevailing-wind rotation is O(1) -- so it cannot loop at all, let alone hang.
+Hang-safety: the only loop in this module is the flower-replacement cascade, bounded by the
+fixed 8-physical-flower count (`_MAX_FLOWERS`) with an assertion. Hand-to-hand bookkeeping
+(`start_next_hand`) is straight-line arithmetic and cannot loop.
 
-**SCORING is a real box in the docs/01-rules-spec.md §4 diagram that never appears in
-`GameState.phase`.** `_finish_win` folds that zero-duration step directly into the
-`HAND_OVER` transition rather than returning a state a caller would need to bounce straight
-back out of with no action available -- consistent with `legal_actions` already returning
-`()` for `SCORING` for the same "no seat decision" reason. `scoring.faan.score_winning_hand`
-plus `scoring.payout.points`/`payout` run right there, once per win, off the real
-`ScoringContext` `actions.build_scoring_context` builds from this module's own timing state
-(`GameState.total_discards`/`wall_exhausted_at_last_draw`/`last_draw_was_kong_replacement`).
+`Phase.SCORING` never actually appears in `GameState.phase`: `_finish_win` folds that
+zero-duration step directly into the `HAND_OVER` transition rather than returning a state a
+caller would need to immediately advance out of again with no action available.
 
-**Flower instant-win (`seven_flowers_instant_win`/`eight_flowers_instant_win`,
-01-rules-spec.md §7) cuts the flower-replacement cascade short.** Checked inside
-`_draw_and_cascade` right after each flower is set aside -- the moment a seat's flower count
-first reaches the configured threshold, the hand ends there as `WinType.FLOWERS` with no
-further replacement draw, bypassing `scoring.faan` entirely (fixed faan, no meld
-decomposition -- patterns.py's "What doesn't fit here" note) but still going through
-`_finish_win` for payout, scored as a self-draw (no seat fed it).
+Flower instant-win (`seven_flowers_instant_win`/`eight_flowers_instant_win`) cuts the
+flower-replacement cascade short: the moment a seat's flower count first reaches the
+configured threshold, the hand ends there as `WinType.FLOWERS` with no meld decomposition,
+but still goes through `_finish_win` for payout, scored as a self-draw (no seat fed it).
 """
 
 from __future__ import annotations
@@ -113,18 +96,15 @@ __all__ = [
 ]
 
 ENGINE_VERSION = "1.0.0"
-# bump on any change to the reducer, wall order, or flower-replacement ordering
-# (docs/06-ml.md §2). Every persisted GameRecord stamps this value; a mismatch against the
-# running engine's ENGINE_VERSION means the record is not replayable, full stop -- there is
-# no migration path (see app/db/records.is_replayable).
+# bump on any change to the reducer, wall order, or flower-replacement ordering. every
+# persisted GameRecord stamps this value; a mismatch means the record is not replayable, full
+# stop -- there is no migration path.
 
 
 class IllegalActionError(ValueError):
     """Raised when `reduce()`/`start_next_hand()` is asked to apply something
-    `actions.legal_actions` didn't actually offer. The server must never construct an action
-    outside that set (server/AGENTS.md: "never trust a client-supplied [legal-action set]");
-    a client-supplied action reaching here unvalidated is an app/ bug, not a game state to
-    tolerate."""
+    `actions.legal_actions` didn't actually offer. A client-supplied action reaching here
+    unvalidated is an app/ bug, not a game state to tolerate."""
 
 
 class EventKind(StrEnum):
@@ -142,8 +122,7 @@ class EventKind(StrEnum):
 
 @dataclass(frozen=True)
 class Drawn:
-    """A normal front-of-wall draw landed in `seat`'s hand (01-rules-spec.md §4
-    `AWAIT_DRAW`)."""
+    """A normal front-of-wall draw landed in `seat`'s hand."""
 
     seat: int
     tile_id: TileId
@@ -183,7 +162,7 @@ class MeldFormed:
 @dataclass(frozen=True)
 class ClaimResolved:
     """A claim window (`AWAIT_CLAIMS`/`AWAIT_KONG_ROB`) closed. `winning_seat`/`action_kind`
-    are both `None` when nobody's claim beat a Pass (00-architecture.md §4)."""
+    are both `None` when nobody's claim beat a Pass."""
 
     window_id: int
     claim_kind: ClaimKind
@@ -194,8 +173,8 @@ class ClaimResolved:
 
 @dataclass(frozen=True)
 class KongReplacementDrawn:
-    """A kong (own-turn declare or claimed) drew its replacement from the back of the wall
-    (§5). Distinct from `Drawn` so a client/bot can tell 槓上開花 apart from a normal draw."""
+    """A kong (own-turn declare or claimed) drew its replacement from the back of the wall.
+    Distinct from `Drawn` so a client/bot can tell 槓上開花 apart from a normal draw."""
 
     seat: int
     tile_id: TileId
@@ -269,12 +248,11 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
     """Roll from `Phase.HAND_OVER` into the next hand's deal, or into `Phase.GAME_OVER`.
     Not an `Action` -- see module docstring for why this can't go through `reduce()`.
 
-    Dealer repeats (連莊) on a dealer win, or on any exhaustive draw if configured
-    (01-rules-spec.md §2, §9); otherwise the deal passes to `(dealer + 1) % 4`, and once that
-    wraps back to seat 0 a full round has completed -- the prevailing wind advances, or the
-    game ends if `ruleset.game_length` has no round left (§2's `EAST_ONLY`/`EAST_SOUTH`/
-    `FULL` map to 1/2/4 rounds via `_ALLOWED_ROUNDS`). `hand_no` increments unconditionally
-    either way, so this can never re-deal the same hand number twice.
+    Dealer repeats (連莊) on a dealer win, or on any exhaustive draw if configured; otherwise
+    the deal passes to `(dealer + 1) % 4`, and once that wraps back to seat 0 a full round has
+    completed -- the prevailing wind advances, or the game ends if `ruleset.game_length` has
+    no round left. `hand_no` increments unconditionally either way, so this can never re-deal
+    the same hand number twice.
     """
     if state.phase != Phase.HAND_OVER:
         raise IllegalActionError(f"start_next_hand requires HAND_OVER, got {state.phase}")
@@ -314,9 +292,6 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
     return next_state, []
 
 
-# --- dispatch helpers ------------------------------------------------------------------------
-
-
 def _acting_seat(state: GameState, action: Action) -> int:
     if isinstance(action, (ClaimChow, ClaimPung, ClaimKong, ClaimWin, Pass)):
         return action.seat
@@ -334,10 +309,9 @@ def _scores(state: GameState) -> tuple[int, int, int, int]:
 
 
 def game_outcome(state: GameState) -> GameOutcome:
-    """Extract `docs/06-ml.md §2`'s `GameOutcome` from a finished game. Same fields as
-    `GameEnded`, but callable independently of catching that event -- a persistence path
-    saving a `GameRecord` after the fact (app/db/records.py) has the final `GameState` on
-    hand, not the event stream that produced it."""
+    """Extract `GameOutcome` from a finished game. Same fields as `GameEnded`, but callable
+    independently of catching that event -- a persistence path saving a `GameRecord` after
+    the fact has the final `GameState` on hand, not the event stream that produced it."""
     if state.phase != Phase.GAME_OVER:
         raise IllegalActionError(f"game_outcome requires Phase.GAME_OVER, got {state.phase}")
     return GameOutcome(hand_count=state.hand_no, final_scores=_scores(state))
@@ -352,11 +326,9 @@ def _can_win_with(
     discarder: int,
 ) -> bool:
     """Whether `seat` could legally claim a win on `tile` right now -- structural shape plus
-    `min_faan`, mirroring `actions.can_declare_win` for the claimed-win path (that function
-    only covers a seat's own-turn `DeclareWin`; a claim is evaluated against a *different*
-    seat's discard/kong, so it's built here instead). `tile` is not yet in `seat`'s concealed
-    tiles (a claim, not a landed draw) -- the candidate hand appends it, matching what
-    `scoring.faan.score_winning_hand` will actually be called with once the win resolves.
+    `min_faan`, mirroring `actions.can_declare_win` for the claimed-win path. `tile` is not
+    yet in `seat`'s concealed tiles (a claim, not a landed draw), so the candidate hand
+    appends it before scoring.
     """
     seat_state = state.seats[seat]
     candidate = dataclasses.replace(seat_state, concealed=(*seat_state.concealed, tile))
@@ -369,9 +341,6 @@ def _can_win_with(
     return result.clears_min_faan
 
 
-# --- draw, incl. flower cascade ------------------------------------------------------------
-
-
 def _wall_exhausted(state: GameState) -> bool:
     return len(state.wall.tiles) <= state.ruleset.wall_reserve
 
@@ -379,16 +348,17 @@ def _wall_exhausted(state: GameState) -> bool:
 def _draw_and_cascade(
     state: GameState, seat: int, *, from_front: bool
 ) -> tuple[GameState, TileId | None, list[Event]]:
-    """Draw one tile for `seat`, replacing any flowers drawn from the back (§3 step 4,
-    §11.1) until a playable tile lands. Checks wall exhaustion before *every* draw in the
-    cascade, not just the first -- a flower reveal can itself run the wall down to
-    `wall_reserve` with no replacement left to draw, which is an exhaustive draw (§9), not an
-    error. Returns `tile=None` in that case; any flowers already revealed this cascade stay
-    revealed (`state` reflects them) even though the hand ends before a real tile lands.
+    """Draw one tile for `seat`, replacing any flowers drawn from the back until a playable
+    tile lands. Checks wall exhaustion before every draw in the cascade, not just the first --
+    a flower reveal can itself run the wall down to `wall_reserve` with no replacement left,
+    which is an exhaustive draw, not an error. Returns `tile=None` in that case; flowers
+    already revealed this cascade stay revealed even though the hand ends before a real tile
+    lands.
 
-    Bounded by `_MAX_FLOWERS`: a flower is a unique physical tile that can never reappear
-    once revealed, so the cascade provably cannot exceed the 8 that exist -- the
-    `AssertionError` below is a can't-happen guard, not a real code path."""
+    Bounded by `_MAX_FLOWERS`: a flower is a unique physical tile that can never reappear once
+    revealed, so the cascade provably cannot exceed the 8 that exist -- the `AssertionError`
+    below is a can't-happen guard.
+    """
     events: list[Event] = []
     seat_state = state.seats[seat]
 
@@ -433,8 +403,8 @@ def _draw_for_turn(
 ) -> tuple[GameState, list[Event]]:
     """Land a drawn tile in `seat`'s hand and open `AWAIT_ACTION` for them -- or, if the wall
     runs out before or during the draw, end the hand as an exhaustive draw instead. If a
-    flower instant-win fired mid-cascade, `state` is already `Phase.HAND_OVER` (see
-    `_draw_and_cascade`'s module-docstring note) and this just passes that through."""
+    flower instant-win fired mid-cascade, `state` is already `Phase.HAND_OVER` and this just
+    passes that through."""
     state, tile, events = _draw_and_cascade(state, seat, from_front=from_front)
     if state.phase == Phase.HAND_OVER:
         return state, events
@@ -458,9 +428,6 @@ def _draw_for_turn(
         KongReplacementDrawn(seat=seat, tile_id=tile) if kong else Drawn(seat=seat, tile_id=tile)
     )
     return state, [*events, draw_event]
-
-
-# --- discard + claim window --------------------------------------------------------------
 
 
 def _discard_claim_offers(state: GameState, discarder: int, tile: TileId) -> tuple[ClaimOffer, ...]:
@@ -511,17 +478,13 @@ def _apply_discard(state: GameState, seat: int, action: Discard) -> tuple[GameSt
     return state, events
 
 
-# --- own-turn kongs, incl. robbing-the-kong window ----------------------------------------
-
-
 def _kong_rob_offers(
     state: GameState, declarer: int, meld: Meld, rob_tile: TileId
 ) -> tuple[ClaimOffer, ...]:
-    """01-rules-spec.md §11.3: robbing an added kong (加槓) is open to any qualifying win;
-    robbing a **concealed** kong is further restricted to a seat whose win would specifically
-    complete Thirteen Orphans (十三么) -- real HK convention only carves out that one narrow
-    exception (the kong declarer's 4th copy can otherwise be a 十三么 player's sole out), not
-    "any winning hand" once `concealed_kong_robbable` is on.
+    """Robbing an added kong (加槓) is open to any qualifying win; robbing a concealed kong is
+    further restricted to a seat whose win would specifically complete Thirteen Orphans
+    (十三么) -- real HK convention only carves out that one narrow exception, not "any winning
+    hand" once `concealed_kong_robbable` is on.
     """
     ruleset = state.ruleset
     if not ruleset.kong_rob_enabled:
@@ -583,9 +546,6 @@ def _apply_self_kong(state: GameState, seat: int, meld: Meld) -> tuple[GameState
     return more_state, events + more_events
 
 
-# --- claim / kong-rob response accumulation and resolution --------------------------------
-
-
 def _apply_claim_response(
     state: GameState, seat: int, action: ClaimResponse
 ) -> tuple[GameState, list[Event]]:
@@ -627,20 +587,15 @@ def _apply_claim_response(
         win_type = WinType.KONG_ROB if window.kind == ClaimKind.KONG_ROB else WinType.DISCARD
         winner_state = state.seats[winner]
         # fold the claimed tile into the winner's concealed hand before scoring, not just into
-        # the tuple passed below -- state.seats[winner].concealed feeds HandEndWire.winning_hand
-        # (app/views.py) and used to stay short exactly this tile for a claimed win, since only
-        # the local tuple ever saw it (docs/02-protocol.md §3's now-fixed "known gap").
+        # the tuple passed below -- state.seats[winner].concealed feeds HandEndWire.winning_hand.
         concealed_tiles = (*winner_state.concealed, window.tile)
         winner_state = dataclasses.replace(winner_state, concealed=concealed_tiles)
         seats = _with_seat(state.seats, winner, winner_state)
 
-        # the claimed tile leaves wherever it came from -- otherwise it's double-counted, both
-        # there and in the winner's hand above. A plain discard win pops it off the discarder's
-        # discard pool, same as a claimed chow/pung/kong does below. A kong-rob win takes it back
-        # out of the declarer's kong meld: an added kong (加槓) reverts to the pung it upgraded
-        # from (the 4th tile never actually completed it); a concealed kong (暗槓, thirteen-orphans
-        # only) had never been exposed at all, so its other 3 tiles just return to the declarer's
-        # concealed hand rather than staying a meld.
+        # the claimed tile leaves wherever it came from, or it's double-counted. a discard win
+        # pops it off the discarder's pool; a kong-rob win takes it back out of the declarer's
+        # kong meld -- an added kong (加槓) reverts to the pung it upgraded from, a concealed
+        # kong (暗槓) returns its other 3 tiles to the declarer's concealed hand.
         source_state = state.seats[window.source_seat]
         if window.kind == ClaimKind.KONG_ROB:
             kong_meld = next(m for m in source_state.melds if window.tile in m.tiles)
@@ -707,9 +662,6 @@ def _apply_claim_response(
     return state, events
 
 
-# --- hand end / next hand / game end -------------------------------------------------------
-
-
 def _end_exhaustive_draw(state: GameState) -> tuple[GameState, list[Event]]:
     result = HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW)
     state = dataclasses.replace(state, phase=Phase.HAND_OVER, claim_window=None, hand_result=result)
@@ -725,7 +677,7 @@ def _end_exhaustive_draw(state: GameState) -> tuple[GameState, list[Event]]:
 
 _SEVEN_FLOWERS_NAME = "七花"
 _EIGHT_FLOWERS_NAME = "八花"
-_SEVEN_FLOWERS_FAAN = 3  # §7 "Flower faan": seven_flowers_instant_win is a flat 3 faan
+_SEVEN_FLOWERS_FAAN = 3  # seven_flowers_instant_win is a flat 3 faan
 _SEVEN_FLOWERS_THRESHOLD = 7
 _EIGHT_FLOWERS_THRESHOLD = 8
 
@@ -733,8 +685,7 @@ _EIGHT_FLOWERS_THRESHOLD = 8
 def _flower_instant_win(ruleset: RuleSet, flower_count: int) -> tuple[int, dict[str, int]] | None:
     """`(faan, breakdown)` if `flower_count` just crossed a configured instant-win threshold,
     else `None`. Eight checked before seven so a table with both enabled resolves to the
-    higher (limit) tier if a single reveal somehow satisfied both -- can't happen in practice
-    (flowers are revealed one at a time) but keeps the ordering correct regardless."""
+    higher tier if a single reveal somehow satisfied both."""
     if ruleset.eight_flowers_instant_win and flower_count >= _EIGHT_FLOWERS_THRESHOLD:
         return ruleset.faan_cap, {_EIGHT_FLOWERS_NAME: ruleset.faan_cap}
     if ruleset.seven_flowers_instant_win and flower_count >= _SEVEN_FLOWERS_THRESHOLD:
@@ -803,9 +754,7 @@ def _end_win(
 ) -> tuple[GameState, list[Event]]:
     """Score a normal (non-instant-win) win -- `concealed_tiles`/`melds` are the winner's hand
     at the moment of the win, including the winning tile. Passed explicitly rather than read
-    back off `state` because the self-draw call site (`reduce()`) never mutates `state` at all;
-    the claimed-win call site (`_apply_claim_response`) does fold the tile into
-    `state.seats[winner].concealed` before calling this, so the two stay consistent."""
+    back off `state` because the self-draw call site never mutates `state` at all."""
     ctx = build_scoring_context(
         state,
         winner,
@@ -832,16 +781,11 @@ def _hand_to_concealed(hand: tuple[WallTile, ...]) -> tuple[TileId, ...]:
 
 
 def _deal_hand(state: GameState, *, dealer: int, prevailing: Wind, hand_no: int) -> GameState:
-    """Deal hand `hand_no` (01-rules-spec.md §3), mirroring `state.new_game` but for hand 2+:
-    scores and `next_window_id` carry over, everything else about a seat (concealed, melds,
-    discards, flowers) starts fresh. `next_window_id` has to survive the hand boundary because
-    `window_id` is a whole-game identifier, not a per-hand one -- `app/table.py`'s per-window
-    bookkeeping (`_armed_window_id`, `_active_seat_timer`, `_claim_deadline_ms`) is keyed by
-    `window_id` alone and is never reset between hands; resetting it to 0 here made hand 2's
-    first claim window collide with hand 1's, which silently starved it of a `claim_offer`
-    (`_arm_claim_timer`'s once-per-window idempotency guard treated it as already armed) --
-    caught by `tests/test_full_game_e2e.py`'s live multi-hand run, pinned in
-    `tests/test_engine.py::test_start_next_hand_carries_forward_next_window_id`."""
+    """Deal hand `hand_no`, mirroring `state.new_game` but for hand 2+: scores and
+    `next_window_id` carry over, everything else about a seat starts fresh. `next_window_id`
+    must survive the hand boundary since `window_id` is a whole-game identifier, not per-hand
+    -- resetting it to 0 caused hand 2's first claim window to collide with hand 1's and
+    silently starve it of a claim offer."""
     hand_seed = derive_hand_seed(state.game_seed, hand_no)
     _, wall = new_wall(hand_seed, state.ruleset)
     hands, wall = deal_hands(wall, dealer_seat=dealer)
