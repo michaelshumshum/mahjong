@@ -7,9 +7,12 @@
 	import ScoreSheetDemo from './_components/ScoreSheetDemo.svelte';
 	import SettingsDemo from './_components/SettingsDemo.svelte';
 	import ToastDemo from './_components/ToastDemo.svelte';
+	import BackButton from '$lib/ui/BackButton.svelte';
 </script>
 
-<a class="back-link" href="/">← Lobby</a>
+<div class="demo-header">
+	<BackButton label="Lobby" href="/" />
+</div>
 <h1>Welcome to SvelteKit</h1>
 <p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
 
@@ -26,15 +29,9 @@
 	// proves the styles/ partials are usable from a page — not real component styling (M4).
 	@use '$lib/styles/layout';
 
-	.back-link {
-		display: inline-block;
+	.demo-header {
+		display: flex;
 		margin-bottom: var(--space-3);
-		color: var(--color-text-muted);
-		text-decoration: none;
-
-		&:hover {
-			color: var(--color-text);
-		}
 	}
 
 	section {

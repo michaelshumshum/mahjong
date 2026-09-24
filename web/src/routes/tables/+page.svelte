@@ -3,6 +3,7 @@
 	import { fetchTables, type TableSummary } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { hasJoinedTable } from '$lib/ui/settings-storage';
+	import BackButton from '$lib/ui/BackButton.svelte';
 	import JoinByCodePanel from './_components/JoinByCodePanel.svelte';
 	import TableCard from './_components/TableCard.svelte';
 
@@ -42,7 +43,7 @@
 
 <div class="tables-page">
 	<header class="page-header">
-		<a class="back-link" href="/">← Lobby</a>
+		<BackButton label="Lobby" href="/" />
 		<h1>Tables</h1>
 		<button type="button" class="ghost" onclick={refreshTables}>Refresh</button>
 	</header>
@@ -91,15 +92,6 @@
 			margin: 0;
 			margin-inline-end: auto;
 			font-size: var(--font-size-xl);
-		}
-	}
-
-	.back-link {
-		color: var(--color-text-muted);
-		text-decoration: none;
-
-		&:hover {
-			color: var(--color-text);
 		}
 	}
 

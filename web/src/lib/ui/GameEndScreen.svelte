@@ -11,6 +11,7 @@
 		type Standing,
 		type Totals
 	} from './ScoreSheet.svelte';
+	import BackButton from './BackButton.svelte';
 
 	let {
 		seats,
@@ -37,6 +38,9 @@
 </script>
 
 <section class="game-end" aria-label="Game end summary">
+	<div class="game-end-header">
+		<BackButton label="Back to home" href="/" />
+	</div>
 	<div class="podium">
 		{#each standings.slice(0, 3) as standing, index (standing.seat)}
 			{@const rank = index}
@@ -59,11 +63,9 @@
 	</div>
 
 	<ScoreSheet {seats} {totals} {hands} />
-	<a class="home-link" href="/">Back to home</a>
 </section>
 
 <style lang="scss">
-	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 
 	.game-end {
@@ -76,6 +78,11 @@
 		@include layout.tablet-up {
 			padding: var(--space-6);
 		}
+	}
+
+	.game-end-header {
+		display: flex;
+		align-self: flex-start;
 	}
 
 	.podium {
@@ -139,19 +146,5 @@
 
 	.podium-score--negative {
 		color: var(--color-accent);
-	}
-
-	.home-link {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-2);
-		min-width: 12rem;
-		padding: var(--space-3) var(--space-6);
-		text-align: center;
-		text-decoration: none;
-		font-size: var(--font-size-lg);
-		font-weight: 700;
-		@include buttons.btn-primary;
 	}
 </style>

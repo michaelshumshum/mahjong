@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { MOCK_SCENARIOS } from '$lib/table/mock-game-state';
 	import { WIND_CHAR, type WindLetter } from '$lib/table/wind';
+	import BackButton from '$lib/ui/BackButton.svelte';
 
 	let {
 		isMock,
@@ -32,6 +33,7 @@
 </script>
 
 <header class="table-toolbar">
+	<BackButton label="Leave game" onclick={onLeaveClick} />
 	{#if isMock}
 		<div class="scenario-picker" role="group" aria-label="Mock scenario">
 			{#each MOCK_SCENARIOS as scenario (scenario.id)}
@@ -63,7 +65,6 @@
 	</div>
 
 	<div class="chrome-toggles">
-		<button type="button" onclick={onLeaveClick}>Leave game</button>
 		<button type="button" onclick={onToggleScoreSheet}>Score sheet</button>
 		{#if !spectating}
 			<button type="button" onclick={onToggleSettings}>Settings</button>

@@ -5,6 +5,7 @@
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import SeatRing from '$lib/table/SeatRing.svelte';
 	import FormGroup from '$lib/ui/FormGroup.svelte';
+	import BackButton from '$lib/ui/BackButton.svelte';
 
 	let {
 		tableId,
@@ -67,7 +68,7 @@
 	(table code + copy-invite-link) and the seat ring's across/left/right/self arrangement, the
 	same relative layout the real table grid uses (docs/03-frontend.md's "Pre-game states"). -->
 <div class="pretable-panel">
-	<button type="button" class="pretable-leave" onclick={onLeaveClick}>Leave game</button>
+	<BackButton label="Leave game" onclick={onLeaveClick} />
 	<div class="pretable-info">
 		<span>Table</span>
 		<span class="pretable-code">{tableId}</span>
@@ -150,16 +151,6 @@
 			max-width: 40ch;
 			color: var(--color-text-muted);
 		}
-	}
-
-	.pretable-leave {
-		align-self: flex-start;
-		min-height: 36px;
-		padding: var(--space-1) var(--space-3);
-		font: inherit;
-		font-size: var(--font-size-sm);
-		cursor: pointer;
-		@include buttons.btn-ghost;
 	}
 
 	.pretable-info {
