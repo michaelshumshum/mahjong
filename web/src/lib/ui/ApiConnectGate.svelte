@@ -14,6 +14,10 @@
 
 	let status = $state<'connecting' | 'ready' | 'error'>('connecting');
 	let attempt = $state(0);
+	// set while waiting out a backoff delay between attempts; cleared the moment the next attempt
+	// starts. Not a ticking countdown -- web/AGENTS.md's "never a JS ticker" rule -- so this reads
+	// "next attempt in Ns" for the full wait rather than counting down second by second.
+	let nextRetryDelayMs = $state<number | null>(null);
 
 	// same panel this screen occupies until `ready` -- shown for the same reason /table/[id]'s
 	// own pregame states show it (docs/03-frontend.md §2's "Shared across routes"), released the
@@ -24,14 +28,15 @@
 	async function connect(): Promise<void> {
 		status = 'connecting';
 		attempt = 0;
+		nextRetryDelayMs = null;
 		const started = Date.now();
-		const healthy = await waitForApiHealthy(
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			(n) => (attempt = n)
-		);
+		const healthy = await waitForApiHealthy({
+			onAttempt: (n) => {
+				attempt = n;
+				nextRetryDelayMs = null;
+			},
+			onRetryScheduled: (delayMs) => (nextRetryDelayMs = delayMs)
+		});
 		const elapsed = Date.now() - started;
 		if (elapsed < MIN_DISPLAY_MS) {
 			await new Promise((resolve) => setTimeout(resolve, MIN_DISPLAY_MS - elapsed));
@@ -55,6 +60,11 @@
 				<p class="connect-status">Connecting…</p>
 				{#if attempt > 1}
 					<p class="connect-counter">Attempt {attempt}</p>
+				{/if}
+				{#if nextRetryDelayMs !== null}
+					<p class="connect-counter">
+						Next attempt in {Math.ceil(nextRetryDelayMs / 1000)}s
+					</p>
 				{/if}
 			{:else}
 				<p class="connect-status">Can't reach the server.</p>

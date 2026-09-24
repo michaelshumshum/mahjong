@@ -53,7 +53,10 @@ describe('waitForApiHealthy', () => {
 
 	it('returns true as soon as /healthz responds ok', async () => {
 		const seen: string[] = [];
-		const healthy = await waitForApiHealthy('http://api.test', stubFetch(200, {}, seen));
+		const healthy = await waitForApiHealthy({
+			baseUrl: 'http://api.test',
+			fetchFn: stubFetch(200, {}, seen)
+		});
 		expect(healthy).toBe(true);
 		expect(seen).toEqual(['http://api.test/healthz']);
 	});
@@ -67,7 +70,7 @@ describe('waitForApiHealthy', () => {
 			return new Response('', { status: 200 });
 		}) as typeof fetch;
 
-		const result = waitForApiHealthy('http://api.test', fetchFn);
+		const result = waitForApiHealthy({ baseUrl: 'http://api.test', fetchFn });
 		await vi.advanceTimersByTimeAsync(1_000); // attempt 1 fails -> wait 1s before attempt 2
 		await vi.advanceTimersByTimeAsync(2_000); // attempt 2 fails -> wait 2s before attempt 3
 
@@ -83,7 +86,7 @@ describe('waitForApiHealthy', () => {
 			return new Response('', { status: 503 });
 		}) as typeof fetch;
 
-		waitForApiHealthy('http://api.test', fetchFn, 3, 1_000);
+		waitForApiHealthy({ baseUrl: 'http://api.test', fetchFn, maxAttempts: 3, baseDelayMs: 1_000 });
 		await vi.advanceTimersByTimeAsync(999);
 		expect(calls).toBe(1); // still waiting out the 1s delay before attempt 2
 
@@ -99,7 +102,12 @@ describe('waitForApiHealthy', () => {
 			return new Response('', { status: 503 });
 		}) as typeof fetch;
 
-		const result = waitForApiHealthy('http://api.test', fetchFn, 4, 10);
+		const result = waitForApiHealthy({
+			baseUrl: 'http://api.test',
+			fetchFn,
+			maxAttempts: 4,
+			baseDelayMs: 10
+		});
 		// backoff between the 4 attempts: 10ms, 20ms, 40ms (doubling from baseDelayMs)
 		await vi.advanceTimersByTimeAsync(10);
 		await vi.advanceTimersByTimeAsync(20);
@@ -109,7 +117,7 @@ describe('waitForApiHealthy', () => {
 		expect(calls).toBe(4);
 	});
 
-	it('defaults to a max of 10 attempts', async () => {
+	it('defaults to a max of 5 attempts', async () => {
 		vi.useFakeTimers();
 		let calls = 0;
 		const fetchFn = (async () => {
@@ -117,12 +125,35 @@ describe('waitForApiHealthy', () => {
 			return new Response('', { status: 503 });
 		}) as typeof fetch;
 
-		// 1s baseDelayMs default, doubling 9 times between 10 attempts: 1+2+4+...+256 = 511s
-		const result = waitForApiHealthy('http://api.test', fetchFn);
-		await vi.advanceTimersByTimeAsync(511_000);
+		// 1s baseDelayMs default, doubling 4 times between 5 attempts: 1+2+4+8 = 15s
+		const result = waitForApiHealthy({ baseUrl: 'http://api.test', fetchFn });
+		await vi.advanceTimersByTimeAsync(15_000);
 
 		expect(await result).toBe(false);
-		expect(calls).toBe(10);
+		expect(calls).toBe(5);
+	});
+
+	it('caps the backoff delay at maxDelayMs instead of doubling forever', async () => {
+		vi.useFakeTimers();
+		let calls = 0;
+		const fetchFn = (async () => {
+			calls++;
+			return new Response('', { status: 503 });
+		}) as typeof fetch;
+
+		// uncapped doubling from 10_000 would be 10s, 20s, 40s, 80s; capped at 15s it's 10s, 15s,
+		// 15s, 15s -- 55s total instead of 150s.
+		const result = waitForApiHealthy({
+			baseUrl: 'http://api.test',
+			fetchFn,
+			maxAttempts: 5,
+			baseDelayMs: 10_000,
+			maxDelayMs: 15_000
+		});
+		await vi.advanceTimersByTimeAsync(55_000);
+
+		expect(await result).toBe(false);
+		expect(calls).toBe(5);
 	});
 
 	it('reports each attempt number via onAttempt, 1-indexed', async () => {
@@ -130,12 +161,38 @@ describe('waitForApiHealthy', () => {
 		const fetchFn = (async () => new Response('', { status: 503 })) as typeof fetch;
 		const seen: number[] = [];
 
-		const result = waitForApiHealthy('http://api.test', fetchFn, 3, 10, (n) => seen.push(n));
+		const result = waitForApiHealthy({
+			baseUrl: 'http://api.test',
+			fetchFn,
+			maxAttempts: 3,
+			baseDelayMs: 10,
+			onAttempt: (n) => seen.push(n)
+		});
 		await vi.advanceTimersByTimeAsync(10);
 		await vi.advanceTimersByTimeAsync(20);
 		await result;
 
 		expect(seen).toEqual([1, 2, 3]);
+	});
+
+	it('reports the scheduled delay via onRetryScheduled before each wait', async () => {
+		vi.useFakeTimers();
+		const fetchFn = (async () => new Response('', { status: 503 })) as typeof fetch;
+		const seen: number[] = [];
+
+		const result = waitForApiHealthy({
+			baseUrl: 'http://api.test',
+			fetchFn,
+			maxAttempts: 3,
+			baseDelayMs: 10,
+			onRetryScheduled: (delayMs) => seen.push(delayMs)
+		});
+		await vi.advanceTimersByTimeAsync(10);
+		await vi.advanceTimersByTimeAsync(20);
+		await result;
+
+		// only fires between attempts (2 gaps for 3 attempts), never after the last one
+		expect(seen).toEqual([10, 20]);
 	});
 });
 

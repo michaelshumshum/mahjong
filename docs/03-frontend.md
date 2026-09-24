@@ -524,15 +524,19 @@ rather than forking into a second render path.
 
 Every route except `?mock=`/`/demo` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
 root `+layout.svelte`, around `{@render children()}`), which polls `GET /healthz`
-(`lib/net/lobby.ts`'s `waitForApiHealthy`, up to 10 attempts, exponential backoff between them
-starting at 1s and doubling each retry — 1s, 2s, 4s, ...) before rendering the page underneath —
-the alternative is a page that loads and looks interactive before the backend is actually
-reachable, which reads as broken rather than loading. Held for a minimum of 1s even if the first
-ping succeeds instantly, so a fast backend doesn't read as a one-frame flash. Exhausted: a "Can't
-reach the server" panel with a manual Retry (not silent auto-retry), showing the attempt count
-once a poll has actually failed (`attempt > 1` — attempt 1 alone isn't a retry yet).
-`?mock=`/`/demo` skip the check entirely, matching their existing no-backend posture (screenshot
-pipeline, mock e2e specs — `web/AGENTS.md`).
+(`lib/net/lobby.ts`'s `waitForApiHealthy`, up to 5 attempts, exponential backoff between them
+starting at 1s and doubling each retry — 1s, 2s, 4s, 8s, capped at 30s — before rendering the page
+underneath. The cap only matters if `maxAttempts`/`baseDelayMs` are ever tuned up; at the current
+defaults the longest gap (8s, before attempt 5) never reaches it. The alternative to gating at all
+is a page that loads and looks interactive before the backend is actually reachable, which reads
+as broken rather than loading. Held for a minimum of 1s even if the first ping succeeds instantly,
+so a fast backend doesn't read as a one-frame flash. Once a poll fails, the panel shows both the
+attempt count (`attempt > 1` — attempt 1 alone isn't a retry yet) and a static "next attempt in Ns"
+line for the scheduled delay (`waitForApiHealthy`'s `onRetryScheduled`) — static, not a ticking
+countdown, per `web/AGENTS.md`'s "never a JS ticker" rule; it reads the same delay for the whole
+wait rather than counting down. Exhausted: a "Can't reach the server" panel with a manual Retry,
+not silent auto-retry. `?mock=`/`/demo` skip the check entirely, matching their existing no-backend
+posture (screenshot pipeline, mock e2e specs — `web/AGENTS.md`).
 
 Claims mural visibility (§2's "Shared across routes") while its own panel is up, releasing it the
 instant the underlying page mounts and claims it for itself. `lib/ui/mural-visibility.svelte.ts`

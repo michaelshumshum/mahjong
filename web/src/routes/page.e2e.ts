@@ -33,7 +33,9 @@ test('shows a connecting screen until the API health check succeeds, then the lo
 // lobby.spec.ts. This only exercises the first real retry cycle in a live browser: a failed
 // attempt 1 followed by a real ~1s wait before attempt 2, proving the backoff/counter wiring
 // against a genuinely failing backend, not just a mocked `waitForApiHealthy`.
-test('retries after a failed attempt, showing the attempt count once it has', async ({ page }) => {
+test('retries after a failed attempt, showing the attempt count and next-retry countdown', async ({
+	page
+}) => {
 	await page.unroute('**/healthz');
 	await page.route('**/healthz', (route) =>
 		route.fulfill({ status: 503, json: { status: 'draining' } })
@@ -42,7 +44,12 @@ test('retries after a failed attempt, showing the attempt count once it has', as
 
 	await expect(page.getByText('Connecting…')).toBeVisible();
 	await expect(page.getByText(/^Attempt \d+$/)).not.toBeVisible();
+	// attempt 1 just failed -- waiting out the 1s backoff before attempt 2.
+	await expect(page.getByText('Next attempt in 1s')).toBeVisible({ timeout: 1_000 });
 	await expect(page.getByText('Attempt 2')).toBeVisible({ timeout: 3_000 });
+	// attempt 2 also failed -- next delay doubled to 2s, proving the backoff actually grows.
+	await expect(page.getByText('Next attempt in 2s')).toBeVisible({ timeout: 1_000 });
+	await expect(page.getByText('Attempt 3')).toBeVisible({ timeout: 4_000 });
 });
 
 // this suite has no real backend behind it (playwright.config.ts's webServer is `pnpm dev`

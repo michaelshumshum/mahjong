@@ -18,16 +18,30 @@ export function apiBaseUrl(): string {
 	return env.PUBLIC_API_URL || 'http://localhost:8000';
 }
 
+export interface WaitForApiHealthyOptions {
+	baseUrl?: string;
+	fetchFn?: typeof fetch;
+	maxAttempts?: number;
+	baseDelayMs?: number;
+	maxDelayMs?: number;
+	onAttempt?: (attempt: number) => void;
+	// fires once a poll fails and a retry has been scheduled, with the delay before it -- lets a
+	// caller show "next attempt in Ns" without duplicating the backoff math.
+	onRetryScheduled?: (delayMs: number) => void;
+}
+
 // polls GET /healthz until it responds ok or maxAttempts is exhausted -- used by ApiConnectGate
-// to gate the app on first load. Exponential backoff between attempts: 1s, 2s, 4s, ... (doubling
-// each retry from baseDelayMs), no delay before the first attempt.
-export async function waitForApiHealthy(
-	baseUrl: string = apiBaseUrl(),
-	fetchFn: typeof fetch = fetch,
-	maxAttempts = 10,
+// to gate the app on first load. Exponential backoff between attempts, capped at maxDelayMs: 1s,
+// 2s, 4s, ... (doubling each retry from baseDelayMs), no delay before the first attempt.
+export async function waitForApiHealthy({
+	baseUrl = apiBaseUrl(),
+	fetchFn = fetch,
+	maxAttempts = 5,
 	baseDelayMs = 1_000,
-	onAttempt?: (attempt: number) => void
-): Promise<boolean> {
+	maxDelayMs = 30_000,
+	onAttempt,
+	onRetryScheduled
+}: WaitForApiHealthyOptions = {}): Promise<boolean> {
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		onAttempt?.(attempt);
 		try {
@@ -37,7 +51,9 @@ export async function waitForApiHealthy(
 			// not reachable yet -- keep retrying with backoff.
 		}
 		if (attempt < maxAttempts) {
-			await new Promise((resolve) => setTimeout(resolve, baseDelayMs * 2 ** (attempt - 1)));
+			const delayMs = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+			onRetryScheduled?.(delayMs);
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
 		}
 	}
 	return false;
