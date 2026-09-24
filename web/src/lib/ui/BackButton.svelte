@@ -52,7 +52,7 @@
 		font-size: var(--font-size-sm);
 		text-decoration: none;
 		cursor: pointer;
-		@include buttons.btn-ghost;
+		@include buttons.btn-secondary;
 
 		svg {
 			width: 18px;
