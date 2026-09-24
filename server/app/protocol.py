@@ -1,21 +1,12 @@
-"""Wire protocol models. Single source of truth (docs/02-protocol.md §6) —
-TS types and JSON Schema get generated from this file, never hand-written.
+"""Wire protocol models. Single source of truth -- TS types and JSON Schema are generated from
+this file, never hand-written. Adding a message type: define its payload model, an Envelope
+subclass with a Literal `t` and that payload as `d`, then add it to `AnyMessage`'s Union.
 
-Adding a message type: define its payload model, define an Envelope subclass
-with a Literal `t` tag and that payload as `d`, then add the subclass to
-`AnyMessage`'s Union. Nothing else needs to change for the union to keep
-discriminating correctly.
-
-**`discard` reuses its wire tag across directions** (docs/02-protocol.md §2 vs §3: the client
-intent and the server broadcast are both `t:"discard"`, different payload shapes). A single
-flat `Field(discriminator="t")` union can't hold two members with the same tag, so
+`discard` reuses its wire tag across directions (client intent vs. server broadcast, different
+payload shapes) -- a flat discriminated union can't hold two members with the same tag, so
 `ClientMessage`/`ServerMessage` are each their own discriminated union and `AnyMessage` is a
-plain (non-discriminated) union of the two -- pydantic v2's "smart" union mode picks the right
-side by trying each and keeping whichever validates (the two `discard` shapes have disjoint
-required fields under `extra="forbid"`, so there's never a genuine ambiguity). `ws.py` still
-validates every incoming frame against `AnyMessage`, same lenient-on-wrong-direction behavior
-as before. `tools/gen_protocol.py`'s `_union_members` was extended to flatten this one extra
-level of nesting; nothing else about codegen changed.
+plain union of the two; pydantic's "smart" mode picks the right side by trying each (the two
+`discard` shapes have disjoint required fields under `extra="forbid"`, so there's no ambiguity).
 """
 
 from typing import Annotated, Any, Literal
@@ -34,27 +25,19 @@ class Envelope(BaseModel):
     ts: int  # server clock, ms
 
 
-# --- shared leaf payloads --------------------------------------------------------------------
-
-
 class HelloPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     last_seq: int | None = None
     client_version: str
-    # reconnect target on an already-bound seat (02-protocol.md §2/§5) -- client-asserted (which
-    # seat), but possession of it is checked via `secret` below (00-architecture.md §2.1). Omit
-    # for a fresh connection awaiting `join`, unchanged M0 behavior.
+    # reconnect target on an already-bound seat; client-asserted, verified via secret below.
+    # Omit for a fresh connection awaiting `join`.
     seat: int | None = None
-    # the `reconnect_secret` this seat's original `join` ack returned (`AckPayload`, below) --
-    # required to actually reclaim `seat`; `Table.reconnect` refuses a missing or wrong one
-    # (`error{code:'bad_secret'}') via `secrets.compare_digest`. Omitted/`None` whenever `seat`
-    # is (this is the M0 no-op path with nothing to authenticate).
+    # reconnect_secret from join's ack (AckPayload) -- required to reclaim seat; wrong or
+    # missing -> bad_secret.
     secret: str | None = None
-    # deliberately no `name` field here -- `hello` is the reconnect/session message (`seat` only
-    # ever makes sense for an already-bound seat reclaiming itself, per the field above), and the
-    # server already has this seat's chosen name from its original `join`. `JoinPayload.name`
-    # below is the one place a guest display name is ever set (02-protocol.md §2, M5).
+    # no name field here -- a reconnect never resends it; JoinPayload.name is the only place
+    # a guest display name is ever set.
 
 
 class PingPayload(BaseModel):
@@ -97,18 +80,12 @@ class Error(Envelope):
     d: ErrorPayload
 
 
-# --- client -> server intents (docs/02-protocol.md §2) ----------------------------------------
-
-
 class JoinPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seat: int | None = None  # omit for "first open seat"
-    # guest display name (M5, docs/00-architecture.md §2.1): client-chosen, persisted client-side
-    # (localStorage), sent once at first `join` -- a reconnecting seat's `hello` never resends it,
-    # the server already has it on `SeatBinding.name`. No wire-level length limit here: an
-    # empty/missing/over-length name is normalized server-side (trim, cap, default), never
-    # rejected -- a low-stakes guest field doesn't get a hard-error validation path.
+    # guest display name, sent once at first join. No wire-level length limit -- normalized
+    # server-side (trim/cap/default), never rejected.
     name: str | None = None
 
 
@@ -117,17 +94,14 @@ class ReadyPayload(BaseModel):
 
 
 class StartWithBotsPayload(BaseModel):
-    """`start_with_bots`: host-only, no fields -- the server already knows which seat is host
-    (`app/table.py`'s `Table.host_seat`) and which seat this session is bound to, so there is
-    nothing for the client to assert here beyond sending the message at all."""
+    """host-only, no fields -- the server already knows the host seat and which seat this
+    session is bound to."""
 
     model_config = ConfigDict(extra="forbid")
 
 
 class HandEndAckPayload(BaseModel):
-    """`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current
-    hand_no)` server-side (`app/table.py`'s `Table.mark_hand_end_ack`), same shape as `ReadyPayload`
-    above."""
+    """no fields -- server keys acks by (seat, current hand_no) server-side."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -200,18 +174,11 @@ class Auto(Envelope):
     d: AutoPayload
 
 
-# --- server -> client events (docs/02-protocol.md §3) ------------------------------------------
-
-
 class HandHistoryEntryPayload(BaseModel):
-    """One completed hand, as carried on `state_sync.hand_history` (`StateSyncPayload` below) --
-    `app/views.py`'s `HandHistoryRecord`/`hand_history_wire`. Same fields as `HandEndPayload`
-    minus its hand-end-hold `deadline_ts` (meaningless for a hand that's long since closed),
-    plus `dealer`/`prevailing`/`winner_melds`, none of which are on `hand_end`'s own wire payload
-    -- a live client derives them itself from current state at the moment it sees `hand_end`
-    (`web/src/lib/net/reducer.ts`'s `HandHistoryEntry`); a client that only gets a fresh
-    `state_sync` has no "current state at the time" to derive them from, so the server captures
-    them once, here, instead."""
+    """One completed hand, carried on `state_sync.hand_history`. Same fields as `HandEndPayload`
+    minus `deadline_ts`, plus `dealer`/`prevailing`/`winner_melds` -- a live client derives
+    those from `hand_end` itself, but a client with only a fresh `state_sync` has no live state
+    to derive them from, so the server captures them here instead."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -232,12 +199,9 @@ class HandHistoryEntryPayload(BaseModel):
 
 
 class StateSyncPayload(BaseModel):
-    """Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for
-    (`seat=None` for a spectator). `legal_actions`/`claim_options` are the JSON-safe dicts
-    `mahjong_core.actions.action_to_dict`/`ws.py`'s claim-offer serializer produce -- a full
-    typed model per `Action`/`ClaimOffer` variant would just re-derive that same shape with no
-    redaction benefit (same reasoning `SeatView`'s own docstring gives for reusing those types
-    directly instead of inventing wire-only ones)."""
+    """Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for.
+    `legal_actions`/`claim_options` are the JSON-safe dicts `action_to_dict`/the claim-offer
+    serializer produce -- a full typed model per variant would just re-derive the same shape."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -254,33 +218,23 @@ class StateSyncPayload(BaseModel):
     flowers: list[list[str]]
     wall_remaining: int
     seat_status: list[str]
-    # per-seat chosen guest display name (M5), same indexing as seat_status -- `null` for a seat
-    # nobody has ever joined ("empty"); always a resolved, non-empty string for any bound seat
-    # (human or bot), never null for those -- see `app/table.py`'s `_normalize_name`.
+    # per-seat display name, same indexing as seat_status -- null only for an unjoined seat.
     names: list[str | None]
     scores: list[int]
     legal_actions: list[dict[str, Any]]
     claim_options: list[dict[str, Any]]
     deadline_ts: int | None
-    # whichever seat's `join` was this table's first -- `None` before anyone has joined (never
-    # actually observable on the wire, since `state_sync` is only ever sent once someone has).
+    # whichever seat's join was first; never actually null on the wire.
     host_seat: int | None
     # every seat's concealed tiles -- spectators of a `spectators_see_hands` table only
     # (`app/table.py`'s `TableSettings`), `null` everywhere else
     hands: list[list[int]] | None = None
-    # every hand this table has completed so far, oldest first (`app/table.py`'s
-    # `Table._hand_history`) -- lets a client whose only view of the game is this snapshot
-    # (a spectator joining mid-game, a reconnect-with-gap, a backpressure-collapse resync,
-    # docs/02-protocol.md §9) still show the full scoresheet, not just hands it was connected
-    # for live. Defaulted (`= []`) so the generated TS field is optional (`ts_type`/
-    # `_render_field`, gen_protocol.py), keeping every `state_sync` test fixture written before
-    # this field existed valid -- a real `Table.state_sync_wire` always populates it for real.
+    # every completed hand, oldest first -- lets a client whose only view is this snapshot
+    # (spectator joining mid-game, reconnect-with-gap) still show the full scoresheet.
+    # Defaulted to [] so older state_sync fixtures stay valid; a real Table always populates it.
     hand_history: list[HandHistoryEntryPayload] = []
-    # this table's ruleset, fixed at construction (docs/00-architecture.md §3 "Table settings"
-    # applies to `TableSettings`, not `RuleSet` -- nothing here is mutable mid-game).
-    # `ruleset_preset` is the `mahjong_core.presets.RULESET_PRESETS` key it matches, `null` for
-    # a custom ruleset; `ruleset` is always the full resolved `RuleSet.to_dict()` regardless, so
-    # a "custom" editor has real values to prefill from either way.
+    # fixed at construction, never mutated mid-game. ruleset_preset is null for a custom
+    # ruleset; ruleset is always the full resolved values either way.
     ruleset_preset: str | None = None
     ruleset: dict[str, Any] = {}
 
@@ -384,8 +338,7 @@ class HandEndPayload(BaseModel):
     payments: dict[int, int] | None
     revealed: bool
     winning_hand: list[int] | None
-    # hand-end hold (docs/00-architecture.md §3 "Hand-end hold"): every seat gets this same
-    # deadline, held until all four ack (`hand_end_ack`) or it elapses, whichever first.
+    # hand-end hold: every seat gets this same deadline, held until all four ack or it elapses.
     deadline_ts: int
 
 
@@ -396,10 +349,8 @@ class ScorePayload(BaseModel):
 
 
 class GameEndPayload(BaseModel):
-    """`{hand_no, scores}`, not `02-protocol.md §3`'s original `{standings, game_id}` sketch --
-    `app/views.py`'s `GameEndWire` (landed in the earlier redaction sub-task) already mirrors
-    `engine.GameEnded` 1:1 as `{hand_no, scores}`; reconciled here rather than reshaping
-    already-tested redaction code to match a sketch that predates it."""
+    """`{hand_no, scores}` -- matches `app/views.py`'s `GameEndWire`, which already mirrors
+    `engine.GameEnded` 1:1."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -412,17 +363,13 @@ class SeatStatePayload(BaseModel):
 
     seat: int
     status: Literal["connected", "disconnected", "autoplay", "bot"]
-    # this seat's resolved display name (M5) -- carried on every seat_state broadcast, not just
-    # the one from `join`, so an already-connected seat never has to wait for a full `state_sync`
-    # to learn a name that was already resolved earlier in the game.
+    # carried on every seat_state broadcast, not just the one from join.
     name: str | None = None
 
 
 class ServerShutdownPayload(BaseModel):
-    """docs/00-architecture.md §8.1 step 2 -- broadcast once a graceful-shutdown drain starts,
-    so clients can show a "reconnect shortly" banner instead of reading the eventual dropped
-    socket as an error. `deadline_ts` is the same bounded grace window every table in this drain
-    shares (server epoch ms, same convention as every other `deadline_ts` on the wire)."""
+    """Broadcast once a graceful-shutdown drain starts, so clients can show a "reconnect
+    shortly" banner instead of reading the dropped socket as an error."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -435,10 +382,7 @@ class AckPayload(BaseModel):
     id: str
     ok: bool
     error: str | None = None
-    # populated only on a successful `join`'s own ack -- the one-time reconnect credential
-    # (00-architecture.md §2.1) this seat must present back on every later `hello{seat, secret}`
-    # (`HelloPayload.secret`, above). `ack` is sender-only, never broadcast (§3 below), so this
-    # never reaches any connection but the one that just joined.
+    # populated only on a successful join's own ack -- the one-time reconnect credential.
     reconnect_secret: str | None = None
 
 
@@ -554,7 +498,6 @@ ServerMessage = Annotated[
     Field(discriminator="t"),
 ]
 
-# Non-discriminated on purpose -- see module docstring's `discard` note. ws.py validates
-# incoming frames against this so a wrong-direction message (e.g. a client sending `pong`)
-# parses and is ignored rather than rejected as malformed.
+# non-discriminated (see module docstring's discard note); ws.py validates against this so a
+# wrong-direction message parses and is ignored rather than rejected as malformed.
 AnyMessage = ClientMessage | ServerMessage

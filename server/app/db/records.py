@@ -1,9 +1,5 @@
-"""Persisting/reading `GameRecord` rows (docs/06-ml.md §2, docs/05-roadmap.md §2's M1 gate).
-
-`save_game_record` is the only write path: given a finished `GameState` (`Phase.GAME_OVER`)
-plus the ordered `Action` log that produced it, it inserts one `games` row. `engine_version`
-is always stamped from `mahjong_core.engine.ENGINE_VERSION` -- never caller-supplied -- so a
-record can't be mislabeled with the wrong version by accident.
+"""Persisting/reading `GameRecord` rows. `engine_version` is always stamped from
+`mahjong_core.engine.ENGINE_VERSION`, never caller-supplied, so a record can't be mislabeled.
 """
 
 from __future__ import annotations
@@ -27,10 +23,8 @@ async def save_game_record(
     *,
     players: Sequence[str | None] | None = None,
 ) -> GameRecord:
-    """Persist a finished game. `state.phase` must be `Phase.GAME_OVER` -- this is the
-    durable record of a *finished* game (docs/07-infra.md §6), not a mid-game snapshot;
-    `app/table.py` has no mid-game durability story yet (docs/00-architecture.md §7).
-    """
+    """Persist a finished game; `state.phase` must be `Phase.GAME_OVER` -- there's no mid-game
+    durability story to record a snapshot against instead."""
     if state.phase != Phase.GAME_OVER:
         raise ValueError(f"save_game_record requires Phase.GAME_OVER, got {state.phase}")
 
@@ -57,6 +51,5 @@ async def get_game_record(session: AsyncSession, record_id: int) -> GameRecord |
 
 
 def is_replayable(record: GameRecord, current_version: str = ENGINE_VERSION) -> bool:
-    """docs/06-ml.md §2 policy: an `engine_version` mismatch invalidates replay, and there is
-    no migration path -- exact equality, never a semver/range comparison."""
+    """Exact `engine_version` equality -- no semver/range comparison, no migration path."""
     return record.engine_version == current_version

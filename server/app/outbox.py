@@ -1,24 +1,11 @@
-"""Bounded per-connection outbound queue (docs/02-protocol.md §9, docs/00-architecture.md
-"Outbound backpressure"). Not `asyncio.Queue`: the drop-oldest/collapse-to-`state_sync` policy
-needs to inspect and remove from the *middle* of the queue, which `asyncio.Queue` doesn't
-support -- so this is a small `deque`-backed queue with its own wakeup event instead.
+"""Bounded per-connection outbound queue. Not `asyncio.Queue`: the drop-oldest/collapse-to-
+`state_sync` overflow policy needs to remove from the middle of the queue.
 
-Overflow policy (both docs agree on the mechanism; docs/02-protocol.md §9 had drifted to a
-different default number than docs/00-architecture.md's "Outbound backpressure" subsection --
-reconciled to 64, this module's default, in the same change that added this file):
-
-1. Drop the oldest queued frame that isn't `ack`/`error` (`_CRITICAL_TYPES`) -- a stale
-   `draw`/`discard`/`turn` is superseded by a fresh snapshot anyway.
-2. The instant anything is dropped, stop trying to catch the stream up: clear every remaining
-   non-critical frame and ask the caller-supplied `resync` callback to enqueue a fresh
-   `state_sync` in its place. `resync` re-enters `push()` (the caller is expected to run the
-   real per-seat `seq` allocation through the same path every other frame uses -- see
-   `app/table.py`'s `Table.publish_to_seat`/`Session._resync` -- rather than this module
-   fabricating a seq number of its own, which could collide with whatever the real stream
-   assigns next).
-3. If the queue is still over capacity after that (every queued frame was critical, or stayed
-   over capacity even after the collapse), the peer is dead, not just slow: `self.dead` flips
-   true and the caller closes the connection.
+Overflow: drop the oldest non-`ack`/`error` frame; if still over capacity, clear every
+remaining non-critical frame and call the caller-supplied `resync` (re-enters `push()` so the
+real per-seat `seq` allocator stamps it, rather than this module fabricating one that could
+collide); if still over capacity after that, the peer is dead, not slow -- `self.dead` flips
+true and the caller closes the connection.
 """
 
 from __future__ import annotations

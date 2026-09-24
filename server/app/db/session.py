@@ -1,8 +1,5 @@
-"""Async SQLAlchemy engine/session factory (docs/00-architecture.md §6).
-
-`docker-compose.yml` sets `DATABASE_URL` for the `api` container; nothing here reads it
-implicitly at import time -- callers (app startup, scripts, tests) pass the URL they want,
-so a test can point at SQLite without touching the environment.
+"""Async SQLAlchemy engine/session factory. Doesn't read `DATABASE_URL` itself -- callers pass
+the URL explicitly, so a test can point at SQLite without touching the environment.
 """
 
 from __future__ import annotations

@@ -1,58 +1,23 @@
-"""`seat_view()` + `redact_event()` -- the redaction layer (docs/00-architecture.md §5,
-docs/02-protocol.md §3, docs/05-roadmap.md §1).
+"""`seat_view()` + `redact_event()` -- the redaction layer (docs/00-architecture.md §5).
 
 Lives in `app/`, not `mahjong_core/`: this module answers "what may seat X see right now",
-which is about a specific wire recipient, not a game rule (server/AGENTS.md: `mahjong_core`
-stays pure; a clock, socket, or *redaction* concern belongs in `app/`). `mahjong_core` never
-redacts -- see melds.py's `Meld.tiles` docstring.
+which is about a specific wire recipient, not a game rule. `mahjong_core` never redacts -- see
+melds.py's `Meld.tiles` docstring.
 
-Two entry points (00-architecture.md §5, D5):
+Two entry points:
     seat_view(state, seat) -> SeatView       full per-recipient snapshot
     redact_event(state, seat, event) -> dict  per-event wire redaction
 
-Both are built the same way: a small, explicitly `Entitlement`-annotated dataclass is
-constructed first (never a bare dict), then converted to a wire dict. The annotated instance
-is also what `tests/test_redaction.py`'s schema walker inspects directly (`_build_event_wire`,
-`seat_view` itself) -- so the walker checks the exact structure that ships, not a
-reimplementation of the same redaction logic that could drift from it or share its bugs.
+Both are built the same way: an explicitly `Entitlement`-annotated dataclass is constructed
+first (never a bare dict), then converted to a wire dict -- `tests/test_redaction.py`'s schema
+walker inspects that annotated instance directly, not a re-derivation of the redaction logic.
 
-**Reconciled against current `mahjong_core` shape** (00-architecture.md §5's own field list
-predates several fields added since M1/M2):
-
-- `legal_actions`/`claim_options` reuse `mahjong_core.actions.Action` / `mahjong_core.state.
-  ClaimOffer` directly rather than inventing separate `LegalAction`/`ClaimOption` wire types --
-  neither module defines those names anywhere, and both real types already carry only this
-  seat's own tiles or already-public tiles (verified field by field below), so a parallel type
-  would add a translation step with no redaction benefit.
-- `legal_actions` is populated whenever `actions.legal_actions(state, seat)` is non-empty --
-  covers both "seat's own `AWAIT_ACTION` turn" *and* "seat has a live claim/kong-rob offer",
-  not just the `seat == turn` case the architecture doc's prose literally says. The doc undersold
-  the claim-window case; the field itself was always meant to cover it (`04-bots.md`'s bot
-  `act()` needs actions during a claim window too).
-- `seat_status`'s wire vocabulary is connected/disconnected/autoplay/bot/empty.
-  `mahjong_core/state.py` deliberately excludes all of it from `SeatState` (see that module's own
-  docstring): `app/table.py`'s `SeatBinding`/`Table.seat_status_tuple()` own it instead, without a
-  pure-engine round-trip. `seat_view()` itself just takes an optional `seat_status` override and
-  defaults to `("connected",) * 4` when the caller has nothing real to pass -- correct for a
-  caller with no `Table` behind it at all (bots/arena.py, bots/selfplay.py, tests calling
-  `seat_view()` directly), where every seat is a live simulated player, never a lobby seat that
-  may genuinely be unjoined. Only `Table.seat_status_tuple()` ever produces `empty`, for a seat
-  nobody has joined yet; `bot` remains unused (`SeatBinding.status`'s docstring).
-- `names` (M5, docs/00-architecture.md §2.1) is the same shape of override as `seat_status`:
-  `app/table.py`'s `SeatBinding.name` (set at `join`, or synthesized for a `bot` seat) is the
-  real source, `seat_view()` defaults to `(None,) * 4` for a caller with no `Table` behind it.
-- `deadline_ts` sources from whichever of `app/table.py`'s `TimerHeap`-armed deadlines applies to
-  this seat right now (`00-architecture.md §3` D17, `§8` "Turn timeout"): a live claim/kong-rob
-  offer (`claim_deadline_ts`), or this seat's own armed `AWAIT_ACTION` turn deadline
-  (`turn_deadline_ts`, the turn-timeout sub-task). `GameState` itself never carries either --
-  `ClaimWindow.deadline_ts` is just an opaque pass-through (`state.py`'s own docstring: "the pure
-  engine never reads a clock") -- so both are override points a caller with a real `Table` behind
-  it supplies; a bare `seat_view()` call with neither gets `None` for a seat with no live claim
-  offer, matching every pre-Table-integration caller.
-- `reveal_hands` (`app/table.py`'s `TableSettings.spectators_see_hands`) is the open-hands
-  spectator: `seat=None` entitled to every seat's concealed tiles -- `SeatView.hands`, every
-  `OWN_SEAT` event field, and concealed-kong tiles. Spectator-only; passing it with a real seat
-  raises, so no seat can ever be handed another seat's tiles through this switch.
+`legal_actions`/`claim_options` reuse `mahjong_core.actions.Action`/`mahjong_core.state.
+ClaimOffer` directly rather than inventing separate wire types -- both already carry only this
+seat's own tiles or already-public tiles, so a parallel type would add translation with no
+redaction benefit. `seat_status`/`names`/`deadline_ts`/`host_seat` are all override points a
+caller with a real `Table` behind it supplies (see `seat_view()`); a caller with none (bots/
+arena.py, bots/selfplay.py, direct tests) gets inert defaults instead.
 """
 
 from __future__ import annotations
@@ -100,12 +65,9 @@ __all__ = [
 
 
 class Entitlement(Enum):
-    """Per-field annotation the schema walker checks structurally (00-architecture.md §5).
-    Not a docstring promise: every restricted field below carries one of these in its
-    `dataclasses.field(metadata=...)`, and `tests/test_redaction.py` reads that metadata off
-    the actual produced instance -- it cannot be satisfied by a field that merely happens to
-    contain a plausible-looking integer (00-architecture.md §5's `"tile_id": 5` vs
-    `"pool_index": 5` note)."""
+    """Per-field annotation the schema walker checks structurally, not a docstring promise --
+    `tests/test_redaction.py` reads this metadata off the actual produced instance, so it can't
+    be satisfied by a field that merely happens to contain a plausible-looking integer."""
 
     PUBLIC = "public"
     OWN_SEAT = "own_seat"
@@ -118,9 +80,6 @@ def _entitled(entitlement: Entitlement) -> dict[str, Any]:
     return {"entitlement": entitlement}
 
 
-# --- SeatView ----------------------------------------------------------------------------
-
-
 _SeatStatus = tuple[str, str, str, str]
 _DEFAULT_SEAT_STATUS: _SeatStatus = ("connected", "connected", "connected", "connected")
 
@@ -130,15 +89,8 @@ _DEFAULT_NAMES: _SeatNames = (None, None, None, None)
 
 @dataclass(frozen=True)
 class SeatView:
-    """Full redacted snapshot for one recipient (00-architecture.md §5, canonical --
-    depended on by 04-bots.md/06-ml.md, neither may change this shape unilaterally).
-    `seat=None` is the spectator view.
-
-    Entitlement owner for every `OWN_SEAT` field here is this instance's own `seat` --
-    `seat_view(state, X)` only ever builds "X's view", so that's trivially satisfied by
-    construction; what the schema walker actually exercises is whether the *content* of
-    `legal_actions`/`claim_options` ever names a tile id outside {X's own concealed tiles,
-    already-public tiles} -- see `tests/test_redaction.py`.
+    """Full redacted snapshot for one recipient; `seat=None` is the spectator view. Canonical
+    shape depended on by bots and ML encoders -- don't change unilaterally.
     """
 
     seat: int | None = field(metadata=_entitled(Entitlement.PUBLIC))
@@ -154,17 +106,13 @@ class SeatView:
     flowers: tuple[tuple[Flower, ...], ...] = field(metadata=_entitled(Entitlement.PUBLIC))
     wall_remaining: int = field(metadata=_entitled(Entitlement.COUNT_ONLY))
     seat_status: _SeatStatus = field(metadata=_entitled(Entitlement.PUBLIC))
-    # chosen guest display name per seat (M5) -- public like seat_status: a name is never a
-    # secret, so there's no redaction question here, only a data-availability one (a caller
-    # with no Table behind it, e.g. bots/arena, has no name to report and defaults to None).
+    # public: a name is never a secret. None when there's no Table behind the caller (bots/arena).
     names: _SeatNames = field(metadata=_entitled(Entitlement.PUBLIC))
     scores: tuple[int, int, int, int] = field(metadata=_entitled(Entitlement.PUBLIC))
     legal_actions: tuple[Action, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
     claim_options: tuple[ClaimOffer, ...] = field(metadata=_entitled(Entitlement.OWN_SEAT))
     deadline_ts: int | None = field(metadata=_entitled(Entitlement.OWN_SEAT))
-    # whichever seat's `join` was this table's first (public: which seat is the host is not a
-    # secret) -- `None` for a caller with no `Table` behind it at all (bots/arena.py, every
-    # pre-M5-host caller).
+    # public: which seat is host isn't a secret. None for a caller with no Table behind it.
     host_seat: int | None = field(metadata=_entitled(Entitlement.PUBLIC))
     # every seat's concealed tiles, open-hands spectator only (`reveal_hands`); `None` otherwise
     hands: tuple[tuple[TileId, ...], ...] | None = field(
@@ -193,29 +141,14 @@ def seat_view(
     host_seat: int | None = None,
     reveal_hands: bool = False,
 ) -> SeatView:
-    """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). `seat_status` is an
-    override point for the future `app/table.py` `SeatBinding` (see module docstring); omit it
-    and every seat reads as `"connected"`. `names` is the analogous override for each seat's
-    chosen guest display name (M5) -- `app/table.py` passes `Table`'s own per-seat names; omit it
-    (every pre-M5 caller, and every caller with no `Table` behind it at all -- bots/arena.py,
-    bots/selfplay.py) and every seat reads as `None`. `claim_deadline_ts` is the same kind of override for
-    `deadline_ts` while this seat holds a live claim/kong-rob offer: `ClaimWindow.deadline_ts`
-    is never set by the pure engine (state.py's own docstring -- "arming and enforcing the
-    actual timer is app/table.py's job"), so `app/table.py` passes its own `TimerHeap`-derived,
-    epoch-converted deadline here once a window is armed; omit it (as every caller before the
-    Table/Session integration sub-task did) and this falls back to the always-`None`
-    `window.deadline_ts`. `turn_deadline_ts` is the analogous override for this seat's own
-    `AWAIT_ACTION` decision (00-architecture.md §8 "Turn timeout") -- surfaced only when
-    `seat == state.turn` and `state.phase == Phase.AWAIT_ACTION`, mutually exclusive with the
-    claim-window branch below (`GameState.__post_init__`: `claim_window` is never set in
-    `AWAIT_ACTION`), so there's never ambiguity about which deadline `SeatView.deadline_ts`
-    means for a given seat/phase. `hand_end_deadline_ts` is the analogous override for
-    `Phase.HAND_OVER`'s hand-end hold (`app/table.py`'s `_hand_end_deadline_ms`) -- unlike the
-    other two, it's the same value for every seat (a whole-table wait, not a per-seat one), so
-    it applies regardless of `seat`. `host_seat` is the analogous override for `SeatView.host_seat`
-    -- `app/table.py` passes its own `Table.host_seat`; omit it (every caller with no `Table`
-    behind it) and it defaults to `None`. `reveal_hands` fills `hands` for a spectator (module
-    docstring).
+    """Build `seat`'s full redacted snapshot (`seat=None` -> spectator). The `*_deadline_ts`/
+    `seat_status`/`names`/`host_seat` params are override points for `app/table.py`'s live state
+    -- the pure engine has no clock or session state of its own (`GameState` never sets
+    `ClaimWindow.deadline_ts`), so a caller with no `Table` behind it (bots/arena, bots/selfplay,
+    direct tests) omits them and gets the inert defaults. `turn_deadline_ts` only ever surfaces
+    when `seat == state.turn` and `state.phase == Phase.AWAIT_ACTION`; `hand_end_deadline_ts`
+    applies regardless of `seat` (a whole-table wait, not per-seat). `reveal_hands` fills `hands`
+    for a spectator (module docstring); raises if `seat` is not `None`.
     """
     _check_reveal(seat, reveal_hands)
     own_hand = state.seats[seat].concealed if seat is not None else ()
@@ -260,29 +193,17 @@ def seat_view(
     )
 
 
-# --- per-event wire forms ------------------------------------------------------------------
+# One dataclass per distinct wire shape -- concealed_kong gets two (owner vs. everyone else)
+# rather than one struct with a runtime-conditional entitlement on the same field. `seat`,
+# where present, is both "whose event this is" and the `OWN_SEAT` owner for that struct's
+# restricted field(s).
 #
-# One frozen dataclass per distinct wire *shape* -- concealed_kong gets two (owner vs. everyone
-# else), matching 02-protocol.md §3's "meld has two per-seat wire forms" rather than one struct
-# trying to serve both with a runtime-conditional entitlement on the same field.
-#
-# `seat` on each of these (where present) is both "whose event this is" and the `OWN_SEAT`
-# owner for that struct's restricted field(s) -- one convention, no separate owner callable
-# needed (see Entitlement's docstring).
-#
-# Deliberately NOT modeled here (left to the future Session/WS-integration sub-task, which
-# controls exactly when `redact_event` runs relative to each event):
-#   - discard.pool_index -- 02-protocol.md §3 sketches it, but it isn't derivable from `state`
-#     in general: if the discard is claimed later in the *same* `reduce()` call, the claiming
-#     seat's discards tuple has the entry removed again by the time `state` reaches here (see
-#     `engine._apply_claim_response`), so recomputing it from final state would be wrong for
-#     exactly the discards that most need a correct wire form. The Table actor sees each event
-#     against its own intermediate state and can compute it there; `redact_event` cannot.
-#   - flower_replace fusing a replacement tile into the same frame (02-protocol.md §3's sketch
-#     shows one `{seat, flower, replacement?}` message) -- the engine emits `FlowerReplaced`
-#     and the landing `Drawn`/`KongReplacementDrawn`/`HandEnded` as separate `Event`s, and this
-#     module redacts one `Event` at a time, 1:1, per its own contract.
-#   - envelope fields (`v`, `seq`, `ts`) -- Session's job, not the payload's.
+# Not modeled here (needs Table's own intermediate per-event state, not just (state, event)):
+# - discard.pool_index -- if the discard is claimed later in the same reduce() call, the
+#   claiming seat's discards entry is already gone from final state by the time this runs.
+# - flower_replace fusing in a replacement tile -- FlowerReplaced and the landing Drawn/
+#   KongReplacementDrawn/HandEnded are separate Events; this redacts one Event at a time.
+# - envelope fields (v/seq/ts) -- Session's job.
 
 
 @dataclass(frozen=True)
@@ -308,8 +229,7 @@ class DiscardWire:
 
 @dataclass(frozen=True)
 class MeldWire:
-    """Every meld kind except concealed_kong -- fully public, full tiles to everyone
-    (02-protocol.md §3)."""
+    """Every meld kind except concealed_kong -- fully public, full tiles to everyone."""
 
     t: Literal["meld"] = field(metadata=_entitled(Entitlement.PUBLIC))
     seat: int = field(metadata=_entitled(Entitlement.PUBLIC))
@@ -320,9 +240,9 @@ class MeldWire:
 
 @dataclass(frozen=True)
 class ConcealedKongWire:
-    """暗槓's redacted-per-seat wire form (02-protocol.md §3): the declaring seat sees `tiles`,
-    everyone else sees `count` only, for the rest of the hand -- there is no later widening of
-    *this* event; a showdown reveal comes only through `HandEndWire.winning_hand`."""
+    """暗槓's redacted-per-seat wire form: declaring seat sees `tiles`, everyone else sees
+    `count`, for the rest of the hand -- a showdown reveal comes only through
+    `HandEndWire.winning_hand`."""
 
     t: Literal["meld"] = field(metadata=_entitled(Entitlement.PUBLIC))
     seat: int = field(metadata=_entitled(Entitlement.PUBLIC))
@@ -349,12 +269,9 @@ class KongReplaceWire:
 
 @dataclass(frozen=True)
 class HandEndWire:
-    """`winning_hand` is `HAND_END`-gated, not owner-gated -- entitled to *every* recipient
-    once `revealed` is true, per 00-architecture.md §5's "tile identity allowed only once that
-    hand has reached HAND_END". Sourced from `state.seats[winner].concealed` at the moment the
-    hand ended, which `engine._apply_claim_response` folds the claimed tile into before scoring
-    a `DISCARD`/`KONG_ROB` win -- so this is complete (winning tile included) for every win
-    type, not just `SELF_DRAW`/`FLOWERS`."""
+    """`winning_hand` is `HAND_END`-gated, not owner-gated: every recipient once `revealed`.
+    Sourced from `state.seats[winner].concealed`, which already includes the claimed winning
+    tile for a DISCARD/KONG_ROB win, not just SELF_DRAW/FLOWERS."""
 
     t: Literal["hand_end"] = field(metadata=_entitled(Entitlement.PUBLIC))
     hand_no: int = field(metadata=_entitled(Entitlement.PUBLIC))
@@ -393,9 +310,9 @@ WireEvent = (
 def _build_event_wire(
     state: GameState, seat: int | None, event: Event, *, reveal_hands: bool = False
 ) -> WireEvent:
-    """The actual per-event redaction decision, as a typed, `Entitlement`-annotated instance.
-    `redact_event` just serializes this; `tests/test_redaction.py` imports this function
-    directly so the schema walker checks the same object that ships, not a re-derivation of it.
+    """The actual per-event redaction decision, as a typed `Entitlement`-annotated instance --
+    `redact_event` just serializes this. `tests/test_redaction.py` imports it directly so the
+    schema walker checks the same object that ships.
     """
     _check_reveal(seat, reveal_hands)
     if isinstance(event, Drawn):
@@ -488,11 +405,9 @@ def _wire_value(value: Any) -> Any:
 def _meld_wire(
     meld: Meld, *, owner: int, viewer: int | None, reveal_hands: bool = False
 ) -> dict[str, Any]:
-    """Redact exactly like `_build_event_wire`'s `ConcealedKongWire` branch: a concealed kong's
-    tiles go only to the declaring seat (`owner`) for the rest of the hand, `count` to everyone
-    else -- `SeatView.melds`' field-level `PUBLIC` annotation is right in aggregate (which seats
-    hold which meld kinds is public) but wrong for concealed-kong tile identity specifically,
-    which needs this per-viewer check instead."""
+    """Same redaction as `ConcealedKongWire`: tiles only to the declaring seat, count to
+    everyone else -- needed because `SeatView.melds`'s `PUBLIC` annotation is right in aggregate
+    but wrong for concealed-kong tile identity specifically."""
     if meld.kind == MeldKind.CONCEALED_KONG:
         owns = _sees_concealed(viewer, owner, reveal_hands)
         return {
@@ -505,13 +420,9 @@ def _meld_wire(
 
 
 def _claim_offer_wire(offer: ClaimOffer, viewer: int | None) -> dict[str, Any]:
-    """`offer.melds` can never actually hold a concealed kong: `_discard_claim_offers`
-    (mahjong_core/engine.py) builds `melds` from `legal_claims`, which only returns
-    chow/pung/exposed-kong -- melds claimable off *another* seat's discard -- and concealed
-    kong is exclusively a self-declared action (`DeclareConcealedKong`), never a claim option;
-    `_kong_rob_offers` never sets `melds` at all (kong-rob is win-only). Still routing through
-    `_meld_wire`'s redaction rather than assuming a bare dict is fine here, in case that ever
-    changes."""
+    """`offer.melds` can never actually hold a concealed kong -- claim offers only ever carry
+    chow/pung/exposed-kong, and concealed kong is self-declared only. Still routes through
+    `_meld_wire` defensively, in case that ever changes."""
     return {
         "seat": offer.seat,
         "can_win": offer.can_win,
@@ -520,12 +431,9 @@ def _claim_offer_wire(offer: ClaimOffer, viewer: int | None) -> dict[str, Any]:
 
 
 def seat_view_wire(view: SeatView) -> dict[str, Any]:
-    """JSON-safe wire dict for a `SeatView` -- `state_sync`'s payload (02-protocol.md §3),
-    built by app/table.py on `join` and (a later sub-task) reconnect. Mirrors `redact_event`'s
-    tail (already-redacted typed data -> wire-safe primitives), but `SeatView.legal_actions`/
-    `claim_options` hold real `mahjong_core.actions.Action`/`mahjong_core.state.ClaimOffer`
-    instances rather than one `WireEvent` dataclass, so they get their own small serializers
-    here instead of `_wire_value`'s generic tuple/mapping unwrap.
+    """JSON-safe wire dict for a `SeatView` -- `state_sync`'s payload. `legal_actions`/
+    `claim_options` hold real `Action`/`ClaimOffer` instances rather than a `WireEvent`
+    dataclass, so they get their own serializers here instead of `_wire_value`'s generic unwrap.
     """
     return {
         "seat": view.seat,
@@ -561,16 +469,10 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class HandHistoryRecord:
-    """One completed hand, captured once by `app/table.py`'s `Table` the moment its `HandEnded`
-    fires (`_record_hand_history`) -- backs `state_sync.hand_history` (docs/02-protocol.md §3),
-    the piece a client that only ever gets a fresh `state_sync` (a spectator joining mid-game, a
-    reconnect-with-gap, a backpressure-collapse resync, docs/02-protocol.md §9) needs to
-    reconstruct the same scoresheet a client accumulates live from `hand_end` events
-    (`web/src/lib/net/reducer.ts`'s `handHistory`). Every field except `winner_melds` is already
-    `HandEndWire`-public (safe for any recipient unconditionally); `winner_melds` is kept as raw
-    `Meld`s and redacted per viewer at `state_sync` time by `hand_history_wire`, exactly like a
-    live `meld` event -- a non-owner must still never learn a past hand's concealed-kong tile
-    identity just because that hand is now over."""
+    """One completed hand, captured once `HandEnded` fires (`_record_hand_history`) -- backs
+    `state_sync.hand_history`. Every field but `winner_melds` is already public; `winner_melds`
+    stays raw `Meld`s, redacted per viewer at `state_sync` time (`hand_history_wire`) so a
+    non-owner still never learns a past hand's concealed-kong tiles."""
 
     hand_no: int
     outcome: str
@@ -591,11 +493,8 @@ class HandHistoryRecord:
 def hand_history_wire(
     records: Sequence[HandHistoryRecord], *, viewer: int | None, reveal_hands: bool = False
 ) -> list[dict[str, Any]]:
-    """`state_sync.hand_history` -- one dict per completed hand, oldest first. Every field but
-    `winner_melds` is already public on the stored record (see `HandHistoryRecord`'s docstring);
-    `winner_melds` gets the same per-viewer concealed-kong redaction a live `meld` event would
-    (`_meld_wire`), so a viewer who never owned that meld still only ever gets `count`, never
-    `tiles`."""
+    """`state_sync.hand_history` -- one dict per completed hand, oldest first. `winner_melds`
+    gets the same per-viewer concealed-kong redaction a live `meld` event would."""
     return [
         {
             "hand_no": r.hand_no,
@@ -627,12 +526,9 @@ def hand_history_wire(
 def redact_event(
     state: GameState, seat: int | None, event: Event, *, reveal_hands: bool = False
 ) -> dict[str, Any]:
-    """Per-event wire redaction: the JSON-safe payload for one logical `Event`, to one
-    recipient (`seat=None` -> spectator). One dict key per field of the wire form
-    `_build_event_wire` chose; this is the logical payload, not a minified wire frame -- keys
-    with no value at all (e.g. `winning_hand` before hand end) are still present as `null`
-    rather than omitted, leaving the final envelope/omission policy to the Session layer that
-    actually assembles `{v,t,seq,id,ts,d}` (02-protocol.md §1).
+    """Per-event wire redaction for one recipient (`seat=None` -> spectator). Absent-value
+    fields (e.g. `winning_hand` before hand end) are still present as `null`, not omitted --
+    envelope assembly is the Session layer's job.
     """
     wire = _build_event_wire(state, seat, event, reveal_hands=reveal_hands)
     return {f.name: _wire_value(getattr(wire, f.name)) for f in fields(wire)}

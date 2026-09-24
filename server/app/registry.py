@@ -1,44 +1,22 @@
-"""`TableRegistry` -- module-level table lookup/creation/cleanup (M3 sub-task 6; replaces
-`app/ws.py`'s bare `_TABLES`/`_TABLE_TASKS` dicts, which that module's own docstring already
-flagged as a stand-in: "sub-task 6 replaces this wholesale").
+"""`TableRegistry` -- module-level table lookup/creation/cleanup (docs/00-architecture.md §6):
+an in-process dict plus the bookkeeping to run each `Table`'s `asyncio.Task` and stop leaking
+finished ones.
 
-docs/00-architecture.md §6: matchmaking, presence, and session state are v1 "module-level dicts
-in the API process -- no `KV`/`Queue`/`Bus` abstraction layer" until a second real backend exists
-to justify one. This is exactly that: an in-process dict plus the bookkeeping needed to run each
-`Table`'s `asyncio.Task` and stop leaking finished ones -- no persistence, no capacity limit, no
-cross-process routing (all explicitly deferred by that section).
+`Table.run()` returns once `state.phase == Phase.GAME_OVER`, and `get_or_create` wraps each
+table's task so `_tasks` drops its entry the moment that happens, freeing the `asyncio.Task`
+promptly. The `Table` object itself is not evicted from `_tables` -- reconnecting after the game
+ends is still a supported path, and there's no session-expiry/TTL policy to drive a real
+eviction decision from; full table eviction is a tracked gap, not an oversight.
 
-**Table lifecycle -- a real gap neither `00-architecture.md` nor `02-protocol.md` addresses.**
-Before this sub-task, `Table.run()` looped `while True` forever, so every finished game left an
-idle `asyncio.Task` (and its `Table`) parked in the registry for the rest of the process's life --
-a slow, unbounded leak matching the same shape `docs/00-architecture.md`'s "Outbound
-backpressure" section already worries about elsewhere. Minimal real fix, not a full expiry
-policy: `Table.run()` (see its own docstring) now returns once `state.phase == Phase.GAME_OVER`,
-and `get_or_create` here wraps each table's task so `_tasks` drops its entry the moment that
-happens -- freeing the `asyncio.Task` promptly. The `Table` object itself is *not* evicted from
-`_tables`: reconnecting after the game ended is still a real, supported path (`Table.reconnect`/
-`resume` are plain synchronous calls on the `Table` object, unaffected by whether its background
-task is still running), and there's no session-expiry/TTL policy documented anywhere to drive a
-real eviction decision from. Full table eviction (freeing the memory of a long-dead finished game)
-is left as a real, tracked gap -- the same "no eviction, no capacity limit" scope line
-`app/ws.py` already carried before this sub-task, just narrowed to "no *table* eviction" now that
-task eviction is real.
+`session_factory`, if given, is threaded into every `Table` so it can persist a `GameRecord` on
+`Phase.GAME_OVER`. `app/ws.py`'s module-level registry gets a fresh one per ASGI startup
+(`reset_registry`) so this and `draining` never leak across server lifetimes.
 
-**DB session factory + graceful shutdown (a later sub-task).** `session_factory`, if given, is
-threaded into every `Table` this registry creates so it can persist a `GameRecord` on
-`Phase.GAME_OVER` (docs/06-ml.md §2) -- `app/main.py`'s `lifespan` is the one real caller;
-`app/ws.py`'s module-level registry gets a fresh one per ASGI startup (`reset_registry`) rather
-than a single eternal instance, specifically so this and `draining` below never leak across
-separate server lifetimes (a real process restart, or one `TestClient(app)` context in tests).
-`begin_shutdown` implements this registry's half of docs/00-architecture.md §8.1's drain
-sequence -- see its own docstring.
-
-**Showcase table.** `start_showcase` keeps one all-bot table (`Table(all_bots=True)`, open hands
+Showcase table. `start_showcase` keeps one all-bot table (`Table(all_bots=True)`, open hands
 for spectators) running under a fixed id forever: when a game ends it holds the finished table
 for `restart_delay` seconds, then swaps in a fresh game under the same id and closes the old
-table's spectator sockets so their reconnect lands on the new one. The one exception to "a table
-id names one particular game". Never persisted (no `session_factory`) and not waited on by the
-shutdown drain -- bot-only, nothing to protect.
+table's spectator sockets so their reconnect lands on the new one. Never persisted and not
+waited on by the shutdown drain -- bot-only, nothing to protect.
 """
 
 from __future__ import annotations
@@ -82,12 +60,9 @@ class TableSummary:
 
 
 class TableRegistry:
-    """In-process table directory. `bot_pool`, if given, is shared by every `Table` this registry
-    creates (D12: one process pool per server process, not one per table) -- omit it to let each
-    `Table` fall back to `app/table.py`'s own lazily-created shared pool. `session_factory`,
-    similarly, is threaded through to every `Table` this registry creates so it can persist its
-    own `GameRecord` on `Phase.GAME_OVER` (docs/06-ml.md §2) -- `None` (the default) means no
-    persistence, matching every pre-existing bare `Table()` construction.
+    """In-process table directory. `bot_pool`, if given, is shared across every `Table` this
+    registry creates (one process pool per server, not per table) -- omit to use `app/table.py`'s
+    lazy shared default. `session_factory=None` means no persistence.
     """
 
     def __init__(
@@ -100,8 +75,7 @@ class TableRegistry:
         self._session_factory = session_factory
         self._tables: dict[str, Table] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
-        # docs/00-architecture.md §8.1 step 1: read by app/ws.py's connection accept and
-        # app/main.py's /healthz once a drain has started (`begin_shutdown`).
+        # read by ws.py's connection accept and main.py's /healthz once a drain starts
         self.draining = False
         self._showcase_id: str | None = None
         self._showcase_task: asyncio.Task[None] | None = None
@@ -121,12 +95,8 @@ class TableRegistry:
         bot_tier: str = DEFAULT_BOT_TIER,
     ) -> Table:
         """Return the existing table for `table_id`, or construct and start one -- a table id
-        names one particular game, not a recyclable lobby slot, so this never creates a second
-        `Table` for an id that already has one, even a finished one (see module docstring).
-        `practice`/`bot_tier` are threaded straight through to `Table.__init__` (docs/05-roadmap.md
-        M4.5) -- only meaningful the first time a given `table_id` is created; an existing table's
-        practice/tier setup was already decided at its own construction and can't be changed
-        retroactively by a later `get_or_create` call for the same id."""
+        names one particular game, never recycled, even after it finishes. `practice`/`bot_tier`
+        only apply the first time a given `table_id` is created."""
         table = self._tables.get(table_id)
         if table is not None:
             return table
@@ -158,8 +128,8 @@ class TableRegistry:
         restart_delay: float = SHOWCASE_RESTART_SECONDS,
         bot_tier: str = DEFAULT_BOT_TIER,
     ) -> None:
-        """Start the always-on all-bot table under `table_id` (module docstring). The first game
-        is created before this returns, so no connection can race it into a plain table."""
+        """Start the always-on all-bot table under `table_id`. The first game is created before
+        this returns, so no connection can race it into a plain table."""
         if self._showcase_task is not None:
             raise RuntimeError("showcase already started")
         self._showcase_id = table_id
@@ -206,17 +176,15 @@ class TableRegistry:
             task = self._start_showcase_game(table_id, ruleset, bot_tier)
 
     def is_running(self, table_id: str) -> bool:
-        """Whether `table_id`'s background task is still alive -- `False` for an unknown table id
-        or one whose game already reached `GAME_OVER` (`Table.run`'s own docstring)."""
+        """Whether `table_id`'s background task is still alive -- `False` for an unknown id or a
+        finished game."""
         task = self._tasks.get(table_id)
         return task is not None and not task.done()
 
     def list_tables(self) -> list[TableSummary]:
-        """Every still-running table at least one human has joined, plus the showcase table
-        (even between games, while its finished table is still up). Finished games (task gone)
-        are skipped since `_tables` never evicts them; so are tables nobody has sat at yet --
-        every `/table/<id>` visit creates one, and a practice table is bot-only until its owner
-        joins, so neither is a real table to browse."""
+        """Every still-running table with at least one human seat, plus the showcase table.
+        Skips finished games (never evicted from `_tables`) and tables nobody has joined yet
+        (a practice table is bot-only until its owner joins)."""
         summaries: list[TableSummary] = []
         for table_id, table in self._tables.items():
             bindings = table.seat_bindings
@@ -240,21 +208,10 @@ class TableRegistry:
     async def begin_shutdown(
         self, *, grace_seconds: float = 90.0, deadline_ts: int | None = None
     ) -> None:
-        """docs/00-architecture.md §8.1's drain sequence, this registry's half of it --
-        `app/main.py`'s `lifespan` calls this on shutdown, `app/ws.py`'s connection accept and
-        `/healthz` read `self.draining` (step 1; both are checked separately, not through here).
-
-        Step 2: every currently-running table with at least one seat ever bound gets a broadcast
-        `server_shutdown{deadline_ts}` (`Table.broadcast_server_shutdown`) -- a table with no seats
-        bound has nobody to warn and nothing worth waiting on.
-
-        Steps 3-5: each such table gets its own bounded wait for a hand boundary
-        (`Table.wait_for_shutdown_boundary`), run concurrently (`asyncio.gather`, not a sequence
-        of awaits) so the total wall-clock cost is `grace_seconds` once, not once per table. A
-        table that times out is logged, not raised on or force-torn-down here -- once every wait
-        in the gather resolves (reached or not), this coroutine returns and the caller (the
-        process itself, exiting) is what actually ends any table whose task is still running --
-        same "abandoned, same as a crash, but warned" §8.1 describes, not a second teardown path.
+        """docs/00-architecture.md §8.1 drain, this registry's half. Broadcasts
+        `server_shutdown` to every table with a bound seat, then waits on each via
+        `asyncio.gather` (one grace window total, not per table). A timed-out table is logged,
+        not torn down here -- the process exiting is what ends it.
         """
         self.draining = True
         if self._showcase_task is not None:
