@@ -50,6 +50,7 @@
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 	import TableToolbar from './_components/TableToolbar.svelte';
+	import MockTableToolbar from './_components/MockTableToolbar.svelte';
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 
@@ -636,20 +637,29 @@
 	<h1 class="sr-only">Table</h1>
 
 	<div class="table-page">
-		<TableToolbar
-			{isMock}
-			bind:scenarioId
-			{spectating}
-			{tableId}
-			{isPractice}
-			seat={liveStore?.state.seat ?? null}
-			wallCount={gameState.wallCount}
-			prevailing={gameState.prevailing}
-			onLeaveClick={handleLeaveClick}
-			onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
-			onToggleSettings={() => (showSettings = !showSettings)}
-			onToggleAnimationDemo={() => (showAnimationDemo = !showAnimationDemo)}
-		/>
+		{#if isMock}
+			<MockTableToolbar
+				bind:scenarioId
+				wallCount={gameState.wallCount}
+				prevailing={gameState.prevailing}
+				onLeaveClick={handleLeaveClick}
+				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
+				onToggleSettings={() => (showSettings = !showSettings)}
+				onToggleAnimationDemo={() => (showAnimationDemo = !showAnimationDemo)}
+			/>
+		{:else}
+			<TableToolbar
+				{spectating}
+				{tableId}
+				{isPractice}
+				seat={liveStore?.state.seat ?? null}
+				wallCount={gameState.wallCount}
+				prevailing={gameState.prevailing}
+				onLeaveClick={handleLeaveClick}
+				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
+				onToggleSettings={() => (showSettings = !showSettings)}
+			/>
+		{/if}
 
 		<div class="table-tilt">
 			<div class="table-surface" data-testid="table-scene">
