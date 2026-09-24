@@ -1,9 +1,48 @@
 import { expect, test } from '@playwright/test';
 
+// every route is gated behind ApiConnectGate's /healthz poll (root +layout.svelte) -- this suite
+// has no real backend (playwright.config.ts's webServer is `pnpm dev` alone), so every test needs
+// this mocked or the gate would poll to its 10s timeout and never render the page under test.
+test.beforeEach(async ({ page }) => {
+	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
+});
+
 test('home page loads and has a title', async ({ page }) => {
 	const response = await page.goto('/');
 	expect(response?.status()).toBe(200);
 	await expect(page).toHaveTitle(/Mahjong/);
+});
+
+test('shows a connecting screen until the API health check succeeds, then the lobby', async ({
+	page
+}) => {
+	await page.unroute('**/healthz');
+	await page.route('**/healthz', async (route) => {
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		await route.fulfill({ json: { status: 'ok' } });
+	});
+	await page.goto('/');
+
+	await expect(page.getByText('Connecting…')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Create a table' })).toBeVisible();
+	await expect(page.getByText('Connecting…')).not.toBeVisible();
+});
+
+test('shows an error with a retry button when the API never becomes healthy', async ({ page }) => {
+	await page.unroute('**/healthz');
+	let healthy = false;
+	await page.route('**/healthz', (route) =>
+		healthy
+			? route.fulfill({ json: { status: 'ok' } })
+			: route.fulfill({ status: 503, json: { status: 'draining' } })
+	);
+	await page.goto('/');
+
+	await expect(page.getByText("Can't reach the server.")).toBeVisible({ timeout: 15_000 });
+	healthy = true;
+	await page.getByRole('button', { name: 'Retry' }).click();
+
+	await expect(page.getByRole('button', { name: 'Create a table' })).toBeVisible();
 });
 
 // this suite has no real backend behind it (playwright.config.ts's webServer is `pnpm dev`

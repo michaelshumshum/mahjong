@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { createTable, fetchTables, seatedCount, type TableSummary } from './lobby';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+	createTable,
+	fetchTables,
+	seatedCount,
+	waitForApiHealthy,
+	type TableSummary
+} from './lobby';
 import { DEFAULT_RULESET } from './ruleset';
 
 const TABLE: TableSummary = {
@@ -37,6 +43,60 @@ describe('fetchTables', () => {
 describe('seatedCount', () => {
 	it('counts every non-empty seat, bots included', () => {
 		expect(seatedCount(TABLE)).toBe(2);
+	});
+});
+
+describe('waitForApiHealthy', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('returns true as soon as /healthz responds ok', async () => {
+		const seen: string[] = [];
+		const healthy = await waitForApiHealthy('http://api.test', stubFetch(200, {}, seen));
+		expect(healthy).toBe(true);
+		expect(seen).toEqual(['http://api.test/healthz']);
+	});
+
+	it('keeps polling every 250ms until a later ping succeeds', async () => {
+		vi.useFakeTimers();
+		let calls = 0;
+		const fetchFn = (async () => {
+			calls++;
+			if (calls < 3) return new Response('', { status: 503 });
+			return new Response('', { status: 200 });
+		}) as typeof fetch;
+
+		const result = waitForApiHealthy('http://api.test', fetchFn);
+		await vi.advanceTimersByTimeAsync(250);
+		await vi.advanceTimersByTimeAsync(250);
+
+		expect(await result).toBe(true);
+		expect(calls).toBe(3);
+	});
+
+	it('gives up and returns false once the timeout elapses', async () => {
+		vi.useFakeTimers();
+		const fetchFn = (async () => new Response('', { status: 503 })) as typeof fetch;
+
+		const result = waitForApiHealthy('http://api.test', fetchFn, 600);
+		// the deadline is only rechecked at the top of the loop, after each 250ms wait -- advance
+		// past the next poll boundary (750ms) so the final over-deadline check actually runs.
+		await vi.advanceTimersByTimeAsync(1000);
+
+		expect(await result).toBe(false);
+	});
+
+	it('reports each attempt number via onAttempt, 1-indexed', async () => {
+		vi.useFakeTimers();
+		const fetchFn = (async () => new Response('', { status: 503 })) as typeof fetch;
+		const seen: number[] = [];
+
+		const result = waitForApiHealthy('http://api.test', fetchFn, 600, (n) => seen.push(n));
+		await vi.advanceTimersByTimeAsync(1000);
+		await result;
+
+		expect(seen).toEqual([1, 2, 3]);
 	});
 });
 

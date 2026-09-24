@@ -185,9 +185,17 @@ async function main() {
 				? route.fulfill({ json: { tables: LOBBY_TABLES } })
 				: route.fallback()
 		);
+		// root +layout.svelte's ApiConnectGate polls GET /healthz before rendering any page --
+		// only `?mock=`/`/demo` skip it client-side, and `lobby`/`tables` above intentionally
+		// don't use `?mock=` (they're not table-scoped), so this stands in for the missing backend.
+		await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 
 		for (const { name, url, before } of PAGES) {
 			await page.goto(BASE + url, { waitUntil: 'networkidle' });
+			// ApiConnectGate holds the "Connecting…" panel for a minimum of 1s even once /healthz
+			// (mocked above) resolves instantly -- wait it out so the screenshot captures the
+			// actual page, not the connecting overlay mid-fade.
+			await page.locator('.connect-gate').waitFor({ state: 'detached' });
 			if (before) await before(page);
 			const dest = path.join(OUT_DIR, `${name}.png`);
 			await page.screenshot({ path: dest, fullPage: true });

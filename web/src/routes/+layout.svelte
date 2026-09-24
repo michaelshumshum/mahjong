@@ -8,6 +8,7 @@
 	import '$lib/styles/app.scss';
 	import favicon from '$lib/assets/favicon.svg';
 	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
+	import ApiConnectGate from '$lib/ui/ApiConnectGate.svelte';
 	import { muralVisibility } from '$lib/ui/mural-visibility.svelte';
 	import { cleanupStaleTableCredentials } from '$lib/ui/settings-storage';
 
@@ -23,4 +24,6 @@
 
 <TileMuralBackground visible={muralVisibility.visible} />
 
-{@render children()}
+<ApiConnectGate>
+	{@render children()}
+</ApiConnectGate>

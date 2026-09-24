@@ -520,6 +520,28 @@ the one field only this scenario sets, mirroring `liveStore.state.gameEnd` close
 `+page.svelte`'s `gameEndReached`/`scoreHands`/`scoreStandings` derivations branch on `isMock`
 rather than forking into a second render path.
 
+### API health gate (`ApiConnectGate`)
+
+Every route except `?mock=`/`/demo` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
+root `+layout.svelte`, around `{@render children()}`), which polls `GET /healthz`
+(`lib/net/lobby.ts`'s `waitForApiHealthy`, every 250ms, 10s overall budget) before rendering the
+page underneath — the alternative is a page that loads and looks interactive before the backend is
+actually reachable, which reads as broken rather than loading. Held for a minimum of 1s even if
+the first ping succeeds instantly, so a fast backend doesn't read as a one-frame flash. Timed out:
+a "Can't reach the server" panel with a manual Retry (not silent auto-retry), showing the attempt
+count once a poll has actually failed (`attempt > 1` — attempt 1 alone isn't a retry yet).
+`?mock=`/`/demo` skip the check entirely, matching their existing no-backend posture (screenshot
+pipeline, mock e2e specs — `web/AGENTS.md`).
+
+Claims mural visibility (§2's "Shared across routes") while its own panel is up, releasing it the
+instant the underlying page mounts and claims it for itself. `lib/ui/mural-visibility.svelte.ts`
+tracks claims as a `SvelteSet` of per-caller tokens, not a plain boolean or a `$state`-wrapped
+plain `Set`: the gate's release and the newly-mounted page's claim land in the same reactive flush,
+and a boolean is last-write-wins (order-dependent — observed stuck hidden); a plain `Set` inside
+`$state` also doesn't work since `$state` only makes the *reference* reactive, not a built-in
+Set's own `.add()`/`.delete()`. `SvelteSet` (`svelte/reactivity`) instruments those methods so a
+release-then-claim or claim-then-release both correctly net to "still visible."
+
 ### SSR
 
 `web/Dockerfile` builds with `pnpm build` and runs `node build` — adapter-node, so SvelteKit SSR
