@@ -1073,7 +1073,7 @@
     },
     "GameEndPayload": {
       "additionalProperties": false,
-      "description": "`{hand_no, scores}`, not `02-protocol.md \u00a73`'s original `{standings, game_id}` sketch --\n`app/views.py`'s `GameEndWire` (landed in the earlier redaction sub-task) already mirrors\n`engine.GameEnded` 1:1 as `{hand_no, scores}`; reconciled here rather than reshaping\nalready-tested redaction code to match a sketch that predates it.",
+      "description": "`{hand_no, scores}` -- matches `app/views.py`'s `GameEndWire`, which already mirrors\n`engine.GameEnded` 1:1.",
       "properties": {
         "hand_no": {
           "title": "Hand No",
@@ -1204,7 +1204,7 @@
     },
     "HandEndAckPayload": {
       "additionalProperties": false,
-      "description": "`hand_end_ack` (hand-end hold): no fields -- the server keys acks by `(seat, current\nhand_no)` server-side (`app/table.py`'s `Table.mark_hand_end_ack`), same shape as `ReadyPayload`\nabove.",
+      "description": "no fields -- server keys acks by (seat, current hand_no) server-side.",
       "properties": {},
       "title": "HandEndAckPayload",
       "type": "object"
@@ -1345,7 +1345,7 @@
     },
     "HandHistoryEntryPayload": {
       "additionalProperties": false,
-      "description": "One completed hand, as carried on `state_sync.hand_history` (`StateSyncPayload` below) --\n`app/views.py`'s `HandHistoryRecord`/`hand_history_wire`. Same fields as `HandEndPayload`\nminus its hand-end-hold `deadline_ts` (meaningless for a hand that's long since closed),\nplus `dealer`/`prevailing`/`winner_melds`, none of which are on `hand_end`'s own wire payload\n-- a live client derives them itself from current state at the moment it sees `hand_end`\n(`web/src/lib/net/reducer.ts`'s `HandHistoryEntry`); a client that only gets a fresh\n`state_sync` has no \"current state at the time\" to derive them from, so the server captures\nthem once, here, instead.",
+      "description": "One completed hand, carried on `state_sync.hand_history`. Same fields as `HandEndPayload`\nminus `deadline_ts`, plus `dealer`/`prevailing`/`winner_melds` -- a live client derives\nthose from `hand_end` itself, but a client with only a fresh `state_sync` has no live state\nto derive them from, so the server captures them here instead.",
       "properties": {
         "hand_no": {
           "title": "Hand No",
@@ -2392,7 +2392,7 @@
     },
     "ServerShutdownPayload": {
       "additionalProperties": false,
-      "description": "docs/00-architecture.md \u00a78.1 step 2 -- broadcast once a graceful-shutdown drain starts,\nso clients can show a \"reconnect shortly\" banner instead of reading the eventual dropped\nsocket as an error. `deadline_ts` is the same bounded grace window every table in this drain\nshares (server epoch ms, same convention as every other `deadline_ts` on the wire).",
+      "description": "Broadcast once a graceful-shutdown drain starts, so clients can show a \"reconnect\nshortly\" banner instead of reading the dropped socket as an error.",
       "properties": {
         "deadline_ts": {
           "title": "Deadline Ts",
@@ -2461,7 +2461,7 @@
     },
     "StartWithBotsPayload": {
       "additionalProperties": false,
-      "description": "`start_with_bots`: host-only, no fields -- the server already knows which seat is host\n(`app/table.py`'s `Table.host_seat`) and which seat this session is bound to, so there is\nnothing for the client to assert here beyond sending the message at all.",
+      "description": "host-only, no fields -- the server already knows the host seat and which seat this\nsession is bound to.",
       "properties": {},
       "title": "StartWithBotsPayload",
       "type": "object"
@@ -2522,7 +2522,7 @@
     },
     "StateSyncPayload": {
       "additionalProperties": false,
-      "description": "Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for\n(`seat=None` for a spectator). `legal_actions`/`claim_options` are the JSON-safe dicts\n`mahjong_core.actions.action_to_dict`/`ws.py`'s claim-offer serializer produce -- a full\ntyped model per `Action`/`ClaimOffer` variant would just re-derive that same shape with no\nredaction benefit (same reasoning `SeatView`'s own docstring gives for reusing those types\ndirectly instead of inventing wire-only ones).",
+      "description": "Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for.\n`legal_actions`/`claim_options` are the JSON-safe dicts `action_to_dict`/the claim-offer\nserializer produce -- a full typed model per variant would just re-derive the same shape.",
       "properties": {
         "seat": {
           "anyOf": [
