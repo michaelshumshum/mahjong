@@ -233,41 +233,26 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/tile';
 
-	// generic tile-display primitives duplicated from table/[id]/+page.svelte's own copy: Svelte
-	// scopes <style> per component, and this sandbox has no game-state dependency on the real
-	// table surface, so it can't share that file's scoped rules. Not yet worth a shared global
-	// partial (docs/03-frontend.md §7.1's planned _tile.scss) for a handful of declarations --
-	// revisit once more table-surface pieces move out of that page and the shared surface grows.
+	// tile-display primitives shared with the real seat regions (docs/03-frontend.md §7.1's
+	// _tile.scss) -- this sandbox has no game-state dependency on the real table surface, so it
+	// still can't share OpponentRegion/YourSeatRegion's scoped selectors directly, but the shape
+	// of each rule is identical, so it goes through the same mixins.
 	.panel-overlay {
-		position: fixed;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgb(0 0 0 / 0.5);
-		z-index: var(--z-modal);
-		padding: var(--space-3);
+		@include buttons.modal-scrim;
 	}
 
 	.tile-row {
-		display: flex;
-		gap: 2px;
-		flex-wrap: wrap;
+		@include tile.tile-row;
 	}
 
 	.mini-tile {
-		height: clamp(24px, 4vw, 36px);
-	}
-
-	.mini-tile :global(.tile-face) {
-		height: 100%;
+		@include tile.mini-tile;
 	}
 
 	.meld {
-		display: flex;
-		gap: 1px;
-		margin-inline-end: var(--space-2);
+		@include tile.meld;
 	}
 
 	.discard-pool {
@@ -279,11 +264,7 @@
 	}
 
 	.discard-tile {
-		height: clamp(22px, 3.5vw, 32px);
-	}
-
-	.discard-tile :global(.tile-face) {
-		height: 100%;
+		@include tile.mini-tile(clamp(22px, 3.5vw, 32px));
 	}
 
 	.hand-row {
@@ -293,11 +274,7 @@
 	}
 
 	.hand-tile {
-		height: clamp(24px, 4vw, 36px);
-	}
-
-	.hand-tile :global(.tile-face) {
-		height: 100%;
+		@include tile.mini-tile;
 	}
 
 	// --- Live animation demo (docs/03-frontend.md §2: transform/opacity only, no JS ticker) ---
@@ -328,7 +305,7 @@
 
 	.demo-actions button,
 	.demo-reset {
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		padding: var(--space-2) var(--space-3);
 		font: inherit;
 		cursor: pointer;

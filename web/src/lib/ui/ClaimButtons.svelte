@@ -50,8 +50,8 @@
 
 	.claim-btn {
 		pointer-events: auto;
-		min-width: 44px;
-		min-height: 44px;
+		min-width: var(--tap-target-min);
+		min-height: var(--tap-target-min);
 		padding: var(--space-2) var(--space-4);
 		font: inherit;
 		cursor: pointer;

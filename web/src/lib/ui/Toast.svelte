@@ -51,8 +51,8 @@
 	}
 
 	.dismiss {
-		min-width: 44px;
-		min-height: 44px;
+		min-width: var(--tap-target-min);
+		min-height: var(--tap-target-min);
 		font-size: var(--font-size-lg);
 		line-height: 1;
 		cursor: pointer;

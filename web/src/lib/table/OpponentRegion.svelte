@@ -67,6 +67,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/tile';
 
 	.seat-region {
 		display: flex;
@@ -95,32 +96,19 @@
 	}
 
 	.seat-meta {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		font-size: var(--font-size-sm);
+		@include tile.seat-meta;
 	}
 
 	.seat-name {
-		font-weight: 600;
+		@include tile.seat-name;
 	}
 
 	.seat-wind {
-		color: var(--color-text-muted);
+		@include tile.seat-wind;
 	}
 
 	.dealer-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.25rem;
-		height: 1.25rem;
-		border-radius: 50%;
-		background: var(--color-accent);
-		color: var(--color-text);
-		font-size: 0.7rem;
-		font-weight: 700;
-		aspect-ratio: 1/1;
+		@include tile.dealer-badge;
 	}
 
 	// bot-controlled seat (M4.5 practice mode) -- a persistent identity marker, not a transient
@@ -135,16 +123,14 @@
 		border-radius: var(--radius-sm);
 		background: var(--color-surface-raised);
 		color: var(--color-text-muted);
-		font-size: 0.65rem;
+		font-size: var(--font-size-xs);
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 	}
 
 	.seat-score {
-		margin-inline-start: auto;
-		font-variant-numeric: tabular-nums;
-		color: var(--color-text-muted);
+		@include tile.seat-score;
 	}
 
 	.seat-hand-strip {
@@ -154,23 +140,15 @@
 	}
 
 	.tile-row {
-		display: flex;
-		gap: 2px;
-		flex-wrap: wrap;
+		@include tile.tile-row;
 	}
 
 	.mini-tile {
-		height: clamp(24px, 4vw, 36px);
-	}
-
-	.mini-tile :global(.tile-face) {
-		height: 100%;
+		@include tile.mini-tile;
 	}
 
 	.meld {
-		display: flex;
-		gap: 1px;
-		margin-inline-end: var(--space-2);
+		@include tile.meld;
 	}
 
 	// vertical strip along the table edge (docs/03-frontend.md §3): `writing-mode` alone reflows
@@ -235,12 +213,6 @@
 			flex-direction: row;
 		}
 
-		.backs-row .mini-tile.back {
-			margin-inline-end: -14px; // overlapping-backs strip, count-only
-
-			&:last-child {
-				margin-inline-end: 0;
-			}
-		}
+		@include tile.backs-row-overlap;
 	}
 </style>

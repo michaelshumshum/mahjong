@@ -206,7 +206,7 @@
 	}
 
 	.pretable-cta {
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		padding: var(--space-2) var(--space-5);
 		font: inherit;
 		cursor: pointer;
@@ -215,7 +215,7 @@
 
 	.pretable-name-input {
 		width: 100%;
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		padding: var(--space-2) var(--space-3);
 		font: inherit;
 		color: var(--color-text);

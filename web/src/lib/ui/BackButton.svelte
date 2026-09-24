@@ -46,7 +46,7 @@
 		align-items: center;
 		gap: var(--space-1);
 		align-self: flex-start;
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		padding: var(--space-1) var(--space-3);
 		font: inherit;
 		font-size: var(--font-size-sm);

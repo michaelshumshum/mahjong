@@ -12,6 +12,7 @@
 		type Totals
 	} from './ScoreSheet.svelte';
 	import BackButton from './BackButton.svelte';
+	import { RANK_LABEL, RANK_TONE } from './rank';
 
 	let {
 		seats,
@@ -24,13 +25,6 @@
 		hands: HandRecord[];
 		standings: Standing[];
 	} = $props();
-
-	const RANK_LABEL = ['1st', '2nd', '3rd', '4th'];
-	const RANK_TONE: Record<number, string> = {
-		0: '#d4af37',
-		1: '#a8a8a8',
-		2: '#cd7f32'
-	};
 
 	function seatName(seat: 0 | 1 | 2 | 3): string {
 		return seats.find((s) => s.seat === seat)?.name ?? `Seat ${seat}`;

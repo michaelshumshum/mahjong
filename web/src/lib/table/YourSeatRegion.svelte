@@ -136,6 +136,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
+	@use '$lib/styles/tile';
 
 	.seat-region {
 		display: flex;
@@ -150,18 +151,15 @@
 	}
 
 	.seat-meta {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		font-size: var(--font-size-sm);
+		@include tile.seat-meta;
 	}
 
 	.seat-name {
-		font-weight: 600;
+		@include tile.seat-name;
 	}
 
 	.seat-wind {
-		color: var(--color-text-muted);
+		@include tile.seat-wind;
 	}
 
 	// fixed footprint (matches `TimerRing size={24}` above) so the header doesn't reflow --
@@ -174,43 +172,23 @@
 	}
 
 	.dealer-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.25rem;
-		height: 1.25rem;
-		border-radius: 50%;
-		background: var(--color-accent);
-		color: var(--color-text);
-		font-size: 0.7rem;
-		font-weight: 700;
-		aspect-ratio: 1/1;
+		@include tile.dealer-badge;
 	}
 
 	.seat-score {
-		margin-inline-start: auto;
-		font-variant-numeric: tabular-nums;
-		color: var(--color-text-muted);
+		@include tile.seat-score;
 	}
 
 	.tile-row {
-		display: flex;
-		gap: 2px;
-		flex-wrap: wrap;
+		@include tile.tile-row;
 	}
 
 	.mini-tile {
-		height: clamp(24px, 4vw, 36px);
-	}
-
-	.mini-tile :global(.tile-face) {
-		height: 100%;
+		@include tile.mini-tile;
 	}
 
 	.meld {
-		display: flex;
-		gap: 1px;
-		margin-inline-end: var(--space-2);
+		@include tile.meld;
 	}
 
 	.your-hand {
@@ -256,7 +234,7 @@
 		gap: var(--space-2);
 
 		button {
-			min-height: 44px;
+			min-height: var(--tap-target-min);
 			padding: var(--space-2) var(--space-3);
 			font: inherit;
 			cursor: pointer;
@@ -277,13 +255,7 @@
 	// sub-768px collapse (docs/03-frontend.md §3): pinned to the safe-area bottom, horizontal
 	// scroll once a full hand no longer fits.
 	@include layout.phone-only {
-		.backs-row .mini-tile.back {
-			margin-inline-end: -14px; // overlapping-backs strip, count-only
-
-			&:last-child {
-				margin-inline-end: 0;
-			}
-		}
+		@include tile.backs-row-overlap;
 
 		// `.table-tilt`'s `perspective` (unconditional, for the desktop rotateX, set in the parent
 		// page) establishes a containing block for descendant `position: fixed` elements same as

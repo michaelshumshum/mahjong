@@ -55,14 +55,7 @@
 	// the same modal weight, not a translucent button row that leaves the table interactive
 	// underneath it.
 	.faan-overlay {
-		position: fixed;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgb(0 0 0 / 0.5);
-		z-index: var(--z-modal);
-		padding: var(--space-3);
+		@include buttons.modal-scrim;
 		flex-direction: column;
 		gap: var(--space-3);
 	}

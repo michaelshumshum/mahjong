@@ -100,7 +100,7 @@
 		font: inherit;
 		font-size: var(--font-size-lg);
 		padding: var(--space-3) var(--space-4);
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		cursor: pointer;
 	}
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import WinningHand, { type FaanPattern, type WinningMeld } from './WinningHand.svelte';
 	import type { TileCode } from '../table/tile-code';
+	import { RANK_LABEL, RANK_TONE } from './rank';
 
 	export type Seat = 0 | 1 | 2 | 3;
 	export type Wind = 'E' | 'S' | 'W' | 'N';
@@ -57,12 +58,6 @@
 	}
 
 	const WIND_LABEL: Record<Wind, string> = { E: 'East', S: 'South', W: 'West', N: 'North' };
-	const RANK_LABEL = ['1st', '2nd', '3rd', '4th'];
-	const RANK_TONE: Record<number, string> = {
-		0: '#d4af37',
-		1: '#a8a8a8',
-		2: '#cd7f32'
-	};
 
 	let {
 		seats,
@@ -240,7 +235,7 @@
 						<span
 							class="rank"
 							style:background={RANK_TONE[index] ?? 'transparent'}
-							style:color={index < 3 ? '#1c1410' : 'var(--color-text-muted)'}
+							style:color={index < 3 ? 'var(--color-tile-ink)' : 'var(--color-text-muted)'}
 						>
 							{RANK_LABEL[index] ?? `${index + 1}th`}
 						</span>
@@ -283,24 +278,6 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-3);
-	}
-
-	h2 {
-		margin: 0;
-		font-size: var(--font-size-xl);
-		font-weight: 800;
-		letter-spacing: -0.02em;
-	}
-
-	.game-end-badge {
-		padding: var(--space-1) var(--space-3);
-		border-radius: 999px;
-		background: var(--color-accent);
-		color: var(--color-text);
-		font-size: var(--font-size-sm);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
 	}
 
 	.table-scroll {

@@ -1,0 +1,71 @@
+// shared seat/tile-display primitives (docs/03-frontend.md §7.1): the seat header row and the
+// mini-tile/meld layout used by every seat's hand strip (opponent regions, your own seat, and
+// the animation sandbox). Mixins, not shared selectors -- Svelte scopes <style> per component,
+// so there's no selector to share directly, only the declarations.
+
+@mixin seat-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-size: var(--font-size-sm);
+}
+
+@mixin seat-name {
+	font-weight: 600;
+}
+
+@mixin seat-wind {
+	color: var(--color-text-muted);
+}
+
+@mixin seat-score {
+	margin-inline-start: auto;
+	font-variant-numeric: tabular-nums;
+	color: var(--color-text-muted);
+}
+
+@mixin dealer-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.25rem;
+	height: 1.25rem;
+	border-radius: 50%;
+	background: var(--color-accent);
+	color: var(--color-text);
+	font-size: var(--font-size-xs);
+	font-weight: 700;
+	aspect-ratio: 1/1;
+}
+
+@mixin tile-row {
+	display: flex;
+	gap: 2px;
+	flex-wrap: wrap;
+}
+
+@mixin mini-tile($size: clamp(24px, 4vw, 36px)) {
+	height: $size;
+
+	:global(.tile-face) {
+		height: 100%;
+	}
+}
+
+@mixin meld {
+	display: flex;
+	gap: 1px;
+	margin-inline-end: var(--space-2);
+}
+
+// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip,
+// count-only.
+@mixin backs-row-overlap {
+	.backs-row .mini-tile.back {
+		margin-inline-end: -14px;
+
+		&:last-child {
+			margin-inline-end: 0;
+		}
+	}
+}

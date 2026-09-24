@@ -23,8 +23,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-height: 44px;
-		min-width: 44px;
+		min-height: var(--tap-target-min);
+		min-width: var(--tap-target-min);
 		padding: 0;
 		cursor: pointer;
 		@include buttons.btn-ghost;

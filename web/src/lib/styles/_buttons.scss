@@ -109,6 +109,20 @@
 	}
 }
 
+// fullscreen dialog backdrop: every modal (dialogs, hand-end/claim overlays, the animation
+// sandbox) centers its panel over the same dimmed scrim, so this is one declaration instead of
+// each caller hand-copying position/background/z-index.
+@mixin modal-scrim {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgb(0 0 0 / 0.5);
+	z-index: var(--z-modal);
+	padding: var(--space-3);
+}
+
 // panels/cards/modals: a shadow tinted from --color-bg's warm brown-black (10 4 2), not
 // neutral grey, so chrome reads as sitting on the lacquered table rather than floating in
 // generic SaaS UI space.

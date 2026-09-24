@@ -107,7 +107,7 @@
 	button {
 		font: inherit;
 		padding: var(--space-2) var(--space-4);
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		cursor: pointer;
 		@include buttons.btn-secondary;
 	}

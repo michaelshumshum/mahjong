@@ -95,7 +95,7 @@
 
 	.scenario-btn,
 	.chrome-toggles button {
-		min-height: 44px;
+		min-height: var(--tap-target-min);
 		padding: var(--space-2) var(--space-3);
 		font: inherit;
 		cursor: pointer;

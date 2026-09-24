@@ -745,7 +745,12 @@ are all web-platform features and behave identically. This is an authoring-layer
 ```
 src/lib/styles/
   _tokens.scss      colour, spacing, type scale, z-layers, seat colours
-  _tile.scss        tile geometry: face size, corner radius, stack depth, back pattern
+  _buttons.scss     btn-primary/secondary/ghost, panel-elevated, modal-scrim, input-recessed
+  _forms.scss       panel-header/title/badge, form-group, option row chrome
+  _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
+                    seat-hand-strip implementation (opponent, self, animation sandbox) --
+                    per-face geometry (size, corner radius) stays on TileFace's own component
+                    styles, not centralized here
   _layout.scss      seat-region grid, perspective/rotateX, breakpoint mixins
   _a11y.scss        focus rings, high-contrast hooks, reduced-motion guards
   app.scss          entry: forwards the above, global resets
