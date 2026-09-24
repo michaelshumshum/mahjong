@@ -24,7 +24,14 @@ jobs:
       - name: ruff format --check
         run: uv run ruff format --check .
       - name: pytest
-        run: uv run pytest -q -m fast -n auto
+        run: >
+          uv run pytest -q -m fast -n auto
+          --cov=mahjong_core --cov=app --cov=bots --cov-report=json:coverage.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-server
+          path: server/coverage.json
+          retention-days: 1
 
   server-slow:
     name: slow tests (soaks, real-bot e2e, hypothesis)

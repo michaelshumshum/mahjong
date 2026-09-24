@@ -29,6 +29,7 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-xdist>=3.7",
+    "pytest-cov>=6.0",
     "hypothesis>=6.115",
     "httpx>=0.28",
     "ruff>=0.8",
@@ -44,6 +45,12 @@ markers = [
     "slow: long-running self-play / arena runs",
     "fast: fast tests (everything except slow)",
 ]
+
+[tool.coverage.run]
+source = ["mahjong_core", "app", "bots"]
+
+[tool.coverage.report]
+precision = 1
 
 [tool.ruff]
 line-length = 100

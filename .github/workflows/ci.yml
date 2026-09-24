@@ -26,3 +26,38 @@ jobs:
   proto-check:
     name: proto-check
     uses: ./.github/workflows/proto-check.yml
+
+  # Pushes updated coverage-badge JSON (shields.io endpoint format, see README) back to main.
+  # Only on push, never on a PR -- forked PRs have no write access, and a PR branch shouldn't
+  # mutate main anyway. GITHUB_TOKEN-authored pushes don't retrigger workflow runs, so this
+  # can't loop.
+  coverage-badge:
+    name: coverage badge
+    needs: [server, web]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-server
+          path: coverage-server
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-web
+          path: coverage-web
+      - name: generate badge JSON
+        run: |
+          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json coverage-server.json
+          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json coverage-web.json
+      - name: commit badge JSON if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add coverage-server.json coverage-web.json
+          git diff --staged --quiet && exit 0
+          git commit -m "chore(ci): update coverage badges"
+          git push

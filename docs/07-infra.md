@@ -170,6 +170,20 @@ workflows** (`workflow_call`), one per concern:
 | `.github/workflows/web.yml` | one `web` job | `pnpm install --frozen-lockfile`, then `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
 | `.github/workflows/proto-check.yml` | one `proto-check` job | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
 
+`ci.yml` also has one job of its own, not a reusable-workflow call: `coverage-badge`, gated
+`if: push to main` (never a PR — a fork PR has no write access, and shouldn't mutate main anyway)
+and `needs: [server, web]`. It downloads the `coverage-server`/`coverage-web` artifacts those two
+jobs upload (`server.yml`'s `server` job runs pytest with `--cov=mahjong_core --cov=app --cov=bots
+--cov-report=json:coverage.json`; `web.yml`'s `web` job runs the new `pnpm run test:coverage`
+script — `vitest --run --coverage`, `@vitest/coverage-v8`, `json-summary` reporter, both vitest
+projects — as a step ahead of the existing Playwright e2e step), turns each into a shields.io
+[endpoint-badge](https://shields.io/badges/endpoint-badge) JSON file
+(`.github/scripts/coverage_badge.py`), and commits `coverage-server.json`/`coverage-web.json` at
+the repo root if they changed. README's two coverage badges point at those files' raw GitHub URLs.
+No external service (Codecov etc.) — self-hosted so it needs no account/token, at the cost of no
+PR-diff coverage comments or trend graphs. `GITHUB_TOKEN`-authored pushes don't retrigger workflow
+runs, so this can't loop into itself.
+
 **Local dev vs. CI split.** `make test` / `make test-server` / `make test-web` run the fast
 suite only — the loop a change actually blocks on. The slow suite (soaks, real-bot e2e,
 hypothesis property runs, `@pytest.mark.slow`) is real, correctness-relevant coverage, not a

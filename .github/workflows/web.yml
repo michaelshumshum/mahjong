@@ -30,6 +30,14 @@ jobs:
       - name: Install Playwright browsers
         working-directory: web
         run: pnpm exec playwright install --with-deps chromium
-      - name: test
+      - name: unit test + coverage
         working-directory: web
-        run: pnpm test
+        run: pnpm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-web
+          path: web/coverage/coverage-summary.json
+          retention-days: 1
+      - name: e2e test
+        working-directory: web
+        run: pnpm run test:e2e
