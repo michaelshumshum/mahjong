@@ -63,4 +63,16 @@ jobs:
           git add .github/badges/coverage-server.svg .github/badges/coverage-web.svg
           git diff --staged --quiet && exit 0
           git commit -m "chore(ci): update coverage badges"
-          git push
+          # Rebase onto any commits that landed while this job waited for artifacts/tests,
+          # then push. Retry a few times in case of a tight race with another workflow run.
+          for attempt in 1 2 3; do
+            git pull --rebase
+            if git push; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "failed to push coverage badges after $attempt attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
