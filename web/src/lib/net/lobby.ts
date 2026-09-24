@@ -18,26 +18,27 @@ export function apiBaseUrl(): string {
 	return env.PUBLIC_API_URL || 'http://localhost:8000';
 }
 
-// polls GET /healthz until it responds ok or timeoutMs elapses -- used by ApiConnectGate to gate
-// the app on first load. 250ms interval matches the e2e suite's own backend-readiness poll.
+// polls GET /healthz until it responds ok or maxAttempts is exhausted -- used by ApiConnectGate
+// to gate the app on first load. Exponential backoff between attempts: 1s, 2s, 4s, ... (doubling
+// each retry from baseDelayMs), no delay before the first attempt.
 export async function waitForApiHealthy(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch,
-	timeoutMs = 10_000,
+	maxAttempts = 10,
+	baseDelayMs = 1_000,
 	onAttempt?: (attempt: number) => void
 ): Promise<boolean> {
-	const deadline = Date.now() + timeoutMs;
-	let attempt = 0;
-	while (Date.now() < deadline) {
-		attempt++;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		onAttempt?.(attempt);
 		try {
 			const response = await fetchFn(`${baseUrl}/healthz`);
 			if (response.ok) return true;
 		} catch {
-			// not reachable yet -- keep polling until the deadline.
+			// not reachable yet -- keep retrying with backoff.
 		}
-		await new Promise((resolve) => setTimeout(resolve, 250));
+		if (attempt < maxAttempts) {
+			await new Promise((resolve) => setTimeout(resolve, baseDelayMs * 2 ** (attempt - 1)));
+		}
 	}
 	return false;
 }

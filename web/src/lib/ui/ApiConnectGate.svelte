@@ -25,7 +25,13 @@
 		status = 'connecting';
 		attempt = 0;
 		const started = Date.now();
-		const healthy = await waitForApiHealthy(undefined, undefined, undefined, (n) => (attempt = n));
+		const healthy = await waitForApiHealthy(
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			(n) => (attempt = n)
+		);
 		const elapsed = Date.now() - started;
 		if (elapsed < MIN_DISPLAY_MS) {
 			await new Promise((resolve) => setTimeout(resolve, MIN_DISPLAY_MS - elapsed));

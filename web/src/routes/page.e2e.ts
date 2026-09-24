@@ -28,21 +28,21 @@ test('shows a connecting screen until the API health check succeeds, then the lo
 	await expect(page.getByText('Connecting…')).not.toBeVisible();
 });
 
-test('shows an error with a retry button when the API never becomes healthy', async ({ page }) => {
+// Exhausting all 10 attempts (1s/2s/4s/.../256s backoff, 511s total) isn't something to actually
+// wait out in an e2e test -- that behaviour is unit-tested deterministically with fake timers in
+// lobby.spec.ts. This only exercises the first real retry cycle in a live browser: a failed
+// attempt 1 followed by a real ~1s wait before attempt 2, proving the backoff/counter wiring
+// against a genuinely failing backend, not just a mocked `waitForApiHealthy`.
+test('retries after a failed attempt, showing the attempt count once it has', async ({ page }) => {
 	await page.unroute('**/healthz');
-	let healthy = false;
 	await page.route('**/healthz', (route) =>
-		healthy
-			? route.fulfill({ json: { status: 'ok' } })
-			: route.fulfill({ status: 503, json: { status: 'draining' } })
+		route.fulfill({ status: 503, json: { status: 'draining' } })
 	);
 	await page.goto('/');
 
-	await expect(page.getByText("Can't reach the server.")).toBeVisible({ timeout: 15_000 });
-	healthy = true;
-	await page.getByRole('button', { name: 'Retry' }).click();
-
-	await expect(page.getByRole('button', { name: 'Create a table' })).toBeVisible();
+	await expect(page.getByText('Connecting…')).toBeVisible();
+	await expect(page.getByText(/^Attempt \d+$/)).not.toBeVisible();
+	await expect(page.getByText('Attempt 2')).toBeVisible({ timeout: 3_000 });
 });
 
 // this suite has no real backend behind it (playwright.config.ts's webServer is `pnpm dev`

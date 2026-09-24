@@ -58,7 +58,7 @@ describe('waitForApiHealthy', () => {
 		expect(seen).toEqual(['http://api.test/healthz']);
 	});
 
-	it('keeps polling every 250ms until a later ping succeeds', async () => {
+	it('retries with exponential backoff (1s, 2s, ...) until a later ping succeeds', async () => {
 		vi.useFakeTimers();
 		let calls = 0;
 		const fetchFn = (async () => {
@@ -68,23 +68,61 @@ describe('waitForApiHealthy', () => {
 		}) as typeof fetch;
 
 		const result = waitForApiHealthy('http://api.test', fetchFn);
-		await vi.advanceTimersByTimeAsync(250);
-		await vi.advanceTimersByTimeAsync(250);
+		await vi.advanceTimersByTimeAsync(1_000); // attempt 1 fails -> wait 1s before attempt 2
+		await vi.advanceTimersByTimeAsync(2_000); // attempt 2 fails -> wait 2s before attempt 3
 
 		expect(await result).toBe(true);
 		expect(calls).toBe(3);
 	});
 
-	it('gives up and returns false once the timeout elapses', async () => {
+	it('does not resolve before the doubled delay has fully elapsed', async () => {
 		vi.useFakeTimers();
-		const fetchFn = (async () => new Response('', { status: 503 })) as typeof fetch;
+		let calls = 0;
+		const fetchFn = (async () => {
+			calls++;
+			return new Response('', { status: 503 });
+		}) as typeof fetch;
 
-		const result = waitForApiHealthy('http://api.test', fetchFn, 600);
-		// the deadline is only rechecked at the top of the loop, after each 250ms wait -- advance
-		// past the next poll boundary (750ms) so the final over-deadline check actually runs.
-		await vi.advanceTimersByTimeAsync(1000);
+		waitForApiHealthy('http://api.test', fetchFn, 3, 1_000);
+		await vi.advanceTimersByTimeAsync(999);
+		expect(calls).toBe(1); // still waiting out the 1s delay before attempt 2
+
+		await vi.advanceTimersByTimeAsync(1_999); // crosses into the 1s mark but not the 2s one
+		expect(calls).toBe(2); // still waiting out the 2s delay before attempt 3
+	});
+
+	it('gives up and returns false after maxAttempts, with no delay after the last attempt', async () => {
+		vi.useFakeTimers();
+		let calls = 0;
+		const fetchFn = (async () => {
+			calls++;
+			return new Response('', { status: 503 });
+		}) as typeof fetch;
+
+		const result = waitForApiHealthy('http://api.test', fetchFn, 4, 10);
+		// backoff between the 4 attempts: 10ms, 20ms, 40ms (doubling from baseDelayMs)
+		await vi.advanceTimersByTimeAsync(10);
+		await vi.advanceTimersByTimeAsync(20);
+		await vi.advanceTimersByTimeAsync(40);
 
 		expect(await result).toBe(false);
+		expect(calls).toBe(4);
+	});
+
+	it('defaults to a max of 10 attempts', async () => {
+		vi.useFakeTimers();
+		let calls = 0;
+		const fetchFn = (async () => {
+			calls++;
+			return new Response('', { status: 503 });
+		}) as typeof fetch;
+
+		// 1s baseDelayMs default, doubling 9 times between 10 attempts: 1+2+4+...+256 = 511s
+		const result = waitForApiHealthy('http://api.test', fetchFn);
+		await vi.advanceTimersByTimeAsync(511_000);
+
+		expect(await result).toBe(false);
+		expect(calls).toBe(10);
 	});
 
 	it('reports each attempt number via onAttempt, 1-indexed', async () => {
@@ -92,8 +130,9 @@ describe('waitForApiHealthy', () => {
 		const fetchFn = (async () => new Response('', { status: 503 })) as typeof fetch;
 		const seen: number[] = [];
 
-		const result = waitForApiHealthy('http://api.test', fetchFn, 600, (n) => seen.push(n));
-		await vi.advanceTimersByTimeAsync(1000);
+		const result = waitForApiHealthy('http://api.test', fetchFn, 3, 10, (n) => seen.push(n));
+		await vi.advanceTimersByTimeAsync(10);
+		await vi.advanceTimersByTimeAsync(20);
 		await result;
 
 		expect(seen).toEqual([1, 2, 3]);
