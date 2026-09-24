@@ -54,13 +54,13 @@ jobs:
           path: coverage-web
       - name: generate badge SVGs
         run: |
-          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json coverage-server.svg
-          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json coverage-web.svg
+          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json .github/badges/coverage-server.svg
+          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json .github/badges/coverage-web.svg
       - name: commit badge SVGs if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add coverage-server.svg coverage-web.svg
+          git add .github/badges/coverage-server.svg .github/badges/coverage-web.svg
           git diff --staged --quiet && exit 0
           git commit -m "chore(ci): update coverage badges"
           git push

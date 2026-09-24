@@ -1,7 +1,7 @@
 # 雀 — Browser Hong Kong Mahjong
 
-[![server coverage](coverage-server.svg)](docs/07-infra.md#9-ci)
-[![web coverage](coverage-web.svg)](docs/07-infra.md#9-ci)
+[![server coverage](.github/badges/coverage-server.svg)](docs/07-infra.md#9-ci)
+[![web coverage](.github/badges/coverage-web.svg)](docs/07-infra.md#9-ci)
 
 Server-authoritative real-time multiplayer Hong Kong (Cantonese) mahjong. Bots fill empty seats
 and take over for disconnected players.

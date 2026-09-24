@@ -174,9 +174,10 @@ workflows** (`workflow_call`), one per concern:
 `if: push to main` (never a PR — a fork PR has no write access, and shouldn't mutate main anyway)
 and `needs: [server, web]`. It downloads the `coverage-server`/`coverage-web` artifacts those two
 jobs upload and renders each into a standalone shields.io-flat-style SVG badge
-(`.github/scripts/coverage_badge.py`), committing `coverage-server.svg`/`coverage-web.svg` at the
-repo root if they changed. README's two coverage badges reference those files by **relative
-path**, not shields.io's own hosted badge — this repo is private, and shields.io's anonymous
+(`.github/scripts/coverage_badge.py`), committing `.github/badges/coverage-server.svg`/
+`coverage-web.svg` if they changed — alongside the generator script rather than at the repo root,
+keeping root to what `§1`'s layout actually lists. README's two coverage badges reference those
+files by **relative path**, not shields.io's own hosted badge — this repo is private, and shields.io's anonymous
 server-side fetch of `raw.githubusercontent.com` 401s on a private repo, so an externally-hosted
 badge would never resolve; GitHub renders a repo-relative image straight from the repo for any
 authenticated viewer, no external fetch involved. No external service (Codecov etc.) either —
