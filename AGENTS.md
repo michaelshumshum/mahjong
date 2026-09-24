@@ -21,6 +21,28 @@ matching doc has shown up in this session (Read, or referenced in a Bash command
 Compliance: start every task by replying with `**Context read: <docs>**` listing the trigger docs
 read this session, or `**Context read: N/A**` if no trigger applied.
 
+## Session setup
+
+MANDATORY, once per session, before touching any other tool: `activate_project`, then
+`initial_instructions`. Skip only if Serena is unavailable/erroring — then fall back silently and
+proceed.
+
+## Tooling — required, not optional
+
+- **Code nav/edit in `server/`, `web/`, `shared/`:** Serena MCP, always. `get_symbols_overview` >
+  Read, `find_symbol` > Grep, `find_referencing_symbols` > Grep, `replace_symbol_body` > Edit,
+  `rename_symbol` > manual rename. Grep/Read/Edit only for non-code files (`docs/`, config, JSON)
+  or a one-line patch inside a function body.
+- **Cross-session knowledge:** anything learned that isn't obvious from re-reading the code
+  (a gotcha, a decision, a "why," a TODO for next session) goes in Serena memory — `write_memory`
+  before ending the session, `list_memories`/`read_memory` at session start to load prior context.
+- **Large/noisy output, `make test*`, and all `docker`/`docker-compose` commands:** context-mode
+  (`ctx_execute`/`ctx_execute_file`/`ctx_batch_execute`), never raw Bash. No exceptions for "just
+  checking status" — `docker ps`, `docker logs`, test runs, all of it goes through context-mode.
+
+Fallback: if a tool above is unavailable, use the native equivalent and keep going — never block
+the task on tooling. This is the only exception; otherwise these are not suggestions.
+
 ## Communication
 
 - Terse. Lead with the answer.
