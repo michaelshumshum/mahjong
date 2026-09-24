@@ -22,9 +22,7 @@
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
 	}
 
-	// occupancy is real (spectator state_sync, kept live via seat_state) -- a filled seat reads
-	// solid/inert rather than still breathing "open," same visual language as SeatRingSlot's own
-	// --self.
+	// occupancy is real -- a filled seat reads solid/inert rather than still breathing "open".
 	.seat-ring-slot--filled {
 		border: 1px solid var(--color-border);
 		color: var(--color-text);

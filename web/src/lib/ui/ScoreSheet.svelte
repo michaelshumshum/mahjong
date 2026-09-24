@@ -14,24 +14,19 @@
 		name: string;
 	}
 
-	// mirrors score.totals (docs/02-protocol.md §3): the authoritative running total per seat, as
-	// last received from the server. Kept as its own prop rather than derived only from `hands`
-	// below — see `historyComplete`.
+	// mirrors score.totals: authoritative running total per seat, last received from the server.
+	// Kept as its own prop rather than derived only from `hands` -- see `historyComplete`.
 	export type Totals = Record<Seat, number>;
 
-	// mirrors hand_end.payments/FaanBreakdown's `Payments` (docs/02-protocol.md §3) for one
-	// already-finished hand: that hand's point delta per seat. Sparse for the same reason —
-	// a seat with nothing to pay or collect has no entry rather than an explicit 0.
+	// mirrors hand_end.payments for one already-finished hand. Sparse: a seat with nothing to
+	// pay or collect has no entry rather than an explicit 0.
 	export interface HandRecord {
 		handNo: number;
 		dealer: Seat;
 		prevailing: Wind;
 		deltas: Partial<Record<Seat, number>>;
-		/** Optional per-round detail (the game-end summary's "more detail per round" — a caller
-		 * with nothing to show for a round, e.g. the mid-game manual toggle's mock-single-row
-		 * case, just omits this). Present, this round's row becomes expandable: clicking it
-		 * reveals the winning hand (win) or a plain draw note (exhaustive draw) inline, rendered
-		 * by `WinningHand` so the full `FaanBreakdown` overlay stays unchanged. */
+		/** Optional per-round detail -- present, this round's row becomes expandable, revealing
+		 * the winning hand or a plain draw note inline via `WinningHand`. */
 		result?: RoundResult;
 	}
 
@@ -45,13 +40,8 @@
 		payments?: Payments;
 	}
 
-	// `score`/`game_end` are real, shipped wire events (docs/02-protocol.md §3;
-	// server/app/views.py's ScoreWire/GameEndWire) — but `game_end` is only ever `{hand_no,
-	// scores}`, absolute per-seat totals with no ranking baked in. There's no "standings" field
-	// on the wire and no placement-rule spec beyond raw totals, so this component doesn't derive
-	// ranking itself either: `standings` is the shape decision this prop codifies (ranked order,
-	// index 0 = 1st place), left for a caller to fill in from `game_end.scores` (sorted) when it
-	// has one, or leave unset otherwise.
+	// `game_end` only ever carries {hand_no, scores} -- absolute totals, no ranking baked in.
+	// `standings` (ranked order, index 0 = 1st) is left for a caller to fill in when it has one.
 	export interface Standing {
 		seat: Seat;
 		total: number;
@@ -79,9 +69,8 @@
 		Object.fromEntries(seats.map((s) => [s.seat, s.name])) as Record<Seat, string>
 	);
 
-	// running total per seat after each hand, derived from `hands` rather than read off `totals`
-	// directly — this is the exact arithmetic bug class the component exists to catch: if a
-	// hand's deltas don't sum to what `totals` reports, that's wrong data, not a display choice.
+	// derived from `hands` rather than read off `totals` directly -- if a hand's deltas don't
+	// sum to what `totals` reports, that's the bug this component exists to catch.
 	let runningTotals = $derived.by(() => {
 		const running: Record<Seat, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
 		const rows: Record<Seat, number>[] = [];
@@ -94,13 +83,8 @@
 		return rows;
 	});
 
-	// Safety net, not the expected case: `state_sync.hand_history` (docs/02-protocol.md §3) now
-	// fills in any hand this session didn't see live (reconnect mid-game, spectator joining
-	// mid-game), so `hands` should normally already reconcile with the authoritative `totals`
-	// footer by the time this renders. Kept as a derived check rather than trusted blindly —
-	// flags it instead of silently showing a running-total column that disagrees with the
-	// footer, in case the two ever do diverge (e.g. a table older than this field, `winner_melds`
-	// aside, everything else here is still just addition a caller could get wrong).
+	// safety net, not the expected case: flags a running-total column that disagrees with the
+	// authoritative `totals` footer, in case the two ever diverge.
 	let historyComplete = $derived(
 		hands.length === 0 ||
 			seats.every((s) => {
@@ -109,8 +93,7 @@
 			})
 	);
 
-	// which rounds' detail panel is open, keyed by handNo — plain component-local presentation
-	// state (docs/03-frontend.md §1's "components own presentation state only"), not game truth.
+	// which rounds' detail panel is open, keyed by handNo — presentation state, not game truth.
 	let expandedHands = $state<Set<number>>(new Set());
 
 	function toggleExpanded(handNo: number): void {
@@ -120,8 +103,7 @@
 		expandedHands = next;
 	}
 
-	// Hand/Wind/Dealer + two columns per seat -- the exact column count the detail row's colspan
-	// needs to actually span the full table width instead of leaving it under just the first cell.
+	// Hand/Wind/Dealer + two columns per seat -- so the detail row's colspan spans the full table.
 	let columnCount = $derived(3 + seats.length * 2);
 </script>
 

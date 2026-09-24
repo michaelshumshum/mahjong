@@ -1,7 +1,5 @@
-// shared seat/tile-display primitives (docs/03-frontend.md §7.1): the seat header row and the
-// mini-tile/meld layout used by every seat's hand strip (opponent regions, your own seat, and
-// the animation sandbox). Mixins, not shared selectors -- Svelte scopes <style> per component,
-// so there's no selector to share directly, only the declarations.
+// shared seat/tile-display primitives: seat header row and mini-tile/meld layout used by every
+// seat's hand strip. Mixins, not shared selectors -- Svelte scopes <style> per component.
 
 @mixin seat-meta {
 	display: flex;
@@ -58,8 +56,7 @@
 	margin-inline-end: var(--space-2);
 }
 
-// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip,
-// count-only.
+// sub-768px collapse: opponent backs to a thin overlapping strip, count-only.
 @mixin backs-row-overlap {
 	.backs-row .mini-tile.back {
 		margin-inline-end: -14px;

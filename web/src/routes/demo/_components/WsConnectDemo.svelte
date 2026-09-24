@@ -11,10 +11,8 @@
 	let socket: MahjongSocket | null = null;
 	let unsubscribe: (() => void) | null = null;
 
-	// M0 demo (docs/05-roadmap.md §2): connect, hello, ping, render the pong.
-	// This page doesn't wire up lib/game/store.svelte.ts (that's /table/[id]'s job, a later
-	// sub-task) — reduce() is called here only to exercise the reducer skeleton, its return
-	// value is unused.
+	// connect, hello, ping, render the pong. Doesn't wire up lib/game/store.svelte.ts --
+	// reduce() is called here only to exercise the reducer skeleton, its return value unused.
 	function connectAndPing(): void {
 		if (socket) return;
 		status = 'connecting';
@@ -27,8 +25,7 @@
 		});
 		s.connect();
 
-		// hello fires on open inside socket.ts; poll briefly for OPEN before
-		// pinging rather than adding a send queue for this one demo call.
+		// poll briefly for OPEN before pinging rather than adding a send queue for this one call.
 		const trySend = () => {
 			if (s.readyState === WebSocket.OPEN) {
 				status = 'connected';

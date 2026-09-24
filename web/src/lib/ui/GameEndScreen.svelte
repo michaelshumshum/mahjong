@@ -1,10 +1,6 @@
 <script lang="ts">
-	// Auto-shown once a real `game_end` lands (docs/03-frontend.md §6/`/table/[id]` wiring) --
-	// unlike the per-hand hold-and-ack overlay, this isn't dismissable back into play: the game
-	// is genuinely over, there's no next hand to advance into. Reuses `ScoreSheet` wholesale
-	// (score table + standings + this sub-task's expandable per-round detail) rather than a
-	// second table/markup implementation -- this component only adds the "game over" framing and
-	// a way back out of the now-terminal table route.
+	// Auto-shown once a real `game_end` lands -- unlike the per-hand hold overlay, not
+	// dismissable back into play. Reuses ScoreSheet wholesale, adding only "game over" framing.
 	import ScoreSheet, {
 		type HandRecord,
 		type SeatInfo,

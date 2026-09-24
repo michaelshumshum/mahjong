@@ -6,11 +6,8 @@ test('home page loads and has a title', async ({ page }) => {
 	await expect(page).toHaveTitle(/Mahjong/);
 });
 
-// Table ids are minted server-side now (POST /tables, docs/02-protocol.md §10) -- this suite has
-// no real backend behind it (playwright.config.ts's webServer is `pnpm dev` alone, see
-// live.e2e.ts's own module doc for the opt-in suite that spins up a real one), so every test
-// that creates a table mocks the response the same way the "tables page lists tables" test below
-// already mocks `GET /tables`.
+// this suite has no real backend behind it (playwright.config.ts's webServer is `pnpm dev`
+// alone), so every test that creates a table mocks the POST /tables response.
 function mockCreateTable(page: import('@playwright/test').Page, tableId: string) {
 	return page.route('**/tables', (route) => {
 		if (route.request().method() !== 'POST') return route.fallback();

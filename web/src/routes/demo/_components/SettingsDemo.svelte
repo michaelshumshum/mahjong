@@ -1,8 +1,7 @@
 <script lang="ts">
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 
-	// Settings demo (this sub-task): mock `auto` pre-arm state plus client-only prefs, no real
-	// `auto` message sent and no prefs persisted anywhere yet.
+	// mock `auto` pre-arm state plus client-only prefs, no real message sent or persisted yet.
 	let autoArm = $state<AutoArm>({ noCalls: false, autoPassChow: false });
 	let clientPrefs = $state<ClientPrefs>({ soundEnabled: true, motion: 'system' });
 	let lastAutoArmSummary = $derived(

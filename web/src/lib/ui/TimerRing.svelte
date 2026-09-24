@@ -7,9 +7,8 @@
 		size = 56
 	}: { durationMs: number; warnWindowMs?: number; size?: number } = $props();
 
-	// anchored once per instance, not re-measured on a JS ticker (docs/03-frontend.md §5
-	// countdown mechanics) — a new deadline gets a new instance (keyed by window_id) in the
-	// real overlay, which naturally restarts these CSS animations from render time.
+	// anchored once per instance, not re-measured on a JS ticker -- a new deadline gets a new
+	// instance (keyed by window_id), restarting the CSS animations from render time.
 	let timing = $derived(computeRingTiming(durationMs, warnWindowMs));
 
 	const RADIUS = 45;
@@ -77,8 +76,7 @@
 		}
 	}
 
-	// last warnWindowMs: shift from accent to error and pulse, per the "about to expire, not
-	// exact" rule (docs/02-protocol.md §4) — no numeric readout, just a state change.
+	// last warnWindowMs: shift from accent to error and pulse -- no numeric readout, just a state change.
 	@keyframes warn-pulse {
 		0% {
 			stroke: var(--color-accent);

@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import DialogTimer from './DialogTimer.svelte';
 
-// The auto-close firing (the scheduled setTimeout calling onClose) is covered without real
-// elapsed time in auto-close.spec.ts (vi.useFakeTimers around scheduleAutoDismiss) -- svelte/
-// server can't run `$effect`, so this file only covers that DialogTimer wires its props into the
-// TimerRing markup it wraps. Same split as Toast.spec.ts/auto-close.spec.ts.
+// Auto-close firing is covered in auto-close.spec.ts (svelte/server can't run $effect) --
+// this file only covers that DialogTimer wires its props into the TimerRing markup.
 describe('DialogTimer', () => {
 	const noop = () => {};
 

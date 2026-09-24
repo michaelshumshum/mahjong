@@ -2,9 +2,7 @@
 	import ToastStack from '$lib/ui/ToastStack.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
 
-	// Toast demo (this sub-task): a small local queue built from toasts.ts's pure helpers, proving
-	// out queuing/auto-dismiss/manual-dismiss together. Real call sites (reconnect banner, the
-	// lobby's copy-to-clipboard flow) come later with the backend that needs them.
+	// a small local queue built from toasts.ts's pure helpers, proving out queuing/dismiss together.
 	let toastQueue = $state<ToastEntry[]>([]);
 	function pushToast(message: string, durationMs?: number): void {
 		toastQueue = [...toastQueue, createToast(message, durationMs)];

@@ -3,10 +3,8 @@ import { render } from 'svelte/server';
 import ClaimButtons from './ClaimButtons.svelte';
 import type { ClaimOption } from './ClaimButtons.svelte';
 
-// `onChoose` firing on click is exercised end-to-end (routes/page.e2e.ts) against the demo
-// section on `/` — svelte/server only renders markup, there's no DOM to dispatch a real click
-// event against here. This file covers the render output: button count, labels, and the
-// multi-chow-option disambiguation.
+// `onChoose` firing on click is covered end-to-end (routes/page.e2e.ts) -- svelte/server only
+// renders markup here. This file covers button count, labels, and chow disambiguation.
 describe('ClaimButtons', () => {
 	const noop = () => {};
 

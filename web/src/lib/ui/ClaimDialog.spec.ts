@@ -30,10 +30,7 @@ describe('ClaimDialog', () => {
 	});
 
 	// `.claim-meld-tile` wrapper immediately followed by its `<img alt>` -- scopes the match to
-	// meld-preview tiles only, since Svelte's own scoped-CSS class hash lands between the base
-	// class and a `class:` directive's conditional class (`claim-meld-tile svelte-x claim-meld-
-	// tile--claimed`), and the "X discarded" subtitle renders the same tile code through a
-	// differently-classed wrapper (`claim-dialog-tile`) that this pattern doesn't match.
+	// meld-preview tiles only; the "X discarded" subtitle uses a differently-classed wrapper.
 	function meldTileCodes(body: string): string[] {
 		return [
 			...body.matchAll(/class="claim-meld-tile[^"]*"><span[^>]*><img[^>]*alt="(\ds) tile"/g)

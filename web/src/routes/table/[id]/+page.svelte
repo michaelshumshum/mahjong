@@ -54,30 +54,20 @@
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 
-	// --- mock vs. live (docs/03-frontend.md §6's WS/reducer/store plumbing, wired into this
-	// route) -----------------------------------------------------------------------------------
-	// `?mock=<scenarioId>` (any value, or bare `?mock`) renders a frozen MOCK_SCENARIOS fixture
-	// -- the screenshot workflow (.claude/skills/frontend-screenshots/SKILL.md) and design
-	// iteration need this to keep working with no backend running. Omitted, `[id]` is treated as
-	// a real table id and this opens a real MahjongSocket -> GameStore against it. Both paths
-	// render through the same MockGameState-shaped view model (`gameState` below) so the
-	// template/component tree never forks (`$lib/table/live-view.ts`'s module doc).
+	// --- mock vs. live ---
+	// `?mock=<scenarioId>` renders a frozen MOCK_SCENARIOS fixture for the screenshot workflow
+	// and design iteration with no backend running. Omitted, `[id]` opens a real MahjongSocket ->
+	// GameStore. Both paths render through the same view model so the template never forks.
 	let isMock = $derived(page.url.searchParams.has('mock'));
 	let tableId = $derived(page.params.id ?? '');
 
-	// `?practice=1` (this route's own query param, set by the lobby's "Play vs bots" button --
-	// spelling is unrelated to the wire's own `&practice=true`) opens the live socket in M4.5
-	// practice mode: seats 1-3 are bot-bound at table *creation* (server/app/ws.py's
-	// `ws_endpoint`/`app/table.py`'s `Table.__init__(practice=...)`), so the human's own `join`
-	// (still a real intent, same seat-picker flow below) is the only one this page ever sends.
+	// `?practice=1` (unrelated in spelling to the wire's own `&practice=true`) opens the live
+	// socket in practice mode: seats 1-3 are already bot-bound at table creation.
 	let isPractice = $derived(page.url.searchParams.has('practice'));
 
 	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket
-	// -- these states depend on `liveStore.connection`/`.state.seat` transitions that a static
-	// `MOCK_SCENARIOS` fixture (which always renders a fully-seated, already-dealt table, see
-	// `tableReady` below) has no room for, so they need a mode of their own rather than folding
-	// into `?mock`. Same "no backend running" posture as `?mock`, for the screenshot workflow
-	// (.claude/skills/frontend-screenshots/SKILL.md) and design iteration.
+	// -- a static MOCK_SCENARIOS fixture (always fully-seated, already-dealt) has no room for
+	// these, so they need a mode of their own rather than folding into `?mock`.
 	const PREGAME_PREVIEWS = ['connecting', 'join', 'waiting'] as const;
 	type PregamePreview = (typeof PREGAME_PREVIEWS)[number];
 	let pregamePreview = $derived.by((): PregamePreview | null => {
@@ -86,13 +76,12 @@
 			? (raw as PregamePreview)
 			: null;
 	});
-	// arbitrary seat for the 'waiting' preview -- its wind comes from whichever dealer the
-	// MOCK_SCENARIOS fallback below happens to carry, same as any other pre-join reuse of
-	// `gameState`/`seatWind` here.
+	// arbitrary seat for the 'waiting' preview -- wind comes from whichever dealer the
+	// MOCK_SCENARIOS fallback happens to carry.
 	const PREGAME_PREVIEW_SEAT = 1 as Seat;
 
-	// `?mock=<scenarioId>` jumps straight to that scenario; any other value (including the bare
-	// `?mock` flag used just to select the mock path at all) falls back to the first one.
+	// any value other than a known scenario id (including a bare `?mock` flag) falls back to
+	// the first scenario.
 	let initialMockParam = page.url.searchParams.get('mock');
 	let scenarioId = $state(
 		MOCK_SCENARIOS.some((s) => s.id === initialMockParam) ? initialMockParam! : MOCK_SCENARIOS[0].id
@@ -103,12 +92,9 @@
 
 	// --- live connection -------------------------------------------------------------------
 	let liveStore = $state<GameStore | null>(null);
-	// there's no backend "has this table actually started" field (state_sync's own snapshot
-	// already reflects a fully-dealt hand the instant the table is created -- mahjong_core's
-	// `new_game()` deals immediately, before any `ready` -- so `phase`/`own_hand` can't
-	// distinguish "waiting for the table to fill" from "already playing"). Tracked here
-	// instead: flips permanently once a genuine post-start broadcast is observed, or the very
-	// first snapshot already shows unambiguous play-in-progress evidence (reconnect mid-game).
+	// no backend "has this table actually started" field -- state_sync already reflects a fully-
+	// dealt hand the instant the table is created, so this flips permanently on a real post-start
+	// broadcast, or if the first snapshot already shows play-in-progress (reconnect mid-game).
 	let handEverStarted = $state(false);
 	let readySent = $state(false);
 
@@ -121,8 +107,7 @@
 		);
 	}
 
-	// discrete events that only exist once `Table.started` (app/table.py) -- unlike a state_sync
-	// snapshot, these can't have been computed ahead of the table actually dealing/turning.
+	// discrete events that only exist once the table has actually started.
 	const HAND_LIFECYCLE_EVENTS = new Set<string>([
 		'hand_start',
 		'draw',
@@ -139,18 +124,13 @@
 
 	$effect(() => {
 		if (isMock || pregamePreview !== null) return;
-		// a page reload builds a fresh MahjongSocket with no memory of which seat this browser
-		// held -- resume it from localStorage so `hello{seat}` reclaims the seat (docs/02
-		// -protocol.md §5) instead of falling into the seat-picker's `join`, which fails
-		// with `table_full` once all four seats are already bound to this game's players.
+		// resume from localStorage so `hello{seat}` reclaims the seat instead of falling into
+		// the seat-picker's `join`, which fails with `table_full` once all seats are bound.
 		const persistedSeat = loadSeatForTable(tableId);
 		const persistedSecret = loadSecretForTable(tableId);
 		const practiceParam = isPractice ? '&practice=true' : '';
-		// no persisted seat yet -- connect as a spectator first so the seat picker below can
-		// show real occupancy (`state_status`/`names`) instead of four identical "Open" slots.
-		// `join` promotes this connection off spectator status the moment a seat is chosen
-		// (docs/00-architecture.md §3's "Spectating" note), so this never blocks becoming a
-		// real seat.
+		// no persisted seat yet -- connect as a spectator so the seat picker shows real occupancy
+		// instead of four identical "Open" slots; `join` promotes off spectator status on pick.
 		const spectateParam = persistedSeat === null ? '&spectate=true' : '';
 		const socket = new MahjongSocket(
 			`${defaultWsUrl()}?table=${encodeURIComponent(tableId)}${practiceParam}${spectateParam}`
@@ -165,29 +145,27 @@
 			if (event.t === 'ack' && event.d.ok === false) {
 				pushToast(`Action failed: ${event.d.error ?? 'unknown error'}`);
 			}
-			// join's own ack carries this seat's one-time reconnect credential
-			// (00-architecture.md §2.1) -- persist it alongside the seat number so a later page
-			// reload can present it back on `hello{seat, secret}` instead of losing the seat.
+			// persist join's one-time reconnect credential so a later reload can present it back
+			// on `hello{seat, secret}` instead of losing the seat.
 			if (event.t === 'ack' && event.d.reconnect_secret != null) {
 				saveSecretForTable(tableId, event.d.reconnect_secret);
 			}
 			if (event.t === 'error') {
 				pushToast(`Server error: ${event.d.message}`);
-				// a stale or wrong secret can never reclaim the seat; drop it so the next connect
-				// falls back to spectator/seat-picker instead of retrying a known-bad credential.
+				// a stale/wrong secret can never reclaim the seat; drop it so the next connect
+				// falls back to spectator/seat-picker instead of retrying it.
 				if (event.d.code === 'bad_secret') {
 					clearSeatForTable(tableId);
 					clearSecretForTable(tableId);
 				}
 			}
-			// the game is over -- the per-table reconnect credential is no longer valid, so don't
-			// leave it in localStorage forever (docs/00-architecture.md §2.1).
+			// the game is over -- the reconnect credential is no longer valid.
 			if (event.t === 'game_end') {
 				clearSeatForTable(tableId);
 				clearSecretForTable(tableId);
 			}
-			// Waiting-room arrivals only -- once the table has actually started, seat_state
-			// churns on every disconnect/autoplay/reconnect, which isn't "a new player" news.
+			// waiting-room arrivals only -- once started, seat_state churns on every
+			// disconnect/autoplay/reconnect, which isn't "a new player" news.
 			if (
 				event.t === 'seat_state' &&
 				!handEverStarted &&
@@ -214,8 +192,7 @@
 		if (seat !== null && seat !== undefined) saveSeatForTable(tableId, seat);
 	});
 
-	// sitting down implies readiness -- no strategic reason to delay `ready` behind a second
-	// button once the player has already made the one real decision (join this table).
+	// sitting down implies readiness -- no reason to delay `ready` behind a second button.
 	$effect(() => {
 		const store = liveStore;
 		if (!store || store.state.seat === null || readySent) return;
@@ -223,11 +200,8 @@
 		store.socket.ready();
 	});
 
-	// Re-assert on (re)connect, not read-back: the server never reports a seat's current
-	// auto-arm state, so this re-sends the client's last persisted intent once per fresh
-	// connection that successfully seats us, rather than assuming the server already agrees.
-	// Mock mode has no real socket (`liveStore` stays null there), so this is a no-op under
-	// `?mock=`.
+	// re-assert on (re)connect, not read-back: the server never reports current auto-arm state,
+	// so this re-sends the client's last persisted intent once per fresh connection.
 	$effect(() => {
 		const store = liveStore;
 		if (!store || store.state.seat === null || autoArmSent) return;
@@ -241,9 +215,8 @@
 		if (hasStartActivity(store.state)) handEverStarted = true;
 	});
 
-	// no seat of our own and none left to take (docs/03-frontend.md's "Spectating"): watch from
-	// seat 0's side instead of showing a picker with nothing to pick. `handNo > 0` = a real
-	// `state_sync` has landed; before that `seatStatus` is just the initial placeholder.
+	// no seat of our own and none left to take: watch from seat 0's side instead of showing a
+	// picker with nothing to pick. `handNo > 0` = a real state_sync has landed.
 	let spectating = $derived(
 		!isMock &&
 			pregamePreview === null &&
@@ -257,7 +230,7 @@
 		!isMock && liveStore ? viewFromClientState(liveStore.state, spectating ? 0 : null) : null
 	);
 	// falls back to the mock fixture when there's no live view yet (pre-join/pre-start) --
-	// never actually rendered in that case, since `tableReady` below gates the whole template;
+	// never actually rendered then, since `tableReady` below gates the whole template;
 	// this just keeps `gameState` non-null so the rest of the (unchanged) template below doesn't
 	// need null-checks sprinkled through it.
 	let gameState = $derived(isMock ? mockGameState : (live?.view ?? mockGameState));
@@ -290,9 +263,8 @@
 				? null
 				: (liveStore?.state.seat ?? null)
 	);
-	// holding a seat (incl. the pre-start waiting room) means leaving costs something -- an
-	// autoplay handover, a seat someone else might take -- so that path gets a confirmation;
-	// spectating (this connection has no seat, above) and mock/pregame previews don't.
+	// holding a seat means leaving costs something (autoplay handover) -- that path gets a
+	// confirmation; spectating and mock/pregame previews don't.
 	let isPlayer = $derived(!isMock && effectiveSeat !== null);
 
 	let showLeaveConfirm = $state(false);
@@ -307,20 +279,16 @@
 		showLeaveConfirm = false;
 		goto('/');
 	}
-	// host = whichever seat's `join` was this table's first (docs/02-protocol.md §2's "Host
-	// definition") -- gates the "Start with bots" shortcut below. `?pregame=` previews have no
-	// real `hostSeat` to compare against, so they never show it.
+	// host = whichever seat's `join` was this table's first -- gates "Start with bots" below.
 	let isHost = $derived(
 		liveStore !== null &&
 			liveStore.state.hostSeat !== null &&
 			liveStore.state.hostSeat === liveStore.state.seat
 	);
 
-	// --- pre-game invite link (live mode only) ----------------------------------------------
-	// the table's URL *is* the invite -- whoever opens it lands in this same table (docs/03
-	// -frontend.md's "/table/[id] wiring": [id] is a real table id, auto-created on first
-	// connect). Waiting for the table to fill is exactly the moment you need to hand that link
-	// to someone, so it lives on both the join and waiting screens, not tucked in the lobby.
+	// --- pre-game invite link (live mode only) ---
+	// the table's URL *is* the invite -- lives on both the join and waiting screens, since
+	// waiting for the table to fill is exactly when you need to hand it to someone.
 	let copiedInviteLink = $state(false);
 	let copyInviteLinkFailed = $state(false);
 
@@ -384,11 +352,8 @@
 		onClick: () => void;
 	}
 
-	// legal_actions' own kind tags (mahjong_core.actions.action_to_dict) are the longer
-	// `declare_*`/`claim_*` forms; the wire `declare{kind}` intent takes the shorter
-	// `concealed_kong|added_kong|win` (docs/02-protocol.md §2's DeclarePayload) -- two different
-	// vocabularies for the same concept, same shape of mismatch reducer.ts's `mapMeldDict`
-	// comment already flags for melds.
+	// legal_actions' own kind tags are the longer declare_*/claim_* forms; the wire declare{kind}
+	// intent takes the shorter concealed_kong|added_kong|win -- two vocabularies, one concept.
 	let declareOptions = $derived.by((): DeclareOption[] => {
 		if (isMock || !liveStore) return [];
 		const options: DeclareOption[] = [];
@@ -425,9 +390,8 @@
 	);
 	let lastClaimChoice: ClaimOption | null = $state(null);
 
-	// hand-end hold (docs/00-architecture.md §3): dismissing is per-seat, tracked locally and
-	// (live mode) sent once via `hand_end_ack` -- reset per hand, mirroring `readySent`'s
-	// one-shot-per-connection pattern above, but keyed on `handNo` instead of the socket effect.
+	// hand-end hold: dismissing is per-seat, tracked locally and sent once via `hand_end_ack` --
+	// reset per hand, mirroring `readySent`'s one-shot pattern but keyed on `handNo`.
 	let handEndAckSent = $state(false);
 	$effect(() => {
 		void gameState.handNo;
@@ -465,7 +429,7 @@
 		const candidates = raw.filter((o) => o.kind === option.kind);
 		if (candidates.length <= 1) return candidates[0];
 		// only a chow claim can have more than one candidate for the same discard -- disambiguate
-		// by which tile codes the option actually names (docs/02-protocol.md §2's `tiles`).
+		// by which tile codes the option actually names.
 		const wanted = new Set(option.tiles ?? []);
 		return candidates.find((o) => {
 			const ids = (o.tiles as number[] | undefined) ?? [];
@@ -482,8 +446,8 @@
 		liveStore.socket.claim(gameState.claimWindow.windowId, option.kind, tiles);
 	}
 
-	// minimal chrome to prove ScoreSheet/Settings/Toast compose into the scene without
-	// layout collision (this sub-task's scope) — not the final chrome, just reachability.
+	// minimal chrome to prove ScoreSheet/Settings/Toast compose into the scene -- not final
+	// chrome, just reachability.
 	let showScoreSheet = $state(false);
 	let showSettings = $state(false);
 
@@ -499,9 +463,8 @@
 			string
 		>
 	);
-	// this hand's per-round detail (ScoreSheet's expandable-row capability): `null` for a mock's
-	// single synthesized row when the frozen scenario has no `handResult` (mid-game scenarios),
-	// otherwise built straight off the same fields the live FaanBreakdown overlay above reads.
+	// this hand's per-round detail: undefined for a mock's synthesized row when the frozen
+	// scenario has no handResult, otherwise built off the same fields FaanBreakdown reads.
 	function mockRoundResult(): RoundResult | undefined {
 		const result = gameState.handResult;
 		if (!result) return undefined;
@@ -517,12 +480,9 @@
 		};
 	}
 
-	// past-round detail off `HandHistoryEntry` (lib/game/state.ts): `winnerMelds`/`winningHand`
-	// are real tile_ids, converted here the same way `live-view.ts`'s own seat mapping does
-	// (`meldToView`/`tileIdToCode`) — this is the one place a *past* round's full winning hand
-	// (melds included, not just the concealed tiles) is reconstructed, since `state.melds` itself
-	// has long since reset by the time a player looks at game-end history (state.ts's
-	// `winnerMelds` doc).
+	// past-round detail off HandHistoryEntry: winnerMelds/winningHand are real tile_ids,
+	// converted the same way live-view.ts's own seat mapping does -- the one place a past
+	// round's full winning hand is reconstructed, since state.melds has long since reset.
 	function liveRoundResult(h: HandHistoryEntry): RoundResult | undefined {
 		if (h.outcome !== 'win' || h.winner === null) {
 			return h.outcome === 'exhaustive_draw' ? { outcome: 'exhaustive_draw' } : undefined;
@@ -540,13 +500,9 @@
 		};
 	}
 
-	// Mock path: either a fixed multi-hand `gameEnd` fixture (the one scenario that's actually
-	// reached game end, `mock-game-state.ts`), or -- every other scenario -- one frozen,
-	// already-dealt hand with no real `hand_end` stream behind it, so a single row synthesized
-	// from the current snapshot is the correct (and only possible) rendering.
-	// Live path: real accumulated history off `handHistory` (lib/game/state.ts), built by
-	// lib/net/reducer.ts from every `hand_end` this session has actually seen — growing across a
-	// live multi-hand game rather than showing just the latest hand.
+	// Mock path: the one game-end scenario's fixed rounds, or a single row synthesized from the
+	// current snapshot for every other (frozen, single-hand) scenario.
+	// Live path: real accumulated `handHistory`, growing across a live multi-hand game.
 	let scoreHands: HandRecord[] = $derived(
 		isMock
 			? (gameState.gameEnd?.rounds ?? [
@@ -567,12 +523,8 @@
 				})) ?? [])
 	);
 
-	// `game_end` (docs/02-protocol.md §3) is a terminal, fires-once event carrying only
-	// `{hand_no, scores}` — absolute final totals, no placement rules. Ranking by raw total is
-	// the "straightforward" case ScoreSheet.svelte's `standings` doc comment calls out; anything
-	// beyond that (tiebreak rules, etc.) isn't specified on the wire, so this doesn't invent one
-	// beyond a deterministic seat-order tiebreak. Mock path reuses the one `gameEnd` scenario's
-	// own fixed standings instead (there's no real `game_end` event behind it to derive from).
+	// `game_end` only carries {hand_no, scores} -- absolute totals, no placement rules. Ranking
+	// by raw total with a deterministic seat-order tiebreak; mock path reuses its own fixed standings.
 	let scoreStandings: Standing[] | undefined = $derived(
 		isMock
 			? gameState.gameEnd?.standings
@@ -583,32 +535,16 @@
 				: undefined
 	);
 
-	// the actual game-end trigger (scope item 1): once real, this replaces the last hand's own
-	// hold-and-ack overlay rather than following it. On the wire, `game_end` only ever fires
-	// *after* that hold has already resolved (every seat acked, or the hold's own timeout) --
-	// `app/table.py`'s `_apply`/`_advance_to_next_hand`, which is what actually calls
-	// `start_next_hand()` (the only place `GameEnded` is produced) -- so there's no real "still
-	// mid-hold" moment this ever preempts. But the client-side hold overlay has no other way to
-	// know that hold is over: it normally clears on the *next* `hand_start` (reducer.ts), and for
-	// the final hand there isn't one -- left alone, `gameState.handResult` would stay truthy
-	// forever. Gating the hold overlay on `!gameEndReached` (below) is what actually closes it.
+	// `game_end` only ever fires after the last hand's own hold has already resolved, but the
+	// client-side hold overlay has no other way to know that -- it normally clears on the next
+	// `hand_start`, and there isn't one for the final hand. Gating on `!gameEndReached` closes it.
 	let gameEndReached = $derived(
 		isMock ? gameState.gameEnd != null : liveStore?.state.gameEnd != null
 	);
 
-	// Persisted to localStorage (lib/ui/settings-storage.ts) so a reload doesn't reset either
-	// one back to these defaults. `autoArm` is "this client's last known intent," not verified
-	// server truth -- there is no wire event that reports a seat's current `no_calls`/
-	// `auto_pass_chow` back to the client (`seat_view_wire`/`state_sync` carry neither field,
-	// docs/02-protocol.md §3), so the server is never read back here. Instead, the re-assert
-	// effect below re-sends the persisted value once a fresh live connection seats us, so the
-	// server's actual `SeatBinding` gets pulled back in line with it rather than silently
-	// drifting after a reload creates a new `GameStore`/`MahjongSocket` with no memory of what
-	// was last chosen. See docs/03-frontend.md §6 "Settings persistence".
-	// Guest display name (docs/02-protocol.md's Auth section, M5): persisted the same way as
-	// autoArm/clientPrefs above, but sent once as a plain field on `join`, not re-asserted on
-	// every connection -- the server keeps it on the seat binding for the life of the game once
-	// join carries it (a `hello` reconnect never resends it, see settings-storage.ts's own note).
+	// persisted to localStorage. `autoArm` is "last known intent," not verified server truth --
+	// re-sent by the re-assert effect below on each fresh connection instead of read back.
+	// Guest display name persists the same way but is sent once on `join`, never re-asserted.
 	let displayName = $state(loadDisplayName() ?? '');
 	function updateDisplayName(value: string): void {
 		displayName = value;
@@ -619,7 +555,7 @@
 	let clientPrefs: ClientPrefs = $state(
 		loadClientPrefs() ?? { soundEnabled: true, motion: 'system' }
 	);
-	// Guards the one-shot re-send below per live connection instance, mirroring `readySent`.
+	// guards the one-shot re-send above per live connection instance, mirroring `readySent`.
 	let autoArmSent = $state(false);
 
 	let toastQueue: ToastEntry[] = $state([]);
@@ -854,9 +790,7 @@
 		overflow: hidden;
 	}
 
-	// pre-game states (connecting / join / waiting-for-players, live mode only) -- same
-	// centered-panel chrome as the lobby's own `.panel` (routes/+page.svelte), not a new
-	// visual language: panel-elevated, --color-surface, the same button/code-pill vocabulary.
+	// same centered-panel chrome as the lobby's own .panel, not a new visual language.
 	.pretable-page {
 		position: relative;
 		z-index: var(--z-hud);
@@ -878,9 +812,7 @@
 		height: 100%;
 		min-height: 420px;
 		padding: var(--space-3);
-		// faint overhead-light falloff on the lacquered surface — a believable material cue,
-		// not a texture asset; stays quiet enough that tiles (the brightest thing on screen,
-		// §1) are unaffected.
+		// faint overhead-light falloff -- a believable material cue, not a texture asset.
 		background:
 			radial-gradient(ellipse 80% 60% at 50% 10%, rgb(255 255 255 / 0.035), transparent 65%),
 			var(--color-surface);
@@ -890,20 +822,14 @@
 
 		@include layout.phone-only {
 			transform: none; // tilt reads as decoration, not worth the layout cost on phone widths
-			// `preserve-3d` alone (independent of `transform: none` above) still establishes a
-			// containing block for `position: fixed` descendants -- `.seat-region--self` needs
-			// the real viewport as its containing block on phone, so drop this here too.
+			// preserve-3d alone still establishes a containing block for position: fixed
+			// descendants -- .seat-region--self needs the real viewport on phone, so drop this too.
 			transform-style: flat;
 		}
 	}
 
-	// all four discard pools live in the centre, forming a box around the middle instead of each
-	// sitting at its own seat's table edge (docs/03-frontend.md §3 "Discard pool geometry") --
-	// matches the physical pile-in-front-of-you layout, and the space is free now that
-	// wall/prevailing moved up to `.table-status` and dealer/turn dropped out entirely
-	// (`.dealer-badge`/`.seat-region--turn`'s outline on the seat headers already say both). Below
-	// tablet-up
-	// there's no room for a literal box, so the four pools just stack.
+	// all four discard pools live in the centre, forming a box instead of each sitting at its own
+	// seat's edge. Below tablet-up there's no room for a literal box, so the pools just stack.
 	.table-center {
 		grid-area: center;
 		display: flex;
@@ -936,9 +862,8 @@
 		overflow-y: auto;
 	}
 
-	// hugs whatever dialog content it wraps (ScoreSheet/Settings/game-end) so the
-	// CloseButton it contains is positioned against that panel's own corner, not the fullscreen
-	// scrim's.
+	// hugs whatever dialog content it wraps so CloseButton is positioned against the panel's own
+	// corner, not the fullscreen scrim's.
 	.panel {
 		position: relative;
 	}
@@ -947,14 +872,11 @@
 		margin-block: auto;
 	}
 
-	// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip,
-	// discard pools to horizontal scroll, your hand pinned to the safe-area bottom.
+	// sub-768px collapse: opponent backs to a thin overlapping strip, discard pools to
+	// horizontal scroll, your hand pinned to the safe-area bottom.
 	@include layout.phone-only {
-		// `.table-tilt`'s `perspective` (unconditional, for the desktop rotateX) establishes a
-		// containing block for descendant `position: fixed` elements same as `transform` does --
-		// YourSeatRegion's own `.seat-region--self` phone override pins to the tilted box's own
-		// edge instead of the viewport's without this. Drop it here so "pinned to the true screen
-		// bottom" means what it says.
+		// .table-tilt's perspective establishes a containing block for position: fixed
+		// descendants same as transform does -- drop it so "pinned to the screen bottom" is real.
 		.table-tilt {
 			perspective: none;
 		}

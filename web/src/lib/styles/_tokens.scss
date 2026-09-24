@@ -1,14 +1,8 @@
-// design tokens (docs/03-frontend.md §7.1). material palette: lacquered dark walnut, ivory
-// tiles, cinnabar seal-ink red — the material culture of a real HK mahjong table, not a
-// generic dark-mode SaaS look or an "Asian restaurant" gold+green cliché.
-//
-// all runtime-consumable, so custom properties on :root rather than scss variables: a scss
-// variable is only visible in files that @use this partial, a custom property is visible to
-// every component's scoped <style> block with no import at all. seat colours and theme are
-// also the kind of thing that gets toggled at runtime later.
+// design tokens: material palette of lacquered dark walnut, ivory tiles, cinnabar seal-ink red.
+// Custom properties on :root, not scss variables, so every component's scoped <style> block
+// can read them with no import -- seat colours and theme also get toggled at runtime later.
 
 :root {
-	// colour — lacquered walnut table, ivory tiles, two reserved accents
 	--color-bg: #1c1410;
 	--color-surface: #241b14;
 	--color-surface-raised: #302319;
@@ -16,42 +10,34 @@
 	--color-text: #ede6da;
 	--color-text-muted: #a99a85;
 
-	// tile-face material: the brightest thing on screen (§1 "tiles are the material hero").
-	// --color-tile-ink is for any text/numerals that must sit on a tile-coloured surface.
+	// the brightest thing on screen. --color-tile-ink is for text sitting on a tile-coloured surface.
 	--color-tile: #f2e8d5;
 	--color-tile-ink: #241b14;
 
-	// the ONE urgent signal — your turn, a live claim window, a win/dealer marker. Never
-	// decorative. --color-accent-jade is the one reserved secondary job: positive score/faan
-	// deltas (ScoreSheet, FaanBreakdown). Don't reach for either as a general decorative color.
+	// the ONE urgent signal (turn/claim window/win-marker), never decorative. --color-accent-jade
+	// is reserved for positive score/faan deltas only.
 	--color-accent: #c23b2e;
 	--color-accent-jade: #3c6e52;
 
-	// distinct hue from both --color-accent (~5°) and --color-accent-jade (~146°) so an error
-	// state never reads as "the urgent accent" or "a positive delta" — a warm amber-orange
-	// alert tier of its own.
+	// distinct hue from both accents so an error state never reads as either one.
 	--color-status-error: #e77e40;
 
-	// medal tones — standings podium (GameEndScreen) and score-sheet rank chips only. Not part
-	// of the seat/accent palette above; these read as "1st/2nd/3rd", never a seat or a signal.
+	// medal tones — podium/rank chips only, never a seat or a signal.
 	--color-rank-gold: #d4af37;
 	--color-rank-silver: #a8a8a8;
 	--color-rank-bronze: #cd7f32;
 
-	// corner radius — deliberately tiered, not one radius everywhere: tiles crisp and
-	// physical, chrome (buttons/chips/badges) a little softer, panels/modals softer still.
+	// tiered, not one radius everywhere: tiles crisp, chrome softer, panels softer still.
 	--radius-tile: 10%;
 	--radius-sm: 6px;
 	--radius-md: 12px;
 
-	// seat colours (self/right/across/left, clockwise from you) — muted, mutually
-	// distinguishable, each hue kept well clear of both reserved accents above.
+	// self/right/across/left, clockwise from you — muted, each hue clear of both accents above.
 	--color-seat-self: #bb9d58;
 	--color-seat-right: #5c85a3;
 	--color-seat-across: #a65979;
 	--color-seat-left: #8e73a5;
 
-	// spacing scale, 4px base
 	--space-1: 0.25rem;
 	--space-2: 0.5rem;
 	--space-3: 0.75rem;
@@ -60,20 +46,15 @@
 	--space-6: 2rem;
 	--space-8: 3rem;
 
-	// type scale — one family throughout (headings via weight/size, not a second family).
-	// 'Noto Sans HK' fallback covers faan pattern names rendered as CJK glyphs (平糊, 對對糊
-	// in FaanBreakdown) on platforms that have it installed; browsers substitute a system CJK
-	// font per-codepoint regardless when it's not.
+	// one family throughout; 'Noto Sans HK' fallback covers CJK faan pattern names (平糊, 對對糊).
 	--font-family-base: 'Schibsted Grotesk', 'Noto Sans HK', sans-serif;
-	// below the scale's floor deliberately — badge/chip text only (dealer/bot badges), never body
-	// copy: anything a user reads at length stays at --font-size-sm or above.
+	// below the scale's floor deliberately — badge/chip text only, never body copy.
 	--font-size-xs: 0.7rem;
 	--font-size-sm: 0.875rem;
 	--font-size-base: 1rem;
 	--font-size-lg: 1.375rem;
 	--font-size-xl: 2rem;
 
-	// z-layers
 	--z-table: 0;
 	--z-tiles: 10;
 	--z-hud: 20;

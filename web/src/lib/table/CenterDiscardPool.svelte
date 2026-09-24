@@ -2,14 +2,8 @@
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState } from './mock-game-state';
 
-	// All four discard pools live together in the centre (docs/03-frontend.md §3's "Discard pool
-	// geometry"), forming a box around the middle of the table instead of sitting at each seat's
-	// own edge -- matches the physical layout of discards piled in front of each player, in the
-	// shared space between hands. `position` picks the box side and, for left/right, the rotation
-	// that keeps each pool parallel to that seat's own (already-rotated) hand. The parent page
-	// still owns the `.table-center` grid container itself; this component's root element is a
-	// grid item inside it, so `grid-area` below is resolved purely by the real DOM/grid
-	// relationship, with no need for the page's stylesheet to reach into this one.
+	// all four discard pools live in the centre box (docs/03-frontend.md §3); `position` picks
+	// the box side and, for left/right, the rotation matching that seat's own hand.
 	let {
 		seat,
 		position,
@@ -71,9 +65,8 @@
 		}
 	}
 
-	// wider than the 6-column default so a long hand's discards wrap onto fewer rows -- unbounded
-	// row growth here pushes the self seat region (in the parent page) down the page, off-screen,
-	// since `.table-center`'s own middle column is `1fr` and has room to spare.
+	// wider than 6 columns so a long hand's discards wrap onto fewer rows -- unbounded row growth
+	// here pushes the self seat region off-screen.
 	.discard-pool {
 		@include layout.tablet-up {
 			grid-template-columns: repeat(12, minmax(20px, 28px));
@@ -87,11 +80,8 @@
 		}
 	}
 
-	// left/right box pools rotated to read parallel to that seat's own already-rotated hand strip
-	// -- same box-stays-put/only-the-face-rotates technique as OpponentRegion's hand strip (paint-
-	// only rotation, never changes what the grid measures), reused here for a grid of discards
-	// instead of a flex row of hand tiles. Declared after the shared `.discard-pool`/`.discard-tile`
-	// rules above so these equal-specificity overrides win on `grid-template-columns`/height.
+	// rotated to read parallel to that seat's hand strip, same paint-only technique as
+	// OpponentRegion. Declared after the shared rules above so these overrides win.
 	.discard-pool--left,
 	.discard-pool--right {
 		@include layout.tablet-up {
@@ -101,26 +91,16 @@
 		}
 	}
 
-	// grid auto-placement always advances new implicit columns toward higher indices, which for
-	// `--left` already reads as "toward the table centre" (its box sits at the screen's left
-	// edge) but for `--right` reads as "away from it" (new columns push further off the right
-	// edge instead of toward centre). `direction: rtl` flips which side a new column lands on
-	// without touching the rotated tile-face positioning below -- that's absolute, keyed off the
-	// box's own centre, not text direction -- so it only changes the wrap direction, matching
-	// `--left`'s.
+	// grid auto-placement advances toward higher indices, which reads as "away from centre" for
+	// --right; `direction: rtl` flips the wrap direction without touching tile positioning.
 	.discard-pool--right {
 		@include layout.tablet-up {
 			direction: rtl;
 		}
 	}
 
-	// self's default row-major wrap (shared with across, below) pushes each overflow row further
-	// down the page. Fine for across -- the table's top edge, where "down" already means "toward
-	// the centre" -- but wrong for self, the bottom edge, where it means further off-screen (the
-	// concern the 12-column override above was only ever able to reduce, not remove). Flex's
-	// `wrap-reverse` does what grid's row-major auto-placement can't: keep the first line
-	// anchored to self's own edge and grow later, overflow lines toward the centre (upward)
-	// instead of away from it.
+	// grid's row-major wrap pushes overflow further down the page -- wrong for self (the bottom
+	// edge); scaleY(-1) flips the grid so overflow reads as growing upward, toward centre.
 	.discard-pool--self {
 		@include layout.tablet-up {
 			transform: scaleY(-1);

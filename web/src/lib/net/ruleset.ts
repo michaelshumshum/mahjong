@@ -1,11 +1,7 @@
-// Hand-written mirror of `server/mahjong_core/config.py`'s `RuleSet` -- not `make proto`-generated
-// (that walks `app/protocol.py`'s wire envelope; `RuleSet` is a `mahjong_core` dataclass sent as
-// a plain JSON body on `POST /tables`, docs/02-protocol.md §10, not a protocol message). Field
-// names and enum string values must match `RuleSet.to_dict()` exactly -- a client-side typo here
-// doesn't error, it silently falls back to `hk_classic` server-side
-// (`mahjong_core.presets.resolve_ruleset`'s deliberately lenient posture), so `CreateTableDialog`
-// treats a mismatch between what it sent and what `POST /tables` echoes back as a real bug, not
-// swallowing it quietly the way the server does for a malformed *external* request.
+// hand-written mirror of server/mahjong_core/config.py's RuleSet -- not make proto-generated,
+// since it's a plain JSON body on POST /tables, not a protocol message. Field names/enum values
+// must match RuleSet.to_dict() exactly: a mismatch doesn't error, it silently falls back to
+// hk_classic server-side, so CreateTableDialog treats a sent/echoed mismatch as a real bug.
 
 export type ScoreTable = 'full_spicy' | 'half_spicy';
 export type HandSet = 'CLASSIC' | 'NEW_6' | 'NEW_18';
@@ -13,7 +9,6 @@ export type DiscardPayment = 'all' | 'half';
 export type GameLength = 'EAST_ONLY' | 'EAST_SOUTH' | 'FULL';
 
 export interface RuleSet {
-	// scoring
 	min_faan: number;
 	faan_cap: number;
 	score_table: ScoreTable;
@@ -25,7 +20,6 @@ export interface RuleSet {
 	seven_flowers_instant_win: boolean;
 	eight_flowers_instant_win: boolean;
 	thirteen_orphans_wait_bonus: boolean;
-	// flow
 	game_length: GameLength;
 	dealer_repeat_on_win: boolean;
 	dealer_repeat_on_draw: boolean;
@@ -33,21 +27,16 @@ export interface RuleSet {
 	four_kong_abort: boolean;
 	nine_terminals_abort: boolean;
 	tenpai_payments: boolean;
-	// variants. `multi_win` is part of `RuleSet.to_dict()`'s shape (server requires every key
-	// present, `RuleSet.from_dict`) so it stays in this type, but `CreateTableDialog` never binds
-	// an input to it: `RuleSet.__post_init__` rejects `True` outright (reserved, deferred past
-	// v1, server/mahjong_core/config.py), and `resolve_ruleset` folds that rejection into its
-	// generic "invalid custom rules -> fall back to hk_classic" path -- so a togglable field the
-	// server can never actually honor would silently discard the whole custom ruleset the instant
-	// someone flips it on.
+	// variants. multi_win stays in the type (RuleSet.to_dict() requires every key) but
+	// CreateTableDialog never binds an input to it -- the server rejects `True` outright, and a
+	// togglable field it can never honor would silently discard the whole custom ruleset.
 	multi_win: boolean;
 	flowers_enabled: boolean;
 	kong_rob_enabled: boolean;
 	concealed_kong_robbable: boolean;
 	pao_rules: boolean;
-	// fairness
 	provable_fairness: boolean;
-	// timing (server-enforced)
+	// server-enforced timing
 	turn_seconds: number;
 	claim_seconds: number;
 	hand_end_seconds: number;
@@ -55,8 +44,8 @@ export interface RuleSet {
 	disconnect_grace_seconds: number;
 }
 
-// `RuleSet()`'s field defaults (server/mahjong_core/config.py) -- the starting point
-// `CreateTableDialog` prefills the custom form with, and what `hk_classic` resolves to.
+// RuleSet()'s field defaults -- the starting point CreateTableDialog prefills the custom form
+// with, and what hk_classic resolves to.
 export const DEFAULT_RULESET: RuleSet = {
 	min_faan: 3,
 	faan_cap: 10,
@@ -97,11 +86,8 @@ export const HAND_SET_OPTIONS: { value: HandSet; label: string }[] = [
 	{ value: 'NEW_18', label: 'New 18' }
 ];
 
-// Named presets a client can pick without knowing their field values -- deliberately NOT a local
-// copy of `mahjong_core.presets.RULESET_PRESETS`'s actual `RuleSet` values: `POST /tables`
-// resolves those server-side from the id alone, so duplicating the values here would just be a
-// second copy that can drift from the real one with no way for a client to notice. `id` is a
-// `RULESET_PRESETS` key.
+// named presets a client can pick without knowing their field values -- deliberately not a local
+// copy of the real RuleSet values, which POST /tables resolves server-side from `id` alone.
 export interface RulesetPresetOption {
 	id: string;
 	label: string;

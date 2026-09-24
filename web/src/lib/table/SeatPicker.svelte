@@ -9,11 +9,9 @@
 	}: { seatStatus: string[]; names: (string | null)[]; onJoin: (seat: Seat) => void } = $props();
 </script>
 
-<!-- Pre-join seat picker: connected as a spectator (the socket-setup effect in +page.svelte), so
-	real seatStatus/names are already known -- unlike the old "Sit down" button (any open seat),
-	each slot here is a specific seat you can click to `join` it directly. Absolute seats 0-3 are
-	assigned to the same across/left/right/self layout SeatRing uses for seat 0, purely so the
-	picker's geometry doesn't jump once you're actually seated. -->
+<!-- Pre-join seat picker: connected as a spectator, so real seatStatus/names are already known --
+	each slot is a specific seat you can click to `join` directly, laid out the same as SeatRing
+	so the geometry doesn't jump once seated. -->
 <div class="seat-ring">
 	<div class="seat-ring-pos seat-ring-pos--across">
 		<SeatPickerSlot

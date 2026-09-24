@@ -51,9 +51,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 
-	// centered, scrim-backed -- a claim decision is as consequential as a hand result, so it gets
-	// the same modal weight, not a translucent button row that leaves the table interactive
-	// underneath it.
+	// centered, scrim-backed -- a hand result gets full modal weight, not a translucent row.
 	.faan-overlay {
 		@include buttons.modal-scrim;
 		flex-direction: column;
@@ -83,8 +81,7 @@
 		}
 	}
 
-	// hugs whatever dialog content it wraps (FaanBreakdown/hand-end result) so the CloseButton it
-	// contains is positioned against that panel's own corner, not the fullscreen scrim's.
+	// hugs whatever content it wraps so CloseButton sits against the panel's own corner.
 	.panel {
 		position: relative;
 	}

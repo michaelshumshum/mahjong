@@ -1,7 +1,6 @@
 <script lang="ts">
-	// shared top-left "go back"/"leave" affordance (docs/03-frontend.md) -- every route that lets
-	// you retreat to the lobby, or leave a table, renders this instead of its own link/button so
-	// the icon, label placement, and position stay identical everywhere.
+	// shared top-left "go back"/"leave" affordance so icon, label placement, and position stay
+	// identical across every route that uses it.
 	let {
 		label,
 		href,

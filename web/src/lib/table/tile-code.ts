@@ -1,5 +1,4 @@
-// mirrors the tiles.py parsing scheme (docs/05-roadmap.md §1, docs/02-protocol.md's
-// `"tile": "5s"` wire field) and the tile set/index layout in docs/01-rules-spec.md §1.
+// mirrors the tiles.py parsing scheme and the tile set/index layout in docs/01-rules-spec.md §1.
 
 type ManTile = '1m' | '2m' | '3m' | '4m' | '5m' | '6m' | '7m' | '8m' | '9m';
 type PinTile = '1p' | '2p' | '3p' | '4p' | '5p' | '6p' | '7p' | '8p' | '9p';
@@ -16,9 +15,8 @@ export type TileCode = ManTile | PinTile | SouTile | HonorTile | FlowerTile;
 /** codes with vendored face art (all 42 tile faces; see NOTICE) */
 export type RenderableTileCode = ManTile | PinTile | SouTile | HonorTile | FlowerTile;
 
-// filenames (extension-less) under web/static/tiles/, from samoheen/mahjong-tiles
-// Hong Kong set. Winds/dragons keep the old repo's romaji names; flowers/seasons use
-// Flor1-4 / Seas1-4 to match the terse naming scheme.
+// filenames under web/static/tiles/ (samoheen/mahjong-tiles). Winds/dragons keep the old
+// repo's romaji names; flowers/seasons use Flor1-4/Seas1-4.
 export const TILE_ASSET: Record<RenderableTileCode, string> = {
 	'1m': 'Man1',
 	'2m': 'Man2',
@@ -70,13 +68,9 @@ export function hasTileArt(code: TileCode): code is RenderableTileCode {
 
 const ID_SUITS = ['m', 'p', 's'] as const;
 
-/** Real tile_ids (0..135) -> the `TileCode` they render as. Mirrors `tiles.py`'s
- * `tile_id_type` (`tile_id // 4` -> the canonical 0..33 `TileType`, docs/01-rules-spec.md §1)
- * composed with `tile_code()`'s string rendering -- the wire protocol only ever gives this
- * seat's own tiles (and any public meld) as numeric ids (docs/02-protocol.md §3), never a
- * code, so the live table view needs this to draw them through the same `TileFace` the mock
- * scenarios already feed a `TileCode` directly. Flowers never go through here -- the wire
- * sends `flowers` as `TileCode` strings (`'f1'..'f8'`) already. */
+/** Real tile_ids (0..135) -> the `TileCode` they render as -- the wire only ever gives numeric
+ * ids, never a code, so the live view needs this to draw through the same TileFace mocks use.
+ * Flowers never go through here -- the wire sends those as TileCode strings already. */
 export function tileIdToCode(tileId: number): TileCode {
 	const value = Math.floor(tileId / 4);
 	if (value < 27) {

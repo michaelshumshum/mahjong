@@ -26,7 +26,7 @@
 <section><ToastDemo /></section>
 
 <style lang="scss">
-	// proves the styles/ partials are usable from a page — not real component styling (M4).
+	// proves the styles/ partials are usable from a page — not real component styling.
 	@use '$lib/styles/layout';
 
 	.demo-header {

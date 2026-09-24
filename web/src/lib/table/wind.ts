@@ -10,13 +10,11 @@ export const WIND_LABEL: Record<WindLetter, string> = {
 	N: 'North'
 };
 
-// table-view wind glyphs (seat/prevailing badges show these instead of the E/S/W/N letter) --
-// WIND_LABEL stays in use for the one full-sentence spot ("You're seated as East") where a bare
-// glyph would read as unlabelled to a screen reader.
+// table-view wind glyphs; WIND_LABEL stays in use for full-sentence spots where a bare glyph
+// would read as unlabelled to a screen reader.
 export const WIND_CHAR: Record<WindLetter, string> = { E: '東', S: '南', W: '西', N: '北' };
 
-// seat wind badge: the dealer holds East for the current hand, remaining seats follow clockwise
-// in seat-index space -- a badge only, never position (docs/03-frontend.md §10 "What stays").
+// dealer holds East for the current hand, remaining seats follow clockwise in seat-index space.
 export function seatWind(seat: Seat, dealer: Seat): WindLetter {
 	return SEAT_WINDS[(seat - dealer + 4) % 4];
 }

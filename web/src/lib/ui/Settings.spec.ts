@@ -3,10 +3,8 @@ import { render } from 'svelte/server';
 import Settings from './Settings.svelte';
 import type { AutoArm, ClientPrefs } from './Settings.svelte';
 
-// `onAutoArmChange`/`onPrefsChange` firing on toggle is exercised end-to-end
-// (routes/page.e2e.ts), same as ClaimButtons' `onChoose` — svelte/server only renders markup,
-// there's no DOM to dispatch a real change event against here. This file covers that the
-// rendered checked/unchecked state matches the given props.
+// Toggle firing is covered end-to-end (routes/page.e2e.ts) -- this file covers that rendered
+// checked/unchecked state matches the given props.
 describe('Settings', () => {
 	const noop = () => {};
 	const offArm: AutoArm = { noCalls: false, autoPassChow: false };

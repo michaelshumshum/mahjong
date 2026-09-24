@@ -12,8 +12,7 @@ describe('ScoreSheet', () => {
 	];
 
 	// three hands' worth of deltas, each summing to zero, chosen so the running totals below are
-	// easy to hand-check: hand 1 Carol wins off a discard, hand 2 Dave self-draws, hand 3 exhaustive
-	// draw with tenpai payments.
+	// easy to hand-check.
 	const hands: HandRecord[] = [
 		{ handNo: 1, dealer: 0, prevailing: 'E', deltas: { 0: -24, 2: 24 } },
 		{ handNo: 2, dealer: 1, prevailing: 'E', deltas: { 0: -16, 1: 48, 2: -16, 3: -16 } },
@@ -30,9 +29,7 @@ describe('ScoreSheet', () => {
 		const { body } = render(ScoreSheet, { props: { seats, totals, hands } });
 		const tbody = body.match(/<tbody[^>]*>[\s\S]*?<\/tbody>/)?.[0] ?? '';
 		expect([...tbody.matchAll(/<tr[\s>]/g)]).toHaveLength(hands.length);
-		// none of these hands carry `result`, so the Hand cell's `{#if}` takes the plain-number
-		// branch -- strip the block's own hydration anchor comments before matching, since they
-		// sit between the `<td>` and the digit regardless of which branch actually rendered.
+		// strip hydration anchor comments -- they sit between the `<td>` and the digit.
 		const stripped = body.replace(/<!--.*?-->/g, '');
 		for (const hand of hands) {
 			expect(stripped).toMatch(new RegExp(`<td[^>]*>${hand.handNo}</td>`));
@@ -106,8 +103,7 @@ describe('ScoreSheet', () => {
 			expect(body).toMatch(/aria-expanded="false"/);
 		});
 
-		// svelte/server only renders the initial (collapsed) markup -- see ClaimButtons.spec.ts's
-		// own note on why a real click has to be an e2e test (routes/demo/demo.e2e.ts covers
-		// clicking the toggle open, revealing the right winning hand/draw note per round).
+		// svelte/server only renders the initial (collapsed) markup -- expand-to-reveal is
+		// covered end-to-end (routes/demo/demo.e2e.ts).
 	});
 });

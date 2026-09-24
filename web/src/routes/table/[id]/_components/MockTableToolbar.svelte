@@ -85,8 +85,7 @@
 		cursor: pointer;
 	}
 
-	// same secondary-button family as the chrome toggles -- only the active scenario stands out,
-	// same as the rest of the toolbar's one-accent-at-a-time treatment (dealer badge, turn outline).
+	// same secondary-button family as the chrome toggles -- only the active scenario stands out.
 	.scenario-btn {
 		@include buttons.btn-secondary;
 	}

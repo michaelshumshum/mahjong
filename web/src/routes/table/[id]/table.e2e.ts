@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// Covers the mock-driven /table scene assembly (docs/03-frontend.md §3): each mock scenario
-// renders without layout errors, switching scenarios actually changes what's on screen, a
-// claim-window interaction works end to end, and the sub-768px collapse structurally applies.
+// Covers the mock-driven /table scene assembly: each scenario renders without layout errors,
+// switching scenarios changes what's on screen, a claim interaction works end to end, and the
+// sub-768px collapse structurally applies.
 
 test('table route renders the default (your-turn) scenario without errors', async ({ page }) => {
 	const errors: string[] = [];
@@ -49,8 +49,8 @@ test('leaving the claim window untouched auto-passes once its timer runs out', a
 	const overlay = page.getByTestId('claim-overlay');
 	await expect(overlay).toBeVisible();
 
-	// claimWindowOpenForYou's fixed durationMs is 5000ms (mock-game-state.ts) -- no click, just
-	// wait it out to prove the dialog's own timer (not a manual choice) fires the pass.
+	// fixed durationMs is 5000ms -- no click, just wait it out to prove the dialog's own timer
+	// (not a manual choice) fires the pass.
 	await expect(page.getByTestId('claim-choice')).toHaveText('chose: pass', { timeout: 7000 });
 });
 
@@ -87,9 +87,8 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 
 	await page.getByRole('button', { name: 'Game just ended' }).click();
 
-	// the game-end screen replaces the last hand's own hold overlay outright (docs/03-frontend.md
-	// §6's "Game-end summary" -- `gameJustEnded`'s `handResult` is null, matching the real wire
-	// sequence where `game_end` only ever fires after that hold has already resolved).
+	// the game-end screen replaces the last hand's own hold overlay outright -- gameJustEnded's
+	// handResult is null, matching the real wire sequence.
 	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
 	const overlay = page.getByTestId('game-end-overlay');
 	await expect(overlay).toBeVisible();
@@ -100,8 +99,7 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 	await expect(overlay.locator('.standings')).toHaveCount(0);
 
 	// clicking into a past round (hand 2, a self-drawn All Pungs win) reveals that round's own
-	// winning hand, not just the most recent one -- the actual gap this sub-task closed
-	// (`HandHistoryEntry.winnerMelds`/the mock's own parallel `MockRoundResult.melds`).
+	// winning hand, not just the most recent one.
 	const round2Toggle = overlay.locator('.score-sheet tbody tr').nth(1).locator('.round-expand');
 	await round2Toggle.click();
 	const detail2 = overlay.locator('#round-detail-2');
@@ -171,12 +169,9 @@ test('desktop-width viewport does not apply the fixed self-hand collapse', async
 	await expect(selfRegion).not.toHaveCSS('position', 'fixed');
 });
 
-// lib/ui/settings-storage.ts persists clientPrefs/autoArm to localStorage independent of the
-// mock/live split (docs/03-frontend.md §6 "Settings persistence") -- this proves the round trip
-// survives an actual page reload, not just the unit-level save/load pair
-// (settings-storage.spec.ts). autoArm's re-assert-on-reconnect half needs a real socket to
-// observe, which is what RUN_LIVE_BACKEND_TESTS=1 tests (live.e2e.ts) are for; not duplicated
-// here.
+// proves clientPrefs/autoArm persistence survives an actual page reload, not just the unit-level
+// save/load pair (settings-storage.spec.ts). autoArm's re-assert-on-reconnect half needs a real
+// socket, covered by RUN_LIVE_BACKEND_TESTS=1 (live.e2e.ts), not duplicated here.
 test('reloading the page preserves clientPrefs toggled in Settings', async ({ page }) => {
 	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
@@ -196,9 +191,8 @@ test('reloading the page preserves clientPrefs toggled in Settings', async ({ pa
 	await expect(page.getByRole('radio', { name: 'Reduce motion' })).toBeChecked();
 });
 
-// Covers the scripted draw/discard/claim/kong animation demo (docs/03-frontend.md §4's
-// positional slot-identity rule) — the pure slot-resolution algorithm is unit-tested in
-// tile-slots.spec.ts; this proves it's actually wired up and reachable end to end.
+// Covers the scripted draw/discard/claim/kong animation demo -- the pure slot-resolution
+// algorithm is unit-tested in tile-slots.spec.ts; this proves it's wired up end to end.
 test('animation demo: draw, discard, claim, and concealed kong run the full sequence without errors', async ({
 	page
 }) => {

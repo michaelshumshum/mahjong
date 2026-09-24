@@ -18,15 +18,11 @@
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
 		font-weight: 600;
-		// "waiting, alive" -- the base/default treatment for a genuinely open seat
-		// (server/app/table.py's `_seat_status_tuple` reports `empty` for one, distinct from
-		// `connected`/`bot`/`disconnected`/`autoplay`), so this animation now means what it
-		// looks like: nobody's here yet, but the table is open and listening.
+		// "waiting, alive" -- the default treatment for a genuinely open (empty) seat.
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
 	}
 
-	// the one seat this screen actually knows something real about: dealer is fixed at table
-	// creation, so once you're seated your own wind is true today, not a guess.
+	// dealer is fixed at table creation, so once seated your own wind is true, not a guess.
 	.seat-ring-slot--self {
 		border: 1px solid var(--color-accent);
 		background: color-mix(in srgb, var(--color-accent) 16%, transparent);

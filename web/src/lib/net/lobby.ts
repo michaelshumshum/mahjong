@@ -1,8 +1,7 @@
 import { env } from '$env/dynamic/public';
 import type { RuleSet } from './ruleset';
 
-// hand-written: `GET /tables`/`POST /tables` are plain HTTP, outside the WS protocol `make proto`
-// generates (server/app/main.py's `TableList`/`CreateTableRequest`/`CreateTableResponse`).
+// hand-written: GET/POST /tables are plain HTTP, outside the WS protocol make proto generates.
 export interface SeatSummary {
 	status: 'connected' | 'disconnected' | 'autoplay' | 'bot' | 'empty';
 	name: string | null;
@@ -45,10 +44,7 @@ export interface CreateTableResponse {
 	ruleset: RuleSet;
 }
 
-// The one-request table-creation path (docs/02-protocol.md §10): resolves the ruleset and mints
-// the table id together server-side, replacing what used to be client-side id generation
-// (`$lib/table/table-code.ts`) followed by threading a full `RuleSet` payload through two nested
-// URL query strings.
+// one-request table creation: resolves the ruleset and mints the table id together server-side.
 export async function createTable(
 	body: CreateTableRequest = {},
 	baseUrl: string = apiBaseUrl(),

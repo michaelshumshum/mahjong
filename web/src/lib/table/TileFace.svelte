@@ -1,16 +1,11 @@
 <script lang="ts">
 	import { TILE_ASSET, hasTileArt, type TileCode } from './tile-code';
 
-	// `null` = concealed (render the back), matching the opponent-hand convention in
-	// docs/03-frontend.md §4 (positional slots have no known tile until reveal).
+	// `null` = concealed (render the back).
 	let { code = null }: { code?: TileCode | null } = $props();
 
-	// plain <img src> rather than inlining the SVG markup (docs/03-frontend.md §7 suggests
-	// inline/`<use>`): the vendored files carry non-namespaced ids (clipPath/filter/gradient)
-	// that collide across repeated inline copies of the same or different tiles — a hand has
-	// many duplicate tile codes on screen at once. <img> gives each instance an isolated
-	// rendering context, at the cost of not being stylable via currentColor/CSS — revisit if
-	// that's needed later.
+	// plain <img src>, not inlined SVG: the vendored files carry non-namespaced ids that collide
+	// across repeated inline copies of the same tile. Costs currentColor/CSS stylability.
 	const BACK_SRC = '/tiles/Back.svg';
 
 	let isBack = $derived(!(code !== null && hasTileArt(code)));
@@ -25,13 +20,8 @@
 </span>
 
 <style lang="scss">
-	// physical-tile treatment (docs/03-frontend.md is silent on this — this sub-task's call):
-	// the vendored art is glyph-only on a transparent canvas, so an ivory background sits
-	// behind it here, clipped to --radius-tile. The background-color and the <img> each clip
-	// to border-radius through a different rendering path (CSS background-clip vs. replaced-
-	// element content clip) and can anti-alias the curve by a fractional pixel differently,
-	// leaving a sliver of ivory visible right at the corners — an `overflow: hidden` wrapper
-	// clips both through the same box, so there's nothing left to mismatch.
+	// background-color and <img> each clip to border-radius through a different rendering path
+	// and can anti-alias the corner differently -- overflow: hidden clips both through one box.
 	.tile-face {
 		display: inline-flex;
 		align-items: center;

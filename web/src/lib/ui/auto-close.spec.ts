@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { scheduleAutoDismiss } from './auto-close';
 
-// the auto-close timer is a one-shot setTimeout, not a ticker, so its scheduling logic is
-// testable with fake timers instead of waiting out real durationMs — same "don't rely on real
-// elapsed time" goal as timer-ring.spec.ts's pure-math approach, applied via vi.useFakeTimers()
-// since the thing under test here is a scheduled side effect, not a derived value.
+// a one-shot setTimeout, not a ticker, so scheduling logic is testable with fake timers instead
+// of waiting out real durationMs.
 describe('scheduleAutoDismiss', () => {
 	afterEach(() => {
 		vi.useRealTimers();

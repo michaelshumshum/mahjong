@@ -67,8 +67,7 @@
 		}
 	}
 
-	// the picker knows real occupancy (spectator state_sync), so a taken seat reads as
-	// solid/inert rather than breathing, and an open one is a real, obviously-clickable button.
+	// a taken seat reads as solid/inert rather than breathing; an open one is a clickable button.
 	.seat-ring-slot--pickable {
 		font: inherit;
 		background: none;

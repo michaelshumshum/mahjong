@@ -76,8 +76,7 @@ describe('MahjongSocket', () => {
 		expect(hello.t).toBe('hello');
 		expect(hello.d.client_version).toBeTruthy();
 		expect(typeof hello.id).toBe('string');
-		// nothing known yet -- omitted, not sent as null (docs/02-protocol.md fairness-field
-		// convention: "omit the key entirely", same rule applies to every optional wire field).
+		// nothing known yet -- omitted, not sent as null (every optional wire field's convention).
 		expect(hello.d.last_seq).toBeUndefined();
 		expect(hello.d.seat).toBeUndefined();
 	});
@@ -244,8 +243,7 @@ describe('MahjongSocket', () => {
 			expect(socket.lastSeq).toBe(1);
 			expect(socket.status).toBe('resyncing');
 
-			// and a fresh hello carrying last_seq (+ seat, once known) was sent to ask the server
-			// to fill the gap (docs/02-protocol.md §5's three-way hello{last_seq} branch).
+			// a fresh hello carrying last_seq was sent to ask the server to fill the gap.
 			const messages = sentMessages(ws);
 			const secondHello = messages.at(-1) as Hello;
 			expect(secondHello.t).toBe('hello');

@@ -83,9 +83,7 @@
 		color: var(--color-text-muted);
 	}
 
-	// wall/prevailing: was `.center-info` on the table surface itself -- dealer/turn moved with
-	// it but aren't reproduced here, since `.dealer-badge`/`.seat-region--turn`'s outline on each
-	// seat already say that.
+	// dealer/turn aren't reproduced here -- .dealer-badge/.seat-region--turn already say that.
 	.table-status {
 		display: flex;
 		align-items: center;

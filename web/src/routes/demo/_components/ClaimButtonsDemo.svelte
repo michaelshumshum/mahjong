@@ -1,9 +1,8 @@
 <script lang="ts">
 	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
 
-	// ClaimButtons/TimerRing demo (this sub-task): mock props only, no claim_offer wiring.
-	// Two chow options on the same discarded 6s (4s-5s vs 5s-7s) exercises the
-	// multi-chow-option disambiguation described in docs/02-protocol.md §2.
+	// mock props only, no claim_offer wiring. Two chow options on the same discarded 6s
+	// (4s-5s vs 5s-7s) exercises the multi-chow-option disambiguation.
 	const demoClaimOptions: ClaimOption[] = [
 		{ kind: 'chow', tiles: ['4s', '5s'] },
 		{ kind: 'chow', tiles: ['5s', '7s'] },

@@ -1,11 +1,7 @@
 <script lang="ts">
-	// A sandbox independent of the 3 static mock scenarios: proves the positional
-	// slot-identity mechanics (tile-slots.ts, docs/03-frontend.md §4) and the
-	// transform/opacity-only transition contract (§2) actually work end to end, rather than
-	// being implemented but unreachable. No JS ticker anywhere here — every animation is a CSS
-	// transition/animation driven by a class or DOM-insertion, and `ontransitionend` (not a
-	// timer standing in for the animation) is what commits the data change once a flight
-	// actually finishes.
+	// A sandbox proving the positional slot-identity mechanics (tile-slots.ts) and the
+	// transform/opacity-only transition contract actually work end to end. No JS ticker --
+	// `ontransitionend` commits the data change once a flight actually finishes.
 	import TileFace from '$lib/table/TileFace.svelte';
 	import type { MockMeld } from '$lib/table/mock-game-state';
 	import type { TileCode } from '$lib/table/tile-code';
@@ -34,9 +30,8 @@
 	let leavingOpponentSlotKey: number | null = $state(null);
 	let leavingOpponentTile: TileCode | null = $state(null);
 
-	// same element (keyed by slot.key) throughout back -> revealed-and-leaving -> gone, per
-	// §4's "element continuity for the CSS transition" -- appending the departed slot back at
-	// its old (last) position rather than letting it disappear from the each-block early.
+	// same element (keyed by slot.key) throughout back -> revealed-and-leaving -> gone --
+	// appending the departed slot back rather than letting it disappear from the each-block early.
 	let renderedOpponentSlots = $derived(
 		leavingOpponentSlotKey !== null
 			? [...demoOpponentSlots.slots, { key: leavingOpponentSlotKey }]
@@ -235,10 +230,8 @@
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/tile';
 
-	// tile-display primitives shared with the real seat regions (docs/03-frontend.md §7.1's
-	// _tile.scss) -- this sandbox has no game-state dependency on the real table surface, so it
-	// still can't share OpponentRegion/YourSeatRegion's scoped selectors directly, but the shape
-	// of each rule is identical, so it goes through the same mixins.
+	// this sandbox can't share OpponentRegion/YourSeatRegion's scoped selectors directly, but
+	// the shape of each rule is identical, so it goes through the same _tile.scss mixins.
 	.panel-overlay {
 		@include buttons.modal-scrim;
 	}
@@ -276,8 +269,6 @@
 	.hand-tile {
 		@include tile.mini-tile;
 	}
-
-	// --- Live animation demo (docs/03-frontend.md §2: transform/opacity only, no JS ticker) ---
 
 	.animation-demo {
 		position: relative;
@@ -323,8 +314,7 @@
 		}
 	}
 
-	// the departing slot/tile: transform+opacity only, per §2 -- no layout-affecting property
-	// animates, so this never triggers reflow on the ~150-element hand/pool it sits inside.
+	// transform+opacity only -- no layout-affecting property, so this never triggers reflow.
 	.demo-tile-leaving {
 		transition:
 			transform 260ms ease-in,
@@ -350,10 +340,8 @@
 		}
 	}
 
-	// reduced motion: skip the visible motion but keep a near-instant transition running --
-	// `ontransitionend` is what commits the data change (see the script section above), so
-	// `transition: none` here would leave the demo permanently stuck mid-flight instead of
-	// just snapping instead of sliding.
+	// keep a near-instant transition running -- `transition: none` would leave the demo stuck
+	// mid-flight, since ontransitionend is what commits the data change.
 	@media (prefers-reduced-motion: reduce) {
 		.demo-tile-leaving {
 			transition-duration: 1ms;

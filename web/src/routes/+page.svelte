@@ -6,12 +6,8 @@
 
 	claimMuralVisible();
 
-	// "Create a table" opens a dialog to pick the ruleset (docs/00-architecture.md §3 "Ruleset
-	// selection") rather than navigating straight there -- table ids are minted server-side now
-	// (`POST /tables`, docs/02-protocol.md §10), and the ruleset has to be chosen before that
-	// call since `RuleSet` is fixed at table construction with no path to change it after. The
-	// table's own pre-game panel still has its own "copy invite link" button
-	// (docs/03-frontend.md's "Pre-game states"), so there's still no separate copy-code step here.
+	// opens a dialog to pick the ruleset rather than navigating straight there -- RuleSet is
+	// fixed at table construction with no path to change it after.
 	let showCreateDialog = $state(false);
 
 	function handleCreated(tableId: string): void {
@@ -19,12 +15,8 @@
 		goto(`/table/${tableId}`);
 	}
 
-	// practice mode (docs/05-roadmap.md M4.5): a solo table with seats 1-3 bot-bound from table
-	// creation. Stays a single click, no dialog -- practice tables don't need a ruleset choice.
-	// `?practice=1` is this route's own query param, translated into `&practice=true` on the
-	// live WS URL by `/table/[id]` if a page reload needs to reopen the socket -- the two
-	// spellings are unrelated. `practice: true` in the `POST /tables` body is what actually binds
-	// the bot seats at construction (`server/app/table.py`'s `Table.__init__(practice=...)`).
+	// practice mode: a solo table with seats 1-3 bot-bound at creation, single click, no dialog.
+	// `?practice=1` (this route's own param) is unrelated in spelling to the wire's `&practice=true`.
 	let practiceSubmitting = $state(false);
 	let practiceError = $state(false);
 

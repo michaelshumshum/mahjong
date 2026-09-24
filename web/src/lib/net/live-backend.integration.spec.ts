@@ -8,24 +8,14 @@ import { initialClientGameState, type ClientGameState } from '../game/state';
 import type { ServerEvent } from './protocol';
 
 /**
- * Live integration smoke test: a real `uv run uvicorn` (server/) and four real
- * `MahjongSocket` connections, proving the socket + reducer actually work against the real
- * backend's real redaction/seq/reconnect wire shapes — not just hand-constructed fixture
- * events (every other test in this package, `reducer.spec.ts`/`socket.spec.ts`, uses those).
- *
- * Skipped by default (no Python/uv dependency for the normal `pnpm test`/CI unit-test run).
- * Opt in explicitly:
+ * Live integration smoke test: a real `uv run uvicorn` and four real `MahjongSocket`
+ * connections, proving the socket + reducer work against the real backend's wire shapes, not
+ * just hand-constructed fixtures. Skipped by default; opt in with:
  *
  *   RUN_LIVE_BACKEND_TESTS=1 pnpm vitest run src/lib/net/live-backend.integration.spec.ts
  *
- * Exercises `MahjongSocket` + `reduce()` directly rather than `lib/game/store.svelte.ts` --
- * `GameStore` needs the 'client' (real-browser) vitest project for its runes to execute
- * (vite.config.ts's own comment explains why), and combining that with a spawned live server
- * felt like more moving parts than this sub-task's scope justified. `store.svelte.spec.ts`
- * already covers the store's own wiring (subscribe/apply/dispose) against a fake socket, and
- * this file covers the wire-protocol layer underneath it against the real thing. Wiring both
- * together (GameStore + a live server, in browser mode) is a reasonable next step, not done
- * here.
+ * Exercises `MahjongSocket` + `reduce()` directly, not `GameStore` -- runes need the 'client'
+ * vitest project, and combining that with a spawned live server was more than this needed.
  */
 describe.skipIf(!process.env.RUN_LIVE_BACKEND_TESTS)('live backend (opt-in)', () => {
 	const port = 8199;
@@ -61,11 +51,8 @@ describe.skipIf(!process.env.RUN_LIVE_BACKEND_TESTS)('live backend (opt-in)', ()
 	}
 
 	beforeAll(async () => {
-		// `uv run uvicorn` is a wrapper process around the real uvicorn/python process (and
-		// uvicorn's own startup forks a couple of short-lived multiprocessing helpers) --
-		// signalling only the top-level PID leaves those children orphaned. `detached: true`
-		// puts the whole tree in its own process group so afterAll can kill all of it at once
-		// via the negative-PID form of `kill` (POSIX: signal every process in the group).
+		// `detached: true` puts uvicorn's whole process tree (it forks helpers) in its own
+		// process group, so afterAll can kill it all via negative-PID `kill`.
 		serverProcess = spawn(
 			'uv',
 			['run', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', String(port)],

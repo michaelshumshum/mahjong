@@ -3,12 +3,9 @@
 	import FormGroup from './FormGroup.svelte';
 	import OptionRow from './OptionRow.svelte';
 
-	// pre-arm toggles sent via `auto` (docs/02-protocol.md §2): `{no_calls?, auto_pass_chow?}`,
-	// enforced server-side. No `auto_win` here on purpose — declining a winning claim is a real
-	// strategic choice under min_faan rulesets (docs/02-protocol.md "Declining a claim on
-	// purpose"), so a win offer always opens a real claim_offer regardless of these toggles. This
-	// component is a pure controlled pair of checkboxes, not local game truth: the parent owns
-	// the actual values and re-sends `auto` on change.
+	// pre-arm toggles sent via `auto`, enforced server-side. No `auto_win` on purpose --
+	// declining a winning claim is a real strategic choice under min_faan rulesets, so a win
+	// offer always opens a real claim_offer regardless. Pure controlled checkboxes, not truth.
 	export interface AutoArm {
 		noCalls: boolean;
 		autoPassChow: boolean;
@@ -16,9 +13,8 @@
 
 	export type MotionPref = 'system' | 'reduced' | 'full';
 
-	// client-only prefs, no wire equivalent. `motion` overrides `prefers-reduced-motion`
-	// (docs/03-frontend.md §8) for a player whose OS setting doesn't match what they want in-game;
-	// 'system' (default) just follows the media query.
+	// client-only prefs, no wire equivalent. `motion` overrides `prefers-reduced-motion` for a
+	// player whose OS setting doesn't match what they want in-game.
 	export interface ClientPrefs {
 		soundEnabled: boolean;
 		motion: MotionPref;

@@ -1,14 +1,7 @@
-// Projects a real `ClientGameState` (docs/03-frontend.md §6, this seat's own redacted view)
-// into the `MockGameState`-shaped view model `+page.svelte`'s template already renders
-// (mock-game-state.ts). Lets the live path reuse the exact same, already-screenshot-audited
-// render tree (TileFace/ClaimDialog/FaanBreakdown/ScoreSheet/...) instead of a
-// second parallel one that could visually drift from it -- the alternative this sub-task
-// weighed and rejected (docs/03-frontend.md's own "the adapter problem" framing).
-//
-// The one thing `MockGameState` has no room for is real tile identity: mock tiles are bare
-// `TileCode`s with no id, but a live discard/claim/declare intent needs the numeric `tile_id`,
-// not just the face. `LiveTableView.ownHand` carries that alongside the view, index-aligned
-// with `view.seats[you].concealedHand`/`.drawn`, for `+page.svelte`'s interactive hand tiles.
+// Projects a real `ClientGameState` into the `MockGameState`-shaped view model +page.svelte's
+// template already renders, so the live path reuses the same render tree instead of a second
+// one that could visually drift. `MockGameState` has no room for real tile identity, so
+// `LiveTableView.ownHand` carries tile_ids alongside, index-aligned with the view.
 
 import type { ClientGameState, MeldState } from '../game/state';
 import { tileIdToCode, type TileCode } from './tile-code';
@@ -41,31 +34,19 @@ export interface LiveTableView {
 	ownHand: LiveOwnHand;
 }
 
-// `state.prevailing`/`hand_start.prevailing` are the wire's `Wind` enum *name*
-// (`app/views.py`/`app/table.py`: `state.prevailing.name` -- IntEnum members EAST=0..NORTH=3),
-// not the single-letter code (`'E'|'S'|'W'|'N'`) `WIND_LABEL`/`MockGameState` use everywhere
-// else. Only found by actually running a live hand end to end -- every mock scenario already
-// hardcodes the single-letter form, so nothing else exercises this mismatch.
+// wire prevailing is the `Wind` enum's *name* (EAST/SOUTH/WEST/NORTH), not the single-letter
+// code MockGameState uses everywhere else.
 const WIRE_WIND_TO_CODE: Record<string, Wind> = { EAST: 'E', SOUTH: 'S', WEST: 'W', NORTH: 'N' };
 
-/** Exported for `+page.svelte`'s `scoreHands` mapping — `ClientGameState.handHistory` entries
- * carry the same wire-form `prevailing` string this converts for the live view's own field. */
 export function wireWindToCode(wind: string): Wind {
 	return WIRE_WIND_TO_CODE[wind] ?? (wind as Wind);
 }
 
 function sortByTileType(ids: readonly number[]): number[] {
-	// TileType order (0..33: m1..m9, p1..p9, s1..s9, z1..z7, tiles.py) is exactly `tile_id // 4`
-	// -- the same order a sorted hand should read in (docs/03-frontend.md §3's "13 faces,
-	// sorted"), so no separate comparator over TileCode is needed.
+	// TileType order (0..33) is exactly tile_id // 4 -- no separate TileCode comparator needed.
 	return ids.slice().sort((a, b) => Math.floor(a / 4) - Math.floor(b / 4));
 }
 
-/** `state.drawnTileId` (reducer.ts) names the actual held-apart tile, so this only needs to
- * gate on whether it's this seat's turn to discard -- no more inferring it from `ownHand`'s
- * array position, which broke for a claimed chow/pung/kong (formed from the discard plus
- * concealed tiles, never a draw, so whatever tile happened to land last in `ownHand` after the
- * removal was never really "held apart"). */
 function splitOwnHand(state: ClientGameState): LiveOwnHand {
 	if (state.seat === null) return { concealedIds: [], drawnId: null };
 	const canDiscard =
@@ -79,15 +60,11 @@ function splitOwnHand(state: ClientGameState): LiveOwnHand {
 	};
 }
 
-/** Exported for `+page.svelte`'s past-round detail mapping (`HandHistoryEntry.winnerMelds`,
- * state.ts) — the same tile_id -> `TileCode` conversion (and concealed_kong backs placeholder)
- * this module already needs for the live seats themselves. */
 export function meldToView(m: MeldState): MockMeld {
 	const tiles = m.tiles
 		? m.tiles.map(tileIdToCode)
-		: // another seat's still-concealed concealed_kong: no real tiles to show yet (redacted to
-			// `count` only, docs/02-protocol.md §3) -- the codes themselves are never read, since
-			// +page.svelte forces `TileFace code={null}` for any `concealed_kong` meld regardless.
+		: // another seat's still-concealed concealed_kong: codes are never read since +page.svelte
+			// forces TileFace code={null} for any concealed_kong meld regardless.
 			(Array(m.count ?? 0).fill('1m') as TileCode[]);
 	return {
 		kind: m.kind as MeldKind,
@@ -106,16 +83,11 @@ function claimOptionToView(o: Record<string, unknown>): MockClaimOption {
 
 function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
 	const offer = state.claimOffer;
-	// a `window_id`-less offer only ever comes from a state_sync snapshot embedding
-	// `claim_options` with no live `claim_offer` behind it yet (state.ts's `ClaimWindowState`
-	// doc comment) -- there's no real id to claim against, so don't offer buttons for it; the
-	// real `claim_offer` event that follows will carry one.
+	// a window_id-less offer comes from a state_sync snapshot with no live claim_offer yet --
+	// no real id to claim against, so don't offer buttons; the real claim_offer will carry one.
 	if (!offer || offer.windowId === null) return null;
-	// `kind` stays a placeholder -- the wire's `claim_offer` never says discard vs kong_rob
-	// (docs/02-protocol.md §3) and nothing downstream branches on it. `sourceSeat`/`tile` are
-	// real, though: `state.lastDiscard` (set by the `discard` event, or derived from
-	// `discard_pools` on resync -- reducer.ts) names the actual tile this window is about,
-	// since `turn` still names the discarder for the window's whole lifetime.
+	// `kind` stays a placeholder -- the wire never says discard vs kong_rob and nothing
+	// downstream branches on it. `sourceSeat`/`tile` are real, from `state.lastDiscard`.
 	return {
 		windowId: offer.windowId,
 		kind: 'discard',
@@ -126,11 +98,8 @@ function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
 	};
 }
 
-/** Same "anchored deadline, not a countdown carried over the wire" shape as
- * `claimWindowToView`'s `durationMs` -- `state.deadlineTs` is set by the `turn` event whenever
- * it's this seat's `AWAIT_ACTION` (normal draw-then-discard or the discard right after a claimed
- * meld, both the same wire event server-side), and cleared once this seat acts or the turn moves
- * on (reducer.ts). */
+/** Anchored deadline, not a countdown carried over the wire -- `state.deadlineTs` is set by
+ * `turn` for this seat's AWAIT_ACTION, cleared once this seat acts or the turn moves on. */
 function turnDurationMsFromState(state: ClientGameState): number | null {
 	return state.turn === state.seat && state.deadlineTs !== null
 		? Math.max(0, state.deadlineTs - Date.now())
@@ -138,9 +107,7 @@ function turnDurationMsFromState(state: ClientGameState): number | null {
 }
 
 function handEndHoldMsFromState(state: ClientGameState): number | null {
-	// same "anchored deadline, not a countdown carried over the wire" shape claimWindowToView's
-	// durationMs already uses -- `handEndDeadlineTs` is `null` whenever there's no open hold
-	// (reducer.ts clears it on `hand_start`).
+	// same anchored-deadline shape as turnDurationMsFromState; null when there's no open hold.
 	return state.handEndDeadlineTs !== null
 		? Math.max(0, state.handEndDeadlineTs - Date.now())
 		: null;
@@ -162,11 +129,8 @@ function handResultToView(state: ClientGameState): MockHandResult | null {
 	};
 }
 
-/** `null` before this seat is known (pre-join/pre-`state_sync`) -- there's no `you` to build a
- * seat-relative view around yet. A spectator (`seat === null`) passes `spectateFrom` instead: the
- * seat drawn at the bottom, with no concealed tiles (a spectator snapshot carries none) unless
- * the table shows spectators every hand (`state.hands`), in which case every seat gets its
- * `concealedHand`. */
+/** `null` before this seat is known. A spectator (`seat === null`) passes `spectateFrom` instead
+ * -- no concealed tiles unless the table shows spectators every hand (`state.hands`). */
 export function viewFromClientState(
 	state: ClientGameState,
 	spectateFrom: Seat | null = null
@@ -182,10 +146,7 @@ export function viewFromClientState(
 		const openHand = state.hands?.[seat];
 		return {
 			seat: seat as Seat,
-			// `state.names` (docs/02-protocol.md §3's `state_sync.names`/`seat_state.name`, M5) is
-			// this seat's real guest display name (or a bot's random pun display name) once
-			// bound -- the `isYou`/`Seat N` fallback only covers the moment before that name has
-			// actually arrived, which shouldn't outlast the first state_sync for a bound seat.
+			// isYou/Seat N fallback only covers the moment before a real name has arrived.
 			name: state.names[seat] ?? (isYou ? 'You' : `Seat ${seat}`),
 			concealedCount: state.concealedCounts[seat],
 			concealedHand: isYou

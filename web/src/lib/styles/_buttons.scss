@@ -1,11 +1,6 @@
-// button/panel/input chrome mixins (docs/03-frontend.md §7.1): the three-tier interactive
-// hierarchy layered on top of the existing token palette (michaels/mahjong-frontend
-// component-craft pass — shape/depth/interaction only, no new colour values, no new type).
-//
-// physical model: chrome belongs to the same lacquered-wood/stamped-ink world as the tiles.
-// primary reads as a carved ink-seal block (inset highlight + hard shadow "riser" + soft cast
-// shadow, presses down on :active); secondary reads as a bevelled wood tile (light top-left /
-// dark bottom-right via box-shadow, lifts on :hover); tertiary is bare text until touched.
+// button/panel/input chrome mixins: three-tier interactive hierarchy on the token palette.
+// physical model: primary reads as a carved ink-seal block (presses down on :active); secondary
+// as a bevelled wood tile (lifts on :hover); tertiary is bare text until touched.
 
 @mixin btn-primary {
 	position: relative;
@@ -87,8 +82,7 @@
 	background: transparent;
 	color: var(--color-text-muted);
 	font-weight: 600;
-	// a transparent-background button can sit over anything (tiles, table felt, a scrim) — a
-	// quiet shadow keeps the label legible without giving it a visible box at rest.
+	// can sit over anything (tiles, felt, a scrim) -- a shadow keeps the label legible at rest.
 	text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
 	transition:
 		background-color 130ms ease,
@@ -109,9 +103,7 @@
 	}
 }
 
-// fullscreen dialog backdrop: every modal (dialogs, hand-end/claim overlays, the animation
-// sandbox) centers its panel over the same dimmed scrim, so this is one declaration instead of
-// each caller hand-copying position/background/z-index.
+// fullscreen dialog backdrop: one declaration instead of each caller hand-copying it.
 @mixin modal-scrim {
 	position: fixed;
 	inset: 0;
@@ -123,9 +115,8 @@
 	padding: var(--space-3);
 }
 
-// panels/cards/modals: a shadow tinted from --color-bg's warm brown-black (10 4 2), not
-// neutral grey, so chrome reads as sitting on the lacquered table rather than floating in
-// generic SaaS UI space.
+// shadow tinted from --color-bg's warm brown-black, not neutral grey, so chrome reads as
+// sitting on the lacquered table.
 @mixin panel-elevated {
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
@@ -135,8 +126,7 @@
 		0 4px 12px rgb(10 4 2 / 0.4);
 }
 
-// text inputs: a recessed well (inset shadow) instead of a flat single-tone border, so a
-// field reads as cut into the surface rather than a bordered box sitting on top of it.
+// recessed well (inset shadow), not a flat border, so a field reads as cut into the surface.
 @mixin input-recessed {
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-sm);

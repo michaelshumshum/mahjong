@@ -4,9 +4,7 @@
 
 	export type Seat = 0 | 1 | 2 | 3;
 
-	// mirrors melds.MeldKind, minus PAIR (mock-game-state.ts's MockMeld) -- kept as a local type
-	// rather than importing MockMeld itself, since this component only needs `kind`/`tiles`, not
-	// the seat-relative fixture shape.
+	// mirrors melds.MeldKind, minus PAIR -- kept local since this only needs kind/tiles.
 	export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong';
 
 	export interface WinningMeld {
@@ -19,11 +17,8 @@
 		faan: number;
 	}
 
-	// mirrors hand_end.payments (docs/02-protocol.md §3): per-seat point delta for *this hand*
-	// only, not the running game total (`score.totals` — the score sheet's job, a separate
-	// component). Winner positive, payer(s) negative, entries sum to zero. `Partial` because a
-	// seat with nothing to pay or collect (e.g. a non-discarder under `discarder_pays_all`)
-	// simply has no entry rather than an explicit 0.
+	// mirrors hand_end.payments: per-seat delta for this hand only. `Partial` because a seat
+	// with nothing to pay or collect has no entry rather than an explicit 0.
 	export type Payments = Partial<Record<Seat, number>>;
 
 	const ALL_SEATS: Seat[] = [0, 1, 2, 3];
@@ -38,8 +33,7 @@
 		payments
 	}: {
 		winner: Seat;
-		// player names, not seat direction (docs/03-frontend.md) -- the win screen is about who
-		// won/lost, not table geometry.
+		// player names, not seat direction -- the win screen is about who won/lost.
 		seatNames: Record<Seat, string>;
 		winningHand: TileCode[];
 		melds?: WinningMeld[];
@@ -48,9 +42,7 @@
 		payments: Payments;
 	} = $props();
 
-	// reading order within a suit (docs/01-rules-spec.md §1's index layout: m, p, s, then
-	// honors) -- winningHand/meld tiles arrive in claim/draw order, not sorted, so the raw wire
-	// order would scatter identical/sequential tiles across the display.
+	// reading order within a suit -- tiles arrive in claim/draw order, not sorted.
 	const SUIT_ORDER: Record<string, number> = { m: 0, p: 1, s: 2 };
 	function tileSortKey(code: TileCode): number {
 		return code[0] === 'z'
@@ -70,12 +62,8 @@
 	);
 	let sortedConcealedHand = $derived(sortTiles(winningHand));
 
-	// docs/01-rules-spec.md §7 clamps the total to `RuleSet.faan_cap` server-side ("Total is
-	// clamped") but still reports every matched pattern at its full value — comparing the raw
-	// pattern sum to the given `totalFaan` is enough to detect and label a capped hand without
-	// this component needing its own copy of the ruleset. Not in the protocol doc's sketch (it
-	// only names the `faan_breakdown` key, not its shape) — this is the shape decision this
-	// component's props codify.
+	// server clamps the total to faan_cap but still reports every pattern at full value --
+	// comparing the raw pattern sum to totalFaan is enough to detect a capped hand.
 	let patternSum = $derived(patterns.reduce((sum, p) => sum + p.faan, 0));
 	let isCapped = $derived(patternSum > totalFaan);
 
@@ -210,9 +198,7 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	// no accent here on purpose — cinnabar is reserved for turn/claim-window/win-marker urgency
-	// (docs this sub-task follows), not a "notable number" highlight. The cap-note text alone
-	// carries the information.
+	// no accent here on purpose -- cinnabar is reserved for turn/claim-window/win-marker urgency.
 
 	.cap-note {
 		font-size: var(--font-size-sm);

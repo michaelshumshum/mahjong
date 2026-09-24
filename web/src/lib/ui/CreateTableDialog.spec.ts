@@ -2,9 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import CreateTableDialog from './CreateTableDialog.svelte';
 
-// Interaction (picking a preset, filling the custom form, submitting) is exercised end-to-end
-// (routes/page.e2e.ts) -- svelte/server only renders markup, no DOM to dispatch events against.
-// This file covers the initial render: sensible defaults, custom form hidden until chosen.
+// Interaction is covered end-to-end (routes/page.e2e.ts) -- this file covers the initial
+// render: sensible defaults, custom form hidden until chosen.
 describe('CreateTableDialog', () => {
 	const noop = () => {};
 

@@ -76,8 +76,7 @@ test('score sheet demo: expanding a win round reveals its winning hand, a draw r
 	// hand 2 (row index 1) has no per-round detail -- no expand affordance for it at all.
 	await expect(rows.nth(1).locator('.round-expand')).toHaveCount(0);
 
-	// hand 1 (row index 0): a real win -- expanding reveals the winning hand tiles and faan
-	// patterns via `WinningHand`, a compact view that omits the overlay heading/payments.
+	// hand 1 (row index 0): a real win -- expanding reveals winning hand tiles and faan patterns.
 	const round1Toggle = rows.nth(0).locator('.round-expand');
 	await expect(scoreSheet.locator('#round-detail-1')).toHaveCount(0);
 	await round1Toggle.click();

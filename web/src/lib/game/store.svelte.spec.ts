@@ -4,11 +4,9 @@ import type { MahjongSocket } from '../net/socket';
 import type { ServerEvent } from '../net/protocol';
 import type { ConnectionStatus } from './state';
 
-/** A minimal fake standing in for MahjongSocket's public surface the store depends on —
- * exercises the store's wiring (subscribe, apply, dispose) without a real WebSocket. Runs under
- * this project's 'client' (jsdom) vitest project (vite.config.ts) — `$effect`/`$effect.root`
- * no-op under the SSR compile target the 'server'/node project uses, so this is the one place
- * that needs a real client-side effect runtime. */
+/** Fake standing in for MahjongSocket, exercising the store's wiring without a real WebSocket.
+ * Must run under the 'client' (jsdom) vitest project — `$effect`/`$effect.root` no-op under the
+ * 'server' project's SSR compile target. */
 class FakeSocket {
 	#eventListeners = new Set<(e: ServerEvent) => void>();
 	#statusListeners = new Set<(s: ConnectionStatus) => void>();

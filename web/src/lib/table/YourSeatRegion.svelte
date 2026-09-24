@@ -162,9 +162,8 @@
 		@include tile.seat-wind;
 	}
 
-	// fixed footprint (matches `TimerRing size={24}` above) so the header doesn't reflow --
-	// `.seat-score`'s `margin-inline-start: auto` shifts position with any preceding sibling that
-	// mounts/unmounts, and this one toggles every time the turn changes.
+	// fixed footprint so the header doesn't reflow -- .seat-score's margin-inline-start: auto
+	// shifts with any preceding sibling that mounts/unmounts, and this toggles every turn.
 	.turn-timer {
 		width: 24px;
 		height: 24px;
@@ -214,8 +213,7 @@
 		margin-inline-start: var(--space-4);
 	}
 
-	// live-mode-only interactive hand tile: same box as the plain `.hand-tile` div (kept a button
-	// only when there's a discard to send it) -- a button reset, not a second style.
+	// same box as the plain .hand-tile div -- a button reset, not a second style.
 	.hand-tile-btn {
 		padding: 0;
 		border: none;
@@ -240,27 +238,20 @@
 			cursor: pointer;
 			@include buttons.btn-primary;
 
-			// `btn-primary`'s `:active` press (`translateY(3px)`) moves the button out from under a
-			// held-then-released pointer before mouseup's hit-test runs, so mouseup/click lands on
-			// this flex row's own `<div>` instead of the button -- Svelte's click delegation walks
-			// up from the real event target and never reaches the button's handler, so the declare
-			// action (win/kong) silently never sends. No visible-position feedback lost: `:hover`'s
-			// background swap still shows the press.
+			// btn-primary's :active translateY(3px) moves the button out from under mouseup's
+			// hit-test, so the click lands on the row's own div and the action never sends.
 			&:active:not(:disabled) {
 				transform: none;
 			}
 		}
 	}
 
-	// sub-768px collapse (docs/03-frontend.md §3): pinned to the safe-area bottom, horizontal
-	// scroll once a full hand no longer fits.
+	// sub-768px collapse: pinned to the safe-area bottom, horizontal scroll once a hand overflows.
 	@include layout.phone-only {
 		@include tile.backs-row-overlap;
 
-		// `.table-tilt`'s `perspective` (unconditional, for the desktop rotateX, set in the parent
-		// page) establishes a containing block for descendant `position: fixed` elements same as
-		// `transform` does -- the parent page drops it at phone width too, so this pins to the
-		// real viewport as intended, not the tilted box's own edge.
+		// `.table-tilt`'s `perspective` establishes a containing block for `position: fixed`
+		// descendants same as `transform` does -- the parent page drops it at phone width too.
 		.seat-region--self {
 			position: fixed;
 			inset-inline: 0;
@@ -275,9 +266,8 @@
 			height: clamp(44px, 12vw, 60px);
 		}
 
-		// a full hand at this tile size is wider than a phone screen, and `.seat-region--self` is
-		// `position: fixed` (no scrollable ancestor) -- without this, tiles past the edge are
-		// simply unreachable rather than scrolled-to.
+		// .seat-region--self is position: fixed (no scrollable ancestor) -- without this, tiles
+		// past the edge are unreachable rather than scrolled-to.
 		.hand-row {
 			overflow-x: auto;
 		}

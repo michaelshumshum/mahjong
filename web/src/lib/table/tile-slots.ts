@@ -1,14 +1,7 @@
-// Positional slot-identity model for an opponent's concealed hand (docs/03-frontend.md §4).
-// The protocol never gives an opponent's tiles a real identity until they're revealed (a
-// discard, an open meld, or hand end) — the client tracks a stable per-slot key instead, so
-// Svelte's keyed {#each} preserves DOM element continuity across draw/discard/kong
-// transitions regardless of which physical tile a slot "really" holds.
-//
-// The doc's rule ("if seat:drawn exists, it left; otherwise the rightmost concealed slot
-// (seat:12) morphs instead, and slots above it shift down") reduces to one operation once you
-// notice both cases name the *same position*: whichever slot is currently last in the array,
-// drawn-slot or not. Popping from the end is the whole rule — no surviving slot's key ever
-// changes, so there is nothing to "shift" except the one that departs.
+// Positional slot-identity model (docs/03-frontend.md §4): a stable per-slot key stands in for
+// an opponent's concealed tiles until reveal. §4's rule reduces to one operation: both "drawn
+// slot left" and "rightmost concealed slot morphs" name whichever slot is currently last, so
+// popping from the end is the whole rule.
 
 export interface Slot {
 	/** Stable across this slot's lifetime; never reused, never reassigned to a different slot. */
@@ -28,7 +21,7 @@ export function initialSlotState(concealedCount: number): SlotState {
 	return { slots, nextKey: concealedCount };
 }
 
-/** draw {seat}: append seat:drawn — the "held apart" 14th tile, same convention as your own hand. */
+/** draw {seat}: append seat:drawn — the held-apart 14th tile. */
 export function pushDrawnSlot(state: SlotState): SlotState {
 	return {
 		slots: [...state.slots, { key: state.nextKey }],
@@ -36,10 +29,7 @@ export function pushDrawnSlot(state: SlotState): SlotState {
 	};
 }
 
-/**
- * A discard from this seat: pop the last slot. Covers both branches of §4's rule (the drawn
- * slot if present, otherwise the rightmost concealed slot) since they're the same position.
- */
+/** A discard from this seat: pop the last slot -- covers both branches of §4's rule. */
 export function popSlotForDiscard(state: SlotState): { left: Slot; remaining: SlotState } {
 	if (state.slots.length === 0) throw new Error('no concealed slots to discard from');
 	const left = state.slots[state.slots.length - 1];
@@ -49,10 +39,7 @@ export function popSlotForDiscard(state: SlotState): { left: Slot; remaining: Sl
 	};
 }
 
-/**
- * concealed_kong {seat, count: 4}: the drawn slot (if present) plus the 3 rightmost concealed
- * slots — the same "pop from the end" rule, extended to 4 (§4).
- */
+/** concealed_kong {seat, count: 4}: same pop-from-the-end rule, extended to 4 (§4). */
 export function popSlotsForConcealedKong(state: SlotState): {
 	kong: readonly Slot[];
 	remaining: SlotState;

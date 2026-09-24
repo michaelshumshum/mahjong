@@ -21,9 +21,8 @@ import {
 	saveSecretForTable
 } from './settings-storage';
 
-// In-memory fake -- this file runs under the 'server' vitest project (plain node, no jsdom/
-// browser globals per web/AGENTS.md's *.svelte.spec.ts note), so `localStorage` doesn't exist
-// as a global until a test installs one on `globalThis`.
+// In-memory fake -- this file runs under the 'server' vitest project (plain node, no jsdom),
+// so `localStorage` doesn't exist as a global until a test installs one.
 class FakeStorage implements Storage {
 	#data = new Map<string, string>();
 	get length(): number {

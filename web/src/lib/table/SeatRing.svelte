@@ -12,13 +12,9 @@
 	}: { you: Seat; dealer: Seat; seatStatus: string[]; names: (string | null)[] } = $props();
 </script>
 
-<!-- Seated pre-game preview (docs/03-frontend.md's "/table/[id] wiring" pre-game states). Same
-	across/left/right/self arrangement the real table grid uses (§3), previewed at token scale
-	before any hand exists. Self is the one seat this screen already knows a real wind for (the
-	dealer is fixed at table construction, before any `ready`). The other three show real live
-	occupancy instead (`seatStatus`/`names`, kept current via `seat_state` broadcasts the same
-	way the seat picker reads them pre-join) -- so a seated player watching this screen sees the
-	next arrival land, not just a placeholder that never changes. -->
+<!-- Seated pre-game preview, same seat arrangement the real table grid uses. Self is the one
+	seat with a known real wind (dealer fixed at construction); the other three show real live
+	occupancy so a seated player watches the next arrival land. -->
 <div class="seat-ring" aria-hidden="true">
 	<div class="seat-ring-pos seat-ring-pos--across">
 		<SeatOccupancySlot

@@ -18,8 +18,7 @@
 	}
 
 	// sit down and watch both land on the same `/table/<id>`: it shows the seat picker while a
-	// seat is open and switches to the spectator view once none is (docs/03-frontend.md's
-	// "Spectating").
+	// seat is open and switches to the spectator view once none is.
 	const REFRESH_MS = 5000;
 	let tables = $state<TableSummary[] | null>(null);
 	let tablesError = $state(false);

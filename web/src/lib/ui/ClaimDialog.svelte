@@ -24,10 +24,8 @@
 		claimed: boolean;
 	}
 
-	// the meld an option would complete: its hand tiles plus the claimed discard, sorted for a
-	// chow (same suit, single-digit rank, so a plain string sort reads left-to-right ascending)
-	// -- pung/kong tiles are already identical so order is moot. `win`/`pass` have no fixed meld
-	// shape to preview (a win's actual hand is the post-win FaanBreakdown overlay's job).
+	// the meld an option would complete: hand tiles plus the claimed discard, sorted for a chow
+	// (plain string sort reads left-to-right ascending; pung/kong tiles are identical already).
 	function meldPreview(option: ClaimOption): PreviewTile[] | null {
 		if (!discardTile || !option.tiles?.length) return null;
 		const tiles: PreviewTile[] = [
@@ -39,9 +37,7 @@
 	}
 
 	// deadline reached with no explicit choice: resolve the same way the server does on its own
-	// claim-window timeout (docs/02-protocol.md §4, "PASS on claim timeout") -- `options` always
-	// carries a `pass` entry (docs/02-protocol.md's `claim_offer` row), so this reuses the exact
-	// `onChoose` path a manual Pass click already takes, rather than inventing a second one.
+	// timeout, reusing the exact onChoose path a manual Pass click takes.
 	function handleTimeout(): void {
 		const passOption = options.find((option) => option.kind === 'pass');
 		if (passOption) onChoose(passOption);
@@ -165,9 +161,8 @@
 		height: 100%;
 	}
 
-	// the one physical tile that came from the discard, not this seat's own hand -- a quiet
-	// accent ring rather than a full recolor, since it sits right next to identical siblings in
-	// a pung/kong preview and only needs to read as "this one", not draw the eye on its own.
+	// the one tile that came from the discard -- a quiet accent ring, not a full recolor, since
+	// it sits next to identical siblings and only needs to read as "this one".
 	.claim-meld-tile--claimed :global(.tile-face) {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 1px;

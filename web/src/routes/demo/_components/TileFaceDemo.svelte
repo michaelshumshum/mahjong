@@ -2,8 +2,7 @@
 	import TileFace from '$lib/table/TileFace.svelte';
 	import type { TileCode } from '$lib/table/tile-code';
 
-	// M4 slice demo (this sub-task): proves TileFace renders vendored art per code plus a
-	// back for concealed/unrendered codes. Not the real hand/table layout.
+	// proves TileFace renders vendored art per code plus a back for concealed codes.
 	const demoCodes: (TileCode | null)[] = ['1m', '9m', '5p', '1s', 'z1', 'z5', 'z7', 'f1', null];
 </script>
 

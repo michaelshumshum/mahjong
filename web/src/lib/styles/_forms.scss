@@ -1,6 +1,5 @@
-// form/panel chrome mixins (docs/03-frontend.md §7.1): reusable patterns shared across
-// Settings, ScoreSheet-style panels, and pre-game chrome. Kept alongside the token palette
-// so components stay visually uniform without copying styles.
+// form/panel chrome mixins: reusable patterns shared across Settings, ScoreSheet-style panels,
+// and pre-game chrome.
 
 // panel header: title + badge row, matching ScoreSheet's score-sheet-header.
 @mixin panel-header {

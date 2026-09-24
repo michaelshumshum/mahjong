@@ -40,11 +40,8 @@
 		onJoin: (seat: Seat) => void;
 		isHost: boolean;
 		onStartWithBots: () => void;
-		// this table's ruleset preset (docs/02-protocol.md §3's `state_sync.ruleset_preset`) --
-		// `null` covers both "no state_sync yet" and "a custom ruleset", rendered identically here
-		// since neither has a preset name worth showing; a mock/pregame-preview render (no real
-		// `liveStore`) always passes `null` too, same fallback `seatStatus`/`names` above already
-		// use for those modes.
+		// `null` covers both "no state_sync yet" and "a custom ruleset" -- rendered identically
+		// since neither has a preset name worth showing.
 		rulesetPreset: string | null;
 	} = $props();
 
@@ -55,18 +52,15 @@
 	};
 
 	// `rulesetPreset === null` means either "custom ruleset" or "no state_sync yet" -- only the
-	// spectator-shaped snapshot every pre-game connection gets (docs/00-architecture.md §3's
-	// "Spectating" note) disambiguates them, so this only renders once we're past the plain
-	// "Connecting…" spinner below, by which point that snapshot has already landed.
+	// spectator-shaped snapshot every pre-game connection gets disambiguates them, so this only
+	// renders once past the "Connecting…" spinner below.
 	let rulesetKnown = $derived(
 		!!effectiveConnection && effectiveConnection !== 'idle' && effectiveConnection !== 'connecting'
 	);
 </script>
 
-<!-- All three pre-game states (connecting, seat-picker, waiting) are real, recurring moments in
-	a genuinely multiplayer game, not filler between "real" screens -- so they share one panel
-	(table code + copy-invite-link) and the seat ring's across/left/right/self arrangement, the
-	same relative layout the real table grid uses (docs/03-frontend.md's "Pre-game states"). -->
+<!-- All three pre-game states share one panel (table code + copy-invite-link) and the seat
+	ring's arrangement, matching the real table grid's relative layout. -->
 <div class="pretable-panel">
 	<BackButton label="Leave game" onclick={onLeaveClick} />
 	<div class="pretable-info">
@@ -227,9 +221,8 @@
 		}
 	}
 
-	// indeterminate connection spinner -- no durationMs to anchor a TimerRing to (docs/03
-	// -frontend.md §5's countdown mechanics are for a known deadline; this is "unknown, still
-	// trying").
+	// indeterminate connection spinner -- no durationMs to anchor a TimerRing to (unknown,
+	// still trying).
 	.pretable-spinner {
 		width: 32px;
 		height: 32px;

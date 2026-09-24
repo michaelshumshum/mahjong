@@ -1,22 +1,16 @@
-// Mock GameState-shaped fixture for the M4-groundwork /table assembly (this sub-task).
-// Mirrors mahjong_core/state.py's GameState/SeatState/Phase (docs/03-frontend.md's
-// cross-reference) closely enough to not be thrown away once real WS integration (M3+)
-// replaces it with a reducer-fed store — field names track the Python dataclasses, just
-// camelCased and pre-redacted for a single seat's point of view.
-//
-// Deliberately NOT modeled: the positional slot-array scheme for opponent concealed tiles
-// (docs/03-frontend.md §4) — there's no event stream to diff against yet, so opponent hands
-// here are a plain count. Real `TileCode`s only appear where the real protocol would reveal
-// them to this seat: your own concealed hand/drawn tile, any open meld, and a finished hand's
-// winning tiles.
+// Mock GameState-shaped fixture, mirroring mahjong_core/state.py's GameState/SeatState/Phase
+// closely enough to survive real WS integration replacing it with a reducer-fed store — field
+// names track the Python dataclasses, camelCased and pre-redacted for a single seat's view.
+// Opponent concealed hands are a plain count here (no event stream to diff yet); real
+// `TileCode`s only appear where the real protocol would reveal them to this seat.
 
 import type { TileCode } from './tile-code';
 
 export type Seat = 0 | 1 | 2 | 3;
 export type Wind = 'E' | 'S' | 'W' | 'N';
 
-// mirrors state.Phase (state.py); AWAIT_KONG_ROB/SCORING/GAME_OVER included for shape
-// completeness even though no mock scenario below uses them yet.
+// mirrors state.Phase; AWAIT_KONG_ROB/SCORING/GAME_OVER included for completeness though no
+// mock scenario below uses them yet.
 export type Phase =
 	| 'AWAIT_DRAW'
 	| 'AWAIT_ACTION'
@@ -26,21 +20,18 @@ export type Phase =
 	| 'HAND_OVER'
 	| 'GAME_OVER';
 
-// mirrors melds.MeldKind, minus PAIR (state.py's SeatState.melds never holds a bare pair).
+// mirrors melds.MeldKind, minus PAIR (SeatState.melds never holds a bare pair).
 export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong';
 
 export interface MockMeld {
 	kind: MeldKind;
-	// real tile identities always, even for a concealed_kong — melds.Meld never redacts;
-	// TileFace is the thing responsible for rendering a concealed_kong as backs (§4's
-	// "identity stays hidden... until hand end"), not this fixture.
+	// real tile identities always, even for concealed_kong -- TileFace renders it as backs.
 	tiles: TileCode[];
 	fromSeat?: Seat; // undefined for concealed_kong/added_kong, mirrors Meld.from_seat = None
 }
 
-// mirrors state.SeatState, redacted for a single point of view: `concealedHand` (real
-// TileCodes) is only ever populated for the "you" seat; every other seat gets
-// `concealedCount` only, per §4's "opponent hands are positional/count-only."
+// mirrors state.SeatState, redacted: `concealedHand` is only populated for the "you" seat;
+// every other seat gets `concealedCount` only.
 export interface MockSeatState {
 	seat: Seat;
 	name: string;
@@ -51,10 +42,8 @@ export interface MockSeatState {
 	discards: TileCode[];
 	flowers: TileCode[];
 	score: number;
-	// wire `seat_status` (docs/00-architecture.md §5's `SeatView.seat_status`) -- optional since
-	// no mock fixture sets it (mock scenarios have no bot concept); live-view.ts populates it
-	// from `ClientGameState.seatStatus` for the one value the table scene renders today: `"bot"`
-	// (M4.5 practice mode).
+	// wire seat_status -- optional since no mock fixture sets it (no bot concept in mocks);
+	// live-view.ts populates it from ClientGameState.seatStatus.
 	status?: string;
 }
 
@@ -67,10 +56,8 @@ export interface MockClaimOption {
 	tiles?: TileCode[];
 }
 
-// mirrors state.ClaimWindow, redacted: the real ClaimWindow.offers carries one ClaimOffer
-// per eligible seat (never broadcasting who else can claim, per its docstring) — `yourOptions`
-// is this seat's own offer only, `null` when this seat has none (server never sends an offer
-// with nothing in it, so `null` is the "not offered" case, not an empty array).
+// mirrors state.ClaimWindow, redacted to this seat's own offer only. `null` (not an empty
+// array) means "not offered".
 export interface MockClaimWindow {
 	windowId: number;
 	kind: 'discard' | 'kong_rob';
@@ -88,9 +75,8 @@ export interface FaanPatternMock {
 	faan: number;
 }
 
-// mirrors state.HandResult plus the faan_breakdown/payments shape FaanBreakdown.svelte
-// already codifies (docs/02-protocol.md's hand_end sketch) -- only populated for outcome
-// 'win'; an exhaustive_draw carries no winner/patterns/payments, same as HandResult itself.
+// mirrors state.HandResult plus FaanBreakdown.svelte's payments shape -- only populated for
+// outcome 'win'; exhaustive_draw carries no winner/patterns/payments.
 export interface MockHandResult {
 	outcome: HandOutcome;
 	winner?: Seat;
@@ -101,11 +87,8 @@ export interface MockHandResult {
 	payments?: Partial<Record<Seat, number>>;
 }
 
-// mirrors ScoreSheet.svelte's own `RoundResult`, kept as a separate parallel type rather than
-// importing it (same reasoning as `FaanPatternMock` above: this module has no UI-component
-// dependency, mirrors server/mahjong_core shapes only) -- `live-view.ts`'s `meldToView` already
-// does the equivalent tile_id -> `TileCode` conversion for the live path; a mock fixture has
-// no ids to begin with, so it writes `TileCode`s directly, same as `MockHandResult` above.
+// mirrors ScoreSheet.svelte's `RoundResult`, kept as a separate parallel type since this module
+// has no UI-component dependency -- writes `TileCode`s directly, same as `MockHandResult`.
 export interface MockRoundResult {
 	outcome: HandOutcome;
 	winner?: Seat;
@@ -116,8 +99,7 @@ export interface MockRoundResult {
 	payments?: Partial<Record<Seat, number>>;
 }
 
-// mirrors ScoreSheet.svelte's `HandRecord`, minus the seat-name resolution ScoreSheet itself
-// does from its own `seats` prop.
+// mirrors ScoreSheet.svelte's `HandRecord`, minus the seat-name resolution ScoreSheet does itself.
 export interface MockScoreRound {
 	handNo: number;
 	dealer: Seat;
@@ -126,17 +108,15 @@ export interface MockScoreRound {
 	result?: MockRoundResult;
 }
 
-// a completed game's full history + final ranking (ScoreSheet's own `standings`) -- present
-// only on the one scenario that's actually reached `game_end` (below); every other scenario is
-// mid-game and has no game-end summary to show.
+// a completed game's full history + final ranking -- present only on the one scenario that's
+// actually reached `game_end` (below).
 export interface MockGameEndSummary {
 	rounds: MockScoreRound[];
 	standings: { seat: Seat; total: number }[];
 }
 
-// mirrors state.GameState, redacted to one seat's point of view. `you` names which seat that
-// is -- always 0 in the scenarios below, but kept as a field (not hardcoded downstream) since
-// the real per-seat redacted stream will vary it.
+// mirrors state.GameState, redacted to one seat's point of view. `you` is always 0 in the
+// scenarios below but kept as a field since the real per-seat stream will vary it.
 export interface MockGameState {
 	phase: Phase;
 	turn: Seat;
@@ -147,28 +127,17 @@ export interface MockGameState {
 	seats: Seats;
 	claimWindow: MockClaimWindow | null;
 	handResult: MockHandResult | null;
-	// the hand-end hold's remaining time (docs/00-architecture.md §3 "Hand-end hold"): every
-	// `HAND_OVER` hand end -- win or exhaustive draw alike -- holds the round open for this
-	// long, or until every seat dismisses, whichever first. `null` whenever `handResult` is
-	// (no hold to show); mirrors `claimWindow.durationMs`'s own shape one level up.
+	// hand-end hold's remaining time; `null` when `handResult` is (no hold to show).
 	handEndHoldMs: number | null;
-	// this seat's own `AWAIT_ACTION` deadline (`ruleset.turn_seconds`, server/mahjong_core/
-	// config.py): set whenever `turn === you`, whether this turn followed a normal draw or a
-	// claimed meld (both arrive as the same `turn` event server-side, docs/00-architecture.md
-	// §8) -- `null` whenever it's any other seat's turn. Mirrors `claimWindow.durationMs`'s own
-	// "already-computed remaining ms" shape.
+	// this seat's own AWAIT_ACTION deadline; `null` whenever it's any other seat's turn.
 	turnDurationMs: number | null;
 	you: Seat;
-	/** Set only on the one scenario that's actually reached `game_end` -- `+page.svelte`'s
-	 * `GameEndScreen` wiring reads this the same way it reads `liveStore.state.gameEnd` on the
-	 * live path (docs/03-frontend.md's `/table/[id]` wiring section), so the auto-shown summary
-	 * screen is reachable/screenshot-able with no backend running. */
+	/** Set only on the one scenario that's actually reached `game_end` -- lets `GameEndScreen`
+	 * be reachable/screenshot-able with no backend running. */
 	gameEnd?: MockGameEndSummary;
 }
 
-// (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left
-// (docs/03-frontend.md's seat-colour comment in _tokens.scss: "self/right/across/left,
-// clockwise from you").
+// (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left.
 export function relativeSeat(seat: Seat, you: Seat): 0 | 1 | 2 | 3 {
 	return ((seat - you + 4) % 4) as 0 | 1 | 2 | 3;
 }
@@ -188,8 +157,7 @@ function emptySeat(seat: Seat, overrides: Partial<MockSeatState> = {}): MockSeat
 	};
 }
 
-// Scenario 1: your turn to discard. AWAIT_ACTION, turn = you (seat 0), you hold a drawn
-// tile and must choose what to discard. No claim window, no hand result.
+// Scenario 1: your turn to discard, holding a drawn tile. No claim window, no hand result.
 export const yourTurnToDiscard: MockGameState = {
 	phase: 'AWAIT_ACTION',
 	turn: 0,
@@ -234,9 +202,8 @@ export const yourTurnToDiscard: MockGameState = {
 	]
 };
 
-// Scenario 2: claim window open with options for you. AWAIT_CLAIMS, seat 1 just discarded
-// a tile you (seat 0) can pung or win on. Turn still shows the last actor (seat 1) since the
-// turn doesn't advance until the window resolves.
+// Scenario 2: seat 1 just discarded a tile you (seat 0) can pung or win on. Turn still shows
+// the last actor (seat 1) since it doesn't advance until the window resolves.
 export const claimWindowOpenForYou: MockGameState = {
 	phase: 'AWAIT_CLAIMS',
 	turn: 1,
@@ -282,10 +249,7 @@ export const claimWindowOpenForYou: MockGameState = {
 	]
 };
 
-// Scenario 3: hand just ended with a win. HAND_OVER, seat 2 self-drew a Half Flush hand;
-// FaanBreakdown overlay reads straight off handResult. Matches the plain-hand example already
-// established in +page.svelte's FaanBreakdown demo, but as a self-draw so payments spread
-// across all three other seats instead of one discarder.
+// Scenario 3: seat 2 self-drew a Half Flush hand; payments spread across all three other seats.
 export const handJustEnded: MockGameState = {
 	phase: 'HAND_OVER',
 	turn: 2,
@@ -323,8 +287,7 @@ export const handJustEnded: MockGameState = {
 		outcome: 'win',
 		winner: 2,
 		winType: 'self_draw',
-		// concealed portion only -- the meld's 2s-3s-4s chow (seat 2's `melds` above) was already
-		// claimed earlier in the hand, so it's not part of the concealed tiles at hand-end.
+		// concealed portion only -- the 2s-3s-4s chow meld was already claimed earlier.
 		winningHand: ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', 'z5', 'z5'],
 		patterns: [
 			{ name: 'All Sequences', faan: 1 },
@@ -335,16 +298,12 @@ export const handJustEnded: MockGameState = {
 		totalFaan: 6,
 		payments: { 0: -16, 1: -16, 2: 48, 3: -16 }
 	},
-	// hand-end hold (docs/00-architecture.md §3): the demo's still-open countdown, not an
-	// arbitrary prop -- a real `hand_end` always carries one, win or draw alike.
 	handEndHoldMs: 8000,
 	turnDurationMs: null
 };
 
-// Scenario 4: hand just ended in an exhaustive draw. Same HAND_OVER hold as a win
-// (docs/00-architecture.md §3's "Hand-end hold" is uniform across outcomes), but with no
-// winner/patterns/payments -- `+page.svelte`'s overlay falls back to a plain draw summary
-// instead of `FaanBreakdown` whenever `outcome !== 'win'`.
+// Scenario 4: exhaustive draw -- same hold as a win, but no winner/patterns/payments; the
+// overlay falls back to a plain draw summary whenever outcome !== 'win'.
 export const handJustEndedDraw: MockGameState = {
 	phase: 'HAND_OVER',
 	turn: 3,
@@ -365,13 +324,9 @@ export const handJustEndedDraw: MockGameState = {
 	turnDurationMs: null
 };
 
-// Scenario 5: a full EAST_ONLY game (一圈) just reached `game_end` -- GAME_OVER, no more hold
-// (`handResult`/`handEndHoldMs` null, unlike scenarios 3/4 above: the real wire sequence only
-// ever reaches `game_end` *after* the final hand's own hold has already resolved, docs/03
-// -frontend.md's `/table/[id]` wiring section, so there's no lingering per-hand overlay to show
-// alongside this one). Four hands is EAST_ONLY's minimum length (dealer 0->1->2->3, wrapping
-// back to 0 ends the round): a discard win, a self-draw, an exhaustive draw, and a second
-// discard win, deltas hand-checked to sum to zero per hand and accumulate to `standings`.
+// Scenario 5: a full EAST_ONLY game (一圈) just reached game_end -- no more hold, since the
+// real wire only reaches game_end after the final hand's hold already resolved. Four hands is
+// EAST_ONLY's minimum (dealer 0->1->2->3); deltas hand-checked to sum to zero per hand.
 export const gameJustEnded: MockGameState = {
 	phase: 'GAME_OVER',
 	turn: 3,

@@ -85,9 +85,7 @@ describe('reduce', () => {
 			options: [{ kind: 'pung', tiles: [4, 4] }],
 			deadlineTs: 1000
 		});
-		// `d.turn` (2) is the discarder for the embedded window's whole lifetime, and its pool's
-		// last entry (7) is the tile the offered `claim_options` are about (live-view.ts's
-		// `claimWindowToView` reads this to show what's actually being claimed).
+		// d.turn (2) is the discarder; its pool's last entry (7) is the claimed tile.
 		expect(next.lastDiscard).toEqual({ seat: 2, tileId: 7 });
 	});
 
@@ -241,11 +239,8 @@ describe('reduce', () => {
 	});
 
 	it("discarding clears this seat's own stale legalActions/deadlineTs, but not another seat's discard", () => {
-		// reproduces a real live-game bug (docs/03-frontend.md §6 sub-task): every entry left in
-		// `legalActions` after a discard still names a tile_id genuinely still in `ownHand` (only
-		// the discarded one is gone), so a UI reading `legalActions` alone can't tell the whole
-		// set is stale -- it kept looking actionable, letting a second click send a discard the
-		// server silently drops as out-of-turn (docs/02-protocol.md §1's ack note).
+		// regression: stale legalActions kept looking valid after a discard, letting a second
+		// click send a discard the server silently drops as out-of-turn.
 		const own = state({
 			seat: 0,
 			ownHand: [1, 2, 47],
@@ -424,10 +419,8 @@ describe('reduce', () => {
 		});
 
 		it('a claimed chow/pung/kong never leaves a held-apart tile -- unlike a real draw, nothing was drawn', () => {
-			// reproduces a real bug: `live-view.ts`'s own-hand split used to infer the held-apart
-			// tile from whatever ended up last in `ownHand`, which after a claim is just leftover
-			// array order, not a tile that was actually just added -- surfacing an already-owned
-			// tile as if freshly drawn.
+			// regression: inferring the held-apart tile from ownHand's last entry surfaced an
+			// already-owned tile as if freshly drawn.
 			const s = state({
 				seat: 1,
 				ownHand: [4, 5, 8, 12, 16],
@@ -625,8 +618,7 @@ describe('reduce', () => {
 			}
 		});
 
-		// dealer patched directly between hands, standing in for the hand_start that would
-		// normally rotate it in a real stream (this reducer.ts case is covered separately above).
+		// dealer patched directly between hands, standing in for hand_start's own rotation.
 		let s = state({ dealer: 0 });
 		s = reduce(s, handEnd(1));
 		s = reduce({ ...s, dealer: 1 }, handEnd(2));
@@ -793,8 +785,7 @@ describe('reduce', () => {
 					winner: 0,
 					win_type: 'self_draw',
 					discarder: null,
-					// deliberately different from _handHistoryEntry1 -- proves the locally-known entry
-					// wins, not the wire's, when both exist for the same hand_no.
+					// deliberately different from _handHistoryEntry1 -- the local entry should win.
 					faan: 999,
 					faan_breakdown: null,
 					points: 999,

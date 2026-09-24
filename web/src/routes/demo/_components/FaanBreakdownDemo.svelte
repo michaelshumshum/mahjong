@@ -12,10 +12,9 @@
 		3: 'Dave'
 	};
 
-	// FaanBreakdown demo (this sub-task): mock hand_end data, no real scoring exists yet
-	// (docs/05-roadmap.md §2 M2). Patterns sourced from docs/01-rules-spec.md §7.
+	// mock hand_end data, no real scoring yet. Patterns sourced from docs/01-rules-spec.md §7.
 	//
-	// Plain hand: discard win, 5 faan, half_spicy P(5) = 24 (docs/01-rules-spec.md §8).
+	// Plain hand: discard win, 5 faan, half_spicy P(5) = 24.
 	const plainPatterns: FaanPattern[] = [
 		{ name: 'All Sequences', faan: 1 },
 		{ name: 'No Flowers', faan: 1 },
@@ -24,10 +23,8 @@
 	];
 	const plainPayments: Payments = { 0: -24, 2: 24 };
 
-	// Capped hand: Full Flush (6) + All Pungs (3) + Self-Draw (1) + No Flowers (1) = 11,
-	// clamped to the default faan_cap of 10 (docs/01-rules-spec.md §7's own Full
-	// Flush+All Pungs stacking example, extended past the cap). Self-draw, half_spicy
-	// P(10) = 128: winner +1.5P, each of the other three -0.5P.
+	// Capped hand: Full Flush (6) + All Pungs (3) + Self-Draw (1) + No Flowers (1) = 11, clamped
+	// to the default faan_cap of 10. Self-draw, half_spicy P(10) = 128: winner +1.5P, others -0.5P.
 	const cappedPatterns: FaanPattern[] = [
 		{ name: 'Full Flush', faan: 6 },
 		{ name: 'All Pungs', faan: 3 },
@@ -35,9 +32,8 @@
 		{ name: 'No Flowers', faan: 1 }
 	];
 	const cappedPayments: Payments = { 0: -64, 1: -64, 2: 192, 3: -64 };
-	// one of the four pungs was claimed off a discard earlier in the hand -- All Pungs doesn't
-	// care whether a set is concealed or exposed, so this stays a valid capped hand while also
-	// exercising FaanBreakdown's claimed/in-hand split.
+	// one pung was claimed off a discard -- All Pungs doesn't care concealed vs exposed, so this
+	// also exercises FaanBreakdown's claimed/in-hand split.
 	const cappedMelds: WinningMeld[] = [{ kind: 'pung', tiles: ['1s', '1s', '1s'] }];
 </script>
 

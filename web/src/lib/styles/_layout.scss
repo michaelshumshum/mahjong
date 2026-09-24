@@ -1,6 +1,5 @@
-// layout mixins (docs/03-frontend.md §7.1): breakpoint set, the four seat rotations, and the
-// seat-region grid (§3's ASCII diagram) fleshed out for the /table route assembly (this
-// sub-task, docs/05-roadmap.md M4 groundwork).
+// layout mixins: breakpoint set, the four seat rotations, and the seat-region grid (§3's
+// ASCII diagram).
 
 $breakpoint-tablet: 768px;
 
@@ -29,9 +28,8 @@ $breakpoint-tablet: 768px;
 }
 
 // §3's desktop grid: across on top, left/right flank a wide centre column, self at bottom.
-// Below 768px it collapses to a simple 3-row stack (across, left/centre/right, self) — the
-// per-region content collapse (backs to a strip, discard pools to horizontal scroll, self
-// pinned to the safe-area bottom) is each region's own concern, not the grid's.
+// Below 768px it collapses to a 3-row stack; per-region content collapse is each region's own
+// concern, not the grid's.
 @mixin seat-region-grid {
 	display: grid;
 	grid-template-areas:
@@ -52,10 +50,8 @@ $breakpoint-tablet: 768px;
 	}
 }
 
-// perspective on the table container, per §2/§3 ("the 2.5D look is perspective + rotateX on
-// the table container, not pre-rendered art"). The rotateX angle itself is applied to the
-// child `.table-surface` (a plain transform, not a mixin) so it composes with that element's
-// own transitions without a second mixin call.
+// perspective on the table container (§2/§3); the rotateX angle itself is a plain transform on
+// the child .table-surface, not a mixin, so it composes with that element's own transitions.
 @mixin table-perspective($depth: 1400px) {
 	perspective: $depth;
 }

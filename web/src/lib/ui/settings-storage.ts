@@ -31,10 +31,8 @@ export function isAutoArm(value: unknown): value is AutoArm {
 	return typeof v.noCalls === 'boolean' && typeof v.autoPassChow === 'boolean';
 }
 
-/** `localStorage` can throw (private browsing, blocked/full storage) or simply not exist
- * (SSR, a test environment) -- every read/write is wrapped so a storage failure never breaks
- * the page; callers always get a usable value (`load*` returns `null`, treated as "use the
- * default") rather than an exception. */
+/** `localStorage` can throw (private browsing, blocked/full storage) or not exist (SSR) --
+ * every read/write is wrapped so a failure never breaks the page. */
 function readRaw(key: string): string | null {
 	try {
 		if (typeof localStorage === 'undefined') return null;
@@ -93,9 +91,8 @@ function isDisplayName(value: unknown): value is string {
 	return typeof value === 'string';
 }
 
-/** The client-chosen guest display name (docs/02-protocol.md's Auth section, M5), sent once on
- * `join`. Not validated here beyond "is a string" -- the server trims/caps/defaults it
- * (`JoinPayload.name`), so this is purely "what the player typed last," not a verified value. */
+/** The client-chosen guest display name, sent once on `join`. Not validated here beyond "is a
+ * string" -- the server trims/caps/defaults it, so this is just what the player typed last. */
 export function loadDisplayName(): string | null {
 	return load(DISPLAY_NAME_STORAGE_KEY, isDisplayName);
 }
@@ -122,10 +119,8 @@ function isStoredSeat(value: unknown): value is StoredSeat {
 	);
 }
 
-/** Which seat this browser last held in a given table, keyed per-table since a seat number only
- * means something relative to one table's `Table.seats`. Lets a page reload resume via
- * `hello{seat}` (docs/02-protocol.md §5) instead of falling back to `join`, which fails with
- * `table_full` once all four seats are already bound -- the bug this persistence exists to fix. */
+/** Which seat this browser last held in a given table. Lets a page reload resume via
+ * `hello{seat}` instead of `join`, which fails with `table_full` once all seats are bound. */
 export function loadSeatForTable(tableId: string): number | null {
 	const raw = load<StoredSeat>(SEAT_STORAGE_KEY_PREFIX + tableId, isStoredSeat);
 	if (raw === null) return null;
@@ -160,10 +155,8 @@ function isStoredReconnectSecret(value: unknown): value is StoredReconnectSecret
 	);
 }
 
-/** The per-seat reconnect credential `join`'s own ack returns (00-architecture.md §2.1,
- * `AckPayload.reconnect_secret`) -- required on every later `hello{seat, secret}` or the server
- * refuses the reclaim (`error{code:'bad_secret'}'`). Keyed per-table, same as the seat number
- * above, since it only means something for that table's own seat binding. */
+/** The per-seat reconnect credential `join`'s ack returns -- required on every later
+ * `hello{seat, secret}` or the server refuses the reclaim. */
 export function loadSecretForTable(tableId: string): string | null {
 	const raw = load<StoredReconnectSecret>(
 		RECONNECT_SECRET_STORAGE_KEY_PREFIX + tableId,

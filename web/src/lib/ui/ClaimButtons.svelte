@@ -4,12 +4,9 @@
 
 	export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
 
-	// mirrors the wire `claim{window_id, choice, tiles?}` shape (docs/02-protocol.md §2):
-	// `tiles` only disambiguates `chow` (two options can claim the same discard into
-	// different runs, e.g. 4s-5s vs 5s-7s completing a discarded 6s) — no other kind is ever
-	// ambiguous once the server has offered it. No `window_id` here: this component is pure
-	// presentation, wiring a real offer to a real window is the caller's job (`+page.svelte`'s
-	// `chooseClaim`).
+	// mirrors the wire claim{window_id, choice, tiles?} shape; `tiles` only disambiguates chow
+	// (two options can complete different runs off the same discard). No `window_id` here --
+	// pure presentation, wiring to a real window is the caller's job.
 	export interface ClaimOption {
 		kind: ClaimKind;
 		tiles?: TileCode[];
@@ -34,8 +31,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 
-	// bottom-center per docs/03-frontend.md §5; fixed rather than relying on a positioned
-	// ancestor, since this component isn't slotted into the real table overlay stack yet.
+	// fixed rather than relying on a positioned ancestor -- not slotted into the overlay stack yet.
 	.claim-buttons {
 		position: fixed;
 		inset-inline: 0;
@@ -69,10 +65,8 @@
 		@include buttons.btn-ghost;
 	}
 
-	// Win: the one urgent action a claim window can offer — stamped-seal primary tier. Same
-	// box geometry as the other tiers (the TimerRing sits fixed just above this row with only
-	// var(--space-2) of clearance — a taller Win button visibly collides with it), so the
-	// hierarchy comes from weight/shadow/colour alone, not size.
+	// same box geometry as the other tiers -- TimerRing sits fixed just above with only
+	// var(--space-2) clearance, so a taller button would collide with it.
 	.claim-btn--win {
 		@include buttons.btn-primary;
 	}

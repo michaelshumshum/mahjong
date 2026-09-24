@@ -22,9 +22,7 @@ import type { ConnectionStatus } from '../game/state';
 
 const CLIENT_VERSION = '0.1.0';
 
-/** Base WS URL, no query string -- callers append `?table=<id>` (docs/02-protocol.md's
- * `wss://…/ws?table={id}`, `app/ws.py`'s `table` query param). Exported for
- * `/table/[id]`'s live wiring, which needs the same base this module defaults to. */
+/** Base WS URL, no query string -- callers append `?table=<id>`. */
 export function defaultWsUrl(): string {
 	return env.PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 }
@@ -33,9 +31,8 @@ function nextId(): string {
 	return `c-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-// Kept in sync by hand with protocol.d.ts's ServerEvent union (mirrors
-// protocol.assertNever.ts's switch, generated from the same source) — a new server event type
-// needs a case added there, which is exactly where a maintainer adding one will already be.
+// kept in sync by hand with protocol.d.ts's ServerEvent union (mirrors protocol.assertNever.ts's
+// exhaustive switch, generated from the same source).
 const SERVER_EVENT_TYPES = new Set<string>([
 	'pong',
 	'error',
@@ -72,15 +69,9 @@ export interface ResumeInfo {
 	secret?: string | null;
 }
 
-/**
- * WS client: connects, sends `hello` on open (carrying `last_seq`/`seat` when known, so a
- * reconnect or a caller-supplied resume point resumes rather than cold-starts —
- * docs/02-protocol.md §5), exposes every real client intent, and fans out parsed+validated
- * server events to subscribers. Enforces the one correctness rule that can't be deferred to
- * lib/game/store.svelte.ts: **seq is per-seat, gapless within this stream; a gap triggers a
- * resync (re-sending `hello{last_seq, seat}`), never a silent patch** (web/AGENTS.md). No
- * reducer/store wiring here — callers decide what to do with events (see reducer.ts).
- */
+/** WS client: connects, sends `hello` on open, exposes every client intent, and fans out
+ * parsed events to subscribers. No reducer/store wiring here — callers decide what to do
+ * with events (see reducer.ts). */
 export class MahjongSocket {
 	#ws: WebSocket | null = null;
 	#url: string;
@@ -116,25 +107,19 @@ export class MahjongSocket {
 		return this.#seat;
 	}
 
-	/** This seat's `reconnect_secret` (00-architecture.md §2.1), once its `join` ack has landed —
-	 * `null` before then, or for a connection that's never joined a seat. Callers persist it
-	 * (`lib/ui/settings-storage.ts`'s `saveSecretForTable`) so a later page load can feed it back
-	 * in via `connect({seat, secret})`. */
+	/** This seat's `reconnect_secret`, once `join`'s ack has landed — `null` otherwise. Callers
+	 * persist it (`settings-storage.ts`'s `saveSecretForTable`) for a later `connect({seat, secret})`. */
 	get secret(): string | null {
 		return this.#secret;
 	}
 
-	/** Learn (or clear) this connection's own seat once the reducer sees it in a `state_sync`
-	 * (StateSyncPayload.seat) — needed here so a later reconnect/resync `hello` can carry it. */
+	/** Learn (or clear) this connection's own seat once the reducer sees it in a `state_sync`. */
 	setSeat(seat: number | null): void {
 		this.#seat = seat;
 	}
 
-	/** `resume` seeds `last_seq`/`seat`/`secret` before the first `hello` of this call — the
-	 * page-reload case, where a fresh `MahjongSocket` has no memory of a previous connection's
-	 * stream. Omit it for a plain fresh connect, or to just resume whatever this instance already
-	 * tracked itself (an unexpected mid-session close already resumes automatically — `#secret`
-	 * is captured on the fly from `join`'s own ack, below). */
+	/** `resume` seeds `last_seq`/`seat`/`secret` before the first `hello` — the page-reload case
+	 * where a fresh `MahjongSocket` has no memory of a previous stream. */
 	connect(resume?: ResumeInfo): void {
 		this.#closedByUser = false;
 		if (resume) {
@@ -177,9 +162,8 @@ export class MahjongSocket {
 		this.#send(msg);
 	}
 
-	/** `name` (M5, docs/02-protocol.md §2) is a client-chosen guest display name, set once at
-	 * join -- the server trims/caps/defaults it, so no client-side validation beyond what the
-	 * caller already did (`lib/ui/settings-storage.ts`'s persisted value) is needed here. */
+	/** `name` is a client-chosen guest display name, set once at join -- the server trims/caps/
+	 * defaults it, so no client-side validation is needed here. */
 	join(seat?: number | null, name?: string | null): void {
 		const d: JoinPayload = {};
 		if (seat != null) d.seat = seat;
@@ -193,10 +177,8 @@ export class MahjongSocket {
 		this.#send(msg);
 	}
 
-	/** Host-only (`ClientGameState.hostSeat === state.seat`); the server rejects a non-host
-	 * sender with `error:'not_host'` and a call once the table's already started with
-	 * `error:'already_started'` -- this method sends unconditionally and lets the UI gate on
-	 * `isHost`/`tableReady` instead of duplicating that check here. */
+	/** Sends unconditionally -- the server rejects a non-host sender (`error:'not_host'`) or a
+	 * call after start (`error:'already_started'`); the UI gates on `isHost`/`tableReady` instead. */
 	startWithBots(): void {
 		const msg: StartWithBots = {
 			v: 1,
@@ -285,8 +267,7 @@ export class MahjongSocket {
 		});
 	}
 
-	/** Exponential backoff with jitter, `min(250ms * 2^attempt, 10s) ± 20%`
-	 * (docs/02-protocol.md §8). */
+	/** Exponential backoff with jitter, `min(250ms * 2^attempt, 10s) ± 20%`. */
 	#scheduleReconnect(): void {
 		const attempt = this.#reconnectAttempts++;
 		const base = Math.min(250 * 2 ** attempt, 10000);
@@ -307,9 +288,7 @@ export class MahjongSocket {
 	}
 
 	/** Re-sends `hello{last_seq, seat}` on the live connection to ask the server to fill a
-	 * detected gap — docs/02-protocol.md §5's three-way branch (replay / full `state_sync` /
-	 * nothing missed) isn't reconnect-only; it's keyed only on what `last_seq` compares against
-	 * the seat's buffered stream, so re-asking mid-connection is the same request. */
+	 * detected gap — the same request as a reconnect's hello, just sent mid-connection. */
 	#requestResync(): void {
 		if (this.#status === 'resyncing') return; // already asked; wait for the reply
 		this.#setStatus('resyncing');
@@ -339,20 +318,14 @@ export class MahjongSocket {
 		this.#ingest(parsed);
 	}
 
-	/** Per-seat seq gap detection (web/AGENTS.md, docs/02-protocol.md §1/§5). `state_sync` is
-	 * always accepted as a full replace regardless of seq continuity — it *is* the resync
-	 * mechanism. Any other frame with `seq > lastSeq + 1` is a gap: dropped, never forwarded to
-	 * listeners (applying it out of order could corrupt client state), and triggers a resync. A
-	 * frame with `seq <= lastSeq` is a stale replay duplicate and is silently ignored. */
+	/** Per-seat seq gap detection. `state_sync` is always accepted regardless of seq continuity
+	 * — it *is* the resync mechanism. `seq > lastSeq + 1` is a gap: dropped and triggers a resync.
+	 * `seq <= lastSeq` is a stale replay, silently ignored. */
 	#ingest(event: ServerEvent): void {
 		const seq = typeof event.seq === 'number' ? event.seq : null;
 
-		// `join`'s own ack carries this seat's one-time reconnect credential
-		// (00-architecture.md §2.1) — captured here, not just left for a caller to persist, so
-		// this same socket instance can already present it on a later automatic reconnect
-		// (`#scheduleReconnect` → `#doConnect` → `#sendHello`) within this page's lifetime,
-		// same as `#lastSeq` self-tracks. `saveSecretForTable` (settings-storage.ts) is a
-		// separate, caller-driven step for surviving a page reload.
+		// captured here (not just left for the caller to persist) so this instance can already
+		// present it on a later automatic reconnect within this page's lifetime.
 		if (event.t === 'ack' && event.d.reconnect_secret != null) {
 			this.#secret = event.d.reconnect_secret;
 		}

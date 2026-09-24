@@ -14,9 +14,7 @@
 		warnWindowMs?: number;
 	} = $props();
 
-	// same one-shot-timeout contract as Toast.svelte -- fires `onClose` once, at `durationMs`,
-	// anchored fresh whenever the prop changes (a new deadline in the parent naturally
-	// reschedules rather than drifting off a stale timer).
+	// same one-shot-timeout contract as Toast.svelte -- re-anchors whenever durationMs changes.
 	$effect(() => scheduleAutoDismiss(durationMs, onClose));
 </script>
 

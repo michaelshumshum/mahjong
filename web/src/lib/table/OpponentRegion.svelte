@@ -111,8 +111,7 @@
 		@include tile.dealer-badge;
 	}
 
-	// bot-controlled seat (M4.5 practice mode) -- a persistent identity marker, not a transient
-	// state like dealer/turn, so it reads as a quiet chip rather than borrowing --color-accent.
+	// persistent identity marker, not transient like dealer/turn -- a quiet chip, not --color-accent.
 	.bot-badge {
 		display: inline-flex;
 		align-items: center;
@@ -151,12 +150,9 @@
 		@include tile.meld;
 	}
 
-	// vertical strip along the table edge (docs/03-frontend.md §3): `writing-mode` alone reflows
-	// the flex axes (a row's main axis becomes the block-progression axis) so the box's own
-	// width/height already account for the vertical footprint, unlike `transform: rotate()`,
-	// which only repaints the box in place and leaves the parent grid cell sized for the
-	// original unrotated (horizontal) footprint — that mismatch is what let the strip's content
-	// escape `.seat-region--left/--right` into whatever sat past the grid's edge.
+	// writing-mode reflows the flex axes so width/height already reflect the vertical footprint --
+	// unlike transform: rotate(), which repaints in place and left the strip's content escaping
+	// its grid cell.
 	.seat-hand-strip--left {
 		@include layout.tablet-up {
 			writing-mode: vertical-lr;
@@ -169,13 +165,9 @@
 		}
 	}
 
-	// tiles themselves rotated 90° to face the table, same physical read as a real side seat.
-	// The mismatch that ruled out `transform: rotate()` on the *strip* above is still real, so
-	// it isn't reused here at the tile level either: `.mini-tile` keeps its normal (unrotated)
-	// box for layout purposes, already sized to the rotated footprint (width/height swapped from
-	// the portrait default) — the swap is what the grid/flex ancestors measure. Only the
-	// `.tile-face` inside is rotated, absolutely positioned off that stable box so the rotation
-	// is paint-only and never changes what its ancestors reserve space for.
+	// same avoid-rotating-the-sized-box principle as the strip above, one level deeper:
+	// .mini-tile keeps an unrotated box pre-sized to the landscape footprint; only .tile-face
+	// inside is rotated, so the rotation is paint-only.
 	.seat-hand-strip--left .mini-tile,
 	.seat-hand-strip--right .mini-tile {
 		@include layout.tablet-up {
@@ -205,7 +197,7 @@
 		}
 	}
 
-	// sub-768px collapse (docs/03-frontend.md §3): opponent backs to a thin overlapping strip.
+	// sub-768px collapse: opponent backs to a thin overlapping strip.
 	@include layout.phone-only {
 		.seat-hand-strip--left,
 		.seat-hand-strip--right,

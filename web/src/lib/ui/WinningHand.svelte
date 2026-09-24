@@ -4,8 +4,7 @@
 
 	export type Seat = 0 | 1 | 2 | 3;
 
-	// mirrors melds.MeldKind, minus PAIR (mock-game-state.ts's MockMeld) -- kept as a local type
-	// rather than importing MockMeld itself, since this component only needs `kind`/`tiles`.
+	// mirrors melds.MeldKind, minus PAIR -- kept local since this only needs kind/tiles.
 	export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong';
 
 	export interface WinningMeld {

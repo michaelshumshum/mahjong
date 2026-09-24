@@ -6,12 +6,8 @@
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
 
-	// ScoreSheet demo (this sub-task): mock score/game_end data — like hand_end above, still
-	// doc-only sketches with no server model yet (docs/02-protocol.md §3). EAST_ONLY (一圈,
-	// docs/05-roadmap.md §5 resolved decision #3) means a full game is one round: dealer stays on
-	// a win/draw, otherwise passes counter-clockwise, so a 4-hand game here is the *minimum*
-	// length, not a fixed count. Deltas below are hand-checked to sum to zero per hand and to
-	// accumulate exactly to `scoreTotals`.
+	// mock score/game_end data. EAST_ONLY (一圈) means a full game is one round, so 4 hands here
+	// is the minimum length, not a fixed count. Deltas hand-checked to sum to zero per hand.
 	const scoreSeats: SeatInfo[] = [
 		{ seat: 0, name: 'Alice' },
 		{ seat: 1, name: 'Bob' },
@@ -24,8 +20,7 @@
 			dealer: 0,
 			prevailing: 'E',
 			deltas: { 0: -24, 2: 24 },
-			// per-round detail (this sub-task): expandable, reveals Carol's winning hand inline
-			// via the same FaanBreakdown the hand-end overlay and the FaanBreakdown demo above use.
+			// expandable, reveals Carol's winning hand inline via the same FaanBreakdown.
 			result: {
 				outcome: 'win',
 				winner: 2,
