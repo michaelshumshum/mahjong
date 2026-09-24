@@ -27,10 +27,13 @@ jobs:
     name: proto-check
     uses: ./.github/workflows/proto-check.yml
 
-  # Pushes updated coverage-badge JSON (shields.io endpoint format, see README) back to main.
-  # Only on push, never on a PR -- forked PRs have no write access, and a PR branch shouldn't
-  # mutate main anyway. GITHUB_TOKEN-authored pushes don't retrigger workflow runs, so this
-  # can't loop.
+  # Pushes updated coverage-badge SVGs back to main, self-rendered rather than shields.io's own
+  # endpoint badge -- this repo is private, and shields.io's anonymous fetch of
+  # raw.githubusercontent.com 401s on a private repo, so an externally-hosted badge would never
+  # resolve. README references these by relative path; GitHub renders that straight from the
+  # repo for any authenticated viewer, no external fetch involved. Only on push, never on a PR
+  # -- forked PRs have no write access, and a PR branch shouldn't mutate main anyway.
+  # GITHUB_TOKEN-authored pushes don't retrigger workflow runs, so this can't loop.
   coverage-badge:
     name: coverage badge
     needs: [server, web]
@@ -49,15 +52,15 @@ jobs:
         with:
           name: coverage-web
           path: coverage-web
-      - name: generate badge JSON
+      - name: generate badge SVGs
         run: |
-          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json coverage-server.json
-          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json coverage-web.json
-      - name: commit badge JSON if changed
+          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json coverage-server.svg
+          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json coverage-web.svg
+      - name: commit badge SVGs if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add coverage-server.json coverage-web.json
+          git add coverage-server.svg coverage-web.svg
           git diff --staged --quiet && exit 0
           git commit -m "chore(ci): update coverage badges"
           git push
