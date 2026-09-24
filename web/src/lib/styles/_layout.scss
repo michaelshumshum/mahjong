@@ -49,9 +49,3 @@ $breakpoint-tablet: 768px;
 		grid-template-rows: auto auto auto;
 	}
 }
-
-// perspective on the table container (§2/§3); the rotateX angle itself is a plain transform on
-// the child .table-surface, not a mixin, so it composes with that element's own transitions.
-@mixin table-perspective($depth: 1400px) {
-	perspective: $depth;
-}

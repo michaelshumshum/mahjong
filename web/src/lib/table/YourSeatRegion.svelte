@@ -250,8 +250,6 @@
 	@include layout.phone-only {
 		@include tile.backs-row-overlap;
 
-		// `.table-tilt`'s `perspective` establishes a containing block for `position: fixed`
-		// descendants same as `transform` does -- the parent page drops it at phone width too.
 		.seat-region--self {
 			position: fixed;
 			inset-inline: 0;

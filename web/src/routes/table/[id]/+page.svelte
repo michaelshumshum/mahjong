@@ -804,7 +804,6 @@
 	.table-tilt {
 		flex: 1;
 		min-height: 0;
-		@include layout.table-perspective;
 	}
 
 	.table-surface {
@@ -817,15 +816,6 @@
 			radial-gradient(ellipse 80% 60% at 50% 10%, rgb(255 255 255 / 0.035), transparent 65%),
 			var(--color-surface);
 		border-radius: var(--radius-md);
-		transform: rotateX(6deg);
-		transform-style: preserve-3d;
-
-		@include layout.phone-only {
-			transform: none; // tilt reads as decoration, not worth the layout cost on phone widths
-			// preserve-3d alone still establishes a containing block for position: fixed
-			// descendants -- .seat-region--self needs the real viewport on phone, so drop this too.
-			transform-style: flat;
-		}
 	}
 
 	// all four discard pools live in the centre, forming a box instead of each sitting at its own
@@ -875,12 +865,6 @@
 	// sub-768px collapse: opponent backs to a thin overlapping strip, discard pools to
 	// horizontal scroll, your hand pinned to the safe-area bottom.
 	@include layout.phone-only {
-		// .table-tilt's perspective establishes a containing block for position: fixed
-		// descendants same as transform does -- drop it so "pinned to the screen bottom" is real.
-		.table-tilt {
-			perspective: none;
-		}
-
 		.table-surface {
 			padding-bottom: 30vh; // reserve room under YourSeatRegion's fixed phone-width footer
 		}

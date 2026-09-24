@@ -43,7 +43,7 @@ class as a single Pixi draw call, without owning the pipeline. That buys, for fr
   `prefers-reduced-motion`, CJK text flow, and devtools inspection — all platform, not hand-rolled.
 - No async renderer bootstrap: the page hydrates like any other SvelteKit route. There's no
   `Application.init()` step gating first paint.
-- The 2.5D look is `perspective` + `rotateX` on the table container (§3), not pre-rendered art.
+- Flat, not tilted: no `perspective`/`rotateX` on the table container (§3), and no pre-rendered art.
 
 Known costs:
 
@@ -155,9 +155,8 @@ own centre, not text direction); `self` switches from grid to flex with `flex-wr
 so an overflow line anchors upward (toward centre) instead of pushing further down the page, the
 concern the wide 12-column override above could only reduce, not remove.
 
-CSS: `grid-template-areas` for the four seat regions + centre; `perspective` + `rotateX` on the
-table container for the 2.5D tilt; `transform`/`opacity` only in animated paths. No global scale
-factor — each region sizes to its own content via `clamp()`.
+CSS: `grid-template-areas` for the four seat regions + centre; `transform`/`opacity` only in
+animated paths. No global scale factor — each region sizes to its own content via `clamp()`.
 
 Left/right opponent hand strips run top-to-bottom via `writing-mode: vertical-lr`/`vertical-rl`,
 not `transform: rotate()` on the strip itself — rotate repaints the box in place without resizing
@@ -727,8 +726,8 @@ doesn't actually send this way):
   SVG is resolution-independent, which is the no-pipeline version of the problem the atlas build
   step existed to solve. (The @1x atlas specifically is moot now, not just deferred — there's no
   atlas at all — see [99-deferred.md](99-deferred.md).)
-- 2.5D look: `perspective` + `rotateX` on the table container (§2), not pre-rendered art. The
-  Blender pre-render route is deferred — see [99-deferred.md](99-deferred.md).
+- Flat table, no tilt/perspective, no pre-rendered art. The Blender pre-render route is deferred
+  — see [99-deferred.md](99-deferred.md).
 - Sound: draw click, discard clack, shuffle — short, compressed, preloaded, mute default-on until
   opt-in. Recorded Cantonese call-outs (碰/上/槓/食糊) are deferred — see
   [99-deferred.md](99-deferred.md); unrecorded, unbudgeted content task, not a code task.
@@ -751,7 +750,7 @@ src/lib/styles/
                     seat-hand-strip implementation (opponent, self, animation sandbox) --
                     per-face geometry (size, corner radius) stays on TileFace's own component
                     styles, not centralized here
-  _layout.scss      seat-region grid, perspective/rotateX, breakpoint mixins
+  _layout.scss      seat-region grid, breakpoint mixins
   _a11y.scss        focus rings, high-contrast hooks, reduced-motion guards
   app.scss          entry: forwards the above, global resets
 ```
