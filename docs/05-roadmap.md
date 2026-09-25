@@ -226,15 +226,22 @@ comment) grouped scoring/flow/variants/fairness/timing; "Practice vs Bots" stays
 calling `POST /tables` with `practice: true` instead of generating an id client-side. The
 waiting room shows the resolved preset name (`PretableScreen.svelte`).
 
-**Known gap: bots only partially read this.** `Bot.act` sees `SeatView`, which now carries a
-`ruleset` field (Tier 1) — `FaanBot`'s claim guard reads `view.ruleset.min_faan`, so that part
-of the `hk_classic`-default assumption is closed. The one live correctness bug is closed too
-(Tier 2's first item): under `hk_strict` (NEW_18 off) `mahjong_core/shanten.py`'s `shanten()`/
-`ukeire()` no longer chase a Seven Pairs shape that can't legally win there — both bot tiers now
-pass `view.ruleset.hand_sets` through. What's left is value drift, not illegal-pattern chasing:
-`score_table`/`faan_overrides` and `wall_reserve`/turn-count breakpoints still assume the
-default regime. See [04-bots.md §9](04-bots.md) for the tiered plan and
-[99-deferred.md](99-deferred.md) for the remaining (Tier 2) scope.
+**Closed: bots are now fully ruleset-aware.** `Bot.act` sees `SeatView`, which carries a
+`ruleset` field (Tier 1) — `FaanBot`'s claim guard reads `view.ruleset.min_faan`. Tier 2 is fully
+closed too: under `hk_strict` (NEW_18 off) `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` no
+longer chase a Seven Pairs shape that can't legally win there (both bot tiers pass
+`view.ruleset.hand_sets` through); `bots/valuation.py`'s `ROUTE_FAAN` remaps through
+`view.ruleset.faan_overrides`; and `bots/faanbot.py`'s turn-based weight schedule
+(`_weights_for_turn`'s speed/value/safety breakpoints, and the fold-mode lateness gate) scales
+off `mahjong_core.wall.max_turns_per_seat(view.ruleset)` instead of the fixed turn-6/turn-12
+constants it was originally tuned against — calibrated so the default ruleset (`wall_reserve=0`,
+`flowers_enabled=True`, every shipped preset) reproduces the old constants exactly. `score_table`
+turned out never to be a bot gap at all (`points()` reads it directly in `mahjong_core/scoring/
+payout.py`, with zero references in `bots/`), and `game_length` (rounds per match) is a different
+axis from `wall_reserve` (turns per hand) with likewise zero references in `bots/` — both were
+miscategorized in earlier passes of the gap table, not open work. See
+[04-bots.md §9](04-bots.md) for the full closure writeup and
+[99-deferred.md](99-deferred.md) for the historical record.
 
 Stats, rating, hand history. i18n
 (zh-Hant/en). Mobile layout pass. M6 has no done gate by design — see §7 for what actually has to
@@ -306,7 +313,7 @@ milestones' `EfficiencyBot`/`FaanBot`) worth re-measuring once they exist.
 | **Claim-window races** produce wrong or inconsistent resolutions | High | Single-writer table loop; `window_id` on every claim; deterministic arrival-order tests; never resolve on first-arrival |
 | **Scoring disputes** — HK house rules differ from what you implemented | High | `RuleSet` from day one; show a per-pattern faan breakdown at hand end so players can see *why*; ship named presets |
 | **Efficiency bots can't win under 3-faan minimum** | **Partially mitigated (M4)** | [04-bots §4/§8](04-bots.md); `FaanBot` built and arena-proven to cut `tenpai_rate_on_sub_minimum_hand` well below T1's; raw-points parity not yet fully closed (paired-diff CI still includes zero) — further self-play weight tuning against the same arena harness is the concrete next step |
-| **Bots are blind to non-default rulesets** — M6's `RULESET_PRESETS`/custom rulesets already ship; `SeatView` carries `ruleset`, and both `min_faan` and `hand_sets` are now read off it | Low–Medium (min_faan and hand_sets closed; `score_table`/`wall_reserve` still value drift, not a correctness bug) | [04-bots §9](04-bots.md); `min_faan` closed (Tier 1, `_should_claim` reads `view.ruleset.min_faan`); `hand_sets` closed (Tier 2 first item — `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` gated on `HandSet.NEW_18`, both bot tiers pass `view.ruleset.hand_sets` through, so `hk_strict` no longer chases an illegal Seven Pairs shape) — see [99-deferred.md](99-deferred.md) for the remaining Tier 2 scope (`score_table`/`ROUTE_FAAN`, `wall_reserve` turn breakpoints) and why it needs arena re-validation, not just a code change |
+| ~~**Bots are blind to non-default rulesets**~~ **Closed** — M6's `RULESET_PRESETS`/custom rulesets ship; `SeatView` carries `ruleset`, and `min_faan`/`hand_sets`/`faan_overrides`/turn-count breakpoints are all read off it now | None (was Low–Medium) | [04-bots §9](04-bots.md); `min_faan` closed (Tier 1, `_should_claim` reads `view.ruleset.min_faan`); `hand_sets` closed (Tier 2 — `shanten()`/`ukeire()` gated on `HandSet.NEW_18`); `faan_overrides` closed (Tier 2 — `bots/valuation.py`'s `ROUTE_FAAN` remaps via `route_faan_for`); `wall_reserve` closed (Tier 2, last item — `bots/faanbot.py`'s turn-6/turn-12 breakpoints now scale off `mahjong_core.wall.max_turns_per_seat(view.ruleset)`, calibrated byte-identical to the old constants at the default ruleset, arena-regression-checked at 500 duplicate sets). `score_table` and `game_length` were never actual bot gaps (zero references in `bots/`) — see [99-deferred.md](99-deferred.md) for the full closed record |
 | Rules scope creep (pao, aborts, regional variants) | High | Ship the default `hand_sets` (`CLASSIC + NEW_6 + NEW_18`) + `min_faan=3` only. NEW_18 is in scope, not creep: Seven Pairs lives there and the bot shanten parser requires it ([01-rules-spec §7](01-rules-spec.md)). Everything else is a config flag behind a flag. |
 | Mobile ergonomics (13 tiles on a 390px screen) | Medium | Design the mobile layout in M4, not M6. Test on a real phone early. |
 | Information leak via message size/timing | Low | Redact server-side (already). The obvious further mitigation — padding `claim_offer` timing so "no offer" and "offer" are indistinguishable to a network observer — is **not done**: it's incompatible with the early-exit claim window that [00-architecture.md §4](00-architecture.md) requires for UX, since early exit necessarily reveals timing. Accepted as a known, low-severity leak rather than mitigated. |

@@ -320,13 +320,15 @@ not a sign the approach is wrong.
 
 ## 9. Ruleset awareness
 
-**Gap, not speculative.** [05-roadmap.md M6](05-roadmap.md) already ships `RULESET_PRESETS`
+**Was a gap; now closed.** [05-roadmap.md M6](05-roadmap.md) already ships `RULESET_PRESETS`
 (`hk_classic`/`hk_casual`/`hk_strict`) plus a `custom` `RuleSet.from_dict` path via `POST
 /tables` — a table can run today with `min_faan=1` (`hk_casual`) or `min_faan=5` with NEW_18
-off (`hk_strict`, `mahjong_core/presets.py`). `Bot.act` only ever sees `SeatView` (§1); as of
-Tier 1 it carries `ruleset: RuleSet`, and as of Tier 2's first two items (below)
-`mahjong_core.shanten` and both bot tiers read `hand_sets` off it too, and `bots/valuation.py`
-reads `faan_overrides` — `wall_reserve` is the one remaining hardcoded assumption.
+off (`hk_strict`, `mahjong_core/presets.py`). `Bot.act` only ever sees `SeatView` (§1); it
+carries `ruleset: RuleSet` (Tier 1), and every Tier 2 item below is now closed too —
+`mahjong_core.shanten` and both bot tiers read `hand_sets` off it, `bots/valuation.py` reads
+`faan_overrides`, and `bots/faanbot.py`'s turn-based weight schedule reads `wall_reserve`/
+`flowers_enabled`. **Tier 2 is fully closed as of this row** — see
+[99-deferred.md](99-deferred.md) for the historical record of what was deferred and why.
 
 | Hardcoded assumption | Where | Effect under a non-default ruleset |
 | --- | --- | --- |
@@ -334,7 +336,8 @@ reads `faan_overrides` — `wall_reserve` is the one remaining hardcoded assumpt
 | ~~`hand_sets` (which patterns are legal)~~ **closed, Tier 2** | was `mahjong_core/shanten.py`'s `shanten()` running Seven Pairs unconditionally whenever `closed=True`; now gated on `HandSet.NEW_18 in hand_sets` | `shanten()`/`ukeire()` (and both `EfficiencyBot`/`FaanBot`, which pass `view.ruleset.hand_sets` through) no longer chase a Seven Pairs shape that can't legally win under `hk_strict` |
 | ~~`faan_overrides`~~ **closed, Tier 2** | was `bots/valuation.py`'s `ROUTE_FAAN` (fixed dict); now `route_faan_for(view.ruleset.faan_overrides)` remaps it via a route-name → `scoring/patterns.py` Chinese-pattern-name table, computed once per `FaanBot` decision and threaded into `estimate_best_faan`/`pattern_optionality` | T2's discard ranking follows a table's real per-pattern faan overrides instead of the fixed defaults; empty `faan_overrides` (every existing preset) is byte-identical to before (`route_faan_for({}) is ROUTE_FAAN`) |
 | ~~`score_table`~~ **not actually a bot gap** | `mahjong_core/scoring/payout.py`'s `points()` already takes `ruleset` directly and reads `ruleset.score_table` — checked via `find_referencing_symbols`, `score_table` has no reference anywhere in `bots/` | None — this was miscategorized in an earlier pass of this table by being adjacent to `faan_overrides` (both are `RuleSet` scoring fields), not because any bot logic hardcoded it. `score_table` is a faan→**points** payout conversion scale (`ScoreTable.HALF_SPICY`/`FULL_SPICY`); `ROUTE_FAAN`/`estimate_best_faan` rank discards by estimated **faan**, never points, so there was never a value here for a bot to read |
-| `wall_reserve`/`game_length` | `bots/faanbot.py`'s `_LATE_TURN`/`_weights_for_turn` breakpoints, hand-tuned against the default turn-count regime | "speed early → value mid → safety late" (§4) fires at the wrong point in a shorter/longer game |
+| ~~`wall_reserve`~~ **closed, Tier 2 (last item)** | was `bots/faanbot.py`'s fixed `_LATE_TURN=12`/turn-6 constants in `_weights_for_turn`; now `_turn_breakpoints(ruleset)` scales them off `mahjong_core.wall.max_turns_per_seat(ruleset)` | `_weights_for_turn`'s speed/value/safety schedule and fold-mode's lateness gate now shift proportionally earlier under a smaller real per-hand turn budget (`wall_reserve` up, or `flowers_enabled` off), instead of always firing at the fixed turn 6/12 tuned against the default regime |
+| ~~`game_length`~~ **not actually a bot gap** | `mahjong_core/engine.py`'s `start_next_hand` reads `ruleset.game_length` via `_ALLOWED_ROUNDS` to decide when a *match* (not a hand) ends — checked via `find_referencing_symbols`, `GameLength`/`game_length` has no reference anywhere in `bots/` | None — this was miscategorized in the doc-9 gap table by being adjacent to `wall_reserve` (both flow-control `RuleSet` fields under "flow"), not because any bot logic hardcoded it. `game_length` controls how many *hands* make up a match (4/8/16 for EAST_ONLY/EAST_SOUTH/FULL); `bots/faanbot.py`'s turn-based weights key off `turn = len(view.discard_pools[view.seat])`, this seat's discard count *within the current hand* — a completely different axis, unaffected by how many hands the match runs for |
 
 **Plan, tiered by blast radius — Tier 2's remaining scope and revival requirements live in
 [99-deferred.md](99-deferred.md):**
@@ -428,15 +431,68 @@ reads `faan_overrides` — `wall_reserve` is the one remaining hardcoded assumpt
   the same sign with an overlapping CI (baseline +0.591, [-0.393, +1.575]) — the wider CI here is
   expected at half the duplicate-set count, not a sign of drift. Confirms threading `ruleset`
   through `bots/valuation.py` didn't perturb default-ruleset (empty `faan_overrides`) behavior.
-- **`wall_reserve` (Tier 2, still deferred).** `bots/faanbot.py`'s `_LATE_TURN`/
-  `_weights_for_turn` breakpoints, hand-tuned against the default turn-count regime — re-deriving
-  them as a fraction of the ruleset's actual turn budget invalidates the shipped
-  `_weights_for_turn` tuning (§4/§8) the same way `faan_overrides` did, so it needs its own full
-  arena re-run before merging (`--games 1000+`, paired-difference CI excludes zero, §8) —
-  re-tuning cost, not implementation cost, is what makes this Tier 2. Out of scope for the
-  `faan_overrides` item above; not touched here. (`bots/arena.py`'s own `shanten()` calls, used
-  only for tenpai/win-rate stats rather than a bot's actual decision, are still not
-  `hand_sets`-aware either — noted here rather than the table above since it isn't bot behavior,
-  but worth revisiting alongside a future item since an `hk_strict` arena run's tenpai-rate stat
+- **Built: `wall_reserve` (Tier 2, last item — Tier 2 now fully closed).** `mahjong_core/wall.py`
+  gains `max_turns_per_seat(ruleset) -> int`, a pure function of `RuleSet` alone: total physical
+  tiles (144 with `flowers_enabled`, 136 without, see `new_wall`) minus the initial deal
+  (`13*4 + 1` dealer extra = 53, see `deal_hands`) minus `wall_reserve`, split evenly across 4
+  seats. It counts front (normal-turn) draws only — a kong/flower replacement draws from the
+  *back* of the same wall (no separate dead wall) without ending that seat's turn, so this is a
+  deliberate upper-bound approximation, not an exact simulation: exactly how many replacement
+  draws happen in a given hand depends on how many flowers get dealt/drawn and how many kongs get
+  declared, both per-hand randomness this function ignores to stay allocation-time-pure.
+
+  `bots/faanbot.py`'s fixed `_LATE_TURN = 12` constant and `_weights_for_turn`'s hardcoded
+  turn-6/turn-12 schedule are gone; `_turn_breakpoints(ruleset)` derives `(early, late)` by
+  scaling `_EARLY_TURN_AT_REFERENCE = 6`/`_LATE_TURN_AT_REFERENCE = 12` by
+  `max_turns_per_seat(ruleset) / _REFERENCE_MAX_TURN`, where `_REFERENCE_MAX_TURN =
+  max_turns_per_seat(RuleSet())`. **Calibration arithmetic** (also in `bots/faanbot.py`'s own
+  comment): at the default ruleset, `144 - 53 - 0 = 91` available draws `// 4` seats `= 22 =
+  _REFERENCE_MAX_TURN`, so `early = round(6 * 22 / 22) == 6` and `late = round(12 * 22 / 22) ==
+  12` exactly, by construction, for every ruleset with `max_turns_per_seat(ruleset) ==
+  _REFERENCE_MAX_TURN` — every shipped preset. `_best_discard` threads `_turn_breakpoints(view.
+  ruleset)` into both `_weights_for_turn` and the fold-mode lateness gate (`turn >= late_turn`,
+  replacing `turn >= _LATE_TURN`).
+
+  New tests in `tests/test_faanbot.py`:
+  `test_turn_breakpoints_match_the_old_hand_tuned_constants_at_default_ruleset` (structural pin:
+  `max_turns_per_seat(RuleSet()) == 22` and `_turn_breakpoints(RuleSet()) == (6, 12)` exactly, not
+  "close to"), `test_turn_breakpoints_shift_earlier_under_a_smaller_turn_budget`
+  (`RuleSet(wall_reserve=40)` → `max_turns_per_seat` 12 → breakpoints `(3, 7)`, proportionally
+  scaled down from `(6, 12)`), and `test_fold_mode_triggers_earlier_under_a_smaller_turn_budget`
+  (the same far-past-3-shanten, threatening-opponent scripted hand as
+  `test_folds_to_a_safe_tile_late_against_a_threatening_opponent`, at turn 8 instead of 13: the
+  default ruleset still treats turn 8 as mid-game — `FaanBot` picks a different discard, not the
+  safe genbutsu tile — while `RuleSet(wall_reserve=40)`'s late-turn value of 7 makes turn 8
+  already late, and the bot folds to the same safe tile the turn-13 test pins; verified directly
+  against `FaanBot.act` before pinning, per this module's convention).
+
+  Arena regression check (docs/99-deferred.md's Tier 2 revival requirement) — default ruleset,
+  `wall_reserve=0`, so `_turn_breakpoints` reproduces the old fixed `(6, 12)` exactly and this is
+  a pure regression check that the threading didn't perturb anything, not a re-tune (no new
+  arena run was needed *because* the calibration constraint in this item guarantees the default
+  path is untouched by construction — run anyway, to prove it rather than assert it):
+  `docker compose --profile tools run --rm -e UV_CACHE_DIR=/tmp/uv-cache arena uv run --no-sync
+  python -m bots.arena --a FaanBot --b EfficiencyBot --games 500 --parallel 8` (500 duplicate
+  sets, same seed default as the `faan_overrides` item's regression run):
+
+  | Metric | FaanBot (A) | EfficiencyBot (B) |
+  | --- | --- | --- |
+  | win_rate | 0.1744 | 0.2238 |
+  | deal_in_rate | 0.1110 | 0.1400 |
+  | avg_winning_faan | 4.2444 | 3.7151 |
+  | tenpai_rate_on_sub_minimum_hand | 0.2251 | 0.3260 |
+  | avg_points_per_hand | 0.2380 | -0.0793 |
+
+  Paired difference (A − B): **+1.269 points/game, 95% CI [-0.128, +2.667]** — every metric is
+  byte-identical to the `faan_overrides` item's own 500-set regression run above, which is exactly
+  what the calibration constraint predicts: `_turn_breakpoints(RuleSet()) == (6, 12)` means
+  `FaanBot`'s discard/claim decisions under the default ruleset are unchanged bit-for-bit by this
+  change, so re-running the same seeded arena harness against the same two bots reproduces the
+  same numbers rather than merely "the same ballpark."
+
+  Unrelated housekeeping note carried over from this item's investigation: `bots/arena.py`'s own
+  direct `shanten()` calls (tenpai-rate/winning-tile stats, not a bot decision) are still not
+  `hand_sets`-aware — noted here since it isn't bot behavior and was out of scope for the
+  `hand_sets` item too, but worth revisiting since an `hk_strict` arena run's tenpai-rate stat
   currently over-counts hands that are only tenpai via a Seven Pairs shape that table can't
-  complete.)
+  complete.

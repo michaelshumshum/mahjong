@@ -284,26 +284,22 @@ memorable than one that's marginally more optimal.
 | --- | --- |
 | Expert | T3 with search budget |
 
-### Tier 2: full ruleset-aware bots
+### Tier 2: full ruleset-aware bots — CLOSED
 
-Provenance: `04-bots.md` §9 (added 2026-09-25) — Tier 1 (`min_faan` reaching `FaanBot` via a
-new `SeatView.ruleset` field), the `hand_sets` row, and the `faan_overrides` row below (all
-three closed) are done; `wall_reserve` is what's left deferred here. `score_table` turned out
-not to be a bot gap at all — see its row below.
+Provenance: `04-bots.md` §9 (added 2026-09-25). Tier 1 (`min_faan` reaching `FaanBot` via a new
+`SeatView.ruleset` field) and all of Tier 2 below — `hand_sets`, `faan_overrides`, and
+`wall_reserve` (the last item, closed 2026-09-26) — are done. `score_table` and `game_length`
+turned out not to be bot gaps at all — see their rows below. This section is kept as the
+historical record of what was deferred and why, per this doc's own header note ("nothing here is
+rejected on merit... parked so the intent survives"); it is not live work.
 
 | Setting | Needs | Why it's Tier 2, not Tier 1 |
 | --- | --- | --- |
 | ~~`hand_sets` (e.g. NEW_18 off under `hk_strict`)~~ **closed** | `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` gated on `HandSet.NEW_18 in hand_sets`, threaded from `view.ruleset.hand_sets` through both `EfficiencyBot` and `FaanBot` — see `04-bots.md` §9 for the full writeup | Reached into the pure, `MahjongRepository`-oracle-validated engine core (§3) — the highest blast radius of anything in this list, and a regression here would have been a correctness bug (illegal-pattern chasing), not a tuning miss. No re-tuning needed: the new `hand_sets` param defaults to every hand_set, so oracle comparisons and every pre-existing caller are unaffected |
 | ~~`faan_overrides`~~ **closed** | `bots/valuation.py`'s fixed `ROUTE_FAAN` dict now goes through `route_faan_for(view.ruleset.faan_overrides)`, a route-name → `scoring/patterns.py` Chinese-pattern-name lookup, threaded through `FaanBot`'s three `estimate_best_faan`/`pattern_optionality` call sites — see `04-bots.md` §9 for the full writeup and the arena regression numbers | Needed the route-name → pattern-name mapping this row anticipated; every changed override value would invalidate T2's shipped weights the same way, but the *default* case (empty `faan_overrides`, every shipped preset) is required to stay byte-identical, so no re-tune was needed to close this row — only a regression check (§9's arena run) that the threading itself didn't perturb anything |
 | ~~`score_table`~~ **not a bot gap** | N/A | Investigated during the `faan_overrides` item: `mahjong_core/scoring/payout.py`'s `points()` already takes `ruleset` directly and reads `ruleset.score_table`, and has zero references anywhere in `bots/`. It's a faan→**points** payout conversion, never consulted for T2's faan-based discard ranking — this row was only ever combined with `faan_overrides` because both are `RuleSet` scoring fields, not because any bot logic hardcoded it |
-| `wall_reserve`/`game_length` | `bots/faanbot.py`'s `_LATE_TURN=12` and `_weights_for_turn`'s turn-6/turn-12 breakpoints re-derived as a fraction of the ruleset's actual turn budget, not fixed constants | Same re-tuning cost as the closed rows above — these constants were hand-tuned against the *default* turn-count regime specifically |
-
-**Needs before un-deferring the remaining row:** a full arena re-run (`bots/arena.py`,
-`--games 1000+`, paired-difference 95% CI excludes zero per `04-bots.md` §8) before merging —
-the code change itself is modest, but it invalidates `_weights_for_turn`'s shipped tuning
-("hand-tuned and retuned twice against arena runs," `04-bots.md` §4), and re-validating that is
-the actual cost. Like the closed `hand_sets`/`faan_overrides` rows, this isn't a live correctness
-bug — it's a pacing nicety, so there's no urgency beyond the other closed items.
+| ~~`wall_reserve`~~ **closed** | `bots/faanbot.py`'s fixed `_LATE_TURN=12`/turn-6 constants replaced by `_turn_breakpoints(ruleset)`, scaling `(6, 12)` off the new `mahjong_core.wall.max_turns_per_seat(ruleset)` relative to its value at the default ruleset (`_REFERENCE_MAX_TURN = 22`) — see `04-bots.md` §9 for the calibration arithmetic and the arena regression numbers | Re-deriving the breakpoints as a fraction of the ruleset's actual turn budget would invalidate the shipped `_weights_for_turn` tuning (§4/§8) the same way `faan_overrides` could have, *unless* the fractions are calibrated to reproduce the old fixed `(6, 12)` exactly at the default ruleset — which they are, by construction, so (like `faan_overrides`) closing this needed only a regression check, not a re-tune |
+| ~~`game_length`~~ **not a bot gap** | N/A | Checked via `find_referencing_symbols` during the `wall_reserve` item: `GameLength`/`game_length` has zero references anywhere in `bots/` — it's read only by `mahjong_core/engine.py`'s `start_next_hand` (`_ALLOWED_ROUNDS`), which decides how many *hands* make up a match (4/8/16 for EAST_ONLY/EAST_SOUTH/FULL). `bots/faanbot.py`'s turn-based weights key off discard count *within the current hand*, a different axis entirely — this row was only ever combined with `wall_reserve` because both are `RuleSet` "flow" fields, not because any bot logic hardcoded it |
 
 ## From 05-roadmap.md and 06-ml.md
 
