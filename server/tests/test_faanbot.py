@@ -22,7 +22,7 @@ import pytest
 from app.views import SeatView, seat_view
 from bots.faanbot import FaanBot
 from bots.random import random_action
-from mahjong_core.config import RuleSet
+from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import decode_action, legal_mask
@@ -43,10 +43,12 @@ def _build_view(
     turn: int | None = None,
     discard_pools: tuple[tuple[TileId, ...], ...] | None = None,
     melds: tuple[tuple[Meld, ...], ...] | None = None,
+    ruleset: RuleSet | None = None,
 ) -> SeatView:
     """Same convention as `tests/test_efficiency.py`'s `_build_view`, extended with a `melds`
     override so fold-logic scenarios can put an exposed meld on an opponent (safety module
-    reads `view.melds`, T1's version never needed to)."""
+    reads `view.melds`, T1's version never needed to), and a `ruleset` override so claim-guard
+    tests can exercise a non-default `min_faan` (docs/04-bots.md §9 Tier 1)."""
     ids = []
     used: dict[TileType, int] = {}
     for t in types:
@@ -73,6 +75,7 @@ def _build_view(
         claim_options=(),
         deadline_ts=None,
         host_seat=None,
+        ruleset=ruleset if ruleset is not None else RuleSet(),
     )
 
 
@@ -353,3 +356,175 @@ async def test_declines_a_claim_that_would_drop_the_hand_below_min_faan() -> Non
     mask[106] = True  # pung
     aid = await FaanBot().act(view, mask, _NO_DEADLINE)
     assert aid == 102  # pass
+
+
+async def test_should_claim_reads_min_faan_from_the_live_ruleset() -> None:
+    """Same hand/offer as `test_declines_a_claim_that_would_drop_the_hand_below_min_faan` --
+    closed Voided Suit at 4 faan, 1-shanten, offered pung of 5p drops it to open Voided Suit at
+    2 faan, tenpai. That test pins the `hk_classic` default (`min_faan=3`): 4 >= 3 > 2, so the
+    guard declines. This test proves the threshold comes from `view.ruleset.min_faan`
+    (docs/04-bots.md §9 Tier 1), not a hardcoded 3, by changing only the ruleset and getting the
+    opposite decision: under `hk_casual` (`min_faan=1`), 2 faan still clears the bar (4 >= 1 > 2
+    is false), so the guard now takes the claim -- the exact claim the default-ruleset test
+    declines."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_9,
+        T.MAN_9,
+        T.WIND_EAST,
+        T.WIND_EAST,
+        T.PIN_5,
+        T.PIN_5,
+    ]
+    discard_pools = ((), (), (), tuple(tile_ids_for_type(T.PIN_5)[2:3]))
+    view = _build_view(
+        0,
+        hand,
+        phase=Phase.AWAIT_CLAIMS,
+        turn=3,
+        discard_pools=discard_pools,
+        ruleset=RuleSet(min_faan=1),
+    )
+    mask = [False] * 109
+    mask[102] = True
+    mask[106] = True  # pung
+    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+    assert aid == 106  # pung -- opposite of the min_faan=3 default's "pass"
+
+
+# --- scripted discard: hand_sets-aware shanten (docs/04-bots.md §9 Tier 2) ---------------------
+
+
+async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
+    """6 honor pairs (South/West/North/Red/Green/White, 12 tiles) + a manzu ryanmen (4m5m, 2
+    tiles) -- 14 tiles, turn 0 so `w_speed` dominates (`_weights_for_turn`). Discarding either
+    manzu tile abandons the ryanmen but completes the shape for a narrow Seven Pairs tenpai
+    (`shanten`=0, only the 3 remaining copies of the surviving manzu tile bring it home) --
+    verified directly against `mahjong_core.shanten` before pinning here: under the `hk_classic`
+    default (`NEW_18` on) this beats every other discard, so the bot takes it. Under `hk_strict`
+    (`NEW_18` off, same `hand_sets` `mahjong_core.presets` ships there) Seven Pairs is illegal,
+    so that same discard only reaches shanten 3 (the honors-heavy standard parse) -- worse than
+    breaking one of the honor pairs instead (also shanten 3, but with real chow potential kept
+    alive in the ryanmen, so wider ukeire). This is the correctness bug docs/04-bots.md §9 and
+    docs/01-rules-spec.md's "New 18" note describe: pre-fix, `shanten()` ran Seven Pairs
+    unconditionally whenever `closed=True` and the bot chased this dead-end shape regardless of
+    the table's ruleset."""
+    hand = [
+        T.WIND_SOUTH,
+        T.WIND_SOUTH,
+        T.WIND_WEST,
+        T.WIND_WEST,
+        T.WIND_NORTH,
+        T.WIND_NORTH,
+        T.DRAGON_RED,
+        T.DRAGON_RED,
+        T.DRAGON_GREEN,
+        T.DRAGON_GREEN,
+        T.DRAGON_WHITE,
+        T.DRAGON_WHITE,
+        T.MAN_4,
+        T.MAN_5,
+    ]
+    mask = _discard_mask(hand)
+
+    view_new_18_on = _build_view(0, hand, ruleset=RuleSet())
+    aid_on = await FaanBot().act(view_new_18_on, mask, _NO_DEADLINE)
+    assert aid_on == int(T.MAN_4)  # chases the seven-pairs tenpai, ryanmen sacrificed
+
+    view_new_18_off = _build_view(
+        0, hand, ruleset=RuleSet(hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6}))
+    )
+    aid_off = await FaanBot().act(view_new_18_off, mask, _NO_DEADLINE)
+    assert aid_off != int(T.MAN_4)
+    assert aid_off != int(T.MAN_5)  # keeps the ryanmen -- seven pairs is a dead end here
+
+
+# --- scripted discard: faan_overrides-aware ROUTE_FAAN (docs/04-bots.md §9 Tier 2) --------------
+
+
+async def test_discard_follows_faan_overrides_boosting_a_route() -> None:
+    """Same 14-tile hand as `test_does_not_chase_a_marginal_value_signal` (9 man tiles + 東東
+    pair + 5p + 南). Under the default ruleset that test pins 南 as the discard at every turn --
+    discarding 5p only reaches a marginal Half Flush signal (3+2=5 faan estimate, `ROUTE_FAAN`'s
+    default `混一色`) that never clears the bar against 南's far wider ukeire. This test proves
+    `_best_discard` reads the *live* ruleset's `faan_overrides`, not the fixed table, by boosting
+    `混一色` to 15 faan (`RuleSet(faan_overrides={"混一色": 15})`): the Half Flush estimate jumps
+    to 15+2=17, now large enough for `w_value` to outweigh 南's ukeire lead at every turn bucket,
+    flipping the discard to 5p -- the opposite of the default-ruleset decision, verified directly
+    against `FaanBot.act` before pinning here, matching the `hand_sets` row's before/after style
+    above."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.MAN_9,
+        T.WIND_EAST,
+        T.WIND_EAST,
+        T.PIN_5,
+        T.WIND_SOUTH,
+    ]
+    own_pool = _own_pool(13, avoid=set(hand))
+    mask = _discard_mask(hand)
+    for turn in (3, 8, 13):
+        discard_pools = (own_pool[:turn], (), (), ())
+
+        view_default = _build_view(0, hand, turn=turn, discard_pools=discard_pools)
+        aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
+        assert aid_default == int(T.WIND_SOUTH), f"turn={turn}"
+
+        view_boosted = _build_view(
+            0,
+            hand,
+            turn=turn,
+            discard_pools=discard_pools,
+            ruleset=RuleSet(faan_overrides={"混一色": 15}),
+        )
+        aid_boosted = await FaanBot().act(view_boosted, mask, _NO_DEADLINE)
+        assert aid_boosted == int(T.PIN_5), f"turn={turn}"  # flips once Half Flush is boosted
+
+
+async def test_discard_with_empty_faan_overrides_matches_default_route_faan() -> None:
+    """`RuleSet(faan_overrides={})` is the default for every existing preset and test --
+    `route_faan_for` must return `ROUTE_FAAN` itself in that case (see `tests/test_valuation.py`),
+    so `FaanBot`'s discard under an explicit empty-override ruleset must be byte-identical to the
+    plain default (`RuleSet()`). Same hand as the boosted-override test above; both rulesets pick
+    南, matching that test's default-ruleset branch."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.MAN_9,
+        T.WIND_EAST,
+        T.WIND_EAST,
+        T.PIN_5,
+        T.WIND_SOUTH,
+    ]
+    own_pool = _own_pool(13, avoid=set(hand))
+    mask = _discard_mask(hand)
+    discard_pools = (own_pool[:8], (), (), ())
+
+    view_default = _build_view(0, hand, turn=8, discard_pools=discard_pools)
+    view_empty_override = _build_view(
+        0, hand, turn=8, discard_pools=discard_pools, ruleset=RuleSet(faan_overrides={})
+    )
+    aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
+    aid_empty_override = await FaanBot().act(view_empty_override, mask, _NO_DEADLINE)
+    assert aid_default == aid_empty_override == int(T.WIND_SOUTH)

@@ -17,6 +17,7 @@ from bots.safety import (
     tile_risk,
     wall_pressure_multiplier,
 )
+from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
@@ -61,6 +62,7 @@ def _view(
         claim_options=(),
         deadline_ts=None,
         host_seat=None,
+        ruleset=RuleSet(),
     )
 
 

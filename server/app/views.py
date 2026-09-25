@@ -29,6 +29,7 @@ from typing import Any, Literal, cast
 
 from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.actions import legal_actions as compute_legal_actions
+from mahjong_core.config import RuleSet
 from mahjong_core.engine import (
     ClaimResolved,
     Discarded,
@@ -114,6 +115,8 @@ class SeatView:
     deadline_ts: int | None = field(metadata=_entitled(Entitlement.OWN_SEAT))
     # public: which seat is host isn't a secret. None for a caller with no Table behind it.
     host_seat: int | None = field(metadata=_entitled(Entitlement.PUBLIC))
+    # public: a table's ruleset isn't secret -- every seat and spectator already sees it.
+    ruleset: RuleSet = field(metadata=_entitled(Entitlement.PUBLIC))
     # every seat's concealed tiles, open-hands spectator only (`reveal_hands`); `None` otherwise
     hands: tuple[tuple[TileId, ...], ...] | None = field(
         default=None, metadata=_entitled(Entitlement.OPEN_HANDS)
@@ -189,6 +192,7 @@ def seat_view(
         claim_options=claim_options,
         deadline_ts=deadline_ts,
         host_seat=host_seat,
+        ruleset=state.ruleset,
         hands=tuple(s.concealed for s in state.seats) if reveal_hands else None,
     )
 

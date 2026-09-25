@@ -69,6 +69,7 @@ def _build_view(
         claim_options=(),
         deadline_ts=None,
         host_seat=None,
+        ruleset=RuleSet(),
     )
 
 

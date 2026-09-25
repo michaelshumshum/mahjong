@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from app.views import SeatView
 from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
+from mahjong_core.config import HandSet
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
 from mahjong_core.tiles import tile_id_type
@@ -31,7 +32,7 @@ _KONG = 107
 _WIN = 108
 
 
-def _best_after_discard(hand34: list[int], *, closed: bool) -> int:
+def _best_after_discard(hand34: list[int], *, closed: bool, hand_sets: frozenset[HandSet]) -> int:
     """Best shanten after discarding one tile -- exposed so claim evaluation can compare against
     the best resulting hand, not just the meld's own shape."""
     best: int | None = None
@@ -40,7 +41,7 @@ def _best_after_discard(hand34: list[int], *, closed: bool) -> int:
             continue
         after = list(hand34)
         after[t] -= 1
-        s = shanten(after, closed=closed)
+        s = shanten(after, closed=closed, hand_sets=hand_sets)
         if best is None or s < best:
             best = s
     assert best is not None, "hand34 must hold at least one tile"
@@ -74,15 +75,16 @@ class EfficiencyBot:
     def _act_on_claim(self, view: SeatView, mask: list[bool]) -> int:
         hand = own_hand34(view)
         closed = is_closed(view)
+        hand_sets = view.ruleset.hand_sets
         best_aid = _PASS
-        best_shanten = shanten(hand, closed=closed)
+        best_shanten = shanten(hand, closed=closed, hand_sets=hand_sets)
 
         claimed_type = _claimed_type(view)
         if claimed_type is not None:
             if mask[_PUNG]:
                 candidate = list(hand)
                 candidate[claimed_type] += 1
-                s = _best_after_discard(candidate, closed=False)
+                s = _best_after_discard(candidate, closed=False, hand_sets=hand_sets)
                 if s < best_shanten:
                     best_shanten, best_aid = s, _PUNG
 
@@ -90,7 +92,7 @@ class EfficiencyBot:
             if chow_aid is not None:
                 candidate = list(hand)
                 candidate[claimed_type] += 1
-                s = _best_after_discard(candidate, closed=False)
+                s = _best_after_discard(candidate, closed=False, hand_sets=hand_sets)
                 if s < best_shanten:
                     best_shanten, best_aid = s, chow_aid
 
@@ -100,7 +102,8 @@ class EfficiencyBot:
     def _act_on_turn(self, view: SeatView, mask: list[bool]) -> int:
         hand = own_hand34(view)
         closed = is_closed(view)
-        base = shanten(hand, closed=closed)
+        hand_sets = view.ruleset.hand_sets
+        base = shanten(hand, closed=closed, hand_sets=hand_sets)
 
         best_kong_aid: int | None = None
         best_kong_shanten = base
@@ -111,18 +114,24 @@ class EfficiencyBot:
                     continue
                 candidate = list(hand)
                 candidate[t] -= 1
-                s = shanten(candidate, closed=False)
+                s = shanten(candidate, closed=False, hand_sets=hand_sets)
                 if s < best_kong_shanten:
                     best_kong_shanten, best_kong_aid = s, aid
         if best_kong_aid is not None:
             return best_kong_aid
 
-        return self._best_discard(hand, seen34(view), mask, closed=closed)
+        return self._best_discard(hand, seen34(view), mask, closed=closed, hand_sets=hand_sets)
 
     def _best_discard(
-        self, hand: list[int], seen: list[int], mask: list[bool], *, closed: bool
+        self,
+        hand: list[int],
+        seen: list[int],
+        mask: list[bool],
+        *,
+        closed: bool,
+        hand_sets: frozenset[HandSet],
     ) -> int:
-        accepts = ukeire(hand, seen, closed=closed)
+        accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
         best_key: tuple[int, int, int, int] | None = None
         best_aid = -1
         for d in range(34):
@@ -131,7 +140,7 @@ class EfficiencyBot:
                 continue
             after = list(hand)
             after[d] -= 1
-            result_shanten = shanten(after, closed=closed)
+            result_shanten = shanten(after, closed=closed, hand_sets=hand_sets)
             kinds, tiles = accepts[d]
             terminal_rank = 0 if is_terminal_or_honor(d) else 1
             key = (result_shanten, -tiles, -kinds, terminal_rank)
