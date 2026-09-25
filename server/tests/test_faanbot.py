@@ -20,7 +20,7 @@ from collections.abc import Iterator
 import pytest
 
 from app.views import SeatView, seat_view
-from bots.faanbot import FaanBot
+from bots.faanbot import FaanBot, _turn_breakpoints
 from bots.random import random_action
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -28,6 +28,7 @@ from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.state import GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from mahjong_core.wall import max_turns_per_seat
 
 _STEP_CAP = 2000
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
@@ -257,7 +258,8 @@ async def test_commits_to_a_strong_value_signal() -> None:
 # --- scripted hand: fold to a safe tile late, far from tenpai, against a threat ---------------
 #
 # 13 fully scattered tiles (isolated singles across every suit and every honor -- deliberately
-# no chow/pung shape at all) is far past 3-shanten. Turn 13 (>= `_LATE_TURN`). Seat 1 holds an
+# no chow/pung shape at all) is far past 3-shanten. Turn 13 (>= `_turn_breakpoints`'s late-turn
+# value, 12 at the default ruleset). Seat 1 holds an
 # exposed 中(DRAGON_RED) pung (`opponent_threat_level` = 1 meld * 0.3 = 0.3, at the
 # `_THREAT_THRESHOLD`) and has 北(WIND_NORTH) sitting in *this seat's* own hand as a candidate
 # discard that is genbutsu against seat 1 (already in seat 1's discard pool) -- weak evidence,
@@ -528,3 +530,69 @@ async def test_discard_with_empty_faan_overrides_matches_default_route_faan() ->
     aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
     aid_empty_override = await FaanBot().act(view_empty_override, mask, _NO_DEADLINE)
     assert aid_default == aid_empty_override == int(T.WIND_SOUTH)
+
+
+# --- scripted: wall_reserve-aware turn breakpoints (docs/04-bots.md §9 Tier 2, closing item) ---
+#
+# `_turn_breakpoints` (`bots/faanbot.py`) replaces the old fixed `_LATE_TURN = 12`/turn-6
+# constants `_weights_for_turn` was hand-tuned against with a formula scaled off
+# `mahjong_core.wall.max_turns_per_seat` -- a pure function of `RuleSet.wall_reserve`/
+# `flowers_enabled` (144/136 total tiles, 53 dealt, split across 4 seats). The calibration
+# constraint: at the default ruleset (`wall_reserve=0`, `flowers_enabled=True`, every shipped
+# preset's regime), the derived breakpoints must reproduce the old fixed 6/12 exactly, not just
+# approximately -- `_REFERENCE_MAX_TURN` in `bots/faanbot.py` is computed the same way, so
+# `round(6 * max_turn / _REFERENCE_MAX_TURN) == 6` and `round(12 * ...) == 12` whenever
+# `max_turn == _REFERENCE_MAX_TURN`.
+
+
+def test_turn_breakpoints_match_the_old_hand_tuned_constants_at_default_ruleset() -> None:
+    """Structural regression pin, not "close to": `max_turns_per_seat(RuleSet())` is 144 total
+    tiles - 53 dealt (13*4 + 1 dealer extra) - 0 `wall_reserve`, // 4 seats = 22, and
+    `_turn_breakpoints` at that reference must come back exactly `(6, 12)` -- the same numbers
+    `_weights_for_turn`'s schedule and the arena tuning history in its docstring were calibrated
+    against (docs/04-bots.md §4/§8)."""
+    assert max_turns_per_seat(RuleSet()) == 22
+    assert _turn_breakpoints(RuleSet()) == (6, 12)
+
+
+def test_turn_breakpoints_shift_earlier_under_a_smaller_turn_budget() -> None:
+    """A ruleset with a real per-hand turn budget smaller than the default's
+    (`wall_reserve=40` -> `max_turns_per_seat` 12, vs the default ruleset's 22) scales both
+    breakpoints down proportionally rather than leaving them fixed: `(3, 7)`, not `(6, 12)`."""
+    reduced = RuleSet(wall_reserve=40)
+    assert max_turns_per_seat(reduced) == 12
+    assert _turn_breakpoints(reduced) == (3, 7)
+
+
+async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
+    """Same far-past-3-shanten hand, threatening opponent, and genbutsu discard candidate as
+    `test_folds_to_a_safe_tile_late_against_a_threatening_opponent`, but at turn 8 instead of 13.
+    Turn 8 is mid-game under the default ruleset (`_turn_breakpoints` late-turn value 12, so
+    `_best_discard`'s `fold_mode` gate -- `turn >= late_turn` -- stays closed and the bot still
+    weighs value/ukeire) but already past the late-turn gate under a ruleset with a much smaller
+    real turn budget (`wall_reserve=40` -> late-turn value 7, from the test above) -- the same
+    turn number that is "mid-game" under the default ruleset is "late" under a shorter one, per
+    docs/04-bots.md §9's `wall_reserve` row. Verified directly against `FaanBot.act` before
+    pinning here, matching this module's convention: default-ruleset turn 8 does *not* pick the
+    safe genbutsu tile (aid 3, a different discard); the `wall_reserve=40` ruleset at the same
+    turn does, matching the turn-13 fold test's pinned choice."""
+    seat1_pung = Meld(MeldKind.PUNG, tile_ids_for_type(T.DRAGON_RED)[:3], from_seat=2)
+    seat1_pool = (tile_ids_for_type(T.WIND_NORTH)[3],)  # genbutsu source for 北
+    discard_pools = (_FOLD_HAND_OWN_POOL[:8], seat1_pool, (), ())
+    melds = ((), (seat1_pung,), (), ())
+    mask = _discard_mask(_FOLD_HAND)
+
+    view_default = _build_view(0, _FOLD_HAND, turn=8, discard_pools=discard_pools, melds=melds)
+    aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
+    assert aid_default != int(T.WIND_NORTH)  # turn 8 is still mid-game under the default ruleset
+
+    view_reduced = _build_view(
+        0,
+        _FOLD_HAND,
+        turn=8,
+        discard_pools=discard_pools,
+        melds=melds,
+        ruleset=RuleSet(wall_reserve=40),
+    )
+    aid_reduced = await FaanBot().act(view_reduced, mask, _NO_DEADLINE)
+    assert aid_reduced == int(T.WIND_NORTH)  # already late under the smaller turn budget

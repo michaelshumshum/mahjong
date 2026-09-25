@@ -13,10 +13,11 @@ from app.views import SeatView
 from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
 from bots.safety import opponent_threat_level, tile_risk
 from bots.valuation import estimate_best_faan, pattern_optionality, route_faan_for
-from mahjong_core.config import HandSet
+from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
 from mahjong_core.tiles import tile_id_type
+from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["FaanBot"]
 
@@ -42,25 +43,54 @@ _UKEIRE_SCALE = 8.0
 Measured: 8 is the smallest divisor letting a strong value signal (Full Flush) still win a
 discard, while a weak one (Voided Suit vs Half Flush) still correctly loses to ukeire."""
 
-_LATE_TURN = 12
-"""`turn` = this seat's own discard count this hand -- the closest proxy to docs/04-bots.md §4's
-turn-number language available from a `SeatView` alone."""
 _FOLD_SHANTEN = 3
 _THREAT_THRESHOLD = 0.3
 """One exposed meld alone (0.3 on `opponent_threat_level`'s scale) counts as "threatening" --
 fold logic already gates on lateness and shanten too, so this doesn't need to be conservative
 alone."""
 
+_REFERENCE_MAX_TURN = max_turns_per_seat(RuleSet())
+"""`mahjong_core.wall.max_turns_per_seat` at the default ruleset: 144 total tiles
+(`flowers_enabled`) - 53 dealt (13*4 + 1 dealer extra) - 0 `wall_reserve` = 91 available draws,
+// 4 seats = 22. `_weights_for_turn`'s turn-6/turn-12 schedule (docs/04-bots.md §4/§8) was
+hand-tuned against exactly this regime -- every shipped preset (`mahjong_core/presets.py`)
+leaves `wall_reserve`/`flowers_enabled` at their defaults, so `_turn_breakpoints` must reproduce
+6 and 12 exactly there (docs/04-bots.md §9's `wall_reserve` row)."""
+_EARLY_TURN_AT_REFERENCE = 6
+_LATE_TURN_AT_REFERENCE = 12
 
-def _weights_for_turn(turn: int) -> tuple[float, float, float, float]:
+
+def _turn_breakpoints(ruleset: RuleSet) -> tuple[int, int]:
+    """`(early, late)` turn numbers for `_weights_for_turn`'s speed/value/safety schedule and
+    fold-mode's lateness gate -- `_EARLY_TURN_AT_REFERENCE`/`_LATE_TURN_AT_REFERENCE` scaled by
+    this ruleset's own `max_turns_per_seat` relative to `_REFERENCE_MAX_TURN`, so a ruleset with
+    a shorter real turn budget (`wall_reserve` up, or `flowers_enabled` off) shifts into value
+    and then safety weighting proportionally earlier. Calibration: at the default ruleset,
+    `max_turns_per_seat(ruleset) == _REFERENCE_MAX_TURN` by construction, so
+    `early == round(6 * 22 / 22) == 6` and `late == round(12 * 22 / 22) == 12` exactly -- the
+    same fixed breakpoints `_weights_for_turn` was tuned against, for every ruleset every shipped
+    preset uses."""
+    max_turn = max_turns_per_seat(ruleset)
+    if max_turn <= 0:
+        return (0, 0)
+    early = round(_EARLY_TURN_AT_REFERENCE * max_turn / _REFERENCE_MAX_TURN)
+    late = round(_LATE_TURN_AT_REFERENCE * max_turn / _REFERENCE_MAX_TURN)
+    return early, late
+
+
+def _weights_for_turn(
+    turn: int, early_turn: int, late_turn: int
+) -> tuple[float, float, float, float]:
     """`(w_speed, w_value, w_safety, w_flex)` per docs/04-bots.md §4's "speed early -> value mid
-    -> safety late" schedule. Hand-tuned and retuned twice against arena runs vs `EfficiencyBot`
-    (1000 duplicate sets): mean paired difference moved -2.420 -> -0.908 -> +0.591 pts/game, but
-    the 95% CI still includes zero -- not yet a clean win. `w_safety` has moved the needle most
-    so far; trimming it further is the natural next step."""
-    if turn <= 6:
+    -> safety late" schedule, at the `early_turn`/`late_turn` breakpoints `_turn_breakpoints`
+    derives (6/12 at the default ruleset). Hand-tuned and retuned twice against arena runs vs
+    `EfficiencyBot` (1000 duplicate sets, at those default breakpoints): mean paired difference
+    moved -2.420 -> -0.908 -> +0.591 pts/game, but the 95% CI still includes zero -- not yet a
+    clean win. `w_safety` has moved the needle most so far; trimming it further is the natural
+    next step."""
+    if turn <= early_turn:
         return (1.0, 0.2, 0.15, 0.15)
-    if turn <= 12:
+    if turn <= late_turn:
         return (0.7, 0.9, 0.3, 0.2)
     return (0.4, 0.4, 0.9, 0.15)
 
@@ -192,6 +222,8 @@ class FaanBot:
             return best_kong_aid
 
         assert view.seat is not None
+        # this seat's own discard count -- closest proxy to docs/04-bots.md §4's turn-number
+        # language available from a SeatView alone.
         turn = len(view.discard_pools[view.seat])
         return self._best_discard(view, hand, seen34(view), mask, closed=closed, turn=turn)
 
@@ -212,9 +244,10 @@ class FaanBot:
         threatening = any(
             opponent_threat_level(view, opp) >= _THREAT_THRESHOLD for opp in _opponents(view.seat)
         )
-        fold_mode = turn >= _LATE_TURN and base_shanten >= _FOLD_SHANTEN and threatening
+        early_turn, late_turn = _turn_breakpoints(view.ruleset)
+        fold_mode = turn >= late_turn and base_shanten >= _FOLD_SHANTEN and threatening
 
-        w_speed, w_value, w_safety, w_flex = _weights_for_turn(turn)
+        w_speed, w_value, w_safety, w_flex = _weights_for_turn(turn, early_turn, late_turn)
         accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
 
         best_key: tuple[float, int, int] | None = None

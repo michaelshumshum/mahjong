@@ -154,3 +154,24 @@ def replace_flowers(
         tuple(set_aside[3]),
     )
     return dealt, Wall(tuple(tiles)), aside
+
+
+def max_turns_per_seat(ruleset: RuleSet) -> int:
+    """Rough per-seat draw budget for one hand before exhaustive draw, as a pure function of
+    `RuleSet` alone -- used by `bots/faanbot.py` to scale its turn-based weight schedule to a
+    non-default `wall_reserve`/`flowers_enabled` instead of the fixed default-ruleset constants
+    it was originally tuned against.
+
+    `total physical tiles (144/136, see new_wall) - initial deal (13*4 + 1 dealer extra = 53,
+    see deal_hands) - wall_reserve`, split evenly across 4 seats. Counts front (normal-turn)
+    draws only: a kong or flower replacement draws from the *back* of this same wall (no
+    separate dead wall, module docstring above) without ending that seat's turn, so this is an
+    upper bound, not an exact count -- exactly how many replacement draws happen in a given hand
+    depends on how many flowers get dealt/drawn and how many kongs get declared, both per-hand
+    randomness this function deliberately ignores so it stays a pure, allocation-time function of
+    `RuleSet` rather than a simulation.
+    """
+    total = 144 if ruleset.flowers_enabled else 136
+    dealt = _HAND_SIZE * _SEATS + 1
+    available = total - dealt - ruleset.wall_reserve
+    return max(available, 0) // _SEATS
