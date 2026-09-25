@@ -16,7 +16,7 @@ which is all ranking needs. Not safe as an absolute faan prediction.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from mahjong_core.tiles import TileType
 
@@ -25,6 +25,7 @@ __all__ = [
     "estimate_best_faan",
     "pattern_optionality",
     "reachable_routes",
+    "route_faan_for",
 ]
 
 _HONOR_START = 27
@@ -42,6 +43,33 @@ ROUTE_FAAN: dict[str, int] = {
     "voided_suit": 2,
     "all_sequences": 1,  # 平糊 -- the floor every hand can reach, T1's whole failure mode
 }
+
+# route name -> the Chinese pattern name `RuleSet.faan_overrides` / `scoring/patterns.py`'s
+# registry key it corresponds to (docs/04-bots.md §9 Tier 2). Every `ROUTE_FAAN` base value
+# above is pinned against the matching pattern's own base faan in `tests/test_valuation.py`.
+_ROUTE_PATTERN_NAMES: dict[str, str] = {
+    "full_flush": "清一色",
+    "half_flush": "混一色",
+    "all_pungs": "對對糊",
+    "small_three_dragons": "小三元",
+    "seven_pairs": "七對子",
+    "voided_suit": "缺一門",
+    "all_sequences": "平糊",
+}
+
+
+def route_faan_for(faan_overrides: Mapping[str, int]) -> dict[str, int]:
+    """`ROUTE_FAAN` with `faan_overrides` applied via `_ROUTE_PATTERN_NAMES`. Empty overrides --
+    every ruleset preset and every pre-existing test -- returns `ROUTE_FAAN` itself unchanged,
+    so callers that skip this (or pass the default `route_faan=ROUTE_FAAN`) see byte-identical
+    behavior to before `faan_overrides` was threaded through."""
+    if not faan_overrides:
+        return ROUTE_FAAN
+    return {
+        route: faan_overrides.get(_ROUTE_PATTERN_NAMES[route], base)
+        for route, base in ROUTE_FAAN.items()
+    }
+
 
 _HALF_FLUSH_MIN_TILES = 7
 _FULL_FLUSH_MIN_TILES = 9
@@ -85,10 +113,15 @@ def _sequence_potential(hand34: Sequence[int]) -> int:
     return potential
 
 
-def reachable_routes(hand34: Sequence[int], *, closed: bool) -> list[tuple[int, str]]:
+def reachable_routes(
+    hand34: Sequence[int], *, closed: bool, route_faan: dict[str, int] = ROUTE_FAAN
+) -> list[tuple[int, str]]:
     """Every route this hand shape's commit threshold already clears, as `(base_faan,
     route_name)` -- always non-empty (falls back to `all_sequences`). Suit-based routes mirror
-    `mahjong_core.scoring.patterns`' own suit-count conditions, so they can't overlap."""
+    `mahjong_core.scoring.patterns`' own suit-count conditions, so they can't overlap.
+
+    `route_faan` defaults to the fixed `ROUTE_FAAN` table; pass `route_faan_for(ruleset.
+    faan_overrides)` to rank by the active ruleset's real per-pattern values instead."""
     routes: list[tuple[int, str]] = []
     suits = _suits_present(hand34)
     honors = _honors_present(hand34)
@@ -98,46 +131,50 @@ def reachable_routes(hand34: Sequence[int], *, closed: bool) -> list[tuple[int, 
         base = suit * _RANKS_PER_SUIT
         tiles_in_suit = sum(hand34[base : base + _RANKS_PER_SUIT])
         if not honors and tiles_in_suit >= _FULL_FLUSH_MIN_TILES:
-            routes.append((ROUTE_FAAN["full_flush"], "full_flush"))
+            routes.append((route_faan["full_flush"], "full_flush"))
         tiles_in_suit_and_honors = tiles_in_suit + sum(hand34[_HONOR_START:34])
         if tiles_in_suit_and_honors >= _HALF_FLUSH_MIN_TILES:
-            routes.append((ROUTE_FAAN["half_flush"], "half_flush"))
+            routes.append((route_faan["half_flush"], "half_flush"))
     elif len(suits) == 2:
-        routes.append((ROUTE_FAAN["voided_suit"], "voided_suit"))
+        routes.append((route_faan["voided_suit"], "voided_suit"))
 
     block_types = sum(1 for c in hand34 if c >= 2)
     if (
         block_types >= _ALL_PUNGS_MIN_BLOCKS
         and _sequence_potential(hand34) <= _ALL_PUNGS_MAX_SEQUENCE_POTENTIAL
     ):
-        routes.append((ROUTE_FAAN["all_pungs"], "all_pungs"))
+        routes.append((route_faan["all_pungs"], "all_pungs"))
 
     dragon_pairs = sum(1 for t in _DRAGON_TYPES if hand34[t] >= 2)
     if dragon_pairs >= _SMALL_DRAGONS_MIN_PAIRS:
-        routes.append((ROUTE_FAAN["small_three_dragons"], "small_three_dragons"))
+        routes.append((route_faan["small_three_dragons"], "small_three_dragons"))
 
     if closed:
         pair_types = sum(1 for c in hand34 if c >= 2)
         if pair_types >= _SEVEN_PAIRS_MIN_PAIRS:
-            routes.append((ROUTE_FAAN["seven_pairs"], "seven_pairs"))
+            routes.append((route_faan["seven_pairs"], "seven_pairs"))
 
     if not routes:
-        routes.append((ROUTE_FAAN["all_sequences"], "all_sequences"))
+        routes.append((route_faan["all_sequences"], "all_sequences"))
     return routes
 
 
-def estimate_best_faan(hand34: Sequence[int], *, closed: bool) -> tuple[int, str]:
+def estimate_best_faan(
+    hand34: Sequence[int], *, closed: bool, route_faan: dict[str, int] = ROUTE_FAAN
+) -> tuple[int, str]:
     """`(estimated_faan, route_name)` for the best reachable route, plus the closed bonus --
     `E[faan | best reachable pattern]`, not weighted by likelihood of completion (that's
     shanten/ukeire's job; `bots/faanbot.py` combines the two)."""
-    routes = reachable_routes(hand34, closed=closed)
+    routes = reachable_routes(hand34, closed=closed, route_faan=route_faan)
     best_faan, best_route = max(routes, key=lambda r: r[0])
     if closed:
         best_faan += _SELF_DRAW_CONCEALED_BONUS
     return best_faan, best_route
 
 
-def pattern_optionality(hand34: Sequence[int], *, closed: bool) -> int:
+def pattern_optionality(
+    hand34: Sequence[int], *, closed: bool, route_faan: dict[str, int] = ROUTE_FAAN
+) -> int:
     """How many distinct routes are reachable right now -- rewards discards that keep more than
     one value route alive rather than committing early."""
-    return len(reachable_routes(hand34, closed=closed))
+    return len(reachable_routes(hand34, closed=closed, route_faan=route_faan))

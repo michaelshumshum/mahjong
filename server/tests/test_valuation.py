@@ -15,7 +15,13 @@ pass/fail regression suite of the same kind as the fixtures below.
 
 from __future__ import annotations
 
-from bots.valuation import ROUTE_FAAN, estimate_best_faan, pattern_optionality, reachable_routes
+from bots.valuation import (
+    ROUTE_FAAN,
+    estimate_best_faan,
+    pattern_optionality,
+    reachable_routes,
+    route_faan_for,
+)
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.patterns import ScoringContext, score_hand
 from mahjong_core.state import Wind
@@ -273,3 +279,76 @@ def test_pattern_optionality_counts_distinct_reachable_routes() -> None:
         TileType.DRAGON_GREEN,
     )
     assert pattern_optionality(multi_route, closed=True) == 3
+
+
+# --- faan_overrides-aware ROUTE_FAAN (docs/04-bots.md §9 Tier 2) ----------------------------
+
+
+def test_route_faan_for_empty_overrides_returns_route_faan_unchanged() -> None:
+    """`{}` is `RuleSet.faan_overrides`'s default for every existing preset and every
+    pre-existing test -- `route_faan_for` must reproduce `ROUTE_FAAN` byte-identically (the
+    same object, not just an equal copy) so every caller that doesn't thread a ruleset through
+    keeps its exact prior behavior."""
+    assert route_faan_for({}) is ROUTE_FAAN
+
+
+def test_route_faan_for_applies_an_override_via_the_pattern_name_mapping() -> None:
+    """`faan_overrides` is keyed by the Chinese pattern name `scoring/patterns.py`'s registry
+    uses (混一色 = Half Flush), not the English route name `ROUTE_FAAN` uses -- this is the
+    route-name -> pattern-name mapping the module docstring for `route_faan_for` describes.
+    Every other route stays at its `ROUTE_FAAN` default; a name absent from `faan_overrides`
+    (e.g. an unrelated pattern) doesn't perturb anything."""
+    overridden = route_faan_for({"混一色": 10, "雞糊": 0})
+    assert overridden["half_flush"] == 10
+    assert overridden["full_flush"] == ROUTE_FAAN["full_flush"]
+    assert overridden["voided_suit"] == ROUTE_FAAN["voided_suit"]
+
+
+def test_estimate_best_faan_reads_route_faan_override() -> None:
+    """A one-suit, no-honor 9+ tile hand reaches both `full_flush` (6) and `half_flush` (3) --
+    `full_flush` wins by default (matches `test_estimate_best_faan_picks_the_highest_reachable_
+    route`). Overriding `混一色` (Half Flush) to 20 via `route_faan_for` must flip which route
+    `estimate_best_faan` reports as best, proving the override actually reaches the value
+    estimator, not just `reachable_routes`'s raw list."""
+    hand = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.MAN_5,
+    )
+    faan_default, route_default = estimate_best_faan(hand, closed=False)
+    assert route_default == "full_flush"
+    assert faan_default == ROUTE_FAAN["full_flush"]
+
+    route_faan = route_faan_for({"混一色": 20})
+    faan_overridden, route_overridden = estimate_best_faan(
+        hand, closed=False, route_faan=route_faan
+    )
+    assert route_overridden == "half_flush"
+    assert faan_overridden == 20
+
+
+def test_estimate_best_faan_with_empty_overrides_matches_the_fixed_default() -> None:
+    """Same hand as `test_estimate_best_faan_picks_the_highest_reachable_route`, run through
+    `route_faan_for({})` explicitly -- must match the no-`route_faan`-argument call exactly,
+    pinning that an empty `faan_overrides` reproduces today's fixed `ROUTE_FAAN` behavior
+    structurally, not just "probably" (docs/99-deferred.md's Tier 2 revival requirement)."""
+    hand = _hand34(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.MAN_5,
+    )
+    assert estimate_best_faan(hand, closed=False) == estimate_best_faan(
+        hand, closed=False, route_faan=route_faan_for({})
+    )
