@@ -20,6 +20,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from mahjong.shanten import Shanten as OracleShanten
 
+from mahjong_core.config import HandSet
 from mahjong_core.shanten import (
     AGARI,
     seven_pairs_shanten,
@@ -107,6 +108,33 @@ def test_thirteen_orphans_agari() -> None:
     counts[orphans[-1]] += 1
     assert sum(counts) == 14
     assert thirteen_orphans_shanten(counts) == AGARI
+
+
+def test_seven_pairs_gated_by_hand_sets() -> None:
+    """Same shape as `test_closed_false_skips_seven_pairs_and_kokushi` (six scattered pairs, no
+    chow potential, one lone single) but exercising the `hand_sets` gate instead of `closed`
+    (docs/04-bots.md §9 Tier 2): Seven Pairs is `HandSet.NEW_18` (`scoring/patterns.py`), so a
+    ruleset without it (e.g. `hk_strict`) must not let this hand read as tenpai via a pattern it
+    can never legally complete there. Thirteen Orphans is `HandSet.CLASSIC` and isn't gated by
+    this param at all -- not exercised here, see `thirteen_orphans_shanten`'s own tests above."""
+    counts = new_count_array()
+    for t in (0, 9, 18, 27, 28, 29):  # 1m, 1p, 1s, East, South, West
+        counts[t] = 2
+    counts[30] = 1  # North, lone -- one pair short of seven pairs tenpai
+    assert sum(counts) == 13
+
+    all_sets = frozenset(HandSet)
+    no_new_18 = frozenset({HandSet.CLASSIC, HandSet.NEW_6})
+
+    # default (no hand_sets passed) is unchanged from pre-gate behavior: every hand_set on.
+    assert shanten(counts) == 0
+    assert shanten(counts, hand_sets=all_sets) == 0
+
+    # NEW_18 off: Seven Pairs is illegal there, so this can only read via the standard parse --
+    # strictly worse, never better, than with it included.
+    result_without = shanten(counts, hand_sets=no_new_18)
+    assert result_without == standard_shanten(counts)
+    assert result_without > shanten(counts, hand_sets=all_sets)
 
 
 def test_closed_false_skips_seven_pairs_and_kokushi() -> None:

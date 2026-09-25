@@ -31,6 +31,8 @@ import itertools
 from collections.abc import Sequence
 from functools import cache
 
+from mahjong_core.config import HandSet
+
 __all__ = [
     "AGARI",
     "seven_pairs_shanten",
@@ -45,6 +47,7 @@ AGARI = -1
 
 _ORPHAN_INDICES = (0, 8, 9, 17, 18, 26, 27, 28, 29, 30, 31, 32, 33)
 _CAP = 4
+_ALL_HAND_SETS: frozenset[HandSet] = frozenset(HandSet)
 
 
 def _sub(counts: tuple[int, ...], *positions: int) -> tuple[int, ...]:
@@ -141,24 +144,43 @@ def thirteen_orphans_shanten(tiles34: Sequence[int]) -> int:
     return 13 - present - (1 if has_pair else 0)
 
 
-def shanten(tiles34: Sequence[int], *, closed: bool = True) -> int:
-    """Overall shanten: the minimum of all three parses. `closed=False` (any exposed meld
-    present) skips Seven Pairs/Thirteen Orphans -- both require a fully concealed hand by
-    construction, so evaluating them against a hand with an exposed meld would produce a
-    meaningless number.
+def shanten(
+    tiles34: Sequence[int],
+    *,
+    closed: bool = True,
+    hand_sets: frozenset[HandSet] = _ALL_HAND_SETS,
+) -> int:
+    """Overall shanten: the minimum of all parses legal under `hand_sets` (default: every
+    hand_set, i.e. identical to the pre-`hand_sets`-param behavior). `closed=False` (any exposed
+    meld present) skips Seven Pairs/Thirteen Orphans regardless of `hand_sets` -- both require a
+    fully concealed hand by construction, so evaluating them against a hand with an exposed meld
+    would produce a meaningless number.
+
+    Thirteen Orphans (十三么) is `HandSet.CLASSIC` (`scoring/patterns.py`), which every ruleset
+    is assumed to carry -- unlike Seven Pairs it isn't gated here. Seven Pairs (七對子) is
+    `HandSet.NEW_18` and is only mandatory-parsed when `NEW_18` is in `hand_sets`; a ruleset with
+    it off (e.g. `hk_strict`) must not have bots chase a shape they can never legally complete
+    (docs/01-rules-spec.md "New 18", docs/04-bots.md §9).
     """
     best = standard_shanten(tiles34)
     if closed:
-        best = min(best, seven_pairs_shanten(tiles34), thirteen_orphans_shanten(tiles34))
+        best = min(best, thirteen_orphans_shanten(tiles34))
+        if HandSet.NEW_18 in hand_sets:
+            best = min(best, seven_pairs_shanten(tiles34))
     return best
 
 
 def ukeire(
-    hand34: Sequence[int], seen34: Sequence[int], *, closed: bool = True
+    hand34: Sequence[int],
+    seen34: Sequence[int],
+    *,
+    closed: bool = True,
+    hand_sets: frozenset[HandSet] = _ALL_HAND_SETS,
 ) -> dict[int, tuple[int, int]]:
     """For each tile type actually held, how many unseen tiles reduce shanten if drawn after
     discarding it. `-> {tile_type_value: (kinds_accepted, tiles_accepted)}`. `seen34` counts
-    everything publicly visible plus the hand itself; never the wall.
+    everything publicly visible plus the hand itself; never the wall. `hand_sets` forwards to
+    `shanten` unchanged (see there).
     """
     result: dict[int, tuple[int, int]] = {}
     after = list(hand34)
@@ -166,14 +188,14 @@ def ukeire(
         if hand34[d] == 0:
             continue
         after[d] -= 1
-        base = shanten(after, closed=closed)
+        base = shanten(after, closed=closed, hand_sets=hand_sets)
         kinds = tiles = 0
         for t in range(34):
             live = 4 - seen34[t]
             if live <= 0:
                 continue
             after[t] += 1
-            if shanten(after, closed=closed) < base:
+            if shanten(after, closed=closed, hand_sets=hand_sets) < base:
                 kinds += 1
                 tiles += live
             after[t] -= 1
