@@ -317,3 +317,126 @@ mode §4 exists to fix. Deal-in rate stays below T1's (better defence); win rate
 `w_safety` moved the needle further than `w_value`/`w_speed` in the retuning so far, so trimming
 it further (or revisiting `bots/safety.py`'s own per-signal multipliers) is the open next step,
 not a sign the approach is wrong.
+
+## 9. Ruleset awareness
+
+**Gap, not speculative.** [05-roadmap.md M6](05-roadmap.md) already ships `RULESET_PRESETS`
+(`hk_classic`/`hk_casual`/`hk_strict`) plus a `custom` `RuleSet.from_dict` path via `POST
+/tables` — a table can run today with `min_faan=1` (`hk_casual`) or `min_faan=5` with NEW_18
+off (`hk_strict`, `mahjong_core/presets.py`). `Bot.act` only ever sees `SeatView` (§1); as of
+Tier 1 it carries `ruleset: RuleSet`, and as of Tier 2's first two items (below)
+`mahjong_core.shanten` and both bot tiers read `hand_sets` off it too, and `bots/valuation.py`
+reads `faan_overrides` — `wall_reserve` is the one remaining hardcoded assumption.
+
+| Hardcoded assumption | Where | Effect under a non-default ruleset |
+| --- | --- | --- |
+| ~~`min_faan = 3`~~ **closed, Tier 1** | was `bots/faanbot.py`'s `_ASSUMED_MIN_FAAN`; now `_should_claim` reads `view.ruleset.min_faan` | `_should_claim`'s claim guard now checks the table's real threshold under any preset |
+| ~~`hand_sets` (which patterns are legal)~~ **closed, Tier 2** | was `mahjong_core/shanten.py`'s `shanten()` running Seven Pairs unconditionally whenever `closed=True`; now gated on `HandSet.NEW_18 in hand_sets` | `shanten()`/`ukeire()` (and both `EfficiencyBot`/`FaanBot`, which pass `view.ruleset.hand_sets` through) no longer chase a Seven Pairs shape that can't legally win under `hk_strict` |
+| ~~`faan_overrides`~~ **closed, Tier 2** | was `bots/valuation.py`'s `ROUTE_FAAN` (fixed dict); now `route_faan_for(view.ruleset.faan_overrides)` remaps it via a route-name → `scoring/patterns.py` Chinese-pattern-name table, computed once per `FaanBot` decision and threaded into `estimate_best_faan`/`pattern_optionality` | T2's discard ranking follows a table's real per-pattern faan overrides instead of the fixed defaults; empty `faan_overrides` (every existing preset) is byte-identical to before (`route_faan_for({}) is ROUTE_FAAN`) |
+| ~~`score_table`~~ **not actually a bot gap** | `mahjong_core/scoring/payout.py`'s `points()` already takes `ruleset` directly and reads `ruleset.score_table` — checked via `find_referencing_symbols`, `score_table` has no reference anywhere in `bots/` | None — this was miscategorized in an earlier pass of this table by being adjacent to `faan_overrides` (both are `RuleSet` scoring fields), not because any bot logic hardcoded it. `score_table` is a faan→**points** payout conversion scale (`ScoreTable.HALF_SPICY`/`FULL_SPICY`); `ROUTE_FAAN`/`estimate_best_faan` rank discards by estimated **faan**, never points, so there was never a value here for a bot to read |
+| `wall_reserve`/`game_length` | `bots/faanbot.py`'s `_LATE_TURN`/`_weights_for_turn` breakpoints, hand-tuned against the default turn-count regime | "speed early → value mid → safety late" (§4) fires at the wrong point in a shorter/longer game |
+
+**Plan, tiered by blast radius — Tier 2's remaining scope and revival requirements live in
+[99-deferred.md](99-deferred.md):**
+
+- **Built: `min_faan` only (Tier 1).** `ruleset: RuleSet` added to `SeatView` (`app/views.py`,
+  `Entitlement.PUBLIC` field, populated in `seat_view()` from `state.ruleset` — `GameState`
+  already carries `ruleset` directly, so none of `seat_view()`'s four call sites (`app/table.py`
+  ×2, `bots/arena.py`, `bots/selfplay.py`) needed changes). `bots/faanbot.py`'s `_should_claim`
+  now takes `min_faan` as a parameter and reads it from `view.ruleset.min_faan` at both call
+  sites in `_act_on_claim`; the `_ASSUMED_MIN_FAAN` constant is deleted. `tests/test_faanbot.py`
+  adds `test_should_claim_reads_min_faan_from_the_live_ruleset`, pinning the opposite claim
+  decision (pung taken vs. passed) between `min_faan=1` and the `min_faan=3` default on the same
+  scripted hand. `tests/test_redaction.py`'s entitlement walker (`_assert_wire_entitlement`)
+  covers the new field automatically — it iterates `dataclasses.fields()`, not a hardcoded list —
+  and `tests/test_safety.py`/`tests/test_efficiency.py`'s direct `SeatView(...)` test fixtures
+  were updated to pass `ruleset=RuleSet()` for the new required field.
+- **Built: `hand_sets` (Tier 2, first item).** Seven Pairs (七對子) is `HandSet.NEW_18`;
+  Thirteen Orphans (十三么) is `HandSet.CLASSIC` (`mahjong_core/scoring/patterns.py`'s registry
+  is the source of truth, not inference — every ruleset is assumed to carry `CLASSIC`, same
+  assumption the rest of the pattern table already makes for the ~20 other `CLASSIC` patterns),
+  so only the Seven Pairs parse needed gating. `mahjong_core/shanten.py`'s `shanten()`/`ukeire()`
+  take a new `hand_sets: frozenset[HandSet] = frozenset(HandSet)` keyword param (imports
+  `HandSet` from `mahjong_core/config.py` — same package, no cycle: `config.py` stays
+  stdlib-only and doesn't import `shanten.py`); the default reproduces the old unconditional
+  behavior exactly, so every existing caller (oracle cross-checks in `tests/test_shanten.py`,
+  `bots/arena.py`'s tenpai/winning-tile helpers) is unaffected. `bots/efficiency.py` and
+  `bots/faanbot.py` thread `view.ruleset.hand_sets` through every `shanten()`/`ukeire()` call
+  site. `bots/safety.py` and `bots/valuation.py` don't call either function directly (checked via
+  `find_referencing_symbols`), so neither needed changes. `bots/arena.py`'s own direct `shanten()`
+  calls (tenpai-rate/winning-tile stats, not a bot decision) were deliberately left as-is — out
+  of this item's scope; see note below. New tests:
+  `tests/test_shanten.py::test_seven_pairs_gated_by_hand_sets` (same shape as
+  `test_closed_false_skips_seven_pairs_and_kokushi`, pins `hand_sets` without `NEW_18` at
+  `standard_shanten`'s value, strictly worse than with it, default unchanged) and
+  `tests/test_faanbot.py::test_discard_stops_chasing_seven_pairs_when_new_18_is_off` (a
+  6-honor-pairs + manzu-ryanmen hand where `FaanBot` sacrifices the ryanmen for a Seven Pairs
+  tenpai under `hk_classic` but keeps it under `hk_strict`'s `hand_sets`).
+- **Built: `faan_overrides` (Tier 2, second item).** Investigated first, per the item's own
+  scoping note — `score_table`/`faan_overrides` were previously listed as one combined row, but
+  they're unrelated: `mahjong_core/scoring/payout.py`'s `points()` already takes `ruleset`
+  directly and is a faan→**points** payout conversion (`ScoreTable.HALF_SPICY`/`FULL_SPICY`),
+  with zero references anywhere in `bots/` (checked via `find_referencing_symbols`) — never a bot
+  gap at all, see the table above. `faan_overrides` (a `{pattern_name: faan}` map keyed by the
+  Chinese name `scoring/patterns.py`'s `PATTERNS` registry uses, applied in
+  `scoring/faan.py`'s `_candidate_breakdown`) *does* change a pattern's real faan value, and is
+  the only one of the two `bots/valuation.py`'s `ROUTE_FAAN` needed to track. `bots/valuation.py`
+  adds `route_faan_for(faan_overrides) -> dict[str, int]`, remapping `ROUTE_FAAN` through a
+  private `_ROUTE_PATTERN_NAMES` table (`"full_flush" -> "清一色"`, `"half_flush" -> "混一色"`,
+  etc. — every entry cross-checked 1:1 against `ROUTE_FAAN`'s own base values in
+  `tests/test_valuation.py`); empty `faan_overrides` (every existing preset) returns `ROUTE_FAAN`
+  itself unchanged (`is`, not just `==`), so every caller that doesn't thread a ruleset through is
+  byte-identical to before. `reachable_routes`/`estimate_best_faan`/`pattern_optionality` take a
+  new `route_faan: dict[str, int] = ROUTE_FAAN` keyword param instead of reading the module
+  constant directly. No `functools.cache`/`lru_cache` was used: `RuleSet` is a frozen dataclass
+  but not actually hashable (`faan_overrides: dict[str, int]` is a mutable field, so
+  `dataclasses`' auto-generated `__hash__` raises `TypeError` on a bare `hash(ruleset)` —
+  confirmed directly), so memoizing on the `RuleSet` itself isn't safe; `route_faan_for` is called
+  once per `FaanBot` decision (top of `_act_on_claim`/`_best_discard`) and the resulting dict
+  reused across that decision's candidate loop, rather than rebuilt per candidate or unsafely
+  cached. `bots/faanbot.py` threads the resulting `route_faan` into every
+  `estimate_best_faan`/`pattern_optionality` call site (`_act_on_claim`, `_should_claim`,
+  `_best_discard`). New tests: `tests/test_valuation.py` (`route_faan_for`'s empty-override
+  identity and pattern-name-mapped override, plus `estimate_best_faan` picking a different best
+  route once an override is applied) and `tests/test_faanbot.py::
+  test_discard_follows_faan_overrides_boosting_a_route` (same marginal-value hand as
+  `test_does_not_chase_a_marginal_value_signal` — 南 wins by default at every turn bucket;
+  boosting `混一色` to 15 via `faan_overrides` flips the discard to 5p at every turn bucket,
+  verified directly against `FaanBot.act`) plus
+  `test_discard_with_empty_faan_overrides_matches_default_route_faan` pinning the empty-override
+  regression requirement at the bot level, not just inside `bots/valuation.py`.
+
+  Arena regression check (docs/99-deferred.md's Tier 2 revival requirement) — default ruleset,
+  no `faan_overrides`, so this is a pure regression check that threading `ruleset` through
+  `bots/valuation.py` didn't perturb anything, not a re-tune:
+  `docker compose --profile tools run --rm arena uv run python -m bots.arena --a FaanBot --b
+  EfficiencyBot --games 500 --parallel 8` (500 duplicate sets, smaller sample than §8's
+  documented 1000-set run — same seed default):
+
+  | Metric | FaanBot (A) | EfficiencyBot (B) |
+  | --- | --- | --- |
+  | win_rate | 0.1744 | 0.2238 |
+  | deal_in_rate | 0.1110 | 0.1400 |
+  | avg_winning_faan | 4.2444 | 3.7151 |
+  | tenpai_rate_on_sub_minimum_hand | 0.2251 | 0.3260 |
+  | avg_points_per_hand | 0.2380 | -0.0793 |
+
+  Paired difference (A − B): **+1.269 points/game, 95% CI [-0.128, +2.667]** — every metric sits
+  within a few thousandths to a few hundredths of §8's documented 1000-set baseline (win_rate
+  0.1752/0.2239, deal_in_rate 0.1096/0.1389, avg_winning_faan 4.2294/3.7456,
+  tenpai_rate_on_sub_minimum_hand 0.2243/0.3243), and the paired-difference point estimate keeps
+  the same sign with an overlapping CI (baseline +0.591, [-0.393, +1.575]) — the wider CI here is
+  expected at half the duplicate-set count, not a sign of drift. Confirms threading `ruleset`
+  through `bots/valuation.py` didn't perturb default-ruleset (empty `faan_overrides`) behavior.
+- **`wall_reserve` (Tier 2, still deferred).** `bots/faanbot.py`'s `_LATE_TURN`/
+  `_weights_for_turn` breakpoints, hand-tuned against the default turn-count regime — re-deriving
+  them as a fraction of the ruleset's actual turn budget invalidates the shipped
+  `_weights_for_turn` tuning (§4/§8) the same way `faan_overrides` did, so it needs its own full
+  arena re-run before merging (`--games 1000+`, paired-difference CI excludes zero, §8) —
+  re-tuning cost, not implementation cost, is what makes this Tier 2. Out of scope for the
+  `faan_overrides` item above; not touched here. (`bots/arena.py`'s own `shanten()` calls, used
+  only for tenpai/win-rate stats rather than a bot's actual decision, are still not
+  `hand_sets`-aware either — noted here rather than the table above since it isn't bot behavior,
+  but worth revisiting alongside a future item since an `hk_strict` arena run's tenpai-rate stat
+  currently over-counts hands that are only tenpai via a Seven Pairs shape that table can't
+  complete.)

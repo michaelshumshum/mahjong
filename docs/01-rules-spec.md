@@ -258,11 +258,14 @@ entry in this table — disabling `NEW_6` disables 雞糊 too, even at `min_faan
 
 ### New 18 (新十八番) — subset most commonly used
 
-**On by default** (see `hand_sets` in §10) — Seven Pairs (七對子) is not an optional extra:
-the bot's shanten parser treats it as one of three mandatory hand-shape parses (see
-[04-bots.md §2, §4](04-bots.md)), so a `RuleSet` without `NEW_18` makes documented bot
-behavior illegal. Unlike `NEW_18` as a whole, individual patterns in this set may still be
-toggled off via `faan_overrides` (§10) if a table wants to disable a specific one.
+**On by default** (see `hand_sets` in §10). Seven Pairs (七對子) is the one `NEW_18` pattern the
+bot shanten parser also cares about (Thirteen Orphans, 十三么, is `CLASSIC` — always on,
+ungated): `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` take a `hand_sets` param and only
+run the Seven Pairs parse when `NEW_18` is present, so a `RuleSet` without it (e.g.
+`hk_strict`, `mahjong_core/presets.py`) no longer makes bots chase a shape they can't legally
+complete there — current status: [04-bots.md §9](04-bots.md). Unlike `NEW_18` as a whole,
+individual patterns in this set may still be toggled off via `faan_overrides` (§10) if a table
+wants to disable a specific one.
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
