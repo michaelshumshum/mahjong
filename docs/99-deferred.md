@@ -354,6 +354,11 @@ shortcuts for bots, ever. Cut from the trimmed `06-ml.md` because it mostly rest
 `04-bots.md` §1's existing plan rather than adding new ML-specific work; revive alongside the
 day-2 encoder.
 
+**Update (2026-09-26):** `SeatView` already carries `ruleset: RuleSet` (`app/views.py`, added for
+`04-bots.md` §9's bot ruleset-awareness work) — a day-2 encoder built on this diagram gets it for
+free. See "Feature-plane encoding" below for why that field needs to actually reach the tensor,
+not just ride along on the struct.
+
 ### Shared feature functions (shanten / ukeire / safety as pure `SeatView` functions)
 
 Provenance: `06-ml.md` §4 (pre-audit), "Shared feature functions."
@@ -370,6 +375,25 @@ Provenance: `06-ml.md` §4 (pre-audit), closing paragraph.
 Feature planes over the 34 tile types, thermometer-encoded counts, players in relative seat
 order. Day-2 work in the pre-audit doc, unchanged by this pass — still day 2.
 
+**Ruleset must be an explicit input, not assumed fixed (added 2026-09-26, per `04-bots.md` §9).**
+This paragraph predates `FaanBot`/`EfficiencyBot` becoming ruleset-aware (`min_faan`, `hand_sets`,
+`faan_overrides`, `wall_reserve` all now read from `view.ruleset`) and a table's ruleset being
+player-choosable at all (`05-roadmap.md` M6's presets/custom-ruleset feature). The consequence for
+this section specifically: the *correct* discard for an identical 13-tile hand now genuinely
+depends on the active ruleset — e.g. chasing Seven Pairs is correct under `hk_classic` and wrong
+under `hk_strict` for the same shape (`04-bots.md` §9's `hand_sets` fix exists precisely because
+this wasn't true of the heuristic bots either, until now). A feature-plane design that encodes
+only tile/seat state and omits the ruleset would train a network that either overfits to whichever
+ruleset generated its data or, worse, gets self-contradictory labels if training data ever mixes
+rulesets (see "Behaviour cloning from `FaanBot`" below). `RuleSet`'s fields split unevenly for
+this purpose: `min_faan`/`hand_sets`/`faan_overrides`/`wall_reserve` change what a *correct*
+action is and need encoding (e.g. `min_faan`/`wall_reserve` as scalars or thermometer-coded like
+the tile counts above, `hand_sets` as a small bitmask, `faan_overrides` is the awkward one —
+unbounded `dict[str, int]`, needs a fixed-size encoding scheme, e.g. one slot per registered
+pattern in `scoring/patterns.py`'s registry). Fields governing timing/connection/fairness
+(`turn_seconds`, `provable_fairness`, etc.) have no bearing on hand-value decisions and shouldn't
+be encoded at all — don't pad the input with the whole `RuleSet.to_dict()` uncritically.
+
 ### PettingZoo AEC environment wrapper
 
 Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
@@ -384,6 +408,14 @@ Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
 Blocked on two things beyond just "day 2": `FaanBot` existing (now M4 per D11, not M6), and a
 compute budget / target metric being defined somewhere — neither exists in the doc set yet. See
 `06-ml.md` §3 for the honest version of this constraint.
+
+**Third thing, added 2026-09-26:** `FaanBot` is now ruleset-conditioned (`04-bots.md` §9), so
+"clone `FaanBot`" is underspecified until someone decides which ruleset(s) generate the training
+corpus. Cloning from single-ruleset self-play (e.g. `hk_classic` only) is straightforward and
+matches this section's original framing. Cloning from a *mix* of rulesets to get a network that
+generalizes across tables additionally requires the "Feature-plane encoding" entry above's
+ruleset-as-input point — without it, the same hand shape carries contradictory labels across
+examples and behaviour cloning has nothing consistent to fit.
 
 ### Self-play PPO + batched inference serving
 
