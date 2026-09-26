@@ -251,7 +251,13 @@ calibrated accuracy.
 
 ## 6. T3 / search, and bot personas
 
-Deferred — see [99-deferred.md](99-deferred.md).
+Deferred — see [99-deferred.md](99-deferred.md). That entry now also carries a concrete
+execution-model finding worth reading before starting this: `_shared_bot_pool()` (§3) is one
+`ProcessPoolExecutor` shared by every tier and every table, and a 300–800ms T3 job on it would
+head-of-line-block T1/T2 jobs from unrelated tables. Per-tier pool routing is the fix, but it's
+deliberately not built yet — no real consumer, and it needs per-core throughput measurement on
+real hardware to size. Don't rediscover this from scratch; see `99-deferred.md`'s "T3 — search"
+entry for the full reasoning and what un-deferring requires.
 
 ## 7. Difficulty levels
 

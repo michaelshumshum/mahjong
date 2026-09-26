@@ -58,6 +58,12 @@ multi-node routing is deferred (§2).
 The base `server` image has no torch or numpy; the `ml` extra adds both (~180MB vs ~3GB). The
 API never imports either.
 
+`trainer`'s `python -m ml.train --config ml/configs/bc.yaml` and `arena`'s `python -m bots.arena`
+both point at real code as of 2026-09-26 — `server/ml/` exists (an empty, import-guarded skeleton
+package; `docs/06-ml.md §3`, `docs/99-deferred.md`), so `trainer` no longer names a module that
+doesn't exist. `ml.train` is still a stub: `--help` works, a real `--config` run raises
+`NotImplementedError`.
+
 ## 4. Image layering
 
 Both Dockerfiles are multi-stage with a shared `base`:
@@ -89,6 +95,9 @@ the shipped image is untouched. Two consequences worth knowing:
 deps. `trainer`/`arena` don't bind-mount source over the image: doing so would shadow the
 image's baked venv with an empty one and force a ~3GB torch reinstall on first run. Rebuild
 (`make train` / `make arena`) to pick up source changes.
+
+The `ml` stage's `CMD ["python", "-m", "ml.train", "--help"]` resolves against a real package
+(`server/ml/`) now, not an aspirational path — see §3.
 
 Dependency install is a separate layer keyed on the lockfile. `uv` and `pnpm` caches are
 BuildKit cache mounts.
@@ -173,6 +182,16 @@ workflows** (`workflow_call`), one per concern:
 | `.github/workflows/server.yml` | `server` + `server-slow` jobs | `server`: `uv sync --locked`, then `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `uv sync --locked`, then `pytest -q -m slow -n auto --games=1000` — soaks, the real-bot/`ProcessPoolExecutor` practice-mode e2e, hypothesis runs. Never skipped: this is the whole suite, not just the fast gate. |
 | `.github/workflows/web.yml` | one `web` job | `pnpm install --frozen-lockfile`, then `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm test` (vitest + Playwright e2e) |
 | `.github/workflows/proto-check.yml` | one `proto-check` job | regenerates protocol types natively (the same two commands `make proto` runs, without the compose wrapper), then `git diff --exit-code` — fails if committed output is stale |
+
+**`.github/workflows/server-ml.yml` (added 2026-09-26) is deliberately not one of the three above.**
+It smoke-tests the `ml` extra — `uv sync --locked --extra ml`, `import ml`/`import ml.train`,
+`python -m ml.train --help` (must exit 0), and a real `--config` run (must raise, not exit 0) —
+but `workflow_call` (what `ci.yml` uses for the three reusable workflows) has no path-filter
+mechanism, and the `ml` extra's torch/numpy install is too heavy (§3) to pay on every push the way
+`server`/`web`/`proto-check` do. So it's a standalone workflow with its own `on.push.paths`/
+`on.pull_request.paths` (GitHub's native path filter, since none of the other workflows use one) —
+`server/ml/**`, `server/pyproject.toml`, `server/uv.lock`, or the workflow file itself — instead of
+being called from `ci.yml`. `server`/`server-slow` are untouched: neither installs the `ml` extra.
 
 `ci.yml` also has one job of its own, not a reusable-workflow call: `coverage-badge`, gated
 `if: push to main` (never a PR — a fork PR has no write access, and shouldn't mutate main anyway)

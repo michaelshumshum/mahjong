@@ -271,6 +271,22 @@ Before reviving this: re-derive the per-decision CPU budget against whatever the
 200 concurrent tables × 3 bot seats is a much larger capacity ask than the T1/T2 shanten-table
 path and needs its own worker-pool sizing pass, not a shared one.
 
+**Execution-model finding (2026-09-26, ml-readiness scoping pass):** `app/table.py`'s
+`_shared_bot_pool()` is one `ProcessPoolExecutor` shared by every tier and every table
+(`00-architecture.md §3`, `04-bots.md §1`). A T3 job at the 300–800ms budget above would
+head-of-line-block T1/T2 jobs from unrelated tables sharing that same pool — one slow `SearchBot`
+decision stalls every other table's bot turn queued behind it in the pool's worker processes.
+**Deliberately not fixed now, for two reasons, not an oversight:** (1) the fix — routing by tier
+to a tier-appropriate pool instead of one shared pool — needs real per-core throughput
+measurement on target hardware to size correctly; guessing pool sizes today would just be another
+unvalidated constant, no better than the reference numbers `04-bots.md §3` already flags as
+needing calibration. (2) there is no real consumer yet: `SearchBot` doesn't exist, so building a
+tier-routing abstraction now is exactly the premature-abstraction pattern this project's
+conventions warn against (see the KV/Queue/Bus precedent above — "written for a Redis that
+doesn't exist yet"). **Un-deferring T3 concretely requires:** (a) per-tier `ProcessPoolExecutor`
+routing in `app/table.py`, sized against measured per-core throughput on real hardware, before a
+T3 job is ever submitted to the pool; (b) the CPU-budget re-derivation above.
+
 ### Bot personas
 
 Provenance: `04-bots.md` §7, paragraph following the difficulty table (pre-audit); the Expert row
@@ -359,14 +375,34 @@ day-2 encoder.
 free. See "Feature-plane encoding" below for why that field needs to actually reach the tensor,
 not just ride along on the struct.
 
-### Shared feature functions (shanten / ukeire / safety as pure `SeatView` functions)
+### Shared feature functions (shanten / ukeire / safety as pure `SeatView` functions) — done, not deferred
 
-Provenance: `06-ml.md` §4 (pre-audit), "Shared feature functions."
+Provenance: `06-ml.md` §4 (pre-audit), "Shared feature functions." **Correction (2026-09-26,
+ml-readiness scoping pass):** this entry was stale. The work it describes is already built, not
+open — kept here per this doc's own header rule ("nothing here is rejected on merit... parked so
+the intent survives"), not because it's still pending.
 
-T1/T2 need shanten, ukeire, safe-tile inference, and faan-reachability regardless
-(`04-bots.md`). Put them in `mahjong_core` as pure functions of a `SeatView`, not buried inside
-bot classes, so a day-2 encoder can call the same functions. The bot-side need for these
-functions is not deferred — only their framing as ML-boundary work is.
+T1/T2 need shanten, ukeire, safe-tile inference, and faan-reachability regardless (`04-bots.md`).
+The ask was to put them in `mahjong_core`/`bots` as pure functions of a `SeatView`, not buried
+inside bot classes, so a day-2 encoder can call the same functions — and that's what exists:
+`server/bots/features.py` exports `own_hand34`/`seen34`/`is_closed`/`is_terminal_or_honor`,
+`server/bots/safety.py` exports `no_chance`/`is_genbutsu`/`wall_pressure_multiplier`/
+`deal_in_probability`/`expected_cost`/`tile_risk`/`opponent_threat_level`, and
+`server/bots/valuation.py` exports `route_faan_for`/`reachable_routes`/`estimate_best_faan`/
+`pattern_optionality` — all pure functions of a `SeatView` (or the 34-count arrays derived from
+one), confirmed directly against each module's symbols. A day-2 feature-plane encoder can call all
+of this today. What's still actually deferred is the encoder itself — see "Feature-plane
+encoding" below, and its ruleset-as-input requirement.
+
+### `server/ml/` package skeleton (2026-09-26)
+
+`server/ml/` now exists (`__init__.py`, `train.py`, `configs/bc.yaml`) as an empty,
+import-guarded skeleton — enough that the `ml` extra (`pyproject.toml`), the Dockerfile's `ml`
+stage, and `docker-compose.yml`'s `trainer`/`arena` services resolve to a real package instead of
+a nonexistent module (see `docs/06-ml.md §3`, `docs/07-infra.md §3`/§4). `python -m ml.train
+--help` works; running it with a real `--config` raises `NotImplementedError` pointing back here.
+Nothing below this note — encoding, the PettingZoo AEC wrapper, behaviour cloning, self-play PPO —
+is any less deferred because the skeleton exists; none of it does real work yet.
 
 ### Feature-plane encoding
 
@@ -424,6 +460,19 @@ Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
 Was listed as a casual day-2 bullet alongside behaviour cloning. Realistically thousands of
 GPU-hours (see Suphx, arXiv:2003.13590) with no compute budget or success metric defined
 anywhere in this doc set — do not schedule this against a milestone until both exist.
+
+**Execution-model finding (2026-09-26, ml-readiness scoping pass):** batched inference is
+architecturally incompatible with `bots/worker.py`'s per-decision `ProcessPoolExecutor` job model
+(`00-architecture.md §3`, `04-bots.md §1`) — each worker is an isolated process handling one bot's
+decision at a time, with no channel to batch several seats'/tables' forward passes into a single
+GPU call. A learned policy fast enough to serve real tables needs a separate long-lived
+inference-serving process (model loaded once, requests batched across callers) that `Table`/the
+worker pool talk to over IPC or a socket, instead of a `ProcessPoolExecutor` job. **Not designed
+or built now** — no model exists yet to serve, and designing a serving protocol before there's a
+policy to put behind it would be speculative. **Un-deferring T4 concretely requires:** (a) a
+trained policy worth serving (blocked on the compute-budget/target-metric gap above); (b) an
+inference-serving process design (batching strategy, IPC/socket shape, how `Table`/`worker.py`
+call it instead of submitting a `ProcessPoolExecutor` job) — neither is scoped yet.
 
 ## From 07-infra.md
 
