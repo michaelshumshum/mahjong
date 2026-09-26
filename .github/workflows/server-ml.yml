@@ -1,0 +1,45 @@
+name: server-ml
+
+# Standalone, not a reusable workflow ci.yml calls: workflow_call has no path-filter mechanism of
+# its own, and the `ml` extra pulls in ~180MB->torch/numpy (docs/07-infra.md §3) that server/
+# server-slow never install. Gated on paths so it only runs when something ml-relevant actually
+# changed, not on every push/PR the way server.yml/web.yml/proto-check.yml do.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/ml/**"
+      - "server/pyproject.toml"
+      - "server/uv.lock"
+      - ".github/workflows/server-ml.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/ml/**"
+      - "server/pyproject.toml"
+      - "server/uv.lock"
+      - ".github/workflows/server-ml.yml"
+
+jobs:
+  server-ml:
+    name: ml extra smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --extra ml
+      - name: ml package imports
+        run: uv run python -c "import ml; import ml.train"
+      - name: python -m ml.train --help
+        run: uv run python -m ml.train --help
+      - name: python -m ml.train fails loudly on a real config
+        run: |
+          if uv run python -m ml.train --config ml/configs/bc.yaml; then
+            echo "expected ml.train to raise NotImplementedError; it exited 0 instead" >&2
+            exit 1
+          fi
