@@ -1,0 +1,6 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"localeSwitcher_label": "Language",
+	"localeSwitcher_en": "English",
+	"localeSwitcher_zhHant": "Traditional Chinese"
+}

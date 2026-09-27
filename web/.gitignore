@@ -26,3 +26,6 @@ test-results
 
 # Coverage
 coverage
+# Paraglide
+src/lib/paraglide
+project.inlang/cache/

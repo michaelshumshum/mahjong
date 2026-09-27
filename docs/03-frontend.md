@@ -810,11 +810,12 @@ should stay one class plus custom properties.
 
 ## 8. Accessibility and i18n
 
-- English only for v1; all UI strings in one module. Cantonese term glyphs (碰/上/槓/食糊) stay as
-  labels in the UI and in live-region text regardless — they're not translated content. zh-Hant
-  locale switching is deferred — see [99-deferred.md](99-deferred.md); matches
-  [05-roadmap.md](05-roadmap.md) M6, which already places i18n in the ongoing bucket ("from day
-  one" was wrong).
+- English only for v1. Cantonese term glyphs (碰/上/槓/食糊) stay as labels in the UI and in
+  live-region text regardless — they're not translated content. zh-Hant locale switching is
+  underway per [08-i18n-plan.md](08-i18n-plan.md) (M6, [05-roadmap.md](05-roadmap.md)): Phase 0
+  (Paraglide JS foundation, cookie-only locale strategy, `lib/i18n/LocaleSwitcher.svelte`) is
+  done, but no component's strings have been migrated to messages yet and the switcher isn't
+  wired into any route — both are later phases in that plan.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).

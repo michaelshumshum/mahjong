@@ -1,3 +1,4 @@
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { defineConfig } from 'vitest/config';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -16,6 +17,19 @@ export default defineConfig({
 			// passing options here (vs. a svelte.config.js) means this is also where <style
 			// lang="scss"> preprocessing gets wired up — see web/AGENTS.md's SCSS convention.
 			preprocess: vitePreprocess()
+		}),
+
+		paraglideVitePlugin({
+			project: './project.inlang',
+			outdir: './src/lib/paraglide',
+			emitTsDeclarations: true,
+			// no 'url' strategy: table invite links (/table/ABC123) must stay locale-agnostic
+			// (docs/08-i18n-plan.md's locale strategy).
+			strategy: ['cookie', 'baseLocale'],
+			// pinned: the plugin defaults to "locale-modules" in dev, whose message functions
+			// drop the per-call `{ locale }` override that LocaleSwitcher needs to render each
+			// option in its own language regardless of the current UI locale.
+			outputStructure: 'message-modules'
 		})
 	],
 	test: {
@@ -35,6 +49,7 @@ export default defineConfig({
 					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
 				}
 			},
+
 			{
 				extends: './vite.config.ts',
 				test: {
