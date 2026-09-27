@@ -248,13 +248,21 @@ Postgres.
 Native tooling means none of the above ever builds the Dockerfiles themselves — a broken stage
 (bad `COPY`, stale build arg, a torch/musl mismatch) would only surface at `make up` or deploy
 time. **`.github/workflows/docker-build.yml`** (added 2026-09-27) closes that gap: a matrix job
-builds every stage each Dockerfile actually defines that CI doesn't already exercise natively —
-`server`'s `dev`/`prod`/`ml`, `web`'s `dev`/`prod` — with `push: false` (build-only, nothing
-published) and a `type=gha` layer cache per matrix entry so repeat runs stay fast. Same
-path-filter reasoning as `server-ml.yml` above: `workflow_call` can't filter by path, and a
-Docker layer build is too heavy to pay on every unrelated push, so it's standalone with its own
-`on.push.paths`/`on.pull_request.paths` — `server/Dockerfile`, `web/Dockerfile`, either
-lockfile, either Compose file, or the workflow file itself.
+builds every stage each Dockerfile defines except `server`'s `ml` — `server`'s `dev`/`prod`,
+`web`'s `dev`/`prod` — with `push: false` (build-only, nothing published) and a `type=gha` layer
+cache per matrix entry so repeat runs stay fast. Same path-filter reasoning as `server-ml.yml`
+above: `workflow_call` can't filter by path, and a Docker layer build is too heavy to pay on
+every unrelated push, so it's standalone with its own `on.push.paths`/`on.pull_request.paths` —
+`server/Dockerfile`, `web/Dockerfile`, either lockfile, either Compose file, or the workflow
+file itself.
+
+`ml` is excluded, not just deferred: the first run that included it (2026-09-27, run
+`36332754927`) exhausted a standard `ubuntu-latest` runner's disk building torch and exporting
+that layer via `cache-to: type=gha,mode=max`, killing the runner process outright mid-step
+rather than failing the build cleanly. `ml` otherwise shares `prod`'s `useradd`/`COPY .`
+pattern, already exercised here, and `server-ml.yml` (§3) already covers the actual torch
+install path natively without Docker's overhead stacked on top — so the marginal coverage
+wasn't worth the runner cost.
 
 **Job graph**: GitHub Actions can't `needs:` across independent top-level workflow files, only
 within one workflow's own jobs — reusable workflows are the way to get real separate files while

@@ -48,10 +48,12 @@ jobs:
             context: ./server
             dockerfile: server/Dockerfile
             target: prod
-          - name: server ml
-            context: ./server
-            dockerfile: server/Dockerfile
-            target: ml
+          # no `ml` target here: torch's install plus a `type=gha,mode=max` cache export of
+          # that layer exhausted a standard ubuntu-latest runner's disk and killed the runner
+          # process outright (2026-09-27, docker-build run 36332754927 — the job died mid-step,
+          # never reported a clean failure). `ml` shares `prod`'s useradd/COPY pattern, already
+          # covered here; server-ml.yml's native `uv sync --extra ml` covers the actual torch
+          # install path without paying Docker's overhead on top of it (docs/07-infra.md §3).
           - name: web dev
             context: .
             dockerfile: web/Dockerfile
