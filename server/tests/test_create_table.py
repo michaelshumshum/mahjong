@@ -74,6 +74,47 @@ def test_practice_binds_bots_to_seats_one_through_three() -> None:
     ]
 
 
+def test_practice_bot_tiers_picks_a_difficulty_per_seat() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/tables",
+            json={"practice": True, "bot_tiers": {"1": "T1", "2": "T2", "3": "ORACLE"}},
+        )
+        table = get_table(response.json()["table_id"])
+    assert table is not None
+    assert table._effective_bot_tier(1) == "T1"
+    assert table._effective_bot_tier(2) == "T2"
+    assert table._effective_bot_tier(3) == "ORACLE"
+
+
+def test_practice_bot_tiers_ignores_an_unrecognized_tier_and_an_out_of_range_seat() -> None:
+    """Same lenient-fallback posture as `ruleset`/`rules` -- a malformed entry is dropped, not a
+    400, and that seat just falls back to `DEFAULT_BOT_TIER` ("T2")."""
+    with TestClient(app) as client:
+        response = client.post(
+            "/tables",
+            json={"practice": True, "bot_tiers": {"1": "not_a_real_tier", "4": "T1"}},
+        )
+        table = get_table(response.json()["table_id"])
+    assert table is not None
+    assert table._effective_bot_tier(1) == "T2"
+
+
+def test_bot_tiers_without_practice_is_a_no_op() -> None:
+    """`bot_tiers` has no bot seats to apply to when `practice` is false -- there is nothing to
+    silently ignore vs. reject, since seat 0 is never a bot seat outside practice/all_bots."""
+    with TestClient(app) as client:
+        response = client.post("/tables", json={"bot_tiers": {"1": "ORACLE"}})
+        table = get_table(response.json()["table_id"])
+    assert table is not None
+    assert [b.status if b is not None else None for b in table.seat_bindings] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+
+
 def test_a_later_ws_connect_to_the_created_id_joins_the_same_table() -> None:
     """The id/ruleset are fixed at `POST /tables` time -- a subsequent `/ws` connect to that id
     (with, deliberately, a *different* `?ruleset=` to prove it's ignored) must join the table

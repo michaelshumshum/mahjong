@@ -95,6 +95,9 @@ class CreateTableRequest(BaseModel):
     # `RuleSet.from_dict`-shaped; only read when `ruleset == "custom"`.
     rules: dict[str, Any] | None = None
     practice: bool = False
+    # practice mode's per-seat difficulty picker: {1: "T1", 2: "T2", 3: "ORACLE"}-shaped, seat 0
+    # excluded (the human seat) -- only meaningful when practice=True, see _resolve_seat_bot_tiers.
+    bot_tiers: dict[int, str] | None = None
 
 
 class CreateTableResponse(BaseModel):
@@ -117,13 +120,44 @@ def _generate_table_id() -> str:
     raise RuntimeError("could not generate a unique table id")
 
 
+# practice mode's per-seat difficulty picker (docs/04-bots.md §7): Easy/Normal/Impossible map
+# 1:1 to the three real bots -- T1/EfficiencyBot, T2/FaanBot, ORACLE/FaanBot-with-full-information.
+# T0/RandomBot is deliberately excluded -- never shipped as a difficulty (docs/04-bots.md §2).
+_PRACTICE_BOT_TIERS = ("T1", "T2", "ORACLE")
+
+
+def _resolve_seat_bot_tiers(
+    practice: bool, bot_tiers: dict[int, str] | None
+) -> dict[int, str] | None:
+    """`CreateTableRequest.bot_tiers` -> `Table(seat_bot_tiers=...)`. Same lenient-fallback
+    posture as `_resolve_ruleset_query`/`resolve_ruleset` (never hard-reject bad input): a seat
+    outside 1..3 (seat 0 is the human seat in practice mode) or a tier outside
+    `_PRACTICE_BOT_TIERS` is silently dropped rather than raising -- a malformed entry just falls
+    back to that seat's `DEFAULT_BOT_TIER` instead of failing the whole request. `practice=False`
+    has no bot seats to apply this to, so it resolves to `None` unconditionally.
+    """
+    if not practice or not bot_tiers:
+        return None
+    resolved = {
+        seat: tier
+        for seat, tier in bot_tiers.items()
+        if 1 <= seat <= 3 and tier in _PRACTICE_BOT_TIERS
+    }
+    return resolved or None
+
+
 @app.post("/tables")
 async def create_table(body: CreateTableRequest) -> CreateTableResponse:
     """Resolves the ruleset and mints the table id together in one request. `?ruleset=`/
     `?rules=` on `/ws` remain a fallback for a direct WS connect to an unclaimed table id."""
     resolved = resolve_ruleset(body.ruleset, body.rules)
     table_id = _generate_table_id()
-    ws.registry().get_or_create(table_id, resolved, practice=body.practice)
+    ws.registry().get_or_create(
+        table_id,
+        resolved,
+        practice=body.practice,
+        seat_bot_tiers=_resolve_seat_bot_tiers(body.practice, body.bot_tiers),
+    )
     return CreateTableResponse(
         table_id=table_id,
         ruleset_preset=preset_id_for(resolved),

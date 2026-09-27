@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Mapping
 from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import Literal
@@ -93,10 +94,11 @@ class TableRegistry:
         require_ready: bool = True,
         practice: bool = False,
         bot_tier: str = DEFAULT_BOT_TIER,
+        seat_bot_tiers: Mapping[int, str] | None = None,
     ) -> Table:
         """Return the existing table for `table_id`, or construct and start one -- a table id
-        names one particular game, never recycled, even after it finishes. `practice`/`bot_tier`
-        only apply the first time a given `table_id` is created."""
+        names one particular game, never recycled, even after it finishes. `practice`/`bot_tier`/
+        `seat_bot_tiers` only apply the first time a given `table_id` is created."""
         table = self._tables.get(table_id)
         if table is not None:
             return table
@@ -109,6 +111,7 @@ class TableRegistry:
             session_factory=self._session_factory,
             practice=practice,
             bot_tier=bot_tier,
+            seat_bot_tiers=seat_bot_tiers,
         )
         self._tables[table_id] = table
         self._tasks[table_id] = asyncio.create_task(self._run(table_id, table))

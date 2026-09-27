@@ -17,6 +17,8 @@ import random
 from concurrent.futures import Executor, Future
 from typing import Any
 
+import pytest
+
 from app.table import SeatBinding, Table
 from bots.random import random_action
 from mahjong_core.actions import Discard
@@ -343,6 +345,54 @@ async def test_t2_bot_jobs_route_to_the_default_pool_only() -> None:
     )
     table._poke_bots()  # seat 0 (dealer) is AWAIT_ACTION right after new_game(); 1 job submitted
     assert len(default_pool.submissions) == 1
+
+
+# --- per-seat bot tier override (practice mode's difficulty picker, docs/03-frontend.md) -------
+
+
+def test_seat_bot_tiers_overrides_bot_tier_per_seat_falling_back_for_seats_it_omits() -> None:
+    table = Table(
+        "table-seat-tiers",
+        RuleSet(),
+        game_seed=1,
+        bot_tier="T2",
+        seat_bot_tiers={1: "T1", 3: "ORACLE"},
+        practice=True,
+    )
+    assert table._effective_bot_tier(1) == "T1"
+    assert table._effective_bot_tier(2) == "T2"  # not in the mapping -- falls back to bot_tier
+    assert table._effective_bot_tier(3) == "ORACLE"
+
+
+async def test_seat_bot_tiers_still_forces_t2_for_disconnect_handover() -> None:
+    """A per-seat override of `ORACLE` only ever applies to a `bot`-status seat (practice mode) --
+    a real human's seat gone `autoplay` must still never be driven by `ORACLE`, same invariant as
+    `test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_oracle` pins for the
+    table-wide `bot_tier`."""
+    table = Table(
+        "table-seat-tiers-disconnect",
+        RuleSet(),
+        game_seed=1,
+        bot_tier="T2",
+        seat_bot_tiers={0: "ORACLE"},
+    )
+    table.seat_bindings[0] = SeatBinding(
+        session_id="sess-0",
+        send=lambda seq, wire: None,
+        name="Guest 1",
+        status="autoplay",
+    )
+    assert table._effective_bot_tier(0) == "T2"
+
+
+def test_seat_bot_tiers_rejects_an_unknown_tier() -> None:
+    with pytest.raises(ValueError, match="unknown bot tier"):
+        Table("table-bad-tier", RuleSet(), game_seed=1, seat_bot_tiers={1: "not_a_real_tier"})
+
+
+def test_seat_bot_tiers_rejects_a_seat_out_of_range() -> None:
+    with pytest.raises(ValueError, match="seat must be 0..3"):
+        Table("table-bad-seat", RuleSet(), game_seed=1, seat_bot_tiers={4: "T1"})
 
 
 # --- ORACLE dispatch + disconnect-handover pinning (docs/04-bots.md §10) -----------------------

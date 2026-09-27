@@ -23,9 +23,11 @@ action id, decoded back into a real `Action` here (a worker process never receiv
 and dropped if the tag no longer matches `_pending_bot[seat]` by the time it lands.
 
 Bot-filled seats from table creation (practice mode). `practice=True` binds seats 1-3 to
-`bot_tier` bots immediately, before seat 0's human ever `join`s -- a `bot` status, distinct from
-`autoplay`, driven through the identical `_poke_bots` machinery. `all_bots=True` binds all four
-and deals as soon as `run()` starts -- `app/registry.py`'s always-on showcase table.
+their resolved tier immediately, before seat 0's human ever `join`s -- a `bot` status, distinct
+from `autoplay`, driven through the identical `_poke_bots` machinery. `seat_bot_tiers` picks a
+different tier per seat (falling back to `bot_tier` for any seat it omits) -- see `Table`'s own
+docstring and `_effective_bot_tier`. `all_bots=True` binds all four and deals as soon as `run()`
+starts -- `app/registry.py`'s always-on showcase table.
 
 Table settings. `TableSettings` holds per-table options that aren't game rules (those live
 on `RuleSet`): `spectators_see_hands` switches spectators to the open-hands redaction. Swappable
@@ -75,7 +77,7 @@ import random
 import secrets
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Final, Literal, cast
@@ -450,10 +452,13 @@ class Table:
     seat this table has, both routed through `_poke_bots` -- with one deliberate exception:
     disconnect-handover (a real human's seat gone `autoplay`) always uses `T2`/`FaanBot`
     regardless of `bot_tier`, never this table's configured tier -- see
-    `_DISCONNECT_HANDOVER_BOT_TIER`/`_effective_bot_tier`. One tier per table, not per seat: `T0`/
-    `T1` stay selectable by passing a different value, so arena/tests that assume T0's
-    uniform-random behavior aren't forced onto T2. `practice=True` binds seats 1-3 to `bot_tier`
-    bots immediately at construction, before seat 0's human ever joins -- see `_bind_bot_seat`.
+    `_DISCONNECT_HANDOVER_BOT_TIER`/`_effective_bot_tier`. `seat_bot_tiers` overrides `bot_tier`
+    per seat -- practice mode's per-seat difficulty picker (`app/main.py`'s `create_table`,
+    docs/03-frontend.md's practice-mode entry point). A seat missing from the mapping falls back
+    to `bot_tier`, so arena/tests that pass a bare `bot_tier=` and expect it applied uniformly
+    (e.g. T0's uniform-random behavior) are unaffected. `practice=True` binds seats 1-3 to their
+    resolved tier (`_effective_bot_tier`) immediately at construction, before seat 0's human ever
+    joins -- see `_bind_bot_seat`.
     `"ORACLE"` builds its view via `_omniscient_seat_view` (`app/views.py`) instead of the
     ordinary `seat_view`, but the bot doing the deciding is a plain `FaanBot()`
     (`bots/worker.py`'s `_make_bot`) -- the same single-digit-millisecond cost as `T2` -- so it
@@ -471,6 +476,7 @@ class Table:
         bot_pool: Executor | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         bot_tier: str = DEFAULT_BOT_TIER,
+        seat_bot_tiers: Mapping[int, str] | None = None,
         practice: bool = False,
         all_bots: bool = False,
         settings: TableSettings | None = None,
@@ -478,6 +484,16 @@ class Table:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
         self._bot_tier = bot_tier
+        # per-seat override on top of self._bot_tier -- see _effective_bot_tier. Validated here,
+        # not just at the app/main.py API boundary, since Table is also constructed directly by
+        # tests/tools.
+        if seat_bot_tiers is not None:
+            for seat, tier in seat_bot_tiers.items():
+                if not 0 <= seat < 4:
+                    raise ValueError(f"seat must be 0..3, got {seat}")
+                if tier not in BOT_TIERS:
+                    raise ValueError(f"unknown bot tier {tier!r}; choices: {BOT_TIERS}")
+        self._seat_bot_tiers: dict[int, str] = dict(seat_bot_tiers) if seat_bot_tiers else {}
         # seeded off game_seed, not random.Random(), so which pun name each bot gets is
         # reproducible from (ruleset, seed, actions). XORed with a constant so this stream
         # doesn't just echo the wall shuffle new_game() also derives from game_seed.
@@ -569,7 +585,8 @@ class Table:
         self.host_seat: int | None = None
 
         # practice mode: seat 0 is left open for the human join; seats 1-3 are bound to
-        # self._bot_tier bots immediately, before anyone ever connects.
+        # their resolved tier (self._seat_bot_tiers, falling back to self._bot_tier) immediately,
+        # before anyone ever connects.
         self.all_bots = all_bots
         if practice or all_bots:
             for seat in range(0 if all_bots else 1, 4):
@@ -1299,22 +1316,23 @@ class Table:
             self._submit_bot_job(seat, tag, mask)
 
     def _effective_bot_tier(self, seat: int) -> str:
-        """The tier that actually drives `seat`'s next bot decision -- almost always
-        `self._bot_tier`, with one deliberate exception: disconnect-handover (`seat`'s binding
-        is `autoplay`, meaning a real human went quiet and a bot took the seat over) is always
-        `_DISCONNECT_HANDOVER_BOT_TIER` ("T2"/`FaanBot`), regardless of what tier this table is
-        configured with. A human never opted into whatever tier the table happens to run, and
-        specifically must never have their seat driven by `ORACLE`, whose view is built by
-        `_omniscient_seat_view` and carries every other seat's concealed tiles -- a real human's
-        own seat must never be the one a bot job is built omnisciently for.
+        """The tier that actually drives `seat`'s next bot decision -- `self._seat_bot_tiers[seat]`
+        if this seat has a per-seat override, else `self._bot_tier`, with one deliberate
+        exception: disconnect-handover (`seat`'s binding is `autoplay`, meaning a real human went
+        quiet and a bot took the seat over) is always `_DISCONNECT_HANDOVER_BOT_TIER`
+        ("T2"/`FaanBot`), regardless of what tier this table or seat is configured with. A human
+        never opted into whatever tier the table happens to run, and specifically must never
+        have their seat driven by `ORACLE`, whose view is built by `_omniscient_seat_view` and
+        carries every other seat's concealed tiles -- a real human's own seat must never be the
+        one a bot job is built omnisciently for.
 
         A `bot`-status seat (practice mode / `all_bots`, bound at `__init__` time, never a real
-        human -- `_bind_bot_seat`) is unaffected and uses `self._bot_tier` as configured.
+        human -- `_bind_bot_seat`) is unaffected and uses its resolved tier as configured.
         """
         binding = self.seat_bindings[seat]
         if binding is not None and binding.status == "autoplay":
             return _DISCONNECT_HANDOVER_BOT_TIER
-        return self._bot_tier
+        return self._seat_bot_tiers.get(seat, self._bot_tier)
 
     def _submit_bot_job(self, seat: int, tag: BotJobTag, mask: list[bool]) -> None:
         """Build this seat's `SeatView` and schedule `bots.worker.compute_action` on the right
