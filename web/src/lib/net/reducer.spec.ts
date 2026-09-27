@@ -418,6 +418,25 @@ describe('reduce', () => {
 			expect(next.concealedCounts[1]).toBe(1);
 		});
 
+		it('a claimed meld pops the claimed tile off the discarder pool immediately, not on the next state_sync', () => {
+			// regression: the pool used to keep the claimed tile until a full state_sync corrected
+			// it, which also misaligned pool_index on that seat's next discard.
+			const s = state({
+				seat: 1,
+				ownHand: [88, 31, 5],
+				concealedCounts: [13, 3, 13, 13],
+				discardPools: [[9, 47], [], [], []]
+			});
+			const next = reduce(s, {
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'meld',
+				d: { seat: 1, meld_kind: 'pung', tiles: [31, 88, 47], from_seat: 0 }
+			});
+			expect(next.discardPools[0]).toEqual([9]);
+		});
+
 		it('a claimed chow/pung/kong never leaves a held-apart tile -- unlike a real draw, nothing was drawn', () => {
 			// regression: inferring the held-apart tile from ownHand's last entry surfaced an
 			// already-owned tile as if freshly drawn.

@@ -336,6 +336,16 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				),
 				ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
 				hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles ?? [])),
+				// mahjong_core.engine pops the claimed tile off the discarder's pool immediately (always
+				// the last entry) -- mirrored here so pool_index doesn't misalign before the next state_sync.
+				discardPools:
+					claimedCount > 0
+						? replaceAt(
+								state.discardPools,
+								d.from_seat as number,
+								state.discardPools[d.from_seat as number].slice(0, -1)
+							)
+						: state.discardPools,
 				// a claimed meld is never a draw -- without this, the last tile left in `ownHand`
 				// after removeMany would show as if freshly drawn.
 				drawnTileId: isOwn ? null : state.drawnTileId
