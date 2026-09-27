@@ -51,7 +51,7 @@ Paired diff (ORACLE - FaanBot): **+11.644 pts/game, 95% CI [6.220, 17.069]**. de
 docs/04-bots.md §10 fully rewritten with design history + mechanism + verification numbers.
 docs/00-architecture.md §5 and §3 references reworded (not rewritten).
 
-## Follow-up: `opponent_threat_level` made hands-aware too (fold-timing gap)
+## Follow-up 1: `opponent_threat_level` made hands-aware too (fold-timing gap)
 
 `tile_risk` being exact only changes *which* tile `_best_discard` picks once already in
 `fold_mode` — it says nothing about *when* `fold_mode` engages. That gate's `threatening` flag
@@ -108,3 +108,66 @@ sample size, and this took real investigation, not just re-running the script:
 
 Full mechanism + both verification tables are in docs/04-bots.md §10 ("The fold-timing gap" /
 "Re-verification after the fold-timing fix" subsections).
+
+## Follow-up 2: `seen34` made hands-aware too (offense-side ukeire gap) -- biggest effect of the three
+
+`tile_risk`/`opponent_threat_level` are both defense-side. Neither touches `_best_discard`'s
+speed term, which reads `ukeire`'s live-tile count `4 - seen34[t]`. `bots/features.seen34` never
+read `view.hands` at all -- an opponent's real concealed tiles (genuinely known under the
+omniscient view) still read as "maybe still in the wall," so ukeire overstated live tiles and
+`FaanBot`'s speed term was systematically inflated for ORACLE.
+
+- `bots/features.py`'s `seen34(view)` branches on `view.hands`:
+  - `None`: byte-identical (own hand, every seat's non-concealed melds, discards; concealed kong
+    still skipped -- genuinely invisible to a normal bot).
+  - populated: also counts every opponent's real concealed tiles (`view.hands[opponent]`), AND
+    stops skipping a concealed meld -- adds it via the existing `_add_meld` (kong contributes 3,
+    unchanged convention).
+- **Concealed-kong subtlety (had to get this right, not assume):** traced
+  `mahjong_core.engine._apply_self_kong` -- a concealed kong's 4 tiles are REMOVED from
+  `SeatState.concealed` the instant it's declared, live only in `SeatState.melds` from then on.
+  `_omniscient_seat_view` builds `.hands` straight from `state.seats[s].concealed`, so a concealed
+  kong's tiles are absent from `view.hands[opponent]` too -- NOT double-counted if also added from
+  `view.melds`. Confirmed by mirroring `bots/safety.py`'s own `_opponent_hand34`, which already
+  does exactly this (unconditionally adds every meld including concealed ones on top of
+  `view.hands`) -- this task's fix makes `seen34` consistent with that existing pattern rather
+  than inventing a new one. Getting the direction backwards (still skipping concealed melds under
+  `view.hands`) would have silently dropped those 4 tiles from the count entirely -- neither loop
+  would add them -- the opposite of what an omniscient view should do.
+- Zero changes to `faanbot.py`/`mahjong_core.shanten` needed (same pattern as the other two).
+
+### Tests
+- `tests/test_features.py` (new file): `view.hands is None` regression pin; a scripted position
+  (opponent holds 3/4 real copies of a tile a discard is kanchan-waiting on) showing seen34
+  undercounts under `hands=None` (0) vs correctly counts under `hands` (3), and `ukeire`'s live
+  count for that discard drops 4->1 accordingly; concealed-kong regression mirroring
+  `test_tile_risk_hands_aware_handles_a_concealed_kong_of_the_candidate_type`'s convention.
+- `tests/test_oracle.py::test_omniscient_view_prefers_a_discard_with_more_real_live_tiles`:
+  bot-level proof, scripted position **found by direct programmatic search over `FaanBot.act`**
+  (not hand-derived -- brute-forced random 13-tile hands + a hidden opponent tile type until a
+  real discard flip appeared, then verified/pinned). Probabilistic view picks PIN_9 (16 kinds/58
+  tiles ukeire, inflated by 3 hidden WIND_EAST copies reading as live); omniscient view correctly
+  shrinks it to 14/51 and picks WIND_NORTH instead. `tile_risk` checked directly in-test to read
+  identically for both candidates in both views, proving the flip is seen34's doing alone.
+
+### Empirical verification (200 duplicate sets / 800 games, same script/seed as the
+fold-timing re-verification -- reran the *unmodified* baseline first via `git stash` to confirm
+the script reproduces the documented pre-fix numbers bit-for-bit before trusting the post-fix run):
+
+| Metric | pre-fix A/B | post-fix A/B |
+| --- | --- | --- |
+| win_rate | 0.2047 / 0.1671 | **0.3181** / 0.1517 |
+| deal_in_rate | 0.0106 / 0.1523 | 0.0209 / 0.1628 |
+| avg_points_per_hand | 2.2687 / -0.7562 | 5.1925 / -1.7308 |
+
+Paired diff: pre-fix +12.100 [10.247, 13.953] -> post-fix **+27.693 [25.098, 30.288]** -- more
+than double, and visible directly at the existing 200-set size (unlike the fold-timing fix, which
+needed the larger sample to show up in win_rate at all). Biggest single effect of the three
+hands-aware fixes -- makes sense: seen34 touches the speed term on *every* turn's discard
+decision, not just a comparatively rare fold-timing gate (~1.6% of decisions) or a single-target
+deal-in check. deal_in_rate ticked up slightly (0.0106->0.0209, still ~8x below FaanBot's own
+0.1628) -- ORACLE now pushes hands further/discards more before hands end, giving the residual
+real-deal-in mechanism marginally more chances to fire; net effect still decisively positive.
+
+Full mechanism + tables in docs/04-bots.md §10 ("The offense-side gap: `seen34` needed the same
+treatment" / "Re-verification after the `seen34` fix" subsections).

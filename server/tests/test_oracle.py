@@ -33,12 +33,14 @@ import pytest
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.faanbot import _THREAT_THRESHOLD, FaanBot
-from bots.safety import opponent_threat_level
+from bots.features import own_hand34, seen34
+from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.shanten import ukeire
 from mahjong_core.state import GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 
@@ -287,6 +289,132 @@ async def test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_a
     assert omniscient_result != int(TileType.MAN_4), (
         "the omniscient view's corrected fold-timing must avoid the real deal-in the ordinary "
         "view's fold gate never even considered"
+    )
+
+
+# --- behavioral proof: hands-aware seen34 changes a real offense-side discard choice ----------
+
+# 13 distinct singles, empirically found by direct search over `FaanBot.act` (not hand-derived --
+# verified against `seen34`/`ukeire` directly below, per this module's convention for scripted
+# positions): 2-shanten, with PIN_9's ukeire unusually wide (16 kinds/58 tiles) among candidate
+# discards.
+_UKEIRE_HAND = [
+    TileType.MAN_3,
+    TileType.WIND_NORTH,
+    TileType.PIN_7,
+    TileType.SOU_6,
+    TileType.SOU_8,
+    TileType.PIN_4,
+    TileType.PIN_5,
+    TileType.SOU_4,
+    TileType.MAN_6,
+    TileType.PIN_3,
+    TileType.PIN_9,
+    TileType.SOU_5,
+    TileType.SOU_9,
+]
+
+
+async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> None:
+    """`seen34` becoming hands-aware (docs/04-bots.md §10) closes an offense-side gap distinct
+    from `tile_risk`/`opponent_threat_level`'s defense-side fixes above. Turn 3 (well before
+    `late_turn`) keeps `fold_mode` off entirely, isolating this from both of those fixes.
+
+    Seat 1 holds 3 of 東's (`WIND_EAST`) 4 real copies in their concealed hand -- genuinely dead
+    to the wall, not drawable by anyone. Under the probabilistic view none of that is visible, so
+    discarding 9筒 (`PIN_9`) reads as the speed-maximising choice (16 kinds/58 tiles of ukeire,
+    all 4 WIND_EAST copies counted as still live). Under the omniscient view, `seen34` correctly
+    counts seat 1's 3 real copies as seen, PIN_9's ukeire drops to 14 kinds/51 tiles, and
+    `FaanBot`'s composite score (docs/04-bots.md §4) picks a different discard (北, `WIND_NORTH`)
+    instead. `tile_risk` is not the mechanism flipping this choice -- it reads identically for
+    both candidate discards within each view (0.9 probabilistic / 0.0 exact, checked below), so
+    it cannot be what tips PIN_9 below WIND_NORTH; the only thing that differs between the two
+    views for these two specific candidates is PIN_9's own ukeire count.
+    """
+    hidden_type = TileType.WIND_EAST
+    opp1_hand = _pool(
+        hidden_type,
+        hidden_type,
+        hidden_type,
+        TileType.WIND_SOUTH,
+        TileType.WIND_SOUTH,
+        TileType.WIND_SOUTH,
+        TileType.WIND_SOUTH,
+        TileType.WIND_WEST,
+        TileType.WIND_WEST,
+        TileType.WIND_WEST,
+        TileType.WIND_WEST,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_RED,
+    )
+    opp2_hand = _pool(
+        TileType.WIND_NORTH,
+        TileType.WIND_NORTH,
+        TileType.WIND_NORTH,
+        TileType.WIND_NORTH,
+        TileType.DRAGON_WHITE,
+        TileType.DRAGON_WHITE,
+        TileType.DRAGON_WHITE,
+        TileType.DRAGON_WHITE,
+        TileType.DRAGON_GREEN,
+        TileType.DRAGON_GREEN,
+        TileType.DRAGON_GREEN,
+        TileType.DRAGON_GREEN,
+        TileType.MAN_1,
+    )
+    opp3_hand = _pool(
+        TileType.PIN_9,
+        TileType.PIN_9,
+        TileType.PIN_9,
+        TileType.PIN_9,
+        TileType.SOU_9,
+        TileType.SOU_9,
+        TileType.SOU_9,
+        TileType.SOU_9,
+        TileType.MAN_9,
+        TileType.MAN_9,
+        TileType.MAN_9,
+        TileType.MAN_9,
+        TileType.PIN_1,
+    )
+    hands = ((), opp1_hand, opp2_hand, opp3_hand)
+    mask = _discard_mask(_UKEIRE_HAND)
+
+    probabilistic_view = _view(0, _UKEIRE_HAND, turn=3)
+    omniscient_view = _view(0, _UKEIRE_HAND, turn=3, hands=hands)
+
+    hand34 = own_hand34(probabilistic_view)
+    pin9, wind_north = int(TileType.PIN_9), int(TileType.WIND_NORTH)
+    accepts_ordinary = ukeire(hand34, seen34(probabilistic_view))
+    accepts_aware = ukeire(hand34, seen34(omniscient_view))
+    assert accepts_ordinary[pin9] == (16, 58), (
+        "sanity: the probabilistic view must read PIN_9's ukeire this wide, or this proves nothing"
+    )
+    assert accepts_aware[pin9] == (14, 51), (
+        "hands-aware seen34 must shrink PIN_9's ukeire once WIND_EAST's hidden copies count as seen"
+    )
+    assert accepts_ordinary[wind_north] == accepts_aware[wind_north], (
+        "sanity: WIND_NORTH's own ukeire must be unaffected -- isolates the effect to PIN_9's "
+        "accepting set specifically"
+    )
+    assert tile_risk(probabilistic_view, pin9) == tile_risk(probabilistic_view, wind_north), (
+        "sanity: tile_risk must not itself distinguish these two candidates under the "
+        "probabilistic view"
+    )
+    assert tile_risk(omniscient_view, pin9) == tile_risk(omniscient_view, wind_north), (
+        "sanity: tile_risk must not itself distinguish these two candidates under the "
+        "omniscient view either -- the flip below is seen34's doing, not tile_risk's"
+    )
+
+    probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
+    omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+
+    assert probabilistic_result == int(TileType.PIN_9), (
+        "sanity: the probabilistic view must actually pick PIN_9, or the rest of this test "
+        "proves nothing"
+    )
+    assert omniscient_result == int(TileType.WIND_NORTH), (
+        "the omniscient view's corrected ukeire count must change the actual discard chosen"
     )
 
 
