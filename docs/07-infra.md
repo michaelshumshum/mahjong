@@ -91,6 +91,15 @@ the shipped image is untouched. Two consequences worth knowing:
   covers the rebuild case, where a lockfile change invalidates the install layer and would
   otherwise re-fetch ~170MB of chromium.
 
+Every stage that runs `pnpm` (`deps`, `dev`, `build`) copies root `package.json` in and strips its
+`scripts` before installing — found and fixed 2026-09-27 via `docker-build.yml` (§9). `corepack`
+resolves the pinned pnpm version (`packageManager` in that file) from whatever's at the *stage's*
+own `/app`, not inherited across stages, so a stage that skips the copy silently installs with
+latest pnpm instead of the pin (this broke `allowBuilds`, which the resolved-latest pnpm didn't
+honor the same way, surfacing as `ERR_PNPM_IGNORED_BUILDS` on `@parcel/watcher`). `scripts` is
+stripped because the un-copied root manifest's `prepare` (`lefthook install`) hard-fails without a
+real `.git` directory, which the build context never has. A new stage that runs `pnpm` needs both.
+
 `ml` mirrors `prod`'s non-root setup — it just installs from the `ml` extra instead of base
 deps. `trainer`/`arena` don't bind-mount source over the image: doing so would shadow the
 image's baked venv with an empty one and force a ~3GB torch reinstall on first run. Rebuild
