@@ -1,7 +1,8 @@
 <script lang="ts">
 	import WinningHand, { type FaanPattern, type WinningMeld } from './WinningHand.svelte';
 	import type { TileCode } from '../table/tile-code';
-	import { RANK_LABEL, RANK_TONE } from './rank';
+	import { rankLabel, RANK_TONE } from './rank';
+	import { m } from '$lib/paraglide/messages.js';
 
 	export type Seat = 0 | 1 | 2 | 3;
 	export type Wind = 'E' | 'S' | 'W' | 'N';
@@ -47,7 +48,18 @@
 		total: number;
 	}
 
-	const WIND_LABEL: Record<Wind, string> = { E: 'East', S: 'South', W: 'West', N: 'North' };
+	function windLabel(wind: Wind): string {
+		switch (wind) {
+			case 'E':
+				return m.scoreSheet_windEast();
+			case 'S':
+				return m.scoreSheet_windSouth();
+			case 'W':
+				return m.scoreSheet_windWest();
+			case 'N':
+				return m.scoreSheet_windNorth();
+		}
+	}
 
 	let {
 		seats,
@@ -62,7 +74,7 @@
 	} = $props();
 
 	function seatName(seat: Seat): string {
-		return seats.find((s) => s.seat === seat)?.name ?? `Seat ${seat}`;
+		return seats.find((s) => s.seat === seat)?.name ?? m.scoreSheet_seatFallbackLabel({ seat });
 	}
 
 	let seatNames = $derived(
@@ -114,9 +126,9 @@
 		<table>
 			<thead>
 				<tr>
-					<th rowspan="2" scope="col" class="col-hand">Hand</th>
-					<th rowspan="2" scope="col" class="col-wind">Wind</th>
-					<th rowspan="2" scope="col" class="col-dealer">Dealer</th>
+					<th rowspan="2" scope="col" class="col-hand">{m.scoreSheet_handColumnHeader()}</th>
+					<th rowspan="2" scope="col" class="col-wind">{m.scoreSheet_windColumnHeader()}</th>
+					<th rowspan="2" scope="col" class="col-dealer">{m.scoreSheet_dealerColumnHeader()}</th>
 					{#each seats as seat (seat.seat)}
 						<th colspan="2" scope="colgroup" class="col-seat">
 							{seat.name}
@@ -125,8 +137,8 @@
 				</tr>
 				<tr>
 					{#each seats as seat (seat.seat)}
-						<th scope="col" class="sub">+/-</th>
-						<th scope="col" class="sub">Total</th>
+						<th scope="col" class="sub">{m.scoreSheet_deltaColumnHeader()}</th>
+						<th scope="col" class="sub">{m.scoreSheet_totalColumnHeader()}</th>
 					{/each}
 				</tr>
 			</thead>
@@ -150,7 +162,7 @@
 								{hand.handNo}
 							{/if}
 						</td>
-						<td class="col-wind">{WIND_LABEL[hand.prevailing]}</td>
+						<td class="col-wind">{windLabel(hand.prevailing)}</td>
 						<td class="col-dealer">
 							{#if seatName(hand.dealer)}
 								<span class="dealer-badge">{seatName(hand.dealer)}</span>
@@ -183,7 +195,7 @@
 										totalFaan={hand.result.totalFaan ?? 0}
 									/>
 								{:else}
-									<p class="draw-note">Exhaustive draw — no winning hand.</p>
+									<p class="draw-note">{m.scoreSheet_exhaustiveDrawNote()}</p>
 								{/if}
 							</td>
 						</tr>
@@ -192,7 +204,7 @@
 			</tbody>
 			<tfoot>
 				<tr>
-					<td colspan="3" class="footer-label">Total</td>
+					<td colspan="3" class="footer-label">{m.scoreSheet_totalColumnHeader()}</td>
 					{#each seats as seat (seat.seat)}
 						<td colspan="2" class="footer-total">{totals[seat.seat]}</td>
 					{/each}
@@ -203,14 +215,13 @@
 
 	{#if !historyComplete}
 		<p class="notice">
-			Hand history incomplete (likely a reconnect mid-game) — running totals above may not reach the
-			authoritative figures in the footer.
+			{m.scoreSheet_historyIncompleteNotice()}
 		</p>
 	{/if}
 
 	{#if standings}
 		<div class="standings">
-			<h3 class="standings-heading">Final standings</h3>
+			<h3 class="standings-heading">{m.scoreSheet_finalStandingsHeading()}</h3>
 			<ol class="standings-list">
 				{#each standings as standing, index (standing.seat)}
 					<li class="standing-card" class:standing-card--top={index < 3}>
@@ -219,7 +230,7 @@
 							style:background={RANK_TONE[index] ?? 'transparent'}
 							style:color={index < 3 ? 'var(--color-tile-ink)' : 'var(--color-text-muted)'}
 						>
-							{RANK_LABEL[index] ?? `${index + 1}th`}
+							{rankLabel(index)}
 						</span>
 						<span class="standing-name">{seatName(standing.seat)}</span>
 						<span

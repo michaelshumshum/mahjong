@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
+	import { m } from '$lib/paraglide/messages.js';
 
 	export type Seat = 0 | 1 | 2 | 3;
 
@@ -73,7 +74,7 @@
 </script>
 
 <section class="faan-breakdown" aria-labelledby="faan-breakdown-heading">
-	<h2 id="faan-breakdown-heading">{seatNames[winner]} wins</h2>
+	<h2 id="faan-breakdown-heading">{m.faanBreakdown_winsHeading({ name: seatNames[winner] })}</h2>
 
 	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
 		<div class="winning-hand">
@@ -104,15 +105,16 @@
 		{#each patterns as pattern, index (`${index}:${pattern.name}`)}
 			<li class="pattern-row">
 				<span class="pattern-name">{pattern.name}</span>
-				<span class="pattern-faan">{pattern.faan} faan</span>
+				<span class="pattern-faan">{m.faanBreakdown_faanCountLabel({ faan: pattern.faan })}</span>
 			</li>
 		{/each}
 	</ul>
 
 	<p class="total" class:total--capped={isCapped}>
-		Total <strong>{totalFaan} faan</strong>
+		{m.faanBreakdown_totalLabel()}
+		<strong>{m.faanBreakdown_faanCountLabel({ faan: totalFaan })}</strong>
 		{#if isCapped}
-			<span class="cap-note">(capped from {patternSum})</span>
+			<span class="cap-note">{m.faanBreakdown_cappedFromLabel({ sum: patternSum })}</span>
 		{/if}
 	</p>
 

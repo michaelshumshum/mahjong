@@ -3,6 +3,7 @@
 	import CloseButton from '$lib/ui/CloseButton.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import type { MockHandResult, MockMeld } from '$lib/table/mock-game-state';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		handResult,
@@ -40,9 +41,13 @@
 				payments={handResult.payments ?? {}}
 			/>
 		{:else}
-			<section class="hand-end-summary" data-testid="hand-end-draw" aria-label="Hand result">
-				<h2>Hand {handNo}</h2>
-				<p>Draw</p>
+			<section
+				class="hand-end-summary"
+				data-testid="hand-end-draw"
+				aria-label={m.handEndOverlay_resultAriaLabel()}
+			>
+				<h2>{m.handEndOverlay_handHeading({ handNo })}</h2>
+				<p>{m.handEndOverlay_drawLabel()}</p>
 			</section>
 		{/if}
 	</div>

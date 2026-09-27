@@ -8,7 +8,8 @@
 		type Totals
 	} from './ScoreSheet.svelte';
 	import BackButton from './BackButton.svelte';
-	import { RANK_LABEL, RANK_TONE } from './rank';
+	import { rankLabel, RANK_TONE } from './rank';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		seats,
@@ -23,13 +24,13 @@
 	} = $props();
 
 	function seatName(seat: 0 | 1 | 2 | 3): string {
-		return seats.find((s) => s.seat === seat)?.name ?? `Seat ${seat}`;
+		return seats.find((s) => s.seat === seat)?.name ?? m.gameEndScreen_seatFallbackLabel({ seat });
 	}
 </script>
 
-<section class="game-end" aria-label="Game end summary">
+<section class="game-end" aria-label={m.gameEndScreen_ariaLabel()}>
 	<div class="game-end-header">
-		<BackButton label="Back to home" href="/" />
+		<BackButton label={m.gameEndScreen_backToHomeLabel()} href="/" />
 	</div>
 	<div class="podium">
 		{#each standings.slice(0, 3) as standing, index (standing.seat)}
@@ -39,7 +40,7 @@
 				class:podium-step--first={rank === 0}
 				style:--step-color={RANK_TONE[rank]}
 			>
-				<span class="podium-rank">{RANK_LABEL[rank]}</span>
+				<span class="podium-rank">{rankLabel(rank)}</span>
 				<span class="podium-name">{seatName(standing.seat)}</span>
 				<span
 					class="podium-score"

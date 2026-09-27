@@ -212,5 +212,43 @@
 	"tablePage_declareAddedKongLabel": "Added kong {tiles}",
 	"tablePage_discardsAriaLabel": "{name}'s discards",
 	"tablePage_yourDiscardsAriaLabel": "Your discards",
-	"tablePage_claimChoiceLabel": "chose: {kind}"
+	"tablePage_claimChoiceLabel": "chose: {kind}",
+
+	"rank_first": "1st",
+	"rank_second": "2nd",
+	"rank_third": "3rd",
+	"rank_fourth": "4th",
+	"rank_nth": "{n}th",
+
+	"scoreSheet_handColumnHeader": "Hand",
+	"scoreSheet_windColumnHeader": "Wind",
+	"scoreSheet_dealerColumnHeader": "Dealer",
+	"scoreSheet_deltaColumnHeader": "+/-",
+	"scoreSheet_totalColumnHeader": "Total",
+	"scoreSheet_windEast": "East",
+	"scoreSheet_windSouth": "South",
+	"scoreSheet_windWest": "West",
+	"scoreSheet_windNorth": "North",
+	"scoreSheet_exhaustiveDrawNote": "Exhaustive draw — no winning hand.",
+	"scoreSheet_historyIncompleteNotice": "Hand history incomplete (likely a reconnect mid-game) — running totals above may not reach the authoritative figures in the footer.",
+	"scoreSheet_finalStandingsHeading": "Final standings",
+	"scoreSheet_seatFallbackLabel": "Seat {seat}",
+
+	"faanBreakdown_winsHeading": "{name} wins",
+	"faanBreakdown_faanCountLabel": "{faan} faan",
+	"faanBreakdown_totalLabel": "Total",
+	"faanBreakdown_cappedFromLabel": "(capped from {sum})",
+
+	"winningHand_ariaLabel": "Winning hand and faan",
+	"winningHand_faanCountLabel": "{faan} faan",
+	"winningHand_totalLabel": "Total",
+	"winningHand_cappedFromLabel": "(capped from {sum})",
+
+	"gameEndScreen_ariaLabel": "Game end summary",
+	"gameEndScreen_backToHomeLabel": "Back to home",
+	"gameEndScreen_seatFallbackLabel": "Seat {seat}",
+
+	"handEndOverlay_resultAriaLabel": "Hand result",
+	"handEndOverlay_handHeading": "Hand {handNo}",
+	"handEndOverlay_drawLabel": "Draw"
 }

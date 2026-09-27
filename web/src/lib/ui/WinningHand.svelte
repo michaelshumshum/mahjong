@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
+	import { m } from '$lib/paraglide/messages.js';
 
 	export type Seat = 0 | 1 | 2 | 3;
 
@@ -51,7 +52,7 @@
 	let isCapped = $derived(patternSum > totalFaan);
 </script>
 
-<section class="winning-hand-summary" aria-label="Winning hand and faan">
+<section class="winning-hand-summary" aria-label={m.winningHand_ariaLabel()}>
 	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
 		<div class="hand">
 			{#if sortedMelds.length > 0}
@@ -81,15 +82,16 @@
 		{#each patterns as pattern, index (`${index}:${pattern.name}`)}
 			<li class="pattern-row">
 				<span class="pattern-name">{pattern.name}</span>
-				<span class="pattern-faan">{pattern.faan} faan</span>
+				<span class="pattern-faan">{m.winningHand_faanCountLabel({ faan: pattern.faan })}</span>
 			</li>
 		{/each}
 	</ul>
 
 	<p class="total" class:total--capped={isCapped}>
-		Total <strong>{totalFaan} faan</strong>
+		{m.winningHand_totalLabel()}
+		<strong>{m.winningHand_faanCountLabel({ faan: totalFaan })}</strong>
 		{#if isCapped}
-			<span class="cap-note">(capped from {patternSum})</span>
+			<span class="cap-note">{m.winningHand_cappedFromLabel({ sum: patternSum })}</span>
 		{/if}
 	</p>
 </section>
