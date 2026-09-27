@@ -1,0 +1,73 @@
+name: docker-build
+
+# Standalone, not one of ci.yml's reusable workflows: workflow_call has no path-filter
+# mechanism of its own (docs/07-infra.md §9), and nothing else in CI ever builds these
+# images — server.yml/web.yml run tests natively via uv/pnpm, not through Compose. Gated on
+# paths so it only runs when a Dockerfile, lockfile, or Compose file actually changed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/Dockerfile"
+      - "server/pyproject.toml"
+      - "server/uv.lock"
+      - "web/Dockerfile"
+      - "web/package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/docker-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/Dockerfile"
+      - "server/pyproject.toml"
+      - "server/uv.lock"
+      - "web/Dockerfile"
+      - "web/package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docker-compose.yml"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/docker-build.yml"
+
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: server dev
+            context: ./server
+            dockerfile: server/Dockerfile
+            target: dev
+          - name: server prod
+            context: ./server
+            dockerfile: server/Dockerfile
+            target: prod
+          - name: server ml
+            context: ./server
+            dockerfile: server/Dockerfile
+            target: ml
+          - name: web dev
+            context: .
+            dockerfile: web/Dockerfile
+            target: dev
+          - name: web prod
+            context: .
+            dockerfile: web/Dockerfile
+            target: prod
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

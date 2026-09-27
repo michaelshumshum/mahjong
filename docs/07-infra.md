@@ -236,6 +236,17 @@ Postgres, so the containers buy nothing but slower cold starts. `docker compose`
 directly against the toolchain instead of shelling through Compose. Revisit if a job ever needs
 Postgres.
 
+Native tooling means none of the above ever builds the Dockerfiles themselves — a broken stage
+(bad `COPY`, stale build arg, a torch/musl mismatch) would only surface at `make up` or deploy
+time. **`.github/workflows/docker-build.yml`** (added 2026-09-27) closes that gap: a matrix job
+builds every stage each Dockerfile actually defines that CI doesn't already exercise natively —
+`server`'s `dev`/`prod`/`ml`, `web`'s `dev`/`prod` — with `push: false` (build-only, nothing
+published) and a `type=gha` layer cache per matrix entry so repeat runs stay fast. Same
+path-filter reasoning as `server-ml.yml` above: `workflow_call` can't filter by path, and a
+Docker layer build is too heavy to pay on every unrelated push, so it's standalone with its own
+`on.push.paths`/`on.pull_request.paths` — `server/Dockerfile`, `web/Dockerfile`, either
+lockfile, either Compose file, or the workflow file itself.
+
 **Job graph**: GitHub Actions can't `needs:` across independent top-level workflow files, only
 within one workflow's own jobs — reusable workflows are the way to get real separate files while
 keeping the option to chain a job that has a genuine dependency. Here, none do: `server`,
