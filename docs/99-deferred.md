@@ -402,6 +402,9 @@ Give each bot a **persona** — a name, an avatar, a play-style bias (aggressive
 flush-lover) and a think-time distribution. A bot that reliably chases full flushes is more
 memorable than one that's marginally more optimal.
 
+The play-style bias is the same `FaanBot` weight-profile mechanism `06-ml.md` §6.6 wants for
+training-opponent variety — build it once, serve both.
+
 | Level | How |
 | --- | --- |
 | Expert | T3 with search budget |
@@ -459,6 +462,26 @@ behaviour-cloning prior needs to be `FaanBot` (`06-ml.md` §4/§5), and the engi
 seeded design means regenerating self-play data on demand is free. `GameRecord` persistence
 itself is *not* cut — it still happens from M1 (`06-ml.md` §2) — only the "this is training data,
 starting now" framing is.
+
+### Human game records as training data
+
+Provenance: `06-ml.md` §6.6 (2026-09-28 training-plan pass).
+
+Persisted `GameRecord`s from live human tables replay through the pure engine to the full
+`GameState`, so every hidden hand is recoverable — each human game is **exactly labelled phase-1
+data** (opponent tenpai/waits) drawn from the real target distribution, which bot variants only
+approximate. The strongest available fix for phase 1's opponent-distribution shift.
+
+Deferred because:
+
+- no live human traffic yet — the corpus would be too small to matter
+- only records matching the current `ENGINE_VERSION` replay (`06-ml.md` §2's policy); a corpus
+  accumulated across engine bumps is mostly unusable unless replay is pinned to old engine builds
+- using players' games for training needs a disclosure/consent line in the product first
+
+Revive when live play has produced a meaningful volume of same-`engine_version` records. Mix into
+phase 1 training alongside bot self-play, and keep a human-only held-out split as the evaluation
+set for §6.6's generalisation check.
 
 ### `SeatView` input-boundary writeup
 
@@ -559,6 +582,11 @@ generalizes across tables additionally requires the "Feature-plane encoding" ent
 ruleset-as-input point — without it, the same hand shape carries contradictory labels across
 examples and behaviour cloning has nothing consistent to fit.
 
+**Superseded teacher (2026-09-28):** `06-ml.md` §6.4 now plans to clone `ORACLE`, not `FaanBot` —
+`ORACLE` is measurably stronger (+12.1 points/game vs `FaanBot`, `04-bots.md` §10), so cloning it
+raises the ceiling instead of capping at `FaanBot`. Cloning from a *mix* of similar-strength
+teachers is rejected for the contradictory-labels reason in `06-ml.md` §6.6.
+
 ### Self-play PPO + batched inference serving
 
 Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
@@ -566,6 +594,9 @@ Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
 Was listed as a casual day-2 bullet alongside behaviour cloning. Realistically thousands of
 GPU-hours (see Suphx, arXiv:2003.13590) with no compute budget or success metric defined
 anywhere in this doc set — do not schedule this against a milestone until both exist.
+**Update (2026-09-28):** `06-ml.md` §6.5 now defines the success metric; the compute budget is
+still open, and §7 there measures why local CPU-only RL is marginal. A ≤5 ms single-sample CPU
+model (§7 "Serving") would avoid the batched-serving requirement below entirely.
 
 **Execution-model finding (2026-09-26, ml-readiness scoping pass):** batched inference is
 architecturally incompatible with `bots/worker.py`'s per-decision `ProcessPoolExecutor` job model
