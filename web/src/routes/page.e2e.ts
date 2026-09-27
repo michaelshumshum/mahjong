@@ -135,8 +135,13 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
 
 	const dialog = page.getByRole('dialog', { name: 'Practice vs Bots' });
-	await dialog.locator('input[name="seat-1-difficulty"][value="easy"]').check();
-	await dialog.locator('input[name="seat-3-difficulty"][value="impossible"]').check();
+	// each seat's difficulty cycles easy -> normal -> impossible -> easy on click, starting from
+	// the default (Normal).
+	const rightSlot = dialog.getByRole('button', { name: /^Right opponent:/ });
+	const leftSlot = dialog.getByRole('button', { name: /^Left opponent:/ });
+	await rightSlot.click(); // normal -> impossible
+	await rightSlot.click(); // impossible -> easy
+	await leftSlot.click(); // normal -> impossible
 	await dialog.getByRole('button', { name: 'Start', exact: true }).click();
 
 	await expect(page).toHaveURL('/table/DIFF456?practice=1');

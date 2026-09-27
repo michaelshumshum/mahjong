@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import PracticeSetupDialog from './PracticeSetupDialog.svelte';
 
-// Interaction (submitting, sending the chosen tiers) is covered end-to-end
-// (routes/page.e2e.ts) -- this file covers the initial render: labelled dialog, one picker per
-// bot seat, defaulting to Normal.
+// Interaction (cycling a seat's difficulty, submitting, sending the chosen tiers) is covered
+// end-to-end (routes/page.e2e.ts) -- this file covers the initial render: labelled dialog, one
+// seat-ring slot per bot seat, defaulting to Normal, the human seat marked distinctly.
 describe('PracticeSetupDialog', () => {
 	const noop = () => {};
 
@@ -15,29 +15,20 @@ describe('PracticeSetupDialog', () => {
 		expect(body).toContain('Practice vs Bots');
 	});
 
-	it('offers a difficulty picker for each of the three bot seats, none for the human seat', () => {
+	it('lays out the three bot seats in the same ring arrangement as the seat-selection screen', () => {
 		const { body } = render(PracticeSetupDialog, { props: { onCreated: noop, onCancel: noop } });
-		expect(body).toContain('Right opponent');
-		expect(body).toContain('Across');
-		expect(body).toContain('Left opponent');
-		expect(body).not.toContain('seat-0-difficulty');
+		expect(body).toContain('seat-ring-pos--across');
+		expect(body).toContain('seat-ring-pos--left');
+		expect(body).toContain('seat-ring-pos--right');
+		expect(body).toContain('seat-ring-pos--self');
 	});
 
-	it('offers Easy/Normal/Impossible for every seat, defaulting to Normal', () => {
+	it('defaults every bot seat to Normal, and marks the human seat distinctly', () => {
 		const { body } = render(PracticeSetupDialog, { props: { onCreated: noop, onCancel: noop } });
-		expect(body).toContain('Easy');
-		expect(body).toContain('Normal');
-		expect(body).toContain('Impossible');
-		for (const seat of [1, 2, 3]) {
-			expect(body).toMatch(
-				new RegExp(`name="seat-${seat}-difficulty"[^>]*value="normal"[^>]*checked`)
-			);
-			expect(body).not.toMatch(
-				new RegExp(`name="seat-${seat}-difficulty"[^>]*value="easy"[^>]*checked`)
-			);
-			expect(body).not.toMatch(
-				new RegExp(`name="seat-${seat}-difficulty"[^>]*value="impossible"[^>]*checked`)
-			);
-		}
+		expect(body).toContain('Right opponent: Normal. Click to change.');
+		expect(body).toContain('Across: Normal. Click to change.');
+		expect(body).toContain('Left opponent: Normal. Click to change.');
+		expect(body).toContain('You');
+		expect(body).toContain('Your seat');
 	});
 });
