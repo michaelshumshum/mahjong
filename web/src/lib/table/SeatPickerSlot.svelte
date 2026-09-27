@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Seat } from './mock-game-state';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		seat,
@@ -25,7 +26,13 @@
 	disabled={!open}
 	onclick={() => onJoin(seat)}
 >
-	<span>{open ? 'Open' : status === 'bot' ? 'Bot' : (name ?? 'Taken')}</span>
+	<span
+		>{open
+			? m.seatPickerSlot_openLabel()
+			: status === 'bot'
+				? m.seatPickerSlot_botLabel()
+				: (name ?? m.seatPickerSlot_takenLabel())}</span
+	>
 </button>
 
 <style lang="scss">

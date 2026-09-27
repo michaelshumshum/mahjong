@@ -1,10 +1,18 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
+
 	let { status, name }: { status: string; name: string | null } = $props();
 	let open = $derived(status === 'empty');
 </script>
 
 <div class="seat-ring-slot" class:seat-ring-slot--filled={!open}>
-	<span>{open ? 'Open' : status === 'bot' ? 'Bot' : (name ?? 'Taken')}</span>
+	<span
+		>{open
+			? m.seatOccupancySlot_openLabel()
+			: status === 'bot'
+				? m.seatOccupancySlot_botLabel()
+				: (name ?? m.seatOccupancySlot_takenLabel())}</span
+	>
 </div>
 
 <style lang="scss">

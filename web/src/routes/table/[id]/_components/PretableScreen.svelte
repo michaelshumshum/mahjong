@@ -6,6 +6,8 @@
 	import SeatRing from '$lib/table/SeatRing.svelte';
 	import FormGroup from '$lib/ui/FormGroup.svelte';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import { RULESET_PRESET_OPTIONS } from '$lib/net/ruleset';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		tableId,
@@ -45,53 +47,55 @@
 		rulesetPreset: string | null;
 	} = $props();
 
-	const PRESET_LABELS: Record<string, string> = {
-		hk_classic: 'HK Classic',
-		hk_casual: 'Casual',
-		hk_strict: 'Strict'
-	};
-
 	// `rulesetPreset === null` means "custom ruleset" or "no state_sync yet" -- only the spectator
 	// snapshot every pre-game connection gets disambiguates them, so this renders only past "Connecting…" below.
 	let rulesetKnown = $derived(
 		!!effectiveConnection && effectiveConnection !== 'idle' && effectiveConnection !== 'connecting'
+	);
+
+	// reuses the preset labels already migrated for CreateTableDialog/ruleset.ts rather than a
+	// second copy of the same three strings.
+	let presetLabel = $derived(
+		rulesetPreset
+			? (RULESET_PRESET_OPTIONS.find((p) => p.id === rulesetPreset)?.label() ?? rulesetPreset)
+			: m.pretableScreen_customRuleset()
 	);
 </script>
 
 <!-- All three pre-game states share one panel (table code + copy-invite-link) and the seat
 	ring's arrangement, matching the real table grid's relative layout. -->
 <div class="pretable-panel">
-	<BackButton label="Leave game" onclick={onLeaveClick} />
+	<BackButton label={m.pretableScreen_leaveGameButton()} onclick={onLeaveClick} />
 	<div class="pretable-info">
-		<span>Table</span>
+		<span>{m.pretableScreen_tableLabel()}</span>
 		<span class="pretable-code">{tableId}</span>
 		<button type="button" class="pretable-link-btn" onclick={onCopyInviteLink}>
-			{copiedInviteLink ? 'Copied' : 'Copy invite link'}
+			{copiedInviteLink ? m.pretableScreen_copiedLabel() : m.pretableScreen_copyInviteLinkButton()}
 		</button>
 		{#if rulesetKnown}
 			<span class="pretable-rules">
-				Rules: {rulesetPreset ? (PRESET_LABELS[rulesetPreset] ?? rulesetPreset) : 'Custom'}
+				{m.pretableScreen_rulesLabel({ preset: presetLabel })}
 			</span>
 		{/if}
 	</div>
 	{#if copyInviteLinkFailed}
-		<p class="pretable-error">Couldn't copy automatically — copy the address bar instead.</p>
+		<p class="pretable-error">{m.pretableScreen_copyLinkError()}</p>
 	{/if}
 
 	{#if !effectiveConnection || effectiveConnection === 'idle' || effectiveConnection === 'connecting'}
 		<div class="pretable-center">
 			<div class="pretable-spinner"></div>
-			<p class="pretable-status">Connecting…</p>
+			<p class="pretable-status">{m.pretableScreen_connectingStatus()}</p>
 		</div>
 	{:else if effectiveSeat === null}
-		<h2>Take a seat</h2>
-		<FormGroup legend="Your name">
+		<h2>{m.pretableScreen_takeASeatTitle()}</h2>
+		<FormGroup legend={m.pretableScreen_nameLegend()}>
 			<input
 				id="display-name-input"
 				type="text"
 				class="pretable-name-input"
 				maxlength="24"
-				placeholder="Guest"
+				placeholder={m.pretableScreen_namePlaceholder()}
 				autocomplete="off"
 				value={displayName}
 				oninput={(e) => onDisplayNameChange(e.currentTarget.value)}
@@ -100,16 +104,17 @@
 		<SeatPicker {seatStatus} {names} {onJoin} />
 	{:else}
 		<SeatRing you={effectiveSeat} {dealer} {seatStatus} {names} />
-		<h2>You're seated as {WIND_LABEL[seatWind(effectiveSeat, dealer)]}</h2>
+		<h2>
+			{m.pretableScreen_seatedAsLabel({ wind: WIND_LABEL[seatWind(effectiveSeat, dealer)] })}
+		</h2>
 		<p>
-			Waiting for the rest of the table to join. The hand starts automatically once all four seats
-			are ready.
+			{m.pretableScreen_waitingMessage()}
 		</p>
 		{#if isHost}
 			<button type="button" class="pretable-cta" onclick={onStartWithBots}>
-				Start with bots
+				{m.pretableScreen_startWithBotsButton()}
 			</button>
-			<p class="pretable-hint">Fills every open seat with a bot and starts right away.</p>
+			<p class="pretable-hint">{m.pretableScreen_startWithBotsHint()}</p>
 		{/if}
 	{/if}
 </div>

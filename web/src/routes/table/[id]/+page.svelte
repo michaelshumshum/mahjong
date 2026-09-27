@@ -53,6 +53,7 @@
 	import MockTableToolbar from './_components/MockTableToolbar.svelte';
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// `?mock=<scenarioId>` renders a frozen MOCK_SCENARIOS fixture with no backend (screenshot
 	// workflow); omitted, `[id]` opens a real MahjongSocket -> GameStore through the same view model.
@@ -168,7 +169,11 @@
 				(event.d.status === 'connected' || event.d.status === 'bot') &&
 				event.d.seat !== liveStore?.state.seat
 			) {
-				pushToast(`${event.d.name ?? 'A player'} took a seat.`);
+				pushToast(
+					m.pretableScreen_arrivalToast({
+						name: event.d.name ?? m.pretableScreen_anonymousPlayer()
+					})
+				);
 			}
 		});
 		socket.connect(

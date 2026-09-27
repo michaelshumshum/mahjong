@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
+
 	let { onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void } = $props();
 </script>
 
@@ -6,14 +8,16 @@
 	<div
 		class="confirm-dialog"
 		role="alertdialog"
-		aria-label="Leave game"
+		aria-label={m.leaveGameDialog_ariaLabel()}
 		aria-describedby="leave-confirm-desc"
 	>
-		<h2>Leave this table?</h2>
-		<p id="leave-confirm-desc">Your seat switches to autoplay until you reconnect.</p>
+		<h2>{m.leaveGameDialog_title()}</h2>
+		<p id="leave-confirm-desc">{m.leaveGameDialog_description()}</p>
 		<div class="confirm-actions">
-			<button type="button" onclick={onCancel}>Cancel</button>
-			<button type="button" class="confirm-leave" onclick={onConfirm}>Leave game</button>
+			<button type="button" onclick={onCancel}>{m.leaveGameDialog_cancelButton()}</button>
+			<button type="button" class="confirm-leave" onclick={onConfirm}
+				>{m.leaveGameDialog_confirmButton()}</button
+			>
 		</div>
 	</div>
 </div>

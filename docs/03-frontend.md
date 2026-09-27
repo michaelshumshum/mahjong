@@ -818,9 +818,12 @@ should stay one class plus custom properties.
   `Settings.svelte`, `Toast.svelte`, `DialogTimer.svelte`/`TimerRing.svelte`,
   `DismissablePanel.svelte` — migrated to `m.*` messages, `LocaleSwitcher` wired into
   `Settings.svelte`), Phase 2 (lobby — `routes/+page.svelte`, `CreateTableDialog.svelte`,
-  `lib/net/ruleset.ts` preset/option labels), and Phase 3 (tables list —
-  `routes/tables/+page.svelte`, `TableCard.svelte`, `JoinByCodePanel.svelte`) are done. Every other
-  route/component's strings are still hardcoded English — later phases in that plan.
+  `lib/net/ruleset.ts` preset/option labels), Phase 3 (tables list —
+  `routes/tables/+page.svelte`, `TableCard.svelte`, `JoinByCodePanel.svelte`), and Phase 4
+  (pre-table / seat picker — `PretableScreen.svelte`, `LeaveGameDialog.svelte`,
+  `SeatPicker.svelte`/`SeatPickerSlot.svelte`, `SeatOccupancySlot.svelte`, plus the pre-game
+  arrival toast in `routes/table/[id]/+page.svelte`) are done. Every other route/component's
+  strings are still hardcoded English — later phases in that plan.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).
