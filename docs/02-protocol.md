@@ -463,10 +463,19 @@ GET /tables
 
 ```
 POST /tables
-{"ruleset"?: "hk_classic", "rules"?: {…RuleSet.to_dict() shape…}, "practice"?: false}
+{"ruleset"?: "hk_classic", "rules"?: {…RuleSet.to_dict() shape…}, "practice"?: false,
+ "bot_tiers"?: {"1": "T1"|"T2"|"ORACLE", "2": …, "3": …}}
 ->
 {"table_id": "ABC123", "ruleset_preset": "hk_classic" | null, "ruleset": {…RuleSet.to_dict()…}}
 ```
+
+`bot_tiers` is practice mode's per-seat difficulty picker (`docs/04-bots.md §7`,
+`web/src/lib/ui/PracticeSetupDialog.svelte`) — seat keys `1`-`3` only (seat `0` is the human seat
+in practice mode, never included), values restricted to `T1`/`T2`/`ORACLE` (`app/main.py`'s
+`_PRACTICE_BOT_TIERS` — `T0`/`RandomBot` is never a selectable difficulty, `docs/04-bots.md §2`).
+Same lenient-fallback posture as `ruleset`/`rules`: an out-of-range seat or an unrecognized tier
+is silently dropped, not rejected, and that seat falls back to `DEFAULT_BOT_TIER` ("T2"). Ignored
+entirely when `practice` is false — there are no bot seats to apply it to.
 
 The one-request table-creation path (`app/main.py`'s `create_table`): resolves the ruleset and
 mints a fresh six-character id (`app/main.py`'s `_generate_table_id`, same look-alike-free

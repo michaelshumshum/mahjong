@@ -84,7 +84,7 @@ bare action id. `app/table.py`'s `_handle_bot_result` decodes it, since it alrea
 | **T2** `FaanBot` | T1 + hand-value planning + discard safety | ~900 lines | "Normal"/"Hard". Moved into M4 (see §4) — the real product. **Built (M4)** — see §4/§5/§8 for the shipped design and real arena numbers. |
 | **T3** `SearchBot` | determinized-world rollout search over the pure engine | ~350 lines | **Built (M6), then removed** — statistically worse than `FaanBot` after two real debugging rounds; a structural ceiling, not a bug. No tier currently occupies "Expert" — see §6/§7. |
 | **T4** learned policy | supervised on self-play or human logs | research | optional, later — see §6's closing note on what would make a future search-based tier viable |
-| **`ORACLE`** | a plain `FaanBot()` fed full-information (`view.hands`) instead of the ordinary view | 0 extra lines (reuses `FaanBot`) | **not on this ladder** — explicitly opt-in only, a table has to be deliberately configured to run it; never a difficulty option (§7). **Built** — see §10 for the shipped design and the safety argument. |
+| **`ORACLE`** | a plain `FaanBot()` fed full-information (`view.hands`) instead of the ordinary view | 0 extra lines (reuses `FaanBot`) | practice mode's "Impossible" difficulty (§7), selectable per seat via `POST /tables`'s `bot_tiers`. **Built** — see §10 for the shipped design and the safety argument. |
 
 Ship T1 and T2 in M4 (§4 explains why T1 alone can't satisfy M4's done-gate). T3 was out of scope
 for M4 and shipped later, in M6, once the per-tier pool-routing precondition existed — see §6 for
@@ -382,22 +382,38 @@ layered on top of whichever tier answers, not a tier itself.
 
 ## 7. Difficulty levels
 
-| Level | How |
-| --- | --- |
-| Easy | T1, no safety model, calls melds too eagerly |
-| Normal | T2 with mild weights, occasional suboptimal discard (ε ≈ 0.1), no fold logic |
-| Hard | T2 tuned, full safety model, fold logic |
+**Built: a per-seat picker in practice mode** (`web/src/lib/ui/PracticeSetupDialog.svelte`,
+`docs/03-frontend.md`'s practice-mode entry point, `POST /tables`'s `bot_tiers` — `app/main.py`).
+Three levels, each one of the bots this doc already ships end to end — no separate "mild" vs.
+"tuned" mode of any of them, no fourth row:
 
-**No "Expert" row currently ships.** T3 `SearchBot` was built and was meant to fill it, but was
-removed after arena validation showed it decisively worse than `FaanBot`/"Hard" — see §6 for the
-full history and why. "Hard" (tuned T2) is the strongest tier a normal player can select today;
-revisit this table if/when §6's "What would make a future attempt viable" is ever acted on.
+| Level | Bot | Tier |
+| --- | --- | --- |
+| Easy | `EfficiencyBot` — pure shanten/ukeire, no value targeting, no safety model (§3) | `T1` |
+| Normal | `FaanBot` — value-targeting, safety model, fold logic (§4/§5) | `T2` |
+| Impossible | `FaanBot` fed a full-information (`view.hands`) view instead of the ordinary redacted one (§10) | `ORACLE` |
 
-`ORACLE` (§10) is **not** a candidate for this table either way, past or future — it isn't a
-difficulty a player picks, it's a full-information analysis/showcase tier a table opts into
-explicitly (UI for that opt-in is a separate, later task). It was never meant to be read as
-"harder than Expert" on the same continuum; the actual difference is information level, not
-skill.
+`T0`/`RandomBot` is still never offered as a difficulty — fuzzing/engine-test tool only (§2).
+
+**Superseded by the row above: an earlier draft of this table.** It split "Normal"/"Hard" as two
+different weight modes of `T2` (a mild-weights ε-noise mode versus the tuned one) and reserved a
+row for a future "Expert" (§6's `SearchBot`, built, then removed for scoring decisively worse
+than `FaanBot` in arena validation). Neither the mild-weights mode nor `SearchBot` was ever
+shipped, so that two-row split of `T2` plus an empty "Expert" slot was aspirational, not real.
+Three rows, each backed by a bot that already exists end to end, is what's actually selectable
+today.
+
+**`ORACLE` as "Impossible" reverses this doc's own earlier design call.** A prior revision of
+this section described `ORACLE` as "not a candidate for this table either way, past or future" —
+reserved for an opt-in analysis/showcase tier, never a difficulty a player picks. That call is
+superseded: `ORACLE` is now practice mode's "Impossible" difficulty. The safety argument §10
+built `ORACLE` on is unaffected either way, because it was never actually about difficulty:
+`_omniscient_seat_view` only ever builds a view for a `bot`-status seat (`_submit_bot_job`'s
+oracle-tier branch), disconnect-handover always forces `T2` regardless of what tier a table or
+seat is configured with (`_DISCONNECT_HANDOVER_BOT_TIER`), and a practice table's seat 0 — the
+only seat a human ever occupies — is never bound to a bot at all. Exposing `ORACLE` as a
+selectable *opponent* difficulty doesn't touch any of that: it was always contained to bot seats,
+difficulty-picker or not.
 
 ## 8. Evaluation harness
 
@@ -636,14 +652,14 @@ carries `ruleset: RuleSet` (Tier 1), and every Tier 2 item below is now closed t
 
 ## 10. `"ORACLE"` tier
 
-**Built, redesigned.** A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a `SeatView`
-with every seat's concealed tiles populated (`.hands`) instead of only `view.own_hand` — no
-dedicated class, no search, no rollout. Same `Bot.act(view, mask, deadline) -> int` shape as every
-other tier, unchanged from `faanbot.py`. **Not on the T0-T2 difficulty ladder** (§2/§7): explicitly
-opt-in only, a live table has to be deliberately configured to run it — UI/protocol work for
-actually offering that choice in table setup (`CreateTableDialog.svelte`/`POST /tables`) is a
-separate, later task; a table *could* run it today via direct `Table(bot_tier="ORACLE")`
-construction, just not through the lobby yet.
+**Built, redesigned, and now selectable.** A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`)
+driven by a `SeatView` with every seat's concealed tiles populated (`.hands`) instead of only
+`view.own_hand` — no dedicated class, no search, no rollout. Same `Bot.act(view, mask, deadline)
+-> int` shape as every other tier, unchanged from `faanbot.py`. Offered as practice mode's
+"Impossible" difficulty (§7) via `PracticeSetupDialog.svelte`/`POST /tables`'s `bot_tiers`
+(`app/main.py`) — the live-table-selection path this section previously deferred as "a separate,
+later task"; a table could already run it via direct `Table(bot_tier="ORACLE")`/
+`seat_bot_tiers={...}` construction before this, just not through the lobby.
 
 ### History: why the original rollout-based design got replaced
 

@@ -664,21 +664,32 @@ to fold into whoever next touches `state_sync`'s payload.
 **Practice mode entry point (M4.5, `docs/05-roadmap.md`).** The lobby (`/`) is three buttons over a
 scrolling tile-mural background (`lib/ui/TileMuralBackground.svelte`, §2's canvas exception): "Create
 a table", "Join a game" (a plain link to the table browser, below), and "Practice vs Bots".
-"Practice vs Bots" generates a table id the same way "Create a table" does and navigates straight to
-`/table/<id>?practice=1` — no invite code to share, but "Create a table" has no copy step to skip
-either (below): both buttons go straight from the lobby to the table. `?practice=1` is this route's
-own query param, unrelated in spelling to
-the wire's own `&practice=true`; `/table/[id]`'s live-connect effect appends the latter to the
-`MahjongSocket` URL when the former is present, which is what actually binds seats 1-3 to real
-`FaanBot`s at table creation server-side (`server/app/ws.py`'s `ws_endpoint`, `app/table.py`'s
-`Table.__init__(practice=...)`). The human's own `join`/`ready` — the existing seat-picker flow —
-is unchanged (seat 0 is the only "Open" slot in the picker, since seats 1-3 already read `bot`); a
-practice table's bot seats are already bound and auto-ready the instant the table
-exists, so the "waiting for the rest of the table" screen should almost never show for long, though
-the client still goes through it structurally since there's still no real "has this table started"
-signal (below). The table label in the live table's toolbar appends "· practice vs bots" when
-this flag is set — not a per-bot name, since each of the three bot seats draws its own random,
-distinct display name (`_BOT_NAME_POOL`, above) rather than sharing one fixed tier label.
+
+**Built: a per-seat difficulty picker (`lib/ui/PracticeSetupDialog.svelte`).** "Practice vs Bots"
+opens a dialog before creating anything — same reasoning as "Create a table"'s own dialog (below):
+bot tier is fixed at table construction with no path to change it after, so it has to be chosen
+before the request, not navigated past. Three radio groups, one per bot seat (`Right opponent`/
+`Across`/`Left opponent`, matching `mock-game-state.ts`'s `relativeSeat` offsets — seat 0 is never
+shown, it's the human's own seat), each offering Easy/Normal/Impossible
+(`docs/04-bots.md §7` — `T1`/`EfficiencyBot`, `T2`/`FaanBot`, `ORACLE` respectively), defaulting to
+Normal. Submitting sends `POST /tables` with `{practice: true, bot_tiers: {1: "T1"|"T2"|"ORACLE",
+2: ..., 3: ...}}` (`app/main.py`'s `CreateTableRequest.bot_tiers` — seat 0 excluded, seats outside
+1-3 or an unrecognized tier value are silently dropped server-side rather than rejected, same
+lenient-fallback posture as `ruleset`/`rules`), then navigates to `/table/<id>?practice=1` — no
+invite code to share, but "Create a table" has no copy step to skip either (below): both dialogs
+end with the same straight-to-table navigation. `?practice=1` is this route's own query param,
+unrelated in spelling to the wire's own `&practice=true`; `/table/[id]`'s live-connect effect
+appends the latter to the `MahjongSocket` URL when the former is present, which is what actually
+binds seats 1-3 to their chosen tier at table creation server-side (`server/app/ws.py`'s
+`ws_endpoint`, `app/table.py`'s `Table.__init__(practice=..., seat_bot_tiers=...)`). The human's
+own `join`/`ready` — the existing seat-picker flow — is unchanged (seat 0 is the only "Open" slot
+in the picker, since seats 1-3 already read `bot`); a practice table's bot seats are already bound
+and auto-ready the instant the table exists, so the "waiting for the rest of the table" screen
+should almost never show for long, though the client still goes through it structurally since
+there's still no real "has this table started" signal (below). The table label in the live table's
+toolbar appends "· practice vs bots" when this flag is set — not a per-bot name or tier badge,
+since each of the three bot seats draws its own random, distinct display name (`_BOT_NAME_POOL`,
+above) rather than surfacing the chosen difficulty in the seat header.
 
 **Table browser (`/tables`).** Reached from the lobby's "Join a game" link (above); holds
 the join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(16rem, 1fr))`),
