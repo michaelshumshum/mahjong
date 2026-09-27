@@ -32,6 +32,9 @@ on:
       - "docker-compose.prod.yml"
       - ".github/workflows/docker-build.yml"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: build ${{ matrix.name }}
