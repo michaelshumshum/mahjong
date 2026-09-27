@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import { TABLE_CODE_LENGTH } from '$lib/table/table-code';
 
 	let {
@@ -9,7 +10,7 @@
 </script>
 
 <section class="panel join-panel" aria-labelledby="join-heading">
-	<h2 id="join-heading">Join by code</h2>
+	<h2 id="join-heading">{m.joinByCodePanel_heading()}</h2>
 	<form
 		onsubmit={(event) => {
 			event.preventDefault();
@@ -22,15 +23,16 @@
 			autocomplete="off"
 			spellcheck="false"
 			maxlength={TABLE_CODE_LENGTH}
-			placeholder="ABC123"
-			aria-label="Table code"
+			placeholder={m.joinByCodePanel_codePlaceholder()}
+			aria-label={m.joinByCodePanel_codeAriaLabel()}
 			bind:value={code}
 		/>
-		<button type="submit" class="primary" disabled={!codeValid}>Join table</button>
+		<button type="submit" class="primary" disabled={!codeValid}
+			>{m.joinByCodePanel_submitButton()}</button
+		>
 	</form>
 	<p class="hint">
-		Any code works — the table is created automatically the moment someone connects to it, so this
-		is a real invite, not a preview.
+		{m.joinByCodePanel_hint()}
 	</p>
 </section>
 

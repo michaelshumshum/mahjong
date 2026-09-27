@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import { seatedCount, type TableSummary } from '$lib/net/lobby';
 
 	let {
@@ -13,24 +14,30 @@
 		<span class="table-code">{table.id}</span>
 		<span class="table-state" class:table-state--open={table.status === 'open'}>
 			{table.status === 'open'
-				? `Open · ${seatedCount(table)}/4`
-				: `In progress · hand ${table.hand_no}`}
+				? m.tableCard_openStatus({ count: seatedCount(table) })
+				: m.tableCard_inProgressStatus({ handNo: table.hand_no })}
 		</span>
 	</header>
-	<ul class="seats" aria-label="Seats">
+	<ul class="seats" aria-label={m.tableCard_seatsAriaLabel()}>
 		{#each table.seats as seat, i (i)}
 			<li class:seat--open={seat.status === 'empty'}>
-				{seat.status === 'empty' ? 'Open seat' : (seat.name ?? 'Guest')}
-				{#if seat.status === 'bot'}<span class="bot-badge">Bot</span>{/if}
+				{seat.status === 'empty'
+					? m.tableCard_openSeatLabel()
+					: (seat.name ?? m.tableCard_guestName())}
+				{#if seat.status === 'bot'}<span class="bot-badge">{m.tableCard_botBadge()}</span>{/if}
 			</li>
 		{/each}
 	</ul>
 	{#if hasJoined}
-		<button type="button" class="primary" onclick={() => onOpen(table.id)}>Rejoin</button>
+		<button type="button" class="primary" onclick={() => onOpen(table.id)}
+			>{m.tableCard_rejoinButton()}</button
+		>
 	{:else if table.status === 'open'}
-		<button type="button" class="primary" onclick={() => onOpen(table.id)}>Sit down</button>
+		<button type="button" class="primary" onclick={() => onOpen(table.id)}
+			>{m.tableCard_sitDownButton()}</button
+		>
 	{:else}
-		<button type="button" onclick={() => onOpen(table.id)}>Watch</button>
+		<button type="button" onclick={() => onOpen(table.id)}>{m.tableCard_watchButton()}</button>
 	{/if}
 </li>
 

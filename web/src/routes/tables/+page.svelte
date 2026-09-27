@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { m } from '$lib/paraglide/messages.js';
 	import { fetchTables, type TableSummary } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { hasJoinedTable } from '$lib/ui/settings-storage';
@@ -42,21 +43,23 @@
 
 <div class="tables-page">
 	<header class="page-header">
-		<BackButton label="Lobby" href="/" />
-		<h1>Tables</h1>
-		<button type="button" class="ghost" onclick={refreshTables}>Refresh</button>
+		<BackButton label={m.tablesPage_backLabel()} href="/" />
+		<h1>{m.tablesPage_title()}</h1>
+		<button type="button" class="ghost" onclick={refreshTables}
+			>{m.tablesPage_refreshButton()}</button
+		>
 	</header>
 
 	<JoinByCodePanel bind:code={joinCode} codeValid={joinCodeValid} onSubmit={joinTable} />
 
 	{#if tablesError && tables === null}
-		<p class="hint">Couldn't reach the server.</p>
+		<p class="hint">{m.tablesPage_errorHint()}</p>
 	{:else if tables === null}
-		<p class="hint">Loading…</p>
+		<p class="hint">{m.tablesPage_loadingHint()}</p>
 	{:else if tables.length === 0}
-		<p class="hint">No tables right now — create one from the lobby and invite others.</p>
+		<p class="hint">{m.tablesPage_emptyHint()}</p>
 	{:else}
-		<ul class="table-grid" aria-label="Tables">
+		<ul class="table-grid" aria-label={m.tablesPage_tablesAriaLabel()}>
 			{#each tables as table (table.id)}
 				<TableCard
 					{table}
