@@ -1031,3 +1031,136 @@ ends, giving the (already much smaller) residual real-deal-in mechanism marginal
 opportunities to fire, while the net points/win-rate swing is decisively positive. The win-rate
 effect this time needed no larger-sample investigation the way the fold-timing fix did — it's
 visible directly at the same 200-set size this tier's checks were already using.
+
+### The kong-rob gap: `_act_on_turn`'s self-kong loop needed the same treatment
+
+`tile_risk`/`opponent_threat_level`/`seen34` all make `_best_discard` hands-aware. They don't
+touch a separate decision point in the same file: `FaanBot._act_on_turn`'s kong loop, which
+declares whichever legal concealed/added kong strictly reduces shanten furthest, with **no safety
+check of any kind** — not even the probabilistic one every ordinary discard gets via `tile_risk`.
+This matters because robbing a kong (搶槓) is real and expensive in this ruleset:
+`mahjong_core.engine._apply_self_kong` calls `_kong_rob_offers`, which checks every other seat's
+*real* hand for a win on the tile the kong exposes; if it fires, `mahjong_core.scoring.payout`'s
+discard-payment rule makes the kong-declarer pay the whole winning payout alone, plus a +1 faan
+搶槓 bonus (`scoring/patterns.py`'s `_detect_robbing_the_kong`). Structurally this is the same
+shape of loss `tile_risk` already exists to avoid for a discard — it just was never consulted for
+a kong decision at all. Declining is always legal: `mahjong_core.actions._turn_actions` offers
+plain `Discard` actions alongside every kong option in the same legal-action set.
+
+**Which tile a kong exposes.** `mahjong_core.ml.action_id` keys both `DeclareConcealedKong` and
+`DeclareAddedKong` off `meld.tile_type` — the same `t` the kong loop already iterates over — and
+`_apply_self_kong` derives the exposed tile from that same type for both kinds: an *added* kong's
+`new_tile` is the concealed 4th copy just folded into the existing pung; a *concealed* kong's is
+any of its 4 identical tiles (`meld.tiles[-1]`, arbitrary — all one type). So "the tile this
+candidate kong would expose" is simply `t`, unchanged, for both loop branches.
+
+**Which kong kinds can actually be robbed.** `_kong_rob_offers` gates this per `RuleSet`, and the
+fix mirrors that gating exactly rather than over-flagging a kong the engine itself would never
+open a claim window for:
+
+- `ruleset.kong_rob_enabled` (default `True`) gates both kinds.
+- An *added* kong is open to **any** opponent win on the exposed tile once that's on.
+- A *concealed* kong only matters at all when `ruleset.concealed_kong_robbable` is also on — it
+  **defaults to `False`** (`mahjong_core/config.py`) — and even then only for an opponent whose
+  candidate hand specifically completes Thirteen Orphans (十三么), real HK convention, not "any
+  winning hand." Under the default ruleset, concealed-kong-robbing is unreachable, full stop —
+  test coverage for that path stays a direct unit check of the gating logic (below), not an
+  elaborate `FaanBot.act`-level scenario for a path no default table can ever reach.
+
+**The fix.** `bots/safety.py` gets one new function, `kong_rob_risk(view, tile_type, *,
+concealed)`, `"ORACLE"`-only (asserts `view.hands is not None` — callers must not invoke it at all
+otherwise). It reuses `_exact_deal_in_faan` per opponent — the identical exact win check
+`tile_risk` already uses for a discard of the same tile type — after applying the two gates above
+(`kong_rob_enabled`, and for a concealed kong, `concealed_kong_robbable` plus a
+`mahjong_core.actions._is_thirteen_orphans` check on the candidate hand). `FaanBot._act_on_turn`'s
+kong loop calls it once per legal candidate, before the shanten comparison:
+
+```python
+if view.hands is not None and kong_rob_risk(view, t, concealed=concealed) > 0.0:
+    continue
+```
+
+`view.hands is None` (every tier but `"ORACLE"`) short-circuits before `kong_rob_risk` is ever
+called — zero behavior change for `T0`–`T2`, pinned by
+`tests/test_faanbot.py::test_never_declares_a_self_kong_when_hands_is_none`.
+
+**Policy: hard-avoid, not risk-weighted.** `_best_discard` already has a real value/risk tradeoff
+formula (§4) because a discard is chosen every turn regardless of danger — folding isn't optional.
+A kong is different: it's one candidate among several, discarding is always available as a safe
+fallback, and `_should_claim` already sets precedent elsewhere in this file for "never do X if it
+provably backfires" over a weighted comparison (it refuses a claim that drops the hand below
+`min_faan`, no exception). Reusing that shape here — hard-skip a kong this seat can *prove* deals
+in, fall through to the next-best kong or an ordinary discard — needs no new scoring formula for a
+decision point this rare, and never turns down a kong on a probabilistic guess (there is no
+probabilistic branch for `kong_rob_risk` at all; every non-`"ORACLE"` tier is exactly as exposed to
+this risk today as before this change, unchanged, since only an omniscient view can know for sure).
+
+**Known, accepted gap.** `_exact_deal_in_faan` hardcodes `is_robbing_kong=False` when it builds the
+opponent's `ScoringContext` (it exists for the discard case, where that's correct). Reused as-is
+here, a hand exactly one faan under `min_faan` that would only clear it with 搶槓's own +1 bonus
+faan reads as safe. Narrow and rare; fixing it means either modifying `_exact_deal_in_faan` (out of
+scope — already validated, reuse-don't-modify per this fix's own ground rules) or duplicating its
+scoring call with the bonus threaded through, which isn't worth it for one faan-level edge case at
+an already-rare decision point.
+
+### Tests
+
+`tests/test_safety.py`: six `kong_rob_risk` unit tests mirroring `tile_risk`'s own conventions —
+an added kong flags a real exact deal-in (reuses the identical Seven-Pairs fixture
+`test_tile_risk_hands_aware_flags_an_exact_deal_in` already uses) and clears a safe tile;
+`kong_rob_enabled=False` zeroes a would-be flag; the concealed-kong path is unreachable at
+`concealed_kong_robbable`'s real default even against a genuine Thirteen-Orphans wait, flags one
+once that ruleset flag is explicitly on, and still ignores a non-Thirteen-Orphans completion on the
+identical tile/hand even then (the engine's own restriction, mirrored exactly).
+`tests/test_faanbot.py::test_never_declares_a_self_kong_when_hands_is_none` is the regression pin
+above. `tests/test_oracle.py::test_omniscient_view_avoids_a_kong_that_would_be_robbed` is the
+bot-level proof, with one honestly-documented wrinkle: it stubs `shanten` for the exact post-kong
+candidate array only (every other call falls through to the real function) to force the kong
+loop's own `s < best_kong_shanten` comparison to succeed at all — see "Why this fix is measured as
+a no-op today," directly below, for why that precondition doesn't occur naturally.
+
+### Why this fix is measured as a no-op today
+
+Unlike the three fixes above, this one does not move any arena number, and the reason is provable,
+not a sampling artifact. `mahjong_core.shanten.shanten` is monotonic in any single tile type's
+count — increasing `tiles34[t]` can never *raise* shanten, only lower or hold it, for both the
+standard-shape and (where applicable) Seven-Pairs/Thirteen-Orphans formulas. Declaring a self-kong
+is exactly "remove one redundant copy from an already-complete group" (`_act_on_turn`'s
+`candidate[t] -= 1`, mirroring `bots/features._add_meld`'s "kong contributes 3" convention) — the
+reverse direction, which the same monotonicity makes non-improving. Exhaustive random search (both
+kong kinds, 500,000 random hands each, `server/tools/kong_rob_check.py`, deleted after use)
+confirmed zero counterexamples: `_act_on_turn`'s kong loop can never actually satisfy its own
+`s < best_kong_shanten` test today, so `best_kong_aid` stays `None` — this bot has never
+voluntarily declared a self-kong, on any tier, regardless of this fix.
+
+Direct decision-level instrumentation against real self-play (50 games, plain `FaanBot` × 4,
+ordinary views, same scratch script) confirms this empirically rather than just algebraically:
+12,709 own-turn decisions, 97 of them with a legal self-kong actually offered in the mask (25 of
+the 50 games saw at least one) — **zero** kongs declared. The full 200-duplicate-set (800-game)
+`"ORACLE"` vs `FaanBot` arena run, same script/methodology/seed as the three fixes above, is the
+clearest evidence of all: every metric comes back **bit-for-bit identical** to the pre-fix,
+post-`seen34` baseline —
+
+| Metric | ORACLE (A) | FaanBot (B) |
+| --- | --- | --- |
+| win_rate | 0.3181 | 0.1517 |
+| deal_in_rate | 0.0209 | 0.1628 |
+| avg_winning_faan | 4.3035 | 4.1559 |
+| tenpai_at_draw_rate | 0.6970 | 0.5367 |
+| tenpai_rate_on_sub_minimum_hand | 0.2273 | 0.1463 |
+| avg_points_per_hand | 5.1925 | -1.7308 |
+
+Paired difference (A − B): **+27.693 points/game, 95% CI [25.098, 30.288]** — identical to the
+`seen34` section's own 200-set numbers to four decimal places, not merely "close." Given the
+mathematical proof above, this is the expected result, not a disappointing one: there is no game
+state this fix can possibly steer away from, because the branch it guards is never entered.
+
+This fix is still worth keeping: it's correct, minimal, fully tested, and a strict no-op for every
+tier but `"ORACLE"` by construction. It's insurance against a future change to the kong-shanten
+heuristic ever making `best_kong_aid` reachable (at which point this gate would already be
+protecting it, untested-in-production but not untested), and it closes the one remaining
+kong-declaration decision point `docs/04-bots.md §5`'s safety model didn't cover. But reporting
+this as a measured win would overstate a change that, today, guards a branch the bot never takes —
+the honest finding is that the arena/instrumentation numbers do not move, and the reason is a
+separate, pre-existing, out-of-scope property of `mahjong_core.shanten` rather than anything about
+this fix's own correctness.
