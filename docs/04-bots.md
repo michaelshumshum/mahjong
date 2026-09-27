@@ -942,3 +942,92 @@ fix is inert — the 200-set run, the direct decision-level instrumentation abov
 `tests/test_oracle.py` proof all agree it does something real; a future change to this tier's
 verification convention (a larger default sample, or a decision-level divergence count alongside
 the game-level metrics) would catch this earlier than "the 15-set numbers didn't move."
+
+### The offense-side gap: `seen34` needed the same treatment
+
+`tile_risk` and `opponent_threat_level` are both defense-side: they change how dangerous a
+candidate discard looks, and when to start caring. Neither touches the other half of
+`_best_discard`'s formula — the speed term, `w_speed * _speed_term(result_shanten, tiles)`, where
+`tiles` comes from `mahjong_core.shanten.ukeire`'s live-tile count, `4 - seen34[t]`. `bots/features.
+seen34(view)` builds that count from everything *this seat* can see: its own hand, every seat's
+*non-concealed* melds, and every discard pool — deliberately never `view.hands`, since a normal
+bot has no such field to read. Under the omniscient view, `view.hands` is populated but `seen34`
+never looked at it: any tile actually sitting in an opponent's real concealed hand still read as
+"maybe still in the wall," so `ukeire` overstated how many draws would advance the hand. Full
+information was already sitting in the view; `seen34` just wasn't using it.
+
+`seen34` now branches on `view.hands` the same way both other fixes do:
+
+- **`view.hands is None`** (every tier except `"ORACLE"`): byte-identical to the original —
+  own hand, every seat's non-concealed melds, every discard pool; a concealed kong is still
+  skipped, since a real bot genuinely can't see it
+  (`tests/test_features.py::test_seen34_hands_none_matches_the_original_probabilistic_behavior`).
+- **`view.hands is not None`**: every opponent's real concealed tiles (`view.hands[opponent]` for
+  `opponent != view.seat`) count as seen too — they're genuinely known, not merely inferred, so a
+  tile sitting there is exactly as dead to the wall as one sitting in this seat's own hand.
+
+**The concealed-kong subtlety.** The probabilistic branch's `if meld.concealed: continue` exists
+because a real bot can't see a concealed kong's tile type at all. Under `view.hands`, naively
+keeping that same skip would look harmless — surely the kong's 4 tiles show up in `view.hands`
+anyway? They don't: `mahjong_core.engine._apply_self_kong` removes all 4 of a concealed kong's
+tiles from `SeatState.concealed` the instant it's declared, and `_omniscient_seat_view` builds
+`.hands` directly from `state.seats[s].concealed` — so those 4 tiles are absent from *both* the
+melds loop (if still skipped) *and* `view.hands[opponent]` (already excluded by the engine). Left
+unfixed, this would have made an opponent's concealed kong tiles silently vanish from the count
+entirely under the very view that's supposed to know everything — the opposite of the intended
+direction, and a real correctness bug, not a missed optimization. The fix: once `view.hands` is
+populated, a concealed meld is no longer skipped — it's added the same way every other meld is
+(`_add_meld`, which already contributes 3 for any kong, matching this module's existing
+convention). `tests/test_features.py::test_seen34_hands_aware_counts_an_opponents_concealed_kong`
+pins this directly, mirroring `tests/test_safety.py`'s own concealed-kong regression test for
+`tile_risk`.
+
+### Tests
+
+`tests/test_features.py` (new file): the `view.hands is None` regression pin above; a scripted
+position where an opponent holds 3 of 4 real copies of a tile type invisible to the probabilistic
+branch, showing `seen34` undercounts it (`seen[t] == 0`) while the hands-aware branch counts it
+correctly (`seen[t] == 3`) and `ukeire`'s live-tile count for a discard genuinely waiting on that
+tile drops from 4 to 1 accordingly; and the concealed-kong regression above.
+`tests/test_oracle.py::test_omniscient_view_prefers_a_discard_with_more_real_live_tiles` proves
+the fix reaches a real `FaanBot.act` decision: a scripted 2-shanten hand, empirically found by
+direct search (not hand-derived), where the probabilistic view's widest-ukeire candidate discard
+(9筒, 16 kinds/58 tiles — inflated because an opponent's 3 real hidden copies of 1東 read as still
+live) loses its edge once `seen34` correctly counts those 3 copies as dead (ukeire drops to 14
+kinds/51 tiles), flipping `FaanBot`'s actual choice to a different discard (北). `tile_risk` is
+checked directly in that test and shown to read identically for both candidates in both views —
+proving the flip is `seen34`'s doing, not incidental interaction with the already-hands-aware
+danger check.
+
+### Re-verification after the `seen34` fix
+
+Same scratch script and duplicate-seeding/paired-difference methodology as both fixes above
+(reusing `bots/arena.py`'s machinery directly), 200 duplicate sets (800 games), same seed, run
+both before and after this fix to isolate its effect from the two already-shipped ones:
+
+| Metric | ORACLE (A), pre-fix | FaanBot (B), pre-fix | ORACLE (A), post-fix | FaanBot (B), post-fix |
+| --- | --- | --- | --- | --- |
+| win_rate | 0.2047 | 0.1671 | **0.3181** | 0.1517 |
+| deal_in_rate | 0.0106 | 0.1523 | 0.0209 | 0.1628 |
+| avg_winning_faan | 4.1786 | 4.2020 | 4.3035 | 4.1559 |
+| tenpai_at_draw_rate | 0.5632 | 0.5618 | 0.6970 | 0.5367 |
+| tenpai_rate_on_sub_minimum_hand | 0.1434 | 0.1551 | 0.2273 | 0.1463 |
+| avg_points_per_hand | 2.2687 | -0.7562 | 5.1925 | -1.7308 |
+
+Paired difference (A − B): pre-fix **+12.100 points/game, 95% CI [10.247, 13.953]** (the
+fold-timing baseline above) → post-fix **+27.693 points/game, 95% CI [25.098, 30.288]** — more
+than double the point estimate, both CIs decisively excluding zero, and the pre-fix row here is
+bit-for-bit identical to the fold-timing section's own 200-set numbers (same script, same seed,
+confirming nothing else drifted between runs). `win_rate` moves from 0.2047 to **0.3181** — a
+much larger jump than either previous fix produced at this sample size, consistent with `seen34`
+touching every turn's speed term rather than gating a comparatively rare decision (fold-timing's
+own effect was only visible in 1.6% of decisions, above). `tenpai_at_draw_rate` (0.5632 → 0.6970)
+and `tenpai_rate_on_sub_minimum_hand` (0.1434 → 0.2273) both rise too — ORACLE reaches tenpai
+distinctly more often, exactly what a corrected (lower) live-tile undercount predicts, since
+`FaanBot` was previously discounting some genuinely-live-but-miscounted draws. `deal_in_rate`
+ticks up slightly (0.0106 → 0.0209) — still roughly 8x below `FaanBot`'s own 0.1628, and a
+reasonable trade: an ORACLE seat now pushes hands further and discards more often before a hand
+ends, giving the (already much smaller) residual real-deal-in mechanism marginally more
+opportunities to fire, while the net points/win-rate swing is decisively positive. The win-rate
+effect this time needed no larger-sample investigation the way the fold-timing fix did — it's
+visible directly at the same 200-set size this tier's checks were already using.
