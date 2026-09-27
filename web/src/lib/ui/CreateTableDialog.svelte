@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import { createTable, type CreateTableRequest } from '$lib/net/lobby';
 	import {
 		CUSTOM_PRESET_ID,
@@ -64,7 +65,7 @@
 			const response = await createTable(body);
 			onCreated(response.table_id);
 		} catch {
-			error = "Couldn't create the table — try again.";
+			error = m.createTableDialog_createError();
 			submitting = false;
 		}
 	}
@@ -72,15 +73,15 @@
 
 <div class="panel-overlay">
 	<div class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-table-heading">
-		<PanelHeader title="Create a table" titleId="create-table-heading" />
+		<PanelHeader title={m.createTableDialog_title()} titleId="create-table-heading" />
 
-		<FormGroup legend="Rules">
+		<FormGroup legend={m.createTableDialog_rulesLegend()}>
 			{#each RULESET_PRESET_OPTIONS as option (option.id)}
 				<OptionRow
 					type="radio"
 					name="preset"
 					value={option.id}
-					label={option.label}
+					label={option.label()}
 					checked={presetId === option.id}
 					onChange={() => (presetId = option.id)}
 				/>
@@ -89,7 +90,7 @@
 				type="radio"
 				name="preset"
 				value={CUSTOM_PRESET_ID}
-				label="Custom"
+				label={m.createTableDialog_customLabel()}
 				checked={presetId === CUSTOM_PRESET_ID}
 				onChange={() => (presetId = CUSTOM_PRESET_ID)}
 			/>
@@ -97,9 +98,9 @@
 
 		{#if presetId === CUSTOM_PRESET_ID}
 			<div class="custom-form">
-				<FormGroup legend="Scoring">
+				<FormGroup legend={m.createTableDialog_scoringLegend()}>
 					<label class="field">
-						Minimum faan
+						{m.createTableDialog_minFaanLabel()}
 						<select bind:value={custom.min_faan}>
 							{#each VALID_MIN_FAAN as value (value)}
 								<option {value}>{value}</option>
@@ -107,7 +108,7 @@
 						</select>
 					</label>
 					<label class="field">
-						Faan cap
+						{m.createTableDialog_faanCapLabel()}
 						<select bind:value={custom.faan_cap}>
 							{#each VALID_FAAN_CAP as value (value)}
 								<option {value}>{value}</option>
@@ -115,19 +116,19 @@
 						</select>
 					</label>
 					<label class="field">
-						Score table
+						{m.createTableDialog_scoreTableLabel()}
 						<select bind:value={custom.score_table}>
-							<option value="half_spicy">Half spicy</option>
-							<option value="full_spicy">Full spicy</option>
+							<option value="half_spicy">{m.createTableDialog_scoreTableHalfSpicy()}</option>
+							<option value="full_spicy">{m.createTableDialog_scoreTableFullSpicy()}</option>
 						</select>
 					</label>
 					<div class="field">
-						Hand sets
+						{m.createTableDialog_handSetsLabel()}
 						<div class="checkbox-row">
 							{#each HAND_SET_OPTIONS as option (option.value)}
 								<OptionRow
 									type="checkbox"
-									label={option.label}
+									label={option.label()}
 									checked={custom.hand_sets.includes(option.value)}
 									onChange={(checked) => toggleHandSet(option.value, checked)}
 								/>
@@ -135,160 +136,167 @@
 						</div>
 					</div>
 					<label class="field">
-						Discard payment
+						{m.createTableDialog_discardPaymentLabel()}
 						<select bind:value={custom.discard_payment}>
-							<option value="all">Discarder pays all</option>
-							<option value="half">Discarder pays half</option>
+							<option value="all">{m.createTableDialog_discardPaymentAll()}</option>
+							<option value="half">{m.createTableDialog_discardPaymentHalf()}</option>
 						</select>
 					</label>
 					<label class="field">
-						Self-draw multiplier
+						{m.createTableDialog_selfDrawMultiplierLabel()}
 						<input type="number" step="0.1" min="1" bind:value={custom.self_draw_multiplier} />
 					</label>
 					<OptionRow
 						type="checkbox"
-						label="Seat flowers score"
+						label={m.createTableDialog_flowersScoreLabel()}
 						checked={custom.flowers_score}
 						onChange={(checked) => (custom.flowers_score = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Seven flowers instant win"
+						label={m.createTableDialog_sevenFlowersInstantWinLabel()}
 						checked={custom.seven_flowers_instant_win}
 						onChange={(checked) => (custom.seven_flowers_instant_win = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Eight flowers instant win"
+						label={m.createTableDialog_eightFlowersInstantWinLabel()}
 						checked={custom.eight_flowers_instant_win}
 						onChange={(checked) => (custom.eight_flowers_instant_win = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Thirteen orphans wait bonus"
+						label={m.createTableDialog_thirteenOrphansWaitBonusLabel()}
 						checked={custom.thirteen_orphans_wait_bonus}
 						onChange={(checked) => (custom.thirteen_orphans_wait_bonus = checked)}
 					/>
 
 					<div class="field">
-						Faan overrides
+						{m.createTableDialog_faanOverridesLabel()}
 						{#each overrideRows as row, i (i)}
 							<div class="override-row">
 								<input
 									type="text"
-									placeholder="pattern name"
-									aria-label="override pattern name"
+									placeholder={m.createTableDialog_overridePatternPlaceholder()}
+									aria-label={m.createTableDialog_overridePatternAriaLabel()}
 									bind:value={row.key}
 								/>
-								<input type="number" aria-label="override faan value" bind:value={row.value} />
-								<button type="button" onclick={() => removeOverrideRow(i)}>Remove</button>
+								<input
+									type="number"
+									aria-label={m.createTableDialog_overrideFaanValueAriaLabel()}
+									bind:value={row.value}
+								/>
+								<button type="button" onclick={() => removeOverrideRow(i)}
+									>{m.createTableDialog_removeOverrideButton()}</button
+								>
 							</div>
 						{/each}
-						<button type="button" class="add-override" onclick={addOverrideRow}>Add override</button
+						<button type="button" class="add-override" onclick={addOverrideRow}
+							>{m.createTableDialog_addOverrideButton()}</button
 						>
 					</div>
 				</FormGroup>
 
-				<FormGroup legend="Flow">
+				<FormGroup legend={m.createTableDialog_flowLegend()}>
 					<label class="field">
-						Game length
+						{m.createTableDialog_gameLengthLabel()}
 						<select bind:value={custom.game_length}>
-							<option value="EAST_ONLY">East only</option>
-							<option value="EAST_SOUTH">East + South</option>
-							<option value="FULL">Full (four rounds)</option>
+							<option value="EAST_ONLY">{m.createTableDialog_gameLengthEastOnly()}</option>
+							<option value="EAST_SOUTH">{m.createTableDialog_gameLengthEastSouth()}</option>
+							<option value="FULL">{m.createTableDialog_gameLengthFull()}</option>
 						</select>
 					</label>
 					<OptionRow
 						type="checkbox"
-						label="Dealer repeats on win"
+						label={m.createTableDialog_dealerRepeatOnWinLabel()}
 						checked={custom.dealer_repeat_on_win}
 						onChange={(checked) => (custom.dealer_repeat_on_win = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Dealer repeats on draw"
+						label={m.createTableDialog_dealerRepeatOnDrawLabel()}
 						checked={custom.dealer_repeat_on_draw}
 						onChange={(checked) => (custom.dealer_repeat_on_draw = checked)}
 					/>
 					<label class="field">
-						Wall reserve
+						{m.createTableDialog_wallReserveLabel()}
 						<input type="number" min="0" step="1" bind:value={custom.wall_reserve} />
 					</label>
 					<OptionRow
 						type="checkbox"
-						label="Four kong abort"
+						label={m.createTableDialog_fourKongAbortLabel()}
 						checked={custom.four_kong_abort}
 						onChange={(checked) => (custom.four_kong_abort = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Nine terminals abort"
+						label={m.createTableDialog_nineTerminalsAbortLabel()}
 						checked={custom.nine_terminals_abort}
 						onChange={(checked) => (custom.nine_terminals_abort = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Tenpai payments on draw"
+						label={m.createTableDialog_tenpaiPaymentsLabel()}
 						checked={custom.tenpai_payments}
 						onChange={(checked) => (custom.tenpai_payments = checked)}
 					/>
 				</FormGroup>
 
-				<FormGroup legend="Variants">
+				<FormGroup legend={m.createTableDialog_variantsLegend()}>
 					<OptionRow
 						type="checkbox"
-						label="Flowers enabled"
+						label={m.createTableDialog_flowersEnabledLabel()}
 						checked={custom.flowers_enabled}
 						onChange={(checked) => (custom.flowers_enabled = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Robbing the kong"
+						label={m.createTableDialog_kongRobEnabledLabel()}
 						checked={custom.kong_rob_enabled}
 						onChange={(checked) => (custom.kong_rob_enabled = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Concealed kong robbable"
+						label={m.createTableDialog_concealedKongRobbableLabel()}
 						checked={custom.concealed_kong_robbable}
 						onChange={(checked) => (custom.concealed_kong_robbable = checked)}
 					/>
 					<OptionRow
 						type="checkbox"
-						label="Pao (liability) rules"
+						label={m.createTableDialog_paoRulesLabel()}
 						checked={custom.pao_rules}
 						onChange={(checked) => (custom.pao_rules = checked)}
 					/>
 				</FormGroup>
 
-				<FormGroup legend="Fairness">
+				<FormGroup legend={m.createTableDialog_fairnessLegend()}>
 					<OptionRow
 						type="checkbox"
-						label="Provable fairness (seed commitment)"
+						label={m.createTableDialog_provableFairnessLabel()}
 						checked={custom.provable_fairness}
 						onChange={(checked) => (custom.provable_fairness = checked)}
 					/>
 				</FormGroup>
 
-				<FormGroup legend="Timing">
+				<FormGroup legend={m.createTableDialog_timingLegend()}>
 					<label class="field">
-						Turn seconds
+						{m.createTableDialog_turnSecondsLabel()}
 						<input type="number" min="1" step="1" bind:value={custom.turn_seconds} />
 					</label>
 					<label class="field">
-						Claim window seconds
+						{m.createTableDialog_claimSecondsLabel()}
 						<input type="number" min="1" step="1" bind:value={custom.claim_seconds} />
 					</label>
 					<label class="field">
-						Hand-end hold seconds
+						{m.createTableDialog_handEndSecondsLabel()}
 						<input type="number" min="0" step="1" bind:value={custom.hand_end_seconds} />
 					</label>
 					<label class="field">
-						Turn timeout strikes
+						{m.createTableDialog_turnTimeoutStrikesLabel()}
 						<input type="number" min="1" step="1" bind:value={custom.turn_timeout_strikes} />
 					</label>
 					<label class="field">
-						Disconnect grace seconds
+						{m.createTableDialog_disconnectGraceSecondsLabel()}
 						<input type="number" min="0" step="1" bind:value={custom.disconnect_grace_seconds} />
 					</label>
 				</FormGroup>
@@ -300,9 +308,11 @@
 		{/if}
 
 		<div class="create-actions">
-			<button type="button" onclick={onCancel} disabled={submitting}>Cancel</button>
+			<button type="button" onclick={onCancel} disabled={submitting}
+				>{m.createTableDialog_cancelButton()}</button
+			>
 			<button type="button" class="create-submit" onclick={handleSubmit} disabled={submitting}>
-				{submitting ? 'Creating…' : 'Create'}
+				{submitting ? m.createTableDialog_creatingButton() : m.createTableDialog_createButton()}
 			</button>
 		</div>
 	</div>

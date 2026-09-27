@@ -813,12 +813,13 @@ should stay one class plus custom properties.
 - English only for v1. Cantonese term glyphs (碰/上/槓/食糊) stay as labels in the UI and in
   live-region text regardless — they're not translated content. zh-Hant locale switching is
   underway per [08-i18n-plan.md](08-i18n-plan.md) (M6, [05-roadmap.md](05-roadmap.md)): Phase 0
-  (Paraglide JS foundation, cookie-only locale strategy, `lib/i18n/LocaleSwitcher.svelte`) and
-  Phase 1 (shared UI primitives — `BackButton`/`CloseButton`/`PanelHeader`/`FormGroup`/
-  `OptionRow`, `Settings.svelte`, `Toast.svelte`, `DialogTimer.svelte`/`TimerRing.svelte`,
+  (Paraglide JS foundation, cookie-only locale strategy, `lib/i18n/LocaleSwitcher.svelte`), Phase 1
+  (shared UI primitives — `BackButton`/`CloseButton`/`PanelHeader`/`FormGroup`/`OptionRow`,
+  `Settings.svelte`, `Toast.svelte`, `DialogTimer.svelte`/`TimerRing.svelte`,
   `DismissablePanel.svelte` — migrated to `m.*` messages, `LocaleSwitcher` wired into
-  `Settings.svelte`) are done. Every other route/component's strings are still hardcoded English
-  — later phases in that plan.
+  `Settings.svelte`), and Phase 2 (lobby — `routes/+page.svelte`, `CreateTableDialog.svelte`,
+  `lib/net/ruleset.ts` preset/option labels) are done. Every other route/component's strings are
+  still hardcoded English — later phases in that plan.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).

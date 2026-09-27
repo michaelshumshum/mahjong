@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { m } from '$lib/paraglide/messages.js';
 	import CreateTableDialog from '$lib/ui/CreateTableDialog.svelte';
 	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
@@ -26,14 +27,14 @@
 </script>
 
 <div class="lobby">
-	<h1 class="sr-only">Mahjong</h1>
+	<h1 class="sr-only">{m.lobby_title()}</h1>
 	<div class="actions">
 		<button type="button" class="primary" onclick={() => (showCreateDialog = true)}>
-			Create a table
+			{m.lobby_createTableButton()}
 		</button>
-		<a class="secondary" href="/tables">Join a game</a>
+		<a class="secondary" href="/tables">{m.lobby_joinGameLink()}</a>
 		<button type="button" class="secondary" onclick={() => (showPracticeDialog = true)}>
-			Practice vs Bots
+			{m.lobby_practiceButton()}
 		</button>
 	</div>
 </div>

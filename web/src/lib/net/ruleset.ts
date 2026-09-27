@@ -1,6 +1,8 @@
 // hand-written mirror of server/mahjong_core/config.py's RuleSet (not proto-generated -- plain JSON on POST /tables).
 // field names/enum values must match RuleSet.to_dict() exactly -- a mismatch silently falls back to hk_classic server-side.
 
+import { m } from '$lib/paraglide/messages.js';
+
 export type ScoreTable = 'full_spicy' | 'half_spicy';
 export type HandSet = 'CLASSIC' | 'NEW_6' | 'NEW_18';
 export type DiscardPayment = 'all' | 'half';
@@ -77,24 +79,36 @@ export const DEFAULT_RULESET: RuleSet = {
 
 export const VALID_MIN_FAAN = [0, 1, 3, 5] as const;
 export const VALID_FAAN_CAP = [10, 13] as const;
-export const HAND_SET_OPTIONS: { value: HandSet; label: string }[] = [
-	{ value: 'CLASSIC', label: 'Classic' },
-	{ value: 'NEW_6', label: 'New 6' },
-	{ value: 'NEW_18', label: 'New 18' }
+export const HAND_SET_OPTIONS: { value: HandSet; label: () => string }[] = [
+	{ value: 'CLASSIC', label: m.ruleset_handSetClassic },
+	{ value: 'NEW_6', label: m.ruleset_handSetNew6 },
+	{ value: 'NEW_18', label: m.ruleset_handSetNew18 }
 ];
 
 // named presets a client can pick without knowing their field values -- deliberately not a local
 // copy of the real RuleSet values, which POST /tables resolves server-side from `id` alone.
 export interface RulesetPresetOption {
 	id: string;
-	label: string;
-	description: string;
+	label: () => string;
+	description: () => string;
 }
 
 export const RULESET_PRESET_OPTIONS: RulesetPresetOption[] = [
-	{ id: 'hk_classic', label: 'HK Classic', description: 'min faan 3, faan cap 10' },
-	{ id: 'hk_casual', label: 'Casual', description: 'min faan 1, faan cap 13' },
-	{ id: 'hk_strict', label: 'Strict', description: 'min faan 5, no New 18, half payment' }
+	{
+		id: 'hk_classic',
+		label: m.ruleset_presetHkClassicLabel,
+		description: m.ruleset_presetHkClassicDescription
+	},
+	{
+		id: 'hk_casual',
+		label: m.ruleset_presetHkCasualLabel,
+		description: m.ruleset_presetHkCasualDescription
+	},
+	{
+		id: 'hk_strict',
+		label: m.ruleset_presetHkStrictLabel,
+		description: m.ruleset_presetHkStrictDescription
+	}
 ];
 
 export const DEFAULT_PRESET_ID = 'hk_classic';
