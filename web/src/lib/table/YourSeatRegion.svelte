@@ -4,6 +4,7 @@
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
 	import { seatWind, WIND_LABEL, WIND_CHAR } from './wind';
+	import { m } from '$lib/paraglide/messages.js';
 
 	interface OwnHandTile {
 		key: string;
@@ -45,14 +46,20 @@
 
 <section
 	class="seat-region seat-region--self"
-	aria-label={spectating ? `${seat.name}'s seat` : 'Your hand'}
+	aria-label={spectating
+		? m.yourSeatRegion_seatAriaLabel({ name: seat.name })
+		: m.yourSeatRegion_yourHandAriaLabel()}
 >
 	<header class="seat-meta">
 		<span class="seat-name">{seat.name}</span>
-		<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat, dealer)]} wind"
+		<span
+			class="seat-wind"
+			aria-label={m.yourSeatRegion_windAriaLabel({ wind: WIND_LABEL[seatWind(seat.seat, dealer)] })}
 			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
 		>
-		{#if seat.seat === dealer}<span class="dealer-badge" title="Dealer">莊</span>{/if}
+		{#if seat.seat === dealer}<span class="dealer-badge" title={m.yourSeatRegion_dealerBadgeTitle()}
+				>莊</span
+			>{/if}
 		<div class="turn-timer">
 			{#if turnDurationMs !== null}
 				{#key turn}
@@ -67,10 +74,17 @@
 		{#if seat.flowers.length || seat.melds.length}
 			<div
 				class="tile-row meld-row"
-				aria-label={spectating ? `${seat.name}'s melds` : 'Your melds'}
+				aria-label={spectating
+					? m.yourSeatRegion_meldsAriaLabel({ name: seat.name })
+					: m.yourSeatRegion_yourMeldsAriaLabel()}
 			>
 				{#if seat.flowers.length}
-					<div class="meld" aria-label={spectating ? `${seat.name}'s flowers` : 'Your flowers'}>
+					<div
+						class="meld"
+						aria-label={spectating
+							? m.yourSeatRegion_flowersAriaLabel({ name: seat.name })
+							: m.yourSeatRegion_yourFlowersAriaLabel()}
+					>
 						{#each seat.flowers as code, i (i)}
 							<div class="mini-tile"><TileFace {code} /></div>
 						{/each}
@@ -90,26 +104,32 @@
 
 		<!-- spectators get the opponents' tile size: no seat here is "yours" -->
 		{#if spectating && seat.concealedHand}
-			<div class="tile-row backs-row" aria-label="{seat.name}'s concealed hand">
+			<div
+				class="tile-row backs-row"
+				aria-label={m.yourSeatRegion_concealedHandAriaLabel({ name: seat.name })}
+			>
 				{#each seat.concealedHand ?? [] as code, i (i)}
 					<div class="mini-tile"><TileFace {code} /></div>
 				{/each}
 			</div>
 		{:else if spectating}
-			<div class="tile-row backs-row" aria-label="{seat.concealedCount} concealed tiles">
+			<div
+				class="tile-row backs-row"
+				aria-label={m.yourSeatRegion_concealedTilesAriaLabel({ count: seat.concealedCount })}
+			>
 				{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
 					<div class="mini-tile back"><TileFace code={null} /></div>
 				{/each}
 			</div>
 		{:else}
-			<div class="hand-row" aria-label="Your concealed hand">
+			<div class="hand-row" aria-label={m.yourSeatRegion_yourConcealedHandAriaLabel()}>
 				{#each ownHandTiles as tile (tile.key)}
 					{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
 						<button
 							type="button"
 							class="hand-tile hand-tile-btn"
 							class:hand-tile--drawn={tile.drawn}
-							aria-label="Discard {tile.code}"
+							aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tile.code })}
 							onclick={() => onDiscard(tile.tileId as number)}
 						>
 							<TileFace code={tile.code} />
@@ -124,7 +144,11 @@
 		{/if}
 
 		{#if declareOptions.length}
-			<div class="declare-actions" role="group" aria-label="Declare options">
+			<div
+				class="declare-actions"
+				role="group"
+				aria-label={m.yourSeatRegion_declareOptionsAriaLabel()}
+			>
 				{#each declareOptions as opt (opt.key)}
 					<button type="button" onclick={opt.onClick}>{opt.label}</button>
 				{/each}

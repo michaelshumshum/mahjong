@@ -2,6 +2,7 @@
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import { seatWind, WIND_LABEL, WIND_CHAR } from './wind';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		seat,
@@ -15,27 +16,39 @@
 <section
 	class="seat-region seat-region--{position}"
 	class:seat-region--turn={seat.seat === turn}
-	aria-label="{seat.name}'s seat"
+	aria-label={m.opponentRegion_seatAriaLabel({ name: seat.name })}
 >
 	<header class="seat-meta">
 		<span class="seat-name">{seat.name}</span>
-		<span class="seat-wind" aria-label="{WIND_LABEL[seatWind(seat.seat, dealer)]} wind"
+		<span
+			class="seat-wind"
+			aria-label={m.opponentRegion_windAriaLabel({ wind: WIND_LABEL[seatWind(seat.seat, dealer)] })}
 			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
 		>
-		{#if seat.seat === dealer}<span class="dealer-badge" title="Dealer">莊</span>{/if}
-		{#if seat.status === 'bot'}<span class="bot-badge" title="Bot-controlled seat">Bot</span>{/if}
+		{#if seat.seat === dealer}<span class="dealer-badge" title={m.opponentRegion_dealerBadgeTitle()}
+				>莊</span
+			>{/if}
+		{#if seat.status === 'bot'}<span class="bot-badge" title={m.opponentRegion_botBadgeTitle()}
+				>{m.opponentRegion_botBadgeLabel()}</span
+			>{/if}
 		<span class="seat-score">{seat.score}</span>
 	</header>
 
 	<div class="seat-hand-strip seat-hand-strip--{position}">
 		{#if seat.concealedHand}
-			<div class="tile-row backs-row" aria-label="{seat.name}'s concealed hand">
+			<div
+				class="tile-row backs-row"
+				aria-label={m.opponentRegion_concealedHandAriaLabel({ name: seat.name })}
+			>
 				{#each seat.concealedHand as code, i (i)}
 					<div class="mini-tile"><TileFace {code} /></div>
 				{/each}
 			</div>
 		{:else}
-			<div class="tile-row backs-row" aria-label="{seat.concealedCount} concealed tiles">
+			<div
+				class="tile-row backs-row"
+				aria-label={m.opponentRegion_concealedTilesAriaLabel({ count: seat.concealedCount })}
+			>
 				{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
 					<div class="mini-tile back"><TileFace code={null} /></div>
 				{/each}
@@ -43,9 +56,12 @@
 		{/if}
 
 		{#if seat.flowers.length || seat.melds.length}
-			<div class="tile-row meld-row" aria-label="{seat.name}'s melds">
+			<div
+				class="tile-row meld-row"
+				aria-label={m.opponentRegion_meldsAriaLabel({ name: seat.name })}
+			>
 				{#if seat.flowers.length}
-					<div class="meld" aria-label="{seat.name}'s flowers">
+					<div class="meld" aria-label={m.opponentRegion_flowersAriaLabel({ name: seat.name })}>
 						{#each seat.flowers as code, i (i)}
 							<div class="mini-tile"><TileFace {code} /></div>
 						{/each}

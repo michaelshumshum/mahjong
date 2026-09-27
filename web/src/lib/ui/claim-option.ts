@@ -1,17 +1,24 @@
 import type { ClaimKind, ClaimOption } from './ClaimButtons.svelte';
+import { m } from '$lib/paraglide/messages.js';
 
-const LABEL: Record<ClaimKind, string> = {
-	pass: 'Pass',
-	chow: 'Chow',
-	pung: 'Pung',
-	kong: 'Kong',
-	win: 'Win'
-};
+function claimKindLabel(kind: ClaimKind): string {
+	switch (kind) {
+		case 'pass':
+			return m.claimOption_passLabel();
+		case 'chow':
+			return m.claimOption_chowLabel();
+		case 'pung':
+			return m.claimOption_pungLabel();
+		case 'kong':
+			return m.claimOption_kongLabel();
+		case 'win':
+			return m.claimOption_winLabel();
+	}
+}
 
 export function claimOptionLabel(option: ClaimOption): string {
-	return option.tiles?.length
-		? `${LABEL[option.kind]} ${option.tiles.join('-')}`
-		: LABEL[option.kind];
+	const label = claimKindLabel(option.kind);
+	return option.tiles?.length ? `${label} ${option.tiles.join('-')}` : label;
 }
 
 // index included because two chow options can otherwise share the same (kind, tiles); tiles

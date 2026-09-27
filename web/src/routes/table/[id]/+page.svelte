@@ -140,7 +140,11 @@
 		const offEvent = socket.onEvent((event: ServerEvent) => {
 			if (!handEverStarted && HAND_LIFECYCLE_EVENTS.has(event.t)) handEverStarted = true;
 			if (event.t === 'ack' && event.d.ok === false) {
-				pushToast(`Action failed: ${event.d.error ?? 'unknown error'}`);
+				pushToast(
+					m.tablePage_actionFailedToast({
+						error: event.d.error ?? m.tablePage_unknownErrorLabel()
+					})
+				);
 			}
 			// persist join's one-time reconnect credential so a later reload can present it back
 			// on `hello{seat, secret}` instead of losing the seat.
@@ -148,7 +152,7 @@
 				saveSecretForTable(tableId, event.d.reconnect_secret);
 			}
 			if (event.t === 'error') {
-				pushToast(`Server error: ${event.d.message}`);
+				pushToast(m.tablePage_serverErrorToast({ message: event.d.message }));
 				// a stale/wrong secret can never reclaim the seat; drop it so the next connect
 				// falls back to spectator/seat-picker instead of retrying it.
 				if (event.d.code === 'bad_secret') {
@@ -358,13 +362,19 @@
 			const meld = action.meld as { tiles?: number[] } | undefined;
 			if (action.kind === 'declare_win') {
 				const store = liveStore;
-				options.push({ key: 'win', label: 'Win', onClick: () => store.socket.declareWin() });
+				options.push({
+					key: 'win',
+					label: m.tablePage_declareWinLabel(),
+					onClick: () => store.socket.declareWin()
+				});
 			} else if (action.kind === 'declare_concealed_kong' && meld?.tiles) {
 				const store = liveStore;
 				const tiles = meld.tiles;
 				options.push({
 					key: `ck-${tiles.join(',')}`,
-					label: `Concealed kong ${tiles.map(tileIdToCode).join('-')}`,
+					label: m.tablePage_declareConcealedKongLabel({
+						tiles: tiles.map(tileIdToCode).join('-')
+					}),
 					onClick: () => store.socket.declareConcealedKong(tiles)
 				});
 			} else if (action.kind === 'declare_added_kong' && meld?.tiles) {
@@ -372,7 +382,9 @@
 				const tiles = meld.tiles;
 				options.push({
 					key: `ak-${tiles.join(',')}`,
-					label: `Added kong ${tiles.map(tileIdToCode).join('-')}`,
+					label: m.tablePage_declareAddedKongLabel({
+						tiles: tiles.map(tileIdToCode).join('-')
+					}),
 					onClick: () => store.socket.declareAddedKong(tiles)
 				});
 			}
@@ -562,7 +574,7 @@
 </script>
 
 {#if tableReady}
-	<h1 class="sr-only">Table</h1>
+	<h1 class="sr-only">{m.tablePage_heading()}</h1>
 
 	<div class="table-page">
 		{#if isMock}
@@ -614,22 +626,24 @@
 					<CenterDiscardPool
 						seat={seatAt(2)}
 						position="across"
-						ariaLabel="{seatAt(2).name}'s discards"
+						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(2).name })}
 					/>
 					<CenterDiscardPool
 						seat={seatAt(3)}
 						position="left"
-						ariaLabel="{seatAt(3).name}'s discards"
+						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(3).name })}
 					/>
 					<CenterDiscardPool
 						seat={seatAt(1)}
 						position="right"
-						ariaLabel="{seatAt(1).name}'s discards"
+						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(1).name })}
 					/>
 					<CenterDiscardPool
 						seat={seatAt(0)}
 						position="self"
-						ariaLabel={spectating ? `${seatAt(0).name}'s discards` : 'Your discards'}
+						ariaLabel={spectating
+							? m.tablePage_discardsAriaLabel({ name: seatAt(0).name })
+							: m.tablePage_yourDiscardsAriaLabel()}
 					/>
 				</div>
 
@@ -660,7 +674,9 @@
 					onChoose={chooseClaim}
 				/>
 				{#if lastClaimChoice}
-					<p class="sr-only" data-testid="claim-choice">chose: {lastClaimChoice.kind}</p>
+					<p class="sr-only" data-testid="claim-choice">
+						{m.tablePage_claimChoiceLabel({ kind: lastClaimChoice.kind })}
+					</p>
 				{/if}
 			</div>
 		{/if}
@@ -729,7 +745,7 @@
 		<ToastStack queue={toastQueue} onDismiss={dismissToast} />
 	</div>
 {:else}
-	<h1 class="sr-only">Table</h1>
+	<h1 class="sr-only">{m.tablePage_heading()}</h1>
 	<div class="pretable-page">
 		<PretableScreen
 			{tableId}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { TILE_ASSET, hasTileArt, type TileCode } from './tile-code';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// `null` = concealed (render the back).
 	let { code = null }: { code?: TileCode | null } = $props();
@@ -12,7 +13,9 @@
 	let src = $derived(
 		code !== null && hasTileArt(code) ? `/tiles/${TILE_ASSET[code]}.svg` : BACK_SRC
 	);
-	let alt = $derived(code !== null && hasTileArt(code) ? `${code} tile` : 'concealed tile');
+	let alt = $derived(
+		code !== null && hasTileArt(code) ? m.tileFace_tileAlt({ code }) : m.tileFace_concealedTileAlt()
+	);
 </script>
 
 <span class="tile-face" class:tile-face--back={isBack}>

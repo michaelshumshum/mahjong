@@ -822,7 +822,11 @@ should stay one class plus custom properties.
   `routes/tables/+page.svelte`, `TableCard.svelte`, `JoinByCodePanel.svelte`), and Phase 4
   (pre-table / seat picker — `PretableScreen.svelte`, `LeaveGameDialog.svelte`,
   `SeatPicker.svelte`/`SeatPickerSlot.svelte`, `SeatOccupancySlot.svelte`, plus the pre-game
-  arrival toast in `routes/table/[id]/+page.svelte`) are done. Every other route/component's
+  arrival toast in `routes/table/[id]/+page.svelte`), and Phase 5 (in-game table —
+  `TableToolbar.svelte`/`MockTableToolbar.svelte`, `YourSeatRegion.svelte`/`OpponentRegion.svelte`,
+  `CenterDiscardPool.svelte`, `TileFace.svelte`, `ClaimButtons.svelte`/`claim-option.ts`/
+  `ClaimDialog.svelte`, and the remaining declared-action/toast strings in
+  `routes/table/[id]/+page.svelte`) are done. Every other route/component's
   strings are still hardcoded English — later phases in that plan.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see

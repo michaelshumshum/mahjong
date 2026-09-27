@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TileCode } from '../table/tile-code';
 	import { claimOptionKey, claimOptionLabel } from './claim-option';
+	import { m } from '$lib/paraglide/messages.js';
 
 	export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
 
@@ -15,7 +16,7 @@
 		$props();
 </script>
 
-<div class="claim-buttons" role="group" aria-label="Claim options">
+<div class="claim-buttons" role="group" aria-label={m.claimButtons_ariaLabel()}>
 	{#each options as option, index (claimOptionKey(option, index))}
 		<button
 			type="button"

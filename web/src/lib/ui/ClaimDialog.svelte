@@ -4,6 +4,7 @@
 	import type { ClaimOption } from './ClaimButtons.svelte';
 	import { claimOptionKey, claimOptionLabel } from './claim-option';
 	import DialogTimer from './DialogTimer.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		discardTile,
@@ -44,22 +45,22 @@
 	}
 </script>
 
-<div class="claim-dialog" role="dialog" aria-label="Claim options">
+<div class="claim-dialog" role="dialog" aria-label={m.claimDialog_ariaLabel()}>
 	<div class="claim-dialog-timer">
 		<DialogTimer {durationMs} size={40} onClose={handleTimeout} />
 	</div>
 
 	<div class="claim-dialog-header">
-		<h2>Claim</h2>
+		<h2>{m.claimDialog_heading()}</h2>
 		{#if discardTile}
 			<p class="claim-dialog-subtitle">
-				{discarderName ?? 'Someone'} discarded
+				{m.claimDialog_discardedLabel({ name: discarderName ?? m.claimDialog_someoneLabel() })}
 				<span class="claim-dialog-tile"><TileFace code={discardTile} /></span>
 			</p>
 		{/if}
 	</div>
 
-	<div class="claim-options" role="group" aria-label="Claim options">
+	<div class="claim-options" role="group" aria-label={m.claimDialog_optionsGroupAriaLabel()}>
 		{#each options as option, index (claimOptionKey(option, index))}
 			{@const meld = meldPreview(option)}
 			<div class="claim-option">

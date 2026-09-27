@@ -2,6 +2,7 @@
 	import { MOCK_SCENARIOS } from '$lib/table/mock-game-state';
 	import { WIND_CHAR, type WindLetter } from '$lib/table/wind';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		scenarioId = $bindable(),
@@ -23,10 +24,14 @@
 </script>
 
 <header class="table-toolbar">
-	<BackButton label="Leave game" onclick={onLeaveClick} />
+	<BackButton label={m.mockTableToolbar_leaveGameLabel()} onclick={onLeaveClick} />
 
-	<div class="scenario-picker" role="group" aria-label="Mock scenario">
-		<span class="table-label">Scenario</span>
+	<div
+		class="scenario-picker"
+		role="group"
+		aria-label={m.mockTableToolbar_scenarioGroupAriaLabel()}
+	>
+		<span class="table-label">{m.mockTableToolbar_scenarioLabel()}</span>
 		{#each MOCK_SCENARIOS as scenario (scenario.id)}
 			<button
 				type="button"
@@ -40,15 +45,19 @@
 		{/each}
 	</div>
 
-	<div class="table-status" aria-label="Table status">
-		<span>Wall <strong>{wallCount}</strong></span>
-		<span>Prevailing <strong>{WIND_CHAR[prevailing]}</strong></span>
+	<div class="table-status" aria-label={m.mockTableToolbar_tableStatusAriaLabel()}>
+		<span>{m.mockTableToolbar_wallLabel()} <strong>{wallCount}</strong></span>
+		<span>{m.mockTableToolbar_prevailingLabel()} <strong>{WIND_CHAR[prevailing]}</strong></span>
 	</div>
 
 	<div class="chrome-toggles">
-		<button type="button" onclick={onToggleScoreSheet}>Score sheet</button>
-		<button type="button" onclick={onToggleSettings}>Settings</button>
-		<button type="button" onclick={onToggleAnimationDemo}>Animate a turn</button>
+		<button type="button" onclick={onToggleScoreSheet}
+			>{m.mockTableToolbar_scoreSheetButton()}</button
+		>
+		<button type="button" onclick={onToggleSettings}>{m.mockTableToolbar_settingsButton()}</button>
+		<button type="button" onclick={onToggleAnimationDemo}
+			>{m.mockTableToolbar_animateATurnButton()}</button
+		>
 	</div>
 </header>
 

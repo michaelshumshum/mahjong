@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { WIND_CHAR, type WindLetter } from '$lib/table/wind';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		spectating,
@@ -26,27 +27,29 @@
 </script>
 
 <header class="table-toolbar">
-	<BackButton label="Leave game" onclick={onLeaveClick} />
+	<BackButton label={m.tableToolbar_leaveGameLabel()} onclick={onLeaveClick} />
 	{#if spectating}
 		<p class="table-label">
-			Table <strong>{tableId}</strong> · spectating
+			{m.tableToolbar_tableLabel()} <strong>{tableId}</strong> · {m.tableToolbar_spectatingLabel()}
 		</p>
 	{:else}
 		<p class="table-label">
-			Table <strong>{tableId}</strong> · seat {seat}{#if isPractice}
-				· practice vs bots{/if}
+			{m.tableToolbar_tableLabel()} <strong>{tableId}</strong> · {m.tableToolbar_seatLabel({
+				seat: seat ?? ''
+			})}{#if isPractice}
+				· {m.tableToolbar_practiceVsBotsLabel()}{/if}
 		</p>
 	{/if}
 
-	<div class="table-status" aria-label="Table status">
-		<span>Wall <strong>{wallCount}</strong></span>
-		<span>Prevailing <strong>{WIND_CHAR[prevailing]}</strong></span>
+	<div class="table-status" aria-label={m.tableToolbar_tableStatusAriaLabel()}>
+		<span>{m.tableToolbar_wallLabel()} <strong>{wallCount}</strong></span>
+		<span>{m.tableToolbar_prevailingLabel()} <strong>{WIND_CHAR[prevailing]}</strong></span>
 	</div>
 
 	<div class="chrome-toggles">
-		<button type="button" onclick={onToggleScoreSheet}>Score sheet</button>
+		<button type="button" onclick={onToggleScoreSheet}>{m.tableToolbar_scoreSheetButton()}</button>
 		{#if !spectating}
-			<button type="button" onclick={onToggleSettings}>Settings</button>
+			<button type="button" onclick={onToggleSettings}>{m.tableToolbar_settingsButton()}</button>
 		{/if}
 	</div>
 </header>
