@@ -136,9 +136,8 @@ _RULESET_VARIATIONS = st.builds(
     kong_rob_enabled=st.booleans(),
     concealed_kong_robbable=st.booleans(),
     flowers_enabled=st.booleans(),
-    # dealer_repeat_* deliberately not varied -- see module docstring: repeats stay off so a
-    # game is bounded at 4/8/16 hands regardless of what hypothesis picks. The repeat paths
-    # themselves are covered by test_engine.py's dedicated unit tests, not by random fuzzing.
+    # dealer_repeat_* deliberately not varied -- repeats off bounds the game at 4/8/16 hands
+    # regardless of what hypothesis picks; repeat paths are covered by test_engine.py's unit tests.
     dealer_repeat_on_win=st.just(False),
     dealer_repeat_on_draw=st.just(False),
 )

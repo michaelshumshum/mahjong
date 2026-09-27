@@ -138,9 +138,8 @@ def test_seven_pairs_gated_by_hand_sets() -> None:
 
 
 def test_closed_false_skips_seven_pairs_and_kokushi() -> None:
-    # 6 pairs scattered across unrelated types (no chow potential at all) + 1 single: a great
-    # seven-pairs candidate (tenpai) but a poor standard-parse hand. closed=False (simulating
-    # an exposed meld, which rules out both special hands) must not get seven-pairs' shanten.
+    # 6 pairs + 1 single: a great seven-pairs candidate but poor standard-parse hand --
+    # closed=False (an exposed meld rules out both special hands) must not get seven-pairs' shanten.
     counts = new_count_array()
     for t in (0, 9, 18, 27, 28, 29):  # 1m, 1p, 1s, East, South, West
         counts[t] = 2
@@ -251,10 +250,8 @@ def test_matches_oracle_hypothesis(seed: int) -> None:
 
 
 def test_ukeire_known_hand() -> None:
-    # 123m 456p 789s 123s + 5m (tanki wait) + a spare 9m: 14 tiles, one over tenpai. The
-    # "correct" discard is the spare 9m (or, symmetrically, the 5m), each keeping a clean
-    # single-kind tanki wait on the other; discarding a tile that breaks a complete meld
-    # instead (e.g. the 1m in 123m) should never yield as narrow an accept set.
+    # 123m 456p 789s 123s + 5m tanki + spare 9m: discarding the spare (9m or 5m) keeps a clean
+    # tanki wait; breaking a complete meld instead (e.g. 1m) should never yield as narrow an accept set.
     counts = new_count_array()
     for t in (0, 1, 2, 12, 13, 14, 24, 25, 26, 18, 19, 20):
         counts[t] += 1
@@ -263,18 +260,18 @@ def test_ukeire_known_hand() -> None:
     assert sum(counts) == 14
     seen = list(counts)
     result = ukeire(counts, seen)
-    assert result[8] == (1, 3)  # discard 9m -> tanki on 5m, 3 live (1 already in hand)
-    assert result[4] == (1, 3)  # discard 5m -> tanki on 9m, symmetric
-    # discarding 1m breaks the 123m meld -- shanten after is worse (1, not 0), and it takes
-    # strictly more kinds to claw back toward tenpai than the clean tanki discards need.
+    # discard 9m -> tanki on 5m, 3 live (1 in hand); discard 5m -> tanki on 9m, symmetric
+    assert result[8] == (1, 3)
+    assert result[4] == (1, 3)
+    # discarding 1m breaks the 123m meld instead -- shanten after is worse and takes more kinds
+    # to claw back toward tenpai than the clean tanki discards need.
     kinds_break_meld, _ = result[0]
     assert kinds_break_meld > 1
 
 
 def test_ukeire_two_away_tanki() -> None:
-    # Single floating tile 1m only, rest empty -- degenerate/minimal case: any tile drawn
-    # can only ever reduce shanten toward pairing it or building around it, never below what
-    # a from-scratch hand can reach; just assert the function runs and returns a sane shape.
+    # single floating 1m, rest empty -- degenerate/minimal case; a drawn tile can only reduce
+    # shanten toward pairing/building around it, never below a from-scratch hand -- just check the shape.
     counts = new_count_array()
     counts[0] = 1
     seen = list(counts)
@@ -285,9 +282,8 @@ def test_ukeire_two_away_tanki() -> None:
 
 
 def test_ukeire_respects_seen_tiles() -> None:
-    # A hand one tile from tenpai where the accepting tile type is already fully visible
-    # elsewhere (seen=4) must report 0 live tiles for it, even though it's a "kind" that
-    # would help in principle.
+    # a hand one tile from tenpai whose accepting tile type is already fully visible (seen=4)
+    # must report 0 live tiles for it, even though it's a "kind" that would help in principle.
     counts = new_count_array()
     for t in (0, 1, 12, 13, 14, 24, 25, 26, 18, 19, 20):
         counts[t] += 1

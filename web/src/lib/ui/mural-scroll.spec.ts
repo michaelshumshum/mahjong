@@ -37,9 +37,8 @@ describe('canvas-space row continuity (regression: offset - CELL_H doubled the r
 	const CELL_H = 80;
 	const SPEED = 14;
 
-	// mirrors TileMuralBackground's draw(): canvas y for grid row `r` is
-	// `(r - topRow) * CELL_H + muralBlitY(offset)`, since renderBuffer places bufferRow
-	// `j = r - topRow` at buffer-local y = j * CELL_H.
+	// mirrors TileMuralBackground's draw(): canvas y for row `r` is
+	// `(r - topRow) * CELL_H + muralBlitY(offset)` (renderBuffer places bufferRow j=r-topRow at j*CELL_H).
 	function canvasY(row: number, topRow: number, offset: number): number {
 		return (row - topRow) * CELL_H + muralBlitY(offset);
 	}

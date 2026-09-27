@@ -230,9 +230,8 @@ def test_expected_cost_bumped_by_meld_reads() -> None:
 
 
 def test_tempo_shift_raises_threat_and_probability() -> None:
-    # Evaluated against PIN_6 -- a different middle tile from the one the "settled" opponent
-    # just discarded (PIN_4), so genbutsu (a much stronger signal) doesn't dominate what this
-    # test is isolating.
+    # evaluated against PIN_6, not the opponent's just-discarded PIN_4, so genbutsu (a
+    # stronger signal) doesn't dominate what this test isolates.
     tile = int(TileType.PIN_6)
     steady = _view(
         discard_pools=(
@@ -420,9 +419,8 @@ def test_tile_risk_hands_aware_flags_an_exact_deal_in() -> None:
         TileType.PIN_5,
         TileType.SOU_9,
     )
-    # a prior discard from this seat, so this candidate discard isn't the dealer's first
-    # (avoids entangling this test with the 地糊 timing bonus -- tested on its own merits, not
-    # accidentally here).
+    # a prior discard from this seat means the candidate discard isn't the dealer's first --
+    # avoids entangling with the 地糊 timing bonus, tested separately.
     view = _view(
         hands=((), opp_hand, (), ()), discard_pools=(_pool(TileType.WIND_EAST), (), (), ())
     )

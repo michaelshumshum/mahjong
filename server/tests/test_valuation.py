@@ -267,9 +267,8 @@ def test_pattern_optionality_counts_distinct_reachable_routes() -> None:
     scattered = _hand34(TileType.MAN_1, TileType.PIN_4, TileType.SOU_7)
     assert pattern_optionality(scattered, closed=True) == 1  # only the all_sequences floor
 
-    # voided_suit (2 suits), small_three_dragons (2 dragon pairs), and all_pungs (2+ pair/pung
-    # blocks, no sequence shape) all reach their threshold at once here -> optionality 3, not
-    # the all_sequences floor (only added when nothing else is reachable).
+    # voided_suit, small_three_dragons, and all_pungs all reach threshold at once here ->
+    # optionality 3, not the all_sequences floor (only added when nothing else is reachable).
     multi_route = _hand34(
         TileType.MAN_1,
         TileType.PIN_2,

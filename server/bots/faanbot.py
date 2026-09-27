@@ -213,11 +213,8 @@ class FaanBot:
                 aid = kong_base + t
                 if not mask[aid]:
                     continue
-                # ORACLE-only: declining is always legal (a plain discard is offered alongside
-                # every kong), so a kong that would hand an opponent an immediate 搶槓 win is
-                # never worth taking regardless of the shanten gain -- skip it outright rather
-                # than weighing it, matching `_should_claim`'s "never do X if it provably
-                # backfires" style. No other tier can see this at all (`view.hands is None`).
+                # ORACLE-only: skip a kong outright if it hands an opponent an immediate 搶槓 win,
+                # regardless of shanten gain -- other tiers can't see this (view.hands is None).
                 if view.hands is not None and kong_rob_risk(view, t, concealed=concealed) > 0.0:
                     continue
                 candidate = list(hand)

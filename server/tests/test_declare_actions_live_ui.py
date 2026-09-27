@@ -156,9 +156,8 @@ def test_concealed_kong_button_sends_declare_frame() -> None:
                 "--strictPort",
             ],
             cwd=WEB_DIR,
-            start_new_session=True,  # own process group -- `pnpm exec vite` forks a real vite
-            # child that doesn't forward SIGTERM (`live.e2e.ts`'s own teardown comment), so
-            # teardown below kills the whole group, not just this handle's own pid.
+            # own process group: `pnpm exec vite` forks a vite child that doesn't forward
+            start_new_session=True,  # SIGTERM, so teardown below kills the whole group.
             env={**os.environ, "PUBLIC_WS_URL": f"ws://127.0.0.1:{backend_port}/ws"},
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

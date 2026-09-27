@@ -52,9 +52,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         grace_seconds = float(
             os.environ.get("SHUTDOWN_GRACE_SECONDS", _DEFAULT_SHUTDOWN_GRACE_SECONDS)
         )
-        # begin_shutdown awaits every affected table's drain wait to completion before
-        # returning -- only then is a table's GAME_OVER persist guaranteed finished, never
-        # still in flight, so it's safe to dispose the engine.
+        # begin_shutdown awaits every table's drain to completion, so GAME_OVER persists are
+        # guaranteed finished (never in flight) before the engine is disposed.
         await registry.begin_shutdown(grace_seconds=grace_seconds)
         if engine is not None:
             await engine.dispose()
@@ -120,9 +119,8 @@ def _generate_table_id() -> str:
     raise RuntimeError("could not generate a unique table id")
 
 
-# practice mode's per-seat difficulty picker (docs/04-bots.md §7): Easy/Normal/Impossible map
-# 1:1 to the three real bots -- T1/EfficiencyBot, T2/FaanBot, ORACLE/FaanBot-with-full-information.
-# T0/RandomBot is deliberately excluded -- never shipped as a difficulty (docs/04-bots.md §2).
+# practice-mode difficulty picker (docs/04-bots.md §7): Easy/Normal/Impossible = T1/T2/ORACLE.
+# T0/RandomBot is deliberately excluded -- never shipped as a difficulty (§2).
 _PRACTICE_BOT_TIERS = ("T1", "T2", "ORACLE")
 
 

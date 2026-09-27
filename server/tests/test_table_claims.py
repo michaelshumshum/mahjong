@@ -158,9 +158,8 @@ async def test_early_exit_resolves_without_waiting_on_every_offer() -> None:
     table.submit(2, pung_action)
     await table.process_one()
 
-    # seat 1's chow is strictly weaker than seat 2's already-submitted pung and never responded
-    # -- the window must close immediately (can_close_early, inside reduce()'s
-    # _apply_claim_response), not stay open waiting for seat 1 or a 999s timer.
+    # seat 1's chow is strictly weaker than seat 2's submitted pung and never responded -- the
+    # window must close immediately (can_close_early), not wait for seat 1 or a 999s timer.
     assert table.state.phase == Phase.AWAIT_ACTION
     assert table.state.claim_window is None
     assert any(m.kind == MeldKind.PUNG for m in table.state.seats[2].melds)
@@ -179,9 +178,8 @@ async def test_claim_timeout_defaults_every_absent_seat_to_pass() -> None:
     await table.process_one()
 
     assert table.state.claim_window is None
-    # mypy narrows table.state.phase to Literal[AWAIT_CLAIMS] from the assert above and doesn't
-    # see that `await table.process_one()` reassigns `table.state` to a new GameState in between --
-    # flags this as a non-overlapping/unreachable comparison, but it's real and correct.
+    # mypy doesn't see process_one() reassigns table.state to a new GameState, so it flags this
+    # phase comparison as unreachable -- it's real and correct.
     assert table.state.phase == Phase.AWAIT_ACTION
     assert table.state.turn == 1  # nobody claimed -> play continues past the discarder
     assert not any(m.kind == MeldKind.PUNG for m in table.state.seats[2].melds)
@@ -221,9 +219,8 @@ async def test_stale_timer_after_early_exit_is_a_noop() -> None:
     resolved_state = table.state
     assert resolved_state.claim_window is None
 
-    # the claim_seconds=0 deadline armed when the window opened is still sitting in the heap
-    # (TimerHeap does lazy deletion) -- drive one more tick so it actually fires and prove it's
-    # a no-op: no crash, no second resolution, no state mutation.
+    # claim_seconds=0's deadline is still in the heap (lazy deletion) -- drive one more tick so
+    # it fires and prove it's a no-op: no crash, no second resolution, no state mutation.
     await table.process_one()
     assert table.state is resolved_state
 
@@ -248,11 +245,10 @@ async def test_disconnect_mid_claim_window_forfeits_seats_own_offer_only() -> No
     table.join("sess-1", lambda seq, wire: None, seat=1)
 
     table.mark_disconnected(1, "sess-1")
-    # `mark_disconnected` queues two inbox items -- `_arm_disconnect_timer`'s own `_WakeUp`
-    # first, then `SeatDisconnected` -- so, unlike `Table.run()`'s real `while True` loop, this
-    # single-step driver needs two ticks to reach the one that actually forfeits the offer.
-    await table.process_one()  # the _WakeUp: no-op
-    await table.process_one()  # SeatDisconnected: forfeits seat 1's chow offer
+    # `mark_disconnected` queues _WakeUp then SeatDisconnected -- this single-step driver needs
+    # two ticks (unlike Table.run()'s while loop) to reach the one that forfeits the offer.
+    await table.process_one()
+    await table.process_one()
 
     window = table.state.claim_window
     assert window is not None  # seat 2's pung offer is still outstanding
@@ -305,12 +301,7 @@ async def test_command_same_tick_as_deadline_expiry_is_not_dropped() -> None:
         await table.process_one()
 
         window = table.state.claim_window
-        # a buggy implementation that drops the queued Pass in favour of the timer would
-        # default *every* offered seat (1 and 2) to Pass in this same tick, closing the
-        # window entirely and losing the fact that seat 1's Pass was a real, specific command
-        # (as opposed to a synthesized one) -- indistinguishable from the correct outcome by
-        # its *effect* on the window, but distinguishable by timing: the window must still be
-        # open afterward, since seat 2 (pung, higher priority, still silent) keeps
-        # can_close_early from firing on a lone Pass.
+        # a bug that defaults every offered seat to Pass via the timer would close the window
+        # too -- seat 2's still-silent, higher-priority pung keeps can_close_early from firing, so the window must still be open here.
         assert window is not None, "seat 1's real Pass must not have been swallowed by the timer"
         assert window.responses == {1: pass_action}

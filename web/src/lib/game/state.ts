@@ -1,6 +1,5 @@
-// plain data, no runes (docs/03-frontend.md §6) — store.svelte.ts wraps this in `$state`, so
-// reducer.spec.ts can test transitions without a Svelte compile step. Field names camelCase the
-// wire payloads 1:1; protocol.d.ts itself stays snake_case (generated from the Python models).
+// plain data, no runes -- store.svelte.ts wraps this in `$state`, so reducer.spec.ts can test
+// transitions with no Svelte compile step. Field names camelCase the wire; protocol.d.ts stays snake_case.
 
 import type { RuleSet } from '$lib/net/ruleset';
 
@@ -88,9 +87,8 @@ export interface ClientGameState {
 	/** Hand-end hold deadline: open until every seat acks or this elapses. Set by `hand_end`,
 	 * cleared by the next `hand_start`. */
 	handEndDeadlineTs: number | null;
-	/** Every completed hand this session knows about, oldest first — the score sheet's running
-	 * history, unlike `lastHandEnd` (latest only). Grown by live `hand_end` plus
-	 * `state_sync.hand_history` backfill (`reducer.ts`'s `mergeHandHistory`) for hands never seen live. */
+	/** Every completed hand, oldest first -- unlike `lastHandEnd` (latest only). Grown by live
+	 * `hand_end` plus `state_sync.hand_history` backfill (`mergeHandHistory` in reducer.ts). */
 	handHistory: HandHistoryEntry[];
 	gameEnd: GameEndState | null;
 	shutdownDeadlineTs: number | null;

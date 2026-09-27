@@ -1,6 +1,5 @@
 // pure queue helpers behind Toast.svelte, split out so id assignment is testable without a DOM.
-// The reactive `$state<ToastEntry[]>` list lives in whichever .svelte file owns the queue, not
-// here: a plain .ts module can't hold runes.
+// the reactive `$state<ToastEntry[]>` list lives in the owning .svelte file -- a plain .ts module can't hold runes.
 
 export interface ToastEntry {
 	id: number;

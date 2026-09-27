@@ -96,9 +96,8 @@ __all__ = [
 ]
 
 ENGINE_VERSION = "1.0.0"
-# bump on any change to the reducer, wall order, or flower-replacement ordering. every
-# persisted GameRecord stamps this value; a mismatch means the record is not replayable, full
-# stop -- there is no migration path.
+# bump on any reducer/wall-order/flower-replacement change; persisted GameRecords stamp this --
+# a mismatch means the record isn't replayable, full stop, no migration path.
 
 
 class IllegalActionError(ValueError):
@@ -212,9 +211,9 @@ Event = (
 
 _MAX_FLOWERS = 8  # tiles.py TOTAL_PHYSICAL_TILES - 136: the whole physical flower/season set
 _ALLOWED_ROUNDS: dict[GameLength, int] = {
-    GameLength.EAST_ONLY: 1,  # 一圈
-    GameLength.EAST_SOUTH: 2,  # 半莊
-    GameLength.FULL: 4,  # 四圈
+    GameLength.EAST_ONLY: 1,
+    GameLength.EAST_SOUTH: 2,
+    GameLength.FULL: 4,
 }
 
 
@@ -592,10 +591,8 @@ def _apply_claim_response(
         winner_state = dataclasses.replace(winner_state, concealed=concealed_tiles)
         seats = _with_seat(state.seats, winner, winner_state)
 
-        # the claimed tile leaves wherever it came from, or it's double-counted. a discard win
-        # pops it off the discarder's pool; a kong-rob win takes it back out of the declarer's
-        # kong meld -- an added kong (加槓) reverts to the pung it upgraded from, a concealed
-        # kong (暗槓) returns its other 3 tiles to the declarer's concealed hand.
+        # the claimed tile leaves wherever it came from or it's double-counted: a discard win pops
+        # it off the discarder's pool; a kong-rob win pulls it back out of the declarer's kong meld.
         source_state = state.seats[window.source_seat]
         if window.kind == ClaimKind.KONG_ROB:
             kong_meld = next(m for m in source_state.melds if window.tile in m.tiles)

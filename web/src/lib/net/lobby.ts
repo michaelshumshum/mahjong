@@ -30,9 +30,8 @@ export interface WaitForApiHealthyOptions {
 	onRetryScheduled?: (delayMs: number) => void;
 }
 
-// polls GET /healthz until it responds ok or maxAttempts is exhausted -- used by ApiConnectGate
-// to gate the app on first load. Exponential backoff between attempts, capped at maxDelayMs: 1s,
-// 2s, 4s, ... (doubling each retry from baseDelayMs), no delay before the first attempt.
+// polls GET /healthz until ok or maxAttempts is exhausted (ApiConnectGate's load gate).
+// exponential backoff between attempts, capped at maxDelayMs; no delay before the first attempt.
 export async function waitForApiHealthy({
 	baseUrl = apiBaseUrl(),
 	fetchFn = fetch,

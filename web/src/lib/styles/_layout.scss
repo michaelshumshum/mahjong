@@ -28,8 +28,7 @@ $breakpoint-tablet: 768px;
 }
 
 // §3's desktop grid: across on top, left/right flank a wide centre column, self at bottom.
-// Below 768px it collapses to a 3-row stack; per-region content collapse is each region's own
-// concern, not the grid's.
+// below 768px it collapses to a 3-row stack; per-region content collapse is each region's own concern.
 @mixin seat-region-grid {
 	display: grid;
 	grid-template-areas:

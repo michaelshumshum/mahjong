@@ -69,9 +69,8 @@ _RED = tile_ids_for_type(TileType.DRAGON_RED)
 _GREEN = tile_ids_for_type(TileType.DRAGON_GREEN)
 _WHITE = tile_ids_for_type(TileType.DRAGON_WHITE)
 
-# 13 distinct tiles, deliberately confined to sou-evens + honors: every other test in this
-# file discards/claims man or pin tiles, so this filler can never accidentally collide with
-# (duplicate) the tile under test -- see the man-suit collision this replaced.
+# confined to sou-evens + honors: every other test here discards/claims man or pin, so this
+# filler can never accidentally duplicate the tile under test.
 _JUNK_HAND = (
     _SOU_2[0],
     _SOU_4[0],
@@ -120,9 +119,8 @@ def _total_tiles(state: GameState) -> int:
 
 
 def test_discard_with_no_claims_advances_to_next_seat_draw() -> None:
-    # a deterministic, flower-free wall -- new_game()'s real dealt wall can legitimately put
-    # a flower on top, which would chain into extra replacement draws and make the plain
-    # "-1" wall-count assertion below flaky.
+    # deterministic, flower-free wall: a real dealt wall could put a flower on top, chaining
+    # into extra replacement draws and making the "-1" wall-count assertion below flaky.
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_SOU_8[2], _SOU_8[3])))
     state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
     state = _all_junk(state, except_seat=0)
@@ -340,10 +338,8 @@ def test_robbing_the_kong_ends_the_hand_as_a_kong_rob_win() -> None:
         payments={0: -32, 1: 0, 2: 32, 3: 0},
     )
     assert any(isinstance(e, HandEnded) for e in events)
-    # regression, same shape as test_claim_win_off_discard_removes_the_tile_from_the_discarder_
-    # pool above: the robbed tile used to stay in the declarer's ADDED_KONG meld *and* get
-    # folded into the winner's concealed hand. Robbing means the 4th tile never actually
-    # completed the kong, so it reverts to the PUNG it was upgraded from.
+    # regression: the robbed tile used to stay in the declarer's ADDED_KONG meld *and* get
+    # folded into the winner's hand -- robbing reverts the meld to the PUNG it upgraded from.
     assert state.seats[0].melds == (Meld(MeldKind.PUNG, _MAN_1[:3], from_seat=1),)
 
 
@@ -429,9 +425,8 @@ def test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win() -> None:
     assert result.win_type == WinType.KONG_ROB
     assert result.faan_breakdown == {"十三么": 10}  # default faan_cap
     assert any(isinstance(e, HandEnded) for e in events)
-    # regression, same shape as the added-kong case above: a concealed kong was never exposed
-    # at all, so robbing it doesn't revert to any meld -- the other 3 tiles just return to the
-    # declarer's concealed hand, and the meld disappears rather than staying a phantom kong.
+    # regression: a concealed kong was never exposed, so robbing it reverts to no meld at all --
+    # the other 3 tiles return to the declarer's concealed hand instead of a phantom kong.
     assert state.seats[0].melds == ()
     assert sorted(state.seats[0].concealed) == sorted((*_EAST[:3], *_JUNK_HAND[:10]))
 
@@ -1250,9 +1245,8 @@ def _play_one_game(seed: int, ruleset: RuleSet, step_cap: int) -> None:
 
 @pytest.mark.slow
 def test_selfplay_50_games_terminate_and_conserve_tiles() -> None:
-    # dealer never repeats: keeps EAST_ONLY deterministically bounded at exactly 4 hands/game,
-    # so a real hang shows up fast against the step cap rather than a long-but-legitimate game
-    # muddying the signal (dealer-repeat's own boundedness is covered separately, above).
+    # dealer never repeats: bounds EAST_ONLY to exactly 4 hands/game, so a real hang shows up
+    # fast against the step cap instead of a long-but-legitimate game muddying the signal.
     ruleset = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
     for seed in range(50):
         _play_one_game(seed, ruleset, step_cap=3000)

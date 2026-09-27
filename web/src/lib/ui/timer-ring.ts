@@ -2,9 +2,11 @@
 // animation clock (docs/02-protocol.md §4: last ~1.5s reads as "about to expire", not exact).
 
 export interface RingTiming {
-	depleteDurationMs: number; // full ring animation length
-	warnDelayMs: number; // when the "about to expire" state kicks in, relative to start
-	warnDurationMs: number; // how long the "about to expire" transition itself takes
+	// depleteDurationMs: full ring length. warnDelayMs: offset (from start) when "about to expire"
+	// kicks in. warnDurationMs: length of that "about to expire" transition itself.
+	depleteDurationMs: number;
+	warnDelayMs: number;
+	warnDurationMs: number;
 }
 
 export function computeRingTiming(durationMs: number, warnWindowMs = 1500): RingTiming {

@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Covers the mock-driven /table scene assembly: each scenario renders without layout errors,
-// switching scenarios changes what's on screen, a claim interaction works end to end, and the
-// sub-768px collapse structurally applies.
+// Covers mock-driven /table scene assembly: scenarios render without layout errors, switching
+// scenarios updates the screen, claim interaction works end to end, sub-768px collapse applies.
 
 test('table route renders the default (your-turn) scenario without errors', async ({ page }) => {
 	const errors: string[] = [];
@@ -169,9 +168,8 @@ test('desktop-width viewport does not apply the fixed self-hand collapse', async
 	await expect(selfRegion).not.toHaveCSS('position', 'fixed');
 });
 
-// proves clientPrefs/autoArm persistence survives an actual page reload, not just the unit-level
-// save/load pair (settings-storage.spec.ts). autoArm's re-assert-on-reconnect half needs a real
-// socket, covered by RUN_LIVE_BACKEND_TESTS=1 (live.e2e.ts), not duplicated here.
+// proves clientPrefs/autoArm persistence survives an actual reload, not just unit-level save/load
+// (settings-storage.spec.ts). autoArm's reconnect re-assert needs a real socket -- see live.e2e.ts.
 test('reloading the page preserves clientPrefs toggled in Settings', async ({ page }) => {
 	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');

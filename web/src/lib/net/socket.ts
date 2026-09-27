@@ -69,9 +69,8 @@ export interface ResumeInfo {
 	secret?: string | null;
 }
 
-/** WS client: connects, sends `hello` on open, exposes every client intent, and fans out
- * parsed events to subscribers. No reducer/store wiring here — callers decide what to do
- * with events (see reducer.ts). */
+/** WS client: connects, sends `hello` on open, exposes every client intent, fans out parsed events.
+ * No reducer/store wiring here -- callers decide what to do with events (see reducer.ts). */
 export class MahjongSocket {
 	#ws: WebSocket | null = null;
 	#url: string;
@@ -318,9 +317,8 @@ export class MahjongSocket {
 		this.#ingest(parsed);
 	}
 
-	/** Per-seat seq gap detection. `state_sync` is always accepted regardless of seq continuity
-	 * — it *is* the resync mechanism. `seq > lastSeq + 1` is a gap: dropped and triggers a resync.
-	 * `seq <= lastSeq` is a stale replay, silently ignored. */
+	/** Per-seat seq gap detection. `state_sync` always applies regardless of seq continuity (it
+	 * *is* the resync). `seq > lastSeq+1` is a gap (dropped, triggers resync); `<= lastSeq` is a stale replay. */
 	#ingest(event: ServerEvent): void {
 		const seq = typeof event.seq === 'number' ? event.seq : null;
 

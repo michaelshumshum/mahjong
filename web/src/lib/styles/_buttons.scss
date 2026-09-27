@@ -1,6 +1,5 @@
-// button/panel/input chrome mixins: three-tier interactive hierarchy on the token palette.
-// physical model: primary reads as a carved ink-seal block (presses down on :active); secondary
-// as a bevelled wood tile (lifts on :hover); tertiary is bare text until touched.
+// button/panel/input chrome mixins: three-tier hierarchy -- primary an ink-seal block (presses on
+// :active), secondary a bevelled wood tile (lifts on :hover), tertiary bare text until touched.
 
 @mixin btn-primary {
 	position: relative;

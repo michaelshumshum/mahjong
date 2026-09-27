@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// every route is gated behind ApiConnectGate's /healthz poll (root +layout.svelte) -- this suite
-// has no real backend (playwright.config.ts's webServer is `pnpm dev` alone), so every test needs
-// this mocked or the gate would poll to its 10s timeout and never render the page under test.
+// every route is gated behind ApiConnectGate's /healthz poll -- this suite has no real backend
+// (webServer is `pnpm dev` alone), so every test must mock it or the gate polls to its 10s timeout.
 test.beforeEach(async ({ page }) => {
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 });
@@ -28,11 +27,8 @@ test('shows a connecting screen until the API health check succeeds, then the lo
 	await expect(page.getByText('Connecting…')).not.toBeVisible();
 });
 
-// Exhausting all 10 attempts (1s/2s/4s/.../256s backoff, 511s total) isn't something to actually
-// wait out in an e2e test -- that behaviour is unit-tested deterministically with fake timers in
-// lobby.spec.ts. This only exercises the first real retry cycle in a live browser: a failed
-// attempt 1 followed by a real ~1s wait before attempt 2, proving the backoff/counter wiring
-// against a genuinely failing backend, not just a mocked `waitForApiHealthy`.
+// Exhausting all 10 attempts (511s total) isn't feasible in e2e -- unit-tested with fake timers
+// in lobby.spec.ts instead. This only exercises the first real retry cycle in a live browser.
 test('retries after a failed attempt, showing the attempt count and next-retry countdown', async ({
 	page
 }) => {
@@ -139,9 +135,10 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 	// the default (Normal).
 	const rightSlot = dialog.getByRole('button', { name: /^Right opponent:/ });
 	const leftSlot = dialog.getByRole('button', { name: /^Left opponent:/ });
-	await rightSlot.click(); // normal -> impossible
-	await rightSlot.click(); // impossible -> easy
-	await leftSlot.click(); // normal -> impossible
+	// rightSlot: normal -> impossible -> easy (2 clicks); leftSlot: normal -> impossible (1 click)
+	await rightSlot.click();
+	await rightSlot.click();
+	await leftSlot.click();
 	await dialog.getByRole('button', { name: 'Start', exact: true }).click();
 
 	await expect(page).toHaveURL('/table/DIFF456?practice=1');

@@ -1,7 +1,6 @@
 <script lang="ts">
-	// A sandbox proving the positional slot-identity mechanics (tile-slots.ts) and the
-	// transform/opacity-only transition contract actually work end to end. No JS ticker --
-	// `ontransitionend` commits the data change once a flight actually finishes.
+	// sandbox proving the positional slot-identity mechanics (tile-slots.ts) and the transform/
+	// opacity-only transition contract work end to end. No JS ticker -- `ontransitionend` commits the change.
 	import TileFace from '$lib/table/TileFace.svelte';
 	import type { MockMeld } from '$lib/table/mock-game-state';
 	import type { TileCode } from '$lib/table/tile-code';

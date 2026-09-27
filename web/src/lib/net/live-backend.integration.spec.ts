@@ -7,16 +7,8 @@ import { reduce } from './reducer';
 import { initialClientGameState, type ClientGameState } from '../game/state';
 import type { ServerEvent } from './protocol';
 
-/**
- * Live integration smoke test: a real `uv run uvicorn` and four real `MahjongSocket`
- * connections, proving the socket + reducer work against the real backend's wire shapes, not
- * just hand-constructed fixtures. Skipped by default; opt in with:
- *
- *   RUN_LIVE_BACKEND_TESTS=1 pnpm vitest run src/lib/net/live-backend.integration.spec.ts
- *
- * Exercises `MahjongSocket` + `reduce()` directly, not `GameStore` -- runes need the 'client'
- * vitest project, and combining that with a spawned live server was more than this needed.
- */
+/** Live smoke test: real uvicorn + MahjongSocket vs actual wire shapes. Skipped by default, opt in
+ * with RUN_LIVE_BACKEND_TESTS=1. Tests MahjongSocket+reduce directly, not GameStore (runes need 'client'). */
 describe.skipIf(!process.env.RUN_LIVE_BACKEND_TESTS)('live backend (opt-in)', () => {
 	const port = 8199;
 	const wsUrl = `ws://127.0.0.1:${port}/ws`;

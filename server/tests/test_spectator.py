@@ -94,10 +94,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             wss = [ws0, ws1, ws2, ws3]
             spec_seq = itertools.count()
 
-            # --- immediately on connect, before this connection ever sends anything: a real,
-            # spectator-shaped state_sync (seat=None), no private hand data for any seat
-            # (docs/00-architecture.md §5's "union of what all four players show publicly, not
-            # their private hands").
+            # immediately on connect: a real spectator-shaped state_sync (seat=None), no
+            # private hand data for any seat (00-architecture.md §5).
             sync = spectator.receive_json()
             assert sync["t"] == "state_sync"
             assert sync["seq"] == next(spec_seq)
@@ -152,9 +150,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             assert spec_turn0["d"]["seat"] == 0
             assert "legal" not in spec_turn0["d"]
 
-            # --- seat 0 discards 5m: broadcast discard, then claim_offer unicast to seat 2
-            # only -- the spectator must never see the claim_offer itself (it would leak seat
-            # 2's own concealed tiles used to form the pung), only the public discard.
+            # seat 0 discards 5m: claim_offer unicasts to seat 2 only -- the spectator must
+            # never see it (would leak seat 2's concealed tiles), only the public discard.
             discard_id = _next_id()
             ws0.send_json(_msg("discard", {"tile_id": _MAN_5[0]}, id_=discard_id))
             ack_d0 = ws0.receive_json()
@@ -175,9 +172,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             window_id = offer2["d"]["window_id"]
             pung_option = next(o for o in offer2["d"]["options"] if o["kind"] == "pung")
 
-            # --- seat 2 pungs: claim_resolved, meld (fully public, real tiles), then seat 2's
-            # turn again -- the very next frame this spectator sees is `claim_resolved`, never
-            # the claim_offer that preceded it, proving the offer really was unicast-only.
+            # seat 2 pungs: the next frame this spectator sees is `claim_resolved`, never the
+            # claim_offer that preceded it -- proving the offer really was unicast-only.
             claim_id = _next_id()
             ws2.send_json(
                 _msg(
@@ -212,10 +208,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             assert spec_turn2["d"]["seat"] == 2
             assert "legal" not in spec_turn2["d"]
 
-            # --- seat 2 discards a junk tile (its own concealed hand post-pung is exactly
-            # `_SEAT2_JUNK`, deterministically -- no need to read its own `turn.legal` back to
-            # pick one): nobody can claim it, the wall is empty, so the hand ends right here in
-            # exhaustive draw, cascading `discard` -> `hand_end` -> `score`.
+            # seat 2 discards a junk tile (post-pung hand is deterministically `_SEAT2_JUNK`);
+            # nobody claims it and the wall is empty, so it cascades discard -> hand_end -> score.
             discard2_id = _next_id()
             ws2.send_json(_msg("discard", {"tile_id": _SEAT2_JUNK[0]}, id_=discard2_id))
             ack_d2 = ws2.receive_json()

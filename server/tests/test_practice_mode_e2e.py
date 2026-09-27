@@ -49,10 +49,8 @@ from mahjong_core.state import Phase
 
 _id_gen = itertools.count(1)
 
-# same rationale as tests/test_full_game_e2e.py's own _GAME_RULESET: with both dealer-repeat
-# flags off, EAST_ONLY is bounded at exactly 4 hands (dealer 0 -> 1 -> 2 -> 3, then GAME_OVER)
-# regardless of how any individual hand ends -- required so a *real*, unscripted game (this
-# test's whole point) terminates in bounded time.
+# same rationale as test_full_game_e2e.py's _GAME_RULESET: dealer-repeat off bounds EAST_ONLY
+# to exactly 4 hands (dealer 0->1->2->3, then GAME_OVER) so this unscripted game terminates.
 _GAME_RULESET = dataclasses.replace(
     DEFAULT_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
 )
@@ -125,13 +123,12 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
             assert binding is not None
             assert binding.status == "bot"
             assert binding.ready is True
-            # M5: a bot seat still gets a real, sensible display name -- never null/empty --
-            # drawn from the random pun pool (app/table.py's `_BOT_NAME_POOL`), not a generic
-            # "Bot" placeholder.
+            # bot name is never null/empty -- drawn from the random pun pool
+            # (`_BOT_NAME_POOL`), never a generic "Bot" placeholder.
             assert binding.name in _BOT_NAME_POOL
-        assert table._bot_tier == "T2"  # M4.5's default -- FaanBot, not a weaker tier
-        # bots choosing names independently could still coincide by chance -- `_draw_bot_name`
-        # guards against exactly that, so this table's three bot seats never collide.
+        assert table._bot_tier == "T2"  # default tier is FaanBot (M4.5)
+        # `_draw_bot_name` avoids name collisions among bot seats
+        bot_names = [table.seat_bindings[seat].name for seat in (1, 2, 3)]
         bot_names = [table.seat_bindings[seat].name for seat in (1, 2, 3)]
         assert len(set(bot_names)) == 3
 
@@ -168,9 +165,8 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
             f"seat {seat} (bot) never discarded -- bots did not actually play"
         )
 
-    # --- practice-mode bot seats never get confused by disconnect/reconnect machinery: there
-    # was no human behind them to disconnect, so status stays exactly "bot" throughout the whole
-    # game, never flipped to "disconnected"/"autoplay"/"connected" by anything.
+    # bot seats have no human behind them to disconnect -- status stays "bot" for the
+    # whole game, never flipped to disconnected/autoplay/connected.
     for seat in (1, 2, 3):
         binding = table.seat_bindings[seat]
         assert binding is not None

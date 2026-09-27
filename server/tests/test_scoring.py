@@ -875,11 +875,7 @@ def test_earthly_hand_false_when_flag_unset() -> None:
 
 
 # --- Win on Last Wall Tile (海底撈月) / Win on Last Discard (河底撈魚) --------------------------
-#
-# `is_last_tile`/`is_kong_replacement`/`is_robbing_kong` are stub context fields -- nothing in
-# wall.py/state.py yet tracks wall-remaining-count or kong-replacement provenance (sub-task 8's
-# job). These tests exercise the detectors' logic given the flags directly, the same way
-# sub-task 3's Heavenly/Earthly Hand tests did before real turn tracking existed.
+# stub context fields (is_last_tile/is_kong_replacement/is_robbing_kong) exercised directly, same as sub-task 3's Heavenly/Earthly Hand tests.
 
 
 def test_win_on_last_wall_tile() -> None:

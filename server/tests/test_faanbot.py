@@ -171,24 +171,8 @@ async def test_full_games_complete_faanbot_vs_faanbot(seed: int) -> None:
     assert len(actions) > 0
 
 
-# --- scripted hands: value-aware discard, calibrated against the real arena run --------------
-#
-# The weight schedule below (`_weights_for_turn`) was tuned against real arena evidence, not
-# just this scripted intuition: an earlier, more value-aggressive calibration (`_UKEIRE_SCALE`
-# still 8, but mid-game `w_value=1.5`) scored a paired-difference CI of [-3.337, -1.503] points
-# per game against `EfficiencyBot` over 1000 duplicate sets -- a real, significant *regression*,
-# not the hoped-for improvement, because it chased every reachable route (including the
-# ubiquitous 2-faan Voided Suit) too eagerly across ordinary hands, not just genuine flush
-# candidates. Retuned mid-game `w_value` down to 0.9 closed most of that gap (CI
-# [-1.857, +0.041] over a second 1000-set run, same seed) while still keeping
-# `tenpai_rate_on_sub_minimum_hand` far below T1's (0.204 vs 0.321) -- see
-# docs/04-bots.md §8's recorded numbers. The two scripted hands below are chosen to be
-# *turn-invariant* under the final weights (every turn picks the same discard) specifically
-# because that arena finding: this calibration is deliberately conservative about chasing a
-# *marginal* value signal, and only commits when the value gap is large. Both hands' shanten/
-# ukeire/value numbers were computed directly against `mahjong_core.shanten`/`ukeire`/
-# `bots.valuation.estimate_best_faan` before being pinned, and `FaanBot.act` itself was run
-# directly (not just the formula) to confirm the discard at every turn bucket.
+# `_weights_for_turn`'s mid-game `w_value=0.9` is tuned against real arena evidence (see
+# docs/04-bots.md §8); these two hands are turn-invariant under it and pin that calibration.
 
 
 async def test_does_not_chase_a_marginal_value_signal() -> None:
@@ -255,19 +239,8 @@ async def test_commits_to_a_strong_value_signal() -> None:
         assert aid == int(T.PIN_5), f"turn={turn}"
 
 
-# --- scripted hand: fold to a safe tile late, far from tenpai, against a threat ---------------
-#
-# 13 fully scattered tiles (isolated singles across every suit and every honor -- deliberately
-# no chow/pung shape at all) is far past 3-shanten. Turn 13 (>= `_turn_breakpoints`'s late-turn
-# value, 12 at the default ruleset). Seat 1 holds an
-# exposed 中(DRAGON_RED) pung (`opponent_threat_level` = 1 meld * 0.3 = 0.3, at the
-# `_THREAT_THRESHOLD`) and has 北(WIND_NORTH) sitting in *this seat's* own hand as a candidate
-# discard that is genbutsu against seat 1 (already in seat 1's discard pool) -- weak evidence,
-# but the only real read available -- while 發(DRAGON_GREEN) is a live dragon type seat 1's
-# pung makes structurally pricier (`bots.safety`'s meld-danger multiplier). Fold mode should
-# discard the genbutsu tile over the meld-flagged dragon even though it's not the ukeire-best
-# option, matching docs/04-bots.md §4's "at 3+ shanten on turn 12 against a threatening
-# opponent, discard safe tiles rather than chasing."
+# far past 3-shanten, late turn, seat 1 threatening (docs/04-bots.md §4): fold mode must
+# discard the genbutsu tile (北) over the meld-flagged dragon (發), not the ukeire-best option.
 
 _FOLD_HAND = [
     T.MAN_1,
@@ -287,11 +260,8 @@ _FOLD_HAND = [
 
 
 _FOLD_HAND_OWN_POOL = (
-    # 13 distinct types none of `_FOLD_HAND` touches (one physical tile each) -- deliberately
-    # not `_dummy_pool` here: that helper cycles one suit's 9 ranks and wraps around past 9
-    # entries, which would put a *second* copy of some rank into `seen34` and could spuriously
-    # trigger the one-chance signal on a tile this test cares about (caught by this test itself
-    # while authoring it -- see the module docstring's "verified directly" convention).
+    # not `_dummy_pool`: it wraps past 9 ranks, duplicating a rank into `seen34` and risking a
+    # spurious one-chance signal on a tile this test cares about.
     tile_ids_for_type(T.MAN_2)[0],
     tile_ids_for_type(T.MAN_3)[0],
     tile_ids_for_type(T.MAN_5)[0],
@@ -532,17 +502,8 @@ async def test_discard_with_empty_faan_overrides_matches_default_route_faan() ->
     assert aid_default == aid_empty_override == int(T.WIND_SOUTH)
 
 
-# --- scripted: wall_reserve-aware turn breakpoints (docs/04-bots.md §9 Tier 2, closing item) ---
-#
-# `_turn_breakpoints` (`bots/faanbot.py`) replaces the old fixed `_LATE_TURN = 12`/turn-6
-# constants `_weights_for_turn` was hand-tuned against with a formula scaled off
-# `mahjong_core.wall.max_turns_per_seat` -- a pure function of `RuleSet.wall_reserve`/
-# `flowers_enabled` (144/136 total tiles, 53 dealt, split across 4 seats). The calibration
-# constraint: at the default ruleset (`wall_reserve=0`, `flowers_enabled=True`, every shipped
-# preset's regime), the derived breakpoints must reproduce the old fixed 6/12 exactly, not just
-# approximately -- `_REFERENCE_MAX_TURN` in `bots/faanbot.py` is computed the same way, so
-# `round(6 * max_turn / _REFERENCE_MAX_TURN) == 6` and `round(12 * ...) == 12` whenever
-# `max_turn == _REFERENCE_MAX_TURN`.
+# `_turn_breakpoints` scales the old fixed 6/12 constants off `max_turns_per_seat`; at the
+# default ruleset (`_REFERENCE_MAX_TURN`) it must reproduce 6/12 exactly, not approximately.
 
 
 def test_turn_breakpoints_match_the_old_hand_tuned_constants_at_default_ruleset() -> None:

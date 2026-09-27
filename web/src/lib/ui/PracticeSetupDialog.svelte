@@ -16,9 +16,8 @@
 		return DIFFICULTY_CYCLE[(DIFFICULTY_CYCLE.indexOf(current) + 1) % DIFFICULTY_CYCLE.length];
 	}
 
-	// seats 1-3 only -- seat 0 is the human's own seat (this route's existing seat-picker flow),
-	// never configured here. Offsets from your own seat, clockwise, matching
-	// mock-game-state.ts's relativeSeat: 1 right, 2 across, 3 left.
+	// seats 1-3 only -- seat 0 is the human's own seat, never configured here. Offsets from your
+	// own seat, clockwise, matching mock-game-state.ts's relativeSeat: 1 right, 2 across, 3 left.
 	let difficulty = $state<Record<1 | 2 | 3, PracticeDifficulty>>({
 		1: 'normal',
 		2: 'normal',
@@ -131,9 +130,8 @@
 		color: var(--color-text-muted);
 	}
 
-	// same geometry as SeatRing/SeatPicker's seat-ring (docs/03-frontend.md's "Pre-game
-	// states"), sized up since each slot here carries a difficulty word + caption, not just a
-	// one-line seat status.
+	// same geometry as SeatRing/SeatPicker's seat-ring (docs/03-frontend.md's "Pre-game states"),
+	// sized up since each slot here carries a difficulty word + caption, not just seat status.
 	.seat-ring {
 		display: grid;
 		grid-template-areas:

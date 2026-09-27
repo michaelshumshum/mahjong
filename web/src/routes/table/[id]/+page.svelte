@@ -54,10 +54,8 @@
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 
-	// --- mock vs. live ---
-	// `?mock=<scenarioId>` renders a frozen MOCK_SCENARIOS fixture for the screenshot workflow
-	// and design iteration with no backend running. Omitted, `[id]` opens a real MahjongSocket ->
-	// GameStore. Both paths render through the same view model so the template never forks.
+	// `?mock=<scenarioId>` renders a frozen MOCK_SCENARIOS fixture with no backend (screenshot
+	// workflow); omitted, `[id]` opens a real MahjongSocket -> GameStore through the same view model.
 	let isMock = $derived(page.url.searchParams.has('mock'));
 	let tableId = $derived(page.params.id ?? '');
 
@@ -65,9 +63,8 @@
 	// socket in practice mode: seats 1-3 are already bot-bound at table creation.
 	let isPractice = $derived(page.url.searchParams.has('practice'));
 
-	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket
-	// -- a static MOCK_SCENARIOS fixture (always fully-seated, already-dealt) has no room for
-	// these, so they need a mode of their own rather than folding into `?mock`.
+	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket --
+	// a MOCK_SCENARIOS fixture (always fully-seated) has no room for these, so it's a mode of its own.
 	const PREGAME_PREVIEWS = ['connecting', 'join', 'waiting'] as const;
 	type PregamePreview = (typeof PREGAME_PREVIEWS)[number];
 	let pregamePreview = $derived.by((): PregamePreview | null => {
@@ -92,9 +89,8 @@
 
 	// --- live connection -------------------------------------------------------------------
 	let liveStore = $state<GameStore | null>(null);
-	// no backend "has this table actually started" field -- state_sync already reflects a fully-
-	// dealt hand the instant the table is created, so this flips permanently on a real post-start
-	// broadcast, or if the first snapshot already shows play-in-progress (reconnect mid-game).
+	// no backend "has this table started" field -- state_sync reflects a fully-dealt hand from
+	// creation, so this flips permanently on a real post-start broadcast or a mid-game reconnect snapshot.
 	let handEverStarted = $state(false);
 	let readySent = $state(false);
 
@@ -229,10 +225,8 @@
 	let live = $derived(
 		!isMock && liveStore ? viewFromClientState(liveStore.state, spectating ? 0 : null) : null
 	);
-	// falls back to the mock fixture when there's no live view yet (pre-join/pre-start) --
-	// never actually rendered then, since `tableReady` below gates the whole template;
-	// this just keeps `gameState` non-null so the rest of the (unchanged) template below doesn't
-	// need null-checks sprinkled through it.
+	// falls back to the mock fixture when there's no live view yet -- never actually rendered,
+	// since `tableReady` gates the template; this just keeps `gameState` non-null so it needs no null-checks.
 	let gameState = $derived(isMock ? mockGameState : (live?.view ?? mockGameState));
 	let tableReady = $derived(
 		isMock ||
@@ -247,9 +241,8 @@
 	// -- `tableReady` false) but never on the actual game table, mock or live, spectator included.
 	claimMuralVisible(() => !tableReady);
 
-	// unifies the real `liveStore`-driven pre-game states with the static `?pregame=` preview
-	// (above) so the template below branches on one pair of values regardless of which is
-	// driving them, instead of forking into two parallel conditionals.
+	// unifies the real `liveStore`-driven pre-game states with the static `?pregame=` preview so
+	// the template branches on one pair of values, instead of forking into two parallel conditionals.
 	let previewConnection: ConnectionStatus = $derived(
 		pregamePreview === 'connecting' ? 'connecting' : pregamePreview !== null ? 'open' : 'idle'
 	);
@@ -286,7 +279,6 @@
 			liveStore.state.hostSeat === liveStore.state.seat
 	);
 
-	// --- pre-game invite link (live mode only) ---
 	// the table's URL *is* the invite -- lives on both the join and waiting screens, since
 	// waiting for the table to fill is exactly when you need to hand it to someone.
 	let copiedInviteLink = $state(false);
@@ -397,9 +389,8 @@
 		void gameState.handNo;
 		handEndAckSent = false;
 	});
-	// mock mode and spectators have no hand_end_ack round trip to hide the overlay behind (a
-	// spectator isn't a seat the hold waits on) -- dismissing just closes it locally, reset
-	// whenever the scenario picker jumps to a fresh one or the next hand starts.
+	// mock mode and spectators have no hand_end_ack round trip to hide the overlay behind --
+	// dismissing just closes it locally, reset when the scenario picker jumps or the next hand starts.
 	let handEndDismissedLocally = $state(false);
 	$effect(() => {
 		void scenarioId;
@@ -480,9 +471,8 @@
 		};
 	}
 
-	// past-round detail off HandHistoryEntry: winnerMelds/winningHand are real tile_ids,
-	// converted the same way live-view.ts's own seat mapping does -- the one place a past
-	// round's full winning hand is reconstructed, since state.melds has long since reset.
+	// past-round detail off HandHistoryEntry: winnerMelds/winningHand are real tile_ids, converted
+	// the same way live-view.ts's seat mapping does -- the one place a past round's hand is reconstructed.
 	function liveRoundResult(h: HandHistoryEntry): RoundResult | undefined {
 		if (h.outcome !== 'win' || h.winner === null) {
 			return h.outcome === 'exhaustive_draw' ? { outcome: 'exhaustive_draw' } : undefined;
@@ -500,9 +490,8 @@
 		};
 	}
 
-	// Mock path: the one game-end scenario's fixed rounds, or a single row synthesized from the
-	// current snapshot for every other (frozen, single-hand) scenario.
-	// Live path: real accumulated `handHistory`, growing across a live multi-hand game.
+	// mock path: the one game-end scenario's fixed rounds, else a single row from the current snapshot.
+	// live path: real accumulated `handHistory`, growing across a live multi-hand game.
 	let scoreHands: HandRecord[] = $derived(
 		isMock
 			? (gameState.gameEnd?.rounds ?? [
@@ -535,16 +524,14 @@
 				: undefined
 	);
 
-	// `game_end` only ever fires after the last hand's own hold has already resolved, but the
-	// client-side hold overlay has no other way to know that -- it normally clears on the next
-	// `hand_start`, and there isn't one for the final hand. Gating on `!gameEndReached` closes it.
+	// `game_end` fires only after the last hand's hold resolves, but the hold overlay has no other
+	// way to know that (it normally clears on the next `hand_start`, absent for the final hand) -- `!gameEndReached` closes it.
 	let gameEndReached = $derived(
 		isMock ? gameState.gameEnd != null : liveStore?.state.gameEnd != null
 	);
 
-	// persisted to localStorage. `autoArm` is "last known intent," not verified server truth --
-	// re-sent by the re-assert effect below on each fresh connection instead of read back.
-	// Guest display name persists the same way but is sent once on `join`, never re-asserted.
+	// persisted to localStorage. `autoArm` is "last known intent," not verified truth -- re-sent
+	// on each fresh connection instead of read back. Display name persists the same way but is sent once on `join`.
 	let displayName = $state(loadDisplayName() ?? '');
 	function updateDisplayName(value: string): void {
 		displayName = value;
@@ -837,9 +824,8 @@
 		}
 	}
 
-	// centered, scrim-backed like `.panel-overlay` below -- a claim decision is as consequential
-	// as a hand result, so it gets the same modal weight, not a translucent button row that
-	// leaves the table interactive underneath it.
+	// centered, scrim-backed like `.panel-overlay` below -- a claim decision is as consequential as
+	// a hand result, so it gets the same modal weight, not a translucent row over an interactive table.
 	.claim-overlay,
 	.panel-overlay {
 		@include buttons.modal-scrim;

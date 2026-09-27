@@ -1,7 +1,5 @@
-// hand-written mirror of server/mahjong_core/config.py's RuleSet -- not make proto-generated,
-// since it's a plain JSON body on POST /tables, not a protocol message. Field names/enum values
-// must match RuleSet.to_dict() exactly: a mismatch doesn't error, it silently falls back to
-// hk_classic server-side, so CreateTableDialog treats a sent/echoed mismatch as a real bug.
+// hand-written mirror of server/mahjong_core/config.py's RuleSet (not proto-generated -- plain JSON on POST /tables).
+// field names/enum values must match RuleSet.to_dict() exactly -- a mismatch silently falls back to hk_classic server-side.
 
 export type ScoreTable = 'full_spicy' | 'half_spicy';
 export type HandSet = 'CLASSIC' | 'NEW_6' | 'NEW_18';
@@ -27,9 +25,8 @@ export interface RuleSet {
 	four_kong_abort: boolean;
 	nine_terminals_abort: boolean;
 	tenpai_payments: boolean;
-	// variants. multi_win stays in the type (RuleSet.to_dict() requires every key) but
-	// CreateTableDialog never binds an input to it -- the server rejects `True` outright, and a
-	// togglable field it can never honor would silently discard the whole custom ruleset.
+	// multi_win stays in the type (to_dict() requires every key) but CreateTableDialog never binds an input to it --
+	// server rejects `True` outright, and a togglable field it can't honor would silently discard the ruleset.
 	multi_win: boolean;
 	flowers_enabled: boolean;
 	kong_rob_enabled: boolean;

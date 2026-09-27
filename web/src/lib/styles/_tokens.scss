@@ -1,6 +1,5 @@
-// design tokens: material palette of lacquered dark walnut, ivory tiles, cinnabar seal-ink red.
-// Custom properties on :root, not scss variables, so every component's scoped <style> block
-// can read them with no import -- seat colours and theme also get toggled at runtime later.
+// design tokens: lacquered dark walnut, ivory tiles, cinnabar seal-ink red palette.
+// custom properties on :root, not scss variables, so every scoped <style> block reads them with no import.
 
 :root {
 	--color-bg: #1c1410;

@@ -205,9 +205,8 @@ class GameState:
 
     ruleset: RuleSet
     game_seed: int
-    # never leaves this process, not even redacted, not ever during play. kept here (not
-    # just passed to new_game and dropped) because engine.py derives every later hand's
-    # hand_seed from it, and this is the only place it lives.
+    # never leaves this process, not even redacted, not ever during play (00-architecture.md §3);
+    # kept here, not just passed to new_game, because engine.py derives every hand_seed from it.
     hand_seed: bytes
     wall: Wall
     seats: Seats
@@ -228,9 +227,8 @@ class GameState:
     last_draw_was_kong_replacement: bool = False
     # whether the most recent draw was a kong replacement (back-of-wall) -- 槓上開花's flag.
     self_draw_win_allowed: bool = True
-    # whether the current AWAIT_ACTION turn may end by self-draw win. true at hand start and
-    # after any draw; false after a chow/pung claim (claimer didn't draw, already passed on
-    # claiming it as a win).
+    # whether the current AWAIT_ACTION turn may still end by self-draw win: true at hand start
+    # and after any draw; false after a chow/pung claim (claimer didn't draw).
 
     def __post_init__(self) -> None:
         if len(self.seats) != 4:

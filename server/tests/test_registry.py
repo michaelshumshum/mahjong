@@ -63,10 +63,8 @@ async def test_table_task_stops_and_is_cleaned_up_on_game_over() -> None:
     table = registry.get_or_create("table-gameover", DEFAULT_RULESET, seed=1, require_ready=False)
     assert registry.is_running("table-gameover")
 
-    # force GAME_OVER directly (white-box, same style tests/test_reconnect.py's `table.state = ...`
-    # rigging already established) and nudge the table's own background task awake with a command
-    # it will drop as illegal (GAME_OVER has no legal_actions for any seat) -- process_one() only
-    # re-checks phase after handling *something*, per Table.run()'s own loop.
+    # force GAME_OVER directly (white-box, same as test_reconnect.py) and nudge the background
+    # task with an illegal command -- process_one() only re-checks phase after handling something.
     table.state = dataclasses.replace(table.state, phase=Phase.GAME_OVER, claim_window=None)
     table.submit(0, Pass(window_id=0, seat=0))
 

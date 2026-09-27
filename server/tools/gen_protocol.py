@@ -129,9 +129,8 @@ def ts_type(annotation: Any) -> str:
     if origin in (list, set, frozenset):
         (item,) = typing.get_args(annotation)
         item_ts = ts_type(item)
-        # `[]` binds tighter than `|` in TS -- `string | null[]` parses as `string | (null[])`,
-        # not the intended `(string | null)[]` (first hit: `list[str | None]`, M5's `names`
-        # field). Parenthesize whenever the item itself rendered as a union.
+        # `[]` binds tighter than `|` in TS -- `string | null[]` parses as `string | (null[])`, not
+        # `(string | null)[]` -- parenthesize whenever the item itself rendered as a union.
         if typing.get_origin(item) in (types.UnionType, typing.Union):
             item_ts = f"({item_ts})"
         return f"{item_ts}[]"

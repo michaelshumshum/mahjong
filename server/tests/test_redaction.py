@@ -73,9 +73,8 @@ from mahjong_core.tiles import TileId
 # --- self-play sample collection -----------------------------------------------------------
 
 _RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
-# matches tests/test_selfplay.py's own bounded config: dealer rotates unconditionally, so a
-# game is capped at exactly 4 hands (EAST_ONLY) -- keeps this suite's self-play fast and
-# guarantees GAME_OVER (hence a GameEnded sample) every run.
+# matches test_selfplay.py's bounded config: dealer rotates unconditionally, capping the game
+# at 4 hands (EAST_ONLY) -- keeps this suite fast and guarantees a GameEnded sample.
 
 _STEP_CAP = 2000
 _SEED_BUDGET = 80
@@ -357,10 +356,8 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
         leaked = _offer_tile_ids(offer) - allowed
         assert not leaked, f"claim_options leaked {leaked} to seat {seat}: {offer!r}"
 
-    # `seat_view_wire`'s `melds` field has its own hand-rolled serialization (app/views.py's
-    # `_meld_wire`), separate from the WireEvent schema walker above -- check it directly rather
-    # than trusting `melds`' aggregate PUBLIC annotation, which is wrong specifically for a
-    # concealed kong's tiles (00-architecture.md §5).
+    # `melds` has hand-rolled serialization (`_meld_wire`), not the schema walker above -- its
+    # aggregate PUBLIC annotation is wrong specifically for a concealed kong's tiles (00-architecture.md §5).
     wire = seat_view_wire(view)
     for owner_seat, seat_melds in enumerate(view.melds):
         wire_melds = wire["melds"][owner_seat]
@@ -371,9 +368,8 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
                 )
                 continue
             if seat == owner_seat:
-                # ground truth: the declaring seat must still get its own real tiles, not
-                # just "not obviously leaked" -- a bug that nulls tiles for everyone
-                # (including the owner) would otherwise pass the branch below vacuously.
+                # ground truth: the declaring seat must get its real tiles, not just "not
+                # obviously leaked" -- else a bug nulling tiles for everyone passes vacuously.
                 assert wire_meld["tiles"] == list(meld.tiles), (
                     "concealed_kong tiles hidden from the declaring seat itself"
                 )
@@ -397,9 +393,8 @@ def _assert_event_redaction(state: GameState, event: Event) -> None:
                 f"redact_event's dict drifted from _build_event_wire for {f.name}"
             )
 
-    # ground-truth (positive) checks: the entitled viewer must get the *real* value, not just
-    # "not obviously redacted" -- a bug that nulls everything for everyone would otherwise
-    # pass every check above.
+    # ground truth: the entitled viewer must get the *real* value, not just "not obviously
+    # redacted" -- else a bug nulling everything for everyone would pass every check above.
     if isinstance(event, Drawn):
         owner_wire = _build_event_wire(state, event.seat, event)
         assert isinstance(owner_wire, DrawWire)

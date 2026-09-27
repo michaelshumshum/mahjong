@@ -46,15 +46,8 @@ def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
     return tuple(ids[:count])
 
 
-# Unlike tests/test_table_claims.py's fixture (which never drives play past the pung, so its
-# junk tiles can safely repeat the same physical ids across seats), this test plays a second
-# discard for real -- so every seat's junk needs to be both physically distinct (no tile_id
-# reused across two seats -- mahjong_core has no cross-seat uniqueness check of its own, so a
-# reused id silently builds an impossible "3 physical copies of one tile" meld the moment it's
-# claimed) *and* type-exclusive per seat (no other seat may hold a type matching whatever seat
-# 2 goes on to discard, or that discard would open a real, unscripted claim window). Each
-# seat's junk pool below draws from its own dedicated tile types -- honors for seat 2 in
-# particular, which can never form a chow at all, making its discard doubly claim-proof.
+# unlike test_table_claims.py's fixture, this test plays a real second discard, so each seat's
+# junk must be physically distinct (no shared tile_id) and type-exclusive (seat 2's eventual discard uses honors, so no other seat can chow or pung it).
 _SEAT0_JUNK = _tiles(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13)
 _SEAT1_JUNK = _tiles(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
 _SEAT2_JUNK = _tiles(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
@@ -250,10 +243,8 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             legal2 = post_pung_turns[2]["d"]["legal"]
             discard_action = next(a for a in legal2 if a["kind"] == "discard")
 
-            # --- seat 2 discards a junk tile: nobody can claim it, so the engine cascades
-            # straight through "advance to seat 3's draw" -> wall exhausted -> hand over --
-            # all inside this one reduce() call, then Table chains start_next_hand() into a
-            # fresh hand 2 in the same tick (app/table.py's `_apply`).
+            # seat 2 discards a junk tile: nobody claims it, so reduce() cascades straight to
+            # wall-exhausted hand over, and Table chains start_next_hand() into hand 2 same tick.
             discard2_id = _next_id()
             wss[2].send_json(
                 _msg("discard", {"tile_id": discard_action["tile_id"]}, id_=discard2_id)
@@ -281,15 +272,8 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             score = _payload(frames[0][2])
             assert score["totals"] == {"0": 0, "1": 0, "2": 0, "3": 0}
 
-            # --- hand-end hold: DEFAULT_RULESET's real hand_end_seconds (10s) would otherwise
-            # hold the table open at HAND_OVER -- the next hand's hand_start/deal/turn don't
-            # follow until every seat acks the hold (`hand_end_ack`), same "wait for all 4"
-            # shape `ready` already uses for the hand-1 start above. And, like that hand-1
-            # start, the 4th (last) ack itself cascades hand_start/deal/turn to every seat --
-            # including the acking seat's own connection -- before `_dispatch` gets to send
-            # that seat's own `ack` for the hand_end_ack that triggered it (mark_hand_end_ack
-            # runs synchronously inside `apply()`, ahead of `Session._ack()`), so seat 3's own
-            # hand_start/deal/turn land ahead of its ack, exactly like `ack_3` above.
+            # hand-end hold needs all 4 hand_end_ack's before the next hand starts (same "wait
+            # for all 4" shape as ready above); the 4th ack cascades hand_start/deal/turn synchronously, landing ahead of its own ack, like ack_3 above.
             for seat in range(3):
                 ack_id = _next_id()
                 wss[seat].send_json(_msg("hand_end_ack", {}, id_=ack_id))
@@ -337,10 +321,8 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
         assert table is not None
         tile_a, tile_b = table.state.seats[table.state.turn].concealed[:2]
 
-        # not this seat's turn (seat 0 may not even be the dealer here) -- irrelevant to the
-        # id contract itself, which fires before Table ever gets to judge legality; Table simply
-        # drops the command silently if it isn't actually legal (unchanged sub-task 2/3
-        # behavior), and this test only cares about the ack/idempotency layer above that.
+        # not necessarily this seat's turn -- irrelevant to the id contract, which fires
+        # before Table judges legality; an illegal command is just dropped silently, unrelated to this test.
         ws.send_json(_msg("discard", {"tile_id": int(tile_a)}, id_="d-1"))
         first_ack = ws.receive_json()
         assert first_ack["d"] == {"id": "d-1", "ok": True}
@@ -394,9 +376,8 @@ def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
         ack0 = ws0.receive_json()
         assert ack0["d"]["ok"] is True
 
-        # --- seat 1 joins: seat 0 (already connected) sees a live seat_state broadcast for
-        # it, not just a snapshot on its own next resync -- and seat 1's own fresh state_sync
-        # already reflects both bound seats as connected, the still-open ones as empty.
+        # seat 1 joins: seat 0 sees a live seat_state broadcast (not just its next resync), and
+        # seat 1's fresh state_sync already reflects both bound seats as connected.
         ws1.send_json(_msg("join", {"seat": 1, "name": "Bob"}, id_=_next_id()))
         live_update = ws0.receive_json()
         assert live_update["t"] == "seat_state"

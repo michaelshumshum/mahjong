@@ -104,9 +104,8 @@ def resolve_claims(
         return ClaimResolution(winning_seat=winner[0], action=winner[1])
 
     if best == ClaimPriority.PUNG_OR_KONG:
-        # kong beats pung. with 4 copies per tile type a kong claim already uses up the
-        # other 3, so a second seat's pung can't coexist in practice — handled explicitly
-        # anyway since this function arbitrates whatever responses it's handed.
+        # kong beats pung; a second seat's pung can't coexist in practice (4 copies per tile
+        # type), handled explicitly anyway since this function arbitrates whatever it's handed.
         kongs = [sc for sc in contenders if sc[1].kind == ActionKind.CLAIM_KONG]
         pool = kongs if kongs else contenders
         if len(pool) > 1:

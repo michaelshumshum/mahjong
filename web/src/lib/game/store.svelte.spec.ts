@@ -4,9 +4,8 @@ import type { MahjongSocket } from '../net/socket';
 import type { ServerEvent } from '../net/protocol';
 import type { ConnectionStatus } from './state';
 
-/** Fake standing in for MahjongSocket, exercising the store's wiring without a real WebSocket.
- * Must run under the 'client' (jsdom) vitest project — `$effect`/`$effect.root` no-op under the
- * 'server' project's SSR compile target. */
+/** Fake MahjongSocket for testing store wiring. Needs the 'client' vitest project —
+ * `$effect`/`$effect.root` no-op under the 'server' project's SSR compile target. */
 class FakeSocket {
 	#eventListeners = new Set<(e: ServerEvent) => void>();
 	#statusListeners = new Set<(s: ConnectionStatus) => void>();

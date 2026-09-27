@@ -1,7 +1,5 @@
-// Positional slot-identity model (docs/03-frontend.md §4): a stable per-slot key stands in for
-// an opponent's concealed tiles until reveal. §4's rule reduces to one operation: both "drawn
-// slot left" and "rightmost concealed slot morphs" name whichever slot is currently last, so
-// popping from the end is the whole rule.
+// positional slot-identity model (docs/03-frontend.md §4): a stable per-slot key stands in for an
+// opponent's concealed tile until reveal -- both of §4's resolution rules always name the last slot, so popping from the end is the whole rule.
 
 export interface Slot {
 	/** Stable across this slot's lifetime; never reused, never reassigned to a different slot. */

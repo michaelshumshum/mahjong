@@ -5,9 +5,8 @@
 	import OptionRow from './OptionRow.svelte';
 	import LocaleSwitcher from '$lib/i18n/LocaleSwitcher.svelte';
 
-	// pre-arm toggles sent via `auto`, enforced server-side. No `auto_win` on purpose --
-	// declining a winning claim is a real strategic choice under min_faan rulesets, so a win
-	// offer always opens a real claim_offer regardless. Pure controlled checkboxes, not truth.
+	// pre-arm toggles sent via `auto`, enforced server-side. No `auto_win` on purpose -- declining
+	// a win is a real strategic choice under min_faan rulesets, so it always opens a real claim_offer.
 	export interface AutoArm {
 		noCalls: boolean;
 		autoPassChow: boolean;

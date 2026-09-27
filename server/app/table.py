@@ -141,16 +141,12 @@ logger = logging.getLogger(__name__)
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
 
-# disconnect-handover (a real human's seat gone quiet -> autoplay) always drives the autoplay
-# bot at T2/FaanBot, never this table's own self._bot_tier -- a human never opted into whatever
-# tier the table happens to run, and specifically must never land on ORACLE, which would build
-# that seat's view via _omniscient_seat_view and hand it every other seat's concealed tiles. See
-# _effective_bot_tier.
+# disconnect-handover always drives the autoplay bot at T2/FaanBot, never self._bot_tier -- must
+# never land on ORACLE, which would leak every seat's concealed tiles. See _effective_bot_tier.
 _DISCONNECT_HANDOVER_BOT_TIER: Final = "T2"
 
-# humanising think delay: a real tier answers in single-digit milliseconds, which reads as the
-# table jumping ahead of anyone watching it. Applied after the worker replies, not inside it, so
-# it never touches the real turn/claim deadline math. Env-overridable (tests zero both).
+# humanising think delay, applied after the worker replies so it never touches the real
+# turn/claim deadline math -- a real tier answers in single-digit ms otherwise. Env-overridable.
 _BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
 _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 
@@ -484,9 +480,8 @@ class Table:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
         self._bot_tier = bot_tier
-        # per-seat override on top of self._bot_tier -- see _effective_bot_tier. Validated here,
-        # not just at the app/main.py API boundary, since Table is also constructed directly by
-        # tests/tools.
+        # per-seat override on top of self._bot_tier (_effective_bot_tier). Validated here too,
+        # since Table is also constructed directly by tests/tools, not just via the API boundary.
         if seat_bot_tiers is not None:
             for seat, tier in seat_bot_tiers.items():
                 if not 0 <= seat < 4:
@@ -494,9 +489,8 @@ class Table:
                 if tier not in BOT_TIERS:
                     raise ValueError(f"unknown bot tier {tier!r}; choices: {BOT_TIERS}")
         self._seat_bot_tiers: dict[int, str] = dict(seat_bot_tiers) if seat_bot_tiers else {}
-        # seeded off game_seed, not random.Random(), so which pun name each bot gets is
-        # reproducible from (ruleset, seed, actions). XORed with a constant so this stream
-        # doesn't just echo the wall shuffle new_game() also derives from game_seed.
+        # seeded off game_seed (reproducible from ruleset/seed/actions), XORed with a constant so
+        # this stream doesn't just echo the wall shuffle new_game() also derives from game_seed.
         self._bot_name_rng = random.Random(game_seed ^ 0x8888)
         self._bot_names_used: set[str] = set()
         self.table_id = table_id
@@ -504,26 +498,21 @@ class Table:
             asyncio.Queue()
         )
         self.state: GameState = new_game(ruleset, game_seed)
-        self.event_id = 0  # internal monotonic id: logging/replay only, never on the wire
-        # full-game action log -- every Action _apply runs through reduce(), never
-        # start_next_hand() transitions.
+        self.event_id = 0  # internal id, logging/replay only, never on the wire
+        # full-game action log -- every action that ran through reduce(), never start_next_hand().
         self.actions: list[Action] = []
         self._session_factory = session_factory
         self._persisted = False  # save_game_record fires at most once, even if driven manually
-        # True only once the GAME_OVER persist attempt returns (write, no-op, or a write that
-        # raised) -- see wait_for_shutdown_boundary
+        # true once the GAME_OVER persist attempt returns (write, no-op, or failure) -- see wait_for_shutdown_boundary.
         self._game_over_persisted = False
         self._boundary_this_tick = False  # reset each process_one() tick, set inside _apply
-        self._shutdown_boundary: asyncio.Event | None = None  # see wait_for_shutdown_boundary
+        self._shutdown_boundary: asyncio.Event | None = None
         self.seat_seq: list[int] = [0, 0, 0, 0]  # per-seat outbound seq: dense, gapless
         self.ring: dict[int | str, deque[Envelope]] = {
             seat: deque[Envelope](maxlen=512) for seat in range(4)
         }
-        # a spectator registered via register_spectator gets its own entry in self.ring (a
-        # string session_id key) and its own dense, gapless seq counter, independent of every
-        # seat's and every other spectator's stream. `spectators` maps a session id to its live
-        # push callback -- the spectator analogue of SeatBinding.send, but a bare callable is
-        # enough since there's no SeatBinding-shaped state for a read-only connection.
+        # a spectator gets its own self.ring/seq entry (session_id key), independent of every seat's
+        # and other spectators' streams; `spectators` maps session id -> push callback (SeatBinding.send's analogue).
         self.spectator_seq: dict[str, int] = {}
         self.spectators: dict[str, Callable[[int, dict[str, Any]], None]] = {}
         self._spectator_close: dict[str, Callable[[], None]] = {}
@@ -538,55 +527,45 @@ class Table:
         self._timer_seat: dict[int, tuple[int, int]] = {}  # timer id -> (window_id, seat)
         # (window_id, seat) -> the timer id that's actually live for it right now
         self._active_seat_timer: dict[tuple[int, int], int] = {}
-        self._claim_deadline_ms: dict[tuple[int, int], int] = {}  # (window_id, seat) -> deadline_ts
-        self._disconnect_timer_seat: dict[int, int] = {}  # timer id -> seat
-        self._active_disconnect_timer: dict[int, int] = {}  # seat -> the timer id live for it
-        # per-seat AWAIT_ACTION turn deadlines -- same lazy-deletion staleness discipline as the
-        # claim-window tables above, one live entry per seat since only one seat is ever
-        # state.turn at a time.
-        self._turn_timer_seat: dict[int, int] = {}  # timer id -> seat
-        self._active_turn_timer: dict[int, int] = {}  # seat -> the timer id live for it
-        self._turn_deadline_ms: dict[int, int] = {}  # seat -> that seat's current turn deadline_ts
-        # hand-end hold: whole-table wait, not per-seat like claims -- a single active timer id
-        # and a single deadline shared by every seat.
+        self._claim_deadline_ms: dict[tuple[int, int], int] = {}
+        self._disconnect_timer_seat: dict[int, int] = {}
+        self._active_disconnect_timer: dict[int, int] = {}
+        # per-seat AWAIT_ACTION turn deadlines -- same lazy-deletion staleness discipline as claims.
+        self._turn_timer_seat: dict[int, int] = {}
+        self._active_turn_timer: dict[int, int] = {}
+        self._turn_deadline_ms: dict[int, int] = {}
+        # hand-end hold is whole-table, not per-seat: one shared active timer id and deadline.
         self._hand_end_acked: set[int] = set()
         self._hand_end_hand_no: int | None = None  # guards a stray/late ack for a prior hand
         self._active_hand_end_timer_id: int | None = None
         self._hand_end_deadline_ms: int | None = None
-        # the tile_id Drawn/KongReplacementDrawn landed for whichever seat self.state is
-        # currently offering an AWAIT_ACTION decision to, if any -- refreshed every _apply()
-        # call in lockstep with self.state (see _timeout_discard_action).
+        # the tile_id Drawn/KongReplacementDrawn landed for the seat self.state is offering an
+        # AWAIT_ACTION decision to, if any; refreshed every _apply() in lockstep with self.state.
         self._turn_draw_tile: TileId | None = None
 
-        # every completed hand this table has ever played, oldest first -- state_sync.
-        # hand_history, populated by _record_hand_history the moment each HandEnded fires. Lets
-        # a client that only gets a fresh state_sync still show the full scoresheet.
+        # every completed hand, oldest first -- populated by _record_hand_history on each HandEnded.
+        # lets a client with only a fresh state_sync still show the full scoresheet.
         self._hand_history: list[HandHistoryRecord] = []
 
-        # bot handover: seat -> the BotJobTag currently in flight for it (absent = no job
-        # outstanding). _bot_tasks holds strong refs to the asyncio.Tasks awaiting each
-        # ProcessPoolExecutor future so they aren't GC'd mid-flight.
+        # seat -> BotJobTag in flight for it (absent = none outstanding). _bot_tasks holds strong
+        # refs to the asyncio.Tasks awaiting each ProcessPoolExecutor future so they aren't GC'd mid-flight.
         self._pending_bot: dict[int, BotJobTag] = {}
         self._bot_tasks: set[asyncio.Task[None]] = set()
         self._bot_pool: Executor = bot_pool if bot_pool is not None else _shared_bot_pool()
         # "ORACLE" needs no dedicated pool: bots/worker.py's _make_bot builds a plain FaanBot()
         # for it (same cost as T2), so every tier shares this one pool.
 
-        # require_ready=True (app/ws.py's real tables) gates every command on all four seats
-        # joining and ready-ing before the table processes anything (_authorize below).
-        # require_ready=False (the default) is immediately actionable straight off new_game()
-        # -- direct-construction test Tables with no join/ready flow are unaffected.
+        # require_ready=True (real tables) gates every command on all four seats joining+ready
+        # first (_authorize below); require_ready=False (default) is actionable off new_game().
         self.require_ready = require_ready
         self.started = not require_ready
         self.seat_bindings: list[SeatBinding | None] = [None, None, None, None]
-        # whichever seat's join was first -- None until someone actually joins. practice=True
-        # doesn't set this itself (seats 1-3 below are bound directly, not through join), so the
-        # human's own first join still becomes host, same as a real four-human table.
+        # whichever seat's join was first; None until someone joins. practice=True binds seats 1-3
+        # directly (not via join), so the human's own first join still becomes host.
         self.host_seat: int | None = None
 
-        # practice mode: seat 0 is left open for the human join; seats 1-3 are bound to
-        # their resolved tier (self._seat_bot_tiers, falling back to self._bot_tier) immediately,
-        # before anyone ever connects.
+        # practice mode: seat 0 stays open for the human; seats 1-3 bind immediately to their
+        # resolved tier (self._seat_bot_tiers, falling back to self._bot_tier).
         self.all_bots = all_bots
         if practice or all_bots:
             for seat in range(0 if all_bots else 1, 4):
@@ -1047,11 +1026,8 @@ class Table:
             try:
                 await self._persist_game_record()
             except Exception:
-                # a lost record must not also wedge the drain: `wait_for_shutdown_boundary`
-                # blocks *unbounded* on exactly this window, so letting this propagate would
-                # kill the table task with `_game_over_persisted` still False and the boundary
-                # below never signalled -- every drain on this table then hangs forever, and
-                # with it the process (or a TestClient context) trying to exit.
+                # must not propagate: wait_for_shutdown_boundary blocks unbounded on this window,
+                # so an uncaught exception here would hang the drain (and the process) forever.
                 logger.exception("table %s: GAME_OVER persist failed, record lost", self.table_id)
             self._game_over_persisted = True
         if self._boundary_this_tick and self._shutdown_boundary is not None:
@@ -1359,11 +1335,8 @@ class Table:
         deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
 
         if tier == "ORACLE":
-            # the ONLY call site for _omniscient_seat_view anywhere in the codebase -- see its
-            # docstring (app/views.py) for the full safety argument. Unreachable for a real
-            # human's own seat: disconnect-handover is forced to T2 above, so an ORACLE-tier
-            # job only ever drives a `bot`-status seat (practice-mode/all-bots), never a
-            # `connected`/`disconnected`/`autoplay` human seat.
+            # the only call site for _omniscient_seat_view (see its docstring for the safety
+            # argument) -- unreachable for a real human seat since disconnect-handover forces T2.
             view = _omniscient_seat_view(self.state, seat)
         else:
             claim_deadline_ts = (
@@ -1527,9 +1500,8 @@ class Table:
         self._boundary_this_tick = True
         self._turn_draw_tile = _turn_draw_tile_for_current_turn(more_events, self.state)
         if self.state.phase == Phase.AWAIT_ACTION:
-            # start_next_hand() deals with no Event of its own, so hand_start/deal have
-            # nothing to redact either way -- this Table synthesizes both here, same as the
-            # ready-triggered hand 1 start.
+            # start_next_hand() emits no Event, so there's nothing to redact into hand_start/deal --
+            # this Table synthesizes both here, same as the ready-triggered hand 1 start.
             self._publish_hand_start_and_deal()
 
     def _arm_hand_end_timer(self) -> None:

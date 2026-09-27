@@ -4,9 +4,8 @@
 
 	export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
 
-	// mirrors the wire claim{window_id, choice, tiles?} shape; `tiles` only disambiguates chow
-	// (two options can complete different runs off the same discard). No `window_id` here --
-	// pure presentation, wiring to a real window is the caller's job.
+	// mirrors the wire claim{window_id, choice, tiles?} shape; `tiles` only disambiguates chow.
+	// no `window_id` here -- pure presentation, wiring to a real window is the caller's job.
 	export interface ClaimOption {
 		kind: ClaimKind;
 		tiles?: TileCode[];

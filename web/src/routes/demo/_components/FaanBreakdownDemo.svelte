@@ -13,8 +13,7 @@
 	};
 
 	// mock hand_end data, no real scoring yet. Patterns sourced from docs/01-rules-spec.md §7.
-	//
-	// Plain hand: discard win, 5 faan, half_spicy P(5) = 24.
+	// plain hand: discard win, 5 faan, half_spicy P(5) = 24.
 	const plainPatterns: FaanPattern[] = [
 		{ name: 'All Sequences', faan: 1 },
 		{ name: 'No Flowers', faan: 1 },

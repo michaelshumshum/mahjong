@@ -37,9 +37,9 @@ class DiscardPayment(StrEnum):
 class GameLength(StrEnum):
     """Rounds played before the game ends (§2)."""
 
-    EAST_ONLY = "EAST_ONLY"  # 一圈, default: East round only
-    EAST_SOUTH = "EAST_SOUTH"  # 半莊: riichi-style convention, not the HK norm
-    FULL = "FULL"  # 四圈: four full rounds
+    EAST_ONLY = "EAST_ONLY"
+    EAST_SOUTH = "EAST_SOUTH"  # riichi-style convention, not the HK norm
+    FULL = "FULL"
 
 
 _VALID_MIN_FAAN = frozenset({0, 1, 3, 5})
@@ -48,7 +48,6 @@ _VALID_FAAN_CAP = frozenset({10, 13})
 
 @dataclass(frozen=True)
 class RuleSet:
-    # scoring
     min_faan: int = 3  # one of 0 | 1 | 3 | 5 (§7); below this a hand cannot win
     faan_cap: int = 10  # one of 10 (HKMA) | 13 (casual); total is clamped (§7)
     score_table: ScoreTable = ScoreTable.HALF_SPICY
@@ -61,17 +60,17 @@ class RuleSet:
     discard_payment: DiscardPayment = DiscardPayment.ALL
     self_draw_multiplier: float = 1.5
     flowers_score: bool = True  # 座位花: +1 faan per flower matching seat (§7)
-    seven_flowers_instant_win: bool = False  # 3 faan, variant (§7)
-    eight_flowers_instant_win: bool = False  # limit hand, variant (§7)
-    thirteen_orphans_wait_bonus: bool = False  # some tables double a single-tile wait (§11.10)
+    seven_flowers_instant_win: bool = False
+    eight_flowers_instant_win: bool = False
+    thirteen_orphans_wait_bonus: bool = False  # flower instant-win + wait doubling (§7, §11.10)
 
     # flow
     game_length: GameLength = GameLength.EAST_ONLY
     dealer_repeat_on_win: bool = True
     dealer_repeat_on_draw: bool = True
     wall_reserve: int = 0  # HK default: no dead wall (§9)
-    four_kong_abort: bool = False  # §9
-    nine_terminals_abort: bool = False  # 九種九牌 (§9)
+    four_kong_abort: bool = False
+    nine_terminals_abort: bool = False
     tenpai_payments: bool = False  # pay tenpai players on exhaustive draw (§9)
 
     # variants
@@ -84,12 +83,12 @@ class RuleSet:
     # fairness (docs/02-protocol.md "Fairness")
     provable_fairness: bool = False  # gates hand_start.seed_commit / hand_end.fairness
 
-    # timing (server-enforced)
-    turn_seconds: int = 15  # AWAIT_ACTION timeout
-    claim_seconds: int = 5  # AWAIT_CLAIMS window
-    hand_end_seconds: int = 10  # HAND_OVER hold, until all seats ack or timeout
-    turn_timeout_strikes: int = 3  # timeouts before seat flips to AUTOPLAY
-    disconnect_grace_seconds: float = 20.0  # DISCONNECTED -> AUTOPLAY (00-architecture.md §8)
+    # timing (server-enforced); defaults documented in docs/00-architecture.md §4, §8.
+    turn_seconds: int = 15
+    claim_seconds: int = 5
+    hand_end_seconds: int = 10
+    turn_timeout_strikes: int = 3
+    disconnect_grace_seconds: float = 20.0
 
     def __post_init__(self) -> None:
         if self.min_faan not in _VALID_MIN_FAAN:

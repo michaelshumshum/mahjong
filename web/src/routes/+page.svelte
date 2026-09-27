@@ -15,11 +15,8 @@
 		goto(`/table/${tableId}`);
 	}
 
-	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a dialog to pick
-	// each bot seat's difficulty rather than navigating straight there -- same reasoning as
-	// "Create a table" above, bot tier is fixed at table construction with no path to change it
-	// after. `?practice=1` (this route's own param) is unrelated in spelling to the wire's
-	// `&practice=true`.
+	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a difficulty-picker
+	// dialog first since bot tier is fixed at construction; `?practice=1` here is unrelated in spelling to the wire's `&practice=true`.
 	let showPracticeDialog = $state(false);
 
 	function handlePracticeCreated(tableId: string): void {

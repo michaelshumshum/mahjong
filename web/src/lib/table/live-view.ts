@@ -1,7 +1,5 @@
-// Projects a real `ClientGameState` into the `MockGameState`-shaped view model +page.svelte's
-// template already renders, so the live path reuses the same render tree instead of a second
-// one that could visually drift. `MockGameState` has no room for real tile identity, so
-// `LiveTableView.ownHand` carries tile_ids alongside, index-aligned with the view.
+// projects a real `ClientGameState` into the `MockGameState`-shaped view model so live and mock
+// share one render tree. `LiveTableView.ownHand` carries real tile_ids alongside, index-aligned with the view.
 
 import type { ClientGameState, MeldState } from '../game/state';
 import { tileIdToCode, type TileCode } from './tile-code';

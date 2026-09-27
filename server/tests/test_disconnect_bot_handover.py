@@ -137,9 +137,8 @@ def _rig_disconnect_state(seed: int) -> GameState:
         tile_ids_for_type(TileType.DRAGON_RED)[0],
         tile_ids_for_type(TileType.DRAGON_GREEN)[0],
         tile_ids_for_type(TileType.DRAGON_WHITE)[0],
-        # one tile each, not `_tiles(..., count=7)`: that slices the *flattened* id list (all 4
-        # copies of the first type before touching the second), not one-per-type -- the wrong
-        # shape here, since this hand needs 7 genuinely distinct types with a single copy each.
+        # one tile each: `_tiles(..., count=7)` slices the flattened id list (4 copies of the
+        # first type first), not one-per-type -- wrong shape for 7 distinct types here.
         tile_ids_for_type(TileType.MAN_1)[0],
         tile_ids_for_type(TileType.MAN_2)[0],
         tile_ids_for_type(TileType.MAN_3)[0],
@@ -186,9 +185,8 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
 
         observers = (ws0, ws2, ws3)
 
-        # --- disconnect detection: every other seat sees exactly seat_state{1, disconnected},
-        # nothing more (no tile identity, no extra fields -- protocol.py's SeatStatePayload
-        # forbids them anyway, but the exact-equality check below proves it at the wire too).
+        # every other seat sees exactly seat_state{1, disconnected}, nothing more -- the
+        # exact-equality check below proves SeatStatePayload carries no extra fields.
         for ws in observers:
             frame = ws.receive_json()
             assert frame["t"] == "seat_state"
@@ -220,10 +218,8 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
             assert turn1["t"] == "turn" and turn1["d"]["seat"] == 1
             assert "legal" not in turn1["d"]  # unicast-only, and nobody here is seat 1
 
-        # --- the bot acts for seat 1 (D12: submitted to a ProcessPoolExecutor, off the table's
-        # own asyncio task) -- a real, legal discard arrives with no human involvement, and the
-        # game keeps progressing straight into seat 2's draw+turn. This is the "doesn't stall"
-        # proof: these receive_json() calls block until the worker round-trip actually lands.
+        # bot acts for seat 1 off the table's asyncio task (ProcessPoolExecutor); these
+        # receive_json() calls block until that worker round-trip actually lands.
         for ws in observers:
             bot_discard = ws.receive_json()
             assert bot_discard["t"] == "discard"
@@ -246,9 +242,8 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
                 assert frame["t"] == "seat_state"
                 assert frame["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
 
-            # mypy narrows this status to Literal["autoplay"] from the assert at line 194 and
-            # doesn't see the reconnect handling above (driven through real websocket frames)
-            # flip it back -- flags this as non-overlapping/unreachable, but it's real and correct.
+            # mypy narrows this to Literal["autoplay"] from the earlier assert and doesn't see
+            # the real websocket reconnect flip it back -- flags unreachable, but it's correct.
             assert table.seat_bindings[1].status == "connected"
             assert 1 not in table._pending_bot
 
@@ -367,7 +362,6 @@ def test_disconnect_bot_runs_faanbot_not_random() -> None:
             bot_discard = ws.receive_json()
             assert bot_discard["t"] == "discard"
             assert bot_discard["d"]["seat"] == 1
-            # the unique shanten-minimising choice (fixture docstring) -- a uniform-random T0
-            # policy would only land here by ~1/13 chance; a deterministic value/efficiency
-            # policy lands here every run.
+            # unique shanten-minimising choice: a uniform-random T0 policy lands here only
+            # ~1/13 of the time, a deterministic value/efficiency policy every run.
             assert bot_discard["d"]["tile_id"] == expected_tile

@@ -45,21 +45,23 @@ export const TILE_ASSET: Record<RenderableTileCode, string> = {
 	'7s': 'Sou7',
 	'8s': 'Sou8',
 	'9s': 'Sou9',
-	z1: 'Ton', // East
-	z2: 'Nan', // South
-	z3: 'Shaa', // West
-	z4: 'Pei', // North
-	z5: 'Chun', // 中, red dragon
-	z6: 'Hatsu', // 發, green dragon
-	z7: 'Haku', // 白, white dragon
-	f1: 'Flor1', // plum
-	f2: 'Flor2', // orchid
-	f3: 'Flor3', // chrysanthemum
-	f4: 'Flor4', // bamboo
-	f5: 'Seas1', // spring
-	f6: 'Seas2', // summer
-	f7: 'Seas3', // autumn
-	f8: 'Seas4' // winter
+	// honors: Ton/Nan/Shaa/Pei = E/S/W/N winds; Chun/Hatsu/Haku = red/green/white dragons.
+	// flowers: f1-4 = plum/orchid/chrysanthemum/bamboo; f5-8 = spring/summer/autumn/winter.
+	z1: 'Ton',
+	z2: 'Nan',
+	z3: 'Shaa',
+	z4: 'Pei',
+	z5: 'Chun',
+	z6: 'Hatsu',
+	z7: 'Haku',
+	f1: 'Flor1',
+	f2: 'Flor2',
+	f3: 'Flor3',
+	f4: 'Flor4',
+	f5: 'Seas1',
+	f6: 'Seas2',
+	f7: 'Seas3',
+	f8: 'Seas4'
 };
 
 export function hasTileArt(code: TileCode): code is RenderableTileCode {
@@ -68,9 +70,8 @@ export function hasTileArt(code: TileCode): code is RenderableTileCode {
 
 const ID_SUITS = ['m', 'p', 's'] as const;
 
-/** Real tile_ids (0..135) -> the `TileCode` they render as -- the wire only ever gives numeric
- * ids, never a code, so the live view needs this to draw through the same TileFace mocks use.
- * Flowers never go through here -- the wire sends those as TileCode strings already. */
+/** Real tile_ids (0..135) -> the `TileCode` they render as, since the wire only gives numeric ids.
+ * Flowers never go through here -- the wire already sends those as TileCode strings. */
 export function tileIdToCode(tileId: number): TileCode {
 	const value = Math.floor(tileId / 4);
 	if (value < 27) {

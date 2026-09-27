@@ -30,10 +30,8 @@ _BOUNDED_RULESET = RuleSet(
     dealer_repeat_on_win=False,
     dealer_repeat_on_draw=False,
     game_length=GameLength.EAST_ONLY,
-    # this bare Table() has no seat_bindings at all (no join/ready flow), so nothing would ever
-    # ack the hand-end hold (app/table.py's `Table._open_hand_end_window`) -- 0 makes every hold
-    # resolve on the very next `process_one()` tick instead, same idiom `claim_seconds=0`/
-    # `turn_seconds=0` already use elsewhere for a test-driven Table.
+    # bare Table() has no seat_bindings to ack the hand-end hold -- 0 resolves every hold on
+    # the next process_one() tick, same idiom as claim_seconds=0/turn_seconds=0 elsewhere.
     hand_end_seconds=0,
 )
 
@@ -90,10 +88,8 @@ async def test_full_game_through_table_progresses_and_publishes_gapless_redacted
         expected_start = table.seat_seq[seat] - len(buf)
         assert [e.seq for e in buf] == list(range(expected_start, expected_start + len(buf)))
 
-        # redaction spot-check: this Table seat's own tile draws are visible, every other
-        # seat's concealed draws/kong-replacements/concealed-kong tiles are not (full schema
-        # coverage is tests/test_redaction.py's job; this only confirms Table is actually
-        # calling redact_event(), not skipping it).
+        # redaction spot-check: own draws visible, other seats' concealed tiles are not --
+        # full coverage is test_redaction.py's job; this only confirms redact_event() actually runs.
         for envelope in buf:
             wire = envelope.event
             if wire["t"] in ("draw", "kong_replace"):
@@ -218,13 +214,7 @@ def test_join_name_over_length_is_truncated_not_rejected() -> None:
 
 
 # --- hand-end hold (docs/00-architecture.md §3, "Hand-end hold") ------------------------------
-#
-# Every hand end -- win or exhaustive draw alike, no outcome branching -- holds the table at
-# `Phase.HAND_OVER` until every non-bot/autoplay seat acks (`Table.mark_hand_end_ack`) or
-# `ruleset.hand_end_seconds` elapses, whichever first (`Table._open_hand_end_window`). These
-# drive a bare `Table()` (join()-bound "connected" seats, no real socket) straight to the very
-# first `HAND_OVER` landing, the same way `_drive_one_step` does for the full-game test above,
-# then exercise the hold itself directly.
+# holds the table at HAND_OVER until every non-bot/autoplay seat acks or hand_end_seconds elapses; these drive a bare Table() to the first landing and exercise the hold directly.
 
 
 async def _drive_to_first_hand_over(table: Table, rng: random.Random) -> None:
@@ -396,11 +386,7 @@ def test_seat_bot_tiers_rejects_a_seat_out_of_range() -> None:
 
 
 # --- ORACLE dispatch + disconnect-handover pinning (docs/04-bots.md §10) -----------------------
-#
-# "ORACLE" is a plain FaanBot() fed an omniscient view (bots/worker.py's _make_bot) -- no
-# dedicated rollout bot, no dedicated pool, so there's nothing to pin about pool isolation here.
-# What still needs pinning: the view-building special case itself, and the one real product
-# requirement (disconnect-handover must never build that view for a human's seat).
+# "ORACLE" is a plain FaanBot() fed an omniscient view -- no dedicated pool, so only the view-building special case and disconnect-handover (never for a human's seat) need pinning here.
 
 
 async def test_oracle_bot_job_view_has_hands_populated_for_a_practice_bot_seat() -> None:
@@ -443,9 +429,8 @@ async def test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_or
         bot_tier="ORACLE",
         bot_pool=default_pool,
     )
-    # seat 0 (dealer, AWAIT_ACTION right after new_game() -- same fact the test above relies on)
-    # is a real human's seat that went quiet, not a practice-mode bot seat -- `status` is
-    # "autoplay", never "bot".
+    # seat 0 (dealer, AWAIT_ACTION right after new_game()) is a real human's seat that went
+    # quiet, not a practice-mode bot seat -- `status` is "autoplay", never "bot".
     table.seat_bindings[0] = SeatBinding(
         session_id="sess-0",
         send=lambda seq, wire: None,

@@ -20,7 +20,7 @@ class Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     v: Literal[1] = 1
-    seq: int | None = None  # server->client only: per-seat, dense, gapless
+    seq: int | None = None
     id: str | None = None  # client->server only: idempotency key
     ts: int  # server clock, ms
 
@@ -84,8 +84,7 @@ class JoinPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seat: int | None = None  # omit for "first open seat"
-    # guest display name, sent once at first join. No wire-level length limit -- normalized
-    # server-side (trim/cap/default), never rejected.
+    # guest display name, sent once at first join; normalized server-side, never rejected.
     name: str | None = None
 
 
@@ -229,9 +228,8 @@ class StateSyncPayload(BaseModel):
     # every seat's concealed tiles -- spectators of a `spectators_see_hands` table only
     # (`app/table.py`'s `TableSettings`), `null` everywhere else
     hands: list[list[int]] | None = None
-    # every completed hand, oldest first -- lets a client whose only view is this snapshot
-    # (spectator joining mid-game, reconnect-with-gap) still show the full scoresheet.
-    # Defaulted to [] so older state_sync fixtures stay valid; a real Table always populates it.
+    # every completed hand, oldest first, so a client whose only view is this snapshot can still
+    # show the full scoresheet. Defaults to [] for older fixtures; a real Table always populates it.
     hand_history: list[HandHistoryEntryPayload] = []
     # fixed at construction, never mutated mid-game. ruleset_preset is null for a custom
     # ruleset; ruleset is always the full resolved values either way.

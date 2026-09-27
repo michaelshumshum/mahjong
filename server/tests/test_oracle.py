@@ -122,9 +122,8 @@ def test_make_bot_oracle_tier_builds_a_plain_faanbot() -> None:
 
 # --- behavioral proof: an omniscient view changes the real discard choice ---------------------
 
-# A hand far from tenpai (shanten >= 3) so fold-mode's pure-defence ranking
-# (`key = (risk, -tiles, terminal_rank)`) picks the discard on danger alone -- same fixture shape
-# as tests/test_faanbot.py's test_folds_to_a_safe_tile_late_against_a_threatening_opponent.
+# far from tenpai (shanten >= 3) so fold-mode's pure-defence ranking (risk, -tiles,
+# terminal_rank) picks the discard on danger alone -- same shape as test_faanbot.py's fold test.
 _FOLD_HAND = [
     TileType.MAN_1,
     TileType.MAN_4,
@@ -294,10 +293,8 @@ async def test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_a
 
 # --- behavioral proof: hands-aware seen34 changes a real offense-side discard choice ----------
 
-# 13 distinct singles, empirically found by direct search over `FaanBot.act` (not hand-derived --
-# verified against `seen34`/`ukeire` directly below, per this module's convention for scripted
-# positions): 2-shanten, with PIN_9's ukeire unusually wide (16 kinds/58 tiles) among candidate
-# discards.
+# 13 distinct singles, found by direct search over FaanBot.act (verified against seen34/ukeire
+# below): 2-shanten, with PIN_9's ukeire unusually wide (16 kinds/58 tiles) among candidates.
 _UKEIRE_HAND = [
     TileType.MAN_3,
     TileType.WIND_NORTH,

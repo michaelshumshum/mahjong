@@ -62,20 +62,14 @@ from mahjong_core.tiles import TileType, tile_ids_for_type
 
 _id_gen = itertools.count(1)
 
-# both repeat flags off + EAST_ONLY (already `DEFAULT_RULESET`'s own default game_length) means
-# the deal rotates dealer 0 -> 1 -> 2 -> 3 unconditionally, regardless of each hand's outcome,
-# and reaching dealer 0 again ends the game -- exactly 4 hands, deterministically, the cheapest
-# real multi-hand terminal condition available (mahjong_core/engine.py's start_next_hand).
+# both repeat flags off + EAST_ONLY rotates dealer 0->1->2->3 unconditionally and ends the game
+# on dealer 0 again -- exactly 4 hands, deterministically, the cheapest multi-hand terminal case.
 _GAME_RULESET = dataclasses.replace(
     DEFAULT_RULESET,
     dealer_repeat_on_win=False,
     dealer_repeat_on_draw=False,
-    # hand-end hold (docs/00-architecture.md §3): every seat bound here is a real "connected"
-    # join, not bot/autoplay, so `Table._open_hand_end_window` won't pre-ack any of them and
-    # nothing in this test ever sends a real `hand_end_ack` -- 0 lets the real background
-    # `Table.run()` task advance past each hold on its own very next tick (no real wait), so the
-    # existing per-hand frame sequences below don't need restructuring around an ack step
-    # (unlike tests/test_ws_gameplay.py, which exercises that real ack round trip instead).
+    # every seat here is "connected", not bot/autoplay, so nothing ever sends a real
+    # hand_end_ack; 0 lets Table.run() advance past each hold on its own next tick.
     hand_end_seconds=0,
 )
 
@@ -245,9 +239,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             },
         )
 
-        # seat 3's own connection is scoped to this nested `with` -- it ends deliberately right
-        # after hand 3's `turn` frames land, standing in for a real mid-hand disconnect (see
-        # module docstring for why this is a nested `with`, not a mid-scenario `.close()`).
+        # seat 3's connection is scoped to this nested `with`, ending right after hand 3's
+        # `turn` frames land -- stands in for a real mid-hand disconnect.
         with client.websocket_connect(f"/ws?table={table_id}") as ws3:
             wss: list[WebSocketTestSession] = [ws0, ws1, ws2, ws3]
             for ws in wss:
@@ -374,10 +367,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                     3: seat3_junk_2,
                 },
             )
-            # total_discards=1: without it, dealer seat 1's turn-1 win with no prior discard
-            # would score as a (different, still-legit) Heavenly Hand instead of the fixture's
-            # 缺一門/自摸/無花 breakdown asserted below (mahjong_core/actions.py's
-            # `won_before_any_discard`).
+            # total_discards=1: without it, dealer seat 1's turn-1 win scores as Heavenly Hand
+            # instead of the 缺一門/自摸/無花 breakdown asserted below (won_before_any_discard).
             table.state = dataclasses.replace(rigged_2, total_discards=1)
 
             wss[1].send_json(_msg("declare", {"kind": "win"}, id_=_next_id()))
@@ -414,9 +405,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             # carried onto the fresh hand 3 state, not reset:
             assert table.state.seats[1].score == int(score_2["1"])
 
-            # --- hand 3 rig: seat 2 (dealer) discards a tile only seat 3 can chow (no pung
-            # available to anyone), so the window stays open on seat 3's response alone -- the
-            # scenario a mid-window disconnect/reconnect actually needs.
+            # hand 3 rig: seat 2 (dealer) discards a tile only seat 3 can chow (no pung
+            # available), so the window stays open on seat 3 alone -- needed for the disconnect/reconnect scenario below.
             seat0_junk_3 = _tiles(
                 TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
             )
@@ -442,15 +432,12 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 },
             )
 
-            # hand 3's hand_start/deal/turn frames were already consumed above, as the tail of
-            # `frames_h2` (indices 2/3/4) -- the rig here only swaps this hand's concealed
-            # tiles/wall in before anyone acts on it, it doesn't replay the deal.
+            # hand 3's hand_start/deal/turn frames were already consumed above (frames_h2[2:5]);
+            # this rig only swaps concealed tiles/wall in, it doesn't replay the deal.
             seat3_last_seq = frames_h2[3][4]["seq"]
 
-        # ws3's `with` block just exited -- seat 3 disconnects for real, before seat 2's
-        # discard even happens, so everything from here until reconnect (the disconnect
-        # broadcast, the discard, and its own claim_offer) is genuinely missed, not just
-        # re-armed against something it already saw live.
+        # seat 3 disconnects for real, before seat 2's discard -- everything until reconnect
+        # (disconnect broadcast, discard, claim_offer) is genuinely missed, not re-armed.
         disc_seat3 = _recv(ws0, 0)
         assert disc_seat3["t"] == "seat_state"
         assert disc_seat3["d"] == {"seat": 3, "status": "disconnected", "name": "Guest 4"}
@@ -461,9 +448,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         assert _recv(ws2, 2)["d"]["ok"] is True
         for seat, ws in ((0, ws0), (1, ws1), (2, ws2)):
             assert _recv(ws, seat)["t"] == "discard"
-        # only seat 3 holds a claim option here (see the rig above) -- seats 0/1/2 have
-        # nothing further queued until the window resolves, so re-fetch the offer's window_id
-        # off Table's own state instead of reading a 4th frame off a bystander connection.
+        # only seat 3 holds a claim option (rig above); re-fetch window_id off Table's own
+        # state instead of reading a 4th frame off a bystander connection.
 
         table = get_table(table_id)
         assert table is not None
@@ -517,9 +503,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert rearmed_offer["d"]["window_id"] == window_id_3
             assert rearmed_offer["d"]["deadline_ts"] >= original_deadline
 
-            # seat 3 answers for real (a genuine Pass, not a synthesized timeout) -> window
-            # resolves unclaimed -> seat 3 draws next with an empty wall -> exhaustive draw,
-            # all delivered over its freshly-reconnected live socket.
+            # seat 3 answers for real (genuine Pass, not synthesized timeout) -> window
+            # resolves unclaimed -> seat 3 draws into an empty wall -> exhaustive draw.
             ws3b.send_json(
                 _msg("claim", {"window_id": window_id_3, "choice": "pass"}, id_=_next_id())
             )
@@ -545,9 +530,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             score_after_h3 = frames_h3[0][2]["d"]["totals"]
 
-            # --- hand 4 rig: final hand of EAST_ONLY (dealer 3, no round left once the deal
-            # would wrap back to seat 0) -- one uncontested discard drives straight to
-            # Phase.GAME_OVER, mirroring tests/test_game_record_ws.py's last-hand fixture.
+            # hand 4 rig: final hand of EAST_ONLY (dealer 3) -- one uncontested discard drives
+            # straight to Phase.GAME_OVER.
             seat0_junk_4 = _tiles(
                 TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
             )
@@ -601,10 +585,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             assert table.state.phase == Phase.GAME_OVER
 
-        # table.actions spans exactly the real Action-bound submissions across all 4 hands: h1
-        # (discard, claim_pung, discard) + h2 (declare_win) + h3 (discard, pass) + h4 (discard)
-        # = 7 -- no drift, gap, or duplication introduced by any of the 3 hand boundaries or the
-        # mid-hand-3 disconnect/reconnect.
+        # table.actions = real Action submissions across 4 hands: h1(3) + h2(1) + h3(2) + h4(1)
+        # = 7 -- no drift/gap/duplication from the 3 hand boundaries or the mid-h3 disconnect.
         assert len(table.actions) == 7
 
     record = _fetch_latest_record(database_url)

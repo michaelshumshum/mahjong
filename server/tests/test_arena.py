@@ -61,9 +61,8 @@ def test_duplicate_set_is_reproducible(sample_duplicate_set: tuple[GameRecord, .
 
 
 def test_paired_differences_and_ci_on_synthetic_data() -> None:
-    # Two duplicate sets' worth of hand-crafted per-rotation scores, bypassing real gameplay,
-    # to pin the arithmetic itself: seat 0 always "A", always scores +30 while the other three
-    # always score -10 each -> per-rotation diff = 30 - (-10) = 40 for every rotation/set.
+    # hand-crafted scores, bypassing gameplay: seat 0 is always "A" at +30, others -10 each,
+    # so per-rotation diff = 30 - (-10) = 40 for every rotation/set.
     def _record(rotation: int) -> GameRecord:
         roles = ["B", "B", "B", "B"]
         roles[rotation] = "A"

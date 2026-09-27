@@ -27,9 +27,8 @@
 		return candidates[Math.floor(Math.random() * candidates.length)];
 	}
 
-	// buffer is pre-rendered and blitted with a y offset each frame -- drawing ~200 tiles
-	// individually every frame visibly dropped frames on a phone-class GPU. Exact 3:4 ratio to
-	// match TileFace.svelte; drawTile's padding/radius math depends on this being exact.
+	// buffer is pre-rendered and blitted with a y offset each frame -- drawing ~200 tiles individually
+	// dropped frames on a phone-class GPU. Exact 3:4 ratio matches TileFace.svelte; drawTile's math depends on it.
 	const TILE_W = 51;
 	const TILE_H = 68;
 	const GAP = 12;

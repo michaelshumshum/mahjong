@@ -196,9 +196,8 @@ def test_full_game_via_ws_persists_a_game_record(
 
         assert table.state.phase == Phase.GAME_OVER
 
-    # the table's background task has to actually finish (and its GAME_OVER persist with it)
-    # before we can trust the DB row exists -- Table.run() returns only after that, and
-    # TableRegistry's own task-cleanup already proves this timing (tests/test_registry.py).
+    # the table's background task must finish (GAME_OVER persist included) before the DB row
+    # is trustworthy -- Table.run() returns only after that.
     record = _fetch_latest_record(database_url)
     assert record is not None
     assert record.engine_version == ENGINE_VERSION

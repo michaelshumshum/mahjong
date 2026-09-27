@@ -3,14 +3,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// UI-level live-backend smoke test: a real uvicorn and a real SvelteKit dev server (its own
-// scratch instance, needing PUBLIC_WS_URL pointed at a real backend), driving /table/[id]
-// through real browser contexts. live-backend.integration.spec.ts covers the socket+reducer
-// layer; this covers the route UI end to end (join/waiting screen, discard, claim, declare).
-//
-// Skipped by default. Opt in explicitly:
-//
-//   RUN_LIVE_BACKEND_TESTS=1 pnpm exec playwright test src/routes/table/[id]/live.e2e.ts
+// UI-level live-backend smoke test (real uvicorn + dev server) driving /table/[id] end to end;
+// live-backend.integration.spec.ts covers socket+reducer. Skipped by default: RUN_LIVE_BACKEND_TESTS=1.
 test.skip(!process.env.RUN_LIVE_BACKEND_TESTS, 'opt-in: RUN_LIVE_BACKEND_TESTS=1');
 
 const BACKEND_PORT = 8197;
@@ -38,9 +32,8 @@ async function waitForHealthy(url: string, timeoutMs: number): Promise<void> {
 }
 
 test.beforeAll(async () => {
-	test.setTimeout(60_000); // starting two real processes is slower than the default 30s budget
-	// detached: true + killing the whole process group on teardown -- vite doesn't forward
-	// SIGTERM to the process it wraps, and uvicorn forks helpers.
+	test.setTimeout(60_000); // two real processes are slower than the default 30s budget
+	// detached:true + kill the process group on teardown -- vite doesn't forward SIGTERM; uvicorn forks helpers.
 	backend = spawn(
 		'uv',
 		['run', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', String(BACKEND_PORT)],
@@ -169,9 +162,8 @@ test('four real seats join, ready, and play real discards/claims through the liv
 });
 
 test('practice mode is reachable from the lobby and reaches real gameplay with bot seats marked', async () => {
-	// the lobby's "Practice vs Bots" button generates a table id tagged `?practice=1`, which
-	// `/table/[id]` translates to `&practice=true` on the WS URL, binding seats 1-3 to real
-	// bots at table creation. Proves the whole chain: lobby button -> bot-filled table -> badge.
+	// "Practice vs Bots" tags the table `?practice=1`, which /table/[id] turns into `&practice=true`
+	// on the WS URL, binding seats 1-3 to real bots at creation -- proves lobby button -> bot table -> badge.
 	test.setTimeout(60_000);
 	const browser = await chromium.launch();
 	try {
@@ -225,13 +217,8 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 });
 
 test('completing more than one real hand accumulates multi-hand history in the ScoreSheet', async () => {
-	// HK ruleset has no dead wall (mahjong_core/config.py's `wall_reserve = 0`) -- absent an
-	// earlier win, a hand runs until the wall is drawn dry, ~80-something real discards. Two
-	// hands plus the occasional claim window is a few hundred real round trips against the real
-	// backend (observed ~70s end to end during development), hence the generous budget (this is
-	// the actual proof the multi-hand lib/game/state.ts `handHistory` accumulation works end to
-	// end -- docs/03-frontend.md's `/table/[id]` wiring section -- not just reducer.spec.ts's
-	// hand-constructed fixtures).
+	// HK ruleset has no dead wall (`wall_reserve = 0`) -- absent an earlier win, a hand runs until
+	// the wall's dry (~80 discards); two hands is hundreds of round trips, hence the generous budget.
 	test.setTimeout(300_000);
 	const table = `e2e-history-${Date.now()}`;
 	const browser = await chromium.launch();
@@ -255,31 +242,21 @@ test('completing more than one real hand accumulates multi-hand history in the S
 			pages.map((p) => p.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 20_000 }))
 		);
 
-		// `.panel-overlay` is a real fixed-inset modal backdrop that intercepts pointer events --
-		// opening the Score sheet on page 0 before playing would permanently block page 0's own
-		// hand-tile clicks (it's seat 0, a real player). Play first, open Score sheet after.
-		//
-		// Progress signal: only `deal` sets wallRemaining, not `draw`, so the "Wall" figure is
-		// constant for a whole hand and only changes at the next deal -- cheaper than repeatedly
-		// opening/closing the Score sheet.
+		// `.panel-overlay` blocks pointer events, so opening Score sheet before playing would block
+		// seat 0's hand-tile clicks. Progress signal: only `deal` sets wallRemaining, once per hand.
 		const wallCount = pages[0].locator('.wall-count strong');
 		let prevWall: string | null = null;
 		let handBoundaries = 0;
 
 		// tsumogiri whichever seat is offered a discard, auto-pass every claim window, until two
-		// hand boundaries land -- bounded by real wall exhaustion, not an arbitrary action count.
-		// Every page's actionable-element check runs in parallel, not one page at a time.
+		// hand boundaries land (bounded by wall exhaustion). Every page's check runs in parallel.
 		for (let round = 0; round < 3000 && handBoundaries < 2; round++) {
 			const wall = await wallCount.textContent().catch(() => null);
 			if (prevWall !== null && wall !== null && wall !== prevWall) handBoundaries++;
 			prevWall = wall;
 
-			// the server closes claim windows early, so a pass button counted a moment ago can be
-			// gone or mid-transition by the time the click lands. Retrying only page 0 on failure
-			// produced a real deadlock (page 1's identical button never attempted), so try every
-			// matching page; a short per-click timeout + swallow is fine either way.
-			// hand-end hold: dismissing here avoids paying the full hand_end_seconds wait per
-			// boundary -- the difference between this test finishing in seconds vs. minutes.
+			// claim windows close early, so a counted pass button may vanish before the click lands;
+			// retrying only page 0 deadlocked, so try every page. Dismissing hand-end here skips the full wait.
 			const overlayCounts = await Promise.all(
 				pages.map((p) => p.getByTestId('faan-overlay').count())
 			);
@@ -335,11 +312,8 @@ test('completing more than one real hand accumulates multi-hand history in the S
 });
 
 test('a real game reaching game_end auto-shows the game-end summary, and a past round reveals its real winning hand', async () => {
-	// `game_end` only fires once EAST_ONLY's minimum 4 hands play out -- practice mode (one
-	// human, three bots) so only this seat's turns need driving; bots run server-side with no
-	// browser round trip. `no_calls`/`auto_pass_chow` pre-armed so this seat never needs a click
-	// either. Dealer repeats on win/draw mean this can run past the 4-hand minimum, hence the
-	// generous wall-clock budget rather than a fixed hand count.
+	// `game_end` needs EAST_ONLY's min 4 hands; practice mode + pre-armed no_calls/auto_pass_chow
+	// means only this seat needs driving. Dealer repeats can run past 4 hands, hence the generous timeout.
 	test.setTimeout(1_800_000);
 	const browser = await chromium.launch();
 	try {
@@ -387,9 +361,8 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 		await expect(gameEndOverlay.getByRole('heading', { name: 'Game over' })).toBeVisible();
 		await expect(gameEndOverlay.locator('.standings li')).toHaveCount(4);
 
-		// past-round detail: expand hand 1's row and confirm it shows a real winning hand or the
-		// plain exhaustive-draw note, not blank/broken output for data long since scrolled out
-		// of `state.melds`.
+		// past-round detail: expand hand 1's row and confirm a real winning hand or exhaustive-draw
+		// note renders, not blank/broken output for data long since scrolled out of `state.melds`.
 		const round1Row = gameEndOverlay.locator('.score-sheet tbody tr').first();
 		const round1Toggle = round1Row.locator('.round-expand');
 		await round1Toggle.click();

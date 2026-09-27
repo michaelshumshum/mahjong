@@ -49,10 +49,8 @@ describe('muralVisibility', () => {
 		dispose();
 	});
 
-	// Regression: ApiConnectGate's claim (tied to `status`) and a newly-mounted page's own claim
-	// both change in the same reactive flush when the gate dismisses. A plain last-write-wins
-	// boolean left `visible` stuck false depending on which of the two effects reran last; the
-	// ref-counted version must stay visible regardless of that ordering.
+	// Regression: gate-release and page-claim land in the same reactive flush; a last-write-wins
+	// boolean left `visible` stuck false depending on effect order. Ref-counting fixes that.
 	it('stays visible when one claim releases as another claims in the same flush', () => {
 		let gateWanted = $state(true);
 		const disposeGate = $effect.root(() => claimMuralVisible(() => gateWanted));

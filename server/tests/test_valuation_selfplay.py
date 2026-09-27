@@ -123,14 +123,7 @@ def test_estimate_matches_real_scorer_on_selfplay_sample() -> None:
         f"MAE={mae:.2f} faan, within 1 faan={within_one:.0%}"
     )
 
-    # Bounds set from the measured run this test produced when it was written (67 samples:
-    # MAE 2.46, 9% within 1 faan -- see bots/valuation.py's module docstring for the same
-    # numbers and why the gap is this large: `estimate_best_faan` only models the route table
-    # (docs/04-bots.md §4), not situational/win-timing faan (箭刻, 座位花, 全求人, 海底/河底/
-    # 槓上/搶槓) that a real `RandomBot` win frequently picks up almost independently of hand
-    # shape). Not a calibrated-model accuracy bar -- the assertion exists to catch a
-    # *regression* (the estimator drifting far past its own measured baseline), with margin for
-    # normal seed-to-seed sampling variance, not to enforce tight accuracy this heuristic was
-    # never designed to have.
+    # bounds are the measured baseline (67 samples: MAE 2.46, 9% within 1 faan; see
+    # bots/valuation.py's docstring) -- catches a regression past it, not a calibrated accuracy bar (the estimator doesn't model situational/win-timing faan).
     assert mae <= 4.0, f"mean absolute error {mae:.2f} faan exceeds the measured baseline"
     assert within_one >= 0.05, f"only {within_one:.0%} of samples within 1 faan"

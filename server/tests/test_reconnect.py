@@ -190,9 +190,8 @@ def _rig_uncontested_state(seed: int) -> GameState:
     state = _with_seat(state, 1, concealed=seat1)
     state = _with_seat(state, 2, concealed=seat2)
     state = _with_seat(state, 3, concealed=seat3)
-    # force the next draw (seat 1's, after seat 0's uncontested discard) to be a plain suited
-    # tile, not a flower -- a flower draw would insert an extra flower_replace/draw pair this
-    # fixture doesn't need to model.
+    # force seat 1's next draw to a plain suited tile, not a flower -- avoids an extra
+    # flower_replace/draw pair this fixture doesn't need to model.
     safe_tile = tile_ids_for_type(TileType.PIN_5)[0]
     wall = state.wall
     state = dataclasses.replace(
@@ -244,10 +243,8 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
             seat1_last_seq = last_seq[1]
             seat1_secret = secret[1]
 
-        # ws1's `with` block just exited -- the socket is gone, but Table's SeatBinding for
-        # seat 1 survives untouched (this is what makes reconnect possible at all). Closing
-        # ws1/ws2/ws3 together also marks all three seats `disconnected` (M3 sub-task 6),
-        # broadcasting `seat_state` to the one connection still open to observe it.
+        # ws1's socket is gone but its SeatBinding survives (what makes reconnect possible);
+        # closing ws1/ws2/ws3 together also marks all three `disconnected`, broadcast to ws0.
         _drain_teardown_disconnects(ws0)
 
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
@@ -311,10 +308,11 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
 
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
         ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
-        ws0.receive_json()  # ack
-        ws0.receive_json()  # discard
-        ws0.receive_json()  # draw
-        ws0.receive_json()  # turn
+        # ack, discard, draw, turn -- from ws0's own uncontested discard
+        ws0.receive_json()
+        ws0.receive_json()
+        ws0.receive_json()
+        ws0.receive_json()
 
         # simulate ring eviction: `last_seq` (the ready cascade's `turn` frame) is now older
         # than anything left in the ring, exactly what a real 512-frame eviction would produce.
@@ -348,11 +346,8 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             _, secret = _join_and_ready_all(wss)
             seat1_secret = secret[1]
 
-        # seat 1's own last_seq is still the ring/seq head at the moment it reconnects -- but
-        # closing ws1/ws2/ws3 together (M3 sub-task 6) already pushed that head forward by 3
-        # (one `seat_state{disconnected}` broadcast per closed seat), so capture *after* that,
-        # matching what "at head" actually means here: nothing happened *besides* the
-        # disconnects this test isn't about.
+        # closing ws1/ws2/ws3 pushed seat 1's seq/ring head forward by 3 (one disconnect
+        # broadcast each) -- capture last_seq *after* that, not before, matching "at head".
         _drain_teardown_disconnects(ws0)
         seat1_last_seq = table.seat_seq[1] - 1
         seq_before = table.seat_seq[1]
@@ -361,16 +356,8 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
 
-            # nothing missed -> no replay, no state_sync -- but reconnecting from `disconnected`
-            # is itself real news: `resume()` announces it with one live `seat_state`, bumping
-            # seq/ring by exactly that one frame, nothing more. Receive it *before* asserting on
-            # Table's own state directly -- `send_json` only enqueues `hello` onto the ASGI app's
-            # anyio stream for the server's own event-loop thread (a separate OS thread under
-            # `TestClient`) to pick up and process; nothing about it returning guarantees that
-            # thread has actually run `resume()` yet. `receive_json` is this test's only real
-            # synchronization point (a blocking round trip through the portal), so it has to
-            # come before, never after, any assertion reading `table.seat_seq`/`table.ring`
-            # straight off the object -- see this module's own docstring.
+            # no replay needed, but reconnecting from `disconnected` still bumps seq by one
+            # `seat_state` -- receive it before asserting table state directly (`send_json` doesn't guarantee resume() ran yet).
             reconnected = ws1b.receive_json()
             assert reconnected["t"] == "seat_state"
             assert reconnected["d"] == {"seat": 1, "status": "connected", "name": "Guest 2"}
@@ -464,16 +451,8 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
             }
             assert table.state.claim_window is None  # fully resolved, nobody claimed
 
-        # seat 1 reconnects only now, after its offer was already forfeited (and the whole
-        # window already resolved) while it was still offline -- nothing claim-shaped left to
-        # hand back, so no `claim_offer` follows the replay. ws2/ws3 also disconnected at the
-        # `with` block's own exit above (in reverse declaration order, `_drain_teardown_
-        # disconnects`'s own docstring), *after* the resolution -- so seat 1's ring holds, in
-        # order: its own disconnect, the resolution cascade (claim_resolved/draw/turn), then
-        # seat 2's and seat 3's disconnects. Rather than hardcode that exact cascade, just drain
-        # the replay until `resume()`'s own reconnect announcement (always the last frame it
-        # sends, after any replay -- `resume()`'s docstring) and check `claim_offer` never
-        # showed up anywhere in between.
+        # seat 1's claim offer was already forfeited and the window resolved while offline, so
+        # no `claim_offer` appears in the replay -- drain until resume()'s reconnect frame (always last) and check.
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
 
@@ -503,9 +482,10 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
             ws0.send_json(_hello())
             ws1.send_json(_hello())
             ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
-            ws0.receive_json()  # seat_state (own join)
-            ws0.receive_json()  # state_sync
-            ws0.receive_json()  # ack
+            # seat_state (own join), state_sync, ack
+            ws0.receive_json()
+            ws0.receive_json()
+            ws0.receive_json()
 
             ws1.send_json(_msg("join", {"seat": 1, "name": "Carol"}, id_=_next_id()))
             joined = ws0.receive_json()  # seat_state broadcast reaches seat 0 live
@@ -579,11 +559,8 @@ def test_hello_wrong_or_missing_secret_refuses_the_reclaim() -> None:
             assert frame["t"] == "error"
             assert frame["d"]["code"] == "bad_secret"
 
-        # the seat was never actually reclaimed by either attempt -- the real secret still
-        # works, proving `Table.reconnect` never rebound the live connection along the way.
-        # (ws0 itself never closed, so `resume()` sees `status` already "connected" and answers
-        # with a plain `state_sync`, not a `seat_state{connected}` announcement -- see its own
-        # docstring; this is just proving the real secret is still accepted, not a disconnect.)
+        # neither bad attempt reclaimed the seat -- the real secret still works, proving
+        # reconnect never rebound the connection (ws0 never closed, so resume() sends state_sync).
         with client.websocket_connect(f"/ws?table={table_id}") as ws0b:
             ws0b.send_json(_hello(seat=0, secret=real_secret))
             reconnected = ws0b.receive_json()

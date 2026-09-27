@@ -151,8 +151,7 @@
 	}
 
 	// writing-mode reflows the flex axes so width/height already reflect the vertical footprint --
-	// unlike transform: rotate(), which repaints in place and left the strip's content escaping
-	// its grid cell.
+	// unlike transform: rotate(), which repaints in place and let content escape the grid cell.
 	.seat-hand-strip--left {
 		@include layout.tablet-up {
 			writing-mode: vertical-lr;
@@ -165,9 +164,8 @@
 		}
 	}
 
-	// same avoid-rotating-the-sized-box principle as the strip above, one level deeper:
-	// .mini-tile keeps an unrotated box pre-sized to the landscape footprint; only .tile-face
-	// inside is rotated, so the rotation is paint-only.
+	// same avoid-rotating-the-sized-box principle as the strip above, one level deeper: .mini-tile
+	// keeps an unrotated, pre-sized box; only .tile-face inside rotates, so it's paint-only.
 	.seat-hand-strip--left .mini-tile,
 	.seat-hand-strip--right .mini-tile {
 		@include layout.tablet-up {

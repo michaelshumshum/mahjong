@@ -44,9 +44,8 @@ ROUTE_FAAN: dict[str, int] = {
     "all_sequences": 1,  # 平糊 -- the floor every hand can reach, T1's whole failure mode
 }
 
-# route name -> the Chinese pattern name `RuleSet.faan_overrides` / `scoring/patterns.py`'s
-# registry key it corresponds to (docs/04-bots.md §9 Tier 2). Every `ROUTE_FAAN` base value
-# above is pinned against the matching pattern's own base faan in `tests/test_valuation.py`.
+# route name -> Chinese pattern name (RuleSet.faan_overrides / scoring/patterns.py's registry key,
+# docs/04-bots.md §9 Tier 2); every ROUTE_FAAN value is pinned against it in tests/test_valuation.py.
 _ROUTE_PATTERN_NAMES: dict[str, str] = {
     "full_flush": "清一色",
     "half_flush": "混一色",

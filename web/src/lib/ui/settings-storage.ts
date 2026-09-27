@@ -8,9 +8,8 @@ export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
-/** How long a per-table reconnect credential stays in `localStorage`. A game can run for hours
- * and a player may reload/return across a long session, but a day is plenty -- and it stops
- * abandoned tables from leaving secrets behind forever. */
+/** How long a per-table reconnect credential stays in `localStorage` -- a day covers a long
+ * session's reload/return, and stops abandoned tables from leaving secrets behind forever. */
 export const TABLE_CREDS_TTL_MS = 24 * 60 * 60 * 1000;
 
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];

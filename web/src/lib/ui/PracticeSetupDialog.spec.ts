@@ -2,9 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import PracticeSetupDialog from './PracticeSetupDialog.svelte';
 
-// Interaction (cycling a seat's difficulty, submitting, sending the chosen tiers) is covered
-// end-to-end (routes/page.e2e.ts) -- this file covers the initial render: labelled dialog, one
-// seat-ring slot per bot seat, defaulting to Normal, the human seat marked distinctly.
+// Interaction is covered end-to-end (routes/page.e2e.ts); this file covers initial render only:
+// labelled dialog, one seat-ring slot per bot seat, defaulting to Normal, human seat marked distinctly.
 describe('PracticeSetupDialog', () => {
 	const noop = () => {};
 

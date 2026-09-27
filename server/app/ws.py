@@ -476,9 +476,8 @@ async def ws_endpoint(
                 break
             await session.handle(message)
     finally:
-        # disconnect is detected only by the socket closing -- no heartbeat/dead-socket timeout
-        # exists. session_id (not just seat) guards the race where a newer reconnect already
-        # reclaimed this seat before this connection's own finally runs.
+        # disconnect is detected only by the socket closing -- no heartbeat/dead-socket timeout.
+        # session_id (not just seat) guards a newer reconnect already reclaiming this seat first.
         if session.seat is not None:
             table_obj.mark_disconnected(session.seat, session.session_id)
         else:

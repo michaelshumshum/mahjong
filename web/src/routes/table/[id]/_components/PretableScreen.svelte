@@ -51,9 +51,8 @@
 		hk_strict: 'Strict'
 	};
 
-	// `rulesetPreset === null` means either "custom ruleset" or "no state_sync yet" -- only the
-	// spectator-shaped snapshot every pre-game connection gets disambiguates them, so this only
-	// renders once past the "Connecting…" spinner below.
+	// `rulesetPreset === null` means "custom ruleset" or "no state_sync yet" -- only the spectator
+	// snapshot every pre-game connection gets disambiguates them, so this renders only past "Connecting…" below.
 	let rulesetKnown = $derived(
 		!!effectiveConnection && effectiveConnection !== 'idle' && effectiveConnection !== 'connecting'
 	);

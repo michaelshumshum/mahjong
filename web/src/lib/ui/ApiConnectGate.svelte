@@ -14,15 +14,12 @@
 
 	let status = $state<'connecting' | 'ready' | 'error'>('connecting');
 	let attempt = $state(0);
-	// set while waiting out a backoff delay between attempts; cleared the moment the next attempt
-	// starts. Not a ticking countdown -- web/AGENTS.md's "never a JS ticker" rule -- so this reads
-	// "next attempt in Ns" for the full wait rather than counting down second by second.
+	// set while waiting out a backoff delay; cleared when the next attempt starts. Static "next
+	// attempt in Ns" text, not a ticking countdown (web/AGENTS.md's "never a JS ticker" rule).
 	let nextRetryDelayMs = $state<number | null>(null);
 
-	// same panel this screen occupies until `ready` -- shown for the same reason /table/[id]'s
-	// own pregame states show it (docs/03-frontend.md §2's "Shared across routes"), released the
-	// moment children mount so the underlying page's own claim (lobby, table pregame, ...) takes
-	// over cleanly.
+	// claims mural visibility until `ready` (docs/03-frontend.md §2's "Shared across routes"),
+	// releasing the instant children mount so the underlying page's own claim takes over.
 	claimMuralVisible(() => !skip && status !== 'ready');
 
 	async function connect(): Promise<void> {

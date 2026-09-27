@@ -272,9 +272,7 @@ def test_decompose_ambiguous_hand_returns_both_splits() -> None:
 
 
 def test_decompose_seven_pairs_shape_is_not_a_standard_split() -> None:
-    # seven pairs isn't melds+pair; decompose() only handles the standard shape (shanten.py
-    # owns seven pairs). A hand that's only pairs, wrong total length for k melds + 1 pair,
-    # correctly yields no split.
+    # decompose() only handles melds+pair (shanten.py owns seven pairs); wrong length yields no split.
     tiles = [_MAN_1[0], _MAN_1[1], _MAN_2[0], _MAN_2[1]]  # length 4, not 3k+2
     assert decompose(tiles) == ()
 
@@ -287,9 +285,8 @@ def test_decompose_seven_pairs_shape_is_not_a_standard_split() -> None:
     )
 )
 def test_property_decompose_conserves_every_tile(ranks: list[int]) -> None:
-    # build a concrete tile multiset of length 3k+2 from man-suit ranks, respecting the
-    # physical 4-copies-per-type limit, then check every returned split accounts for every
-    # input tile exactly once.
+    # build a tile multiset of length 3k+2 from man-suit ranks (respecting the 4-copies-per-type
+    # limit), then check every returned split accounts for every input tile exactly once.
     if len(ranks) % 3 != 2:
         ranks = ranks[:-1] if (len(ranks) - 1) % 3 == 2 else ranks + [ranks[0] if ranks else 0]
     if len(ranks) % 3 != 2:

@@ -19,10 +19,8 @@ describe('ScoreSheet', () => {
 		{ handNo: 3, dealer: 2, prevailing: 'E', deltas: { 0: 10, 1: 10, 2: -30, 3: 10 } }
 	];
 
-	// running totals after each hand, by hand-checking the deltas above:
-	// after hand 1: {0:-24, 1:0,   2:24,  3:0}
-	// after hand 2: {0:-40, 1:48,  2:8,   3:-16}
-	// after hand 3: {0:-30, 1:58,  2:-22, 3:-6}
+	// running totals after each hand (hand-checked against deltas above): {0:-24,2:24} ->
+	// {0:-40,1:48,2:8,3:-16} -> {0:-30,1:58,2:-22,3:-6}
 	const totals: Totals = { 0: -30, 1: 58, 2: -22, 3: -6 };
 
 	it('renders one row per hand', () => {

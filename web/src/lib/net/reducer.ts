@@ -236,13 +236,12 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				ownHand: isOwn ? removeOne(state.ownHand, d.tile_id) : state.ownHand,
 				hands: updateHand(state.hands, d.seat, (h) => removeOne(h, d.tile_id)),
 				drawnTileId: isOwn ? null : state.drawnTileId,
-				// a discard claimed later server-side is removed from the pool there; this client-side
-				// pool can transiently show it until the next state_sync corrects it.
+				// a discard claimed later is popped back off in the `meld` case above, mirroring
+				// mahjong_core.engine's own removal -- not left for the next state_sync to correct.
 				discardPools: replaceAt(state.discardPools, d.seat, pool),
 				lastDiscard: { seat: d.seat, tileId: d.tile_id },
-				// clear stale legal_actions/deadline_ts from the `turn` that granted this seat's move --
-				// left set, they'd still look actionable and a second click would get silently dropped
-				// as out-of-turn.
+				// clear stale legal_actions/deadline_ts from the `turn` that granted this move --
+				// left set, a second click would get silently dropped as out-of-turn.
 				legalActions: isOwn ? [] : state.legalActions,
 				deadlineTs: isOwn ? null : state.deadlineTs
 			};

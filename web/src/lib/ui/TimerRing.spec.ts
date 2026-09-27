@@ -2,9 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import TimerRing from './TimerRing.svelte';
 
-// The countdown is a CSS animation (no JS ticker), so this asserts the CSS custom properties
-// derived from `durationMs` instead of waiting out real elapsed time. `computeRingTiming`
-// (timer-ring.spec.ts) covers the underlying math; this just checks the wiring.
+// CSS-animation countdown (no JS ticker): asserts custom properties derived from `durationMs`
+// instead of waiting on real elapsed time. `computeRingTiming` (timer-ring.spec.ts) covers the math.
 describe('TimerRing', () => {
 	it('renders deplete/warn CSS custom properties for a duration longer than the warn window', () => {
 		const { body } = render(TimerRing, { props: { durationMs: 5000 } });

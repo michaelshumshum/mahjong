@@ -1,8 +1,5 @@
-// Mock GameState-shaped fixture, mirroring mahjong_core/state.py's GameState/SeatState/Phase
-// closely enough to survive real WS integration replacing it with a reducer-fed store — field
-// names track the Python dataclasses, camelCased and pre-redacted for a single seat's view.
-// Opponent concealed hands are a plain count here (no event stream to diff yet); real
-// `TileCode`s only appear where the real protocol would reveal them to this seat.
+// mock GameState-shaped fixture mirroring mahjong_core's GameState/SeatState/Phase, camelCased and
+// pre-redacted for a single seat's view. Opponent hands are plain counts; TileCodes only where the wire would reveal them.
 
 import type { TileCode } from './tile-code';
 
@@ -324,9 +321,8 @@ export const handJustEndedDraw: MockGameState = {
 	turnDurationMs: null
 };
 
-// Scenario 5: a full EAST_ONLY game (一圈) just reached game_end -- no more hold, since the
-// real wire only reaches game_end after the final hand's hold already resolved. Four hands is
-// EAST_ONLY's minimum (dealer 0->1->2->3); deltas hand-checked to sum to zero per hand.
+// scenario 5: a full EAST_ONLY game (一圈) just reached game_end -- no hold, since the wire only
+// reaches game_end once the final hand's hold resolves. Four hands (dealer 0->1->2->3) is the minimum.
 export const gameJustEnded: MockGameState = {
 	phase: 'GAME_OVER',
 	turn: 3,

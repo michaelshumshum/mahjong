@@ -62,11 +62,8 @@ def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
     return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
-# hand-end hold (docs/00-architecture.md §3): `_bind_fake_seats` binds real "connected"
-# SeatBindings (fake sockets, not bot/autoplay), so `Table._open_hand_end_window` won't
-# pre-seed/auto-ack any of them -- these tests never send a real `hand_end_ack` (no real
-# session/socket in front of these rigged tables), so `hand_end_seconds=0` is what actually lets
-# the rigged hand boundary resolve, same idiom `tests/test_table.py`'s `_BOUNDED_RULESET` uses.
+# `_bind_fake_seats` binds real "connected" SeatBindings (not bot/autoplay), so the hand-end
+# hold never auto-acks; `hand_end_seconds=0` is what lets it resolve (test_table.py's `_BOUNDED_RULESET` idiom).
 _ZERO_HOLD_RULESET = dataclasses.replace(DEFAULT_RULESET, hand_end_seconds=0)
 
 
@@ -219,19 +216,16 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
     table.submit(0, Discard(tile_id=_SEAT0_DISCARD))
 
     with caplog.at_level(logging.ERROR):
-        # first tick: the discard lands HAND_OVER and opens the hand-end hold (arms the
-        # hand_end_seconds=0 timer, doesn't advance yet -- no seat here is bot/autoplay, so
-        # nothing pre-acks it). Second tick: that timer has already expired, so this call
-        # processes it and actually advances into GAME_OVER, running the persist attempt.
+        # first tick: discard lands HAND_OVER, arms the hand_end_seconds=0 timer (no seat here
+        # is bot/autoplay, so nothing pre-acks). Second tick: timer expired -- advances to GAME_OVER.
         await asyncio.wait_for(table.process_one(), timeout=2.0)
         assert table.state.phase == Phase.HAND_OVER
         await asyncio.wait_for(table.process_one(), timeout=2.0)
 
-    # mypy narrows table.state.phase to Literal[HAND_OVER] from the assert two ticks up and
-    # doesn't see that the second `await table.process_one()` above reassigns `table.state` to a
-    # new GameState -- flags this as non-overlapping/unreachable, but it's real and correct.
-    assert table.state.phase == Phase.GAME_OVER  # the game still ended for real
-    assert table._game_over_persisted is True  # the attempt returned: nothing left to wait on
+    # mypy doesn't see the second process_one() reassigns table.state to a new GameState, so
+    # it flags this phase check as unreachable -- it's real and correct.
+    assert table.state.phase == Phase.GAME_OVER
+    assert table._game_over_persisted is True
     assert any("persist failed" in r.message for r in caplog.records)
 
     # and the drain that used to hang on it now resolves immediately, without abandoning it.

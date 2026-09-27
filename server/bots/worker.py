@@ -24,10 +24,8 @@ from bots.random import RandomBot
 
 __all__ = ["BOT_TIERS", "DEFAULT_BOT_TIER", "compute_action"]
 
-# "ORACLE", not "T4": it deliberately doesn't read as one more rung on the T0-T2 difficulty
-# ladder (docs/04-bots.md §7 maps T0-T2 to Easy/Normal/Hard; T3 `SearchBot` was Expert and was
-# removed, see docs/04-bots.md §6) -- it's a full-information bot a table opts into explicitly,
-# not a harder version of the same game a normal player faces.
+# "ORACLE", not "T4": not one more rung on the T0-T2 ladder (T3/SearchBot, Expert, was removed --
+# docs/04-bots.md §6) but a full-information bot a table opts into explicitly.
 BOT_TIERS: Final = ("T0", "T1", "T2", "ORACLE")
 DEFAULT_BOT_TIER: Final = "T2"
 """A bot-filled table runs `FaanBot`, not a weaker tier -- an all-T1 table produces endless
@@ -42,11 +40,8 @@ def _make_bot(tier: str, seed: int) -> Bot:
     if tier == "T2":
         return FaanBot()
     if tier == "ORACLE":
-        # a plain FaanBot -- no dedicated bot class needed. bots/safety.py's tile_risk is
-        # hands-aware: when the view it's handed has .hands populated (only ever true for this
-        # tier, via app/views.py's _omniscient_seat_view), FaanBot's existing discard-risk
-        # scoring already computes exact per-opponent deal-in danger instead of the probabilistic
-        # estimate -- no rollout/search required (docs/04-bots.md §10).
+        # plain FaanBot -- no dedicated class needed. its discard-risk scoring is hands-aware
+        # (bots/safety.py's tile_risk), computing exact deal-in danger when .hands is populated (§10).
         return FaanBot()
     raise ValueError(f"unknown bot tier {tier!r}; choices: {BOT_TIERS}")
 

@@ -237,17 +237,8 @@ def _omniscient_seat_view(state: GameState, seat: int) -> SeatView:
     return replace(view, hands=tuple(s.concealed for s in state.seats))
 
 
-# One dataclass per distinct wire shape -- concealed_kong gets two (owner vs. everyone else)
-# rather than one struct with a runtime-conditional entitlement on the same field. `seat`,
-# where present, is both "whose event this is" and the `OWN_SEAT` owner for that struct's
-# restricted field(s).
-#
-# Not modeled here (needs Table's own intermediate per-event state, not just (state, event)):
-# - discard.pool_index -- if the discard is claimed later in the same reduce() call, the
-#   claiming seat's discards entry is already gone from final state by the time this runs.
-# - flower_replace fusing in a replacement tile -- FlowerReplaced and the landing Drawn/
-#   KongReplacementDrawn/HandEnded are separate Events; this redacts one Event at a time.
-# - envelope fields (v/seq/ts) -- Session's job.
+# one dataclass per distinct wire shape -- concealed_kong gets two (owner vs. everyone else).
+# not modeled (needs Table's own per-event state): discard.pool_index, flower_replace's tile, envelope fields.
 
 
 @dataclass(frozen=True)
