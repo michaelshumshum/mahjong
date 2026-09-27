@@ -78,7 +78,7 @@ from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Final, Literal, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -86,7 +86,7 @@ from app.db.records import save_game_record
 from app.idempotency import IdempotencyCache
 from app.views import (
     HandHistoryRecord,
-    SeatView,
+    _omniscient_seat_view,
     hand_history_wire,
     redact_event,
     seat_view,
@@ -139,6 +139,13 @@ logger = logging.getLogger(__name__)
 
 _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
 
+# disconnect-handover (a real human's seat gone quiet -> autoplay) always drives the autoplay
+# bot at T2/FaanBot, never this table's own self._bot_tier -- a human never opted into whatever
+# tier the table happens to run, and specifically must never land on ORACLE, which would build
+# that seat's view via _omniscient_seat_view and hand it every other seat's concealed tiles. See
+# _effective_bot_tier.
+_DISCONNECT_HANDOVER_BOT_TIER: Final = "T2"
+
 # humanising think delay: a real tier answers in single-digit milliseconds, which reads as the
 # table jumping ahead of anyone watching it. Applied after the worker replies, not inside it, so
 # it never touches the real turn/claim deadline math. Env-overridable (tests zero both).
@@ -185,7 +192,15 @@ _default_bot_pool: ProcessPoolExecutor | None = None
 def _shared_bot_pool() -> ProcessPoolExecutor:
     """One `ProcessPoolExecutor` per server process, created lazily on first use (constructing
     it doesn't spawn a worker), not one per `Table`. `Table.__init__`'s `bot_pool` param exists
-    so tests (and `TableRegistry`) can inject a different `Executor` instead."""
+    so tests (and `TableRegistry`) can inject a different `Executor` instead.
+
+    Every tier shares this pool. A second, dedicated pool for `T3` (`SearchBot`) existed
+    historically -- `SearchBot` budgeted 300-800ms per decision, two to three orders of
+    magnitude slower than a `T1`/`T2` decision, which would have head-of-line-blocked unrelated
+    tables' jobs sharing this pool. `SearchBot` was removed (docs/04-bots.md §6: determinized
+    rollout search never beat plain `FaanBot` in arena validation, a structural ceiling from the
+    rollout policy's own noise, not a fixable bug), so the isolation problem it existed to solve
+    no longer has a tier that needs it."""
     global _default_bot_pool
     if _default_bot_pool is None:
         _default_bot_pool = ProcessPoolExecutor()
@@ -431,11 +446,19 @@ class Table:
     docstring for disconnect/bot-handover (`mark_disconnected`/`_poke_bots`).
 
     `bot_tier` (`bots.worker.BOT_TIERS`, default `T2`/`FaanBot`) picks which real tier answers
-    for every bot-driven seat this table has -- disconnect-handover autoplay and practice-mode
-    bot seats alike, both routed through `_poke_bots`. One tier per table, not per seat: `T0`/
+    for a practice-mode `bot` seat (`_bind_bot_seat`, at construction) or an in-game `autoplay`
+    seat this table has, both routed through `_poke_bots` -- with one deliberate exception:
+    disconnect-handover (a real human's seat gone `autoplay`) always uses `T2`/`FaanBot`
+    regardless of `bot_tier`, never this table's configured tier -- see
+    `_DISCONNECT_HANDOVER_BOT_TIER`/`_effective_bot_tier`. One tier per table, not per seat: `T0`/
     `T1` stay selectable by passing a different value, so arena/tests that assume T0's
     uniform-random behavior aren't forced onto T2. `practice=True` binds seats 1-3 to `bot_tier`
     bots immediately at construction, before seat 0's human ever joins -- see `_bind_bot_seat`.
+    `"ORACLE"` builds its view via `_omniscient_seat_view` (`app/views.py`) instead of the
+    ordinary `seat_view`, but the bot doing the deciding is a plain `FaanBot()`
+    (`bots/worker.py`'s `_make_bot`) -- the same single-digit-millisecond cost as `T2` -- so it
+    shares the same pool every tier now uses (`_shared_bot_pool`'s docstring has the historical
+    note on why a second, `T3`-only pool briefly existed and was removed).
     """
 
     def __init__(
@@ -530,6 +553,8 @@ class Table:
         self._pending_bot: dict[int, BotJobTag] = {}
         self._bot_tasks: set[asyncio.Task[None]] = set()
         self._bot_pool: Executor = bot_pool if bot_pool is not None else _shared_bot_pool()
+        # "ORACLE" needs no dedicated pool: bots/worker.py's _make_bot builds a plain FaanBot()
+        # for it (same cost as T2), so every tier shares this one pool.
 
         # require_ready=True (app/ws.py's real tables) gates every command on all four seats
         # joining and ready-ing before the table processes anything (_authorize below).
@@ -1249,7 +1274,9 @@ class Table:
         hasn't answered -- tagged with what it's computed against (`BotJobTag`) so a stale
         result is dropped when it lands. Idempotent: a seat whose current decision already has a
         job in flight isn't resubmitted. Never runs bot logic inline -- `_submit_bot_job` only
-        schedules work and returns immediately.
+        schedules work and returns immediately; it also builds the `SeatView` this seat's job
+        gets, since which tier (and therefore which `SeatView` constructor) applies to a given
+        seat needs `_effective_bot_tier`'s "is this a real human's autoplay seat" check.
         """
         window = self.state.claim_window
         for seat in range(4):
@@ -1268,6 +1295,59 @@ class Table:
             if tag is None or self._pending_bot.get(seat) == tag:
                 continue
             self._pending_bot[seat] = tag
+            mask = legal_mask(self.state, seat)
+            self._submit_bot_job(seat, tag, mask)
+
+    def _effective_bot_tier(self, seat: int) -> str:
+        """The tier that actually drives `seat`'s next bot decision -- almost always
+        `self._bot_tier`, with one deliberate exception: disconnect-handover (`seat`'s binding
+        is `autoplay`, meaning a real human went quiet and a bot took the seat over) is always
+        `_DISCONNECT_HANDOVER_BOT_TIER` ("T2"/`FaanBot`), regardless of what tier this table is
+        configured with. A human never opted into whatever tier the table happens to run, and
+        specifically must never have their seat driven by `ORACLE`, whose view is built by
+        `_omniscient_seat_view` and carries every other seat's concealed tiles -- a real human's
+        own seat must never be the one a bot job is built omnisciently for.
+
+        A `bot`-status seat (practice mode / `all_bots`, bound at `__init__` time, never a real
+        human -- `_bind_bot_seat`) is unaffected and uses `self._bot_tier` as configured.
+        """
+        binding = self.seat_bindings[seat]
+        if binding is not None and binding.status == "autoplay":
+            return _DISCONNECT_HANDOVER_BOT_TIER
+        return self._bot_tier
+
+    def _submit_bot_job(self, seat: int, tag: BotJobTag, mask: list[bool]) -> None:
+        """Build this seat's `SeatView` and schedule `bots.worker.compute_action` on the right
+        bot pool (a `ProcessPoolExecutor` -- the GIL makes a thread pool useless for CPU-bound
+        search), returning immediately -- the actual wait lives in `_await_bot_job`, a separate
+        task. `seed` is derived from the tag, not an unseeded `random.Random()`, so a given
+        decision point's bot output is reproducible. `deadline` is advisory only, derived from
+        the same hard `_BOT_JOB_TIMEOUT_SECONDS` `_await_bot_job` actually enforces.
+
+        Tier resolution goes through `_effective_bot_tier`, not `self._bot_tier` directly, so
+        disconnect-handover is pinned to T2 regardless of this table's configured tier (see that
+        method's docstring -- the one explicit product requirement behind this whole method's
+        shape).
+
+        `ORACLE` jobs build their view with `_omniscient_seat_view` (`app/views.py`) instead of
+        the normal `seat_view(state, seat)` -- **this is the only call site for that function in
+        the entire codebase**; see its docstring, and `tests/test_oracle_containment.py`, which
+        pins that structurally. The bot itself is a plain `FaanBot()` (`bots/worker.py`'s
+        `_make_bot`), so `ORACLE` jobs share `self._bot_pool` like every other tier.
+        """
+        loop = asyncio.get_running_loop()
+        tier = self._effective_bot_tier(seat)
+        seed = hash((self.table_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
+        deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
+
+        if tier == "ORACLE":
+            # the ONLY call site for _omniscient_seat_view anywhere in the codebase -- see its
+            # docstring (app/views.py) for the full safety argument. Unreachable for a real
+            # human's own seat: disconnect-handover is forced to T2 above, so an ORACLE-tier
+            # job only ever drives a `bot`-status seat (practice-mode/all-bots), never a
+            # `connected`/`disconnected`/`autoplay` human seat.
+            view = _omniscient_seat_view(self.state, seat)
+        else:
             claim_deadline_ts = (
                 self._claim_deadline_ms.get((tag.key, seat)) if tag.kind == "claim" else None
             )
@@ -1280,22 +1360,9 @@ class Table:
                 claim_deadline_ts=claim_deadline_ts,
                 turn_deadline_ts=turn_deadline_ts,
             )
-            mask = legal_mask(self.state, seat)
-            self._submit_bot_job(seat, tag, view, mask)
 
-    def _submit_bot_job(self, seat: int, tag: BotJobTag, view: SeatView, mask: list[bool]) -> None:
-        """Schedule `bots.worker.compute_action` on `self._bot_pool` (a `ProcessPoolExecutor` --
-        the GIL makes a thread pool useless for CPU-bound search) and return immediately -- the
-        actual wait lives in `_await_bot_job`, a separate task. `seed` is derived from the tag,
-        not an unseeded `random.Random()`, so a given decision point's bot output is
-        reproducible. `deadline` is advisory only, derived from the same hard
-        `_BOT_JOB_TIMEOUT_SECONDS` `_await_bot_job` actually enforces.
-        """
-        loop = asyncio.get_running_loop()
-        seed = hash((self.table_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
-        deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
         future = loop.run_in_executor(
-            self._bot_pool, compute_action, view, mask, seed, self._bot_tier, deadline
+            self._bot_pool, compute_action, view, mask, seed, tier, deadline
         )
         task = asyncio.ensure_future(self._await_bot_job(seat, tag, future, seed))
         self._bot_tasks.add(task)

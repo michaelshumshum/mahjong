@@ -18,12 +18,30 @@ seat's own tiles or already-public tiles, so a parallel type would add translati
 redaction benefit. `seat_status`/`names`/`deadline_ts`/`host_seat` are all override points a
 caller with a real `Table` behind it supplies (see `seat_view()`); a caller with none (bots/
 arena.py, bots/selfplay.py, direct tests) gets inert defaults instead.
+
+**One deliberate, contained exception to "a real seat never sees another seat's tiles":**
+`_omniscient_seat_view()` builds a `SeatView` for a real acting seat with `.hands` (every seat's
+concealed tiles) populated -- exactly what `seat_view()`'s `_check_reveal` guard exists to forbid
+for a real `seat`. It backs the `"ORACLE"` bot tier (docs/04-bots.md §10), an explicitly opt-in,
+non-ladder tier a live table may be configured to run -- driven by a plain `FaanBot()`
+(`bots/worker.py`), whose `bots/safety.py`-derived discard scoring becomes exact rather than
+probabilistic once it sees `.hands` populated. This is safe to hand across
+the `ProcessPoolExecutor` boundary (`app/table.py`'s `_submit_bot_job`, the only caller) because
+`SeatView` never carries `game_seed`/`hand_seed` -- see its field list below, there is no seed
+field -- so `docs/00-architecture.md §3`'s "`game_seed` never leaves this process" invariant is
+untouched; that invariant is about the seed specifically, not about tile visibility. It is never
+reachable from any wire-facing/protocol-facing path (`seat_view_wire`, `state_sync_wire`, or
+anything a real WS client's own traffic goes through) -- those all go through `seat_view()`'s
+public, unmodified contract. Do not call `_omniscient_seat_view` from anywhere but
+`app/table.py`'s oracle-tier branch, and do not weaken `_check_reveal` to make it "unnecessary" --
+that guard is the real security boundary for every real client and stays exactly as strict as it
+is today.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
 from enum import Enum
 from typing import Any, Literal, cast
 
@@ -195,6 +213,28 @@ def seat_view(
         ruleset=state.ruleset,
         hands=tuple(s.concealed for s in state.seats) if reveal_hands else None,
     )
+
+
+def _omniscient_seat_view(state: GameState, seat: int) -> SeatView:
+    """DANGEROUS -- do not call this from anywhere except `app/table.py`'s `_submit_bot_job`,
+    in its oracle-tier branch. That is the ONLY sanctioned call site in the whole codebase
+    (`tests/test_oracle_containment.py` pins this structurally); see the module docstring's
+    "deliberate, contained exception" section for the full safety argument.
+
+    Builds `seat`'s ordinary `seat_view(state, seat)` and then replaces `.hands` with every
+    seat's concealed tiles -- the one thing `seat_view(..., reveal_hands=True)` refuses to do
+    for a real `seat` (`_check_reveal` raises). This function exists specifically to bypass that
+    guard for the `"ORACLE"` tier -- a plain `FaanBot()` handed full information a live table may
+    opt into (docs/04-bots.md §10); `seat_view()`'s own public contract, and `_check_reveal`, are
+    left completely untouched by this function's existence.
+
+    Never call this for a spectator (`seat_view(..., reveal_hands=True)` already covers that
+    case) and never call this for a disconnect-handover autoplay seat -- `app/table.py` pins
+    disconnect-handover to `T2`/`FaanBot` unconditionally, specifically so a real human's seat
+    never lands on this path.
+    """
+    view = seat_view(state, seat)
+    return replace(view, hands=tuple(s.concealed for s in state.seats))
 
 
 # One dataclass per distinct wire shape -- concealed_kong gets two (owner vs. everyone else)

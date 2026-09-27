@@ -8,6 +8,7 @@ in isolation by holding every other signal fixed.
 from __future__ import annotations
 
 from app.views import SeatView
+from bots.faanbot import _THREAT_THRESHOLD
 from bots.safety import (
     deal_in_probability,
     expected_cost,
@@ -17,9 +18,12 @@ from bots.safety import (
     tile_risk,
     wall_pressure_multiplier,
 )
+from mahjong_core.actions import hand_is_winning_shape
 from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, MeldKind
-from mahjong_core.state import Phase, Wind
+from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
+from mahjong_core.state import Phase, SeatState, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 
 
@@ -30,12 +34,15 @@ def _view(
     discard_pools: tuple[tuple[TileId, ...], ...] | None = None,
     own_hand_types: tuple[TileType, ...] = (),
     wall_remaining: int = 50,
+    hands: tuple[tuple[TileId, ...], ...] | None = None,
 ) -> SeatView:
     """A minimal, hand-built `SeatView` carrying exactly what `bots/safety.py` reads --
     `own_hand`, `melds`, `discard_pools`, `wall_remaining`, `seat` -- matching
     `tests/test_efficiency.py`'s `_build_view` convention. `own_hand_types` lets a test put
     tiles in this seat's own concealed hand so `seen34` accounts for them (mirroring
-    `bots/features.seen34`'s "your hand... never the wall" contract)."""
+    `bots/features.seen34`'s "your hand... never the wall" contract). `hands`, when given,
+    populates `SeatView.hands` -- the omniscient-view field that flips `tile_risk` onto its
+    hands-aware exact path."""
     used: dict[TileType, int] = {}
     ids = []
     for t in own_hand_types:
@@ -63,6 +70,7 @@ def _view(
         deadline_ts=None,
         host_seat=None,
         ruleset=RuleSet(),
+        hands=hands,
     )
 
 
@@ -284,6 +292,85 @@ def test_more_melds_raise_threat_level() -> None:
     assert opponent_threat_level(one_meld, 1) < opponent_threat_level(two_melds, 1)
 
 
+# --- opponent_threat_level: hands-aware exact path (view.hands populated, the "ORACLE" tier) ----
+
+
+def test_opponent_threat_level_hands_none_matches_the_original_probabilistic_formula() -> None:
+    """`view.hands is None` (every tier except `"ORACLE"`) must still be exactly
+    `melds * 0.3 + tempo_bump` -- the hands-aware path is a strict override for an omniscient
+    view, not a behavior change for every other tier. Two exposed melds, empty discard pool (no
+    tempo shift): the formula's original, hand-computed value."""
+    view = _view(melds=((), (_pung(TileType.PIN_1), _pung(TileType.SOU_1)), (), ()))
+    assert view.hands is None
+    assert opponent_threat_level(view, 1) == 2 * 0.3
+
+
+def test_opponent_threat_level_hands_aware_flags_a_near_tenpai_opponent_the_proxy_misses() -> None:
+    """Opponent 1 holds no melds and an empty discard pool -- too short to raise the tempo
+    signal even if it held one -- so the probabilistic proxy reads them as zero threat, well
+    below `_THREAT_THRESHOLD` (`bots/faanbot.py`). Their real hand (omniscient view, same
+    melds/discards) is genuinely tenpai (shanten 0: three concealed sequences plus a closed run,
+    tanki wait on 5s). Hands-aware `opponent_threat_level` must flag them as threatening; the
+    probabilistic proxy on the exact same position must not -- proving the fix catches a real
+    threat the proxy misses, not just adding an unused code path."""
+    tenpai_hand = _pool(
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.MAN_6,
+        TileType.MAN_7,
+        TileType.MAN_8,
+        TileType.MAN_9,
+        TileType.PIN_1,
+        TileType.PIN_2,
+        TileType.PIN_3,
+        TileType.SOU_5,
+    )
+    proxy_view = _view()
+    hands_view = _view(hands=((), tenpai_hand, (), ()))
+
+    proxy_threat = opponent_threat_level(proxy_view, 1)
+    real_threat = opponent_threat_level(hands_view, 1)
+
+    assert proxy_threat < _THREAT_THRESHOLD
+    assert real_threat >= _THREAT_THRESHOLD
+
+
+def test_opponent_threat_level_hands_aware_clears_an_opponent_that_looks_threatening_by_proxy() -> (
+    None
+):
+    """Opponent 1 holds two exposed melds plus a settled discard tempo -- the probabilistic
+    proxy reads them as clearly threatening, well above `_THREAT_THRESHOLD`. Their real hand
+    (omniscient view, same melds/discards) is nowhere near tenpai (shanten 4: two gapped-pair
+    fragments, three lone honors, nothing beyond the two exposed pungs already on the table).
+    Hands-aware `opponent_threat_level` must read them as clearly safe (0.0); the probabilistic
+    proxy on the exact same position must not -- proving the fix lets `FaanBot` keep pushing
+    instead of folding against a false alarm."""
+    melds = ((), (_pung(TileType.PIN_1), _pung(TileType.PIN_9)), (), ())
+    discard_pools = (
+        (),
+        _pool(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.PIN_4),
+        (),
+        (),
+    )
+    proxy_view = _view(melds=melds, discard_pools=discard_pools)
+    assert opponent_threat_level(proxy_view, 1) > _THREAT_THRESHOLD
+
+    far_hand = _pool(
+        TileType.MAN_2,
+        TileType.MAN_6,
+        TileType.SOU_2,
+        TileType.SOU_6,
+        TileType.WIND_EAST,
+        TileType.WIND_SOUTH,
+        TileType.DRAGON_WHITE,
+    )
+    hands_view = _view(melds=melds, discard_pools=discard_pools, hands=((), far_hand, (), ()))
+    assert opponent_threat_level(hands_view, 1) == 0.0
+
+
 # --- tile_risk: aggregates across every opponent -------------------------------------------------
 
 
@@ -304,3 +391,179 @@ def test_tile_risk_excludes_own_seat() -> None:
     # Should not raise, and should be a finite non-negative float.
     risk = tile_risk(view, tile)
     assert risk >= 0.0
+
+
+# --- tile_risk: hands-aware exact path (view.hands populated, the "ORACLE" tier) ----------------
+
+
+def test_tile_risk_hands_aware_flags_an_exact_deal_in() -> None:
+    """Opponent 1's real 13-tile hand is one tile short of Seven Pairs (default ruleset: NEW_18
+    on, min_faan=3) -- adding SOU_9 completes it. `tile_risk` under an omniscient view must
+    report exactly the real faan the scorer computes, not `_ASSUMED_DEALIN_FAAN`'s 5.0 proxy."""
+    tile_type = int(TileType.SOU_9)
+    opp_seat = 1
+    opp_hand = _pool(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.PIN_1,
+        TileType.PIN_1,
+        TileType.PIN_3,
+        TileType.PIN_3,
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.SOU_9,
+    )
+    # a prior discard from this seat, so this candidate discard isn't the dealer's first
+    # (avoids entangling this test with the 地糊 timing bonus -- tested on its own merits, not
+    # accidentally here).
+    view = _view(
+        hands=((), opp_hand, (), ()), discard_pools=(_pool(TileType.WIND_EAST), (), (), ())
+    )
+
+    candidate = (*opp_hand, TileId(int(TileType.SOU_9) * 4 + 1))
+    assert hand_is_winning_shape(SeatState(concealed=candidate))
+    ctx = ScoringContext(
+        seat_wind=seat_wind_for(opp_seat, view.dealer),
+        prevailing_wind=view.prevailing,
+        self_drawn=False,
+        flowers=(),
+        flowers_score=view.ruleset.flowers_score,
+    )
+    expected = score_winning_hand(candidate, (), ctx, view.ruleset)
+    assert expected.clears_min_faan  # sanity: this really is a live deal-in, not a sub-minimum win
+
+    assert tile_risk(view, tile_type) == expected.total_faan
+
+
+def test_tile_risk_hands_aware_clears_a_tile_that_looks_dangerous_by_probabilistic_signals() -> (
+    None
+):
+    """Two same-suit melds bump this tile's danger under the probabilistic model
+    (`_meld_danger_multiplier`), but opponent 1's real hand (omniscient view) is nowhere near
+    tenpai on it. The hands-aware path must return exactly 0.0 for that opponent -- proof it is
+    actually using the real hand, not just inheriting the probabilistic estimate."""
+    tile_type = int(TileType.PIN_4)
+    melds = ((), (_pung(TileType.PIN_1), _pung(TileType.PIN_9)), (), ())
+    probabilistic_view = _view(melds=melds)
+    assert deal_in_probability(probabilistic_view, opponent_seat=1, tile_type=tile_type) > 0.0
+
+    far_hand = _pool(
+        TileType.MAN_2,
+        TileType.MAN_4,
+        TileType.MAN_6,
+        TileType.MAN_8,
+        TileType.SOU_2,
+        TileType.SOU_4,
+        TileType.SOU_6,
+        TileType.SOU_8,
+        TileType.WIND_EAST,
+        TileType.WIND_SOUTH,
+        TileType.WIND_WEST,
+        TileType.WIND_NORTH,
+        TileType.DRAGON_RED,
+    )
+    hands_view = _view(melds=melds, hands=((), far_hand, (), ()))
+    assert tile_risk(hands_view, tile_type) == 0.0
+
+
+def test_tile_risk_hands_aware_does_not_flag_a_sub_minimum_structural_win() -> None:
+    """Opponent 1's real hand structurally completes on PIN_9 (three sequences + a pair, plus one
+    already-exposed chow) but the real scorer puts it below the default ruleset's `min_faan=3` --
+    losing 門前清 (not fully concealed) leaves it a bare all-sequence hand. A sub-minimum
+    structural win is not a deal-in (docs/04-bots.md §4), so the hands-aware path must return
+    0.0, not the real (sub-minimum) faan value."""
+    tile_type = int(TileType.PIN_9)
+    opp_seat = 1
+    exposed_chow = Meld(
+        MeldKind.CHOW,
+        tile_ids_for_type(TileType.MAN_1)[:1]
+        + (
+            tile_ids_for_type(TileType.MAN_2)[0],
+            tile_ids_for_type(TileType.MAN_3)[0],
+        ),
+        from_seat=2,
+    )
+    opp_hand = _pool(
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.MAN_6,
+        TileType.PIN_1,
+        TileType.PIN_2,
+        TileType.PIN_3,
+        TileType.PIN_7,
+        TileType.PIN_8,
+        TileType.SOU_5,
+        TileType.SOU_5,
+    )
+    melds = ((), (exposed_chow,), (), ())
+    # a prior discard from this seat -- same "not the dealer's first discard" fixture hygiene as
+    # test_tile_risk_hands_aware_flags_an_exact_deal_in, above.
+    view = _view(
+        hands=((), opp_hand, (), ()),
+        melds=melds,
+        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
+    )
+
+    candidate = (*opp_hand, TileId(int(TileType.PIN_9) * 4))
+    assert hand_is_winning_shape(SeatState(concealed=candidate, melds=(exposed_chow,)))
+    ctx = ScoringContext(
+        seat_wind=seat_wind_for(opp_seat, view.dealer),
+        prevailing_wind=view.prevailing,
+        self_drawn=False,
+        flowers=(),
+        flowers_score=view.ruleset.flowers_score,
+    )
+    expected = score_winning_hand(candidate, (exposed_chow,), ctx, view.ruleset)
+    assert not expected.clears_min_faan  # sanity: genuinely sub-minimum, not a mistaken fixture
+
+    assert tile_risk(view, tile_type) == 0.0
+
+
+def test_tile_risk_hands_none_matches_the_original_probabilistic_formula() -> None:
+    """`view.hands is None` (every tier except `"ORACLE"`) must reproduce the original
+    `P(deal_in) * expected_cost` sum byte-for-byte -- the hands-aware path is a strict override
+    for an omniscient view, not a behavior change for every other tier."""
+    tile = int(TileType.DRAGON_WHITE)
+    view = _view(melds=((), (_pung(TileType.DRAGON_RED),), (_pung(TileType.DRAGON_RED),), ()))
+    assert view.hands is None
+
+    expected = sum(
+        deal_in_probability(view, opp, tile) * expected_cost(view, opp, tile)
+        for opp in range(4)
+        if opp != view.seat
+    )
+    assert tile_risk(view, tile) == expected
+
+
+def test_tile_risk_hands_aware_handles_a_concealed_kong_of_the_candidate_type() -> None:
+    """Regression: opponent 1's real hand already holds all 4 physical copies of PIN_5
+    (a concealed kong candidate) -- a naive synthetic id (`tile_type * 4`, always the block's
+    first id) collides with a real id already in the hand once `decompose` materializes a
+    candidate `Meld`, and `Meld.__post_init__` (mahjong_core/melds.py) raises on a meld built
+    from two equal physical ids. `_synthetic_tile_id` must recognize no 5th-copy placeholder id
+    is available and return `None` instead -- `_exact_deal_in_faan` must then read that as 0.0,
+    not propagate a crash: a 5th physical PIN_5 can't exist, so this discard provably can't deal
+    in via it, the same fact the probabilistic `no_chance` signal captures for the non-hands-aware
+    path."""
+    tile_type = int(TileType.PIN_5)
+    opp_hand = _pool(
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_6,
+        TileType.MAN_7,
+        TileType.SOU_1,
+        TileType.SOU_1,
+        TileType.SOU_2,
+    )
+    view = _view(hands=((), opp_hand, (), ()))
+    assert tile_risk(view, tile_type) == 0.0

@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 
+from app.table import Table
 from app.views import (
     ClaimResolvedWire,
     ConcealedKongWire,
@@ -40,6 +41,7 @@ from app.views import (
     seat_view_wire,
 )
 from bots.random import random_action
+from bots.worker import BOT_TIERS
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -641,6 +643,29 @@ def test_reveal_hands_is_spectator_only() -> None:
             seat_view(state, seat, reveal_hands=True)
         with pytest.raises(ValueError, match="spectator-only"):
             redact_event(state, seat, event, reveal_hands=True)
+
+
+# --- ORACLE tier containment (docs/04-bots.md §10): a real seat's own wire traffic never gets hands
+
+
+@pytest.mark.parametrize("bot_tier", BOT_TIERS)
+@pytest.mark.parametrize("seat", range(4))
+def test_state_sync_wire_never_populates_hands_for_a_real_seat_regardless_of_bot_tier(
+    seat: int, bot_tier: str
+) -> None:
+    """Regression, `ORACLE`-tier-specific: `app/views.py`'s `_omniscient_seat_view` is a
+    deliberate, narrowly-scoped exception to "a real seat's `.hands` is never populated" -- it
+    exists purely to feed `app/table.py`'s `_submit_bot_job` (which drives the `"ORACLE"` tier's
+    plain `FaanBot()` with an omniscient view), and must never leak into what a real WS client
+    actually receives. `state_sync_wire` is exactly that path (`app/ws.py` calls it on
+    join/reconnect/backpressure-collapse) -- confirm it's completely unaffected by which
+    `bot_tier` a table happens to be configured with, `ORACLE` included: a real seat's own
+    `state_sync` never carries another seat's tiles, no matter what bot is driving other seats
+    at this table.
+    """
+    table = Table("table-redaction-bot-tier", RuleSet(), game_seed=1, bot_tier=bot_tier)
+    wire = table.state_sync_wire(seat)
+    assert wire["hands"] is None
 
 
 def test_walker_catches_open_hands_leak() -> None:

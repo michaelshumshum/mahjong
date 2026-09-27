@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import dataclasses
 import random
+from concurrent.futures import Executor, Future
+from typing import Any
 
-from app.table import Table
+from app.table import SeatBinding, Table
 from bots.random import random_action
 from mahjong_core.actions import Discard
 from mahjong_core.config import GameLength, RuleSet
@@ -308,3 +310,102 @@ async def test_state_sync_carries_the_hand_end_deadline_while_the_hold_is_open()
     wire = table.state_sync_wire(0)
     assert wire["phase"] == "HAND_OVER"
     assert isinstance(wire["deadline_ts"], int)
+
+
+# --- bot job pool routing (app/table.py's _shared_bot_pool) ------------------------------------
+
+
+class _RecordingExecutor(Executor):
+    """Minimal `Executor` stand-in, same convention as `tests/test_table_turn_timeout.py`'s
+    `_HangingExecutor` -- `loop.run_in_executor` only needs `submit(fn, *args, **kwargs)`.
+    Resolves immediately with a harmless action id (0, DISCARD tile_type 0) since these tests
+    only care about *which* pool a job lands on, never the decoded result."""
+
+    def __init__(self) -> None:
+        self.submissions: list[tuple[Any, ...]] = []
+
+    def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Any]:
+        self.submissions.append((fn, args, kwargs))
+        future: Future[Any] = Future()
+        future.set_result(0)
+        return future
+
+
+async def test_t2_bot_jobs_route_to_the_default_pool_only() -> None:
+    default_pool = _RecordingExecutor()
+    table = Table(
+        "table-pool-t2",
+        RuleSet(),
+        game_seed=1,
+        bot_tier="T2",
+        bot_pool=default_pool,
+        all_bots=True,
+    )
+    table._poke_bots()  # seat 0 (dealer) is AWAIT_ACTION right after new_game(); 1 job submitted
+    assert len(default_pool.submissions) == 1
+
+
+# --- ORACLE dispatch + disconnect-handover pinning (docs/04-bots.md §10) -----------------------
+#
+# "ORACLE" is a plain FaanBot() fed an omniscient view (bots/worker.py's _make_bot) -- no
+# dedicated rollout bot, no dedicated pool, so there's nothing to pin about pool isolation here.
+# What still needs pinning: the view-building special case itself, and the one real product
+# requirement (disconnect-handover must never build that view for a human's seat).
+
+
+async def test_oracle_bot_job_view_has_hands_populated_for_a_practice_bot_seat() -> None:
+    """A practice-mode `bot` seat (`all_bots=True`, never a real human -- `_bind_bot_seat`) on
+    an `ORACLE` table gets the omniscient view built by `_omniscient_seat_view` -- the whole
+    point of the tier, and the one case where `_submit_bot_job` is allowed to build one. Routes
+    through the ordinary default pool, same as `T2` -- a `FaanBot`-cost decision needs no
+    isolation from other tables' `T1`/`T2` jobs."""
+    default_pool = _RecordingExecutor()
+    table = Table(
+        "table-pool-oracle-view",
+        RuleSet(),
+        game_seed=1,
+        bot_tier="ORACLE",
+        bot_pool=default_pool,
+        all_bots=True,
+    )
+    table._poke_bots()
+    assert len(default_pool.submissions) == 1
+    _fn, args, _kwargs = default_pool.submissions[0]
+    view, _mask, _seed, tier, _deadline = args
+    assert tier == "ORACLE"
+    assert view.hands is not None
+    assert view.hands == tuple(s.concealed for s in table.state.seats)
+
+
+async def test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_oracle() -> None:
+    """The one explicit product requirement behind the `ORACLE` tier's live-dispatch wiring
+    (docs/04-bots.md): a real human's seat gone quiet (`autoplay`) must never be driven by the
+    table's own `bot_tier` when that tier is `ORACLE` -- a human never opted into a bot that
+    sees every other seat's concealed tiles. Verified: the view built for that job is an
+    ordinary `seat_view` (`.hands is None`), never the omniscient one -- both tiers already share
+    the same pool, so there's no separate pool-routing fact left to pin here.
+    """
+    default_pool = _RecordingExecutor()
+    table = Table(
+        "table-disconnect-oracle",
+        RuleSet(),
+        game_seed=1,
+        bot_tier="ORACLE",
+        bot_pool=default_pool,
+    )
+    # seat 0 (dealer, AWAIT_ACTION right after new_game() -- same fact the test above relies on)
+    # is a real human's seat that went quiet, not a practice-mode bot seat -- `status` is
+    # "autoplay", never "bot".
+    table.seat_bindings[0] = SeatBinding(
+        session_id="sess-0",
+        send=lambda seq, wire: None,
+        name="Guest 1",
+        status="autoplay",
+    )
+    table._poke_bots()
+
+    assert len(default_pool.submissions) == 1
+    _fn, args, _kwargs = default_pool.submissions[0]
+    view, _mask, _seed, tier, _deadline = args
+    assert tier == "T2"
+    assert view.hands is None

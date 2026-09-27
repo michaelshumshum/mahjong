@@ -9,6 +9,15 @@ work, not silently skipped.
 No `is_safe(tile) -> bool`: every signal is a multiplier into `deal_in_probability`, a float in
 `[0, 1]` -- `no_chance` is the only hard zero. Genbutsu/suji only ever scale the estimate down,
 never to exactly zero (HK has no furiten).
+
+**`tile_risk` is hands-aware.** When `view.hands` is populated (the `"ORACLE"` tier's omniscient
+view, `app.views._omniscient_seat_view`, docs/04-bots.md §10) every opponent's real hand is
+known, so "does this exact tile complete seat X's exact hand right now" is a direct, cheap, exact
+check -- no rollout, no sampling, and no need for the statistical signals above at all for that
+tier. `_exact_deal_in_faan` replicates `mahjong_core.engine._can_win_with`'s candidate-hand
+pattern outside a live `GameState`/claim window. This is a strict superset: `view.hands is None`
+(every other tier) is untouched, byte-for-byte (`tests/test_safety.py::
+test_tile_risk_hands_none_matches_the_original_probabilistic_behavior` pins it).
 """
 
 from __future__ import annotations
@@ -18,7 +27,12 @@ from statistics import fmean
 
 from app.views import SeatView
 from bots.features import is_terminal_or_honor, seen34
-from mahjong_core.tiles import TileId, TileType, tile_id_type
+from mahjong_core.actions import hand_is_winning_shape
+from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
+from mahjong_core.shanten import shanten
+from mahjong_core.state import SeatState
+from mahjong_core.tiles import TileId, TileType, new_count_array, tile_id_type
 
 __all__ = [
     "deal_in_probability",
@@ -69,6 +83,29 @@ _ASSUMED_DEALIN_FAAN = 5.0
 """Baseline assumed faan if this discard deals in -- arbitrary but documented (halfway between
 min_faan=3 and a half-flush-plus-dragon hand), scaled by `_meld_danger_multiplier`. A relative
 cost unit for ranking candidates, never a real point estimate."""
+
+_SHANTEN_THREAT_BASE = 3
+"""Real-shanten mapping's zero-crossing for `opponent_threat_level`'s hands-aware branch --
+chosen to equal `bots/faanbot.py`'s `_FOLD_SHANTEN` (not imported, to avoid a `safety<->faanbot`
+cycle: `faanbot` already imports this module): an opponent within the same shanten distance our
+own fold gate treats as "still chasing" is exactly the band this scale should call threatening.
+Real shanten 0 (tenpai) -> `3 * _SHANTEN_THREAT_STEP` = 0.9, real shanten 1 -> 0.6, both well past
+`_THREAT_THRESHOLD` (0.3, `bots/faanbot.py`) -- decisive, not borderline. Real shanten 3+ -> 0.0,
+clamped -- clearly safe. `-1` (opponent already complete) -> 1.2, the scale's max, matching
+"worse than any meld-count reading" intent."""
+_SHANTEN_THREAT_STEP = 0.3
+"""Per-shanten-step weight, deliberately equal to the probabilistic proxy's per-meld weight
+(`melds * 0.3` below) -- keeps the two branches on a comparable scale rather than inventing an
+unrelated unit: one shanten step closer to tenpai reads as one exposed meld would.
+
+Deliberately shanten-only, not faan-weighted, even though a bigger threatened hand is more
+dangerous (the same idea `tile_risk`'s exact-faan already captures for defence). This gate only
+decides *whether* `_best_discard` enters pure-defence mode at all; once it does, `tile_risk` --
+already hands-aware -- prices each candidate discard's real faan exactly, including returning 0
+for a structurally-complete-but-sub-`min_faan` opponent hand. Folding a beat early against a
+tenpai opponent who turns out to be sub-minimum costs only tie-break quality among safe discards,
+not a real deal-in avoided that shouldn't have been; duplicating `tile_risk`'s value/min_faan
+logic here would just re-run that check one level up for no behavioural gain."""
 
 
 def no_chance(tile_type: int, seen: Sequence[int]) -> bool:
@@ -178,12 +215,82 @@ def expected_cost(view: SeatView, opponent_seat: int, tile_type: int) -> float:
     return cost
 
 
+def _synthetic_tile_id(tile_type: int, hand: Sequence[TileId]) -> TileId | None:
+    """A placeholder physical id for a hypothetical tile of `tile_type`, distinct from every id
+    already in `hand`. Every function this feeds (`hand_is_winning_shape`, `decompose`,
+    `score_winning_hand`) only ever reads a tile's *type* back out via `tile_id_type` -- never
+    raw id equality -- so any *unused* id in that type's 4-id block is interchangeable. Distinct
+    still matters, though: `decompose` materializes real `Meld` objects from the candidate
+    concealed tiles, and `Meld.__post_init__` (`mahjong_core/melds.py`) rejects a meld built from
+    two equal physical ids -- reusing an id already in `hand` (e.g. always `tile_type * 4`) can
+    collide with a real tile already there and raise, not just misclassify.
+
+    Returns `None` if all 4 physical copies of `tile_type` are already in `hand` -- a 5th
+    physical tile of that type cannot exist, so this discard provably can't deal in via it (the
+    same fact `bots/safety.py`'s probabilistic `no_chance` checks, exactly)."""
+    used = {int(t) for t in hand if int(tile_id_type(TileId(t))) == tile_type}
+    for offset in range(4):
+        candidate = tile_type * 4 + offset
+        if candidate not in used:
+            return TileId(candidate)
+    return None
+
+
+def _exact_deal_in_faan(view: SeatView, opponent_seat: int, tile_type: int) -> float:
+    """Exact per-opponent contribution to `tile_risk` under an omniscient view (`view.hands` is
+    populated): the real faan `opponent_seat` would score by winning on `tile_type` right now,
+    or `0.0` if their real hand provably can't -- either not a complete shape, or a complete
+    shape that doesn't clear `view.ruleset.min_faan` (a sub-minimum structural win is not a
+    deal-in, docs/04-bots.md §4). Mirrors `mahjong_core.engine._can_win_with`'s candidate-hand
+    pattern (append the tile, check shape, score, check `clears_min_faan`) but built directly
+    from `view` rather than a live `GameState`/claim window, since this is a hypothetical
+    "what if this seat discards this tile" check, not resolving a real claim."""
+    assert view.hands is not None
+    assert view.seat is not None
+    hand = view.hands[opponent_seat]
+    melds = view.melds[opponent_seat]
+    synthetic = _synthetic_tile_id(tile_type, hand)
+    if synthetic is None:
+        return 0.0
+    candidate = (*hand, synthetic)
+    if not hand_is_winning_shape(SeatState(concealed=candidate, melds=melds)):
+        return 0.0
+
+    discards_before_this_one = sum(len(pool) for pool in view.discard_pools)
+    ctx = ScoringContext(
+        seat_wind=seat_wind_for(opponent_seat, view.dealer),
+        prevailing_wind=view.prevailing,
+        self_drawn=False,
+        flowers=view.flowers[opponent_seat],
+        won_on_dealer_first_discard=(view.seat == view.dealer and discards_before_this_one == 0),
+        is_last_tile=view.wall_remaining == 0,
+        flowers_score=view.ruleset.flowers_score,
+    )
+    result = score_winning_hand(candidate, melds, ctx, view.ruleset)
+    return float(result.total_faan) if result.clears_min_faan else 0.0
+
+
 def tile_risk(view: SeatView, tile_type: int) -> float:
     """`P(deal_in) * expected_cost`, summed across opponents -- summing instead of the stricter
     `1 - prod(1-p_i)` is deliberate: at `_BASE_RATE`'s small magnitude they're nearly identical,
-    and summing keeps each opponent's contribution separately testable."""
+    and summing keeps each opponent's contribution separately testable.
+
+    When `view.hands` is populated (the `"ORACLE"` tier's omniscient view, docs/04-bots.md §10)
+    this is a strict override, not an addition: every opponent's real hand is known, so
+    `P(deal_in | tile)` collapses from an estimate to an exact 0-or-1 -- the candidate tile
+    either completes that opponent's real hand right now (clearing `min_faan`) or it provably
+    doesn't -- and the cost is the real faan that hand would score, not `_ASSUMED_DEALIN_FAAN`'s
+    proxy. `view.hands is None` (every other tier) reproduces the original probabilistic
+    estimate byte-for-byte -- this function's original behavior is an unconditional fallback,
+    not something that gets reached only sometimes."""
     if view.seat is None:
         raise ValueError("tile_risk needs a seated view, not a spectator's")
+    if view.hands is not None:
+        return sum(
+            _exact_deal_in_faan(view, opponent, tile_type)
+            for opponent in range(4)
+            if opponent != view.seat
+        )
     total = 0.0
     for opponent in range(4):
         if opponent == view.seat:
@@ -194,9 +301,43 @@ def tile_risk(view: SeatView, tile_type: int) -> float:
     return total
 
 
+def _opponent_hand34(view: SeatView, opponent_seat: int) -> list[int]:
+    """`opponent_seat`'s real hand as a 34-array (concealed tiles from `view.hands` plus their
+    own melds) -- mirrors `bots.features.own_hand34`'s shape/meld-counting rule (a kong
+    contributes 3, matching `mahjong_core.shanten`'s contract) but for another seat, only valid
+    when `view.hands` is populated. Duplicated rather than imported: `own_hand34` is hardwired to
+    `view.seat`, and reusing it for an arbitrary opponent seat would mean threading an extra
+    parameter through a helper every other caller expects to mean "this seat"."""
+    assert view.hands is not None
+    counts = new_count_array()
+    for t in view.hands[opponent_seat]:
+        counts[int(tile_id_type(t))] += 1
+    for meld in view.melds[opponent_seat]:
+        tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
+        for t in tiles:
+            counts[int(tile_id_type(t))] += 1
+    return counts
+
+
+def _opponent_real_shanten(view: SeatView, opponent_seat: int) -> int:
+    """`opponent_seat`'s exact shanten (`mahjong_core.shanten.shanten`, `-1` = already won, `0` =
+    tenpai) computed from their real hand -- only valid when `view.hands` is populated."""
+    hand34 = _opponent_hand34(view, opponent_seat)
+    closed = not view.melds[opponent_seat]
+    return shanten(hand34, closed=closed, hand_sets=view.ruleset.hand_sets)
+
+
 def opponent_threat_level(view: SeatView, opponent_seat: int) -> float:
     """Coarse "how worried should T2 be" score for `bots/faanbot.py`'s fold logic -- combines
-    meld count and the tempo signal into a threshold-compared scalar, not a probability."""
+    meld count and the tempo signal into a threshold-compared scalar, not a probability.
+
+    Hands-aware when `view.hands` is populated (the `"ORACLE"` tier's omniscient view,
+    docs/04-bots.md §10): `opponent_seat`'s real shanten replaces the meld/tempo proxy entirely,
+    via `_opponent_real_shanten`/`_SHANTEN_THREAT_STEP` below. `view.hands is None` (every other
+    tier) is untouched, byte-for-byte."""
+    if view.hands is not None:
+        real_shanten = _opponent_real_shanten(view, opponent_seat)
+        return max(0.0, (_SHANTEN_THREAT_BASE - real_shanten) * _SHANTEN_THREAT_STEP)
     melds = len(view.melds[opponent_seat])
     tempo_bump = _tempo_multiplier(view.discard_pools[opponent_seat]) - 1.0
     return melds * 0.3 + tempo_bump
