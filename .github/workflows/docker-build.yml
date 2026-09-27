@@ -48,12 +48,6 @@ jobs:
             context: ./server
             dockerfile: server/Dockerfile
             target: prod
-          # no `ml` target here: torch's install plus a `type=gha,mode=max` cache export of
-          # that layer exhausted a standard ubuntu-latest runner's disk and killed the runner
-          # process outright (2026-09-27, docker-build run 36332754927 — the job died mid-step,
-          # never reported a clean failure). `ml` shares `prod`'s useradd/COPY pattern, already
-          # covered here; server-ml.yml's native `uv sync --extra ml` covers the actual torch
-          # install path without paying Docker's overhead on top of it (docs/07-infra.md §3).
           - name: web dev
             context: .
             dockerfile: web/Dockerfile
@@ -73,3 +67,46 @@ jobs:
           push: false
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  # Separate job, not a 5th matrix entry: torch's PyPI wheel bundles full CUDA (nvidia-cublas,
+  # cudnn, nccl, triton, ...) even though GPU passthrough is commented out in
+  # docker-compose.yml's `trainer` service and docs/99-deferred.md defers GPU training entirely
+  # for now — the `ml` target image is 18.6GB. Kept CUDA-ready rather than switching to a
+  # CPU-only torch wheel, since GPU training is still the eventual plan; that size just means
+  # this stage needs its own disk/cache handling that the matrix's other four (each well under
+  # 1GB) don't. Building it as a plain matrix entry with a `type=gha,mode=max` cache export
+  # crashed a standard runner outright — the job died mid-step with no clean failure
+  # (2026-09-27, run 36332754927) — almost certainly disk exhaustion (~14GB free on a standard
+  # runner, less than the image alone) compounded by GHA's cache-blob upload trying to buffer
+  # that layer in memory.
+  build-server-ml:
+    name: build server ml
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      # frees ~25-30GB: these preinstalled toolchains (dotnet, Android SDK, GHC, CodeQL) are
+      # unused by this job and dwarf the runner's default ~14GB free.
+      - name: free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker image prune --all --force
+      - uses: docker/setup-buildx-action@v3
+      # cache-to/from target the registry, not `type=gha`: GHCR streams large blobs as a normal
+      # OCI push instead of buffering them through the Actions cache-blob API, which is what
+      # crashed the runner above on this image's size.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: server/Dockerfile
+          target: ml
+          push: false
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/cache:server-ml
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/cache:server-ml,mode=max
