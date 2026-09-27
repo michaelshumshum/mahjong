@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { createTable } from '$lib/net/lobby';
 	import CreateTableDialog from '$lib/ui/CreateTableDialog.svelte';
+	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 
 	claimMuralVisible();
@@ -15,21 +15,16 @@
 		goto(`/table/${tableId}`);
 	}
 
-	// practice mode: a solo table with seats 1-3 bot-bound at creation, single click, no dialog.
-	// `?practice=1` (this route's own param) is unrelated in spelling to the wire's `&practice=true`.
-	let practiceSubmitting = $state(false);
-	let practiceError = $state(false);
+	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a dialog to pick
+	// each bot seat's difficulty rather than navigating straight there -- same reasoning as
+	// "Create a table" above, bot tier is fixed at table construction with no path to change it
+	// after. `?practice=1` (this route's own param) is unrelated in spelling to the wire's
+	// `&practice=true`.
+	let showPracticeDialog = $state(false);
 
-	async function startPractice(): Promise<void> {
-		practiceSubmitting = true;
-		practiceError = false;
-		try {
-			const { table_id } = await createTable({ practice: true });
-			goto(`/table/${table_id}?practice=1`);
-		} catch {
-			practiceError = true;
-			practiceSubmitting = false;
-		}
+	function handlePracticeCreated(tableId: string): void {
+		showPracticeDialog = false;
+		goto(`/table/${tableId}?practice=1`);
 	}
 </script>
 
@@ -40,17 +35,21 @@
 			Create a table
 		</button>
 		<a class="secondary" href="/tables">Join a game</a>
-		<button type="button" class="secondary" onclick={startPractice} disabled={practiceSubmitting}>
-			{practiceSubmitting ? 'Starting…' : 'Practice vs Bots'}
+		<button type="button" class="secondary" onclick={() => (showPracticeDialog = true)}>
+			Practice vs Bots
 		</button>
-		{#if practiceError}
-			<p class="lobby-error">Couldn't start a practice table — try again.</p>
-		{/if}
 	</div>
 </div>
 
 {#if showCreateDialog}
 	<CreateTableDialog onCreated={handleCreated} onCancel={() => (showCreateDialog = false)} />
+{/if}
+
+{#if showPracticeDialog}
+	<PracticeSetupDialog
+		onCreated={handlePracticeCreated}
+		onCancel={() => (showPracticeDialog = false)}
+	/>
 {/if}
 
 <style lang="scss">
@@ -102,13 +101,6 @@
 
 	.secondary {
 		@include buttons.btn-secondary;
-	}
-
-	.lobby-error {
-		margin: 0;
-		text-align: center;
-		font-size: var(--font-size-sm);
-		color: var(--color-status-error);
 	}
 
 	a.secondary {

@@ -77,7 +77,26 @@ export interface CreateTableRequest {
 	ruleset?: string;
 	rules?: RuleSet;
 	practice?: boolean;
+	// practice mode's per-seat difficulty picker: seat 1..3 -> a bot tier (seat 0 is the human
+	// seat, never included). Server-side: app/main.py's CreateTableRequest.bot_tiers.
+	bot_tiers?: Record<number, string>;
 }
+
+// the three real, selectable practice difficulties -- T0/RandomBot is never one (docs/04-bots.md
+// §2/§7). Keep in sync with server/app/main.py's _PRACTICE_BOT_TIERS.
+export type PracticeDifficulty = 'easy' | 'normal' | 'impossible';
+
+export const PRACTICE_DIFFICULTY_TO_TIER: Record<PracticeDifficulty, string> = {
+	easy: 'T1',
+	normal: 'T2',
+	impossible: 'ORACLE'
+};
+
+export const PRACTICE_DIFFICULTY_OPTIONS: { value: PracticeDifficulty; label: string }[] = [
+	{ value: 'easy', label: 'Easy' },
+	{ value: 'normal', label: 'Normal' },
+	{ value: 'impossible', label: 'Impossible' }
+];
 
 export interface CreateTableResponse {
 	table_id: string;

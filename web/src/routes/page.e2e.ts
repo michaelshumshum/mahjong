@@ -107,7 +107,7 @@ test('lobby create table with custom rules sends the edited RuleSet, never multi
 	});
 });
 
-test('lobby practice vs bots navigates straight to a practice table, no dialog', async ({
+test('lobby practice vs bots opens a difficulty dialog, then navigates to the practice table', async ({
 	page
 }) => {
 	await mockCreateTable(page, 'XYZ789');
@@ -115,7 +115,35 @@ test('lobby practice vs bots navigates straight to a practice table, no dialog',
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
 
+	await expect(page.getByRole('dialog', { name: 'Practice vs Bots' })).toBeVisible();
+	await page.getByRole('button', { name: 'Start', exact: true }).click();
+
 	await expect(page).toHaveURL('/table/XYZ789?practice=1');
+});
+
+test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ page }) => {
+	let sentBody: Record<string, unknown> | null = null;
+	await page.route('**/tables', (route) => {
+		if (route.request().method() !== 'POST') return route.fallback();
+		sentBody = route.request().postDataJSON();
+		return route.fulfill({
+			json: { table_id: 'DIFF456', ruleset_preset: 'hk_classic', ruleset: {} }
+		});
+	});
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
+
+	const dialog = page.getByRole('dialog', { name: 'Practice vs Bots' });
+	await dialog.locator('input[name="seat-1-difficulty"][value="easy"]').check();
+	await dialog.locator('input[name="seat-3-difficulty"][value="impossible"]').check();
+	await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+
+	await expect(page).toHaveURL('/table/DIFF456?practice=1');
+	expect(sentBody).toMatchObject({
+		practice: true,
+		bot_tiers: { 1: 'T1', 2: 'T2', 3: 'ORACLE' }
+	});
 });
 
 test('lobby join a game link opens the tables page', async ({ page }) => {
