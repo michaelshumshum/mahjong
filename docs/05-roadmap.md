@@ -213,8 +213,14 @@ ones in progress, and `/table/[id]` renders a spectator view whenever no seat is
 host-facing settings UI / wire message to toggle it, and a delayed reveal for human tables.
 
 ### M6 — Depth (ongoing)
-Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). Replay viewer
-(reusing the client reducer). Sound. **Ruleset presets: built.**
+Arena harness deepening (`FaanBot` itself now ships in M4 — see above, not here). **T3
+`SearchBot`: built, then removed.** Determinized-world rollout search shipped, was debugged
+twice (real bugs, not tuning), and stayed statistically worse than plain `FaanBot` in arena
+validation — a structural ceiling from the rollout policy's own noise, not a fixable
+implementation gap. Deleted; no tier currently occupies the "Expert" difficulty rung. Full
+design/removal writeup: [04-bots.md §6](04-bots.md); revival requirements:
+[99-deferred.md](99-deferred.md). Replay viewer (reusing the client reducer). Sound.
+**Ruleset presets: built.**
 `mahjong_core.presets.RULESET_PRESETS` (`hk_classic`/`hk_casual`/`hk_strict`) plus a `custom`
 `RuleSet.from_dict` path, resolved by `POST /tables` (`docs/02-protocol.md §10`, the primary
 one-request table-creation path that also generates the table id server-side now — table ids are

@@ -7,6 +7,21 @@ human gets — and returns an intent. It has no access to `GameState`, the wall,
 (`redact_event` is the separate wire-facing function for outbound events; bots don't use it. See
 [00-architecture.md](00-architecture.md).)
 
+**One deliberate exception: `"ORACLE"` (§10).** A worker process never receives real hidden
+information beyond `view.own_hand` — with exactly one exception, contained to one tier and one
+call site. `"ORACLE"` is a plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a
+`SeatView` with `.hands` populated (every seat's concealed tiles), built by `app/views.py`'s
+`_omniscient_seat_view` —
+the only call site for that function anywhere in the codebase is `app/table.py`'s
+`_submit_bot_job`, in its oracle-tier branch, verified structurally
+(`tests/test_oracle_containment.py`). This is safe to cross the `ProcessPoolExecutor` boundary
+specifically because `SeatView` never carries `game_seed`/`hand_seed` — the "`game_seed` never
+leaves this process" invariant ([00-architecture.md §3](00-architecture.md)) is about the seed,
+not about tile visibility — and it never reaches a real client: disconnect-handover always uses
+`T2`/`FaanBot` regardless of the table's configured tier, so a human's own seat can never be
+driven by `"ORACLE"`, and no wire-facing function (`seat_view_wire`, `state_sync_wire`) ever
+calls `_omniscient_seat_view`. See §10 for the full design.
+
 ```python
 class Bot(Protocol):
     async def act(self, view: SeatView, mask: list[bool], deadline: float) -> int:
@@ -53,7 +68,8 @@ the delay by yet.
 `bots/worker.py`'s `compute_action` drives the real `Bot.act` tiers. A worker process never
 receives `GameState` (the table's `game_seed` must never leave its own process), so it can't call
 `decode_action(aid, state, seat)` itself — `compute_action` builds the requested tier
-(`T0`/`T1`/`T2`, `app/table.py`'s `Table.__init__(bot_tier=...)`, default `T2`/`FaanBot`) and drives
+(`T0`-`T2`/`ORACLE`, `bots.worker.BOT_TIERS`; `app/table.py`'s `Table.__init__(bot_tier=...)`,
+default `T2`/`FaanBot`) and drives
 its real `act(view, mask, deadline)` via `asyncio.run` (the worker has no running event loop of
 its own — same pattern `bots/arena.py`'s `ProcessPoolExecutor` entry point uses), returning a
 bare action id. `app/table.py`'s `_handle_bot_result` decodes it, since it already holds the real
@@ -66,11 +82,13 @@ bare action id. `app/table.py`'s `_handle_bot_result` decodes it, since it alrea
 | **T0** `RandomBot` | uniform over legal actions | 20 lines | fuzzing, engine tests, never shipped |
 | **T1** `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak | ~400 lines | "Easy". Ship in M4. |
 | **T2** `FaanBot` | T1 + hand-value planning + discard safety | ~900 lines | "Normal"/"Hard". Moved into M4 (see §4) — the real product. **Built (M4)** — see §4/§5/§8 for the shipped design and real arena numbers. |
-| **T3** `SearchBot` | determinized rollouts / MCTS over the pure engine | large | Deferred — see [99-deferred.md](99-deferred.md). |
-| **T4** learned policy | supervised on self-play or human logs | research | optional, later |
+| **T3** `SearchBot` | determinized-world rollout search over the pure engine | ~350 lines | **Built (M6), then removed** — statistically worse than `FaanBot` after two real debugging rounds; a structural ceiling, not a bug. No tier currently occupies "Expert" — see §6/§7. |
+| **T4** learned policy | supervised on self-play or human logs | research | optional, later — see §6's closing note on what would make a future search-based tier viable |
+| **`ORACLE`** | a plain `FaanBot()` fed full-information (`view.hands`) instead of the ordinary view | 0 extra lines (reuses `FaanBot`) | **not on this ladder** — explicitly opt-in only, a table has to be deliberately configured to run it; never a difficulty option (§7). **Built** — see §10 for the shipped design and the safety argument. |
 
-Ship T1 and T2 in M4 (§4 explains why T1 alone can't satisfy M4's done-gate). T3 is out of scope
-for now — see [99-deferred.md](99-deferred.md).
+Ship T1 and T2 in M4 (§4 explains why T1 alone can't satisfy M4's done-gate). T3 was out of scope
+for M4 and shipped later, in M6, once the per-tier pool-routing precondition existed — see §6 for
+the shipped design, the arena result, and why it was removed rather than kept and re-tuned.
 
 ## 3. Shanten and ukeire
 
@@ -249,15 +267,118 @@ not silently skipped — see `bots/safety.py`'s module docstring for the same di
 the code. Nineteen unit tests (`tests/test_safety.py`) pin each signal's *direction*, not its
 calibrated accuracy.
 
-## 6. T3 / search, and bot personas
+## 6. T3 `SearchBot` — built, debugged twice, removed
 
-Deferred — see [99-deferred.md](99-deferred.md). That entry now also carries a concrete
-execution-model finding worth reading before starting this: `_shared_bot_pool()` (§3) is one
-`ProcessPoolExecutor` shared by every tier and every table, and a 300–800ms T3 job on it would
-head-of-line-block T1/T2 jobs from unrelated tables. Per-tier pool routing is the fix, but it's
-deliberately not built yet — no real consumer, and it needs per-core throughput measurement on
-real hardware to size. Don't rediscover this from scratch; see `99-deferred.md`'s "T3 — search"
-entry for the full reasoning and what un-deferring requires.
+**Removed.** Was `server/bots/search.py`: determinized-world Monte Carlo rollout search. Per
+decision (only for a real `Phase.AWAIT_ACTION` turn): sample N worlds consistent with the
+redacted `SeatView`, for each legal root action roll forward up to `rollout_depth` further
+decisions with `FaanBot` acting for every seat, value a rollout by its real point delta if it
+reached `HAND_OVER` or a shanten/reachable-faan/ukeire proxy if it hit the depth cap first,
+average each action's value across the worlds it was evaluated in, return the best. Full
+original design — `determinize()`'s tile-conservation argument, the scope cuts
+(`AWAIT_ACTION`-only search, bounded-depth rollout instead of full hand-to-`HAND_OVER`, strategy
+fusion accepted-not-solved, the dedicated pool sizing), and the arena numbers below — is
+preserved as the historical record in [99-deferred.md](99-deferred.md)'s "T3 `SearchBot`" entry,
+which also carries the real requirements for a future revival.
+
+### What happened
+
+Two real debugging rounds (the same session that also redesigned `ORACLE`, §10) found and fixed
+three genuine bugs in the rollout search — not tuning:
+
+1. **Sampling bias.** A fixed ascending `legal_ids` iteration order, combined with deadline
+   pressure cutting a world's candidate sweep short (routine under the real time budget),
+   systematically starved every candidate after the cutoff point of samples, on every world,
+   every decision — a bias toward low action ids, not neutral variance. Fixed by shuffling
+   candidate order per world.
+2. **Tie-break bias.** The value-estimate proxy is small-integer-valued, so an exact tie for the
+   best average action value is common, not a corner case — confirmed directly against real
+   self-play decisions: 20 of 40 sampled decisions had a multi-way tie, and `max()`'s
+   first-encountered-wins tie-break resolved every one of those 20 to the lowest action id. Fixed
+   by breaking ties uniformly at random.
+3. **Missing ukeire term.** The value-estimate proxy combined only shanten and reachable-faan,
+   both frequently tied across candidates too — leaving the rollout with no signal to break the
+   tie-break bug's own tie, exactly on "which of these equally-safe discards actually opens up
+   more tiles." Fixed by adding a scaled ukeire term, mirroring `bots/faanbot.py`'s own
+   `_speed_term`.
+
+All three are real, independently diagnosed, and independently justified. Despite that, the
+flagship arena metric (tenpai rate) barely moved. The final validation run (15 duplicate sets,
+paired-duplicate methodology, §8) with all three fixes live:
+
+```
+paired difference (SearchBot - FaanBot), mean points/game: -13.156
+95% CI: [-25.581, -0.730]  -- excludes zero, in FaanBot's favor
+tenpai_at_draw_rate: SearchBot 6.35% vs FaanBot 51.85%
+```
+
+Decisively worse than the tier it was supposed to sit a rung above, and the core symptom —
+almost never reaching tenpai — essentially unchanged from the smaller (8 duplicate sets),
+CI-includes-zero plausibility check this section originally reported before the fixes.
+
+### Why removed, not re-tuned
+
+Same root-cause diagnosis §10's "History" subsection already reached for `OracleBot`'s
+predecessor: both bots rolled out every candidate through the same noisy, few-sample,
+`FaanBot`-driven rollout, so search could only ever be as good as "which root action leads to the
+best downstream `FaanBot`-driven outcome" — a noisy value estimate could, and did, pick a worse
+root action than `FaanBot` would have chosen directly. Three unrelated, correctly-diagnosed
+implementation bugs fixed with zero movement on the flagship metric is the signature of hitting
+that ceiling, not of needing one more fix.
+
+The literature agrees, and predicts this specific failure mode:
+
+- **Determinized/"perfect information Monte Carlo" (PIMC) search has two named pathologies**:
+  *strategy fusion* (the search plans a different continuation per sampled world, which a real
+  player can't do across their own single hidden hand) and *non-locality* (a subtree's true value
+  depends on the opponent's actual strategy, not just what a rollout policy happens to do in it).
+  `SearchBot`'s own module docstring already named strategy fusion as an accepted, unsolved
+  weakness — it isn't a fringe concern: Cazenave & Ventos's αμ search
+  ([arXiv:1911.07960](https://arxiv.org/abs/1911.07960)) exists specifically because PIMC's
+  strategy-fusion/non-locality pathologies are severe enough in Bridge (a comparable
+  hidden-information trick game) to need a structurally different search algorithm, not a better
+  heuristic inside the same PIMC loop.
+- **[arXiv:1904.07491](https://arxiv.org/abs/1904.07491)** (Kurita & Hoki, already cited by this
+  doc for strategy fusion) does not build a naive determinized-rollout MCTS over mahjong's raw
+  game tree at all — its whole contribution is an MDP *abstraction* specifically to make search
+  tractable and meaningful under mahjong's imperfect information. A real, published mahjong-AI
+  approach in the same design space avoiding exactly the algorithm shape `SearchBot` used is
+  independent evidence that plain PIMC with a heuristic rollout policy is a known-weak fit here,
+  not a novel discovery of this project's own arena runs.
+- **Suphx** ([arXiv:2003.13590](https://arxiv.org/abs/2003.13590)) and **Mortal**
+  (`docs/06-ml.md`'s other reference architecture) are both learned value/policy-function
+  approaches — Suphx a deep network trained via self-play RL, Mortal a pure forward pass through a
+  trained network — neither a heuristic-rollout search. That the two strongest published mahjong
+  AIs both spent their engineering budget on a learned evaluator instead of search depth is
+  consistent with PIMC's known dependence on rollout/evaluation quality: averaging over sampled
+  worlds only beats the policy itself if the per-node value estimate carries real signal, and a
+  hand-tuned heuristic's own scoring is already close to whatever a shallow rollout of it can
+  discover — so the search layer mostly adds small-sample noise, not new signal.
+
+None of this indicts `FaanBot` (§4/§8's numbers stand on their own) or the engineering of
+`bots/search.py` (`determinize()`'s tile-conservation guarantee, the deadline discipline, the
+three bug fixes above are all real, correct work) — it indicts the specific combination of
+"determinized rollout" plus "the same static heuristic as both the acting policy and the leaf
+evaluator," as an approach, for this game, at this evaluation-function quality.
+
+### What would make a future attempt viable
+
+Not attempted in this pass; full requirements captured in
+[99-deferred.md](99-deferred.md) so a revival starts from the real constraint list instead of
+re-discovering it. In rough order of realism: (a) a rollout leaf evaluator meaningfully better
+than a shallow rollout of the same heuristic used as the policy — realistically a learned value
+function (T4), itself blocked on compute-budget/training-corpus/success-metric decisions nobody
+has made yet; (b) real information-set MCTS (solves strategy fusion/non-locality properly, unlike
+determinization) — already flagged as non-trivial, undone design work, not a parameter change;
+(c) materially more rollout budget — arithmetically incompatible with the measured ~4.7ms/decision
+× ~83 decisions/hand economics at this project's target concurrency (200 tables × 3 bot seats)
+unless that target or the hardware budget changes.
+
+### Bot personas
+
+Still deferred — see [99-deferred.md](99-deferred.md)'s "Bot personas" entry. Unaffected by `T3`
+shipping or its later removal: a persona (name, play-style bias, think-time distribution) is
+layered on top of whichever tier answers, not a tier itself.
 
 ## 7. Difficulty levels
 
@@ -266,7 +387,17 @@ entry for the full reasoning and what un-deferring requires.
 | Easy | T1, no safety model, calls melds too eagerly |
 | Normal | T2 with mild weights, occasional suboptimal discard (ε ≈ 0.1), no fold logic |
 | Hard | T2 tuned, full safety model, fold logic |
-| Expert | Deferred — see [99-deferred.md](99-deferred.md). |
+
+**No "Expert" row currently ships.** T3 `SearchBot` was built and was meant to fill it, but was
+removed after arena validation showed it decisively worse than `FaanBot`/"Hard" — see §6 for the
+full history and why. "Hard" (tuned T2) is the strongest tier a normal player can select today;
+revisit this table if/when §6's "What would make a future attempt viable" is ever acted on.
+
+`ORACLE` (§10) is **not** a candidate for this table either way, past or future — it isn't a
+difficulty a player picks, it's a full-information analysis/showcase tier a table opts into
+explicitly (UI for that opt-in is a separate, later task). It was never meant to be read as
+"harder than Expert" on the same continuum; the actual difference is information level, not
+skill.
 
 ## 8. Evaluation harness
 
@@ -502,3 +633,312 @@ carries `ruleset: RuleSet` (Tier 1), and every Tier 2 item below is now closed t
   `hand_sets` item too, but worth revisiting since an `hk_strict` arena run's tenpai-rate stat
   currently over-counts hands that are only tenpai via a Seven Pairs shape that table can't
   complete.
+
+## 10. `"ORACLE"` tier
+
+**Built, redesigned.** A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a `SeatView`
+with every seat's concealed tiles populated (`.hands`) instead of only `view.own_hand` — no
+dedicated class, no search, no rollout. Same `Bot.act(view, mask, deadline) -> int` shape as every
+other tier, unchanged from `faanbot.py`. **Not on the T0-T2 difficulty ladder** (§2/§7): explicitly
+opt-in only, a live table has to be deliberately configured to run it — UI/protocol work for
+actually offering that choice in table setup (`CreateTableDialog.svelte`/`POST /tables`) is a
+separate, later task; a table *could* run it today via direct `Table(bot_tier="ORACLE")`
+construction, just not through the lobby yet.
+
+### History: why the original rollout-based design got replaced
+
+The tier originally shipped as `bots/oracle.py`'s `OracleBot`: a `SearchBot`-style determinized-
+wall rollout search, differing from `SearchBot` only in how the root `GameState` was built
+(`view.hands` fixes hand composition exactly, so only wall *draw order* needed sampling). Two
+rounds of debugging `SearchBot`'s shared rollout algorithm found and fixed three real bugs there
+(sampling bias, tie-break bias, missing ukeire signal), but `SearchBot` stayed statistically worse
+than `FaanBot` in arena validation, and `OracleBot` inherited the same ceiling despite full
+information. The root cause was structural, not a tuning problem: both bots rolled out every
+candidate action using `FaanBot` as the policy for every future decision, so search could only ever
+be as good as "which root action leads to the best downstream `FaanBot`-driven outcome" — a noisy
+few-sample value estimate could (and did) pick a worse root action than `FaanBot` would have chosen
+directly. Full information wasn't fixing this: it only changed which *worlds* got sampled (wall
+order), not how a candidate got evaluated — every candidate was still scored through the same
+noisy rollout machinery.
+
+The actual fix needed no search at all. `bots/safety.py`'s `tile_risk` exists because a normal bot
+can't know whether a discard deals in — it estimates `P(deal_in | tile)` from genbutsu/suji/meld-
+reading/wall-pressure, explicitly documented as "statistical evidence, not proof" (§5). That is the
+one thing full information genuinely eliminates: with every opponent's hand known, "does this exact
+tile complete seat X's exact hand right now" is a direct, cheap, exact check — no rollout, no
+sampling, no noise. Making `tile_risk` hands-aware (below) means `FaanBot`'s own existing
+`_best_discard` — completely unmodified — already exploits full information correctly the moment
+it's handed an omniscient view. `bots/oracle.py` is deleted; nothing from its rollout loop was worth
+keeping (`_omniscient_state`'s tile-accounting logic was the one piece that looked reusable, but the
+exact-win check below needed a different shape — a candidate `SeatState` per opponent per candidate
+tile, not a whole determinized `GameState` — so it was rewritten rather than reused).
+
+### The exact-danger mechanism
+
+`bots/safety.py`'s `tile_risk(view, tile_type)` branches on `view.hands`:
+
+- **`view.hands is None`** (every tier except `"ORACLE"`): byte-identical to the original
+  probabilistic model — `sum(deal_in_probability(view, opp, tile_type) * expected_cost(view, opp,
+  tile_type) for opp in ...)`. A strict superset, not a replacement (`tests/test_safety.py::
+  test_tile_risk_hands_none_matches_the_original_probabilistic_formula` pins this).
+- **`view.hands is not None`**: for each opponent, `_exact_deal_in_faan` builds the candidate hand
+  they'd have if this exact tile landed in their real concealed tiles (`(*view.hands[opp],
+  synthetic_tile)`), and mirrors `mahjong_core.engine._can_win_with`'s own candidate-hand pattern —
+  the same one `actions.can_declare_win` uses for the self-draw path — but built directly from
+  `SeatView` fields instead of a live `GameState`/claim window, since this is a hypothetical "what
+  if this seat discards this tile" check, not resolving a real claim:
+  1. `mahjong_core.actions.hand_is_winning_shape(SeatState(concealed=candidate, melds=opp_melds))`
+     — structural completeness (standard melds+pair, Seven Pairs, or Thirteen Orphans).
+  2. If structurally complete, build a `mahjong_core.scoring.patterns.ScoringContext` (seat wind,
+     prevailing wind, `self_drawn=False`, the opponent's real flowers, `ruleset.flowers_score`) and
+     call `mahjong_core.scoring.faan.score_winning_hand(candidate, opp_melds, ctx, view.ruleset)`.
+  3. Return the real `total_faan` if `result.clears_min_faan`, else `0.0` — a structurally-complete
+     hand that doesn't clear the ruleset's `min_faan` is not a deal-in (§4), and never was under
+     the probabilistic model either.
+
+  The synthetic candidate tile's *physical id* doesn't matter for correctness — every function in
+  this chain reads a tile's type back out (`tile_id_type`), never its specific id — except that
+  `decompose()` materializes real `Meld` objects from the candidate, and `Meld.__post_init__`
+  rejects two equal physical ids in one meld. `_synthetic_tile_id` picks an id in that type's 4-copy
+  block not already present in the opponent's hand, and returns `None` (read as `0.0` risk, not a
+  crash) if all 4 real copies are already accounted for in that hand — a 5th physical tile of that
+  type cannot exist, so this discard provably can't deal in via it. (This was a real bug caught by
+  the arena verification script, not by unit tests alone — see "Verification" below.)
+
+Since `FaanBot`'s `_best_discard` already calls `tile_risk(view, d)` for every candidate discard,
+and does not read `view.hands` itself anywhere, no change to `faanbot.py` was needed at all —
+`tile_risk` becoming hands-aware is sufficient for the whole tier.
+
+### The fold-timing gap: `opponent_threat_level` needed the same treatment
+
+`tile_risk` being exact under `view.hands` only ever changes *which tile* `_best_discard` picks
+once it's already decided to play defensively — it says nothing about *when* to switch into
+defence. That decision is a separate gate, `bots/faanbot.py`'s `fold_mode = turn >= late_turn and
+base_shanten >= _FOLD_SHANTEN and threatening`, and `threatening` was still computed by
+`opponent_threat_level`'s original meld-count/discard-tempo proxy — purely inferential, and blind
+to `view.hands` even when it was populated. An `"ORACLE"` seat could sit on exact per-tile deal-in
+math while still deciding *whether to use it* off the same guesswork every other tier relies on:
+an opponent with no exposed melds and steady discard tempo read as zero threat regardless of
+whether their real hand was genuinely tenpai, and a meld-heavy, fast-discarding opponent read as
+dangerous regardless of whether their real hand was nowhere close. This is very likely why the
+original redesign's win-rate gain (17.5% vs 14.7%, below) was modest relative to its points/
+deal-in swing — the fold gate could stay closed against a real tenpai opponent, or open
+unnecessarily against a harmless one, independent of how exact `tile_risk` itself was.
+
+`opponent_threat_level` (`bots/safety.py`) now branches on `view.hands` the same way `tile_risk`
+does:
+
+- **`view.hands is None`** (every tier except `"ORACLE"`): byte-identical to the original
+  `melds * 0.3 + tempo_bump` formula (`tests/test_safety.py::
+  test_opponent_threat_level_hands_none_matches_the_original_probabilistic_formula` pins it).
+- **`view.hands is not None`**: `_opponent_real_shanten` computes `opponent_seat`'s exact shanten
+  (`mahjong_core.shanten.shanten`) from their real hand (`_opponent_hand34` — `view.hands[opp]`
+  plus their own melds, the same 34-array shape `bots.features.own_hand34` builds for this seat)
+  and maps it onto the proxy's own scale: `max(0.0, (_SHANTEN_THREAT_BASE - real_shanten) *
+  _SHANTEN_THREAT_STEP)`, with `_SHANTEN_THREAT_BASE = 3` (deliberately equal to `faanbot.py`'s
+  own `_FOLD_SHANTEN`, not imported — `faanbot` already imports this module, so importing back
+  would cycle) and `_SHANTEN_THREAT_STEP = 0.3` (deliberately equal to the proxy's per-meld
+  weight). Concretely, against `_THREAT_THRESHOLD = 0.3`: real shanten 0 (tenpai) scores 0.9, real
+  shanten 1 scores 0.6 — both decisively past the threshold, matching "near-tenpai should clear
+  it decisively" — real shanten 3+ clamps to 0.0, clearly safe, and an opponent who already has a
+  complete hand (shanten `-1`, e.g. mid-decision before their win is taken) scores 1.2, the top of
+  the scale. One shanten step closer to tenpai reads as threatening as one more exposed meld did
+  under the old proxy — the two branches stay on a comparable scale by construction rather than
+  inventing an unrelated unit.
+
+  Deliberately shanten-only, not faan-weighted, even though a bigger threatened hand is more
+  dangerous — the same idea `tile_risk`'s exact faan already captures for defence. This gate only
+  decides *whether* `_best_discard` enters pure-defence mode at all; once it does, `tile_risk` —
+  already hands-aware — prices each candidate discard's real faan exactly, including returning
+  `0.0` for a structurally-complete-but-sub-`min_faan` opponent hand (§4). Folding a beat early
+  against a tenpai opponent who turns out to be sub-minimum costs only tie-break quality among
+  already-safe discards, not a real deal-in avoided that shouldn't have been; duplicating
+  `tile_risk`'s value/`min_faan` logic here would re-run that check one level up for no
+  behavioural gain.
+
+`tests/test_safety.py` proves the fix catches what the proxy misses, not just that it runs: an
+opponent with no melds and too short a discard pool to raise the tempo signal reads as zero threat
+under the proxy but is genuinely tenpai under the omniscient view, and hands-aware
+`opponent_threat_level` flags them while the proxy — evaluated on the identical position — does
+not (`test_opponent_threat_level_hands_aware_flags_a_near_tenpai_opponent_the_proxy_misses`); an
+opponent with two exposed melds and a settled discard tempo reads as clearly threatening under the
+proxy but is genuinely far from tenpai (shanten 4) under the omniscient view, and hands-aware
+`opponent_threat_level` correctly reads them as safe (`0.0`) while the proxy does not
+(`test_opponent_threat_level_hands_aware_clears_an_opponent_that_looks_threatening_by_proxy`).
+`tests/test_oracle.py::
+test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_as_safe` proves the fix
+reaches a real `FaanBot.act` decision, not just the helper in isolation: an opponent with zero
+melds and an empty discard pool is genuinely tenpai, tanki-waiting on exactly the tile
+`_best_discard`'s ordinary value-weighted scoring would pick anyway. Under the ordinary
+(probabilistic) view the fold gate never opens (proxy threat stays below `_THREAT_THRESHOLD`) and
+`FaanBot` walks straight into the deal-in; under the omniscient view, real shanten correctly opens
+the gate and — combined with `tile_risk`'s own exact per-tile danger — `FaanBot` avoids that tile
+specifically. Both fixes have to fire together for that outcome: fold mode alone (a threat flag
+with no exact per-tile danger) wouldn't single out the one dangerous tile, and exact `tile_risk`
+alone with fold mode never engaging wouldn't change `_best_discard`'s scoring formula at all.
+
+### Why full information genuinely eliminates the noise, not just reduces it
+
+Under the probabilistic model, genbutsu is deliberately never a hard "safe" signal (§5 item 1) —
+HK has no furiten, so an opponent can discard a tile and legally win on it later once their hand
+reshapes. That's exactly the gap exact information closes: with `view.hands` populated, "would
+opponent's *current* real hand complete on this tile" has a definite yes/no answer, no matter what
+they discarded earlier. `tests/test_oracle.py::
+test_omniscient_view_avoids_a_real_deal_in_the_probabilistic_view_walks_into` is a scripted
+instance of exactly this: an opponent who discarded 北 early (creating weak genbutsu "safety"
+evidence) but whose real hand has since reshaped into a live Seven Pairs wait on 北 — the
+probabilistic-only view has `FaanBot` discard straight into it, the omniscient view avoids it.
+
+### Why a full-information bot is safe to wire into a live table
+
+A prior pass at this idea assumed it had to stay an offline-only arena-analysis tool, never
+reachable from a live table, on the theory that handing a bot every seat's tiles was
+irreconcilable with the redaction boundary ([00-architecture.md §5](00-architecture.md)). That
+turned out to be more conservative than necessary once re-examined against the actual code:
+
+- `SeatView` (`app/views.py`) already has a `hands: tuple[tuple[TileId, ...], ...] | None`
+  field — used today for the spectator-only `BOTS` showcase table
+  (`spectators_see_hands`/`reveal_hands`, [00-architecture.md §5](00-architecture.md)).
+- **`SeatView` never carries `game_seed`/`hand_seed`** — check its field list
+  ([00-architecture.md §5](00-architecture.md)) — so a `SeatView` with `.hands` populated
+  crossing the `ProcessPoolExecutor` boundary does **not** violate
+  [00-architecture.md §3](00-architecture.md)'s "`game_seed` never leaves this process"
+  invariant. That invariant is about the seed specifically (it determines every *future* hand's
+  wall), not about whether a bot ever sees the *current* hand's tiles.
+- `seat_view()`'s `_check_reveal` guard still raises if `seat is not None` when
+  `reveal_hands=True` — spectator-only, unchanged, still the real security boundary for every
+  real WS-facing client. `app/views.py` instead adds a **new, separate, dangerously-named**
+  function, `_omniscient_seat_view(state, seat) -> SeatView`, that builds an omniscient view for
+  a real acting seat — the one thing `_check_reveal` forbids — used by exactly one caller:
+  `app/table.py`'s `_submit_bot_job`, in its oracle-tier branch. This is verified structurally,
+  not just asserted: `tests/test_oracle_containment.py` AST-scans every production source file
+  under `server/` and fails if `_omniscient_seat_view` is ever called from anywhere but
+  `Table._submit_bot_job`. `tests/test_redaction.py` separately pins that `Table.state_sync_wire`
+  — what a real WS client actually receives — never populates `.hands` for a real seat, for
+  every `bot_tier` including `ORACLE`.
+- `_submit_bot_job` already builds the `view` that crosses the process-pool boundary; the fix is
+  entirely in `app/table.py`: when the *effective* tier for a seat's decision is `ORACLE`, build
+  the view via `_omniscient_seat_view` instead of the normal `seat_view(state, seat)`. No change
+  to `compute_action`'s signature, no new `Bot` protocol member, and — critically — no
+  `GameState` ever crosses the process boundary; the `"ORACLE"`-tier `FaanBot` still only ever
+  sees a `SeatView`.
+
+### Disconnect-handover carve-out
+
+**The one explicit product requirement here:** disconnect-handover (a real human's seat gone
+`autoplay`) always runs `T2`/`FaanBot`, never the table's configured `bot_tier` — regardless of
+what tier the table itself uses. `Table._effective_bot_tier(seat)` (`app/table.py`) is the one
+place this is decided: a `seat_bindings[seat].status == "autoplay"` seat is pinned to
+`_DISCONNECT_HANDOVER_BOT_TIER` (`"T2"`) unconditionally; only a `bot`-status seat (practice
+mode / `all_bots`, bound at construction, never a real human) uses `self._bot_tier` as
+configured. This carve-out matters exactly as much post-redesign as before it: `"ORACLE"` and
+`"T2"` are both `FaanBot` underneath now, but a human's seat must still never be driven by the
+*omniscient view* — the bot class is no longer the risk, the view is.
+`tests/test_table.py::test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_oracle`
+pins this directly: an `autoplay`-status seat on an `ORACLE`-tier table still gets an ordinary
+(`.hands is None`) view.
+
+### Pool routing
+
+No dedicated pool. The original rollout-based `OracleBot` got its own `_shared_oracle_bot_pool`
+(`ProcessPoolExecutor(max_workers=2)`) on the assumption its per-decision cost was at least as
+expensive as `SearchBot`'s 300-800ms budget — true for a rollout search, false for a plain
+`FaanBot` decision, which costs the same single-digit milliseconds as `T2` always has (root-state
+construction changed from "sample every opponent's hand" to "read `view.hands` directly," and
+there's no rollout loop left to dominate the cost). `_shared_oracle_bot_pool` is deleted;
+`"ORACLE"` jobs route to the same pool every tier now shares (`app/table.py`'s
+`_submit_bot_job`) — `T3`'s own isolated pool existed for the same reason `SearchBot`'s
+per-decision cost justified not head-of-line-blocking other tables, and was removed along with
+`SearchBot` itself (§6).
+
+### Verification
+
+`docker compose run --rm --no-deps api uv run python -m tools.oracle_arena_check --games 15
+--seed 1` — a scratch script (not shipped; reused `bots/arena.py`'s duplicate-seeding/paired-
+difference machinery, rotating which seat gets the omniscient view across the same 4 seeds
+`bots/arena.py`'s own duplicate sets use) comparing the `"ORACLE"` tier against plain `FaanBot`,
+15 duplicate sets (60 games):
+
+| Metric | ORACLE (A) | FaanBot (B) |
+| --- | --- | --- |
+| win_rate | 0.1750 | 0.1472 |
+| deal_in_rate | 0.0083 | 0.1542 |
+| avg_winning_faan | 4.1667 | 4.0566 |
+| tenpai_at_draw_rate | 0.6848 | 0.5616 |
+| tenpai_rate_on_sub_minimum_hand | 0.1429 | 0.1613 |
+| avg_points_per_hand | 2.1833 | -0.7278 |
+
+Paired difference (A − B): **+11.644 points/game, 95% CI [6.220, 17.069]** — excludes zero,
+decisively in the redesigned tier's favor, at a fraction of the sample size the old rollout-based
+`OracleBot`'s own (inconclusive) comparison used. `deal_in_rate` falling by roughly 18x (0.1542 →
+0.0083) is the headline number and exactly what the redesign targets: the residual 0.0083 is real
+opponents winning on a tile before this seat's *own* hand had a chance to reach a decision point
+favoring some other discard, not a gap in the exact-danger check itself. This result is the
+expected one by construction (same `FaanBot` formula, exact-or-better safety information going
+into the identical `w_safety * risk` term) — a worse result would have meant something was broken,
+and the arena run is in fact how `_synthetic_tile_id`'s physical-id-collision bug (a hand already
+holding all 4 copies of the candidate type) was actually caught: a scripted unit test wouldn't
+have hit a hand shaped exactly that way by chance, but a real 60-game run did on its first attempt.
+
+### Re-verification after the fold-timing fix (`opponent_threat_level` hands-aware)
+
+Same scratch script, same invocation, same seed, re-run after making `opponent_threat_level`
+hands-aware (above) — 15 duplicate sets (60 games):
+
+| Metric | ORACLE (A) | FaanBot (B) |
+| --- | --- | --- |
+| win_rate | 0.1750 | 0.1472 |
+| deal_in_rate | 0.0083 | 0.1542 |
+| avg_winning_faan | 4.1667 | 4.0660 |
+| tenpai_at_draw_rate | 0.6522 | 0.5580 |
+| tenpai_rate_on_sub_minimum_hand | 0.1500 | 0.1558 |
+| avg_points_per_hand | 2.1833 | -0.7278 |
+
+Paired difference (A − B): **+11.644 points/game, 95% CI [6.220, 17.069]** — `win_rate`,
+`deal_in_rate`, `avg_points_per_hand`, and the paired-difference CI are *bit-for-bit identical* to
+the pre-fix numbers above; only `avg_winning_faan`/`tenpai_at_draw_rate`/
+`tenpai_rate_on_sub_minimum_hand` moved slightly, proving some hands really did play out
+differently, just not in a way that flipped a win/loss/deal-in outcome at this sample size. Taken
+at face value this looks like the fix did nothing — it doesn't, and re-running the identical
+15-set check is exactly how that gets caught rather than papered over with the points number
+alone (the CI still excludes zero, but it's the *same* CI as before, which is the tell).
+
+**Investigation: the fix is real but rare per-decision, and 60 games is too few to see it.**
+Instrumenting `FaanBot._best_discard` directly (comparing, at every own-turn decision the
+`"ORACLE"` seat faced across 20 self-play games — seeds 1–5, all 4 rotations — what it would have
+discarded under the pre-fix proxy-only `opponent_threat_level` against what it actually discards
+now, both computed against the identical `SeatView` so this isolates only this session's change):
+`fold_mode`'s `threatening` flag flipped on 39 of 1399 own-turn decisions (2.8%), and the flip
+actually changed the chosen discard on 22 of those 1399 (1.6%) — the rest picked the same tile
+either way because the old and new modes' tie-breaks happened to agree on that position. A ~1.6%
+per-decision change rate, spread across many decisions per hand and many hands per game, is a real
+but thin signal — nowhere near guaranteed to flip a whole hand's winner within any given 60-game
+sample, which is exactly what the identical 15-set numbers above show happening (or rather, not
+happening) here.
+
+Re-running the same script at **200 duplicate sets (800 games)**, same seed, confirms the effect
+is real once the sample is large enough to resolve it:
+
+| Metric | ORACLE (A) | FaanBot (B) |
+| --- | --- | --- |
+| win_rate | 0.2047 | 0.1671 |
+| deal_in_rate | 0.0106 | 0.1523 |
+| avg_winning_faan | 4.1786 | 4.2020 |
+| tenpai_at_draw_rate | 0.5632 | 0.5618 |
+| tenpai_rate_on_sub_minimum_hand | 0.1434 | 0.1551 |
+| avg_points_per_hand | 2.2687 | -0.7562 |
+
+Paired difference (A − B): **+12.100 points/game, 95% CI [10.247, 13.953]** — `win_rate` moved
+from 0.1750 to **0.2047**, meaningfully above both the pre-fix 15-set number and the 17.5%
+figure the fold-timing gap was named as the likely cause of (above); the paired-difference point
+estimate holds at roughly the same level as the 15-set run (+12.100 vs +11.644) with a much
+tighter CI, as expected from ~13x the sample. **Conclusion: the win-rate gap does close, but only
+visibly at a larger sample size than the 15-set/60-game convention this tier's checks have used
+so far** — the fix's real per-decision effect (~1.6% of own-turn decisions) is too thin to reliably
+move a binary per-hand outcome (won or didn't) within 60 games, the same statistical-power point
+§8 makes about raw win totals generally. This is a sample-size limitation
+of the existing 15-set convention for *this specific, low-frequency* mechanism, not evidence the
+fix is inert — the 200-set run, the direct decision-level instrumentation above, and the scripted
+`tests/test_oracle.py` proof all agree it does something real; a future change to this tier's
+verification convention (a larger default sample, or a decision-level divergence count alongside
+the game-level metrics) would catch this earlier than "the 15-set numbers didn't move."

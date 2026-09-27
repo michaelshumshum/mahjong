@@ -238,7 +238,7 @@ a single scalar.
 `(table_id, window_id, state_version, seat_view)` to a `ProcessPoolExecutor` — the GIL makes a
 thread pool useless for CPU-bound pure-Python search — with a hard deadline (`bots/worker.py`'s
 `compute_action`, 10s, `_BOT_JOB_TIMEOUT_SECONDS`), and returns immediately. The worker builds the
-requested tier (`T0`/`T1`/`T2`, default `T2`/`FaanBot`, [04-bots.md](04-bots.md)) and drives
+requested tier (`T0`-`T2`/`ORACLE`, default `T2`/`FaanBot`, [04-bots.md](04-bots.md)) and drives
 `Bot.act(view, mask, deadline)` against a `SeatView`/`legal_mask`, returning a bare action id — a
 worker process never receives `GameState`; `Table._handle_bot_result` decodes the id against the
 real state once it lands back. The result re-enters through `inbox`, tagged with the
@@ -403,8 +403,26 @@ tiles or already-public tiles, so a parallel type would add translation with no 
 benefit. `legal_actions` is non-empty whenever `actions.legal_actions(state, seat)` is — "seat's
 own `AWAIT_ACTION` turn" *or* "seat holds a live claim/kong-rob offer", not just `seat == turn`.
 
-There is no field on `SeatView` capable of holding another seat's concealed tile identity —
-`own_hand` is the only tile-id field, and it's populated only for the view's own seat.
+`own_hand` is the only tile-id field a *normal* `seat_view(state, seat)` call ever populates for
+another seat's identity — never. `hands` (below) is the one field capable of holding every
+seat's concealed tiles at once, and `seat_view()`'s own public contract keeps it just as
+restricted: `reveal_hands=True` only ever fills it for a spectator (`seat=None`), and raises
+(`_check_reveal`) if `seat` is a real seat. The **one deliberate, contained exception** to "a
+real seat never gets another seat's tiles" is `_omniscient_seat_view` (`app/views.py`), which
+bypasses `_check_reveal` on purpose to build a real seat's view with `.hands` populated — not a
+weakening of `seat_view()`/`_check_reveal` themselves, which are untouched, but a second,
+separate, dangerously-named function used by exactly one caller: `app/table.py`'s
+`_submit_bot_job`, only when driving the `"ORACLE"` bot tier — a plain `FaanBot()` fed this
+omniscient view instead of the ordinary one ([04-bots.md §10](04-bots.md)), an explicitly
+opt-in, non-ladder tier. Safe to cross the
+`ProcessPoolExecutor` boundary for the same reason any `SeatView` is: it never carries
+`game_seed`/`hand_seed` (§3's invariant is about the seed, not tile visibility), and it never
+reaches a real client — disconnect-handover always runs `T2`/`FaanBot` regardless of the
+table's configured tier, so a human's own seat can never be the one this function is called
+for. `tests/test_oracle_containment.py` pins the single-call-site claim structurally (an AST
+sweep of the production codebase, not a trust-me comment); `tests/test_redaction.py` pins that
+`Table.state_sync_wire` — what a real WS client actually receives — never populates `.hands`
+for a real seat, for every `bot_tier` including `"ORACLE"`.
 
 `seat_status` (`connected`/`disconnected`/`autoplay`/`bot`/`empty`) comes from
 `SeatBinding.status`; `bot` seats are bound at table construction for practice mode

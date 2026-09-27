@@ -238,21 +238,34 @@ Blender sources), kept for reference.
 Cut per audit decision D16. Original source: `docs/04-bots.md`, pre-audit versions of §2 (T3
 row), §6 ("T3 — search"), and §7 (bot personas paragraph, Expert row detail).
 
-### T3 `SearchBot`
+### T3 `SearchBot` — CLOSED (built, M6; removed 2026-09-27)
 
-Provenance: `04-bots.md` §2, tier table row for T3 (pre-audit).
+Provenance: `04-bots.md` §2, tier table row for T3 (pre-audit). **Built in M6, removed
+2026-09-27** — `server/bots/search.py` is deleted; `04-bots.md §6` carries the compact
+built-then-removed writeup (what happened, why removed, revival requirements). Kept below as the
+historical record of the original ask and the full shipped design, per this doc's own header
+rule — nothing here is rejected on merit, this is exactly the kind of decision this file exists
+to keep a trail for.
 
 | Tier | What it is | Effort | Use |
 | --- | --- | --- | --- |
 | **T3** `SearchBot` | determinized rollouts / MCTS over the pure engine | large | "Expert", post-launch |
 
-### T3 — search
+(the row above is the original, pre-audit ask, kept verbatim for the historical record — the
+shipped tier table is `04-bots.md §2`.)
+
+### T3 — search — CLOSED (built, M6; removed 2026-09-27)
 
 Provenance: `04-bots.md` §6, "T3 — search" (pre-audit; cut because T1/T2 alone satisfy the M4
 done-gate per the D9/§4 fix, and the 300–800ms budget below is incompatible with the
 single-worker, single-event-loop process described in `07-infra.md` — it would block every table,
 every socket, and every heartbeat on that process if run inline, and even off-loop it competes
-for the same `ProcessPoolExecutor` capacity flagged as a real constraint in §3).
+for the same `ProcessPoolExecutor` capacity flagged as a real constraint in §3). **Built, M6, once
+the execution-model finding below stopped being a blocker** — `04-bots.md §6` has the shipped
+algorithm, the determinization design, every scope cut actually made (bounded-depth rollout
+instead of full hand-to-`HAND_OVER`, `AWAIT_ACTION`-only search, strategy fusion accepted not
+solved), the pool-isolation fix, and a real (small) arena comparison against `FaanBot`. This entry
+stays as the historical record of the original ask and the finding that gated it.
 
 With a pure engine, determinized MCTS is straightforward:
 
@@ -266,26 +279,119 @@ fusion** (the search assumes it can act differently per world when it can't); in
 MCTS mitigates it. Read [arXiv:1904.07491](https://arxiv.org/pdf/1904.07491) on MDP abstraction
 for mahjong before building this.
 
-Before reviving this: re-derive the per-decision CPU budget against whatever the
+~~Before reviving this: re-derive the per-decision CPU budget against whatever the
 `ProcessPoolExecutor` sizing turns out to be (see `04-bots.md` §3) — 300–800ms per decision at
 200 concurrent tables × 3 bot seats is a much larger capacity ask than the T1/T2 shanten-table
-path and needs its own worker-pool sizing pass, not a shared one.
+path and needs its own worker-pool sizing pass, not a shared one.~~ **Done, at a starting-point,
+not final-capacity, level of rigor:** the CPU-budget arithmetic actually done for the shipped
+version lives in `04-bots.md §6` ("Bounded-depth rollout" bullet — a direct benchmark, not a
+guess); the pool is now per-tier (`app/table.py`'s `_shared_search_bot_pool`,
+`max_workers=2`), but that worker count is still explicitly flagged as unvalidated against real
+per-core throughput, exactly the open item this paragraph originally named — 200-concurrent-table
+capacity sizing is still not done.
 
 **Execution-model finding (2026-09-26, ml-readiness scoping pass):** `app/table.py`'s
 `_shared_bot_pool()` is one `ProcessPoolExecutor` shared by every tier and every table
 (`00-architecture.md §3`, `04-bots.md §1`). A T3 job at the 300–800ms budget above would
 head-of-line-block T1/T2 jobs from unrelated tables sharing that same pool — one slow `SearchBot`
 decision stalls every other table's bot turn queued behind it in the pool's worker processes.
-**Deliberately not fixed now, for two reasons, not an oversight:** (1) the fix — routing by tier
-to a tier-appropriate pool instead of one shared pool — needs real per-core throughput
-measurement on target hardware to size correctly; guessing pool sizes today would just be another
-unvalidated constant, no better than the reference numbers `04-bots.md §3` already flags as
-needing calibration. (2) there is no real consumer yet: `SearchBot` doesn't exist, so building a
-tier-routing abstraction now is exactly the premature-abstraction pattern this project's
-conventions warn against (see the KV/Queue/Bus precedent above — "written for a Redis that
-doesn't exist yet"). **Un-deferring T3 concretely requires:** (a) per-tier `ProcessPoolExecutor`
-routing in `app/table.py`, sized against measured per-core throughput on real hardware, before a
-T3 job is ever submitted to the pool; (b) the CPU-budget re-derivation above.
+**Deliberately not fixed at the time, for two reasons, not an oversight:** (1) the fix — routing
+by tier to a tier-appropriate pool instead of one shared pool — needs real per-core throughput
+measurement on target hardware to size correctly; guessing pool sizes then would have just been
+another unvalidated constant, no better than the reference numbers `04-bots.md §3` already flags
+as needing calibration. (2) there was no real consumer yet: `SearchBot` didn't exist, so building
+a tier-routing abstraction then would have been exactly the premature-abstraction pattern this
+project's conventions warn against (see the KV/Queue/Bus precedent above — "written for a Redis
+that doesn't exist yet"). **What actually un-deferred T3:** (a) per-tier `ProcessPoolExecutor`
+routing landed in `app/table.py` (`_shared_search_bot_pool`, routed by `Table._bot_tier` in
+`_submit_bot_job`) alongside `SearchBot` itself in the same change, so the pool finally had a real
+consumer to size a starting point against; (b) the CPU-budget re-derivation is the direct
+`FaanBot.act` benchmark cited in `04-bots.md §6`, which is *why* the shipped rollout is
+bounded-depth rather than full-hand — the literal 300–800ms full-rollout budget this section
+described turned out not to be arithmetically achievable at all, benchmark or no benchmark, and
+that finding (not a capacity number) is what actually shaped the shipped design.
+
+**Removal (2026-09-27).** The shipped design, archived in full since `server/bots/search.py` no
+longer exists:
+
+- **Algorithm.** Per decision (`Phase.AWAIT_ACTION` only): sample N worlds consistent with the
+  redacted `SeatView` (`determinize()`), for each legal root action roll forward up to
+  `rollout_depth` further decisions with `FaanBot` acting for every seat, value a rollout by its
+  real point delta at `HAND_OVER` or a shanten/reachable-faan/ukeire proxy (`value_estimate`) at
+  the depth cap, average each action's value across the worlds it was evaluated in, return the
+  best. Default `time_budget=0.5s`, `max_worlds=8`, `rollout_depth=4`.
+- **`determinize(view, rng)`.** Every `TileId` not accounted for by (own hand + all melds + all
+  discards) is unseen, shuffled once, and handed out — `concealed_counts[s]` tiles to each
+  opponent seat, the remainder to the wall; flowers need no identity sampling (only 8 exist, so
+  whichever aren't revealed must be in the wall — only their wall position was randomized). Tile
+  conservation (every physical tile accounted for exactly once) was verified directly, not
+  eyeballed. Only supported `AWAIT_ACTION`-shaped views — a `SeatView` never carries another
+  seat's live claim offers/`window_id`/discarding seat, so a legal `ClaimWindow` couldn't be
+  reconstructed for a sampled world; claim-window decisions delegated straight to `FaanBot`.
+- **Scope cuts (deliberate, not oversights):** only `AWAIT_ACTION` ran real search; bounded-depth
+  rollout with a value-estimate cutoff instead of full hand-to-`HAND_OVER` (a direct benchmark of
+  `FaanBot.act` measured ~4.7ms/decision, ~83 decisions/hand, so one full-hand rollout for a
+  single (world, candidate) pair alone cost ~390ms — already the entire per-decision budget);
+  strategy fusion accepted, not solved; time-boxing checked between worlds, between candidates,
+  and inside a rollout's own step loop.
+- **Pool isolation (`app/table.py`).** A dedicated `_shared_search_bot_pool()`
+  (`ProcessPoolExecutor(max_workers=2)`) existed so a 300–800ms `T3` job never head-of-line-blocked
+  `T1`/`T2` jobs from unrelated tables sharing the default pool. Removed along with `SearchBot`;
+  every tier now shares `_shared_bot_pool()` again.
+
+**Why removed, not re-tuned.** Two real debugging rounds in this same pass (2026-09-27, alongside
+the `ORACLE` redesign, see `04-bots.md §10`) found and fixed three genuine bugs — a fixed
+candidate-iteration order that, combined with deadline pressure, systematically biased search
+toward low action ids; a `max()` tie-break that silently always picked the lowest action id among
+ties (confirmed common: 20/40 sampled real decisions had tied candidates); and a `value_estimate`
+with no ukeire term at all, giving ties nothing to break on meaningfully. All three real, all
+three fixed, all three correctly diagnosed. The final arena validation after all three fixes (15
+duplicate sets, paired-duplicate methodology, `04-bots.md §8`) still showed `SearchBot`
+decisively worse than `FaanBot` — paired difference −13.156 pts/game, 95% CI [−25.581, −0.730]
+(excludes zero, in `FaanBot`'s favor), `tenpai_at_draw_rate` 6.35% vs `FaanBot`'s 51.85% — the
+core symptom essentially unmoved from the pre-fix run.
+
+That result, plus the domain literature, points at a structural ceiling rather than an
+implementation gap: `SearchBot` and the original rollout-based `OracleBot` (`04-bots.md §10`)
+shared the identical rollout machinery — every candidate root action evaluated by rolling forward
+with the same static `FaanBot` heuristic as both the acting policy and the implicit leaf
+evaluator. A noisy, few-sample value estimate built entirely out of a fixed heuristic's own
+judgment can't reliably beat that same heuristic acting directly; it can only add variance around
+it. This is a known, named failure mode for determinized/"perfect information Monte Carlo" (PIMC)
+search in hidden-information games — *strategy fusion* (planning a different continuation per
+sampled world, which a real player can't do across their own single hidden hand) and
+*non-locality* (a subtree's true value depending on the opponent's real strategy, not just what a
+rollout policy does in it) are severe enough in comparable games that dedicated algorithms exist
+specifically to fix them (e.g. Cazenave & Ventos's αμ search for Bridge,
+[arXiv:1911.07960](https://arxiv.org/abs/1911.07960)) rather than a better heuristic bolted onto
+the same PIMC loop. The mahjong paper this project already cites for strategy fusion,
+[arXiv:1904.07491](https://arxiv.org/abs/1904.07491) (Kurita & Hoki), doesn't use naive
+determinized-rollout MCTS either — it builds an MDP abstraction specifically to make search
+tractable under imperfect information. And the two strongest published mahjong AIs this project's
+own `06-ml.md` references — Suphx ([arXiv:2003.13590](https://arxiv.org/abs/2003.13590)) and
+Mortal — are both learned value/policy-function approaches, not heuristic-rollout search, which is
+consistent with PIMC's known dependence on rollout/evaluation quality rather than coincidental.
+
+**Needs before reviving this**, in rough order of realism:
+
+1. **A rollout leaf evaluator meaningfully better than a shallow rollout of the same heuristic
+   used as the policy** — realistically a learned value function, i.e. T4 (see "Self-play PPO"
+   below), which is itself blocked on a compute budget, a training corpus, and a success metric,
+   none of which exist yet. This is the load-bearing requirement; the other two items are
+   secondary without it.
+2. **Real information-set MCTS instead of the determinized simplification** — solves strategy
+   fusion/non-locality properly rather than accepting them. Real, undone design work: needs a way
+   to search over claim-window decisions too (reconstructing a legal `ClaimWindow` from
+   information a `SeatView` doesn't carry), not a parameter change to the existing algorithm.
+3. **Materially more rollout budget** — arithmetically incompatible with the measured
+   ~4.7ms/decision × ~83 decisions/hand economics at this project's target concurrency (200
+   concurrent tables × 3 bot seats, `04-bots.md §3`) unless that concurrency target or the
+   deploy hardware budget changes; this alone doesn't fix the ceiling above even if it were
+   affordable, since more samples of the same noisy heuristic-driven estimate narrows variance,
+   not bias.
+
+Re-read `04-bots.md §6` in full before reviving — it has the compact version of this same
+argument plus pointers to what changed around it since.
 
 ### Bot personas
 
