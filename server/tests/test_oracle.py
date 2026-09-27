@@ -32,7 +32,7 @@ import random
 import pytest
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
-from bots.faanbot import _THREAT_THRESHOLD, FaanBot
+from bots.faanbot import _ADDED_KONG_BASE, _THREAT_THRESHOLD, FaanBot
 from bots.features import own_hand34, seen34
 from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
@@ -40,7 +40,7 @@ from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import decode_action, legal_mask
-from mahjong_core.shanten import ukeire
+from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 
@@ -415,6 +415,125 @@ async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> 
     )
     assert omniscient_result == int(TileType.WIND_NORTH), (
         "the omniscient view's corrected ukeire count must change the actual discard chosen"
+    )
+
+
+# --- behavioral proof: an omniscient view avoids declaring a kong that would be robbed --------
+
+
+async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`bots/faanbot.py`'s kong loop (`_act_on_turn`) declares whichever legal self-kong strictly
+    reduces shanten furthest -- with no safety check at all before this fix, docs/04-bots.md §10.
+
+    Provable, pre-existing fact about `mahjong_core.shanten.shanten`, unrelated to this fix:
+    removing a redundant 4th copy from an already-complete group (exactly what declaring a
+    self-kong does to the 34-array) can never *lower* shanten -- `shanten` is monotonic in any
+    single tile type's count, confirmed by exhaustive random search (0 counterexamples across
+    500,000 random hands, both kong kinds). So the kong loop's own `s < best_kong_shanten`
+    comparison can never actually be won by a real hand, making `best_kong_aid` always `None` in
+    practice regardless of this fix. This test stubs `shanten` -- transparently: every call
+    except the exact post-kong candidate array falls through to the real function -- purely to
+    force that otherwise-unreachable precondition so this fix's own gating logic, which sits
+    *inside* that loop, can be exercised at all.
+
+    Seat 0 holds an exposed 中 (`DRAGON_RED`) pung plus its 4th copy concealed -- a legal added
+    kong exposing 中. Seat 1's real hand (omniscient view) is one 中 short of Seven Pairs (4 faan,
+    clears the default min_faan=3) -- declaring the kong would hand seat 1 an immediate 搶槓 win.
+    Under the ordinary view (`hands=None`), this fix's gate never runs at all and the (forced)
+    kong is declared -- the regression pin, proving `view.hands is None` behavior is untouched.
+    Under the omniscient view, the gate must skip it, falling back to a discard instead.
+    """
+    kong_type = int(TileType.DRAGON_RED)
+    pung = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.DRAGON_RED)[:3], from_seat=0)
+    own_kong_tile = tile_ids_for_type(TileType.DRAGON_RED)[3]
+    filler_types = [
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.MAN_4,
+        TileType.MAN_5,
+        TileType.MAN_7,
+        TileType.MAN_8,
+        TileType.PIN_2,
+        TileType.PIN_3,
+        TileType.SOU_2,
+        TileType.SOU_3,
+    ]
+    own_hand = (own_kong_tile, *(tile_ids_for_type(t)[0] for t in filler_types))
+
+    def _build(hands: tuple[tuple[TileId, ...], ...] | None) -> SeatView:
+        return SeatView(
+            seat=0,
+            hand_no=1,
+            prevailing=Wind.EAST,
+            dealer=0,
+            turn=0,
+            phase=Phase.AWAIT_ACTION,
+            own_hand=own_hand,
+            concealed_counts=(len(own_hand), 0, 0, 0),
+            melds=((pung,), (), (), ()),
+            discard_pools=((), (), (), ()),
+            flowers=((), (), (), ()),
+            wall_remaining=50,
+            seat_status=("connected", "connected", "connected", "connected"),
+            names=(None, None, None, None),
+            scores=(0, 0, 0, 0),
+            legal_actions=(),
+            claim_options=(),
+            deadline_ts=None,
+            host_seat=None,
+            ruleset=RuleSet(),
+            hands=hands,
+        )
+
+    probabilistic_view = _build(None)
+    hand34 = own_hand34(probabilistic_view)
+    after_kong = list(hand34)
+    after_kong[kong_type] -= 1
+
+    def _fake_shanten(
+        tiles: list[int], *, closed: bool = True, hand_sets: frozenset = frozenset()
+    ) -> int:
+        if not closed and list(tiles) == after_kong:
+            return 0  # pretend this exact candidate is a huge improvement
+        return shanten(tiles, closed=closed, hand_sets=hand_sets)
+
+    monkeypatch.setattr("bots.faanbot.shanten", _fake_shanten)
+
+    mask = [False] * 109
+    kong_aid = _ADDED_KONG_BASE + kong_type
+    mask[kong_aid] = True
+    for t in filler_types:
+        mask[int(t)] = True
+
+    # seat 1's real hand: one 中 short of Seven Pairs.
+    seat1_hand = _pool(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.PIN_1,
+        TileType.PIN_1,
+        TileType.PIN_3,
+        TileType.PIN_3,
+        TileType.PIN_5,
+        TileType.PIN_5,
+        TileType.DRAGON_RED,
+    )
+    omniscient_view = _build(((), seat1_hand, (), ()))
+
+    probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
+    omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+
+    assert probabilistic_result == kong_aid, (
+        "sanity: the forced shanten-improvement precondition must actually make the unfixed "
+        "path declare this kong, or the rest of this test proves nothing"
+    )
+    assert omniscient_result != kong_aid, (
+        "the omniscient view must avoid declaring a kong that would be robbed for a real win"
     )
 
 

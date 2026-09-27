@@ -20,7 +20,7 @@ from collections.abc import Iterator
 import pytest
 
 from app.views import SeatView, seat_view
-from bots.faanbot import FaanBot, _turn_breakpoints
+from bots.faanbot import _CONCEALED_KONG_BASE, FaanBot, _turn_breakpoints
 from bots.random import random_action
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -596,3 +596,38 @@ async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
     )
     aid_reduced = await FaanBot().act(view_reduced, mask, _NO_DEADLINE)
     assert aid_reduced == int(T.WIND_NORTH)  # already late under the smaller turn budget
+
+
+# --- self-kong loop: regression (docs/04-bots.md §10's kong-rob-risk fix) --------------------
+
+
+async def test_never_declares_a_self_kong_when_hands_is_none() -> None:
+    """Regression pin for the `"ORACLE"`-only kong-rob-risk gate added to `_act_on_turn`'s kong
+    loop: with `view.hands is None` (every tier but `"ORACLE"`), the gate never runs at all, so
+    behavior must stay exactly what it was before that fix -- same convention as
+    `tests/test_efficiency.py::test_never_declares_a_self_kong`. Holding all 4 copies of a tile
+    concealed never strictly helps here (a kong always counts as exactly 3 tiles in the shanten
+    array, same as a plain triplet, `bots/features._add_meld`) -- the bot must discard instead of
+    declaring the legal concealed kong."""
+    hand = [
+        T.MAN_1,
+        T.MAN_1,
+        T.MAN_1,
+        T.MAN_1,
+        T.PIN_4,
+        T.PIN_5,
+        T.PIN_6,
+        T.SOU_7,
+        T.SOU_8,
+        T.SOU_9,
+        T.SOU_1,
+        T.SOU_2,
+        T.SOU_3,
+        T.WIND_EAST,
+    ]
+    view = _build_view(0, hand)
+    assert view.hands is None
+    mask = _discard_mask(hand, extra=[_CONCEALED_KONG_BASE + int(T.MAN_1)])
+    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+    assert aid != _CONCEALED_KONG_BASE + int(T.MAN_1)
+    assert aid < 34  # took a discard, not the kong

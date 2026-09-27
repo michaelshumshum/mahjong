@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from app.views import SeatView
 from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
-from bots.safety import opponent_threat_level, tile_risk
+from bots.safety import kong_rob_risk, opponent_threat_level, tile_risk
 from bots.valuation import estimate_best_faan, pattern_optionality, route_faan_for
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.shanten import shanten, ukeire
@@ -208,10 +208,17 @@ class FaanBot:
 
         best_kong_aid: int | None = None
         best_kong_shanten = base
-        for kong_base in (_CONCEALED_KONG_BASE, _ADDED_KONG_BASE):
+        for kong_base, concealed in ((_CONCEALED_KONG_BASE, True), (_ADDED_KONG_BASE, False)):
             for t in range(34):
                 aid = kong_base + t
                 if not mask[aid]:
+                    continue
+                # ORACLE-only: declining is always legal (a plain discard is offered alongside
+                # every kong), so a kong that would hand an opponent an immediate 搶槓 win is
+                # never worth taking regardless of the shanten gain -- skip it outright rather
+                # than weighing it, matching `_should_claim`'s "never do X if it provably
+                # backfires" style. No other tier can see this at all (`view.hands is None`).
+                if view.hands is not None and kong_rob_risk(view, t, concealed=concealed) > 0.0:
                     continue
                 candidate = list(hand)
                 candidate[t] -= 1

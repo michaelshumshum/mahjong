@@ -27,7 +27,7 @@ from statistics import fmean
 
 from app.views import SeatView
 from bots.features import is_terminal_or_honor, seen34
-from mahjong_core.actions import hand_is_winning_shape
+from mahjong_core.actions import _is_thirteen_orphans, hand_is_winning_shape
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.shanten import shanten
@@ -38,6 +38,7 @@ __all__ = [
     "deal_in_probability",
     "expected_cost",
     "is_genbutsu",
+    "kong_rob_risk",
     "no_chance",
     "opponent_threat_level",
     "tile_risk",
@@ -299,6 +300,49 @@ def tile_risk(view: SeatView, tile_type: int) -> float:
             view, opponent, tile_type
         )
     return total
+
+
+def kong_rob_risk(view: SeatView, tile_type: int, *, concealed: bool) -> float:
+    """Exact 搶槓 (robbing the kong) risk of declaring a kong that exposes `tile_type` right now
+    -- `\"ORACLE\"`-only (`view.hands` populated). Callers must not invoke this at all when
+    `view.hands is None`: no other tier has any way to know this, and this function asserts on
+    it rather than degrading to an estimate.
+
+    Mirrors `mahjong_core.engine._kong_rob_offers`'s own gating exactly, so this never flags a
+    kong the engine itself would never open a robbing window for: `ruleset.kong_rob_enabled`
+    gates both kinds; an *added* kong (加槓) exposes the tile completing the existing pung to any
+    opponent's win, while a *concealed* kong (暗槓) only matters at all when
+    `ruleset.concealed_kong_robbable` is on, and even then only for an opponent whose candidate
+    hand specifically completes Thirteen Orphans (十三么) -- real HK convention, not "any winning
+    hand" (see `_kong_rob_offers`'s own docstring). `concealed` distinguishes the two kong kinds
+    for this gating -- both expose `tile_type` itself as the tile at risk (`mahjong_core.ml.
+    action_id`/`_apply_self_kong` both key a kong's action id and its exposed tile off the same
+    `meld.tile_type`).
+
+    Reuses `_exact_deal_in_faan`'s exact win check per opponent -- the same exact-faan-or-zero
+    shape `tile_risk` already prices for an ordinary discard of the same tile type, since a
+    kong-rob deal-in is structurally identical: the declaring seat pays the whole payout alone
+    (docs/04-bots.md §10). Does not add 搶槓's own +1 bonus faan (`_exact_deal_in_faan` hardcodes
+    `is_robbing_kong=False`), so a hand exactly one faan under `min_faan` that would only clear it
+    with that bonus reads as safe here -- a narrow, accepted gap: reusing `_exact_deal_in_faan`
+    unmodified (out of scope for this change) is preferred over reimplementing the scoring path
+    for one rare edge case."""
+    assert view.hands is not None
+    assert view.seat is not None
+    if not view.ruleset.kong_rob_enabled:
+        return 0.0
+    if concealed and not view.ruleset.concealed_kong_robbable:
+        return 0.0
+    best = 0.0
+    for opponent in range(4):
+        if opponent == view.seat:
+            continue
+        if concealed:
+            synthetic = _synthetic_tile_id(tile_type, view.hands[opponent])
+            if synthetic is None or not _is_thirteen_orphans((*view.hands[opponent], synthetic)):
+                continue
+        best = max(best, _exact_deal_in_faan(view, opponent, tile_type))
+    return best
 
 
 def _opponent_hand34(view: SeatView, opponent_seat: int) -> list[int]:
