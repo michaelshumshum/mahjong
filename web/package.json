@@ -9,7 +9,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy cookie baseLocale --emit-ts-declarations --output-structure message-modules",
-		"prepare": "pnpm run paraglide:compile && (svelte-kit sync || echo '')",
+		"prepare": "svelte-kit sync || echo ''",
 		"check": "pnpm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
 		"check:watch": "pnpm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
 		"lint": "oxlint . && oxfmt --check .",
