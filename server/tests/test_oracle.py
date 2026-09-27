@@ -270,12 +270,12 @@ async def test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_a
         0, _FOLD_HAND, turn=13, discard_pools=discard_pools, hands=((), tenpai_hand, (), ())
     )
 
-    assert (
-        opponent_threat_level(probabilistic_view, 1) < _THREAT_THRESHOLD
-    ), "sanity: the probabilistic proxy must genuinely read seat 1 as not-threatening here"
-    assert (
-        opponent_threat_level(omniscient_view, 1) >= _THREAT_THRESHOLD
-    ), "sanity: seat 1's real tenpai hand must genuinely flag as threatening"
+    assert opponent_threat_level(probabilistic_view, 1) < _THREAT_THRESHOLD, (
+        "sanity: the probabilistic proxy must genuinely read seat 1 as not-threatening here"
+    )
+    assert opponent_threat_level(omniscient_view, 1) >= _THREAT_THRESHOLD, (
+        "sanity: seat 1's real tenpai hand must genuinely flag as threatening"
+    )
 
     probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
     omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
