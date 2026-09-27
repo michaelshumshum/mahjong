@@ -51,4 +51,12 @@ describe('Settings', () => {
 		});
 		expect(body.toLowerCase()).not.toContain('win');
 	});
+
+	it('renders the language switcher as its own section', () => {
+		const { body } = render(Settings, {
+			props: { autoArm: offArm, prefs: offPrefs, onAutoArmChange: noop, onPrefsChange: noop }
+		});
+		expect(body).toContain('Language');
+		expect([...body.matchAll(/type="radio"[^>]*name="locale"/g)]).toHaveLength(2);
+	});
 });

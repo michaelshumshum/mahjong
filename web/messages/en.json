@@ -2,5 +2,19 @@
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"localeSwitcher_label": "Language",
 	"localeSwitcher_en": "English",
-	"localeSwitcher_zhHant": "Traditional Chinese"
+	"localeSwitcher_zhHant": "Traditional Chinese",
+	"closeButton_ariaLabel": "Close",
+	"settings_title": "Settings",
+	"settings_badge": "Preferences",
+	"settings_preArmLegend": "Pre-arm this hand",
+	"settings_noCallsLabel": "No calls this hand",
+	"settings_autoPassChowLabel": "Auto-pass chow",
+	"settings_soundLegend": "Sound",
+	"settings_soundEffectsLabel": "Sound effects",
+	"settings_motionLegend": "Motion",
+	"settings_motionSystemLabel": "Match system",
+	"settings_motionReducedLabel": "Reduce motion",
+	"settings_motionFullLabel": "Full motion",
+	"toast_dismissLabel": "Dismiss",
+	"timerRing_remainingLabel": "{seconds}s remaining"
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import { computeRingTiming } from './timer-ring';
 
 	let {
@@ -24,7 +25,12 @@
 	);
 </script>
 
-<div class="timer-ring" role="timer" aria-label="{secondsLabel}s remaining" style={ringStyle}>
+<div
+	class="timer-ring"
+	role="timer"
+	aria-label={m.timerRing_remainingLabel({ seconds: secondsLabel })}
+	style={ringStyle}
+>
 	<svg viewBox="0 0 100 100">
 		<circle class="track" cx="50" cy="50" r={RADIUS} />
 		<circle class="progress" cx="50" cy="50" r={RADIUS} stroke-dasharray={CIRCUMFERENCE} />

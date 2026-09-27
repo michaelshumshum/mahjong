@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import { scheduleAutoDismiss } from './auto-close';
 
 	let {
@@ -12,7 +13,9 @@
 
 <div class="toast" role="status" data-duration-ms={durationMs}>
 	<span class="message">{message}</span>
-	<button type="button" class="dismiss" aria-label="Dismiss" onclick={onDismiss}>×</button>
+	<button type="button" class="dismiss" aria-label={m.toast_dismissLabel()} onclick={onDismiss}
+		>×</button
+	>
 </div>
 
 <style lang="scss">

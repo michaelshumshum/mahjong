@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import FormGroup from './FormGroup.svelte';
 	import OptionRow from './OptionRow.svelte';
+	import LocaleSwitcher from '$lib/i18n/LocaleSwitcher.svelte';
 
 	// pre-arm toggles sent via `auto`, enforced server-side. No `auto_win` on purpose --
 	// declining a winning claim is a real strategic choice under min_faan rulesets, so a win
@@ -32,52 +34,54 @@
 		onPrefsChange: (next: ClientPrefs) => void;
 	} = $props();
 
-	const MOTION_OPTIONS: { value: MotionPref; label: string }[] = [
-		{ value: 'system', label: 'Match system' },
-		{ value: 'reduced', label: 'Reduce motion' },
-		{ value: 'full', label: 'Full motion' }
+	const MOTION_OPTIONS: { value: MotionPref; label: () => string }[] = [
+		{ value: 'system', label: m.settings_motionSystemLabel },
+		{ value: 'reduced', label: m.settings_motionReducedLabel },
+		{ value: 'full', label: m.settings_motionFullLabel }
 	];
 </script>
 
 <section class="settings" aria-labelledby="settings-heading">
-	<PanelHeader title="Settings" badge="Preferences" />
+	<PanelHeader title={m.settings_title()} badge={m.settings_badge()} />
 
-	<FormGroup legend="Pre-arm this hand">
+	<FormGroup legend={m.settings_preArmLegend()}>
 		<OptionRow
 			type="checkbox"
-			label="No calls this hand"
+			label={m.settings_noCallsLabel()}
 			checked={autoArm.noCalls}
 			onChange={(checked) => onAutoArmChange({ ...autoArm, noCalls: checked })}
 		/>
 		<OptionRow
 			type="checkbox"
-			label="Auto-pass chow"
+			label={m.settings_autoPassChowLabel()}
 			checked={autoArm.autoPassChow}
 			onChange={(checked) => onAutoArmChange({ ...autoArm, autoPassChow: checked })}
 		/>
 	</FormGroup>
 
-	<FormGroup legend="Sound">
+	<FormGroup legend={m.settings_soundLegend()}>
 		<OptionRow
 			type="checkbox"
-			label="Sound effects"
+			label={m.settings_soundEffectsLabel()}
 			checked={prefs.soundEnabled}
 			onChange={(checked) => onPrefsChange({ ...prefs, soundEnabled: checked })}
 		/>
 	</FormGroup>
 
-	<FormGroup legend="Motion">
+	<FormGroup legend={m.settings_motionLegend()}>
 		{#each MOTION_OPTIONS as option (option.value)}
 			<OptionRow
 				type="radio"
 				name="motion"
 				value={option.value}
-				label={option.label}
+				label={option.label()}
 				checked={prefs.motion === option.value}
 				onChange={() => onPrefsChange({ ...prefs, motion: option.value })}
 			/>
 		{/each}
 	</FormGroup>
+
+	<LocaleSwitcher />
 </section>
 
 <style lang="scss">
