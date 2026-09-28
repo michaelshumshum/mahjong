@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { waitForApiHealthy } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -54,19 +55,23 @@
 		<div class="connect-panel">
 			{#if status === 'connecting'}
 				<div class="connect-spinner"></div>
-				<p class="connect-status">Connecting…</p>
+				<p class="connect-status">{m.apiConnectGate_connectingStatus()}</p>
 				{#if attempt > 1}
-					<p class="connect-counter">Attempt {attempt}</p>
+					<p class="connect-counter">{m.apiConnectGate_attemptCounter({ attempt })}</p>
 				{/if}
 				{#if nextRetryDelayMs !== null}
 					<p class="connect-counter">
-						Next attempt in {Math.ceil(nextRetryDelayMs / 1000)}s
+						{m.apiConnectGate_nextAttemptCounter({
+							seconds: Math.ceil(nextRetryDelayMs / 1000)
+						})}
 					</p>
 				{/if}
 			{:else}
-				<p class="connect-status">Can't reach the server.</p>
-				<p class="connect-counter">No response after {attempt} attempts.</p>
-				<button type="button" class="connect-retry" onclick={connect}>Retry</button>
+				<p class="connect-status">{m.apiConnectGate_unreachableStatus()}</p>
+				<p class="connect-counter">{m.apiConnectGate_noResponseCounter({ attempts: attempt })}</p>
+				<button type="button" class="connect-retry" onclick={connect}
+					>{m.apiConnectGate_retryButton()}</button
+				>
 			{/if}
 		</div>
 	</div>

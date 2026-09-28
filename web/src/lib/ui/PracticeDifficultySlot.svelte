@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PracticeDifficulty } from '$lib/net/lobby';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let {
 		positionLabel,
@@ -22,7 +23,10 @@
 	<button
 		type="button"
 		class="seat-ring-slot"
-		aria-label={`${positionLabel}: ${DIFFICULTY_LABEL[difficulty]}. Click to change.`}
+		aria-label={m.practiceDifficultySlot_ariaLabel({
+			position: positionLabel,
+			difficulty: DIFFICULTY_LABEL[difficulty]
+		})}
 		onclick={onCycle}
 	>
 		<span>{DIFFICULTY_LABEL[difficulty]}</span>

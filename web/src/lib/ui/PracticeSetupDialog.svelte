@@ -4,6 +4,7 @@
 		PRACTICE_DIFFICULTY_TO_TIER,
 		type PracticeDifficulty
 	} from '$lib/net/lobby';
+	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import PracticeDifficultySlot from './PracticeDifficultySlot.svelte';
 
@@ -53,7 +54,7 @@
 		aria-modal="true"
 		aria-labelledby="practice-setup-heading"
 	>
-		<PanelHeader title="Practice vs Bots" titleId="practice-setup-heading" />
+		<PanelHeader title={m.practiceSetupDialog_title()} titleId="practice-setup-heading" />
 		<p class="practice-hint">Tap a seat to cycle its bot's difficulty.</p>
 
 		<!-- Same ring arrangement as the real seat-selection screen (SeatRing/SeatPicker,

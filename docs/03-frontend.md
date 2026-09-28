@@ -840,8 +840,17 @@ should stay one class plus custom properties.
   dev-only `?mock=` path — not real user-visible copy. Demo components' own diagnostic
   `data-testid` readouts (`status: {status}`, `pong: t0=... t1=...`, `no_calls=... auto_pass_chow=...`,
   `chose: {kind}`) were left the same way: raw protocol/enum identifiers for test assertions, not
-  prose. Every other route/component's strings are still hardcoded English — later phases in that
-  plan.
+  prose. Phase 8 (accessibility audit — repo-wide sweep of `aria-label`/`title`/`alt`/`placeholder`/
+  live-region text) is also done: the discard-pool per-seat aria-labels, `TileFace`'s tile/back
+  `alt` text, and the table page's `pushToast` calls were already covered by Phases 5/6; the sweep's
+  actual finds were two components untouched by any earlier phase — `ApiConnectGate.svelte` (its
+  "Connecting...", attempt-count, "next attempt in Ns", "Can't reach the server.", and Retry copy)
+  and the practice-vs-bots dialog (`PracticeSetupDialog.svelte`'s title, `PracticeDifficultySlot.svelte`'s
+  aria-label — both added by a later, non-i18n-tracked commit). The per-discard `aria-label="{seat}
+  discarded {tile}, turn {n}"` and the rolling `aria-live="polite"` announcement described above are
+  design intent, not yet implemented in `CenterDiscardPool.svelte` — nothing to migrate there until
+  that a11y feature itself is built. Every other route/component's strings are still hardcoded
+  English — later phases in that plan.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).

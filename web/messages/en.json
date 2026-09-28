@@ -307,5 +307,24 @@
 	"animationDemoPanel_yourHandAriaLabel": "Your demo hand",
 	"animationDemoPanel_yourDiscardsAriaLabel": "Your discards",
 	"animationDemoPanel_discardTileAriaLabel": "Discard {tile}",
-	"animationDemoPanel_resetButton": "Reset demo"
+	"animationDemoPanel_resetButton": "Reset demo",
+
+	"practiceSetupDialog_title": "Practice vs Bots",
+	"practiceDifficultySlot_ariaLabel": "{position}: {difficulty}. Click to change.",
+
+	"apiConnectGate_connectingStatus": "Connecting…",
+	"apiConnectGate_attemptCounter": "Attempt {attempt}",
+	"apiConnectGate_nextAttemptCounter": "Next attempt in {seconds}s",
+	"apiConnectGate_unreachableStatus": "Can't reach the server.",
+	"apiConnectGate_noResponseCounter": [
+		{
+			"declarations": ["input attempts", "local attemptsPlural = attempts: plural"],
+			"selectors": ["attemptsPlural"],
+			"match": {
+				"attemptsPlural=one": "No response after {attempts} attempt.",
+				"attemptsPlural=other": "No response after {attempts} attempts."
+			}
+		}
+	],
+	"apiConnectGate_retryButton": "Retry"
 }
