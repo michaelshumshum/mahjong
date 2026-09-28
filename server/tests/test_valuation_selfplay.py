@@ -28,12 +28,12 @@ import statistics
 
 import pytest
 
+from bots.labels import seat_hand34
 from bots.random import random_action
 from bots.valuation import estimate_best_faan
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import HandEnded, new_game, reduce, start_next_hand
-from mahjong_core.state import HandOutcome, Phase, SeatState
-from mahjong_core.tiles import new_count_array, tile_id_type
+from mahjong_core.state import HandOutcome, Phase
 
 _STEP_CAP = 4000
 _GAMES = 1500
@@ -43,20 +43,6 @@ needs on the order of a thousand games. That makes this test genuinely slow (ten
 unlike `tests/test_arena.py`'s single-duplicate-set smoke test -- `@pytest.mark.slow`
 (`server/AGENTS.md`'s `make test` excludes these), run manually/in CI's slow lane to (re)produce
 the numbers quoted in `bots/valuation.py`'s module docstring."""
-
-
-def _hand34(seat_state: SeatState) -> list[int]:
-    """Same 34-array contract as `bots/arena.py`'s `_seat_hand34` -- duplicated rather than
-    imported since `bots/arena.py` doesn't export it and this test has no other reason to
-    depend on the arena module."""
-    counts = new_count_array()
-    for t in seat_state.concealed:
-        counts[int(tile_id_type(t))] += 1
-    for meld in seat_state.melds:
-        tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
-        for t in tiles:
-            counts[int(tile_id_type(t))] += 1
-    return counts
 
 
 def _collect_win_samples(seed: int) -> list[tuple[int, int]]:
@@ -99,7 +85,7 @@ def _collect_win_samples(seed: int) -> list[tuple[int, int]]:
             if result is None:
                 continue
             pre_seat_state = pre_state.seats[winner]
-            hand34 = _hand34(pre_seat_state)
+            hand34 = seat_hand34(pre_seat_state)
             estimate, _route = estimate_best_faan(hand34, closed=not pre_seat_state.melds)
             samples.append((estimate, result.faan))
 

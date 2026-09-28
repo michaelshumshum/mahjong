@@ -36,7 +36,7 @@ mahjong/
 │   │       # separate app/infra/ module
 │   ├── tools/gen_protocol.py   # pydantic → TS directly (+ informational JSON Schema), 02-protocol §6
 │   ├── bots/
-│   │   ├── base.py  random.py  efficiency.py  faanbot.py  safety.py  valuation.py
+│   │   ├── base.py  random.py  efficiency.py  faanbot.py  safety.py  valuation.py  labels.py
 │   │   └── arena.py            # self-play evaluation harness
 │   └── tests/
 │       ├── test_engine.py  test_scoring.py  test_faan.py  test_payout.py  test_claims.py

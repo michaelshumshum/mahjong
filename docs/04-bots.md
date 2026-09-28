@@ -643,12 +643,16 @@ carries `ruleset: RuleSet` (Tier 1), and every Tier 2 item below is now closed t
   change, so re-running the same seeded arena harness against the same two bots reproduces the
   same numbers rather than merely "the same ballpark."
 
-  Unrelated housekeeping note carried over from this item's investigation: `bots/arena.py`'s own
-  direct `shanten()` calls (tenpai-rate/winning-tile stats, not a bot decision) are still not
-  `hand_sets`-aware — noted here since it isn't bot behavior and was out of scope for the
-  `hand_sets` item too, but worth revisiting since an `hk_strict` arena run's tenpai-rate stat
-  currently over-counts hands that are only tenpai via a Seven Pairs shape that table can't
-  complete.
+  **Closed (2026-09-28):** the housekeeping note this paragraph used to carry — `bots/arena.py`'s
+  own direct `shanten()` calls (tenpai-rate/winning-tile stats, not a bot decision) not being
+  `hand_sets`-aware — is fixed as a side effect of extracting that logic into `bots/labels.py`
+  (docs/06-ml.md §6.2's ground-truth label module): `_hand_record`'s tenpai loop now calls
+  `labels.is_tenpai(state, s)`, which threads `state.ruleset.hand_sets` through, in place of the
+  old direct hand_sets-oblivious `shanten()` call. `_tenpai_can_reach_min_faan` likewise now calls
+  `labels.winning_tile_types(..., hand_sets=state.ruleset.hand_sets)`. Behavior-preserving for
+  every existing arena run — `_ARENA_RULESET` never overrides `hand_sets`, so this was a no-op
+  against the default value in practice — but a real fix for any future `hk_strict` arena run,
+  which no longer over-counts a Seven Pairs-only tenpai that ruleset can't complete.
 
 ## 10. `"ORACLE"` tier
 

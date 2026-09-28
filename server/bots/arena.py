@@ -32,15 +32,14 @@ from app.views import seat_view
 from bots.base import Bot
 from bots.efficiency import EfficiencyBot
 from bots.faanbot import FaanBot
+from bots.labels import is_tenpai, seat_hand34, unused_tile_id_for_type, winning_tile_types
 from bots.random import RandomBot
 from mahjong_core.actions import build_scoring_context
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import Discarded, HandEnded, new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.scoring.faan import score_winning_hand
-from mahjong_core.shanten import shanten
-from mahjong_core.state import GameState, HandOutcome, Phase, SeatState, WinType
-from mahjong_core.tiles import TileId, TileType, new_count_array, tile_id_type, tile_ids_for_type
+from mahjong_core.state import GameState, HandOutcome, Phase, WinType
 
 __all__ = [
     "BOT_REGISTRY",
@@ -105,51 +104,15 @@ class GameRecord:
     final_scores: tuple[int, int, int, int]
 
 
-def _seat_hand34(seat_state: SeatState) -> list[int]:
-    """34-array contract, straight from `SeatState` -- the arena has real `GameState`, unlike
-    `bots/features.py`'s `SeatView`-based equivalent, so it builds its own."""
-    counts = new_count_array()
-    for t in seat_state.concealed:
-        counts[int(tile_id_type(t))] += 1
-    for meld in seat_state.melds:
-        tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
-        for t in tiles:
-            counts[int(tile_id_type(t))] += 1
-    return counts
-
-
-def _winning_tile_types(hand34: list[int], *, closed: bool) -> list[int]:
-    """Every tile type that would bring `hand34` (already tenpai) to agari."""
-    out = []
-    for t in range(34):
-        if hand34[t] >= 4:
-            continue
-        candidate = list(hand34)
-        candidate[t] += 1
-        if shanten(candidate, closed=closed) == -1:
-            out.append(t)
-    return out
-
-
-def _unused_tile_id_for_type(tile_type_value: int, seat_state: SeatState) -> TileId:
-    used = set(seat_state.concealed)
-    for m in seat_state.melds:
-        used.update(m.tiles)
-    for tid in tile_ids_for_type(TileType(tile_type_value)):
-        if tid not in used:
-            return tid
-    raise AssertionError("no unused physical tile for a hypothetical win check")
-
-
 def _tenpai_can_reach_min_faan(state: GameState, seat: int) -> bool:
     """Whether any of this seat's actual waits legally clears `min_faan` if completed self-drawn
     right now."""
     seat_state = state.seats[seat]
-    hand34 = _seat_hand34(seat_state)
+    hand34 = seat_hand34(seat_state)
     closed = not seat_state.melds
     ctx = build_scoring_context(state, seat, self_drawn=True)
-    for t in _winning_tile_types(hand34, closed=closed):
-        tile_id = _unused_tile_id_for_type(t, seat_state)
+    for t in winning_tile_types(hand34, closed=closed, hand_sets=state.ruleset.hand_sets):
+        tile_id = unused_tile_id_for_type(t, seat_state)
         concealed = (*seat_state.concealed, tile_id)
         result = score_winning_hand(concealed, seat_state.melds, ctx, state.ruleset)
         if result.clears_min_faan:
@@ -213,9 +176,7 @@ def _hand_record(state: GameState, event: HandEnded, turns: int) -> HandRecord:
         tenpai = []
         sub_min = []
         for s in range(4):
-            seat_state = state.seats[s]
-            hand34 = _seat_hand34(seat_state)
-            if shanten(hand34, closed=not seat_state.melds) == 0:
+            if is_tenpai(state, s):
                 tenpai.append(s)
                 if not _tenpai_can_reach_min_faan(state, s):
                     sub_min.append(s)
