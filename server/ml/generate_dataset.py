@@ -1,15 +1,38 @@
 """Self-play dataset generation for the Phase 1 opponent-danger model (docs/06-ml.md §6.2).
 
-    python -m ml.generate_dataset --out data/danger_model --bots FaanBot,FaanBot,FaanBot,FaanBot \
-        --parallel 8
+    python -m ml.generate_dataset --out data/danger_model \
+        --bots FaanBot,FaanBotAggressive,FaanBotDefensive,FaanBotFlushChasing --parallel 12
 
 Plays real self-play games (same stepping logic as `bots/selfplay.py`'s `play_game`), and at
 every genuine turn decision (not a claim-window response -- a different decision type this model
-doesn't cover) encodes the acting seat's real `SeatView` (`ml/encode.py`) and pairs it with the
-other three seats' ground-truth danger labels (`bots/labels.py`, computed from the real
-`GameState`, never through `app.views._omniscient_seat_view`). Writes shards of that as parquet.
+doesn't cover) records the acting seat's public table state as compact 34-tile-type counts, paired
+with the other three seats' ground-truth danger labels (`bots/labels.py`, computed from the real
+`GameState`, never through `app.views._omniscient_seat_view`). Writes shards of that as parquet,
+plus one `manifest.json` per output directory (ruleset + bot roster, written once, not repeated
+per row -- it's constant for the whole run).
 
-`ml`-extra only -- numpy/pyarrow aren't base dependencies (`server/AGENTS.md`).
+Row schema stores raw per-tile-type counts (uint8 range, 0-4), not a specific model-input
+encoding (e.g. thermometer planes) -- that's a training-time choice for `ml/dataset.py` to make
+and revisit later without needing to regenerate data. `context` fields that are constant *by the
+row-capture design itself* (every row is the acting seat's own `AWAIT_ACTION` turn, verified
+against the previous dataset generation: relative turn-holder position and phase never vary) are
+dropped entirely rather than stored redundantly; `prevailing_wind` is kept despite being constant
+under the single ruleset this run uses, since that constancy is a property of the ruleset
+(`hk_classic` is `EAST_ONLY`), not of the capture design, and doesn't generalize to a future
+multi-ruleset run.
+
+**Seat<->personality assignment is randomized per game** (seeded off that game's own seed, via an
+independent `random.Random` instance from the one driving in-game claim-arrival order) and
+recorded as `seat_personalities` metadata -- never fed to the model. A prior version of this
+script fixed one personality per seat for the *entire* run, which let dealer/seat-wind context
+leak seat identity (and therefore personality identity) directly to the model -- a real
+shortcut-learning risk flagged in review, not a hypothetical one.
+
+`ml`-extra only -- pyarrow isn't a base dependency (`server/AGENTS.md`). Notably does **not**
+depend on numpy: `bots/labels.py`, `bots/features.py`, and `mahjong_core` are all pure Python, so
+this script only needs pyarrow for the parquet write -- keeping the numpy-heavy thermometer
+expansion out of the per-row hot path (both compute and inter-process pickling cost under
+`--parallel`) is itself a real speedup, not just a storage optimization.
 
 Runs until `--games` is reached, or forever (default) until interrupted (SIGINT/SIGTERM) -- the
 in-progress shard is flushed before exit either way, so a stop never loses more than the games
@@ -18,9 +41,9 @@ buffered since the last completed shard.
 `--parallel N` runs games across a `ProcessPoolExecutor`, same pattern as `bots/arena.py`'s
 `--parallel` -- each worker plays one game start to finish via `_play_and_label_sync` (a
 top-level, picklable entry point), so nothing needs pickling beyond `(seed, ruleset, bot_names)`.
-Games complete out of seed order under parallelism, so shard filenames use the real
-min/max seed *among that shard's accumulated rows*, not an assumed-contiguous range -- the
-`game_seed` column is the source of truth regardless.
+Games complete out of seed order under parallelism, so shard filenames use the real min/max seed
+*among that shard's accumulated rows*, not an assumed-contiguous range -- the `game_seed` column
+is the source of truth regardless.
 """
 
 from __future__ import annotations
@@ -28,9 +51,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import concurrent.futures
+import json
+import multiprocessing
 import random
 import signal
 import sys
+import threading
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
@@ -42,18 +68,51 @@ import pyarrow.parquet as pq
 from app.views import SeatView, seat_view
 from bots.arena import BOT_REGISTRY
 from bots.base import Bot
-from bots.labels import danger_labels_for_opponents
+from bots.features import own_hand34
+from bots.labels import (
+    OpponentDangerLabel,
+    danger_labels_for_opponents,
+    discard_counts34,
+    meld_counts34,
+)
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
-from mahjong_core.state import GameState, Phase
-from ml.encode import encode_seat_view
+from mahjong_core.scoring.patterns import seat_wind_for
+from mahjong_core.state import Phase
 
 __all__ = ["build_parser", "main"]
 
 _STEP_CAP = 8000
 _NO_DEADLINE = float("inf")
+_N_TILE_TYPES = 34
+
+
+def _mp_context() -> multiprocessing.context.BaseContext:
+    """`fork` over the platform default (`forkserver` on this interpreter, confirmed via
+    `multiprocessing.get_start_method()`): measured directly on this workload (120 games, 12
+    workers, `hk_classic`, identical bot roster, both legs run back-to-back in one process) --
+    `forkserver` managed 0.860 games/sec, `fork` managed 1.518 games/sec, a ~1.8x difference at
+    the same worker count.
+
+    Only safe when the current process is single-threaded at pool-creation time -- a thread other
+    than main could hold a lock (import lock, malloc, logging) that the forked child inherits
+    already-acquired and can never release, deadlocking the child the first time it needs that
+    lock. That's not hypothetical here: running this under pytest triggers Python's own
+    `DeprecationWarning` for exactly this condition, because pytest's own process is
+    multi-threaded. Checking `threading.active_count()` at call time (not import time, since
+    thread state can change) picks the fast path only when it's actually safe."""
+    if threading.active_count() > 1:
+        return multiprocessing.get_context()
+    return multiprocessing.get_context("fork")
+
+
+def _relative_seats(seat: int) -> tuple[int, int, int, int]:
+    """(self, next, across, previous) as absolute seat indices -- matches `ml/encode.py`'s
+    convention, reimplemented locally (one line) rather than imported, since importing from
+    `ml.encode` would pull numpy back into this script for a single formula."""
+    return (seat, (seat + 1) % 4, (seat + 2) % 4, (seat + 3) % 4)
 
 
 def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
@@ -69,30 +128,58 @@ def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
     return bots
 
 
-def _example_row(seed: int, state: GameState, seat: int, view: SeatView) -> dict[str, object]:
-    encoded = encode_seat_view(view)
-    labels = danger_labels_for_opponents(state, seat)
-    order = [(seat + offset) % 4 for offset in (1, 2, 3)]  # matches encode.py's relative order
+def _shuffled_roster(bot_names: Sequence[str], seed: int) -> list[str]:
+    """This game's seat->personality assignment -- a fresh `random.Random(seed)` instance,
+    independent of `play_and_label`'s own `random.Random(seed)` (used for claim-arrival order),
+    so the two don't share state despite the same seed value. Deterministic and reproducible:
+    same seed -> same assignment, every time."""
+    return random.Random(seed).sample(list(bot_names), len(bot_names))
+
+
+def _winning_tiles_multihot(winning_tiles: tuple[int, ...]) -> list[int]:
+    row = [0] * _N_TILE_TYPES
+    for t in winning_tiles:
+        row[t] = 1
+    return row
+
+
+def _example_row(
+    seed: int,
+    view: SeatView,
+    seat_personalities: list[str],
+    labels: dict[int, OpponentDangerLabel],
+) -> dict[str, object]:
+    assert view.seat is not None
+    seat = view.seat
+    order = _relative_seats(seat)
+    opponent_order = order[1:]  # next, across, previous -- relative slots 1, 2, 3
+
     return {
         "game_seed": seed,
-        "hand_no": state.hand_no,
+        "hand_no": view.hand_no,
         "seat": seat,
-        "hand": encoded.hand.tolist(),
-        "melds": encoded.melds.tolist(),
-        "discards": encoded.discards.tolist(),
-        "concealed_counts": encoded.concealed_counts.tolist(),
-        "context": encoded.context.tolist(),
-        "wall_remaining": float(encoded.wall_remaining[0]),
-        "ruleset": encoded.ruleset.tolist(),
-        "opponent_seats": order,
-        "opponent_is_tenpai": [labels[o].is_tenpai for o in order],
-        "opponent_winning_tiles": [list(labels[o].winning_tiles) for o in order],
-        "opponent_expected_faan": [list(labels[o].expected_faan_by_tile_type) for o in order],
+        "seat_personalities": list(seat_personalities),
+        "hand_counts": own_hand34(view),
+        "meld_counts": [meld_counts34(view.melds[s]) for s in order],
+        "discard_counts": [discard_counts34(view.discard_pools[s]) for s in order],
+        "concealed_counts": [view.concealed_counts[s] for s in order],
+        "dealer_idx": order.index(view.dealer),
+        "prevailing_wind": int(view.prevailing),
+        "seat_wind": int(seat_wind_for(seat, view.dealer)),
+        "wall_remaining": view.wall_remaining,
+        "opponent_seats": list(opponent_order),
+        "opponent_is_tenpai": [labels[o].is_tenpai for o in opponent_order],
+        "opponent_winning_tiles_multihot": [
+            _winning_tiles_multihot(labels[o].winning_tiles) for o in opponent_order
+        ],
+        "opponent_expected_faan": [
+            list(labels[o].expected_faan_by_tile_type) for o in opponent_order
+        ],
     }
 
 
 async def play_and_label(
-    seed: int, ruleset: RuleSet, bots: Sequence[Bot]
+    seed: int, ruleset: RuleSet, bots: Sequence[Bot], seat_personalities: list[str]
 ) -> list[dict[str, object]]:
     """Plays one complete game, returning one row per real turn decision (docs/06-ml.md §6.2's
     "Labels: from the real GameState at each recorded decision"). Claim-window responses are a
@@ -126,7 +213,8 @@ async def play_and_label(
 
         view = seat_view(state, seat)
         if not is_claim:
-            rows.append(_example_row(seed, state, seat, view))
+            labels = danger_labels_for_opponents(state, seat)
+            rows.append(_example_row(seed, view, seat_personalities, labels))
 
         mask = legal_mask(state, seat)
         aid = await bots[seat].act(view, mask, _NO_DEADLINE)
@@ -139,11 +227,12 @@ async def play_and_label(
 def _play_and_label_sync(
     seed: int, ruleset: RuleSet, bot_names: list[str]
 ) -> list[dict[str, object]]:
-    """Top-level, picklable `ProcessPoolExecutor` entry point -- see module docstring. Builds
-    fresh bots inside the worker (same `_make_bots(names, seed)` the sequential path uses), so
+    """Top-level, picklable `ProcessPoolExecutor` entry point -- see module docstring. Shuffles
+    this game's seat->personality assignment and builds fresh bots inside the worker, so
     reproducibility is unaffected by which process a seed happens to run in."""
-    bots = _make_bots(bot_names, seed)
-    return asyncio.run(play_and_label(seed, ruleset, bots))
+    roster = _shuffled_roster(bot_names, seed)
+    bots = _make_bots(roster, seed)
+    return asyncio.run(play_and_label(seed, ruleset, bots, roster))
 
 
 def _write_shard(
@@ -155,6 +244,26 @@ def _write_shard(
     return path
 
 
+def _write_manifest(
+    out_dir: Path, ruleset: RuleSet, ruleset_preset: str, bot_names: list[str]
+) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "schema_version": 2,
+        "ruleset_preset": ruleset_preset,
+        "ruleset": ruleset.to_dict(),
+        "bot_roster": bot_names,
+        "n_tile_types": _N_TILE_TYPES,
+        "note": (
+            "seat_personalities in each row records that game's randomized seat->roster-entry "
+            "assignment -- metadata only, never a model input. Every row is captured at the "
+            "acting seat's own AWAIT_ACTION turn (turn-holder is always relative seat 0, phase "
+            "is constant) -- both dropped from the row schema rather than stored redundantly."
+        ),
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m ml.generate_dataset",
@@ -164,8 +273,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed-start", type=int, default=0)
     parser.add_argument(
         "--bots",
-        default="FaanBot,FaanBot,FaanBot,FaanBot",
-        help=f"comma-separated, 4 entries, from {sorted(BOT_REGISTRY)}",
+        default="FaanBot,FaanBotAggressive,FaanBotDefensive,FaanBotFlushChasing",
+        help=(
+            f"comma-separated roster, from {sorted(BOT_REGISTRY)} -- shuffled to a random seat "
+            "assignment independently per game, not fixed per seat for the whole run"
+        ),
     )
     parser.add_argument("--ruleset", default=DEFAULT_PRESET_ID, choices=sorted(RULESET_PRESETS))
     parser.add_argument("--out", default="data/danger_model", type=Path)
@@ -216,7 +328,7 @@ def _run_parallel(
     last_seed_done = args.seed_start - 1
     next_seed = [args.seed_start]  # single-element cell: mutable from the nested closure below
 
-    with ProcessPoolExecutor(max_workers=args.parallel) as pool:
+    with ProcessPoolExecutor(max_workers=args.parallel, mp_context=_mp_context()) as pool:
         in_flight: dict[concurrent.futures.Future[list[dict[str, object]]], int] = {}
 
         def _top_up() -> None:
@@ -265,6 +377,7 @@ def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     ruleset = RULESET_PRESETS[args.ruleset]
     bot_names = args.bots.split(",")
+    _write_manifest(args.out, ruleset, args.ruleset, bot_names)
 
     stop_flag = False
 

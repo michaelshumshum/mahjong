@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from mahjong_core.actions import build_scoring_context, hand_is_winning_shape
 from mahjong_core.config import HandSet
+from mahjong_core.melds import Meld
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, SeatState
@@ -24,8 +25,10 @@ from mahjong_core.tiles import TileId, TileType, new_count_array, tile_id_type, 
 __all__ = [
     "OpponentDangerLabel",
     "danger_labels_for_opponents",
+    "discard_counts34",
     "expected_faan_if_won",
     "is_tenpai",
+    "meld_counts34",
     "seat_hand34",
     "unused_tile_id_for_type",
     "winning_tile_types",
@@ -38,10 +41,30 @@ def seat_hand34(seat_state: SeatState) -> list[int]:
     counts = new_count_array()
     for t in seat_state.concealed:
         counts[int(tile_id_type(t))] += 1
-    for meld in seat_state.melds:
+    meld_counts = meld_counts34(seat_state.melds)
+    for i in range(34):
+        counts[i] += meld_counts[i]
+    return counts
+
+
+def meld_counts34(melds: tuple[Meld, ...]) -> list[int]:
+    """34-count array from a public meld tuple alone (no concealed tiles) -- a kong contributes 3
+    tiles, matching `mahjong_core.shanten`'s convention. Split out from `seat_hand34` so a caller
+    that only has another seat's public melds (never their concealed tiles) can still get a
+    count array without touching anything it isn't entitled to."""
+    counts = new_count_array()
+    for meld in melds:
         tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
         for t in tiles:
             counts[int(tile_id_type(t))] += 1
+    return counts
+
+
+def discard_counts34(discards: tuple[TileId, ...]) -> list[int]:
+    """34-count array from a discard pool -- always public."""
+    counts = new_count_array()
+    for t in discards:
+        counts[int(tile_id_type(t))] += 1
     return counts
 
 

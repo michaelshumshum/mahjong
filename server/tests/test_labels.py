@@ -12,8 +12,10 @@ import dataclasses
 
 from bots.labels import (
     danger_labels_for_opponents,
+    discard_counts34,
     expected_faan_if_won,
     is_tenpai,
+    meld_counts34,
     seat_hand34,
     winning_tile_types,
 )
@@ -184,3 +186,27 @@ def test_danger_labels_for_opponents_covers_every_seat_but_self_with_real_labels
     assert not labels[3].is_tenpai
     assert labels[3].winning_tiles == ()
     assert labels[3].expected_faan_by_tile_type == (0.0,) * 34
+
+
+def test_meld_counts34_matches_seat_hand34_when_concealed_is_empty() -> None:
+    """`meld_counts34` is `seat_hand34` restricted to melds only -- with an empty concealed hand
+    they must agree exactly."""
+    kong = Meld(kind=MeldKind.EXPOSED_KONG, tiles=tile_ids_for_type(TileType.DRAGON_RED), from_seat=1)
+    pung = Meld(kind=MeldKind.PUNG, tiles=tile_ids_for_type(TileType.WIND_EAST)[:3], from_seat=2)
+    state = _with_seat(_state(), 1, concealed=(), melds=(kong, pung), flowers=())
+    assert meld_counts34(state.seats[1].melds) == seat_hand34(state.seats[1])
+    # kong contributes 3, not 4 -- matches mahjong_core.shanten's convention
+    assert meld_counts34(state.seats[1].melds)[int(TileType.DRAGON_RED)] == 3
+    assert meld_counts34(state.seats[1].melds)[int(TileType.WIND_EAST)] == 3
+
+
+def test_discard_counts34_counts_each_physical_tile_once() -> None:
+    pool = (
+        tile_ids_for_type(TileType.MAN_1)[0],
+        tile_ids_for_type(TileType.MAN_1)[1],
+        tile_ids_for_type(TileType.PIN_9)[0],
+    )
+    counts = discard_counts34(pool)
+    assert counts[int(TileType.MAN_1)] == 2
+    assert counts[int(TileType.PIN_9)] == 1
+    assert sum(counts) == 3
