@@ -1,6 +1,7 @@
 """Self-play dataset generation for the Phase 1 opponent-danger model (docs/06-ml.md §6.2).
 
-    python -m ml.generate_dataset --out data/danger_model --bots FaanBot,FaanBot,FaanBot,FaanBot
+    python -m ml.generate_dataset --out data/danger_model --bots FaanBot,FaanBot,FaanBot,FaanBot \
+        --parallel 8
 
 Plays real self-play games (same stepping logic as `bots/selfplay.py`'s `play_game`), and at
 every genuine turn decision (not a claim-window response -- a different decision type this model
@@ -13,17 +14,26 @@ other three seats' ground-truth danger labels (`bots/labels.py`, computed from t
 Runs until `--games` is reached, or forever (default) until interrupted (SIGINT/SIGTERM) -- the
 in-progress shard is flushed before exit either way, so a stop never loses more than the games
 buffered since the last completed shard.
+
+`--parallel N` runs games across a `ProcessPoolExecutor`, same pattern as `bots/arena.py`'s
+`--parallel` -- each worker plays one game start to finish via `_play_and_label_sync` (a
+top-level, picklable entry point), so nothing needs pickling beyond `(seed, ruleset, bot_names)`.
+Games complete out of seed order under parallelism, so shard filenames use the real
+min/max seed *among that shard's accumulated rows*, not an assumed-contiguous range -- the
+`game_seed` column is the source of truth regardless.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import concurrent.futures
 import random
 import signal
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import pyarrow as pa
@@ -126,6 +136,16 @@ async def play_and_label(
     return rows
 
 
+def _play_and_label_sync(
+    seed: int, ruleset: RuleSet, bot_names: list[str]
+) -> list[dict[str, object]]:
+    """Top-level, picklable `ProcessPoolExecutor` entry point -- see module docstring. Builds
+    fresh bots inside the worker (same `_make_bots(names, seed)` the sequential path uses), so
+    reproducibility is unaffected by which process a seed happens to run in."""
+    bots = _make_bots(bot_names, seed)
+    return asyncio.run(play_and_label(seed, ruleset, bots))
+
+
 def _write_shard(
     rows: list[dict[str, object]], out_dir: Path, first_seed: int, last_seed: int
 ) -> Path:
@@ -150,33 +170,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ruleset", default=DEFAULT_PRESET_ID, choices=sorted(RULESET_PRESETS))
     parser.add_argument("--out", default="data/danger_model", type=Path)
     parser.add_argument("--shard-games", type=int, default=20)
+    parser.add_argument("--parallel", type=int, default=1, help="worker processes (1 = no pool)")
     return parser
 
 
-def main(argv: list[str] | None = None) -> None:
-    args = build_parser().parse_args(argv)
-    ruleset = RULESET_PRESETS[args.ruleset]
-    bot_names = args.bots.split(",")
-
-    stop = False
-
-    def _request_stop(signum: int, _frame: object) -> None:
-        nonlocal stop
-        print(f"received signal {signum}, finishing the in-flight shard then exiting", flush=True)
-        stop = True
-
-    signal.signal(signal.SIGTERM, _request_stop)
-    signal.signal(signal.SIGINT, _request_stop)
-
+def _run_sequential(
+    args: argparse.Namespace, ruleset: RuleSet, bot_names: list[str], stop: Callable[[], bool]
+) -> None:
     seed = args.seed_start
     games_done = 0
     shard_rows: list[dict[str, object]] = []
     shard_first_seed = seed
     started = time.monotonic()
 
-    while not stop and (args.games == 0 or games_done < args.games):
-        bots = _make_bots(bot_names, seed)
-        rows = asyncio.run(play_and_label(seed, ruleset, bots))
+    while not stop() and (args.games == 0 or games_done < args.games):
+        rows = _play_and_label_sync(seed, ruleset, bot_names)
         shard_rows.extend(rows)
         games_done += 1
         seed += 1
@@ -195,8 +203,83 @@ def main(argv: list[str] | None = None) -> None:
     if shard_rows:
         path = _write_shard(shard_rows, args.out, shard_first_seed, seed - 1)
         print(f"wrote final partial shard {path} ({len(shard_rows)} examples)", flush=True)
-
     print(f"done: {games_done} games, seeds [{args.seed_start}, {seed - 1}]", flush=True)
+
+
+def _run_parallel(
+    args: argparse.Namespace, ruleset: RuleSet, bot_names: list[str], stop: Callable[[], bool]
+) -> None:
+    games_done = 0
+    shard_rows: list[dict[str, object]] = []
+    shard_seeds: list[int] = []
+    started = time.monotonic()
+    last_seed_done = args.seed_start - 1
+    next_seed = [args.seed_start]  # single-element cell: mutable from the nested closure below
+
+    with ProcessPoolExecutor(max_workers=args.parallel) as pool:
+        in_flight: dict[concurrent.futures.Future[list[dict[str, object]]], int] = {}
+
+        def _top_up() -> None:
+            while (
+                len(in_flight) < args.parallel
+                and not stop()
+                and (args.games == 0 or (next_seed[0] - args.seed_start) < args.games)
+            ):
+                fut = pool.submit(_play_and_label_sync, next_seed[0], ruleset, bot_names)
+                in_flight[fut] = next_seed[0]
+                next_seed[0] += 1
+
+        _top_up()
+
+        while in_flight:
+            done, _pending = concurrent.futures.wait(
+                in_flight, return_when=concurrent.futures.FIRST_COMPLETED
+            )
+            for fut in done:
+                completed_seed = in_flight.pop(fut)
+                shard_rows.extend(fut.result())
+                shard_seeds.append(completed_seed)
+                games_done += 1
+                last_seed_done = max(last_seed_done, completed_seed)
+
+            if len(shard_rows) and games_done % args.shard_games == 0:
+                path = _write_shard(shard_rows, args.out, min(shard_seeds), max(shard_seeds))
+                elapsed = time.monotonic() - started
+                print(
+                    f"wrote {path} ({len(shard_rows)} examples, {games_done} games, "
+                    f"{elapsed:.0f}s elapsed, {args.parallel} workers)",
+                    flush=True,
+                )
+                shard_rows = []
+                shard_seeds = []
+
+            _top_up()
+
+    if shard_rows:
+        path = _write_shard(shard_rows, args.out, min(shard_seeds), max(shard_seeds))
+        print(f"wrote final partial shard {path} ({len(shard_rows)} examples)", flush=True)
+    print(f"done: {games_done} games, seeds up to {last_seed_done}", flush=True)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
+    ruleset = RULESET_PRESETS[args.ruleset]
+    bot_names = args.bots.split(",")
+
+    stop_flag = False
+
+    def _request_stop(signum: int, _frame: object) -> None:
+        nonlocal stop_flag
+        print(f"received signal {signum}, finishing in-flight work then exiting", flush=True)
+        stop_flag = True
+
+    signal.signal(signal.SIGTERM, _request_stop)
+    signal.signal(signal.SIGINT, _request_stop)
+
+    if args.parallel > 1:
+        _run_parallel(args, ruleset, bot_names, lambda: stop_flag)
+    else:
+        _run_sequential(args, ruleset, bot_names, lambda: stop_flag)
 
 
 if __name__ == "__main__":

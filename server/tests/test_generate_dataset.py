@@ -96,3 +96,34 @@ def test_bot_registry_names_are_valid_choices_for_the_cli() -> None:
     name = min(BOT_REGISTRY)
     args = parser.parse_args(["--bots", ",".join([name] * 4)])
     assert args.bots.split(",") == [name] * 4
+
+
+def test_parallel_run_covers_every_seed_exactly_once(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """`--parallel` games complete out of seed order -- this pins that shard filenames still use
+    the real min/max seed *of that shard's rows* (not an assumed-contiguous range), and that no
+    seed is silently dropped or doubled across shard boundaries."""
+    out_dir = tmp_path / "shards"
+    ml_generate_dataset.main(
+        [
+            "--games",
+            "6",
+            "--seed-start",
+            "100",
+            "--shard-games",
+            "3",
+            "--parallel",
+            "3",
+            "--out",
+            str(out_dir),
+        ]
+    )
+
+    shards = sorted(out_dir.glob("*.parquet"))
+    assert len(shards) == 2
+    all_seeds: list[int] = []
+    for shard in shards:
+        table = pq.read_table(shard, columns=["game_seed"])
+        seeds = table.column("game_seed").to_pylist()
+        assert len(set(seeds)) == 3  # exactly one shard's worth of distinct games
+        all_seeds.extend(seeds)
+    assert sorted(set(all_seeds)) == list(range(100, 106))
