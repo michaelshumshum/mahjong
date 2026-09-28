@@ -40,11 +40,11 @@ test('retries after a failed attempt, showing the attempt count and next-retry c
 
 	await expect(page.getByText('Connecting…')).toBeVisible();
 	await expect(page.getByText(/^Attempt \d+$/)).not.toBeVisible();
-	// attempt 1 just failed -- waiting out the 1s backoff before attempt 2.
-	await expect(page.getByText('Next attempt in 1s')).toBeVisible({ timeout: 1_000 });
+	// attempt 1 just failed -- a 1s timeout raced the real 1s backoff 1:1 with no CI slack.
+	await expect(page.getByText('Next attempt in 1s')).toBeVisible({ timeout: 3_000 });
 	await expect(page.getByText('Attempt 2')).toBeVisible({ timeout: 3_000 });
 	// attempt 2 also failed -- next delay doubled to 2s, proving the backoff actually grows.
-	await expect(page.getByText('Next attempt in 2s')).toBeVisible({ timeout: 1_000 });
+	await expect(page.getByText('Next attempt in 2s')).toBeVisible({ timeout: 3_000 });
 	await expect(page.getByText('Attempt 3')).toBeVisible({ timeout: 4_000 });
 });
 
