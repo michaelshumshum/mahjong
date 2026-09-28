@@ -4,6 +4,7 @@
 		type Payments,
 		type WinningMeld
 	} from '$lib/ui/FaanBreakdown.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	const seatNames: Record<0 | 1 | 2 | 3, string> = {
 		0: 'Alice',
@@ -36,11 +37,12 @@
 	const cappedMelds: WinningMeld[] = [{ kind: 'pung', tiles: ['1s', '1s', '1s'] }];
 </script>
 
-<h2>FaanBreakdown demo</h2>
+<h2>{m.faanBreakdownDemo_heading()}</h2>
 <p class="hint">
-	Mock <code>hand_end</code> data (docs/02-protocol.md §3) — no real scoring exists yet. First card:
-	a plain 5-faan discard win. Second: four patterns stacking to 11 faan, clamped to the default
-	<code>faan_cap</code> of 10.
+	{m.faanBreakdownDemo_hintBeforeHandEnd()} <code>hand_end</code>
+	{m.faanBreakdownDemo_hintBetween()}
+	<code>faan_cap</code>
+	{m.faanBreakdownDemo_hintAfterFaanCap()}
 </p>
 <div class="breakdown-row">
 	<FaanBreakdown

@@ -8,13 +8,18 @@
 	import SettingsDemo from './_components/SettingsDemo.svelte';
 	import ToastDemo from './_components/ToastDemo.svelte';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 </script>
 
 <div class="demo-header">
-	<BackButton label="Lobby" href="/" />
+	<BackButton label={m.demoPage_backLabel()} href="/" />
 </div>
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<h1>{m.demoPage_heading()}</h1>
+<p>
+	{m.demoPage_docsLinkPrefix()}
+	<a href="https://svelte.dev/docs/kit">{m.demoPage_docsLinkText()}</a>
+	{m.demoPage_docsLinkSuffix()}
+</p>
 
 <section><WsConnectDemo /></section>
 <section><TileFaceDemo /></section>

@@ -250,5 +250,62 @@
 
 	"handEndOverlay_resultAriaLabel": "Hand result",
 	"handEndOverlay_handHeading": "Hand {handNo}",
-	"handEndOverlay_drawLabel": "Draw"
+	"handEndOverlay_drawLabel": "Draw",
+
+	"demoPage_backLabel": "Lobby",
+	"demoPage_heading": "Welcome to SvelteKit",
+	"demoPage_docsLinkPrefix": "Visit",
+	"demoPage_docsLinkText": "svelte.dev/docs/kit",
+	"demoPage_docsLinkSuffix": "to read the documentation",
+
+	"wsConnectDemo_heading": "WS connect/ping/pong demo",
+	"wsConnectDemo_connectButton": "Connect + ping",
+
+	"tileFaceDemo_heading": "TileFace demo",
+	"tileFaceDemo_backLabel": "back",
+
+	"timerRingDemo_heading": "TimerRing demo",
+	"timerRingDemo_hint": "Pick a duration; the ring depletes over that many ms and turns red near expiry.",
+	"timerRingDemo_durationButton": "{ms}ms",
+
+	"claimButtonsDemo_heading": "ClaimButtons demo",
+	"claimButtonsDemo_hint": "Mock claim_offer with two chow options on the same discard (4s-5s vs 5s-7s), plus pung, win, pass. Fixed to the bottom-center of the viewport per docs/03-frontend.md §5.",
+
+	"faanBreakdownDemo_heading": "FaanBreakdown demo",
+	"faanBreakdownDemo_hintBeforeHandEnd": "Mock",
+	"faanBreakdownDemo_hintBetween": "data (docs/02-protocol.md §3) — no real scoring exists yet. First card: a plain 5-faan discard win. Second: four patterns stacking to 11 faan, clamped to the default",
+	"faanBreakdownDemo_hintAfterFaanCap": "of 10.",
+
+	"scoreSheetDemo_heading": "ScoreSheet demo",
+	"scoreSheetDemo_hintIntro": "Mock",
+	"scoreSheetDemo_hintBody": "data (docs/02-protocol.md §3) — like the FaanBreakdown demo above, no real server model exists for these events yet. Four hands of a one-round (",
+	"scoreSheetDemo_hintTail": ", 一圈) game; deltas per hand sum to zero and accumulate to the footer totals and final standings shown below. Hands 1 and 3 carry per-round detail — click their row to expand the winning hand (or the draw note).",
+
+	"settingsDemo_heading": "Settings demo",
+	"settingsDemo_hint": "Pre-arm toggles mirror the `auto` message's `no_calls`/`auto_pass_chow` fields (docs/02-protocol.md §2) — no `auto_win`, per that section's \"Declining a claim on purpose\". Sound/motion are client-only prefs stubbed ahead of the real settings surface.",
+
+	"toastDemo_heading": "Toast demo",
+	"toastDemo_hint": "Generic transient notifications, queued locally with toasts.ts's pure helpers. Auto-dismiss is a one-shot timer per toast (not a JS ticker); dismiss manually with the × button.",
+	"toastDemo_reconnectingMessage": "Reconnecting…",
+	"toastDemo_copiedMessage": "Copied to clipboard",
+	"toastDemo_pushReconnectingButton": "Push \"Reconnecting…\"",
+	"toastDemo_pushCopiedButton": "Push \"Copied\" (1.5s)",
+
+	"animationDemoPanel_heading": "Animate a turn",
+	"animationDemoPanel_hint": "Sandboxed mock, independent of the scenarios above — proves the positional slot-identity mechanics and CSS-only transitions.",
+	"animationDemoPanel_opponentSeatAriaLabel": "Opponent seat",
+	"animationDemoPanel_opponentHeading": "Bob (opponent)",
+	"animationDemoPanel_opponentConcealedAriaLabel": "Bob's concealed tiles",
+	"animationDemoPanel_opponentMeldsAriaLabel": "Bob's melds",
+	"animationDemoPanel_opponentDiscardsAriaLabel": "Bob's discards",
+	"animationDemoPanel_drawButton": "Draw",
+	"animationDemoPanel_discardButton": "Discard",
+	"animationDemoPanel_concealedKongButton": "Concealed kong",
+	"animationDemoPanel_claimLastDiscardButton": "You claim last discard (pung)",
+	"animationDemoPanel_yourSeatAriaLabel": "Your seat",
+	"animationDemoPanel_youHeading": "You",
+	"animationDemoPanel_yourHandAriaLabel": "Your demo hand",
+	"animationDemoPanel_yourDiscardsAriaLabel": "Your discards",
+	"animationDemoPanel_discardTileAriaLabel": "Discard {tile}",
+	"animationDemoPanel_resetButton": "Reset demo"
 }

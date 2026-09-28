@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// mock `auto` pre-arm state plus client-only prefs, no real message sent or persisted yet.
 	let autoArm = $state<AutoArm>({ noCalls: false, autoPassChow: false });
@@ -12,11 +13,9 @@
 	);
 </script>
 
-<h2>Settings demo</h2>
+<h2>{m.settingsDemo_heading()}</h2>
 <p class="hint">
-	Pre-arm toggles mirror the `auto` message's `no_calls`/`auto_pass_chow` fields
-	(docs/02-protocol.md §2) — no `auto_win`, per that section's "Declining a claim on purpose".
-	Sound/motion are client-only prefs stubbed ahead of the real settings surface.
+	{m.settingsDemo_hint()}
 </p>
 {#if lastAutoArmSummary}
 	<p data-testid="auto-arm-summary">{lastAutoArmSummary}</p>

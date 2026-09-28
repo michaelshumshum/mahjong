@@ -1,17 +1,18 @@
 <script lang="ts">
 	import TileFace from '$lib/table/TileFace.svelte';
 	import type { TileCode } from '$lib/table/tile-code';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// proves TileFace renders vendored art per code plus a back for concealed codes.
 	const demoCodes: (TileCode | null)[] = ['1m', '9m', '5p', '1s', 'z1', 'z5', 'z7', 'f1', null];
 </script>
 
-<h2>TileFace demo</h2>
+<h2>{m.tileFaceDemo_heading()}</h2>
 <div class="tile-row">
 	{#each demoCodes as code (code)}
 		<figure>
 			<TileFace {code} />
-			<figcaption>{code ?? 'back'}</figcaption>
+			<figcaption>{code ?? m.tileFaceDemo_backLabel()}</figcaption>
 		</figure>
 	{/each}
 </div>

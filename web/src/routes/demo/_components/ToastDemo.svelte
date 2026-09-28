@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ToastStack from '$lib/ui/ToastStack.svelte';
 	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// a small local queue built from toasts.ts's pure helpers, proving out queuing/dismiss together.
 	let toastQueue = $state<ToastEntry[]>([]);
@@ -12,15 +13,16 @@
 	}
 </script>
 
-<h2>Toast demo</h2>
+<h2>{m.toastDemo_heading()}</h2>
 <p class="hint">
-	Generic transient notifications, queued locally with toasts.ts's pure helpers. Auto-dismiss is a
-	one-shot timer per toast (not a JS ticker); dismiss manually with the × button.
+	{m.toastDemo_hint()}
 </p>
 <div class="toast-controls">
-	<button type="button" onclick={() => pushToast('Reconnecting…')}>Push "Reconnecting…"</button>
-	<button type="button" onclick={() => pushToast('Copied to clipboard', 1500)}>
-		Push "Copied" (1.5s)
+	<button type="button" onclick={() => pushToast(m.toastDemo_reconnectingMessage())}
+		>{m.toastDemo_pushReconnectingButton()}</button
+	>
+	<button type="button" onclick={() => pushToast(m.toastDemo_copiedMessage(), 1500)}>
+		{m.toastDemo_pushCopiedButton()}
 	</button>
 </div>
 <ToastStack queue={toastQueue} onDismiss={dismissToast} />

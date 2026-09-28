@@ -12,6 +12,7 @@
 		type SlotState
 	} from '$lib/table/tile-slots';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let { onClose }: { onClose: () => void } = $props();
 
@@ -127,15 +128,17 @@
 <div class="panel-overlay" data-testid="animation-demo">
 	<div class="animation-demo">
 		<CloseButton onclick={onClose} />
-		<h2>Animate a turn</h2>
+		<h2>{m.animationDemoPanel_heading()}</h2>
 		<p class="demo-hint">
-			Sandboxed mock, independent of the scenarios above — proves the positional slot-identity
-			mechanics and CSS-only transitions.
+			{m.animationDemoPanel_hint()}
 		</p>
 
-		<section aria-label="Opponent seat">
-			<h3>Bob (opponent)</h3>
-			<div class="tile-row backs-row" aria-label="Bob's concealed tiles">
+		<section aria-label={m.animationDemoPanel_opponentSeatAriaLabel()}>
+			<h3>{m.animationDemoPanel_opponentHeading()}</h3>
+			<div
+				class="tile-row backs-row"
+				aria-label={m.animationDemoPanel_opponentConcealedAriaLabel()}
+			>
 				{#each renderedOpponentSlots as slot (slot.key)}
 					<div
 						class="mini-tile back demo-slot"
@@ -149,7 +152,7 @@
 				{/each}
 			</div>
 			{#if demoOpponentMelds.length}
-				<div class="tile-row meld-row" aria-label="Bob's melds">
+				<div class="tile-row meld-row" aria-label={m.animationDemoPanel_opponentMeldsAriaLabel()}>
 					{#each demoOpponentMelds as meld, mi (mi)}
 						<div class="meld demo-meld-entering">
 							{#each meld.tiles as code, ti (ti)}
@@ -161,47 +164,56 @@
 					{/each}
 				</div>
 			{/if}
-			<div class="discard-pool" role="list" aria-label="Bob's discards">
+			<div
+				class="discard-pool"
+				role="list"
+				aria-label={m.animationDemoPanel_opponentDiscardsAriaLabel()}
+			>
 				{#each demoOpponentDiscards as code, i (i)}
 					<div class="discard-tile" role="listitem"><TileFace {code} /></div>
 				{/each}
 			</div>
 			<div class="demo-actions">
-				<button type="button" onclick={demoOpponentDraw}>Draw</button>
+				<button type="button" onclick={demoOpponentDraw}>{m.animationDemoPanel_drawButton()}</button
+				>
 				<button
 					type="button"
 					onclick={demoOpponentDiscard}
 					disabled={leavingOpponentSlotKey !== null || demoOpponentSlots.slots.length === 0}
 				>
-					Discard
+					{m.animationDemoPanel_discardButton()}
 				</button>
 				<button
 					type="button"
 					onclick={demoOpponentConcealedKong}
 					disabled={demoOpponentSlots.slots.length < 4}
 				>
-					Concealed kong
+					{m.animationDemoPanel_concealedKongButton()}
 				</button>
 				<button
 					type="button"
 					onclick={demoOpponentClaim}
 					disabled={demoOpponentDiscards.length === 0}
 				>
-					You claim last discard (pung)
+					{m.animationDemoPanel_claimLastDiscardButton()}
 				</button>
 			</div>
 		</section>
 
-		<section aria-label="Your seat">
-			<h3>You</h3>
-			<div class="hand-row" aria-label="Your demo hand" data-testid="demo-your-hand">
+		<section aria-label={m.animationDemoPanel_yourSeatAriaLabel()}>
+			<h3>{m.animationDemoPanel_youHeading()}</h3>
+			<div
+				class="hand-row"
+				aria-label={m.animationDemoPanel_yourHandAriaLabel()}
+				data-testid="demo-your-hand"
+			>
 				{#each demoYourHand as tile (tile.id)}
 					<button
 						type="button"
 						class="hand-tile demo-hand-tile"
 						class:demo-tile-leaving={tile.id === leavingYourTileId}
 						disabled={leavingYourTileId !== null}
-						aria-label="Discard {tile.code}"
+						aria-label={m.animationDemoPanel_discardTileAriaLabel({ tile: tile.code })}
 						onclick={() => demoYourDiscard(tile.id)}
 						ontransitionend={tile.id === leavingYourTileId ? commitYourDiscard : undefined}
 					>
@@ -212,7 +224,7 @@
 			<div
 				class="discard-pool discard-pool--self"
 				role="list"
-				aria-label="Your discards"
+				aria-label={m.animationDemoPanel_yourDiscardsAriaLabel()}
 				data-testid="demo-your-discards"
 			>
 				{#each demoYourDiscards as tile (tile.id)}
@@ -221,7 +233,9 @@
 			</div>
 		</section>
 
-		<button type="button" class="demo-reset" onclick={resetAnimationDemo}>Reset demo</button>
+		<button type="button" class="demo-reset" onclick={resetAnimationDemo}
+			>{m.animationDemoPanel_resetButton()}</button
+		>
 	</div>
 </div>
 

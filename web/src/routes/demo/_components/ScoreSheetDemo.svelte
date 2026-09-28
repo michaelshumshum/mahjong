@@ -5,6 +5,7 @@
 		type Standing,
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// mock score/game_end data. EAST_ONLY (一圈) means a full game is one round, so 4 hands here
 	// is the minimum length, not a fixed count. Deltas hand-checked to sum to zero per hand.
@@ -52,13 +53,10 @@
 	];
 </script>
 
-<h2>ScoreSheet demo</h2>
+<h2>{m.scoreSheetDemo_heading()}</h2>
 <p class="hint">
-	Mock <code>score</code>/<code>game_end</code> data (docs/02-protocol.md §3) — like the
-	FaanBreakdown demo above, no real server model exists for these events yet. Four hands of a
-	one-round (<code>EAST_ONLY</code>, 一圈) game; deltas per hand sum to zero and accumulate to the
-	footer totals and final standings shown below. Hands 1 and 3 carry per-round detail — click their
-	row to expand the winning hand (or the draw note).
+	{m.scoreSheetDemo_hintIntro()} <code>score</code>/<code>game_end</code>
+	{m.scoreSheetDemo_hintBody()}<code>EAST_ONLY</code>{m.scoreSheetDemo_hintTail()}
 </p>
 <ScoreSheet seats={scoreSeats} totals={scoreTotals} hands={scoreHands} standings={scoreStandings} />
 

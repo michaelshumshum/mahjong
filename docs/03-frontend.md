@@ -831,8 +831,17 @@ should stay one class plus custom properties.
   `HandEndOverlay.svelte`, `lib/ui/rank.ts`'s standings/podium labels) are done. `lib/table/wind.ts`'s
   `WIND_LABEL`/`seatWind()` stayed untouched in Phase 6: every remaining caller is outside this
   phase's scope and already treats `WIND_LABEL`'s value as an interpolated parameter into its own
-  already-migrated message, not raw rendered text. Every other route/component's strings are still
-  hardcoded English — later phases in that plan.
+  already-migrated message, not raw rendered text. Phase 7 (demo routes — `routes/demo/+page.svelte`
+  and its `_components/` — plus `AnimationDemoPanel.svelte`, a dev-only sandbox reachable from
+  `routes/table/[id]/+page.svelte` only via `MockTableToolbar`'s "Animate a turn" toggle) is also
+  done. `lib/table/mock-game-state.ts`'s `MOCK_SCENARIOS` labels stayed untouched, same as
+  Phase 5's `MockTableToolbar.svelte` `scenario.label`: they're e2e/screenshot fixture data
+  (`web/AGENTS.md`), read verbatim by `table.e2e.ts` assertions, never reachable outside the
+  dev-only `?mock=` path — not real user-visible copy. Demo components' own diagnostic
+  `data-testid` readouts (`status: {status}`, `pong: t0=... t1=...`, `no_calls=... auto_pass_chow=...`,
+  `chose: {kind}`) were left the same way: raw protocol/enum identifiers for test assertions, not
+  prose. Every other route/component's strings are still hardcoded English — later phases in that
+  plan.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).

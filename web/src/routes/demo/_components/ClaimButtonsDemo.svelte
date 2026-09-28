@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// mock props only, no claim_offer wiring. Two chow options on the same discarded 6s
 	// (4s-5s vs 5s-7s) exercises the multi-chow-option disambiguation.
@@ -16,10 +17,9 @@
 	}
 </script>
 
-<h2>ClaimButtons demo</h2>
+<h2>{m.claimButtonsDemo_heading()}</h2>
 <p class="hint">
-	Mock claim_offer with two chow options on the same discard (4s-5s vs 5s-7s), plus pung, win, pass.
-	Fixed to the bottom-center of the viewport per docs/03-frontend.md §5.
+	{m.claimButtonsDemo_hint()}
 </p>
 {#if lastChoice}
 	<p data-testid="claim-choice">

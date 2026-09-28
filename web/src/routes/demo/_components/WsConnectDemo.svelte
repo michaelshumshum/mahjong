@@ -4,6 +4,7 @@
 	import { reduce } from '$lib/net/reducer';
 	import { initialClientGameState } from '$lib/game/state';
 	import type { Pong } from '$lib/net/protocol';
+	import { m } from '$lib/paraglide/messages.js';
 
 	let status = $state<'idle' | 'connecting' | 'connected'>('idle');
 	let lastPong = $state<Pong['d'] | null>(null);
@@ -43,8 +44,10 @@
 	});
 </script>
 
-<h2>WS connect/ping/pong demo</h2>
-<button onclick={connectAndPing} disabled={status !== 'idle'}>Connect + ping</button>
+<h2>{m.wsConnectDemo_heading()}</h2>
+<button onclick={connectAndPing} disabled={status !== 'idle'}
+	>{m.wsConnectDemo_connectButton()}</button
+>
 <p>status: {status}</p>
 {#if lastPong}
 	<p data-testid="pong-result">pong: t0={lastPong.t0} t1={lastPong.t1}</p>
