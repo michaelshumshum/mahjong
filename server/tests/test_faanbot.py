@@ -20,7 +20,15 @@ from collections.abc import Iterator
 import pytest
 
 from app.views import SeatView, seat_view
-from bots.faanbot import _CONCEALED_KONG_BASE, FaanBot, _turn_breakpoints
+from bots.faanbot import (
+    _CONCEALED_KONG_BASE,
+    AGGRESSIVE,
+    BASELINE,
+    DEFENSIVE,
+    FLUSH_CHASING,
+    FaanBot,
+    _turn_breakpoints,
+)
 from bots.random import random_action
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -291,6 +299,103 @@ async def test_folds_to_a_safe_tile_late_against_a_threatening_opponent() -> Non
     mask = _discard_mask(_FOLD_HAND)
     aid = await FaanBot().act(view, mask, _NO_DEADLINE)
     assert aid == int(T.WIND_NORTH)
+
+
+# --- weight profiles: opponent-variety multipliers for training data (docs/06-ml.md §6.6) -----
+
+
+async def test_aggressive_chases_a_marginal_value_signal_baseline_declines() -> None:
+    """Same hand and turns as `test_does_not_chase_a_marginal_value_signal` above, where
+    `BASELINE` never chases the 1-faan Half Flush edge over ukeire. At turn 8 -- mid-game, where
+    `_weights_for_turn` already weights `w_value` heavily -- `AGGRESSIVE`'s `w_value*1.3` tips it
+    into chasing; turns 3 and 13 (where `w_value` is small or swamped by `w_safety`) still match
+    `BASELINE`, so this isn't "always chase value", just a real shift in the marginal case."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.MAN_9,
+        T.WIND_EAST,
+        T.WIND_EAST,
+        T.PIN_5,
+        T.WIND_SOUTH,
+    ]
+    own_pool = _own_pool(13, avoid=set(hand))
+    mask = _discard_mask(hand)
+    for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (13, T.WIND_SOUTH)):
+        view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
+        aid = await FaanBot(weight_profile=AGGRESSIVE).act(view, mask, _NO_DEADLINE)
+        assert aid == int(expected), f"turn={turn}"
+
+
+async def test_flush_chasing_also_chases_the_same_marginal_value_signal() -> None:
+    """Same hand/turns as the AGGRESSIVE test above. `FLUSH_CHASING` reaches the same turn-8/10
+    flip via a different lever -- `w_flex*0.3` discounts `pattern_optionality` rather than
+    boosting `w_safety`'s discount -- confirming it's a real, independent divergence from
+    `BASELINE`, not a copy of AGGRESSIVE's tuning."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.MAN_9,
+        T.WIND_EAST,
+        T.WIND_EAST,
+        T.PIN_5,
+        T.WIND_SOUTH,
+    ]
+    own_pool = _own_pool(13, avoid=set(hand))
+    mask = _discard_mask(hand)
+    for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (10, T.PIN_5), (13, T.WIND_SOUTH)):
+        view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
+        aid = await FaanBot(weight_profile=FLUSH_CHASING).act(view, mask, _NO_DEADLINE)
+        assert aid == int(expected), f"turn={turn}"
+
+
+async def test_defensive_discards_the_genbutsu_floater_baseline_keeps() -> None:
+    """123456789m + 11p pair + two isolated numbered floaters (5s, 5p), one of which (5p) is
+    genbutsu against seat 1's own discard. `BASELINE` (and `AGGRESSIVE`) discard 5s at every
+    turn tested -- `DEFENSIVE`'s `w_safety*1.6` flips it to the genbutsu-safe 5p instead, a real
+    divergence driven purely by the risk term, not shanten/ukeire (both floaters are otherwise
+    symmetric: isolated, numbered, mid-rank)."""
+    hand = [
+        T.MAN_1,
+        T.MAN_2,
+        T.MAN_3,
+        T.MAN_4,
+        T.MAN_5,
+        T.MAN_6,
+        T.MAN_7,
+        T.MAN_8,
+        T.MAN_9,
+        T.PIN_1,
+        T.PIN_1,
+        T.SOU_5,
+        T.PIN_5,
+    ]
+    seat1_pool = (tile_ids_for_type(T.PIN_5)[0],)  # genbutsu source for 5p
+    mask = _discard_mask(hand)
+    for turn in (3, 6, 8, 10):
+        view = _build_view(0, hand, turn=turn, discard_pools=((), seat1_pool, (), ()))
+        baseline_aid = await FaanBot(weight_profile=BASELINE).act(view, mask, _NO_DEADLINE)
+        defensive_aid = await FaanBot(weight_profile=DEFENSIVE).act(view, mask, _NO_DEADLINE)
+        assert baseline_aid == int(T.SOU_5), f"turn={turn}"
+        assert defensive_aid == int(T.PIN_5), f"turn={turn}"
+
+
+def test_baseline_is_the_default_weight_profile() -> None:
+    assert FaanBot()._weight_profile is BASELINE
 
 
 # --- scripted claim: value-aware guard beyond "strictly reduces shanten" ----------------------

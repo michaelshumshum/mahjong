@@ -9,6 +9,8 @@ minimum, not a hardcoded default (docs/04-bots.md §9 Tier 1).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.views import SeatView
 from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
 from bots.safety import kong_rob_risk, opponent_threat_level, tile_risk
@@ -19,7 +21,7 @@ from mahjong_core.state import Phase
 from mahjong_core.tiles import tile_id_type
 from mahjong_core.wall import max_turns_per_seat
 
-__all__ = ["FaanBot"]
+__all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
 
 _DISCARD_BASE = 0
 _CONCEALED_KONG_BASE = 34
@@ -135,8 +137,37 @@ def _speed_term(result_shanten: int, tiles_accepted: int) -> float:
     return -_SHANTEN_UNIT * result_shanten + tiles_accepted / _UKEIRE_SCALE
 
 
+@dataclass(frozen=True)
+class WeightProfile:
+    """Multipliers on `_weights_for_turn`'s `(w_speed, w_value, w_safety, w_flex)` schedule --
+    docs/06-ml.md §6.6's "a weight vector is free" opponent-variety mechanism for Phase 1 training
+    data. `BASELINE`'s all-1.0 multipliers reproduce the shipped, arena-tuned weights exactly
+    (docs/04-bots.md §8's numbers are measured against `BASELINE` specifically) -- every other
+    profile is a deliberate, unvalidated-by-arena departure from that tuning, meant to widen the
+    input distribution a danger model trains on, not to compete with it."""
+
+    w_speed: float = 1.0
+    w_value: float = 1.0
+    w_safety: float = 1.0
+    w_flex: float = 1.0
+
+
+BASELINE = WeightProfile()
+AGGRESSIVE = WeightProfile(w_value=1.3, w_safety=0.5)
+"""Chases points and discounts danger relative to the shipped tuning."""
+DEFENSIVE = WeightProfile(w_value=0.7, w_safety=1.6)
+"""Folds earlier and more readily than the shipped tuning."""
+FLUSH_CHASING = WeightProfile(w_value=1.3, w_flex=0.3)
+"""Commits to its single best route instead of hedging across several -- `w_flex`
+(`pattern_optionality`) rewards keeping multiple routes open, which is exactly what a
+flush-chaser gives up in exchange for committing harder to the biggest one."""
+
+
 class FaanBot:
     """T2: see module docstring. Never returns an id `mask` doesn't mark legal."""
+
+    def __init__(self, *, weight_profile: WeightProfile = BASELINE) -> None:
+        self._weight_profile = weight_profile
 
     async def act(self, view: SeatView, mask: list[bool], deadline: float) -> int:
         del deadline  # no search budget; O(1)-ish per candidate
@@ -252,6 +283,11 @@ class FaanBot:
         fold_mode = turn >= late_turn and base_shanten >= _FOLD_SHANTEN and threatening
 
         w_speed, w_value, w_safety, w_flex = _weights_for_turn(turn, early_turn, late_turn)
+        profile = self._weight_profile
+        w_speed *= profile.w_speed
+        w_value *= profile.w_value
+        w_safety *= profile.w_safety
+        w_flex *= profile.w_flex
         accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
 
         best_key: tuple[float, int, int] | None = None

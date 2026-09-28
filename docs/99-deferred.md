@@ -394,6 +394,20 @@ memorable than one that's marginally more optimal.
 The play-style bias is the same `FaanBot` weight-profile mechanism `06-ml.md` §6.6 wants for
 training-opponent variety — build it once, serve both.
 
+**Play-style bias half: built (2026-09-28), for the training-variety use case.**
+`bots/faanbot.py`'s `WeightProfile`/`BASELINE`/`AGGRESSIVE`/`DEFENSIVE`/`FLUSH_CHASING`, registered
+in `bots/arena.py`'s `BOT_REGISTRY` as `FaanBotAggressive`/`FaanBotDefensive`/
+`FaanBotFlushChasing` — exactly the "build it once, serve both" mechanism this paragraph
+anticipated. What's still not done, and still genuinely this section's own scope, not §6.6's: a
+**name** for a persona (vs. a bare bot-tier string), an **avatar**, and a **think-time
+distribution** per persona (docs/04-bots.md §1's humanising delay is currently uniform per
+decision regardless of tier or profile) — none of that matters for a training-data generator, all
+of it matters for a difficulty-picker-facing persona. Also still open: no live-table selection
+path (`PracticeSetupDialog.svelte`/`POST /tables`'s `bot_tiers`) offers these profiles the way
+`04-bots.md §7`'s Easy/Normal/Impossible picker offers `T1`/`T2`/`ORACLE` — a weight profile isn't
+a difficulty level, so it isn't obvious it belongs in that picker at all without a real product
+decision, not just wiring.
+
 | Level | How |
 | --- | --- |
 | Expert | T3 with search budget |

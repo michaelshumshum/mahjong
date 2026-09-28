@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from app.views import seat_view
 from bots.base import Bot
 from bots.efficiency import EfficiencyBot
-from bots.faanbot import FaanBot
+from bots.faanbot import AGGRESSIVE, DEFENSIVE, FLUSH_CHASING, FaanBot, WeightProfile
 from bots.labels import is_tenpai, seat_hand34, unused_tile_id_for_type, winning_tile_types
 from bots.random import RandomBot
 from mahjong_core.actions import build_scoring_context
@@ -64,10 +64,26 @@ def _faan_bot_factory(seed: int) -> Bot:
     return FaanBot()
 
 
+def _weight_profile_factory(profile: WeightProfile) -> Callable[[int], Bot]:
+    """A `BOT_REGISTRY` factory for a non-`BASELINE` `FaanBot` weight profile (docs/06-ml.md
+    §6.6's opponent-variety mechanism for Phase 1 training data) -- same stateless-seed shape as
+    `_faan_bot_factory`, parameterised so `AGGRESSIVE`/`DEFENSIVE`/`FLUSH_CHASING` don't each need
+    their own near-identical factory function."""
+
+    def factory(seed: int) -> Bot:
+        del seed  # stateless; seed unused
+        return FaanBot(weight_profile=profile)
+
+    return factory
+
+
 BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "RandomBot": _random_bot_factory,
     "EfficiencyBot": _efficiency_bot_factory,
     "FaanBot": _faan_bot_factory,
+    "FaanBotAggressive": _weight_profile_factory(AGGRESSIVE),
+    "FaanBotDefensive": _weight_profile_factory(DEFENSIVE),
+    "FaanBotFlushChasing": _weight_profile_factory(FLUSH_CHASING),
 }
 
 _STEP_CAP = 8000
