@@ -33,10 +33,10 @@ test('switching to the claim-window scenario surfaces claim buttons, and choosin
 
 	const overlay = page.getByTestId('claim-overlay');
 	await expect(overlay).toBeVisible();
-	await expect(overlay.getByRole('button', { name: 'Win' })).toBeVisible();
-	await expect(overlay.getByRole('button', { name: /^Pung/ })).toBeVisible();
+	await expect(overlay.locator('.claim-btn--win')).toBeVisible();
+	await expect(overlay.locator('.claim-btn--pung')).toBeVisible();
 
-	await overlay.getByRole('button', { name: 'Win' }).click();
+	await overlay.locator('.claim-btn--win').click();
 	await expect(page.getByTestId('claim-choice')).toHaveText('chose: win');
 });
 
@@ -125,7 +125,7 @@ test('dismissing the hand-end hold in mock mode closes it locally with no socket
 	const overlay = page.getByTestId('faan-overlay');
 	await expect(overlay).toBeVisible();
 
-	await overlay.getByRole('button', { name: 'Close' }).click();
+	await overlay.getByTestId('close-button').click();
 	await expect(overlay).toHaveCount(0);
 
 	// switching scenarios resets the local dismiss -- a fresh hand-end always starts open.
@@ -174,7 +174,7 @@ test('reloading the page preserves clientPrefs toggled in Settings', async ({ pa
 	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 
-	await page.getByRole('button', { name: 'Settings' }).click();
+	await page.getByTestId('toggle-settings').click();
 	const soundToggle = page.getByRole('checkbox', { name: 'Sound effects' });
 	const reducedMotion = page.getByRole('radio', { name: 'Reduce motion' });
 	await expect(soundToggle).toBeChecked(); // default is on
@@ -183,7 +183,7 @@ test('reloading the page preserves clientPrefs toggled in Settings', async ({ pa
 
 	await page.reload();
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Settings' }).click();
+	await page.getByTestId('toggle-settings').click();
 
 	await expect(page.getByRole('checkbox', { name: 'Sound effects' })).not.toBeChecked();
 	await expect(page.getByRole('radio', { name: 'Reduce motion' })).toBeChecked();

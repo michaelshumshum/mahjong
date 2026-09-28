@@ -96,11 +96,11 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		}
 		// join seats one at a time (not Promise.all) so the first joiner's waiting-for-players
 		// screen has a real moment to render before the last `ready` starts the hand.
-		await pages[0].getByRole('button', { name: 'Open' }).first().click();
+		await pages[0].locator('.seat-ring-slot--open').first().click();
 		await expect(pages[0].getByText(/You're seated as/)).toBeVisible();
 		for (const p of pages.slice(1)) {
-			await expect(p.getByRole('button', { name: 'Open' }).first()).toBeVisible();
-			await p.getByRole('button', { name: 'Open' }).first().click();
+			await expect(p.locator('.seat-ring-slot--open').first()).toBeVisible();
+			await p.locator('.seat-ring-slot--open').first().click();
 		}
 
 		await Promise.all(
@@ -169,13 +169,13 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 	try {
 		const page = await browser.newPage();
 		await page.goto(BASE, { waitUntil: 'networkidle' });
-		await page.getByRole('button', { name: 'Practice vs Bots' }).click();
+		await page.getByTestId('lobby-practice-bots').click();
 
 		await expect(page).toHaveURL(/\/table\/[A-Z0-9]+\?practice=1$/);
 
 		// bot seats are already bound and auto-ready, so the waiting screen clears so fast the
 		// intermediate "You're seated as" text often never renders -- assert the stable end state.
-		await page.getByRole('button', { name: 'Open' }).click();
+		await page.locator('.seat-ring-slot--open').click();
 		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
 
 		// three opponent seats, all bot-controlled.
@@ -233,10 +233,10 @@ test('completing more than one real hand accumulates multi-hand history in the S
 		await Promise.all(
 			pages.map((p) => p.goto(`${BASE}/table/${table}`, { waitUntil: 'networkidle' }))
 		);
-		await pages[0].getByRole('button', { name: 'Open' }).first().click();
+		await pages[0].locator('.seat-ring-slot--open').first().click();
 		for (const p of pages.slice(1)) {
-			await expect(p.getByRole('button', { name: 'Open' }).first()).toBeVisible();
-			await p.getByRole('button', { name: 'Open' }).first().click();
+			await expect(p.locator('.seat-ring-slot--open').first()).toBeVisible();
+			await p.locator('.seat-ring-slot--open').first().click();
 		}
 		await Promise.all(
 			pages.map((p) => p.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 20_000 }))
@@ -264,7 +264,7 @@ test('completing more than one real hand accumulates multi-hand history in the S
 				if (overlayCounts[i] <= 0) continue;
 				await pages[i]
 					.getByTestId('faan-overlay')
-					.getByRole('button', { name: 'Close' })
+					.getByTestId('close-button')
 					.click({ timeout: 800 })
 					.catch(() => {});
 			}
@@ -301,7 +301,7 @@ test('completing more than one real hand accumulates multi-hand history in the S
 
 		expect(handBoundaries).toBeGreaterThanOrEqual(2);
 
-		await pages[0].getByRole('button', { name: 'Score sheet' }).click();
+		await pages[0].getByTestId('toggle-score-sheet').click();
 		const handRows = pages[0].locator('.score-sheet tbody tr');
 		await expect(handRows).toHaveCount(2, { timeout: 10_000 });
 		await expect(handRows.nth(0).locator('td').first()).toHaveText('1');
@@ -319,14 +319,14 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 	try {
 		const page = await browser.newPage();
 		await page.goto(BASE, { waitUntil: 'networkidle' });
-		await page.getByRole('button', { name: 'Practice vs Bots' }).click();
-		await page.getByRole('button', { name: 'Open' }).click();
+		await page.getByTestId('lobby-practice-bots').click();
+		await page.locator('.seat-ring-slot--open').click();
 		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
 
-		await page.getByRole('button', { name: 'Settings' }).click();
+		await page.getByTestId('toggle-settings').click();
 		await page.getByLabel('No calls this hand').check();
 		await page.getByLabel('Auto-pass chow').check();
-		await page.getByRole('button', { name: 'Close' }).click();
+		await page.getByTestId('close-button').click();
 
 		const gameEndOverlay = page.getByTestId('game-end-overlay');
 		const deadline = Date.now() + 1_770_000;
@@ -336,7 +336,7 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 			const faanOverlay = page.getByTestId('faan-overlay');
 			if (await faanOverlay.count()) {
 				await faanOverlay
-					.getByRole('button', { name: 'Close' })
+					.getByTestId('close-button')
 					.click({ timeout: 800 })
 					.catch(() => {});
 				continue;

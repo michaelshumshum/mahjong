@@ -47,9 +47,13 @@
 	</div>
 
 	<div class="chrome-toggles">
-		<button type="button" onclick={onToggleScoreSheet}>{m.tableToolbar_scoreSheetButton()}</button>
+		<button type="button" data-testid="toggle-score-sheet" onclick={onToggleScoreSheet}
+			>{m.tableToolbar_scoreSheetButton()}</button
+		>
 		{#if !spectating}
-			<button type="button" onclick={onToggleSettings}>{m.tableToolbar_settingsButton()}</button>
+			<button type="button" data-testid="toggle-settings" onclick={onToggleSettings}
+				>{m.tableToolbar_settingsButton()}</button
+			>
 		{/if}
 	</div>
 </header>

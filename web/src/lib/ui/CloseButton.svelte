@@ -4,7 +4,13 @@
 	let { onclick }: { onclick: () => void } = $props();
 </script>
 
-<button type="button" class="close-btn" aria-label={m.closeButton_ariaLabel()} {onclick}>
+<button
+	type="button"
+	class="close-btn"
+	data-testid="close-button"
+	aria-label={m.closeButton_ariaLabel()}
+	{onclick}
+>
 	<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
 		<path
 			d="M6 6 L18 18 M18 6 L6 18"

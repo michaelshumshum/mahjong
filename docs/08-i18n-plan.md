@@ -1,9 +1,9 @@
 # i18n implementation plan
 
-Status: Phases 0-9 implemented (Paraglide JS foundation through zh-Hant translation coverage of
-every key in `messages/en.json`); Phase 10 (test/QA hardening, locale-switch e2e coverage) is
-still pending. The zh-Hant translation is machine-generated, not yet reviewed by a fluent Hong
-Kong mahjong player — see the Risks table below.
+Status: fully implemented, phases 0-10 (Paraglide JS foundation through test/QA hardening and
+locale-switch e2e coverage). The zh-Hant translation is machine-generated, not yet reviewed by a
+fluent Hong Kong mahjong player — see the Risks table below; that domain-expert review is the one
+open follow-up, not a blocker to shipping cookie-based locale switching.
 
 ## Decision: Paraglide JS
 
@@ -112,11 +112,39 @@ Each phase is a self-contained change. Run `make test-web` after each; regenerat
   see Risks table.
 
 ### Phase 10 — Tests & QA
-- Update tests that assert on English strings to use `data-testid` or message keys.
-- Add e2e coverage for locale switching and a few zh-Hant labels.
-- Run `make test-web`.
-- Regenerate screenshots if needed.
-- Verify SSR source has correct `<html lang="...">`.
+Done.
+- Core-flow e2e assertions (lobby create-table/practice-vs-bots, tables list join/watch/rejoin,
+  claim win/pung, hand-end close, settings/score-sheet toggles, seat-join) switched from
+  role-name-by-English-text to `data-testid`/stable-class selectors, so a copy tweak (e.g. the
+  pending zh-Hant domain review) can't silently break them. Mock-fixture-driven assertions
+  (`MOCK_SCENARIOS` scenario-picker labels in `table.e2e.ts`, `AnimationDemoPanel`'s dev-only
+  buttons) were left alone — they're e2e fixture data, not real UI copy, per `web/AGENTS.md`.
+  `ApiConnectGate`'s copy checks in `page.e2e.ts` were also left alone: still byte-identical
+  post-migration, and not core-flow.
+- New: `lib/i18n/locale-switch.e2e.ts` — switches locale via the UI (the demo page's Settings
+  section, reachable with no backend), asserts the `PARAGLIDE_LOCALE` cookie is written, that the
+  lobby's heading/CTA labels actually render in zh-Hant on the next navigation, and that a plain
+  reload doesn't reset it. Plus a no-cookie-set English-default case.
+- New: `hooks.server.e2e.ts` — fetches `/` directly (no browser) with and without a
+  `PARAGLIDE_LOCALE` cookie, asserting the raw SSR response contains `<html lang="en" dir="ltr">`
+  / `<html lang="zh-Hant" dir="ltr">`. Confirms `hooks.server.ts`'s `transformPageChunk` resolves
+  both locales correctly; nothing client-side ever touches `<html lang>` afterwards.
+- `pnpm run test:unit -- --run`, `pnpm run check`, and `npx playwright test` (the opt-in
+  `RUN_LIVE_BACKEND_TESTS=1` suite excluded, as always) all green.
+- Screenshots: regenerated and diffed byte-for-byte against the pre-Phase-10 set. All 12 differed,
+  but only in the randomized decorative tile-mural background (`TileMuralBackground`) — text,
+  layout, and copy are pixel-identical. Discarded as render noise, not a real diff.
+- SSR `<html lang>`: verified via `hooks.server.e2e.ts` above (both locales resolve correctly) and
+  spot-checked manually; `app.html`'s `%paraglide.lang%`/`%paraglide.dir%` placeholders are
+  substituted by `hooks.server.ts`'s `paraglideMiddleware` as designed.
+- Found, not fixed (out of Phase 10's scope — pre-existing gap from Phases 2/8, not a test
+  problem): `PracticeSetupDialog.svelte` and `PracticeDifficultySlot.svelte` still have hardcoded
+  English strings outside their `aria-label`/`title` (which Phase 8 did cover) — the hint text,
+  Cancel/Start/Starting… buttons, Across/Left/Right-opponent/You captions, the difficulty-cycle
+  error message, and the Easy/Normal/Impossible labels. These won't translate when switching to
+  zh-Hant. Flagged here for a follow-up phase; not touched in Phase 10 per the "don't re-litigate
+  earlier phases' component changes" rule, beyond adding `data-testid`s for the test conversion
+  above (no visible-copy change).
 
 ## Risks and mitigations
 

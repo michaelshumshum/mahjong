@@ -50,6 +50,7 @@
 <div class="panel-overlay">
 	<div
 		class="practice-dialog"
+		data-testid="practice-setup-dialog"
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="practice-setup-heading"
@@ -63,6 +64,7 @@
 		<div class="seat-ring">
 			<div class="seat-ring-pos seat-ring-pos--across">
 				<PracticeDifficultySlot
+					testId="practice-difficulty-across"
 					positionLabel="Across"
 					difficulty={difficulty[2]}
 					onCycle={() => (difficulty[2] = nextDifficulty(difficulty[2]))}
@@ -70,6 +72,7 @@
 			</div>
 			<div class="seat-ring-pos seat-ring-pos--left">
 				<PracticeDifficultySlot
+					testId="practice-difficulty-left"
 					positionLabel="Left opponent"
 					difficulty={difficulty[3]}
 					onCycle={() => (difficulty[3] = nextDifficulty(difficulty[3]))}
@@ -77,6 +80,7 @@
 			</div>
 			<div class="seat-ring-pos seat-ring-pos--right">
 				<PracticeDifficultySlot
+					testId="practice-difficulty-right"
 					positionLabel="Right opponent"
 					difficulty={difficulty[1]}
 					onCycle={() => (difficulty[1] = nextDifficulty(difficulty[1]))}
@@ -96,7 +100,13 @@
 
 		<div class="practice-actions">
 			<button type="button" onclick={onCancel} disabled={submitting}>Cancel</button>
-			<button type="button" class="practice-submit" onclick={handleSubmit} disabled={submitting}>
+			<button
+				type="button"
+				class="practice-submit"
+				data-testid="practice-start-submit"
+				onclick={handleSubmit}
+				disabled={submitting}
+			>
 				{submitting ? 'Starting…' : 'Start'}
 			</button>
 		</div>

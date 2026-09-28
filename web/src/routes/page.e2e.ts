@@ -67,10 +67,10 @@ test('lobby create table opens a rules dialog, then navigates to the created tab
 	// wait past hydration: the create button is server-rendered but its click handler only
 	// attaches once svelte-kit finishes loading, so an immediate click can race it.
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Create a table' }).click();
+	await page.getByTestId('lobby-create-table').click();
 
-	await expect(page.getByRole('dialog', { name: 'Create a table' })).toBeVisible();
-	await page.getByRole('button', { name: 'Create', exact: true }).click();
+	await expect(page.getByTestId('create-table-dialog')).toBeVisible();
+	await page.getByTestId('create-table-submit').click();
 
 	await expect(page).toHaveURL('/table/ABC123');
 });
@@ -88,12 +88,12 @@ test('lobby create table with custom rules sends the edited RuleSet, never multi
 	});
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Create a table' }).click();
+	await page.getByTestId('lobby-create-table').click();
 
-	const dialog = page.getByRole('dialog', { name: 'Create a table' });
+	const dialog = page.getByTestId('create-table-dialog');
 	await dialog.locator('input[type="radio"][value="custom"]').check();
 	await dialog.getByLabel('Minimum faan').selectOption('0');
-	await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+	await dialog.getByTestId('create-table-submit').click();
 
 	await expect(page).toHaveURL('/table/CUSTOM1');
 	expect(sentBody).toMatchObject({ ruleset: 'custom' });
@@ -109,10 +109,10 @@ test('lobby practice vs bots opens a difficulty dialog, then navigates to the pr
 	await mockCreateTable(page, 'XYZ789');
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
+	await page.getByTestId('lobby-practice-bots').click();
 
-	await expect(page.getByRole('dialog', { name: 'Practice vs Bots' })).toBeVisible();
-	await page.getByRole('button', { name: 'Start', exact: true }).click();
+	await expect(page.getByTestId('practice-setup-dialog')).toBeVisible();
+	await page.getByTestId('practice-start-submit').click();
 
 	await expect(page).toHaveURL('/table/XYZ789?practice=1');
 });
@@ -128,18 +128,17 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 	});
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Practice vs Bots' }).click();
+	await page.getByTestId('lobby-practice-bots').click();
 
-	const dialog = page.getByRole('dialog', { name: 'Practice vs Bots' });
+	const dialog = page.getByTestId('practice-setup-dialog');
 	// each seat's difficulty cycles easy -> normal -> impossible -> easy on click, starting from
 	// the default (Normal).
-	const rightSlot = dialog.getByRole('button', { name: /^Right opponent:/ });
-	const leftSlot = dialog.getByRole('button', { name: /^Left opponent:/ });
-	// rightSlot: normal -> impossible -> easy (2 clicks); leftSlot: normal -> impossible (1 click)
-	await rightSlot.click();
-	await rightSlot.click();
-	await leftSlot.click();
-	await dialog.getByRole('button', { name: 'Start', exact: true }).click();
+	const rightSlot = dialog.getByTestId('practice-difficulty-right');
+	const leftSlot = dialog.getByTestId('practice-difficulty-left');
+	await rightSlot.click(); // normal -> impossible
+	await rightSlot.click(); // impossible -> easy
+	await leftSlot.click(); // normal -> impossible
+	await dialog.getByTestId('practice-start-submit').click();
 
 	await expect(page).toHaveURL('/table/DIFF456?practice=1');
 	expect(sentBody).toMatchObject({
@@ -150,7 +149,7 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 
 test('lobby join a game link opens the tables page', async ({ page }) => {
 	await page.goto('/');
-	await page.getByRole('link', { name: 'Join a game' }).click();
+	await page.getByTestId('lobby-join-game-link').click();
 	await expect(page).toHaveURL('/tables');
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tables');
 });
@@ -158,8 +157,8 @@ test('lobby join a game link opens the tables page', async ({ page }) => {
 test('tables page join navigates to the table route with the entered code', async ({ page }) => {
 	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
-	await page.getByPlaceholder('ABC123').fill('ABC123');
-	await page.getByRole('button', { name: 'Join table' }).click();
+	await page.getByTestId('join-by-code-input').fill('ABC123');
+	await page.getByTestId('join-by-code-submit').click();
 
 	await expect(page).toHaveURL('/table/ABC123');
 	await expect(page.locator('h1')).toHaveText('Table');
@@ -228,12 +227,13 @@ test('tables page lists tables with sit-down for open ones and watch for ones in
 	await expect(cards.nth(0)).toContainText('Open · 1/4');
 	await expect(cards.nth(1)).toContainText('In progress · hand 3');
 
-	await cards.nth(1).getByRole('button', { name: 'Watch' }).click();
+	await cards.nth(1).getByTestId('table-card-action').click();
 	await expect(page).toHaveURL('/table/LIVE22');
 
 	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Sit down' }).click();
+	// open tables sort first, same as above
+	await page.getByTestId('table-card').first().getByTestId('table-card-action').click();
 	await expect(page).toHaveURL('/table/OPEN11');
 });
 
@@ -270,6 +270,6 @@ test('tables page shows Rejoin for a table this browser has joined before', asyn
 
 	const card = page.getByTestId('table-card');
 	await expect(card).toContainText('REJOIN');
-	await card.getByRole('button', { name: 'Rejoin' }).click();
+	await card.getByTestId('table-card-action').click();
 	await expect(page).toHaveURL('/table/REJOIN');
 });

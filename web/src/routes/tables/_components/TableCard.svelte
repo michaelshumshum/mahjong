@@ -29,15 +29,23 @@
 		{/each}
 	</ul>
 	{#if hasJoined}
-		<button type="button" class="primary" onclick={() => onOpen(table.id)}
-			>{m.tableCard_rejoinButton()}</button
+		<button
+			type="button"
+			class="primary"
+			data-testid="table-card-action"
+			onclick={() => onOpen(table.id)}>{m.tableCard_rejoinButton()}</button
 		>
 	{:else if table.status === 'open'}
-		<button type="button" class="primary" onclick={() => onOpen(table.id)}
-			>{m.tableCard_sitDownButton()}</button
+		<button
+			type="button"
+			class="primary"
+			data-testid="table-card-action"
+			onclick={() => onOpen(table.id)}>{m.tableCard_sitDownButton()}</button
 		>
 	{:else}
-		<button type="button" onclick={() => onOpen(table.id)}>{m.tableCard_watchButton()}</button>
+		<button type="button" data-testid="table-card-action" onclick={() => onOpen(table.id)}
+			>{m.tableCard_watchButton()}</button
+		>
 	{/if}
 </li>
 

@@ -20,6 +20,7 @@
 		<input
 			id="join-code"
 			type="text"
+			data-testid="join-by-code-input"
 			autocomplete="off"
 			spellcheck="false"
 			maxlength={TABLE_CODE_LENGTH}
@@ -27,7 +28,7 @@
 			aria-label={m.joinByCodePanel_codeAriaLabel()}
 			bind:value={code}
 		/>
-		<button type="submit" class="primary" disabled={!codeValid}
+		<button type="submit" class="primary" data-testid="join-by-code-submit" disabled={!codeValid}
 			>{m.joinByCodePanel_submitButton()}</button
 		>
 	</form>

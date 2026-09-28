@@ -51,10 +51,12 @@
 	</div>
 
 	<div class="chrome-toggles">
-		<button type="button" onclick={onToggleScoreSheet}
+		<button type="button" data-testid="toggle-score-sheet" onclick={onToggleScoreSheet}
 			>{m.mockTableToolbar_scoreSheetButton()}</button
 		>
-		<button type="button" onclick={onToggleSettings}>{m.mockTableToolbar_settingsButton()}</button>
+		<button type="button" data-testid="toggle-settings" onclick={onToggleSettings}
+			>{m.mockTableToolbar_settingsButton()}</button
+		>
 		<button type="button" onclick={onToggleAnimationDemo}
 			>{m.mockTableToolbar_animateATurnButton()}</button
 		>

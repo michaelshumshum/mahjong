@@ -810,51 +810,35 @@ should stay one class plus custom properties.
 
 ## 8. Accessibility and i18n
 
-- English only for v1. Cantonese term glyphs (碰/上/槓/食糊) stay as labels in the UI and in
-  live-region text regardless — they're not translated content. zh-Hant locale switching is
-  underway per [08-i18n-plan.md](08-i18n-plan.md) (M6, [05-roadmap.md](05-roadmap.md)): Phase 0
-  (Paraglide JS foundation, cookie-only locale strategy, `lib/i18n/LocaleSwitcher.svelte`), Phase 1
-  (shared UI primitives — `BackButton`/`CloseButton`/`PanelHeader`/`FormGroup`/`OptionRow`,
-  `Settings.svelte`, `Toast.svelte`, `DialogTimer.svelte`/`TimerRing.svelte`,
-  `DismissablePanel.svelte` — migrated to `m.*` messages, `LocaleSwitcher` wired into
-  `Settings.svelte`), Phase 2 (lobby — `routes/+page.svelte`, `CreateTableDialog.svelte`,
-  `lib/net/ruleset.ts` preset/option labels), Phase 3 (tables list —
-  `routes/tables/+page.svelte`, `TableCard.svelte`, `JoinByCodePanel.svelte`), and Phase 4
-  (pre-table / seat picker — `PretableScreen.svelte`, `LeaveGameDialog.svelte`,
-  `SeatPicker.svelte`/`SeatPickerSlot.svelte`, `SeatOccupancySlot.svelte`, plus the pre-game
-  arrival toast in `routes/table/[id]/+page.svelte`), Phase 5 (in-game table —
-  `TableToolbar.svelte`/`MockTableToolbar.svelte`, `YourSeatRegion.svelte`/`OpponentRegion.svelte`,
-  `CenterDiscardPool.svelte`, `TileFace.svelte`, `ClaimButtons.svelte`/`claim-option.ts`/
-  `ClaimDialog.svelte`, and the remaining declared-action/toast strings in
-  `routes/table/[id]/+page.svelte`), and Phase 6 (results/scoring —
-  `ScoreSheet.svelte`, `FaanBreakdown.svelte`, `WinningHand.svelte`, `GameEndScreen.svelte`,
-  `HandEndOverlay.svelte`, `lib/ui/rank.ts`'s standings/podium labels) are done. `lib/table/wind.ts`'s
-  `WIND_LABEL`/`seatWind()` stayed untouched in Phase 6: every remaining caller is outside this
-  phase's scope and already treats `WIND_LABEL`'s value as an interpolated parameter into its own
-  already-migrated message, not raw rendered text. Phase 7 (demo routes — `routes/demo/+page.svelte`
-  and its `_components/` — plus `AnimationDemoPanel.svelte`, a dev-only sandbox reachable from
-  `routes/table/[id]/+page.svelte` only via `MockTableToolbar`'s "Animate a turn" toggle) is also
-  done. `lib/table/mock-game-state.ts`'s `MOCK_SCENARIOS` labels stayed untouched, same as
-  Phase 5's `MockTableToolbar.svelte` `scenario.label`: they're e2e/screenshot fixture data
-  (`web/AGENTS.md`), read verbatim by `table.e2e.ts` assertions, never reachable outside the
-  dev-only `?mock=` path — not real user-visible copy. Demo components' own diagnostic
-  `data-testid` readouts (`status: {status}`, `pong: t0=... t1=...`, `no_calls=... auto_pass_chow=...`,
-  `chose: {kind}`) were left the same way: raw protocol/enum identifiers for test assertions, not
-  prose. Phase 8 (accessibility audit — repo-wide sweep of `aria-label`/`title`/`alt`/`placeholder`/
-  live-region text) is also done: the discard-pool per-seat aria-labels, `TileFace`'s tile/back
-  `alt` text, and the table page's `pushToast` calls were already covered by Phases 5/6; the sweep's
-  actual finds were two components untouched by any earlier phase — `ApiConnectGate.svelte` (its
-  "Connecting...", attempt-count, "next attempt in Ns", "Can't reach the server.", and Retry copy)
-  and the practice-vs-bots dialog (`PracticeSetupDialog.svelte`'s title, `PracticeDifficultySlot.svelte`'s
-  aria-label — both added by a later, non-i18n-tracked commit). The per-discard `aria-label="{seat}
-  discarded {tile}, turn {n}"` and the rolling `aria-live="polite"` announcement described above are
-  design intent, not yet implemented in `CenterDiscardPool.svelte` — nothing to migrate there until
-  that a11y feature itself is built. Every other route/component's strings are still hardcoded
-  English — later phases in that plan. Phase 9 (`messages/zh-Hant.json` — a Traditional Chinese,
-  Hong Kong-register translation of every key in `messages/en.json`, 283/283, key-parity checked)
-  is also done, but it's machine-translated, not yet reviewed by a fluent Hong Kong mahjong player —
-  domain-expert review of the mahjong terminology (番/自摸/包/番例 etc.) is still open, per
-  [08-i18n-plan.md](08-i18n-plan.md)'s Risks table.
+- English and zh-Hant are both live (Paraglide JS, [08-i18n-plan.md](08-i18n-plan.md), M6,
+  [05-roadmap.md](05-roadmap.md)). Locale strategy is cookie-based only (`['cookie', 'baseLocale']`)
+  with no URL prefix, so invite links (`/table/ABC123`) stay locale-agnostic; switching writes the
+  cookie and reloads via `lib/i18n/LocaleSwitcher.svelte` (wired into `Settings.svelte`). Cantonese
+  term glyphs (碰/上/槓/食糊) stay as labels in the UI and in live-region text in both locales
+  regardless — they're not translated content.
+  - Every route and component's copy is migrated to Paraglide `m.*` messages, with two deliberate
+    exceptions: `CenterDiscardPool.svelte`'s per-discard `aria-label`/live-region announcement is
+    design intent not yet implemented (nothing to migrate until that a11y feature is built), and
+    `PracticeSetupDialog.svelte`/`PracticeDifficultySlot.svelte` still carry hardcoded English
+    outside their `aria-label`/title (hint text, Cancel/Start/Starting… buttons, seat captions,
+    the difficulty-cycle error message, Easy/Normal/Impossible) — added after the lobby's
+    migration pass, a known gap flagged for a follow-up, not yet fixed.
+  - Fixture/dev-only strings are intentionally *not* migrated: `mock-game-state.ts`'s
+    `MOCK_SCENARIOS` labels and `MockTableToolbar`'s scenario picker (e2e/screenshot fixture data
+    per `web/AGENTS.md`, read verbatim by `table.e2e.ts`), `AnimationDemoPanel`'s dev-only sandbox
+    controls, and demo components' diagnostic `data-testid` readouts (raw protocol/enum
+    identifiers, not prose). `lib/table/wind.ts`'s `WIND_LABEL` is also untouched on purpose —
+    every caller treats it as an interpolated parameter into its own already-migrated message,
+    never raw rendered text.
+  - Tests assert on `data-testid`/stable classes for core flows (lobby/table creation, join,
+    claim, hand-end), not English wording, so a copy edit or the terminology review below can't
+    silently break them — the fixture strings above are the deliberate exception, since they're
+    not real user-visible copy. Locale switching and SSR `<html lang>` resolution both have
+    dedicated e2e coverage (`lib/i18n/locale-switch.e2e.ts`, `hooks.server.e2e.ts`).
+  - Open follow-up: the zh-Hant translation (`messages/zh-Hant.json`, 283/283 keys, key-parity
+    checked) is machine-generated and complete, but not yet reviewed by a fluent Hong Kong mahjong
+    player — domain-expert review of the terminology (番/自摸/包/番例 etc.) is still outstanding,
+    per [08-i18n-plan.md](08-i18n-plan.md)'s Risks table. Not a blocker to shipping.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).

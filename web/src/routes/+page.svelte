@@ -29,11 +29,23 @@
 <div class="lobby">
 	<h1 class="sr-only">{m.lobby_title()}</h1>
 	<div class="actions">
-		<button type="button" class="primary" onclick={() => (showCreateDialog = true)}>
+		<button
+			type="button"
+			class="primary"
+			data-testid="lobby-create-table"
+			onclick={() => (showCreateDialog = true)}
+		>
 			{m.lobby_createTableButton()}
 		</button>
-		<a class="secondary" href="/tables">{m.lobby_joinGameLink()}</a>
-		<button type="button" class="secondary" onclick={() => (showPracticeDialog = true)}>
+		<a class="secondary" data-testid="lobby-join-game-link" href="/tables"
+			>{m.lobby_joinGameLink()}</a
+		>
+		<button
+			type="button"
+			class="secondary"
+			data-testid="lobby-practice-bots"
+			onclick={() => (showPracticeDialog = true)}
+		>
 			{m.lobby_practiceButton()}
 		</button>
 	</div>

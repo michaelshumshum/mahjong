@@ -72,7 +72,13 @@
 </script>
 
 <div class="panel-overlay">
-	<div class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-table-heading">
+	<div
+		class="create-dialog"
+		data-testid="create-table-dialog"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="create-table-heading"
+	>
 		<PanelHeader title={m.createTableDialog_title()} titleId="create-table-heading" />
 
 		<FormGroup legend={m.createTableDialog_rulesLegend()}>
@@ -311,7 +317,13 @@
 			<button type="button" onclick={onCancel} disabled={submitting}
 				>{m.createTableDialog_cancelButton()}</button
 			>
-			<button type="button" class="create-submit" onclick={handleSubmit} disabled={submitting}>
+			<button
+				type="button"
+				class="create-submit"
+				data-testid="create-table-submit"
+				onclick={handleSubmit}
+				disabled={submitting}
+			>
 				{submitting ? m.createTableDialog_creatingButton() : m.createTableDialog_createButton()}
 			</button>
 		</div>

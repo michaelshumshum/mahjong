@@ -3,10 +3,12 @@
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
+		testId,
 		positionLabel,
 		difficulty,
 		onCycle
 	}: {
+		testId: string;
 		positionLabel: string;
 		difficulty: PracticeDifficulty;
 		onCycle: () => void;
@@ -23,6 +25,7 @@
 	<button
 		type="button"
 		class="seat-ring-slot"
+		data-testid={testId}
 		aria-label={m.practiceDifficultySlot_ariaLabel({
 			position: positionLabel,
 			difficulty: DIFFICULTY_LABEL[difficulty]
