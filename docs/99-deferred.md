@@ -522,9 +522,15 @@ a nonexistent module (see `docs/06-ml.md §3`, `docs/07-infra.md §3`/§4). `pyt
 Nothing below this note — encoding, the PettingZoo AEC wrapper, behaviour cloning, self-play PPO —
 is any less deferred because the skeleton exists; none of it does real work yet.
 
-### Feature-plane encoding
+### Feature-plane encoding — built, not deferred
 
 Provenance: `06-ml.md` §4 (pre-audit), closing paragraph.
+
+**Correction (2026-09-28):** this entry was stale. The encoder itself is now built — kept here
+per this doc's own header rule ("nothing here is rejected on merit... parked so the intent
+survives"), not because it's still pending. What's still actually deferred is everything *around*
+the encoder: the network, the PettingZoo AEC wrapper, behaviour cloning, self-play PPO — see those
+entries below.
 
 Feature planes over the 34 tile types, thermometer-encoded counts, players in relative seat
 order. Day-2 work in the pre-audit doc, unchanged by this pass — still day 2.
@@ -547,6 +553,35 @@ unbounded `dict[str, int]`, needs a fixed-size encoding scheme, e.g. one slot pe
 pattern in `scoring/patterns.py`'s registry). Fields governing timing/connection/fairness
 (`turn_seconds`, `provable_fairness`, etc.) have no bearing on hand-value decisions and shouldn't
 be encoded at all — don't pad the input with the whole `RuleSet.to_dict()` uncritically.
+
+**Built (2026-09-28):** `server/ml/encode.py` (`ml`-extra only — numpy isn't a base dependency,
+`server/AGENTS.md`). `encode_seat_view(view) -> EncodedSeatView` reads only entitled `SeatView`
+fields — `own_hand`, `melds`, `discard_pools`, `concealed_counts` — never `view.hands` (the
+`"ORACLE"` tier's omniscient extra, `04-bots.md` §10): a network trained on oracle-only input
+wouldn't generalize to the redacted view it's actually served at inference. `hand`/`melds`/
+`discards` are `(..., 4, 34)` thermometer planes exactly as specified above (plane `k` lit where a
+tile type's count is `> k`, a kong contributing 3 tiles per `mahjong_core.shanten`'s own
+convention); every per-seat axis is reordered to relative seats (`_relative_seats`: self, next,
+across, previous) so the same absolute seat never has to be looked up twice. `context` adds
+turn/dealer/prevailing-wind/own-seat-wind/phase as one-hot blocks — not in the original spec text,
+but the tile planes alone can't express whose turn it is or a seat's yakuhai exposure, and both
+are already load-bearing for the heuristic bots (`04-bots.md` §5 item 4, §9's `hand_sets`/
+`wall_reserve` closure) this encoder exists to eventually replace signals inside.
+
+`encode_ruleset(ruleset) -> np.ndarray` implements the exact scheme this paragraph specifies:
+`[min_faan, wall_reserve, *hand_sets bitmask, *effective faan per `PATTERNS` entry]` — the last
+block is `ruleset.faan_overrides.get(pattern.name, pattern.faan)` for all 36 registered patterns
+in registry order, so the network sees each pattern's real, currently-active faan value rather
+than needing to separately learn the override-lookup semantics. Timing/connection/fairness fields
+are not encoded, per this paragraph's own instruction. `tests/test_ml_encode.py` pins the
+thermometer boundary (0/1/2/3/4 copies), the kong-counts-as-3 convention, relative-seat reordering
+under a non-zero seat, the context one-hots, and both ruleset cases (default vs. narrowed
+`hand_sets` + a `faan_overrides` entry) — guarded with `pytest.importorskip("numpy")` so it skips
+cleanly (not a collection failure) under `make test-server`'s no-`ml`-extra environment, the same
+gap `server-ml.yml`'s separate smoke-test workflow already works around (`07-infra.md` §9).
+
+Not built: anything that consumes `EncodedSeatView` — the opponent-danger model itself (`06-ml.md`
+§6.2), so this is still a pure input-shaping function with no trained weights behind it anywhere.
 
 ### PettingZoo AEC environment wrapper
 
