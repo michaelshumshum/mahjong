@@ -1,6 +1,9 @@
 # i18n implementation plan
 
-Status: planned, not yet implemented. v1 ships English-only; this work is scoped for M6.
+Status: Phases 0-9 implemented (Paraglide JS foundation through zh-Hant translation coverage of
+every key in `messages/en.json`); Phase 10 (test/QA hardening, locale-switch e2e coverage) is
+still pending. The zh-Hant translation is machine-generated, not yet reviewed by a fluent Hong
+Kong mahjong player — see the Risks table below.
 
 ## Decision: Paraglide JS
 
@@ -103,8 +106,10 @@ Each phase is a self-contained change. Run `make test-web` after each; regenerat
 - Toast messages in `routes/table/[id]/+page.svelte`.
 
 ### Phase 9 — zh-Hant translation
-- Translate every key in `messages/en.json` to `messages/zh-Hant.json`.
-- Domain-expert review of mahjong terminology.
+- Translate every key in `messages/en.json` to `messages/zh-Hant.json`. Done — 283/283 keys,
+  key-parity verified.
+- Domain-expert review of mahjong terminology. Not done — current translation is machine-generated;
+  see Risks table.
 
 ### Phase 10 — Tests & QA
 - Update tests that assert on English strings to use `data-testid` or message keys.

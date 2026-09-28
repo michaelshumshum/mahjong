@@ -850,7 +850,11 @@ should stay one class plus custom properties.
   discarded {tile}, turn {n}"` and the rolling `aria-live="polite"` announcement described above are
   design intent, not yet implemented in `CenterDiscardPool.svelte` — nothing to migrate there until
   that a11y feature itself is built. Every other route/component's strings are still hardcoded
-  English — later phases in that plan.
+  English — later phases in that plan. Phase 9 (`messages/zh-Hant.json` — a Traditional Chinese,
+  Hong Kong-register translation of every key in `messages/en.json`, 283/283, key-parity checked)
+  is also done, but it's machine-translated, not yet reviewed by a fluent Hong Kong mahjong player —
+  domain-expert review of the mahjong terminology (番/自摸/包/番例 etc.) is still open, per
+  [08-i18n-plan.md](08-i18n-plan.md)'s Risks table.
 - Colourblind-safe: dragons distinguished by glyph, not just red/green — fixed art asset, ships
   regardless. A switchable high-contrast theme _system_ is deferred — see
   [99-deferred.md](99-deferred.md).
