@@ -816,13 +816,11 @@ should stay one class plus custom properties.
   cookie and reloads via `lib/i18n/LocaleSwitcher.svelte` (wired into `Settings.svelte`). Cantonese
   term glyphs (碰/上/槓/食糊) stay as labels in the UI and in live-region text in both locales
   regardless — they're not translated content.
-  - Every route and component's copy is migrated to Paraglide `m.*` messages, with two deliberate
-    exceptions: `CenterDiscardPool.svelte`'s per-discard `aria-label`/live-region announcement is
-    design intent not yet implemented (nothing to migrate until that a11y feature is built), and
-    `PracticeSetupDialog.svelte`/`PracticeDifficultySlot.svelte` still carry hardcoded English
-    outside their `aria-label`/title (hint text, Cancel/Start/Starting… buttons, seat captions,
-    the difficulty-cycle error message, Easy/Normal/Impossible) — added after the lobby's
-    migration pass, a known gap flagged for a follow-up, not yet fixed.
+  - Every route and component's copy is migrated to Paraglide `m.*` messages, with one deliberate
+    exception: `CenterDiscardPool.svelte`'s per-discard `aria-label`/live-region announcement is
+    design intent not yet implemented (nothing to migrate until that a11y feature is built).
+    `web/AGENTS.md`'s "No literal user-facing strings" rule is the standing convention for new
+    code — this bullet list only tracks status, not the rule itself.
   - Fixture/dev-only strings are intentionally *not* migrated: `mock-game-state.ts`'s
     `MOCK_SCENARIOS` labels and `MockTableToolbar`'s scenario picker (e2e/screenshot fixture data
     per `web/AGENTS.md`, read verbatim by `table.e2e.ts`), `AnimationDemoPanel`'s dev-only sandbox
@@ -835,7 +833,7 @@ should stay one class plus custom properties.
     silently break them — the fixture strings above are the deliberate exception, since they're
     not real user-visible copy. Locale switching and SSR `<html lang>` resolution both have
     dedicated e2e coverage (`lib/i18n/locale-switch.e2e.ts`, `hooks.server.e2e.ts`).
-  - Open follow-up: the zh-Hant translation (`messages/zh-Hant.json`, 283/283 keys, key-parity
+  - Open follow-up: the zh-Hant translation (`messages/zh-Hant.json`, 296/296 keys, key-parity
     checked) is machine-generated and complete, but not yet reviewed by a fluent Hong Kong mahjong
     player — domain-expert review of the terminology (番/自摸/包/番例 etc.) is still outstanding,
     per [08-i18n-plan.md](08-i18n-plan.md)'s Risks table. Not a blocker to shipping.

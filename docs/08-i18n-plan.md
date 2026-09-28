@@ -106,8 +106,10 @@ Each phase is a self-contained change. Run `make test-web` after each; regenerat
 - Toast messages in `routes/table/[id]/+page.svelte`.
 
 ### Phase 9 — zh-Hant translation
-- Translate every key in `messages/en.json` to `messages/zh-Hant.json`. Done — 283/283 keys,
-  key-parity verified.
+- Translate every key in `messages/en.json` to `messages/zh-Hant.json`. Done — 296/296 keys,
+  key-parity verified. Key-parity is a standing invariant, not a one-time count: any new key added
+  to `en.json` without its `zh-Hant.json` counterpart falls back to English silently, no build
+  error (`web/AGENTS.md`'s "No literal user-facing strings" rule).
 - Domain-expert review of mahjong terminology. Not done — current translation is machine-generated;
   see Risks table.
 
@@ -137,14 +139,13 @@ Done.
 - SSR `<html lang>`: verified via `hooks.server.e2e.ts` above (both locales resolve correctly) and
   spot-checked manually; `app.html`'s `%paraglide.lang%`/`%paraglide.dir%` placeholders are
   substituted by `hooks.server.ts`'s `paraglideMiddleware` as designed.
-- Found, not fixed (out of Phase 10's scope — pre-existing gap from Phases 2/8, not a test
-  problem): `PracticeSetupDialog.svelte` and `PracticeDifficultySlot.svelte` still have hardcoded
-  English strings outside their `aria-label`/`title` (which Phase 8 did cover) — the hint text,
-  Cancel/Start/Starting… buttons, Across/Left/Right-opponent/You captions, the difficulty-cycle
-  error message, and the Easy/Normal/Impossible labels. These won't translate when switching to
-  zh-Hant. Flagged here for a follow-up phase; not touched in Phase 10 per the "don't re-litigate
-  earlier phases' component changes" rule, beyond adding `data-testid`s for the test conversion
-  above (no visible-copy change).
+- Found and since fixed (post-Phase-10, no new phase number): `PracticeSetupDialog.svelte` and
+  `PracticeDifficultySlot.svelte` had hardcoded English strings outside their `aria-label`/`title`
+  (which Phase 8 did cover) — the hint text, Cancel/Start/Starting… buttons,
+  Across/Left/Right-opponent/You captions, the difficulty-cycle error message, and the
+  Easy/Normal/Impossible labels. Migrated to `m.*` and translated into `zh-Hant.json` in the same
+  follow-up change that added `web/AGENTS.md`'s "No literal user-facing strings" rule, precisely
+  to stop this class of gap recurring for new components.
 
 ## Risks and mitigations
 

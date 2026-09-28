@@ -33,6 +33,16 @@ src/lib/styles/ SCSS tokens, tile geometry, layout mixins (see docs/03-frontend.
   `$effect`) must wrap it in `$effect.root(...)` with an explicit disposer — effects need an
   owner. `$state<T[]>` fields are deep proxies; hand non-reactive consumers a
   `$state.snapshot(...)` plus the store's `version` counter, not the live proxy.
+- **No literal user-facing strings.** Every string a player can see or hear (labels, buttons,
+  hints, error text, `aria-label`/`title`/`alt`/placeholder, toast messages) goes through Paraglide
+  (`import { m } from '$lib/paraglide/messages.js'`), never a bare string in a template or script.
+  Add the key to **both** `messages/en.json` and `messages/zh-Hant.json` in the same change —
+  a key missing from `zh-Hant.json` doesn't fail the build, it just silently falls back to English
+  for that locale, which is exactly how the practice-mode dialog was found to have skipped this
+  the first time. Key naming and ICU-plural syntax: `docs/08-i18n-plan.md` ("Key conventions").
+  Exempt: Cantonese call glyphs (碰/上/槓/食糊/莊) and wind glyphs (東/南/西/北), which stay as
+  literal labels in both locales (`docs/03-frontend.md §8`); demo-only fixture/diagnostic strings
+  read verbatim by test assertions (same section).
 
 ## Commands
 

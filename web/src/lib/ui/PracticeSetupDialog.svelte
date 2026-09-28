@@ -41,7 +41,7 @@
 			});
 			onCreated(table_id);
 		} catch {
-			error = "Couldn't start a practice table — try again.";
+			error = m.practiceSetupDialog_createErrorMessage();
 			submitting = false;
 		}
 	}
@@ -56,7 +56,7 @@
 		aria-labelledby="practice-setup-heading"
 	>
 		<PanelHeader title={m.practiceSetupDialog_title()} titleId="practice-setup-heading" />
-		<p class="practice-hint">Tap a seat to cycle its bot's difficulty.</p>
+		<p class="practice-hint">{m.practiceSetupDialog_hint()}</p>
 
 		<!-- Same ring arrangement as the real seat-selection screen (SeatRing/SeatPicker,
 			docs/03-frontend.md's "Pre-game states") -- right/across/left are the bot seats this
@@ -65,7 +65,7 @@
 			<div class="seat-ring-pos seat-ring-pos--across">
 				<PracticeDifficultySlot
 					testId="practice-difficulty-across"
-					positionLabel="Across"
+					positionLabel={m.practiceSetupDialog_positionAcross()}
 					difficulty={difficulty[2]}
 					onCycle={() => (difficulty[2] = nextDifficulty(difficulty[2]))}
 				/>
@@ -73,7 +73,7 @@
 			<div class="seat-ring-pos seat-ring-pos--left">
 				<PracticeDifficultySlot
 					testId="practice-difficulty-left"
-					positionLabel="Left opponent"
+					positionLabel={m.practiceSetupDialog_positionLeft()}
 					difficulty={difficulty[3]}
 					onCycle={() => (difficulty[3] = nextDifficulty(difficulty[3]))}
 				/>
@@ -81,15 +81,17 @@
 			<div class="seat-ring-pos seat-ring-pos--right">
 				<PracticeDifficultySlot
 					testId="practice-difficulty-right"
-					positionLabel="Right opponent"
+					positionLabel={m.practiceSetupDialog_positionRight()}
 					difficulty={difficulty[1]}
 					onCycle={() => (difficulty[1] = nextDifficulty(difficulty[1]))}
 				/>
 			</div>
 			<div class="seat-ring-pos seat-ring-pos--self">
 				<div class="slot-column">
-					<div class="seat-ring-slot seat-ring-slot--self"><span>You</span></div>
-					<span class="slot-caption">Your seat</span>
+					<div class="seat-ring-slot seat-ring-slot--self">
+						<span>{m.practiceSetupDialog_selfBadge()}</span>
+					</div>
+					<span class="slot-caption">{m.practiceSetupDialog_selfCaption()}</span>
 				</div>
 			</div>
 		</div>
@@ -99,7 +101,9 @@
 		{/if}
 
 		<div class="practice-actions">
-			<button type="button" onclick={onCancel} disabled={submitting}>Cancel</button>
+			<button type="button" onclick={onCancel} disabled={submitting}
+				>{m.practiceSetupDialog_cancelButton()}</button
+			>
 			<button
 				type="button"
 				class="practice-submit"
@@ -107,7 +111,7 @@
 				onclick={handleSubmit}
 				disabled={submitting}
 			>
-				{submitting ? 'Starting…' : 'Start'}
+				{submitting ? m.practiceSetupDialog_startingButton() : m.practiceSetupDialog_startButton()}
 			</button>
 		</div>
 	</div>

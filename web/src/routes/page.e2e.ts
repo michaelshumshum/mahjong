@@ -135,9 +135,9 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 	// the default (Normal).
 	const rightSlot = dialog.getByTestId('practice-difficulty-right');
 	const leftSlot = dialog.getByTestId('practice-difficulty-left');
-	await rightSlot.click(); // normal -> impossible
-	await rightSlot.click(); // impossible -> easy
-	await leftSlot.click(); // normal -> impossible
+	await rightSlot.click();
+	await rightSlot.click();
+	await leftSlot.click();
 	await dialog.getByTestId('practice-start-submit').click();
 
 	await expect(page).toHaveURL('/table/DIFF456?practice=1');

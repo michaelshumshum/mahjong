@@ -14,10 +14,10 @@
 		onCycle: () => void;
 	} = $props();
 
-	const DIFFICULTY_LABEL: Record<PracticeDifficulty, string> = {
-		easy: 'Easy',
-		normal: 'Normal',
-		impossible: 'Impossible'
+	const DIFFICULTY_LABEL: Record<PracticeDifficulty, () => string> = {
+		easy: m.practiceDifficultySlot_easyLabel,
+		normal: m.practiceDifficultySlot_normalLabel,
+		impossible: m.practiceDifficultySlot_impossibleLabel
 	};
 </script>
 
@@ -28,11 +28,11 @@
 		data-testid={testId}
 		aria-label={m.practiceDifficultySlot_ariaLabel({
 			position: positionLabel,
-			difficulty: DIFFICULTY_LABEL[difficulty]
+			difficulty: DIFFICULTY_LABEL[difficulty]()
 		})}
 		onclick={onCycle}
 	>
-		<span>{DIFFICULTY_LABEL[difficulty]}</span>
+		<span>{DIFFICULTY_LABEL[difficulty]()}</span>
 	</button>
 	<span class="slot-caption">{positionLabel}</span>
 </div>

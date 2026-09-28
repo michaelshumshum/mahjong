@@ -1,12 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// LocaleSwitcher (Phase 0 of 08-i18n-plan.md) lives in Settings, reachable with no backend via
-// the demo page's SettingsDemo section -- ApiConnectGate explicitly skips /demo (see
-// ApiConnectGate.svelte's `skip` derivation), so this doesn't need the healthz mock the lobby
-// assertions below do. Switching is cookie-based with no URL prefix (table invite links must
-// stay locale-agnostic) and reloads the document by default -- this proves that whole round trip
-// end to end: UI click -> `PARAGLIDE_LOCALE` cookie -> SSR-rendered zh-Hant on the next
-// navigation, and that it survives a plain reload rather than resetting.
+// LocaleSwitcher lives in Settings, reachable with no backend via the demo page's SettingsDemo
+// section (ApiConnectGate skips /demo), proving the full round trip: click -> cookie -> SSR zh-Hant.
 test.beforeEach(async ({ page }) => {
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 });
@@ -18,9 +13,8 @@ test('switching locale via the UI writes the cookie and re-renders zh-Hant, surv
 	await page.goto('/demo');
 	await page.waitForLoadState('networkidle');
 
-	// each locale option renders its own label in its own language regardless of the current
-	// locale (LocaleSwitcher.svelte passes `{ locale }` per option) -- these two names are stable
-	// across both directions of the switch.
+	// each locale option renders its own label in its own language regardless of current locale,
+	// so these two names are stable across both directions of the switch.
 	const englishOption = page.getByRole('radio', { name: 'English' });
 	const zhHantOption = page.getByRole('radio', { name: '繁體中文' });
 	await expect(englishOption).toBeChecked();
