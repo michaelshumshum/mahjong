@@ -1,6 +1,6 @@
 # i18n Phase 10 (tests & QA) — done, 2026-09-28
 
-Full plan: `mem:web/core`, `docs/08-i18n-plan.md`, `docs/03-frontend.md` §8.
+Full plan: `mem:web/core`, `docs/03-frontend.md` §8.
 
 ## What changed
 - Converted fragile English-text e2e selectors to `data-testid`/stable classes for core flows only
@@ -30,14 +30,12 @@ Full plan: `mem:web/core`, `docs/08-i18n-plan.md`, `docs/03-frontend.md` §8.
   tiles (confirmed by extracting the pre-change PNGs via `git show HEAD:...` and eyeballing) —
   reverted via `git checkout -- docs/screenshots`, not a real diff.
 
-## Known gap found, not fixed (out of Phase 10 scope)
-`PracticeSetupDialog.svelte` + `PracticeDifficultySlot.svelte` have hardcoded English outside their
+## Known gap found in this phase — since fixed
+`PracticeSetupDialog.svelte` + `PracticeDifficultySlot.svelte` had hardcoded English outside their
 `aria-label`/title (Phase 8 only covered those): hint text, Cancel/Start/Starting… buttons,
 Across/Left/Right-opponent/You captions, the create-error message, Easy/Normal/Impossible labels.
-Won't translate under zh-Hant. Documented in `docs/08-i18n-plan.md`'s Phase 10 section and
-`docs/03-frontend.md` §8 as an open follow-up — next session doing more i18n work should migrate
-these two files to `m.*` (needs new keys in both `messages/en.json` and `messages/zh-Hant.json`,
-which Phase 10 was told not to touch).
+Migrated to `m.*` and translated into `zh-Hant.json` in a follow-up change, which also added
+`web/AGENTS.md`'s "No literal user-facing strings" rule so new components don't repeat this.
 
 ## Verified green (post `pnpm run format` too)
 `pnpm run paraglide:compile && pnpm run test:unit -- --run && pnpm run check && npx playwright test`

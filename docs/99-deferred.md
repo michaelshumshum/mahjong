@@ -166,17 +166,6 @@ Revisit as: a rate-limited server `hint` request/response reusing `mahjong_core.
 `ukeire`, not a client-side reimplementation. Needs a new protocol message — out of scope here,
 flagged for whoever owns `02-protocol.md`.
 
-### zh-Hant locale switching
-
-Provenance: was `03-frontend.md §7`, cut — contradicted `05-roadmap.md` M6, which already places
-i18n in the ongoing/later bucket; "from day one" was wrong.
-
-Original: "Traditional Chinese (zh-Hant) and English from day one; Cantonese terms (碰/上/槓/食糊)
-in both locales."
-
-v1 ships English only, strings in one module. Cantonese term glyphs stay as untranslated labels
-in both states — not blocked by this defer.
-
 ### Recorded Cantonese call-out audio
 
 Provenance: was `03-frontend.md §5` (Asset pipeline), cut — nobody has recorded it; unbudgeted
