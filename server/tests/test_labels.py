@@ -191,7 +191,9 @@ def test_danger_labels_for_opponents_covers_every_seat_but_self_with_real_labels
 def test_meld_counts34_matches_seat_hand34_when_concealed_is_empty() -> None:
     """`meld_counts34` is `seat_hand34` restricted to melds only -- with an empty concealed hand
     they must agree exactly."""
-    kong = Meld(kind=MeldKind.EXPOSED_KONG, tiles=tile_ids_for_type(TileType.DRAGON_RED), from_seat=1)
+    kong = Meld(
+        kind=MeldKind.EXPOSED_KONG, tiles=tile_ids_for_type(TileType.DRAGON_RED), from_seat=1
+    )
     pung = Meld(kind=MeldKind.PUNG, tiles=tile_ids_for_type(TileType.WIND_EAST)[:3], from_seat=2)
     state = _with_seat(_state(), 1, concealed=(), melds=(kong, pung), flowers=())
     assert meld_counts34(state.seats[1].melds) == seat_hand34(state.seats[1])

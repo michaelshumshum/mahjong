@@ -33,9 +33,9 @@ def test_make_bots_rejects_unknown_name() -> None:
 
 def test_shuffled_roster_is_deterministic_per_seed_and_actually_varies() -> None:
     roster = ["FaanBot", "FaanBotAggressive", "FaanBotDefensive", "FaanBotFlushChasing"]
-    assert ml_generate_dataset._shuffled_roster(roster, seed=7) == ml_generate_dataset._shuffled_roster(
+    assert ml_generate_dataset._shuffled_roster(
         roster, seed=7
-    )
+    ) == ml_generate_dataset._shuffled_roster(roster, seed=7)
     # every entry from the original roster is present, just reordered
     assert sorted(ml_generate_dataset._shuffled_roster(roster, seed=7)) == sorted(roster)
 
@@ -48,7 +48,9 @@ def test_play_and_label_emits_one_row_per_turn_decision_with_the_expected_shapes
     roster = ["FaanBot", "FaanBotAggressive", "FaanBotDefensive", "FaanBotFlushChasing"]
     bots = [FaanBot() for _ in range(4)]
     rows = asyncio.run(
-        ml_generate_dataset.play_and_label(seed=1, ruleset=ruleset, bots=bots, seat_personalities=roster)
+        ml_generate_dataset.play_and_label(
+            seed=1, ruleset=ruleset, bots=bots, seat_personalities=roster
+        )
     )
 
     assert len(rows) > 0
