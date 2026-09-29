@@ -133,3 +133,22 @@ def test_resume_matches_an_uninterrupted_run(packed, tmp_path) -> None:  # type:
     assert a.keys() == b.keys()
     for k in a:
         assert torch.allclose(a[k], b[k], atol=1e-6), k
+
+
+def test_evaluate_reports_metrics_with_intervals_at_candidate_tiles(packed, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from ml.danger_model import DangerNet, DangerNetConfig
+    from ml.evaluate import evaluate_model, load_model
+
+    out = ml_train.train(_cfg(packed, tmp_path / "run"))
+    model = load_model(out / "ckpt_last.pt")
+    assert isinstance(model, DangerNet) and model.config == DangerNetConfig(channels=16, blocks=1)
+
+    data = DangerData(packed)
+    result = evaluate_model(model, data, data.rows_of(VAL), n_boot=20)
+    assert result["n_samples"] == len(data.rows_of(VAL)) * 3
+    for name in ("legal_wait", "struct_wait", "legal_wait_all_tiles", "tenpai"):
+        point, lo, hi = result[name]["auc"]
+        assert lo <= point <= hi
+        assert result[name]["logloss"][0] > 0
+    assert 0 < result["base_rate"] < 0.2
+    assert sum(n for _, _, n in result["reliability"]) > 0

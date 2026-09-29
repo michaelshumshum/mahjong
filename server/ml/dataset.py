@@ -42,8 +42,6 @@ class DangerData:
         """Encoded tensors and targets for `samples` (indices into `rows`' sample space)."""
         row_idx = rows[samples // _OPPONENTS]
         opp = samples % _OPPONENTS
-        order = np.argsort(row_idx, kind="stable")  # sorted reads are kinder to the memmap
-        row_idx, opp = row_idx[order], opp[order]
         needed = {k: np.asarray(v[row_idx]) for k, v in self.raw.items() if k != "split"}
         tiles, scalars = encode_batch(needed, opp, self.ruleset_vec)
         targets = targets_from_raw(needed, np.arange(len(row_idx)), opp)
