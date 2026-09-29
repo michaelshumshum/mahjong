@@ -35,6 +35,8 @@ jobs:
       - run: uv sync --locked --extra ml
       - name: ml package imports
         run: uv run python -c "import ml; import ml.train"
+      - name: ml unit tests
+        run: uv run pytest -q tests/test_ml_*.py tests/test_generate_dataset.py
       - name: python -m ml.train --help
         run: uv run python -m ml.train --help
       - name: python -m ml.train fails loudly on a real config

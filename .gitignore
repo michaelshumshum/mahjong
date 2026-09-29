@@ -13,3 +13,4 @@ data/
 *.ckpt
 *.parquet
 .DS_Store
+server/runs/

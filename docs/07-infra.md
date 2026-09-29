@@ -195,6 +195,8 @@ workflows** (`workflow_call`), one per concern:
 **`.github/workflows/server-ml.yml` (added 2026-09-26) is deliberately not one of the three above.**
 It smoke-tests the `ml` extra — `uv sync --locked --extra ml`, `import ml`/`import ml.train`,
 `python -m ml.train --help` (must exit 0), and a real `--config` run (must raise, not exit 0) —
+plus the ml unit tests (`tests/test_ml_*.py`, `tests/test_generate_dataset.py`), which skip
+silently under `server`'s no-extra environment and only run for real here —
 but `workflow_call` (what `ci.yml` uses for the three reusable workflows) has no path-filter
 mechanism, and the `ml` extra's torch/numpy install is too heavy (§3) to pay on every push the way
 `server`/`web`/`proto-check` do. So it's a standalone workflow with its own `on.push.paths`/
