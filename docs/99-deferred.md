@@ -644,6 +644,10 @@ teachers is rejected for the contradictory-labels reason in `06-ml.md` §6.6.
 
 ### Self-play PPO + batched inference serving
 
+**Un-deferred (2026-09-29):** planned as phase 4, [08-rl.md](08-rl.md). Batched inference is
+training-only; serving stays single-sample ≤ 5 ms, so the serving-process design below is still
+not needed.
+
 Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
 
 Was listed as a casual day-2 bullet alongside behaviour cloning. Realistically thousands of

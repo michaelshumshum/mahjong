@@ -249,6 +249,9 @@ miscategorized in earlier passes of the gap table, not open work. See
 [04-bots.md §9](04-bots.md) for the full closure writeup and
 [99-deferred.md](99-deferred.md) for the historical record.
 
+**ML:** phases 1–3 per [06-ml.md](06-ml.md), then phase 4 self-play RL
+([08-rl.md](08-rl.md)), which ships as the T4 "Expert" tier.
+
 Stats, rating, hand history. i18n
 (zh-Hant/en). Mobile layout pass. M6 has no done gate by design — see §7 for what actually has to
 ship before that's okay.

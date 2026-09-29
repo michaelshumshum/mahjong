@@ -10,7 +10,7 @@ Project outline lives in `docs/`.
 | `core game logic, server mechanics`         | [server/AGENTS.md](server/AGENTS.md), `docs/00-architecture.md` |
 | `user interface, gameplay`                  | [web/AGENTS.md](web/AGENTS.md), `docs/03-frontend.md`           |
 | `shared/protocol.schema.json`               | `docs/02-protocol.md`                                           |
-| `bots and machine learning`                 | `docs/04-bots.md`, `docs/06-ml.md`                              |
+| `bots and machine learning`                 | `docs/04-bots.md`, `docs/06-ml.md`, `docs/08-rl.md`             |
 | `Dockerfile`, `docker-compose*`, `Makefile` | `docs/07-infra.md`                                              |
 | Milestones, scope, what to build next       | `docs/05-roadmap.md`                                            |
 
