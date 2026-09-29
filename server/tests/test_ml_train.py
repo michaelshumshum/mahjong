@@ -1,0 +1,135 @@
+"""Unit tests for `ml/train.py` and `ml/dataset.py`, on a synthetic packed dataset (random raw
+arrays in `ml.pack`'s layout) so no self-play is needed. Needs the `ml` extra."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+np = pytest.importorskip("numpy")
+torch = pytest.importorskip("torch")
+pytest.importorskip("yaml")
+ml_train = pytest.importorskip("ml.train")
+
+from mahjong_core.presets import RULESET_PRESETS
+from ml.dataset import DangerData
+from ml.splits import TRAIN, VAL, split_ids
+
+_TILES = 34
+
+
+def _synthetic_packed(path: Path, n_games: int = 60, rows_per_game: int = 20) -> None:
+    rng = np.random.default_rng(0)
+    n = n_games * rows_per_game
+    seeds = np.repeat(np.arange(n_games, dtype=np.int64), rows_per_game)
+    tenpai = rng.random((n, 3)) < 0.2
+    multihot = (rng.random((n, 3, _TILES)) < 0.05).astype(np.uint8) * tenpai[:, :, None]
+    faan = multihot * rng.integers(3, 11, size=(n, 3, _TILES)).astype(np.uint8)
+    fields = {
+        "hand_counts": rng.integers(0, 3, size=(n, _TILES)),
+        "meld_counts": rng.integers(0, 2, size=(n, 4, _TILES)),
+        "discard_counts": rng.integers(0, 3, size=(n, 4, _TILES)),
+        "discard_seq": np.full((n, 4, 32), 255),
+        "concealed_counts": rng.integers(1, 14, size=(n, 4)),
+        "concealed_kongs": np.zeros((n, 4)),
+        "flowers": rng.integers(0, 3, size=(n, 4)),
+        "dealer_idx": rng.integers(0, 4, size=n),
+        "prevailing_wind": np.zeros(n),
+        "seat_wind": rng.integers(0, 4, size=n),
+        "wall_remaining": rng.integers(0, 90, size=n),
+        "opponent_is_tenpai": tenpai,
+        "opponent_winning_tiles_multihot": multihot,
+        "opponent_expected_faan": faan,
+    }
+    path.mkdir(parents=True)
+    shapes = {}
+    for name, arr in fields.items():
+        arr = arr.astype(np.uint8)
+        np.save(path / f"{name}.npy", arr)
+        shapes[name] = list(arr.shape)
+    np.save(path / "game_seed.npy", seeds)
+    np.save(path / "split.npy", split_ids(seeds))
+    shapes["game_seed"] = [n]
+    shapes["split"] = [n]
+    manifest = {"ruleset": RULESET_PRESETS["hk_classic"].to_dict()}
+    (path / "meta.json").write_text(json.dumps({"fields": shapes, "manifest": manifest}))
+
+
+@pytest.fixture(scope="module")
+def packed(tmp_path_factory):  # type: ignore[no-untyped-def]
+    path = tmp_path_factory.mktemp("packed") / "d"
+    _synthetic_packed(path)
+    return path
+
+
+def _cfg(packed: Path, out: Path, **over):  # type: ignore[no-untyped-def]
+    cfg = ml_train.TrainConfig(
+        data=str(packed),
+        out=str(out),
+        threads=1,
+        channels=16,
+        blocks=1,
+        batch_size=32,
+        steps=6,
+        warmup=2,
+        log_every=2,
+        eval_every=3,
+        eval_samples=64,
+        save_every=2,
+    )
+    for k, v in over.items():
+        setattr(cfg, k, v)
+    return cfg
+
+
+def test_unimplemented_algorithm_still_fails_loudly() -> None:
+    with pytest.raises(NotImplementedError):
+        ml_train.main(["--config", "ml/configs/bc.yaml"])
+
+
+def test_shipped_danger_config_loads() -> None:
+    algorithm, cfg = ml_train.load_config(Path("ml/configs/danger.yaml"))
+    assert algorithm == "danger" and cfg.batch_size == 512
+
+
+def test_lr_warms_up_then_decays_to_the_floor() -> None:
+    cfg = ml_train.TrainConfig(lr=1.0, min_lr=0.1, warmup=10, steps=110)
+    assert ml_train.lr_at(0, cfg) == pytest.approx(0.1)
+    assert ml_train.lr_at(9, cfg) == pytest.approx(1.0)
+    assert ml_train.lr_at(60, cfg) == pytest.approx(0.55)
+    assert ml_train.lr_at(110, cfg) == pytest.approx(0.1)
+
+
+def test_batches_have_the_encoded_shapes_and_are_reproducible(packed) -> None:  # type: ignore[no-untyped-def]
+    data = DangerData(packed)
+    rows = data.rows_of(TRAIN)
+    order = data.epoch_order(len(rows), seed=3, epoch=0)
+    assert np.array_equal(order, data.epoch_order(len(rows), seed=3, epoch=0))
+    assert not np.array_equal(order, data.epoch_order(len(rows), seed=3, epoch=1))
+    tiles, scalars, targets = data.batch(rows, order[:16])
+    assert tiles.shape[0] == scalars.shape[0] == 16
+    assert targets["legal"].shape == (16, _TILES)
+    assert len(data.rows_of(VAL)) > 0
+
+
+def test_train_writes_checkpoints_and_metrics(packed, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    out = ml_train.train(_cfg(packed, tmp_path / "run"))
+    assert (out / "ckpt_last.pt").exists() and (out / "ckpt_best.pt").exists()
+    lines = [json.loads(x) for x in (out / "metrics.jsonl").read_text().splitlines()]
+    assert lines[-1]["step"] == 6
+    assert "val_total" in lines[-1] and "train_total" in lines[0]
+    assert torch.load(out / "ckpt_last.pt", weights_only=False)["step"] == 6
+
+
+def test_resume_matches_an_uninterrupted_run(packed, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    straight = ml_train.train(_cfg(packed, tmp_path / "a"))
+    ml_train.train(_cfg(packed, tmp_path / "b"), max_steps=3)
+    resumed = ml_train.train(_cfg(packed, tmp_path / "b"), resume=True)
+
+    a = torch.load(straight / "ckpt_last.pt", weights_only=False)["model"]
+    b = torch.load(resumed / "ckpt_last.pt", weights_only=False)["model"]
+    assert a.keys() == b.keys()
+    for k in a:
+        assert torch.allclose(a[k], b[k], atol=1e-6), k
