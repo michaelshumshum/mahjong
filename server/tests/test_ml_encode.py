@@ -12,6 +12,7 @@ np = pytest.importorskip("numpy")
 ml_encode = pytest.importorskip("ml.encode")
 
 from app.views import SeatView
+from bots.features import own_hand34
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.patterns import PATTERNS
@@ -203,3 +204,102 @@ def test_encode_ruleset_reflects_narrower_hand_sets_and_overrides() -> None:
     assert encoded[5 + override_index] == 15.0
     other_index = next(i for i, p in enumerate(PATTERNS) if p.name == "清一色")
     assert encoded[5 + other_index] == next(p.faan for p in PATTERNS if p.name == "清一色")
+
+
+def _row(**over):  # type: ignore[no-untyped-def]
+    row = {
+        "hand_counts": [0] * 34,
+        "meld_counts": [[0] * 34 for _ in range(4)],
+        "discard_counts": [[0] * 34 for _ in range(4)],
+        "discard_seq": [[], [], [], []],
+        "concealed_counts": [13, 13, 13, 13],
+        "concealed_kongs": [0, 0, 0, 0],
+        "flowers": [0, 0, 0, 0],
+        "dealer_idx": 0,
+        "prevailing_wind": 0,
+        "seat_wind": 0,
+        "wall_remaining": 70,
+    }
+    row.update(over)
+    return row
+
+
+def _batch(rows, opp):  # type: ignore[no-untyped-def]
+    raw = ml_encode.rows_to_arrays(rows)
+    return ml_encode.encode_batch(raw, np.asarray(opp), ml_encode.encode_ruleset(RuleSet()))
+
+
+def test_encode_batch_shapes_and_finite_values() -> None:
+    tiles, scalars = _batch([_row(), _row()], [0, 2])
+    assert tiles.shape == (2, ml_encode.N_TILE_CHANNELS, 34)
+    assert scalars.shape == (2, ml_encode.N_SCALARS)
+    assert tiles.dtype == scalars.dtype == np.float32
+    assert np.isfinite(tiles).all() and np.isfinite(scalars).all()
+
+
+def test_encode_batch_rotates_so_the_target_opponent_comes_first() -> None:
+    discards = [[0] * 34 for _ in range(4)]
+    for slot in range(4):
+        discards[slot][slot] = 1  # observer-relative slot k discarded tile type k
+    row = _row(discard_counts=discards)
+    # channels: hand 0-3, melds 4-19, discards 20-35 (4 per seat, target first)
+    for opp in range(3):
+        tiles, _ = _batch([row], [opp])
+        target_slot = opp + 1
+        for pos in range(4):
+            slot = (target_slot + pos) % 4
+            plane = tiles[0, 20 + 4 * pos]
+            assert plane[slot] == 1.0 and plane.sum() == 1.0
+
+
+def test_encode_batch_hand_planes_match_the_seat_view_encoder() -> None:
+    view = _view(own_hand_types=(TileType.MAN_1, TileType.MAN_1, TileType.PIN_5))
+    row = _row(hand_counts=own_hand34(view))
+    tiles, _ = _batch([row], [0])
+    assert np.array_equal(tiles[0, :4], ml_encode.encode_seat_view(view).hand)
+
+
+def test_encode_batch_discard_age_buckets_track_recency_for_the_target_only() -> None:
+    m1, m2, m3, m9 = (int(TileType.MAN_1), int(TileType.MAN_2), int(TileType.MAN_3), 8)
+    seq = [[], [m9, m1, m2, m2, m3, m3, m3, m3], [], []]  # opponent 0 (slot 1)
+    counts = [[0] * 34 for _ in range(4)]
+    for tile in seq[1]:
+        counts[1][tile] += 1
+    tiles, _ = _batch([_row(discard_counts=counts, discard_seq=seq)], [0])
+    age = tiles[0, 36:40]  # buckets: age 0, 1-2, 3-5, 6+
+    assert age[0, m3] == 1 and age[0, m2] == 0
+    assert age[1, m2] == 0 and age[2, m2] == 1  # m2 is 3 turns old
+    assert age[3, m9] == 1
+    assert tiles[0, 40:44].sum() == 0  # no other seat discarded anything
+
+
+def test_encode_batch_unseen_uses_own_hand_once_and_counts_other_seats_melds() -> None:
+    m1 = int(TileType.MAN_1)
+    hand = [0] * 34
+    hand[m1] = 3
+    melds = [[0] * 34 for _ in range(4)]
+    melds[0][m1] = 3  # observer's own meld: already inside hand_counts, must not double count
+    melds[2][int(TileType.MAN_2)] = 3
+    tiles, _ = _batch([_row(hand_counts=hand, meld_counts=melds)], [0])
+    unseen = tiles[0, 44]
+    assert unseen[m1] == pytest.approx(0.25)
+    assert unseen[int(TileType.MAN_2)] == pytest.approx(0.25)
+    assert unseen[int(TileType.MAN_3)] == 1.0
+
+
+def test_encode_batch_suji_channel_needs_both_sides_for_middle_ranks() -> None:
+    def suji(discarded: list[int]) -> np.ndarray:
+        counts = [[0] * 34 for _ in range(4)]
+        for t in discarded:
+            counts[1][t] = 1
+        tiles, _ = _batch([_row(discard_counts=counts)], [0])
+        return tiles[0, -1]
+
+    man = lambda rank: rank - 1
+    assert suji([man(4)])[man(1)] == 1  # 1m is suji of a discarded 4m
+    assert suji([man(6)])[man(9)] == 1
+    assert suji([man(1)])[man(4)] == 0  # 4m needs 1m and 7m
+    assert suji([man(1), man(7)])[man(4)] == 1
+    assert suji([man(7)])[man(4)] == 0
+    assert suji([man(1)])[int(TileType.PIN_1) + 3] == 0  # no leaking across suits
+    assert suji([int(TileType.WIND_EAST)]).sum() == 0

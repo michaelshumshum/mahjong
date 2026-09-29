@@ -21,17 +21,21 @@ from bots.features import own_hand34
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.scoring.patterns import PATTERNS, seat_wind_for
 from mahjong_core.state import Phase
-from mahjong_core.tiles import new_count_array, tile_id_type
+from mahjong_core.tiles import TileType, new_count_array, tile_id_type
 from ml.raw import visible_meld_counts34
 
 __all__ = [
     "N_PATTERNS",
     "N_RULESET_FEATURES",
+    "N_SCALARS",
     "N_THERMOMETER",
+    "N_TILE_CHANNELS",
     "N_TILE_TYPES",
     "EncodedSeatView",
+    "encode_batch",
     "encode_ruleset",
     "encode_seat_view",
+    "rows_to_arrays",
 ]
 
 N_TILE_TYPES = 34
@@ -41,6 +45,16 @@ N_PATTERNS = len(PATTERNS)
 _PHASES = tuple(Phase)
 # min_faan, wall_reserve (2 scalars) + hand_sets bitmask + one effective-faan slot per pattern
 N_RULESET_FEATURES = 2 + len(_HAND_SETS) + N_PATTERNS
+
+_PAD = 255
+_AGE_BUCKETS = ((0, 0), (1, 2), (3, 5), (6, 10**6))
+_NEVER = 10**7
+# hand + 4 seats' melds + 4 seats' discards (thermometer) + target/others discard-age buckets
+# + copies unseen + static tile properties + wind/dragon markers + target-suji
+N_TILE_CHANNELS = N_THERMOMETER * (1 + 4 + 4) + 2 * len(_AGE_BUCKETS) + 1 + (4 + 1 + 1) + 4 + 1
+# opponent slot(3) + target-wind(4) + dealer(4) + prevailing(4) + wall(1) + concealed/kongs/
+# flowers/discard-count per seat(16) + ruleset
+N_SCALARS = 3 + 4 + 4 + 4 + 1 + 16 + N_RULESET_FEATURES
 
 
 def _relative_seats(seat: int) -> tuple[int, int, int, int]:
@@ -143,3 +157,173 @@ def encode_ruleset(ruleset: RuleSet) -> np.ndarray:
         [ruleset.faan_overrides.get(p.name, p.faan) for p in PATTERNS], dtype=np.float32
     )
     return np.concatenate([scalars, hand_sets, effective_faan])
+
+
+def _static_tile_channels() -> np.ndarray:
+    """(6, 34): suit one-hot (man, pin, sou, honor), rank/8 (0 for honors), terminal flag."""
+    out = np.zeros((6, N_TILE_TYPES), dtype=np.float32)
+    for t in range(N_TILE_TYPES):
+        if t >= int(TileType.WIND_EAST):
+            out[3, t] = 1.0
+            continue
+        suit, rank = divmod(t, 9)
+        out[suit, t] = 1.0
+        out[4, t] = rank / 8
+        out[5, t] = float(rank in (0, 8))
+    return out
+
+
+_STATIC = _static_tile_channels()
+_SUIT_RANK = np.array([t % 9 if t < 27 else -1 for t in range(N_TILE_TYPES)])
+_HAS_LOWER = (_SUIT_RANK >= 3) & (_SUIT_RANK >= 0)
+_HAS_UPPER = (_SUIT_RANK <= 5) & (_SUIT_RANK >= 0)
+
+
+def _thermo(counts: np.ndarray) -> np.ndarray:
+    """(..., 34) counts -> (..., N_THERMOMETER, 34) planes, plane k lit where count > k."""
+    return (counts[..., None, :] > np.arange(N_THERMOMETER)[:, None]).astype(np.float32)
+
+
+def _rotate(a: np.ndarray, rot: np.ndarray) -> np.ndarray:
+    idx = rot.reshape(rot.shape + (1,) * (a.ndim - 2))
+    return np.take_along_axis(a, idx, axis=1)
+
+
+def _min_age(seq: np.ndarray) -> np.ndarray:
+    """(B, L) discard order, `_PAD`-padded -> (B, 34) turns since each tile type was last
+    discarded by that seat (0 = its most recent discard), `_NEVER` if never."""
+    b, length = seq.shape
+    valid = seq != _PAD
+    n = valid.sum(axis=1)
+    ages = np.full((b, N_TILE_TYPES), _NEVER, dtype=np.int64)
+    rows = np.arange(b)
+    for k in range(length):  # later discards overwrite earlier ones, so the minimum age wins
+        m = valid[:, k]
+        ages[rows[m], seq[m, k]] = n[m] - 1 - k
+    return ages
+
+
+def _age_buckets(ages: np.ndarray) -> np.ndarray:
+    return np.stack([((ages >= lo) & (ages <= hi)) for lo, hi in _AGE_BUCKETS], axis=1).astype(
+        np.float32
+    )
+
+
+def _marker(tile: np.ndarray) -> np.ndarray:
+    out = np.zeros((len(tile), N_TILE_TYPES), dtype=np.float32)
+    out[np.arange(len(tile)), tile] = 1.0
+    return out
+
+
+def encode_batch(
+    raw: dict[str, np.ndarray], opp: np.ndarray, ruleset_vec: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Danger-model input for one (row, opponent) sample per element of `opp` (0..2 = the
+    observer's next/across/previous seat). Rows are `ml.pack` fields (or `rows_to_arrays` of
+    `ml.raw.raw_row`s); seats are rotated so the target opponent is position 0, then the seats
+    after it. Returns `tiles (B, N_TILE_CHANNELS, 34)` and `scalars (B, N_SCALARS)`.
+
+    Channel `hand` is the observer's own tiles; `unseen` counts the copies of a tile the observer
+    can't see (a kong shows 3 of its 4 tiles in `meld_counts`, so it overstates unseen by one).
+    """
+    b = len(opp)
+    t = opp.astype(np.int64) + 1
+    rot = (t[:, None] + np.arange(4)) % 4
+
+    hand = raw["hand_counts"].astype(np.int64)
+    melds = _rotate(raw["meld_counts"].astype(np.int64), rot)
+    discards = _rotate(raw["discard_counts"].astype(np.int64), rot)
+    seq = _rotate(raw["discard_seq"], rot)
+
+    target_age = _min_age(seq[:, 0])
+    other_age = np.minimum.reduce([_min_age(seq[:, p]) for p in (1, 2, 3)])
+
+    # the observer's own melds are already inside `hand`; the observer sits at position 4 - t
+    obs_melds = melds[np.arange(b), (4 - t) % 4]
+    seen = hand + melds.sum(axis=1) - obs_melds + discards.sum(axis=1)
+    unseen = np.clip(4 - seen, 0, 4)[:, None, :] / 4.0
+
+    target_discarded = discards[:, 0] > 0
+    down = np.zeros_like(target_discarded)
+    down[:, 3:] = target_discarded[:, :-3]
+    up = np.zeros_like(target_discarded)
+    up[:, :-3] = target_discarded[:, 3:]
+    suji = ((_HAS_LOWER | _HAS_UPPER) & (~_HAS_LOWER | down) & (~_HAS_UPPER | up))[:, None, :]
+
+    obs_wind = raw["seat_wind"].astype(np.int64)
+    target_wind = (obs_wind + t) % 4
+    markers = np.stack(
+        [
+            np.broadcast_to(
+                (np.arange(N_TILE_TYPES) >= int(TileType.DRAGON_RED)).astype(np.float32),
+                (b, N_TILE_TYPES),
+            ),
+            _marker(int(TileType.WIND_EAST) + raw["prevailing_wind"].astype(np.int64)),
+            _marker(int(TileType.WIND_EAST) + target_wind),
+            _marker(int(TileType.WIND_EAST) + obs_wind),
+        ],
+        axis=1,
+    )
+
+    tiles = np.concatenate(
+        [
+            _thermo(hand),
+            _thermo(melds).reshape(b, -1, N_TILE_TYPES),
+            _thermo(discards).reshape(b, -1, N_TILE_TYPES),
+            _age_buckets(target_age),
+            _age_buckets(other_age),
+            unseen.astype(np.float32),
+            np.broadcast_to(_STATIC, (b, *_STATIC.shape)),
+            markers,
+            suji.astype(np.float32),
+        ],
+        axis=1,
+    )
+
+    eye4 = np.eye(4, dtype=np.float32)
+    n_discards = (seq != _PAD).sum(axis=2)
+    ruleset = ruleset_vec.astype(np.float32).copy()
+    ruleset[0] /= 10.0
+    ruleset[1] /= 100.0
+    ruleset[2 + len(_HAND_SETS) :] /= 10.0
+    scalars = np.concatenate(
+        [
+            np.eye(3, dtype=np.float32)[opp],
+            eye4[target_wind],
+            eye4[(raw["dealer_idx"].astype(np.int64) - t) % 4],
+            eye4[raw["prevailing_wind"].astype(np.int64)],
+            raw["wall_remaining"].astype(np.float32)[:, None] / 100.0,
+            _rotate(raw["concealed_counts"], rot) / 13.0,
+            _rotate(raw["concealed_kongs"], rot) / 4.0,
+            _rotate(raw["flowers"], rot) / 8.0,
+            n_discards / 24.0,
+            np.broadcast_to(ruleset, (b, N_RULESET_FEATURES)),
+        ],
+        axis=1,
+    ).astype(np.float32)
+    return tiles, scalars
+
+
+def rows_to_arrays(rows: list[dict[str, object]], max_discards: int = 32) -> dict[str, np.ndarray]:
+    """`ml.raw.raw_row` dicts -> the batched uint8 arrays `encode_batch` reads, laid out the
+    same way as `ml.pack`."""
+    out: dict[str, np.ndarray] = {}
+    for key in (
+        "hand_counts",
+        "meld_counts",
+        "discard_counts",
+        "concealed_counts",
+        "concealed_kongs",
+        "flowers",
+        "dealer_idx",
+        "prevailing_wind",
+        "seat_wind",
+        "wall_remaining",
+    ):
+        out[key] = np.asarray([r[key] for r in rows], dtype=np.uint8)
+    seq = np.full((len(rows), 4, max_discards), _PAD, dtype=np.uint8)
+    for i, r in enumerate(rows):
+        for p, pool in enumerate(r["discard_seq"]):  # type: ignore[attr-defined]
+            seq[i, p, : len(pool)] = pool
+    out["discard_seq"] = seq
+    return out
