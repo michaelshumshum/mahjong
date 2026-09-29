@@ -83,7 +83,7 @@ bare action id. `app/table.py`'s `_handle_bot_result` decodes it, since it alrea
 | **T1** `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak | ~400 lines | "Easy". Ship in M4. |
 | **T2** `FaanBot` | T1 + hand-value planning + discard safety | ~900 lines | "Normal"/"Hard". Moved into M4 (see §4) — the real product. **Built (M4)** — see §4/§5/§8 for the shipped design and real arena numbers. |
 | **T3** `SearchBot` | determinized-world rollout search over the pure engine | ~350 lines | **Built (M6), then removed** — statistically worse than `FaanBot` after two real debugging rounds; a structural ceiling, not a bug. No tier currently occupies "Expert" — see §6/§7. |
-| **T4** learned policy | `ORACLE`-cloned, PPO fine-tuned ([06-ml §6.4](06-ml.md)) | research | optional, later — preceded by a learned `tile_risk` inside `FaanBot` ([06-ml §6.2](06-ml.md)); see §6's closing note on what would make a future search-based tier viable |
+| **T4** learned policy | distilled from `FaanBot` + learned heads, DAgger-relabelled ([06-ml §6.4](06-ml.md)) | research | optional, later — preceded by a learned `tile_risk` inside `FaanBot` ([06-ml §6.2](06-ml.md)); see §6's closing note on what would make a future search-based tier viable |
 | **`ORACLE`** | a plain `FaanBot()` fed full-information (`view.hands`) instead of the ordinary view | 0 extra lines (reuses `FaanBot`) | practice mode's "Impossible" difficulty (§7), selectable per seat via `POST /tables`'s `bot_tiers`. **Built** — see §10 for the shipped design and the safety argument. |
 
 Ship T1 and T2 in M4 (§4 explains why T1 alone can't satisfy M4's done-gate). T3 was out of scope
