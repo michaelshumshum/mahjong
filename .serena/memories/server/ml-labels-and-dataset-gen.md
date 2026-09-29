@@ -1,47 +1,39 @@
-# ML Stage A/B: ground-truth labels + dataset generation (built 2026-09-28)
+# ML labels + dataset gen + training pipeline (updated 2026-09-29)
 
-Continuation of `mem:server/ml-feature-encoder`. Phase 1 (docs/06-ml.md §6.2) checklist status:
-encoder built, labels built, dataset generation built (boilerplate), model/training/tile_risk
-integration still not started.
+Phase 1 (docs/06-ml.md §6.2) status: encoder, labels, dataset gen (schema v3), packing, model,
+training loop, eval, both baselines and numpy export are BUILT and committed. NOT done: the real
+training run, running the baselines/eval on real data, recording results (docs stage 11),
+`tile_risk` integration + arena gate.
 
-**Stage A — `server/bots/labels.py`:** pure `GameState`-based ground truth: `is_tenpai`,
-`winning_tile_types`, `expected_faan_if_won`, `danger_labels_for_opponents`. Key constraint
-discovered and respected: `tests/test_oracle_containment.py` AST-sweeps `app/`, `bots/`,
-`mahjong_core/`, `ml/`, `alembic/`, `tools/` and hard-fails if `_omniscient_seat_view` is called
-anywhere but `Table._submit_bot_job`. Label generation must read `GameState`/`SeatState`
-directly instead — self-play/arena code already holds it, no omniscient `SeatView` needed.
-`bots/arena.py` was refactored to import these from `bots/labels.py` instead of duplicating them
-(`_seat_hand34`→`seat_hand34`, `_winning_tile_types`→`winning_tile_types`,
-`_unused_tile_id_for_type`→`unused_tile_id_for_type`); this also closed a real, previously-flagged
-gap (docs/04-bots.md §9's housekeeping note): arena's own `shanten()` calls weren't `hand_sets`-
-aware, now they are via the shared `is_tenpai`. `tests/test_valuation_selfplay.py` had a third
-independent duplicate of the same `seat_hand34` logic; also switched to import from `bots.labels`.
+**Labels — `bots/labels.py`:** pure `GameState`-based ground truth (`is_tenpai`, `winning_tile_types`,
+`expected_faan_if_won`, `danger_labels_for_opponents`). `tests/test_oracle_containment.py` forbids
+`_omniscient_seat_view` outside `Table._submit_bot_job`, so labels read `GameState` directly.
+Faan values in `tests/test_labels.py` come from the real scorer, never hand-derived (平糊/無花/門前清
+stack, so a plain closed tenpai hand scores 3).
 
-**Every faan value in `tests/test_labels.py` was computed once via the real scorer, not hand-
-derived** — `平糊`/`無花`/`門前清` stack on nearly any closed hand, so a "boring" all-sequences
-tenpai hand scores 3 faan (clears default `min_faan=3`), not 1, once those stack. Don't assume a
-hand-authored test hand's faan without running `score_winning_hand` on it first.
+**Dataset gen — `ml/generate_dataset.py`:** schema v3 rows via `ml/raw.py::raw_row` (per-tile counts,
+`discard_seq`, `concealed_kongs`, `flowers`, relative-seat order). Other seats' concealed-kong tile
+types are hidden (`visible_meld_counts34`); v2 data leaked them and must not be trained on.
+`play_and_label(..., row_hook)` gives baselines the live GameState. Seat<->personality shuffled per
+game from the game seed. Real run: `data/danger_v3` (`--games 21800 --parallel 10`, ~1.2 games/s,
+~5 h; started 2026-09-29 ~12:45 under `setsid nohup`, log `server/data/danger_v3_gen.log`). Held-out
+EfficiencyBot set still to generate (`data/danger_v3_heldout_eff`, seed-start 10000000).
+Repo-root `data/` is root-owned; local data lives under `server/data/`.
 
-**Stage B — `server/ml/generate_dataset.py`:** self-play data generation,
-`python -m ml.generate_dataset --out data/danger_model --bots FaanBot,FaanBot,FaanBot,FaanBot`.
-Mirrors `bots/selfplay.py`'s `play_game` stepping logic exactly but emits one row per real turn
-decision (not claim-window responses -- different decision type, out of scope) via
-`encode_seat_view` + `danger_labels_for_opponents`. Writes parquet shards (`--shard-games`,
-default 20 games/shard). Runs forever by default (`--games 0`) until SIGINT/SIGTERM, which
-flushes the in-progress shard before exiting cleanly.
+**Pipeline commands (cwd server/):**
+- `uv run python -m ml.pack --src data/danger_v3 --out data/danger_v3_packed`
+- `uv run python -m ml.train --config ml/configs/danger.yaml [--resume]` -> `runs/danger/`
+- `uv run python -m ml.evaluate --ckpt runs/danger/ckpt_best.pt --data data/danger_v3_packed --split test`
+  (`--split all` on the held-out pack)
+- `python -m ml.heuristic_baseline --data ... --ckpt ...` (replays games; slow), `python -m
+  ml.gbdt_baseline ...`, `python -m ml.export --ckpt ... --out danger.npz`
 
-**Environment gotcha:** repo-root `data/` is gitignored (and `*.parquet` too — parquet was
-already the anticipated format before this work) but is **root-owned on this machine**, not
-writable as the `michaels` user (likely leftover from a prior `docker compose` run creating the
-bind-mount dir as root). Real dataset output for local runs goes to `server/data/danger_model`
-instead (still matches the repo-wide `data/` gitignore pattern). Didn't `chown`/`pkexec` the
-root-owned one — out of scope, low value, mildly invasive host change for a build artifact
-directory that docker will recreate correctly anyway when actually deployed via compose.
-
-Both `tests/test_generate_dataset.py` and `tests/test_ml_encode.py` guard on
-`pytest.importorskip` for numpy/pyarrow — verified the full fast suite's pass/skip/deselect counts
-reconcile exactly with and without those packages installed (13 real tests ↔ 2 skip placeholders,
-one per gated file) before trusting this as safe under `make test-server`.
-
-Not built yet: the actual model architecture/training loop (`ml/train.py` is still the
-`NotImplementedError` stub), offline eval, `tile_risk` integration, arena validation gate.
+**Gotchas:**
+- Splits are game-level (`ml/splits.py`, TRAIN/VAL/TEST = 0/1/2; seed 2 is val, 6 is test).
+- `ml/heuristic_baseline.py` tests are slow-marked (~100 s under load); latency test in
+  `test_ml_export.py` is slow-marked and noisy under CPU load (~5 ms for 3 opponents, 96x6).
+- `tests/ml_synthetic.py` builds a synthetic packed dataset for ml tests.
+- Known heuristic bug logged in docs/99-deferred.md: `no_chance` counts the observer's own copy
+  (3.4% of candidate discards scored exactly 0). FaanBot intentionally untouched.
+- lefthook comment-length hook: max 2 consecutive comment lines.
+- numpy is not a base dependency; serving the model in the api image needs numpy added.
