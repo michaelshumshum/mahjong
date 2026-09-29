@@ -22,6 +22,7 @@ ml = [
     "pettingzoo>=1.24",
     "pyarrow>=18.0",
     "pyyaml>=6.0",
+    "lightgbm>=4.5",                  # gbdt baseline in ml.gbdt_baseline
 ]
 
 [dependency-groups]
