@@ -604,6 +604,16 @@ before this fix (schema v2) carry the leak and shouldn't be trained on.
 Not built: anything that consumes `EncodedSeatView` — the opponent-danger model itself (`06-ml.md`
 §6.2), so this is still a pure input-shaping function with no trained weights behind it anywhere.
 
+### `no_chance` counts the observer's own tiles (found 2026-09-29, not fixed)
+
+`bots/safety.py` `deal_in_probability` returns exactly 0 when `seen34(view)[t] >= 4`, and
+`seen34` includes the observer's own hand, so holding all four copies of a tile scores it as
+undealable — correct — but the same branch fires on discard candidates the observer holds fewer
+than four of whenever the pool and melds make up the rest. The offline baseline
+(`ml/heuristic_baseline.py`) found 1,075 of 32,080 candidate discards (3.4%) scored exactly 0.
+`FaanBot` is deliberately left alone until the danger model replaces `deal_in_probability`
+(`06-ml.md` §6.2), so the baseline measures the shipped behaviour.
+
 ### PettingZoo AEC environment wrapper
 
 Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.

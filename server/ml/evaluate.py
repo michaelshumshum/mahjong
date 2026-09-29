@@ -30,7 +30,7 @@ from ml.metrics import (
 )
 from ml.splits import TEST, TRAIN, VAL
 
-__all__ = ["evaluate_model", "load_model", "main"]
+__all__ = ["evaluate_model", "legal_wait_probs", "load_model", "main"]
 
 _SPLITS = {"train": TRAIN, "val": VAL, "test": TEST}
 _OPPONENTS = 3
@@ -45,6 +45,20 @@ def load_model(ckpt_path: Path) -> DangerNet:
 
 def _sigmoid(x: torch.Tensor) -> np.ndarray:
     return torch.sigmoid(x).numpy().astype(np.float64)
+
+
+def legal_wait_probs(
+    model: DangerNet, data: DangerData, rows: np.ndarray, chunk: int = 2048
+) -> np.ndarray:
+    """`(len(rows), 3, 34)` legal-wait probabilities for every (row, opponent, tile)."""
+    n = len(rows) * _OPPONENTS
+    out = np.empty((n, 34), dtype=np.float32)
+    with torch.no_grad():
+        for i in range(0, n, chunk):
+            idx = np.arange(i, min(i + chunk, n))
+            tiles, scalars, _ = data.batch(rows, idx)
+            out[idx] = torch.sigmoid(model(tiles, scalars).legal_wait).numpy()
+    return out.reshape(len(rows), _OPPONENTS, 34)
 
 
 def evaluate_model(
