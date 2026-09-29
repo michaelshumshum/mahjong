@@ -77,6 +77,13 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   already has for e2e/screenshots) so effects actually execute. Name the spec
   `*.svelte.spec.ts` to route it there automatically; a plain `.spec.ts` importing a `.svelte.ts`
   module still runs under `server` and any `$effect` inside it will silently never fire.
+- **Mounting a `.svelte` component directly** (not just its logic) in a `*.svelte.spec.ts` spec:
+  `lib/table/test-render.ts` (`render`/`cleanup`/`cleanupAll`, wrapping `svelte`'s own
+  `mount`/`unmount`) is the shared helper for table-surface specs — `afterEach(cleanupAll)` covers
+  specs that don't hold on to each `render()` result individually. Rendering a route's top-level
+  `+page.svelte` needs SvelteKit context the table-surface components don't (`$app/navigation`,
+  `$lib/net/lobby`'s `$env/dynamic/public`), so `routes-tests/*.svelte.spec.ts` mount inline with
+  plain `mount`/`unmount` instead of this helper.
 - `typescript` stays pinned to `^6.0.3`; TS7's native/Go compiler is installed alongside as
   `@typescript/native` (`npm:typescript@^7`) and used only via `svelte-check --tsgo` (wired into
   `pnpm check`). svelte-check's own CLI hard-requires the plain `typescript` package to resolve to

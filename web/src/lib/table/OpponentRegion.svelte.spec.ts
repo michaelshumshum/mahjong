@@ -1,0 +1,107 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import { render, cleanupAll } from './test-render';
+import OpponentRegion from './OpponentRegion.svelte';
+import type { MockSeatState } from './mock-game-state';
+
+function mockSeat(overrides: Partial<MockSeatState> = {}): MockSeatState {
+	return {
+		seat: 1,
+		name: 'Bob',
+		concealedCount: 13,
+		melds: [],
+		discards: [],
+		flowers: [],
+		score: 0,
+		...overrides
+	};
+}
+
+describe('OpponentRegion', () => {
+	afterEach(cleanupAll);
+
+	it('renders the seat name, wind, and score', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ name: 'Bob', score: 25 }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.seat-name')?.textContent).toContain('Bob');
+		expect(target.querySelector('.seat-score')?.textContent).toContain('25');
+		expect(target.querySelector('.seat-wind')?.textContent).toContain('南');
+	});
+
+	it('applies the position modifier and turn highlight', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ seat: 2 }),
+			position: 'left',
+			dealer: 0,
+			turn: 2
+		});
+		expect(target.querySelector('.seat-region--left')).not.toBeNull();
+		expect(target.querySelector('.seat-region--turn')).not.toBeNull();
+	});
+
+	it('shows the dealer badge when the seat is the dealer', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ seat: 1 }),
+			position: 'right',
+			dealer: 1,
+			turn: 0
+		});
+		expect(target.querySelector('.dealer-badge')).not.toBeNull();
+		expect(target.querySelector('.dealer-badge')?.textContent).toContain('莊');
+	});
+
+	it('shows the bot badge for bot status', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ status: 'bot' }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.bot-badge')).not.toBeNull();
+	});
+
+	it('renders concealed backs when concealedHand is not provided', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ concealedCount: 10 }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		const backs = target.querySelectorAll('.backs-row .mini-tile');
+		expect(backs).toHaveLength(10);
+		expect(target.querySelectorAll('.backs-row .tile-face--back').length).toBeGreaterThan(0);
+	});
+
+	it('renders revealed concealed tiles for spectators', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ concealedHand: ['1m', '2m', '3m'], concealedCount: 3 }),
+			position: 'left',
+			dealer: 0,
+			turn: 0
+		});
+		const tiles = target.querySelectorAll('.backs-row .mini-tile');
+		expect(tiles).toHaveLength(3);
+		expect(target.innerHTML).toContain('src="/tiles/Man1.svg"');
+	});
+
+	it('renders flowers and melds', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({
+				flowers: ['f1'],
+				melds: [
+					{ kind: 'pung', tiles: ['z1', 'z1', 'z1'], fromSeat: 3 },
+					{ kind: 'concealed_kong', tiles: ['z7', 'z7', 'z7', 'z7'] }
+				]
+			}),
+			position: 'right',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelectorAll('.meld-row .mini-tile')).toHaveLength(8);
+		// concealed kong renders as backs
+		expect(target.querySelectorAll('.meld-row .tile-face--back')).toHaveLength(4);
+	});
+});
