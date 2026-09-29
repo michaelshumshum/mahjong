@@ -83,7 +83,29 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   specs that don't hold on to each `render()` result individually. Rendering a route's top-level
   `+page.svelte` needs SvelteKit context the table-surface components don't (`$app/navigation`,
   `$lib/net/lobby`'s `$env/dynamic/public`), so `routes-tests/*.svelte.spec.ts` mount inline with
-  plain `mount`/`unmount` instead of this helper.
+  plain `mount`/`unmount` instead of this helper — see the next point and `test/mocks.ts`
+  (`createMessagesProxy`) for what those need mocked.
+- **`vi.mock`/`vi.hoisted` under the `client` project's real browser mode**: Vite's import-analysis
+  transform rewrites every static `import` into an awaited dynamic `import()`, so any code that
+  runs *synchronously* before those imports resolve — a `vi.hoisted()` callback's body, in
+  particular — can't reference an imported binding; referencing one throws `[vitest] There was an
+  error when mocking a module` at hoist time, not at the call site, which reads like the mock
+  itself is broken rather than a timing issue. `vi.mock(...)`'s own factory is fine referencing an
+  import, since factories run lazily (after the mocked module is actually requested, i.e. after
+  imports have resolved) — confirmed by `routes-tests/tables/TableCard.svelte.spec.ts`'s working
+  `vi.mock('$lib/paraglide/messages.js', () => ({ m: createMessagesProxy() }))` with no
+  `vi.hoisted` involved. When a factory needs data from module scope (a fixture array, a prior
+  `vi.fn()`), the safe pattern is a **dynamic `import()` inside the factory itself** (see
+  `routes-tests/lobby/page.svelte.spec.ts`), not a reference to any outer-scope variable — even one
+  declared via `vi.hoisted()`. To assert against or configure a mocked function afterwards, import
+  the real binding (`import { goto } from '$app/navigation'` after `vi.mock('$app/navigation', ()
+  => ({ goto: vi.fn() }))`) rather than threading a separately-held mock reference through the
+  file.
+- A route pulling in `$lib/net/lobby` (directly, or transitively through a child component like
+  `TableCard`) needs `$env/dynamic/public` mocked too (`vi.mock('$env/dynamic/public', () => ({
+  env: {} }))`) — that module is only populated by SvelteKit's own dev/build server at request
+  time, so under Vitest it's `undefined`, and `lobby.ts`'s `apiBaseUrl()` reading `env.PUBLIC_API_URL`
+  throws before the component even renders.
 - `typescript` stays pinned to `^6.0.3`; TS7's native/Go compiler is installed alongside as
   `@typescript/native` (`npm:typescript@^7`) and used only via `svelte-check --tsgo` (wired into
   `pnpm check`). svelte-check's own CLI hard-requires the plain `typescript` package to resolve to
