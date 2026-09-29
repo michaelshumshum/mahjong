@@ -68,25 +68,20 @@ import pyarrow.parquet as pq
 from app.views import SeatView, seat_view
 from bots.arena import BOT_REGISTRY
 from bots.base import Bot
-from bots.features import own_hand34
-from bots.labels import (
-    OpponentDangerLabel,
-    danger_labels_for_opponents,
-    discard_counts34,
-)
+from bots.labels import OpponentDangerLabel, danger_labels_for_opponents
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
-from mahjong_core.scoring.patterns import seat_wind_for
-from mahjong_core.state import Phase
-from ml.raw import visible_meld_counts34
+from mahjong_core.state import GameState, Phase
+from ml.raw import raw_row, relative_seats
 
 __all__ = ["build_parser", "main"]
 
 _STEP_CAP = 8000
 _NO_DEADLINE = float("inf")
 _N_TILE_TYPES = 34
+SCHEMA_VERSION = 3
 
 
 def _mp_context() -> multiprocessing.context.BaseContext:
@@ -106,13 +101,6 @@ def _mp_context() -> multiprocessing.context.BaseContext:
     if threading.active_count() > 1:
         return multiprocessing.get_context()
     return multiprocessing.get_context("fork")
-
-
-def _relative_seats(seat: int) -> tuple[int, int, int, int]:
-    """(self, next, across, previous) as absolute seat indices -- matches `ml/encode.py`'s
-    convention, reimplemented locally (one line) rather than imported, since importing from
-    `ml.encode` would pull numpy back into this script for a single formula."""
-    return (seat, (seat + 1) % 4, (seat + 2) % 4, (seat + 3) % 4)
 
 
 def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
@@ -151,22 +139,14 @@ def _example_row(
 ) -> dict[str, object]:
     assert view.seat is not None
     seat = view.seat
-    order = _relative_seats(seat)
-    opponent_order = order[1:]  # next, across, previous -- relative slots 1, 2, 3
+    opponent_order = relative_seats(seat)[1:]  # next, across, previous -- relative slots 1, 2, 3
 
     return {
         "game_seed": seed,
         "hand_no": view.hand_no,
         "seat": seat,
         "seat_personalities": list(seat_personalities),
-        "hand_counts": own_hand34(view),
-        "meld_counts": [visible_meld_counts34(view, s) for s in order],
-        "discard_counts": [discard_counts34(view.discard_pools[s]) for s in order],
-        "concealed_counts": [view.concealed_counts[s] for s in order],
-        "dealer_idx": order.index(view.dealer),
-        "prevailing_wind": int(view.prevailing),
-        "seat_wind": int(seat_wind_for(seat, view.dealer)),
-        "wall_remaining": view.wall_remaining,
+        **raw_row(view),
         "opponent_seats": list(opponent_order),
         "opponent_is_tenpai": [labels[o].is_tenpai for o in opponent_order],
         "opponent_winning_tiles_multihot": [
@@ -178,13 +158,22 @@ def _example_row(
     }
 
 
+RowHook = Callable[[GameState, int, dict[str, object]], None]
+
+
 async def play_and_label(
-    seed: int, ruleset: RuleSet, bots: Sequence[Bot], seat_personalities: list[str]
+    seed: int,
+    ruleset: RuleSet,
+    bots: Sequence[Bot],
+    seat_personalities: list[str],
+    row_hook: RowHook | None = None,
 ) -> list[dict[str, object]]:
     """Plays one complete game, returning one row per real turn decision (docs/06-ml.md §6.2's
     "Labels: from the real GameState at each recorded decision"). Claim-window responses are a
     different decision type this model doesn't cover, so they advance the game without emitting
-    a row -- same as `bots/selfplay.py`'s `play_game`, whose stepping logic this mirrors."""
+    a row -- same as `bots/selfplay.py`'s `play_game`, whose stepping logic this mirrors.
+    `row_hook(state, seat, row)` runs on each emitted row against the live `GameState`, for
+    offline baselines that need the exact decision point (`ml/heuristic_baseline.py`)."""
     rng = random.Random(seed)
     state = new_game(ruleset, seed)
     rows: list[dict[str, object]] = []
@@ -214,7 +203,10 @@ async def play_and_label(
         view = seat_view(state, seat)
         if not is_claim:
             labels = danger_labels_for_opponents(state, seat)
-            rows.append(_example_row(seed, view, seat_personalities, labels))
+            row = _example_row(seed, view, seat_personalities, labels)
+            rows.append(row)
+            if row_hook is not None:
+                row_hook(state, seat, row)
 
         mask = legal_mask(state, seat)
         aid = await bots[seat].act(view, mask, _NO_DEADLINE)
@@ -249,7 +241,7 @@ def _write_manifest(
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": 2,
+        "schema_version": SCHEMA_VERSION,
         "ruleset_preset": ruleset_preset,
         "ruleset": ruleset.to_dict(),
         "bot_roster": bot_names,
@@ -258,7 +250,9 @@ def _write_manifest(
             "seat_personalities in each row records that game's randomized seat->roster-entry "
             "assignment -- metadata only, never a model input. Every row is captured at the "
             "acting seat's own AWAIT_ACTION turn (turn-holder is always relative seat 0, phase "
-            "is constant) -- both dropped from the row schema rather than stored redundantly."
+            "is constant) -- both dropped from the row schema rather than stored redundantly. "
+            "v3 adds discard_seq (per-seat discard order), concealed_kongs and flowers, and "
+            "hides other seats' concealed-kong tile types in meld_counts."
         ),
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))

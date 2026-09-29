@@ -63,7 +63,10 @@ def test_play_and_label_emits_one_row_per_turn_decision_with_the_expected_shapes
         "hand_counts",
         "meld_counts",
         "discard_counts",
+        "discard_seq",
         "concealed_counts",
+        "concealed_kongs",
+        "flowers",
         "dealer_idx",
         "prevailing_wind",
         "seat_wind",
@@ -83,6 +86,10 @@ def test_play_and_label_emits_one_row_per_turn_decision_with_the_expected_shapes
     assert len(row["discard_counts"]) == 4
     assert all(len(d) == 34 for d in row["discard_counts"])
     assert len(row["concealed_counts"]) == 4
+    assert len(row["discard_seq"]) == 4
+    assert all(len(seq) == sum(d) for seq, d in zip(row["discard_seq"], row["discard_counts"]))
+    assert len(row["concealed_kongs"]) == 4
+    assert len(row["flowers"]) == 4
     assert row["dealer_idx"] in range(4)
     assert row["prevailing_wind"] in range(4)
     assert row["seat_wind"] in range(4)
@@ -96,6 +103,25 @@ def test_play_and_label_emits_one_row_per_turn_decision_with_the_expected_shapes
     assert all(len(w) == 34 and set(w) <= {0, 1} for w in row["opponent_winning_tiles_multihot"])
     assert len(row["opponent_expected_faan"]) == 3
     assert all(len(f) == 34 for f in row["opponent_expected_faan"])
+
+
+def test_row_hook_sees_every_row_with_its_live_state() -> None:
+    seen: list[tuple[int, int]] = []
+
+    def hook(state, seat, row) -> None:  # type: ignore[no-untyped-def]
+        assert state.turn == seat == row["seat"]
+        seen.append((seat, row["hand_no"]))
+
+    rows = asyncio.run(
+        ml_generate_dataset.play_and_label(
+            seed=2,
+            ruleset=RULESET_PRESETS["hk_classic"],
+            bots=[FaanBot() for _ in range(4)],
+            seat_personalities=["FaanBot"] * 4,
+            row_hook=hook,
+        )
+    )
+    assert len(seen) == len(rows)
 
 
 def test_main_writes_a_parquet_shard_and_manifest(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -123,6 +149,7 @@ def test_main_writes_a_parquet_shard_and_manifest(tmp_path) -> None:  # type: ig
     assert manifest["ruleset_preset"] == "hk_classic"
     assert manifest["bot_roster"] == ["FaanBot", "FaanBot", "FaanBot", "FaanBot"]
     assert manifest["n_tile_types"] == 34
+    assert manifest["schema_version"] == 3
 
     table = pq.read_table(shards[0])
     assert table.num_rows > 0
