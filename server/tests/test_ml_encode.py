@@ -135,6 +135,14 @@ def test_meld_kong_counts_as_three_tiles_not_four() -> None:
     assert lit.sum() == 3
 
 
+def test_opponent_concealed_kong_tile_type_is_not_encoded_but_own_is() -> None:
+    kong = Meld(kind=MeldKind.CONCEALED_KONG, tiles=tile_ids_for_type(TileType.DRAGON_RED))
+    view = _view(seat=0, melds=((kong,), (kong,), (), ()))
+    encoded = ml_encode.encode_seat_view(view)
+    assert encoded.melds[0, :, int(TileType.DRAGON_RED)].sum() == 3  # own, relative slot 0
+    assert encoded.melds[1].sum() == 0  # next seat's concealed kong: hidden
+
+
 def test_relative_seat_ordering_puts_self_first_and_rotates_the_rest() -> None:
     pools = (
         (tile_ids_for_type(TileType.MAN_1)[0],),

@@ -19,10 +19,10 @@ import numpy as np
 from app.views import SeatView
 from bots.features import own_hand34
 from mahjong_core.config import HandSet, RuleSet
-from mahjong_core.melds import Meld
 from mahjong_core.scoring.patterns import PATTERNS, seat_wind_for
 from mahjong_core.state import Phase
 from mahjong_core.tiles import new_count_array, tile_id_type
+from ml.raw import visible_meld_counts34
 
 __all__ = [
     "N_PATTERNS",
@@ -53,17 +53,6 @@ def _thermometer(counts: list[int]) -> np.ndarray:
     """(N_THERMOMETER, 34): plane k is 1.0 wherever a tile type's count is > k."""
     arr = np.asarray(counts, dtype=np.float32)
     return np.stack([(arr > k).astype(np.float32) for k in range(N_THERMOMETER)])
-
-
-def _meld_counts(melds: tuple[Meld, ...]) -> list[int]:
-    """34-count array from one seat's public melds. A kong contributes 3 tiles, matching
-    `mahjong_core.shanten`/`bots.features._add_meld`'s convention."""
-    counts = new_count_array()
-    for meld in melds:
-        tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
-        for t in tiles:
-            counts[int(tile_id_type(t))] += 1
-    return counts
 
 
 def _discard_counts(pool: tuple[int, ...]) -> list[int]:
@@ -110,7 +99,7 @@ def encode_seat_view(view: SeatView) -> EncodedSeatView:
     order = _relative_seats(view.seat)
 
     hand = _thermometer(own_hand34(view))
-    melds = np.stack([_thermometer(_meld_counts(view.melds[s])) for s in order])
+    melds = np.stack([_thermometer(visible_meld_counts34(view, s)) for s in order])
     discards = np.stack([_thermometer(_discard_counts(view.discard_pools[s])) for s in order])
     concealed_counts = np.asarray([view.concealed_counts[s] for s in order], dtype=np.float32)
 

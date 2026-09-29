@@ -73,7 +73,6 @@ from bots.labels import (
     OpponentDangerLabel,
     danger_labels_for_opponents,
     discard_counts34,
-    meld_counts34,
 )
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -81,6 +80,7 @@ from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from mahjong_core.scoring.patterns import seat_wind_for
 from mahjong_core.state import Phase
+from ml.raw import visible_meld_counts34
 
 __all__ = ["build_parser", "main"]
 
@@ -160,7 +160,7 @@ def _example_row(
         "seat": seat,
         "seat_personalities": list(seat_personalities),
         "hand_counts": own_hand34(view),
-        "meld_counts": [meld_counts34(view.melds[s]) for s in order],
+        "meld_counts": [visible_meld_counts34(view, s) for s in order],
         "discard_counts": [discard_counts34(view.discard_pools[s]) for s in order],
         "concealed_counts": [view.concealed_counts[s] for s in order],
         "dealer_idx": order.index(view.dealer),

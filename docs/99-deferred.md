@@ -594,6 +594,13 @@ under a non-zero seat, the context one-hots, and both ruleset cases (default vs.
 cleanly (not a collection failure) under `make test-server`'s no-`ml`-extra environment, the same
 gap `server-ml.yml`'s separate smoke-test workflow already works around (`07-infra.md` §9).
 
+**Fixed (2026-09-29): concealed-kong leak.** `SeatView.melds` carries the full `Meld` for every
+seat (only the wire path redacts), so reading it directly encoded the tile type of other seats'
+concealed kongs. `server/ml/raw.py` (numpy-free) now owns `visible_meld_counts34` — another
+seat's concealed kong is skipped, the observer's own is kept, same rule as `bots/features.py`
+`seen34` — and both `encode.py` and `generate_dataset.py` read through it. Datasets generated
+before this fix (schema v2) carry the leak and shouldn't be trained on.
+
 Not built: anything that consumes `EncodedSeatView` — the opponent-danger model itself (`06-ml.md`
 §6.2), so this is still a pure input-shaping function with no trained weights behind it anywhere.
 
