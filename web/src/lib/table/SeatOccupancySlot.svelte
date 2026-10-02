@@ -20,13 +20,15 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 2.75rem;
-		height: 2.75rem;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+		padding-inline: var(--space-2);
 		border-radius: 50%;
 		border: 1px dashed var(--color-border);
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
 		font-weight: 600;
+		white-space: nowrap;
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
 	}
 
