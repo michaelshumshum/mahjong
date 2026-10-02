@@ -47,8 +47,8 @@ from mahjong_core.actions import (
     Discard,
     Pass,
     _is_thirteen_orphans,
+    _is_winning_shape,
     build_scoring_context,
-    hand_is_winning_shape,
     legal_actions,
 )
 from mahjong_core.claims import ClaimResponse, can_close_early, resolve_claims
@@ -348,13 +348,13 @@ def _can_win_with(
     appends it before scoring.
     """
     seat_state = state.seats[seat]
-    candidate = dataclasses.replace(seat_state, concealed=(*seat_state.concealed, tile))
-    if not hand_is_winning_shape(candidate):
+    concealed = (*seat_state.concealed, tile)
+    if not _is_winning_shape(concealed, closed=not seat_state.melds):
         return False
     ctx = build_scoring_context(
         state, seat, self_drawn=False, is_robbing_kong=is_robbing_kong, discarder=discarder
     )
-    result = score_winning_hand(candidate.concealed, candidate.melds, ctx, state.ruleset)
+    result = score_winning_hand(concealed, seat_state.melds, ctx, state.ruleset)
     return result.clears_min_faan
 
 

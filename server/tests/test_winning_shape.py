@@ -3,10 +3,12 @@ replaced (docs/06-ml.md §7: behaviour-neutral engine speed-ups)."""
 
 from __future__ import annotations
 
+import dataclasses
 import random
 from collections.abc import Sequence
 from itertools import product
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -14,11 +16,17 @@ from mahjong_core.actions import (
     _is_seven_pairs,
     _is_thirteen_orphans,
     _is_winning_shape,
+    build_scoring_context,
     hand_is_winning_shape,
+    legal_actions,
 )
+from mahjong_core.config import DEFAULT_RULESET
+from mahjong_core.engine import _can_win_with, new_hand, reduce
 from mahjong_core.melds import _SUIT_SHAPES, Meld, MeldKind, _is_standard_shape, decompose
-from mahjong_core.state import SeatState
+from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.state import GameState, Phase, SeatState, Wind
 from mahjong_core.tiles import TileId, count_array_from_types, tile_id_type
+from tests.test_engine_trajectory_pin import _greedy
 
 
 def _reference(concealed: Sequence[TileId], *, closed: bool) -> bool:
@@ -123,3 +131,50 @@ def test_hand_is_winning_shape_reads_melds_for_closed() -> None:
     assert hand_is_winning_shape(SeatState(concealed=tuple(pairs)))
     assert not hand_is_winning_shape(SeatState(concealed=tuple(pairs[:11]), melds=(pung,)))
     assert not hand_is_winning_shape(SeatState(concealed=tuple(pairs), melds=(pung,)))
+
+
+def _reference_can_win_with(
+    state: GameState, seat: int, tile: TileId, *, is_robbing_kong: bool, discarder: int
+) -> bool:
+    """`engine._can_win_with` as it was before the speed-up."""
+    seat_state = state.seats[seat]
+    candidate = dataclasses.replace(seat_state, concealed=(*seat_state.concealed, tile))
+    if not hand_is_winning_shape(candidate):
+        return False
+    ctx = build_scoring_context(
+        state, seat, self_drawn=False, is_robbing_kong=is_robbing_kong, discarder=discarder
+    )
+    result = score_winning_hand(candidate.concealed, candidate.melds, ctx, state.ruleset)
+    return result.clears_min_faan
+
+
+@pytest.mark.parametrize("min_faan", [0, 3])
+def test_can_win_with_equals_reference(min_faan: int) -> None:
+    """every (other seat, tile in the mover's hand, rob flag) at every turn of seeded hands."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, min_faan=min_faan)
+    wins = 0
+    for seed in range(12):
+        rng = random.Random(seed)
+        state = new_hand(ruleset, seed, dealer=seed % 4, prevailing=Wind.EAST)
+        while state.phase != Phase.HAND_OVER:
+            if state.phase == Phase.AWAIT_ACTION:
+                mover = state.turn
+                for seat in range(4):
+                    if seat == mover:
+                        continue
+                    for tile in state.seats[mover].concealed:
+                        for rob in (False, True):
+                            args = (state, seat, tile)
+                            got = _can_win_with(*args, is_robbing_kong=rob, discarder=mover)
+                            ref = _reference_can_win_with(
+                                *args, is_robbing_kong=rob, discarder=mover
+                            )
+                            assert got == ref
+                            wins += got
+                seat = mover
+            else:
+                assert state.claim_window is not None
+                window = state.claim_window
+                seat = rng.choice([o.seat for o in window.offers if o.seat not in window.responses])
+            state, _ = reduce(state, _greedy(state, seat, legal_actions(state, seat), rng))
+    assert wins > 0
