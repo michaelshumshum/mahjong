@@ -11,6 +11,8 @@
   every unseen copy equally likely to sit in any hidden slot, so P(location) = that location's
   hidden-slot count / all hidden slots (public: concealed counts, concealed-kong counts, wall).
 - Own win / deal-in AUC; shanten and ukeire MAE on own discard turns.
+- `--v3-data`: the same danger AUCs on the v3 danger dataset's split (`DangerNet`'s own
+  benchmark, §5), its rows re-expressed as encoder v2 rows by `v3_policy_raw`.
 
 Intervals resample games (`ml.metrics.game_bootstrap`).
 """
@@ -26,16 +28,20 @@ from typing import Any
 import numpy as np
 import torch
 
+from mahjong_core.config import RuleSet
+from mahjong_core.state import Phase
 from ml.aux_data import AuxData, danger_raw
 from ml.aux_train import to_tensors
 from ml.encode import encode_batch
+from ml.encode_v2 import PAD, encode_policy_batch, ruleset_features
 from ml.metrics import add_stats, game_bootstrap, game_stats, metric_fns
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.splits import TEST, TRAIN, VAL
 
-__all__ = ["evaluate_aux_model", "load_policy", "main"]
+__all__ = ["evaluate_aux_model", "evaluate_v3", "load_policy", "main", "v3_policy_raw"]
 
 _SPLITS = {"train": TRAIN, "val": VAL, "test": TEST}
+_PHASES = tuple(Phase)
 
 
 def load_policy(ckpt_path: Path) -> PolicyNet:
@@ -153,6 +159,88 @@ def evaluate_aux_model(
     return result
 
 
+def v3_policy_raw(raw: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    """v3 danger rows (`ml.pack`, all own discard turns) as encoder v2 policy rows. v3 has no
+    flower identities, so `own_flowers` is zero: the seat-flower and flower-set scalars are off."""
+    n = len(raw["hand_counts"])
+    return {
+        "concealed": raw["hand_counts"] - raw["meld_counts"][:, 0],
+        "melds": raw["meld_counts"],
+        "discard_seq": raw["discard_seq"],
+        "concealed_counts": raw["concealed_counts"],
+        "concealed_kongs": raw["concealed_kongs"],
+        "flowers": raw["flowers"],
+        "own_flowers": np.zeros((n, 8), dtype=np.uint8),
+        "seat_wind": raw["seat_wind"],
+        "dealer": raw["dealer_idx"],
+        "prevailing": raw["prevailing_wind"],
+        "turn": np.zeros(n, dtype=np.uint8),
+        "phase": np.full(n, _PHASES.index(Phase.AWAIT_ACTION), dtype=np.uint8),
+        "wall_remaining": raw["wall_remaining"],
+        "claim_tile": np.full(n, PAD, dtype=np.uint8),
+    }
+
+
+def evaluate_v3(
+    model: PolicyNet,
+    v3_path: Path,
+    *,
+    split: int = TEST,
+    danger: Any = None,
+    max_rows: int | None = None,
+    chunk: int = 2048,
+    n_boot: int = 500,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Legal-wait and tenpai AUC on a v3 packed dataset (`ml.evaluate`'s protocol), for the
+    policy's danger heads and, if given, `DangerNet`, with the paired difference."""
+    from ml.dataset import DangerData
+
+    data = DangerData(v3_path)
+    rows = data.rows_of(split)
+    if max_rows is not None and max_rows < len(rows):
+        rows = np.sort(np.random.default_rng(seed).choice(rows, max_rows, replace=False))
+    ruleset = ruleset_features(RuleSet.from_dict(data.meta["manifest"]["ruleset"]))
+    games, game_of = np.unique(np.asarray(data.raw["game_seed"])[rows], return_inverse=True)
+    n_games = len(games)
+    acc: dict[str, Any] = {}
+    with torch.no_grad():
+        for i in range(0, len(rows), chunk):
+            idx = np.arange(i, min(i + chunk, len(rows)))
+            raw = {k: np.asarray(v[rows[idx]]) for k, v in data.raw.items()}
+            tiles, scalars = encode_policy_batch(v3_policy_raw(raw), ruleset)
+            aux = model(torch.from_numpy(tiles), torch.from_numpy(scalars)).aux
+            assert aux is not None
+            b = len(idx)
+            legal = raw["opponent_expected_faan"] > 0
+            tenpai = raw["opponent_is_tenpai"]
+            cand = np.broadcast_to((raw["hand_counts"] > 0)[:, None], (b, 3, 34))
+            g = np.broadcast_to(game_of[idx][:, None, None], (b, 3, 34))
+            scorers = {"policy": (_sig(aux.legal_wait), _sig(aux.tenpai))}
+            if danger is not None:
+                d_tiles, d_scalars, _ = data.batch(rows[idx], np.arange(3 * b))
+                d = danger(d_tiles, d_scalars)
+                scorers["danger"] = (
+                    _sig(d.legal_wait).reshape(b, 3, 34),
+                    _sig(d.tenpai).reshape(b, 3),
+                )
+            for name, (lw, tp) in scorers.items():
+                _acc(acc, f"{name}_legal_wait", game_stats(lw[cand], legal[cand], g[cand], n_games))
+                gt = g[:, :, 0].ravel()
+                _acc(acc, f"{name}_tenpai", game_stats(tp.ravel(), tenpai.ravel(), gt, n_games))
+    auc = metric_fns["auc"]
+    result: dict[str, Any] = {"n_rows": len(rows), "n_games": n_games}
+    for name, stats in acc.items():
+        result[f"{name}_auc"] = game_bootstrap({"m": stats}, lambda s: auc(s["m"]), n_boot, seed)
+    if danger is not None:
+        for head in ("legal_wait", "tenpai"):
+            pair = {"p": acc[f"policy_{head}"], "d": acc[f"danger_{head}"]}
+            result[f"{head}_auc_policy_minus_danger"] = game_bootstrap(
+                pair, lambda s: auc(s["p"]) - auc(s["d"]), n_boot, seed
+            )
+    return result
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m ml.aux_eval", description=__doc__)
     parser.add_argument("--ckpt", type=Path, required=True)
@@ -162,6 +250,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-rows", type=int)
     parser.add_argument("--n-boot", type=int, default=500)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--v3-data", type=Path, help="also score a v3 packed danger dataset")
+    parser.add_argument("--v3-max-rows", type=int)
     parser.add_argument("--out", type=Path)
     return parser
 
@@ -180,9 +270,17 @@ def main(argv: list[str] | None = None) -> None:
         from ml.evaluate import load_model
 
         danger = load_model(args.danger_ckpt)
-    result = evaluate_aux_model(
-        load_policy(args.ckpt), data, rows, danger=danger, n_boot=args.n_boot
-    )
+    model = load_policy(args.ckpt)
+    result = evaluate_aux_model(model, data, rows, danger=danger, n_boot=args.n_boot)
+    if args.v3_data is not None:
+        result["v3"] = evaluate_v3(
+            model,
+            args.v3_data,
+            split=_SPLITS[args.split] if args.split != "all" else TEST,
+            danger=danger,
+            max_rows=args.v3_max_rows,
+            n_boot=args.n_boot,
+        )
     text = json.dumps(result, indent=2)
     if args.out:
         args.out.write_text(text)

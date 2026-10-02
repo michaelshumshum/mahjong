@@ -14,13 +14,15 @@ from app.views import seat_view
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from ml import train as ml_train
 from ml.aux_data import AuxData, danger_raw, pack_aux
-from ml.aux_eval import evaluate_aux_model, load_policy
+from ml.aux_eval import evaluate_aux_model, evaluate_v3, load_policy, v3_policy_raw
 from ml.danger_model import DangerNet, DangerNetConfig
 from ml.encode_v2 import PAD, policy_raw, stack_rows
 from ml.env import HandEnv
 from ml.generate_aux import main as generate_main
 from ml.generate_aux import record_game
+from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.raw import raw_row
+from tests.ml_synthetic import synthetic_packed
 
 _BOTS = ["EfficiencyBot"] * 4
 _RULESET = RULESET_PRESETS[DEFAULT_PRESET_ID]
@@ -132,3 +134,24 @@ def test_train_dispatch_and_eval(packed: Path, tmp_path: Path) -> None:
         assert key in result, key
     point, lo, hi = result["hidden_nll_gain"]
     assert lo <= point <= hi
+
+
+def test_v3_rows_round_trip_on_own_turns(packed: Path) -> None:
+    data = AuxData(packed)
+    _, _, raw = data.arrays(np.arange(data.meta["rows"]))
+    own = {k: v[raw["own_turn"] > 0] for k, v in raw.items()}
+    back = v3_policy_raw(danger_raw(own))
+    for k, v in back.items():
+        if k == "own_flowers":
+            assert not v.any()
+        else:
+            assert np.array_equal(v, own[k]), k
+
+
+def test_evaluate_v3_on_a_synthetic_pack(tmp_path: Path) -> None:
+    synthetic_packed(tmp_path / "v3", n_games=30, rows_per_game=5)
+    model = PolicyNet(PolicyNetConfig(channels=16, blocks=1)).eval()
+    danger = DangerNet(DangerNetConfig(channels=16, blocks=1)).eval()
+    result = evaluate_v3(model, tmp_path / "v3", split=0, danger=danger, n_boot=10)
+    for key in ("policy_legal_wait_auc", "danger_tenpai_auc", "legal_wait_auc_policy_minus_danger"):
+        assert key in result, key
