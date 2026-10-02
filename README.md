@@ -8,12 +8,21 @@
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Server-authoritative real-time multiplayer Hong Kong (Cantonese) mahjong. Bots fill empty seats
-and take over for disconnected players.
+Hong Kong mahjong, browser-native and server-authoritative — full faan scoring, zero client trust.
+Play solo against bots tuned from easy heuristics to a self-play RL "Expert."
 
 **Stack:** Python 3.13 / FastAPI (REST + native WebSocket) · SvelteKit 2 + Svelte 5 (runes), DOM + SCSS · Postgres
 
+## Features
+
+- **Full HK ruleset** — faan table, claim priority, payouts, configurable `RuleSet` presets ([01](docs/01-rules-spec.md))
+- **Bots from Easy to Impossible** — heuristic tiers, a self-play RL "Expert", and a full-information `ORACLE` ([04](docs/04-bots.md), [06](docs/06-ml.md))
+- **Structural anti-cheat** — per-seat redaction; clients never see what they shouldn't ([00 §5, §9](docs/00-architecture.md))
+- **Deterministic** — any hand reproduces from `(ruleset, seed, actions)` ([00 §3](docs/00-architecture.md))
+
 ## Quick start
+
+Requires Docker + Docker Compose; `make up` builds everything else.
 
 ```bash
 cp .env.example .env
@@ -52,6 +61,7 @@ wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible fro
 | [05-roadmap.md](docs/05-roadmap.md) | Milestones, testing strategy, risk register, resolved decisions |
 | [06-ml.md](docs/06-ml.md) | Self-play RL agent (T4 "Expert"): action encoding, game records, plan and status |
 | [07-infra.md](docs/07-infra.md) | Monorepo layout, process model, Docker targets and profiles |
+| [09-testing.md](docs/09-testing.md) | Implementation-level testing gotchas (Vitest browser mode, mocking, fixtures) |
 
 ## Layout
 
@@ -75,6 +85,31 @@ docs/     Planning
 Only `ml` and `tools` profiles exist — no multi-node/`scale` profile yet ([docs/07-infra.md §3](docs/07-infra.md)).
 
 > `--workers 1` on the API is load-bearing: tables are in-memory objects owned by one process. [docs/07-infra.md §2](docs/07-infra.md)
+
+## Testing
+
+```bash
+make test              # everything (server + web)
+make test-server       # pytest, fast suite only
+make test-server-slow  # pytest, slow suite: soaks, real-bot e2e, hypothesis runs
+make test-web          # vitest + svelte-check
+```
+
+`mahjong_core` is pure and tested directly, no mocks. CI runs fast + slow suites in parallel on
+every push ([07 §9](docs/07-infra.md)); gotchas live in [docs/09-testing.md](docs/09-testing.md).
+
+## Development
+
+```bash
+make fmt        # ruff format + oxfmt
+make lint       # ruff check + pnpm lint
+make typecheck  # svelte-check
+make proto      # regenerate shared/protocol.schema.json + web TS types
+```
+
+`server/app/protocol.py` is the source of truth for the wire protocol; generated files
+(`shared/`, `web/src/lib/net/protocol.d.ts`) are never hand-edited — `make proto-check` (CI)
+fails the build if they drift.
 
 ## License
 
