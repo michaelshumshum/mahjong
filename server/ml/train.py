@@ -2,7 +2,9 @@
 (docker-compose.yml's `trainer` service, this repo's `make train`).
 
 `algorithm: danger` trains the opponent-danger model (`DangerNet`, docs/06-ml.md §5) on a packed
-dataset (`ml.pack`). Any other algorithm raises `NotImplementedError`.
+dataset (`ml.pack`). `algorithm: rl_aux` trains `PolicyNet`'s trunk and auxiliary heads
+(`ml.aux_train`, §8) on an `ml.aux_data` dataset. Any other algorithm raises
+`NotImplementedError`.
 
 A run directory holds `ckpt_last.pt` (resumable), `ckpt_best.pt` (best validation total) and an
 append-only `metrics.jsonl`. SIGINT/SIGTERM save a checkpoint after the current step and exit 0.
@@ -22,7 +24,9 @@ from typing import Any
 
 import yaml
 
-__all__ = ["TrainConfig", "build_parser", "load_config", "main", "train"]
+__all__ = ["ALGORITHMS", "TrainConfig", "build_parser", "load_config", "main", "train"]
+
+ALGORITHMS = ("danger", "rl_aux")
 
 
 @dataclass
@@ -50,10 +54,9 @@ class TrainConfig:
 def load_config(path: Path) -> tuple[str, TrainConfig]:
     raw: dict[str, Any] = yaml.safe_load(path.read_text())
     algorithm = raw.pop("algorithm", None)
-    if algorithm != "danger":
+    if algorithm not in ALGORITHMS:
         raise NotImplementedError(
-            f"ml.train only implements algorithm 'danger', got {algorithm!r} "
-            f"(config={str(path)!r})."
+            f"ml.train implements {sorted(ALGORITHMS)}, got {algorithm!r} (config={str(path)!r})."
         )
     unknown = set(raw) - set(TrainConfig.__dataclass_fields__)
     if unknown:
@@ -71,7 +74,7 @@ def lr_at(step: int, cfg: TrainConfig) -> float:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m ml.train",
-        description="Train the opponent-danger model.",
+        description="Train the opponent-danger model or PolicyNet's auxiliary heads.",
     )
     parser.add_argument("--config", required=True, help="e.g. ml/configs/danger.yaml")
     parser.add_argument("--resume", action="store_true", help="continue from <out>/ckpt_last.pt")
@@ -207,12 +210,17 @@ def train(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None = Non
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
-    _, cfg = load_config(Path(args.config))
+    algorithm, cfg = load_config(Path(args.config))
     if args.out:
         cfg.out = args.out
     if args.data:
         cfg.data = args.data
-    train(cfg, resume=args.resume, max_steps=args.max_steps)
+    if algorithm == "rl_aux":
+        from ml.aux_train import train_aux
+
+        train_aux(cfg, resume=args.resume, max_steps=args.max_steps)
+    else:
+        train(cfg, resume=args.resume, max_steps=args.max_steps)
 
 
 if __name__ == "__main__":
