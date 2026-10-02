@@ -9,6 +9,7 @@ from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from itertools import combinations_with_replacement
 
 from mahjong_core.tiles import TileId, TileType, tile_id_type
 
@@ -278,3 +279,45 @@ def _materialize(
             picked = tuple(work[start].popleft() for _ in range(_MELD_SIZES[kind]))
         melds.append(Meld(kind, picked))
     return tuple(melds)
+
+
+def _complete_suit_shapes() -> dict[tuple[int, ...], bool]:
+    """Every 9-rank count vector of one suit that splits fully into chows/pungs, mapped to
+    whether that split also uses the hand's single pair. At most 4 melds + 1 pair (14 tiles)."""
+    groups = [(r, r + 1, r + 2) for r in range(7)] + [(r, r, r) for r in range(9)]
+    shapes: dict[tuple[int, ...], bool] = {}
+    for n in range(5):
+        for combo in combinations_with_replacement(groups, n):
+            base = [0] * 9
+            for group in combo:
+                for rank in group:
+                    base[rank] += 1
+            if max(base) > 4:
+                continue
+            shapes[tuple(base)] = False
+            for rank in range(9):
+                if base[rank] <= 2:
+                    with_pair = base.copy()
+                    with_pair[rank] += 2
+                    shapes[tuple(with_pair)] = True
+    return shapes
+
+
+_SUIT_SHAPES = _complete_suit_shapes()
+
+
+def _is_standard_shape(counts: Sequence[int]) -> bool:
+    """`decompose(tiles) != ()` for the 34-array `counts` of `tiles`, without building any
+    melds: each suit must be a complete shape and exactly one group may hold the pair."""
+    pairs = 0
+    for base in (0, 9, 18):
+        has_pair = _SUIT_SHAPES.get(tuple(counts[base : base + 9]))
+        if has_pair is None:
+            return False
+        pairs += has_pair
+    for c in counts[_SUIT_TYPE_COUNT:34]:
+        if c == 2:
+            pairs += 1
+        elif c != 0 and c != 3:
+            return False
+    return pairs == 1

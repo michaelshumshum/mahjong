@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
 
-from mahjong_core.melds import Meld, MeldKind, decompose, legal_self_melds
+from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_melds
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
@@ -188,6 +188,9 @@ _ORPHAN_TYPES = frozenset(
 )
 
 
+_ORPHAN_INDICES = tuple(sorted(int(t) for t in _ORPHAN_TYPES))
+
+
 def _is_seven_pairs(concealed: Sequence[TileId]) -> bool:
     """Seven pairs (七對子): 14 concealed tiles as 7 *distinct* pairs. Shape only — whether it
     scores depends on the table's `hand_sets`/`faan_overrides`."""
@@ -209,9 +212,26 @@ def hand_is_winning_shape(seat: SeatState) -> bool:
     """Structurally complete hand right now — standard melds+pair, Seven Pairs, or Thirteen
     Orphans. Shape only, no `min_faan` check. Seven Pairs/Thirteen Orphans require a fully
     concealed hand; any exposed meld rules both out."""
-    if not seat.melds and (_is_seven_pairs(seat.concealed) or _is_thirteen_orphans(seat.concealed)):
-        return True
-    return decompose(seat.concealed) != ()
+    return _is_winning_shape(seat.concealed, closed=not seat.melds)
+
+
+def _is_winning_shape(concealed: Sequence[TileId], *, closed: bool) -> bool:
+    """`hand_is_winning_shape` on one 34-array pass; equivalence-tested against the
+    `_is_seven_pairs`/`_is_thirteen_orphans`/`decompose` form in tests/test_winning_shape.py."""
+    if len(concealed) % 3 != 2:
+        return False
+    counts = [0] * 34
+    for t in concealed:
+        counts[tile_id_type(t)] += 1
+    if closed and len(concealed) == 14:
+        if all(c == 0 or c == 2 for c in counts):
+            return True
+        if (
+            all(counts[i] for i in _ORPHAN_INDICES)
+            and sum(counts[i] for i in _ORPHAN_INDICES) == 14
+        ):
+            return True
+    return _is_standard_shape(counts)
 
 
 def build_scoring_context(
