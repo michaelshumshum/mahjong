@@ -91,6 +91,8 @@ __all__ = [
     "MeldFormed",
     "game_outcome",
     "new_game",
+    "new_hand",
+    "prevailing_winds",
     "reduce",
     "start_next_hand",
 ]
@@ -289,6 +291,22 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
         state, dealer=next_dealer, prevailing=next_prevailing, hand_no=state.hand_no + 1
     )
     return next_state, []
+
+
+def prevailing_winds(ruleset: RuleSet) -> tuple[Wind, ...]:
+    """Every prevailing wind a game under `ruleset` can reach (`EAST_ONLY` -> East only)."""
+    return tuple(Wind(i) for i in range(_ALLOWED_ROUNDS[ruleset.game_length]))
+
+
+def new_hand(ruleset: RuleSet, game_seed: int, *, dealer: int, prevailing: Wind) -> GameState:
+    """A fresh game's first hand dealt with `dealer`/`prevailing` instead of seat 0/East, for
+    training on every seat-wind context. Same wall as `new_game(ruleset, game_seed)`; with
+    `dealer=0, prevailing=EAST` the result equals it."""
+    if not 0 <= dealer < 4:
+        raise ValueError(f"dealer must be 0..3, got {dealer}")
+    if prevailing not in prevailing_winds(ruleset):
+        raise ValueError(f"prevailing {prevailing!r} unreachable under {ruleset.game_length}")
+    return _deal_hand(new_game(ruleset, game_seed), dealer=dealer, prevailing=prevailing, hand_no=1)
 
 
 def _acting_seat(state: GameState, action: Action) -> int:
