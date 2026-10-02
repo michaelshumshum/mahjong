@@ -52,11 +52,9 @@ import argparse
 import asyncio
 import concurrent.futures
 import json
-import multiprocessing
 import random
 import signal
 import sys
-import threading
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
@@ -74,6 +72,7 @@ from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from mahjong_core.state import Phase
+from ml.mp import mp_context
 from ml.raw import raw_row, relative_seats
 
 __all__ = ["build_parser", "main"]
@@ -82,25 +81,6 @@ _STEP_CAP = 8000
 _NO_DEADLINE = float("inf")
 _N_TILE_TYPES = 34
 SCHEMA_VERSION = 3
-
-
-def _mp_context() -> multiprocessing.context.BaseContext:
-    """`fork` over the platform default (`forkserver` on this interpreter, confirmed via
-    `multiprocessing.get_start_method()`): measured directly on this workload (120 games, 12
-    workers, `hk_classic`, identical bot roster, both legs run back-to-back in one process) --
-    `forkserver` managed 0.860 games/sec, `fork` managed 1.518 games/sec, a ~1.8x difference at
-    the same worker count.
-
-    Only safe when the current process is single-threaded at pool-creation time -- a thread other
-    than main could hold a lock (import lock, malloc, logging) that the forked child inherits
-    already-acquired and can never release, deadlocking the child the first time it needs that
-    lock. That's not hypothetical here: running this under pytest triggers Python's own
-    `DeprecationWarning` for exactly this condition, because pytest's own process is
-    multi-threaded. Checking `threading.active_count()` at call time (not import time, since
-    thread state can change) picks the fast path only when it's actually safe."""
-    if threading.active_count() > 1:
-        return multiprocessing.get_context()
-    return multiprocessing.get_context("fork")
 
 
 def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
@@ -313,7 +293,7 @@ def _run_parallel(
     last_seed_done = args.seed_start - 1
     next_seed = [args.seed_start]  # single-element cell: mutable from the nested closure below
 
-    with ProcessPoolExecutor(max_workers=args.parallel, mp_context=_mp_context()) as pool:
+    with ProcessPoolExecutor(max_workers=args.parallel, mp_context=mp_context()) as pool:
         in_flight: dict[concurrent.futures.Future[list[dict[str, object]]], int] = {}
 
         def _top_up() -> None:
