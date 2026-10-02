@@ -73,6 +73,11 @@ doc_for_target() {
       esac
       ;;
   esac
+  # test files additionally route to the testing doc, on top of whatever their
+  # path prefix above already required.
+  case "$base" in
+    *.spec.ts|*.test.ts) echo "docs/09-testing.md" ;;
+  esac
 }
 
 required=()

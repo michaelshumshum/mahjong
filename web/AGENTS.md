@@ -67,45 +67,9 @@ pnpm run screenshots   # regenerate docs/screenshots/*.png — see below
   and `table.e2e.ts` explicitly pass `?mock=<scenarioId>` (any value works; a bare `?mock` picks
   the first scenario) to stay on the frozen `MOCK_SCENARIOS` fixture, since neither runs a backend.
   Live wiring detail: `docs/03-frontend.md`'s "`/table/[id]` wiring" (§6).
+- Vitest project choice, mount helpers, `vi.mock`/`vi.hoisted` timing under browser mode, and the
+  `$env/dynamic/public` mock requirement: `docs/09-testing.md` §1.
 
-- **Testing a `*.svelte.ts` file's runes** (`$state`/`$effect`) needs `vite.config.ts`'s vitest
-  `client` project, not `server`: Vitest's default `node` environment still loads modules through
-  Vite's SSR compile target even with `environment: 'jsdom'` set, and Svelte's server runtime
-  never runs `$effect` (there's no DOM to react into) — silently a no-op, not an error, which is
-  easy to mistake for "nothing subscribed yet" rather than "this never ran." The `client` project
-  uses real browser mode (`@vitest/browser-playwright`, reusing the `playwright` install this repo
-  already has for e2e/screenshots) so effects actually execute. Name the spec
-  `*.svelte.spec.ts` to route it there automatically; a plain `.spec.ts` importing a `.svelte.ts`
-  module still runs under `server` and any `$effect` inside it will silently never fire.
-- **Mounting a `.svelte` component directly** (not just its logic) in a `*.svelte.spec.ts` spec:
-  `lib/table/test-render.ts` (`render`/`cleanup`/`cleanupAll`, wrapping `svelte`'s own
-  `mount`/`unmount`) is the shared helper for table-surface specs — `afterEach(cleanupAll)` covers
-  specs that don't hold on to each `render()` result individually. Rendering a route's top-level
-  `+page.svelte` needs SvelteKit context the table-surface components don't (`$app/navigation`,
-  `$lib/net/lobby`'s `$env/dynamic/public`), so `routes-tests/*.svelte.spec.ts` mount inline with
-  plain `mount`/`unmount` instead of this helper — see the next point and `test/mocks.ts`
-  (`createMessagesProxy`) for what those need mocked.
-- **`vi.mock`/`vi.hoisted` under the `client` project's real browser mode**: Vite's import-analysis
-  transform rewrites every static `import` into an awaited dynamic `import()`, so any code that
-  runs *synchronously* before those imports resolve — a `vi.hoisted()` callback's body, in
-  particular — can't reference an imported binding; referencing one throws `[vitest] There was an
-  error when mocking a module` at hoist time, not at the call site, which reads like the mock
-  itself is broken rather than a timing issue. `vi.mock(...)`'s own factory is fine referencing an
-  import, since factories run lazily (after the mocked module is actually requested, i.e. after
-  imports have resolved) — confirmed by `routes-tests/tables/TableCard.svelte.spec.ts`'s working
-  `vi.mock('$lib/paraglide/messages.js', () => ({ m: createMessagesProxy() }))` with no
-  `vi.hoisted` involved. When a factory needs data from module scope (a fixture array, a prior
-  `vi.fn()`), the safe pattern is a **dynamic `import()` inside the factory itself** (see
-  `routes-tests/lobby/page.svelte.spec.ts`), not a reference to any outer-scope variable — even one
-  declared via `vi.hoisted()`. To assert against or configure a mocked function afterwards, import
-  the real binding (`import { goto } from '$app/navigation'` after `vi.mock('$app/navigation', ()
-  => ({ goto: vi.fn() }))`) rather than threading a separately-held mock reference through the
-  file.
-- A route pulling in `$lib/net/lobby` (directly, or transitively through a child component like
-  `TableCard`) needs `$env/dynamic/public` mocked too (`vi.mock('$env/dynamic/public', () => ({
-  env: {} }))`) — that module is only populated by SvelteKit's own dev/build server at request
-  time, so under Vitest it's `undefined`, and `lobby.ts`'s `apiBaseUrl()` reading `env.PUBLIC_API_URL`
-  throws before the component even renders.
 - `typescript` stays pinned to `^6.0.3`; TS7's native/Go compiler is installed alongside as
   `@typescript/native` (`npm:typescript@^7`) and used only via `svelte-check --tsgo` (wired into
   `pnpm check`). svelte-check's own CLI hard-requires the plain `typescript` package to resolve to
