@@ -139,6 +139,7 @@ table to) — this isn't a "not built yet" line item, it's out of scope by desig
 | Table | Holds | Status |
 | --- | --- | --- |
 | `games` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `action_log` (JSONB), `players` (JSONB — each seat's chosen guest name, wired through from `join.name` via `SeatBinding.name`, M5), `result` (JSONB), `created_at` — the durable record of a finished game (`docs/06-ml.md §2`) | **built** |
+| `hand_records` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `dealer`, `prevailing`, `action_log` (JSONB), `players` (JSONB), `result` (JSONB), `created_at` — a standalone hand started from `engine.new_hand`, e.g. an RL eval episode (`docs/06-ml.md §2`) | **built** |
 | `leaderboard` | derived/aggregated from `games.players`/`games.result` by name, not by account — a guest who reuses the same name resumes the same leaderboard row, no login needed; may be a materialized view instead of a table | not built |
 
 `ruleset`/`action_log`/`players`/`result` use `JSON().with_variant(JSONB(), "postgresql")` —

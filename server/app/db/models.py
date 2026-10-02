@@ -1,4 +1,5 @@
-"""SQLAlchemy models for durable game records. Only `games` exists so far.
+"""SQLAlchemy models for durable records: finished games (`games`) and standalone hands
+(`hand_records`).
 
 JSON columns use `JSONB` on Postgres, generic `JSON` elsewhere (`.with_variant`) -- SQLite
 (tests) has no JSONB.
@@ -33,6 +34,28 @@ class GameRecord(Base):
     engine_version: Mapped[str] = mapped_column(String(32), nullable=False)
     ruleset: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False)
     seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    action_log: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, nullable=False)
+    players: Mapped[list[str | None]] = mapped_column(JSONType, nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class HandRecord(Base):
+    """One standalone hand, e.g. an RL evaluation episode (`ml/env.py`): played from
+    `engine.new_hand(ruleset, seed, dealer=, prevailing=)` to `HAND_OVER`, so it needs `dealer`/
+    `prevailing` to replay and can't live in `games`, which only holds finished games.
+    """
+
+    __tablename__ = "hand_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    engine_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    ruleset: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False)
+    seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    dealer: Mapped[int] = mapped_column(Integer, nullable=False)
+    prevailing: Mapped[int] = mapped_column(Integer, nullable=False)
     action_log: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, nullable=False)
     players: Mapped[list[str | None]] = mapped_column(JSONType, nullable=False)
     result: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False)
