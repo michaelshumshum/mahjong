@@ -1,9 +1,10 @@
 """Single-hand self-play env over `mahjong_core` (docs/06-ml.md §7). `ml`-extra only.
 
-One episode is hand 1 of `new_game(ruleset, env_seed)`, played to `HAND_OVER`; the caller drives
-all four seats. Decisions with exactly one legal action are auto-played and never surface.
-A trajectory is a pure function of `(ruleset, env_seed, actions)`: the deal comes from the
-engine's own seed derivation, claim-window ordering from a `Random` seeded off `env_seed`.
+One episode is a fresh hand from `engine.new_hand(ruleset, env_seed, dealer, prevailing)`,
+played to `HAND_OVER`; the caller drives all four seats. Dealer and prevailing wind are drawn
+from `env_seed` (uniform over seats and `prevailing_winds(ruleset)`), so the policy sees every
+seat-wind context, not just hand 1's. Decisions with exactly one legal action are auto-played
+and never surface. A trajectory is a pure function of `(ruleset, env_seed, actions)`.
 
 Observations are `encode_seat_view(seat_view(...))` flattened into one float32 vector of
 `OBS_DIM`, computed by the fast encoder (`ml/fast_encode.py`) that is parity-tested against it.
@@ -17,11 +18,18 @@ from typing import Any
 
 import numpy as np
 
-from mahjong_core.actions import Action, action_from_dict, action_to_dict
+from app.db.records import hand_record_columns
+from mahjong_core.actions import Action, action_from_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
-from mahjong_core.engine import ENGINE_VERSION, IllegalActionError, reduce
+from mahjong_core.engine import (
+    ENGINE_VERSION,
+    IllegalActionError,
+    new_hand,
+    prevailing_winds,
+    reduce,
+)
 from mahjong_core.ml import N_ACTIONS, decode_action, legal_mask
-from mahjong_core.state import GameOutcome, GameState, Phase, new_game
+from mahjong_core.state import GameState, Phase, Wind
 from ml.fast_encode import OBS_DIM, encode_state
 
 __all__ = [
@@ -30,6 +38,7 @@ __all__ = [
     "REWARD_SCALE",
     "HandEnv",
     "encode_obs",
+    "hand_start",
     "replay_hand",
 ]
 
@@ -42,6 +51,12 @@ def encode_obs(state: GameState, seat: int, out: np.ndarray | None = None) -> np
     """`seat`'s observation, `(OBS_DIM,)` float32: `ml.fast_encode.encode_state`, parity-tested
     against `encode_reference` (`seat_view` -> `encode_seat_view`)."""
     return encode_state(state, seat, out)
+
+
+def hand_start(ruleset: RuleSet, seed: int) -> tuple[int, Wind]:
+    """`(dealer, prevailing)` for episode `seed`."""
+    rng = random.Random(f"start:{seed}")
+    return rng.randrange(4), rng.choice(prevailing_winds(ruleset))
 
 
 def _scores(state: GameState) -> tuple[int, int, int, int]:
@@ -72,7 +87,8 @@ class HandEnv:
 
     def reset(self, seed: int) -> tuple[int, np.ndarray | None, np.ndarray]:
         self.seed = seed
-        self.state = new_game(self.ruleset, seed)
+        dealer, prevailing = hand_start(self.ruleset, seed)
+        self.state = new_hand(self.ruleset, seed, dealer=dealer, prevailing=prevailing)
         self.actions = []
         self.done = False
         self.decisions = 0
@@ -104,18 +120,11 @@ class HandEnv:
         )
 
     def record(self, players: Sequence[str | None] | None = None) -> dict[str, Any]:
-        """The finished hand as `app.db.models.GameRecord` column values. `result` is a
-        `GameOutcome` with `hand_count=1`: the log stops at `HAND_OVER`, not `GAME_OVER`."""
-        if not self.done or self.state is None or self.seed is None:
+        """The finished hand as `app.db.models.HandRecord` column values
+        (`app.db.records.save_hand_record` persists the same shape)."""
+        if not self.done or self.state is None:
             raise RuntimeError("record() needs a finished episode")
-        return {
-            "engine_version": ENGINE_VERSION,
-            "ruleset": self.ruleset.to_dict(),
-            "seed": self.seed,
-            "action_log": [action_to_dict(a) for a in self.actions],
-            "players": list(players) if players is not None else [None, None, None, None],
-            "result": GameOutcome(hand_count=1, final_scores=_scores(self.state)).to_dict(),
-        }
+        return hand_record_columns(self.state, self.actions, players=players)
 
     def _obs(self) -> np.ndarray | None:
         if not self.encode:
@@ -165,12 +174,18 @@ class HandEnv:
 
 
 def replay_hand(record: Mapping[str, Any]) -> GameState:
-    """Rebuild the final state of a `HandEnv.record()` through `new_game` + `reduce`."""
+    """Rebuild the final state of a `HandEnv.record()` (or a `HandRecord` row's columns) through
+    `new_hand` + `reduce`."""
     if record["engine_version"] != ENGINE_VERSION:
         raise ValueError(
             f"record engine_version {record['engine_version']!r} != {ENGINE_VERSION!r}"
         )
-    state = new_game(RuleSet.from_dict(record["ruleset"]), record["seed"])
+    state = new_hand(
+        RuleSet.from_dict(record["ruleset"]),
+        record["seed"],
+        dealer=record["dealer"],
+        prevailing=Wind(record["prevailing"]),
+    )
     for data in record["action_log"]:
         state, _ = reduce(state, action_from_dict(data))
     return state

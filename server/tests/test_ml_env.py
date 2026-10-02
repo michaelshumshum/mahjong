@@ -8,10 +8,10 @@ import pytest
 
 np = pytest.importorskip("numpy")
 
-from mahjong_core.config import RuleSet
+from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, IllegalActionError
-from mahjong_core.state import Phase
-from ml.env import OBS_DIM, HandEnv, replay_hand
+from mahjong_core.state import Phase, Wind
+from ml.env import OBS_DIM, HandEnv, hand_start, replay_hand
 from ml.fast_encode import encode_reference
 
 
@@ -82,7 +82,10 @@ def test_record_replays_through_reduce():
     record = env.record(players=["a", "b", "c", "d"])
     assert record["engine_version"] == ENGINE_VERSION
     assert record["seed"] == 21
-    assert record["result"]["hand_count"] == 1
+    assert (record["dealer"], record["prevailing"]) == (env.state.dealer, int(env.state.prevailing))
+    assert record["result"]["payments"] == [
+        env.state.hand_result.payments.get(s, 0) for s in range(4)
+    ]
     assert replay_hand(record) == env.state
     assert RuleSet.from_dict(record["ruleset"]) == env.ruleset
 
@@ -125,3 +128,22 @@ def test_step_after_done_raises():
     _play(env, seed=2, policy_seed=2)
     with pytest.raises(RuntimeError):
         env.step(0)
+
+
+def test_dealer_is_drawn_from_the_seed_and_covers_every_seat():
+    env = HandEnv(encode=False)
+    dealers = set()
+    for seed in range(40):
+        env.reset(seed)
+        assert (env.state.dealer, env.state.prevailing) == hand_start(env.ruleset, seed)
+        dealers.add(env.state.dealer)
+    assert dealers == {0, 1, 2, 3}
+
+
+def test_prevailing_wind_varies_when_the_ruleset_allows_it():
+    env = HandEnv(RuleSet(game_length=GameLength.FULL), encode=False)
+    winds = set()
+    for seed in range(40):
+        env.reset(seed)
+        winds.add(env.state.prevailing)
+    assert winds == set(Wind)
