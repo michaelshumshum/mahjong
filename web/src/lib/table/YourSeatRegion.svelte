@@ -3,7 +3,7 @@
 	import TimerRing from '$lib/ui/TimerRing.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
-	import { seatWind, WIND_LABEL, WIND_CHAR } from './wind';
+	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 
 	interface OwnHandTile {
@@ -54,7 +54,7 @@
 		<span class="seat-name">{seat.name}</span>
 		<span
 			class="seat-wind"
-			aria-label={m.yourSeatRegion_windAriaLabel({ wind: WIND_LABEL[seatWind(seat.seat, dealer)] })}
+			aria-label={m.yourSeatRegion_windAriaLabel({ wind: windWord(seatWind(seat.seat, dealer)) })}
 			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
 		>
 		{#if seat.seat === dealer}<span class="dealer-badge" title={m.yourSeatRegion_dealerBadgeTitle()}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ConnectionStatus } from '$lib/game/state';
 	import type { Seat } from '$lib/table/mock-game-state';
-	import { seatWind, WIND_LABEL } from '$lib/table/wind';
+	import { seatWind, windWord } from '$lib/table/wind';
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import SeatRing from '$lib/table/SeatRing.svelte';
 	import FormGroup from '$lib/ui/FormGroup.svelte';
@@ -105,7 +105,7 @@
 	{:else}
 		<SeatRing you={effectiveSeat} {dealer} {seatStatus} {names} />
 		<h2>
-			{m.pretableScreen_seatedAsLabel({ wind: WIND_LABEL[seatWind(effectiveSeat, dealer)] })}
+			{m.pretableScreen_seatedAsLabel({ wind: windWord(seatWind(effectiveSeat, dealer)) })}
 		</h2>
 		<p>
 			{m.pretableScreen_waitingMessage()}

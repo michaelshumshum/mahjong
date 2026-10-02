@@ -174,10 +174,14 @@ they read parallel to that seat's own hand rather than upright like the across/s
 
 Seat wind badges and the header's prevailing indicator render the wind as its Chinese character
 (東/南/西/北), not the `E`/`S`/`W`/`N` letter `seatWind()` returns internally — a screen reader
-gets the full English name via `aria-label`, since the glyph alone has no accessible name. The one
-exception is the pre-game "You're seated as East" sentence (§"Join flow" note below): that's a
-full English sentence read as a unit, where a bare glyph substituted into it would read as
-unlabelled.
+gets a full word via `aria-label` (`wind.ts`'s `windWord()`), since the glyph alone has no
+accessible name on its own. The one exception is the pre-game "You're seated as East" sentence
+(§"Join flow" note below): that's a full sentence read as a unit, where a bare glyph substituted
+in would read as unlabelled — `windWord()` is what both spots call, since "a real word, not a bare
+glyph" means `WIND_LABEL`'s English word in the `en` locale but `WIND_CHAR`'s glyph in `zh-Hant`
+(東風 etc. already reads naturally once the sentence around it is Chinese too; forcing `WIND_LABEL`
+there regardless of locale used to render the English word mid-Chinese-sentence, e.g. "你坐的位置是
+South" — fixed by making the full-sentence call sites locale-aware instead of English-only).
 
 Below 768px (phone portrait — the roadmap's stated risk case):
 

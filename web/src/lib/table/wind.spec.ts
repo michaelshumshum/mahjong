@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { seatWind, WIND_LABEL, WIND_CHAR } from './wind';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('$lib/paraglide/runtime.js', () => ({ getLocale: vi.fn(() => 'en') }));
+
+import { seatWind, windWord, WIND_LABEL, WIND_CHAR } from './wind';
+import { getLocale } from '$lib/paraglide/runtime.js';
 import type { Seat } from './mock-game-state';
 
 describe('seatWind', () => {
@@ -25,5 +29,17 @@ describe('WIND_LABEL / WIND_CHAR', () => {
 			expect(WIND_LABEL[w]).toBeTruthy();
 			expect(WIND_CHAR[w]).toBeTruthy();
 		}
+	});
+});
+
+describe('windWord', () => {
+	it('uses the English word for the en locale', () => {
+		vi.mocked(getLocale).mockReturnValue('en');
+		expect(windWord('S')).toBe('South');
+	});
+
+	it('uses the Chinese glyph for the zh-Hant locale, not the English word', () => {
+		vi.mocked(getLocale).mockReturnValue('zh-Hant');
+		expect(windWord('S')).toBe('南');
 	});
 });

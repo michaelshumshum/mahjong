@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
-	import { seatWind, WIND_LABEL, WIND_CHAR } from './wind';
+	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -22,7 +22,7 @@
 		<span class="seat-name">{seat.name}</span>
 		<span
 			class="seat-wind"
-			aria-label={m.opponentRegion_windAriaLabel({ wind: WIND_LABEL[seatWind(seat.seat, dealer)] })}
+			aria-label={m.opponentRegion_windAriaLabel({ wind: windWord(seatWind(seat.seat, dealer)) })}
 			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
 		>
 		{#if seat.seat === dealer}<span class="dealer-badge" title={m.opponentRegion_dealerBadgeTitle()}
