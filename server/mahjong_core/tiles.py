@@ -77,6 +77,10 @@ class Flower(IntEnum):
 
 Tile = TileType | Flower
 
+_TILE_ID_TYPES: tuple[TileType, ...] = tuple(
+    TileType(i // _COPIES_PER_TYPE) for i in range(_TILE_ID_COUNT)
+)
+
 
 def tile_code(tile: Tile) -> str:
     """Render a `TileType`/`Flower` to its wire string, matching
@@ -109,7 +113,7 @@ def tile_id_type(tile_id: TileId) -> TileType:
     numbering (4 consecutive ids per type, in `TileType` order)."""
     if not 0 <= tile_id < _TILE_ID_COUNT:
         raise ValueError(f"tile_id out of range 0..{_TILE_ID_COUNT - 1}: {tile_id}")
-    return TileType(tile_id // _COPIES_PER_TYPE)
+    return _TILE_ID_TYPES[tile_id]
 
 
 def tile_ids_for_type(tile_type: TileType) -> tuple[TileId, ...]:

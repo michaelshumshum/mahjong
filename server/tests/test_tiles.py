@@ -177,6 +177,25 @@ def test_tile_ids_for_type_covers_all_tile_ids_exactly_once() -> None:
     assert sorted(covered) == sorted(all_tile_ids())
 
 
+def _reference_tile_id_type(tile_id: int) -> TileType:
+    if not 0 <= tile_id < 136:
+        raise ValueError(f"tile_id out of range 0..135: {tile_id}")
+    return TileType(tile_id // 4)
+
+
+@pytest.mark.parametrize("tile_id", range(-8, 144))
+def test_tile_id_type_table_equals_reference(tile_id: int) -> None:
+    try:
+        expected = _reference_tile_id_type(tile_id)
+    except ValueError:
+        with pytest.raises(ValueError, match="tile_id out of range"):
+            tile_id_type(TileId(tile_id))
+        return
+    got = tile_id_type(TileId(tile_id))
+    assert got is expected
+    assert type(got) is TileType
+
+
 @pytest.mark.parametrize("bad_id", [-1, 136, 137, 1000])
 def test_tile_id_type_rejects_out_of_range(bad_id: int) -> None:
     with pytest.raises(ValueError, match="tile_id out of range"):
