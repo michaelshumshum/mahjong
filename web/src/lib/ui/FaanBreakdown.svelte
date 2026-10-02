@@ -2,6 +2,7 @@
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
 	import { m } from '$lib/paraglide/messages.js';
+	import { faanPatternLabel } from './faan-pattern-labels';
 
 	export type Seat = 0 | 1 | 2 | 3;
 
@@ -104,7 +105,7 @@
 	<ul class="patterns">
 		{#each patterns as pattern, index (`${index}:${pattern.name}`)}
 			<li class="pattern-row">
-				<span class="pattern-name">{pattern.name}</span>
+				<span class="pattern-name">{faanPatternLabel(pattern.name)}</span>
 				<span class="pattern-faan">{m.faanBreakdown_faanCountLabel({ faan: pattern.faan })}</span>
 			</li>
 		{/each}

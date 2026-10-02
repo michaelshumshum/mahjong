@@ -738,7 +738,7 @@ mid-hand the way whose turn it is does. Other `seat_status` values (`connected`/
 `autoplay`/`empty`) have no visual treatment yet; this sub-task only covers `bot`, the one value
 that just gained real backend meaning.
 
-**Two wire-shape gotchas the mock fixtures can't surface** (they hardcode values the real wire
+**Three wire-shape gotchas the mock fixtures can't surface** (they hardcode values the real wire
 doesn't actually send this way):
 
 - The reducer clears both `legalActions` and `deadlineTs` on a seat's own `discard` — leaving
@@ -752,6 +752,15 @@ doesn't actually send this way):
   `live-view.ts`'s `wireWindToCode()` maps it — the one enum-shaped wire field that needs this;
   `phase`/meld `kind`/claim `kind` already serialize through a `StrEnum`'s `.value`, the same
   string either way.
+- `hand_end.faan_breakdown`'s keys are the canonical Chinese pattern names
+  `mahjong_core.scoring.patterns.PATTERNS` uses (平糊/混一色/...), not an English display string —
+  `live-view.ts` passes them straight through into `FaanPattern.name` unchanged, so without a
+  client-side mapping an English-locale player would see raw Chinese in the win breakdown
+  regardless of which locale is active. `lib/ui/faan-pattern-labels.ts`'s `faanPatternLabel()`
+  looks the key up against all 36 patterns and falls through to the raw string for anything
+  unrecognized, so mock fixtures (`mock-game-state.ts`'s `FaanPatternMock.name`, already English
+  literals like `"Half Flush"`/`"Chicken Hand"`) render unchanged through the same call path
+  rather than needing a parallel one.
 
 ## 7. Asset pipeline
 
