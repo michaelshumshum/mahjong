@@ -301,7 +301,7 @@ async def test_folds_to_a_safe_tile_late_against_a_threatening_opponent() -> Non
     assert aid == int(T.WIND_NORTH)
 
 
-# --- weight profiles: opponent-variety multipliers for training data (docs/06-ml.md §6.6) -----
+# --- weight profiles: persona multipliers for mixed-table evaluation (docs/06-ml.md §12) ------
 
 
 async def test_aggressive_chases_a_marginal_value_signal_baseline_declines() -> None:

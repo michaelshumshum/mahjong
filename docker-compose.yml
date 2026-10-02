@@ -75,7 +75,7 @@ services:
     build:
       context: ./server
       target: ml
-    command: uv run python -m ml.train --config ml/configs/bc.yaml
+    command: uv run python -m ml.train --config ml/configs/danger.yaml
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mahjong}:${POSTGRES_PASSWORD:-mahjong}@postgres:5432/${POSTGRES_DB:-mahjong}
       PYTHONPATH: /app

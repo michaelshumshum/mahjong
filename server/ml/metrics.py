@@ -1,5 +1,5 @@
-"""Offline metrics for wait/danger scores (docs/06-ml.md §6.2's gate): AUC, log-loss and Brier
-with game-level bootstrap confidence intervals, plus Platt calibration for baselines.
+"""Offline metrics for wait/danger scores (docs/06-ml.md §5): AUC, log-loss and Brier with
+game-level bootstrap confidence intervals.
 
 Rows within a game are correlated, so resampling is over games, never samples. Each game is
 reduced once to sufficient statistics (score histograms, loss sums) so a bootstrap replicate is a
@@ -15,9 +15,7 @@ import numpy as np
 
 __all__ = [
     "add_stats",
-    "apply_platt",
     "auc_from_hist",
-    "fit_platt",
     "game_bootstrap",
     "game_stats",
     "logit",
@@ -100,27 +98,6 @@ def game_bootstrap(
         draws.append(fn({k: {n: (w @ v)[None] for n, v in s.items()} for k, s in stats.items()}))
     lo, hi = np.nanpercentile(draws, [2.5, 97.5])
     return point, float(lo), float(hi)
-
-
-def fit_platt(scores: np.ndarray, y: np.ndarray, iters: int = 30) -> tuple[float, float]:
-    """Logistic recalibration `sigmoid(a * logit(score) + b)` by Newton's method."""
-    x = logit(scores)
-    y = y.astype(np.float64)
-    a, b = 1.0, 0.0
-    for _ in range(iters):
-        p = _sigmoid(a * x + b)
-        w = p * (1 - p) + 1e-12
-        grad = np.array([((p - y) * x).sum(), (p - y).sum()])
-        hess = np.array([[(w * x * x).sum(), (w * x).sum()], [(w * x).sum(), w.sum()]])
-        step = np.linalg.solve(hess + 1e-9 * np.eye(2), grad)
-        a, b = a - step[0], b - step[1]
-        if np.abs(step).max() < 1e-8:
-            break
-    return float(a), float(b)
-
-
-def apply_platt(scores: np.ndarray, a: float, b: float) -> np.ndarray:
-    return _sigmoid(a * logit(scores) + b)
 
 
 _REL_EDGES = np.array([0, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0000001])

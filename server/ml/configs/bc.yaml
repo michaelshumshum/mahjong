@@ -1,6 +1,0 @@
-# placeholder for `python -m ml.train --config ml/configs/bc.yaml` (docker-compose.yml's
-# `trainer` service, `make train`). ml.train is a stub -- see docs/99-deferred.md -- so nothing
-# reads this yet; shape is a guess at what a behaviour-cloning config will eventually need.
-algorithm: behaviour_cloning
-teacher: FaanBot
-ruleset: hk_classic

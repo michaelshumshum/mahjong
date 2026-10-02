@@ -1,5 +1,4 @@
-"""`SeatView` + `RuleSet` -> fixed-shape numpy feature planes for a network (docs/06-ml.md §6.2,
-docs/99-deferred.md "Feature-plane encoding"). `ml`-extra only -- numpy is not a base dependency
+"""`SeatView` + `RuleSet` -> fixed-shape numpy feature planes for a network (docs/06-ml.md §5). `ml`-extra only -- numpy is not a base dependency
 (server/AGENTS.md: "mahjong_core is stdlib-only... no numpy, no torch in base deps"), so nothing
 outside `server/ml/` may import this module.
 
@@ -140,8 +139,7 @@ def encode_seat_view(view: SeatView) -> EncodedSeatView:
 
 
 def encode_ruleset(ruleset: RuleSet) -> np.ndarray:
-    """The `RuleSet` fields that change correct play (docs/06-ml.md §6.2,
-    docs/99-deferred.md "Feature-plane encoding") -- not the full `RuleSet.to_dict()`. Timing/
+    """The `RuleSet` fields that change correct play (docs/06-ml.md §5) -- not the full `RuleSet.to_dict()`. Timing/
     connection/fairness fields (`turn_seconds`, `provable_fairness`, etc.) have no bearing on
     hand-value decisions and are deliberately not encoded.
 

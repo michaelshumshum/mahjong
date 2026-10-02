@@ -1,5 +1,5 @@
 """Unit tests for `bots/labels.py` -- ground-truth danger labels from a live `GameState`
-(docs/06-ml.md §6.2). Every faan value asserted below was computed once via the real
+(docs/06-ml.md §5). Every faan value asserted below was computed once via the real
 `score_winning_hand` against the exact hand-authored scenario (not hand-derived by eyeballing
 yaku) -- `平糊`/`無花`/`門前清` stack on nearly any closed hand, so a "boring" hand's real faan is
 routinely higher than it looks at a glance; see individual test comments for each hand's real

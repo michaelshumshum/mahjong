@@ -39,9 +39,3 @@ jobs:
         run: uv run pytest -q tests/test_ml_*.py tests/test_generate_dataset.py
       - name: python -m ml.train --help
         run: uv run python -m ml.train --help
-      - name: python -m ml.train fails loudly on a real config
-        run: |
-          if uv run python -m ml.train --config ml/configs/bc.yaml; then
-            echo "expected ml.train to raise NotImplementedError; it exited 0 instead" >&2
-            exit 1
-          fi

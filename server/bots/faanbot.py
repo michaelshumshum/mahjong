@@ -140,11 +140,11 @@ def _speed_term(result_shanten: int, tiles_accepted: int) -> float:
 @dataclass(frozen=True)
 class WeightProfile:
     """Multipliers on `_weights_for_turn`'s `(w_speed, w_value, w_safety, w_flex)` schedule --
-    docs/06-ml.md §6.6's "a weight vector is free" opponent-variety mechanism for Phase 1 training
-    data. `BASELINE`'s all-1.0 multipliers reproduce the shipped, arena-tuned weights exactly
+    personas for docs/06-ml.md §12's mixed-table evaluation and the danger dataset's opponent
+    variety. `BASELINE`'s all-1.0 multipliers reproduce the shipped, arena-tuned weights exactly
     (docs/04-bots.md §8's numbers are measured against `BASELINE` specifically) -- every other
-    profile is a deliberate, unvalidated-by-arena departure from that tuning, meant to widen the
-    input distribution a danger model trains on, not to compete with it."""
+    profile is a deliberate, unvalidated-by-arena departure from that tuning, meant to vary the
+    opponents a learned model is trained or evaluated against, not to compete with `BASELINE`."""
 
     w_speed: float = 1.0
     w_value: float = 1.0

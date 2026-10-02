@@ -1,4 +1,4 @@
-"""Unit tests for `ml/encode.py` (docs/06-ml.md §6.2, docs/99-deferred.md "Feature-plane
+"""Unit tests for `ml/encode.py` (docs/06-ml.md §5
 encoding"). `ml.encode` needs numpy, which isn't a base dependency (`server/AGENTS.md`) --
 `importorskip` keeps this file a clean skip, not a collection failure, under `make test-server`'s
 no-ml-extra environment; it runs for real wherever the `ml` extra is installed.

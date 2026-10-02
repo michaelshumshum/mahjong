@@ -1,6 +1,5 @@
-"""Ground-truth per-opponent danger labels from a live `GameState` (docs/06-ml.md §6.2's Phase 1
-danger model: "Labels: from the real GameState at each recorded decision -- exact, not
-estimated"). `bots/arena.py`'s tenpai/winning-tile stats already computed most of this for its
+"""Ground-truth per-opponent danger labels from a live `GameState` (docs/06-ml.md §5's danger
+model and §8's auxiliary heads -- exact, not estimated). `bots/arena.py`'s tenpai/winning-tile stats already computed most of this for its
 own metrics; those helpers live here now and `arena.py` imports them back, rather than this
 module reimplementing them.
 
@@ -133,7 +132,7 @@ def expected_faan_if_won(state: GameState, seat: int, tile_type: int, *, discard
 
 @dataclass(frozen=True)
 class OpponentDangerLabel:
-    """Ground truth for one seat at one `GameState` snapshot -- docs/06-ml.md §6.2's three label
+    """Ground truth for one seat at one `GameState` snapshot -- docs/06-ml.md §5's three label
     heads: `P(tenpai)`, `P(wait on t)` per tile type, expected faan if dealt into."""
 
     is_tenpai: bool

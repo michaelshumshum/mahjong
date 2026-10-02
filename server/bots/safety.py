@@ -1,10 +1,9 @@
 """Defence/safety model for T2 `FaanBot` (docs/04-bots.md §5) -- read that section before
 touching this module.
 
-Hand-tuned, not trained: a logistic-regression model needs a labelled self-play corpus that
-doesn't exist yet (docs/06-ml.md §3). Weights are checked per-signal for *direction*
-(`tests/test_safety.py`), not calibrated accuracy. Training one is flagged as real follow-up
-work, not silently skipped.
+Hand-tuned, not trained. Weights are checked per-signal for *direction* (`tests/test_safety.py`),
+not calibrated accuracy: offline, `deal_in_probability` ranks legal waits at AUC ~0.50 across
+opponents (docs/06-ml.md §5). Kept as-is; the learned bot is a separate RL policy.
 
 No `is_safe(tile) -> bool`: every signal is a multiplier into `deal_in_probability`, a float in
 `[0, 1]` -- `no_chance` is the only hard zero. Genbutsu/suji only ever scale the estimate down,

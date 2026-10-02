@@ -66,7 +66,7 @@ def _faan_bot_factory(seed: int) -> Bot:
 
 def _weight_profile_factory(profile: WeightProfile) -> Callable[[int], Bot]:
     """A `BOT_REGISTRY` factory for a non-`BASELINE` `FaanBot` weight profile (docs/06-ml.md
-    §6.6's opponent-variety mechanism for Phase 1 training data) -- same stateless-seed shape as
+    §12's mixed-table personas, also the dataset generator's `--bots`) -- same stateless-seed shape as
     `_faan_bot_factory`, parameterised so `AGGRESSIVE`/`DEFENSIVE`/`FLUSH_CHASING` don't each need
     their own near-identical factory function."""
 

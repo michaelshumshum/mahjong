@@ -1,4 +1,4 @@
-"""Torch-free export of a trained danger model (docs/06-ml.md §6.2, §7):
+"""Torch-free export of a trained danger model (docs/06-ml.md §5):
 
     python -m ml.export --ckpt runs/danger/ckpt_best.pt --out runs/danger/danger.npz
 

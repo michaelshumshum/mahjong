@@ -8,8 +8,6 @@ np = pytest.importorskip("numpy")
 
 from ml.metrics import (
     add_stats,
-    apply_platt,
-    fit_platt,
     game_bootstrap,
     game_stats,
     metric_fns,
@@ -76,17 +74,6 @@ def test_bootstrap_interval_brackets_the_point_and_paired_diff_is_zero_for_equal
         50,
     )
     assert same == (0.0, 0.0, 0.0)
-
-
-def test_platt_recovers_a_known_miscalibration() -> None:
-    rng = np.random.default_rng(3)
-    true_p = rng.random(50000) * 0.5
-    y = (rng.random(50000) < true_p).astype(np.uint8)
-    overconfident = np.clip(true_p * 1.8, 0.001, 0.999)
-    a, b = fit_platt(overconfident, y)
-    fixed = apply_platt(overconfident, a, b)
-    assert abs(fixed.mean() - y.mean()) < 0.01
-    assert abs(overconfident.mean() - y.mean()) > 0.05
 
 
 def test_reliability_table_reports_observed_frequency_per_bin() -> None:

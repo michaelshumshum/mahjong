@@ -1,4 +1,4 @@
-"""Self-play dataset generation for the Phase 1 opponent-danger model (docs/06-ml.md §6.2).
+"""Self-play dataset generation for the opponent-danger model (docs/06-ml.md §5).
 
     python -m ml.generate_dataset --out data/danger_model \
         --bots FaanBot,FaanBotAggressive,FaanBotDefensive,FaanBotFlushChasing --parallel 12
@@ -73,7 +73,7 @@ from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
-from mahjong_core.state import GameState, Phase
+from mahjong_core.state import Phase
 from ml.raw import raw_row, relative_seats
 
 __all__ = ["build_parser", "main"]
@@ -158,22 +158,16 @@ def _example_row(
     }
 
 
-RowHook = Callable[[GameState, int, dict[str, object]], None]
-
-
 async def play_and_label(
     seed: int,
     ruleset: RuleSet,
     bots: Sequence[Bot],
     seat_personalities: list[str],
-    row_hook: RowHook | None = None,
 ) -> list[dict[str, object]]:
-    """Plays one complete game, returning one row per real turn decision (docs/06-ml.md §6.2's
-    "Labels: from the real GameState at each recorded decision"). Claim-window responses are a
-    different decision type this model doesn't cover, so they advance the game without emitting
-    a row -- same as `bots/selfplay.py`'s `play_game`, whose stepping logic this mirrors.
-    `row_hook(state, seat, row)` runs on each emitted row against the live `GameState`, for
-    offline baselines that need the exact decision point (`ml/heuristic_baseline.py`)."""
+    """Plays one complete game, returning one row per real turn decision, labelled from the real
+    `GameState` at that decision (docs/06-ml.md §5). Claim-window responses are a different
+    decision type this model doesn't cover, so they advance the game without emitting a row --
+    same as `bots/selfplay.py`'s `play_game`, whose stepping logic this mirrors."""
     rng = random.Random(seed)
     state = new_game(ruleset, seed)
     rows: list[dict[str, object]] = []
@@ -203,10 +197,7 @@ async def play_and_label(
         view = seat_view(state, seat)
         if not is_claim:
             labels = danger_labels_for_opponents(state, seat)
-            row = _example_row(seed, view, seat_personalities, labels)
-            rows.append(row)
-            if row_hook is not None:
-                row_hook(state, seat, row)
+            rows.append(_example_row(seed, view, seat_personalities, labels))
 
         mask = legal_mask(state, seat)
         aid = await bots[seat].act(view, mask, _NO_DEADLINE)
@@ -261,7 +252,7 @@ def _write_manifest(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m ml.generate_dataset",
-        description="Self-play dataset generation for the Phase 1 opponent-danger model.",
+        description="Self-play dataset generation for the opponent-danger model.",
     )
     parser.add_argument("--games", type=int, default=0, help="0 = run until interrupted (default)")
     parser.add_argument("--seed-start", type=int, default=0)

@@ -1,4 +1,4 @@
-"""Opponent-danger network (docs/06-ml.md §6.2): one (row, opponent) sample in, that opponent's
+"""Opponent-danger network (docs/06-ml.md §5): one (row, opponent) sample in, that opponent's
 tenpai probability, per-tile legal/structural wait logits and per-tile faan class logits out.
 
 A 1-D pre-activation ResNet over the tile axis. Tiles sit on a 37-wide axis with a zero column

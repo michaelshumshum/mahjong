@@ -62,9 +62,9 @@ arena: ## Bot evaluation: make arena A=FaanBot B=EfficiencyBot N=20000
 		uv run python -m bots.arena --a $${A:-FaanBot} --b $${B:-EfficiencyBot} \
 		--games $${N:-20000} --parallel $${P:-8}
 
-train: ## Training run: make train CONFIG=ml/configs/bc.yaml
+train: ## Training run: make train CONFIG=ml/configs/danger.yaml
 	$(COMPOSE) --profile ml run --rm trainer \
-		uv run python -m ml.train --config $${CONFIG:-ml/configs/bc.yaml}
+		uv run python -m ml.train --config $${CONFIG:-ml/configs/danger.yaml}
 
 # ── codegen / db ──────────────────────────────────────────────────────────────
 proto: ## Regenerate web protocol types (+ shared/protocol.schema.json, informational)

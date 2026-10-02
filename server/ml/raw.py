@@ -1,4 +1,4 @@
-"""Raw, entitlement-safe values read off a `SeatView` for the danger model (docs/06-ml.md §6.2).
+"""Raw, entitlement-safe values read off a `SeatView` for the danger model (docs/06-ml.md §5).
 
 Pure Python, no numpy -- shared by dataset generation (`ml/generate_dataset.py`) and the encoder
 (`ml/encode.py`) so both see the same table a human at the seat sees. `SeatView.melds` holds the

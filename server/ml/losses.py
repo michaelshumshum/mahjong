@@ -1,4 +1,4 @@
-"""Masked losses for the opponent-danger model (docs/06-ml.md §6.2).
+"""Masked losses for the opponent-danger model (docs/06-ml.md §5).
 
 Wait heads are trained unconditionally on every tile, not only when the opponent is tenpai: the
 model is used to price a discard, so it has to say "safe" for non-tenpai opponents too. The

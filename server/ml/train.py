@@ -1,9 +1,8 @@
 """CLI entry point: `python -m ml.train --config ml/configs/danger.yaml [--resume]`
 (docker-compose.yml's `trainer` service, this repo's `make train`).
 
-`algorithm: danger` trains the Phase 1 opponent-danger model (docs/06-ml.md §6.2) on a packed
-dataset (`ml.pack`). Any other algorithm (`ml/configs/bc.yaml`'s `behaviour_cloning`) still raises
-`NotImplementedError`: the ml CI smoke test asserts that a real, unimplemented config fails loudly.
+`algorithm: danger` trains the opponent-danger model (`DangerNet`, docs/06-ml.md §5) on a packed
+dataset (`ml.pack`). Any other algorithm raises `NotImplementedError`.
 
 A run directory holds `ckpt_last.pt` (resumable), `ckpt_best.pt` (best validation total) and an
 append-only `metrics.jsonl`. SIGINT/SIGTERM save a checkpoint after the current step and exit 0.
@@ -54,7 +53,7 @@ def load_config(path: Path) -> tuple[str, TrainConfig]:
     if algorithm != "danger":
         raise NotImplementedError(
             f"ml.train only implements algorithm 'danger', got {algorithm!r} "
-            f"(config={str(path)!r}). See docs/99-deferred.md for what's deferred and why."
+            f"(config={str(path)!r})."
         )
     unknown = set(raw) - set(TrainConfig.__dataclass_fields__)
     if unknown:
@@ -72,7 +71,7 @@ def lr_at(step: int, cfg: TrainConfig) -> float:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m ml.train",
-        description="Train the Phase 1 opponent-danger model.",
+        description="Train the opponent-danger model.",
     )
     parser.add_argument("--config", required=True, help="e.g. ml/configs/danger.yaml")
     parser.add_argument("--resume", action="store_true", help="continue from <out>/ckpt_last.pt")

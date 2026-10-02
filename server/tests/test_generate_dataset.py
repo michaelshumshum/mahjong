@@ -1,4 +1,4 @@
-"""Unit tests for `ml/generate_dataset.py` (docs/06-ml.md §6.2's Phase 1 dataset generation).
+"""Unit tests for `ml/generate_dataset.py` (docs/06-ml.md §5).
 Needs pyarrow (`ml`-extra only, not a base dependency) -- `importorskip` keeps this file a clean
 skip, not a collection failure, under `make test-server`'s no-ml-extra environment. Unlike the
 encoder, this module doesn't need numpy itself (see its own module docstring).
@@ -103,25 +103,6 @@ def test_play_and_label_emits_one_row_per_turn_decision_with_the_expected_shapes
     assert all(len(w) == 34 and set(w) <= {0, 1} for w in row["opponent_winning_tiles_multihot"])
     assert len(row["opponent_expected_faan"]) == 3
     assert all(len(f) == 34 for f in row["opponent_expected_faan"])
-
-
-def test_row_hook_sees_every_row_with_its_live_state() -> None:
-    seen: list[tuple[int, int]] = []
-
-    def hook(state, seat, row) -> None:  # type: ignore[no-untyped-def]
-        assert state.turn == seat == row["seat"]
-        seen.append((seat, row["hand_no"]))
-
-    rows = asyncio.run(
-        ml_generate_dataset.play_and_label(
-            seed=2,
-            ruleset=RULESET_PRESETS["hk_classic"],
-            bots=[FaanBot() for _ in range(4)],
-            seat_personalities=["FaanBot"] * 4,
-            row_hook=hook,
-        )
-    )
-    assert len(seen) == len(rows)
 
 
 def test_main_writes_a_parquet_shard_and_manifest(tmp_path) -> None:  # type: ignore[no-untyped-def]
