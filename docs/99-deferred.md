@@ -364,9 +364,8 @@ consistent with PIMC's known dependence on rollout/evaluation quality rather tha
 **Needs before reviving this**, in rough order of realism:
 
 1. **A rollout leaf evaluator meaningfully better than a shallow rollout of the same heuristic
-   used as the policy** — realistically a learned value function, i.e. T4 (see "Self-play PPO"
-   below), which is itself blocked on a compute budget, a training corpus, and a success metric,
-   none of which exist yet. This is the load-bearing requirement; the other two items are
+   used as the policy** — realistically a learned value function, i.e. the T4 RL critic
+   ([06-ml.md](06-ml.md), not yet trained). This is the load-bearing requirement; the other two items are
    secondary without it.
 2. **Real information-set MCTS instead of the determinized simplification** — solves strategy
    fusion/non-locality properly rather than accepting them. Real, undone design work: needs a way
@@ -391,8 +390,8 @@ Give each bot a **persona** — a name, an avatar, a play-style bias (aggressive
 flush-lover) and a think-time distribution. A bot that reliably chases full flushes is more
 memorable than one that's marginally more optimal.
 
-The play-style bias is the same `FaanBot` weight-profile mechanism `06-ml.md` §6.6 wants for
-training-opponent variety — build it once, serve both.
+The play-style bias is the same `FaanBot` weight-profile mechanism `06-ml.md` §12 uses for
+mixed-table evaluation — build it once, serve both.
 
 **Play-style bias half: built (2026-09-28), for the training-variety use case.**
 `bots/faanbot.py`'s `WeightProfile`/`BASELINE`/`AGGRESSIVE`/`DEFENSIVE`/`FLUSH_CHASING`, registered
@@ -455,220 +454,28 @@ Cut, not merely deferred as a live "decide later" question — D10 settled rende
 A 3D/2.5D asset pipeline is out of scope for this project, full stop. Recorded here only because
 the question and its framing existed in the doc and the audit wants cuts to leave a trail.
 
-### Early bot-vs-bot game recording as training data
-
-Provenance: `06-ml.md` §1 (pre-audit): "Start recording now — every bot-vs-bot game from M1
-onward is training data later."
-
-Cut as pointless rather than merely early: M1's only bots are `RandomBot`s, the
-behaviour-cloning prior needs to be `FaanBot` (`06-ml.md` §4/§5), and the engine's pure +
-seeded design means regenerating self-play data on demand is free. `GameRecord` persistence
-itself is *not* cut — it still happens from M1 (`06-ml.md` §2) — only the "this is training data,
-starting now" framing is.
-
 ### Human game records as training data
 
-Provenance: `06-ml.md` §6.6 (2026-09-28 training-plan pass).
-
-Persisted `GameRecord`s from live human tables replay through the pure engine to the full
-`GameState`, so every hidden hand is recoverable — each human game is **exactly labelled phase-1
-data** (opponent tenpai/waits) drawn from the real target distribution, which bot variants only
-approximate. The strongest available fix for phase 1's opponent-distribution shift.
+Persisted `GameRecord`s from live tables replay through the pure engine to the full `GameState`,
+so every hidden hand is recoverable: each human game is exactly labelled data for the RL
+policy's auxiliary heads ([06-ml.md §8](06-ml.md)) and a held-out evaluation slice drawn from the
+real target distribution, which self-play only approximates.
 
 Deferred because:
 
 - no live human traffic yet — the corpus would be too small to matter
-- only records matching the current `ENGINE_VERSION` replay (`06-ml.md` §2's policy); a corpus
-  accumulated across engine bumps is mostly unusable unless replay is pinned to old engine builds
+- only records matching the current `ENGINE_VERSION` replay (`06-ml.md` §2); a corpus spanning
+  engine bumps is mostly unusable unless replay is pinned to old engine builds
 - using players' games for training needs a disclosure/consent line in the product first
-
-Revive when live play has produced a meaningful volume of same-`engine_version` records. Mix into
-phase 1 training alongside bot self-play, and keep a human-only held-out split as the evaluation
-set for §6.6's generalisation check.
-
-### `SeatView` input-boundary writeup
-
-Provenance: `06-ml.md` §2 (pre-audit), "Input boundary."
-
-```
-GameState ──seat_view(state,seat)──► SeatView ──► bot ──► Intent
-                                 │
-                                 └──► (day 2) encode() ──► tensor ──► policy
-```
-
-The encoder takes `SeatView`, never `GameState`, so a network trained this way is structurally
-un-cheatable. The rule to hold in M3: `seat_view()` is the only path to seat-visible state — no
-shortcuts for bots, ever. Cut from the trimmed `06-ml.md` because it mostly restates
-`04-bots.md` §1's existing plan rather than adding new ML-specific work; revive alongside the
-day-2 encoder.
-
-**Update (2026-09-26):** `SeatView` already carries `ruleset: RuleSet` (`app/views.py`, added for
-`04-bots.md` §9's bot ruleset-awareness work) — a day-2 encoder built on this diagram gets it for
-free. See "Feature-plane encoding" below for why that field needs to actually reach the tensor,
-not just ride along on the struct.
-
-### Shared feature functions (shanten / ukeire / safety as pure `SeatView` functions) — done, not deferred
-
-Provenance: `06-ml.md` §4 (pre-audit), "Shared feature functions." **Correction (2026-09-26,
-ml-readiness scoping pass):** this entry was stale. The work it describes is already built, not
-open — kept here per this doc's own header rule ("nothing here is rejected on merit... parked so
-the intent survives"), not because it's still pending.
-
-T1/T2 need shanten, ukeire, safe-tile inference, and faan-reachability regardless (`04-bots.md`).
-The ask was to put them in `mahjong_core`/`bots` as pure functions of a `SeatView`, not buried
-inside bot classes, so a day-2 encoder can call the same functions — and that's what exists:
-`server/bots/features.py` exports `own_hand34`/`seen34`/`is_closed`/`is_terminal_or_honor`,
-`server/bots/safety.py` exports `no_chance`/`is_genbutsu`/`wall_pressure_multiplier`/
-`deal_in_probability`/`expected_cost`/`tile_risk`/`opponent_threat_level`, and
-`server/bots/valuation.py` exports `route_faan_for`/`reachable_routes`/`estimate_best_faan`/
-`pattern_optionality` — all pure functions of a `SeatView` (or the 34-count arrays derived from
-one), confirmed directly against each module's symbols. A day-2 feature-plane encoder can call all
-of this today. What's still actually deferred is the encoder itself — see "Feature-plane
-encoding" below, and its ruleset-as-input requirement.
-
-### `server/ml/` package skeleton (2026-09-26)
-
-`server/ml/` now exists (`__init__.py`, `train.py`, `configs/bc.yaml`) as an empty,
-import-guarded skeleton — enough that the `ml` extra (`pyproject.toml`), the Dockerfile's `ml`
-stage, and `docker-compose.yml`'s `trainer`/`arena` services resolve to a real package instead of
-a nonexistent module (see `docs/06-ml.md §3`, `docs/07-infra.md §3`/§4). `python -m ml.train
---help` works; running it with a real `--config` raises `NotImplementedError` pointing back here.
-Nothing below this note — encoding, the PettingZoo AEC wrapper, behaviour cloning, self-play PPO —
-is any less deferred because the skeleton exists; none of it does real work yet.
-
-### Feature-plane encoding — built, not deferred
-
-Provenance: `06-ml.md` §4 (pre-audit), closing paragraph.
-
-**Correction (2026-09-28):** this entry was stale. The encoder itself is now built — kept here
-per this doc's own header rule ("nothing here is rejected on merit... parked so the intent
-survives"), not because it's still pending. What's still actually deferred is everything *around*
-the encoder: the network, the PettingZoo AEC wrapper, behaviour cloning, self-play PPO — see those
-entries below.
-
-Feature planes over the 34 tile types, thermometer-encoded counts, players in relative seat
-order. Day-2 work in the pre-audit doc, unchanged by this pass — still day 2.
-
-**Ruleset must be an explicit input, not assumed fixed (added 2026-09-26, per `04-bots.md` §9).**
-This paragraph predates `FaanBot`/`EfficiencyBot` becoming ruleset-aware (`min_faan`, `hand_sets`,
-`faan_overrides`, `wall_reserve` all now read from `view.ruleset`) and a table's ruleset being
-player-choosable at all (`05-roadmap.md` M6's presets/custom-ruleset feature). The consequence for
-this section specifically: the *correct* discard for an identical 13-tile hand now genuinely
-depends on the active ruleset — e.g. chasing Seven Pairs is correct under `hk_classic` and wrong
-under `hk_strict` for the same shape (`04-bots.md` §9's `hand_sets` fix exists precisely because
-this wasn't true of the heuristic bots either, until now). A feature-plane design that encodes
-only tile/seat state and omits the ruleset would train a network that either overfits to whichever
-ruleset generated its data or, worse, gets self-contradictory labels if training data ever mixes
-rulesets (see "Behaviour cloning from `FaanBot`" below). `RuleSet`'s fields split unevenly for
-this purpose: `min_faan`/`hand_sets`/`faan_overrides`/`wall_reserve` change what a *correct*
-action is and need encoding (e.g. `min_faan`/`wall_reserve` as scalars or thermometer-coded like
-the tile counts above, `hand_sets` as a small bitmask, `faan_overrides` is the awkward one —
-unbounded `dict[str, int]`, needs a fixed-size encoding scheme, e.g. one slot per registered
-pattern in `scoring/patterns.py`'s registry). Fields governing timing/connection/fairness
-(`turn_seconds`, `provable_fairness`, etc.) have no bearing on hand-value decisions and shouldn't
-be encoded at all — don't pad the input with the whole `RuleSet.to_dict()` uncritically.
-
-**Built (2026-09-28):** `server/ml/encode.py` (`ml`-extra only — numpy isn't a base dependency,
-`server/AGENTS.md`). `encode_seat_view(view) -> EncodedSeatView` reads only entitled `SeatView`
-fields — `own_hand`, `melds`, `discard_pools`, `concealed_counts` — never `view.hands` (the
-`"ORACLE"` tier's omniscient extra, `04-bots.md` §10): a network trained on oracle-only input
-wouldn't generalize to the redacted view it's actually served at inference. `hand`/`melds`/
-`discards` are `(..., 4, 34)` thermometer planes exactly as specified above (plane `k` lit where a
-tile type's count is `> k`, a kong contributing 3 tiles per `mahjong_core.shanten`'s own
-convention); every per-seat axis is reordered to relative seats (`_relative_seats`: self, next,
-across, previous) so the same absolute seat never has to be looked up twice. `context` adds
-turn/dealer/prevailing-wind/own-seat-wind/phase as one-hot blocks — not in the original spec text,
-but the tile planes alone can't express whose turn it is or a seat's yakuhai exposure, and both
-are already load-bearing for the heuristic bots (`04-bots.md` §5 item 4, §9's `hand_sets`/
-`wall_reserve` closure) this encoder exists to eventually replace signals inside.
-
-`encode_ruleset(ruleset) -> np.ndarray` implements the exact scheme this paragraph specifies:
-`[min_faan, wall_reserve, *hand_sets bitmask, *effective faan per `PATTERNS` entry]` — the last
-block is `ruleset.faan_overrides.get(pattern.name, pattern.faan)` for all 36 registered patterns
-in registry order, so the network sees each pattern's real, currently-active faan value rather
-than needing to separately learn the override-lookup semantics. Timing/connection/fairness fields
-are not encoded, per this paragraph's own instruction. `tests/test_ml_encode.py` pins the
-thermometer boundary (0/1/2/3/4 copies), the kong-counts-as-3 convention, relative-seat reordering
-under a non-zero seat, the context one-hots, and both ruleset cases (default vs. narrowed
-`hand_sets` + a `faan_overrides` entry) — guarded with `pytest.importorskip("numpy")` so it skips
-cleanly (not a collection failure) under `make test-server`'s no-`ml`-extra environment, the same
-gap `server-ml.yml`'s separate smoke-test workflow already works around (`07-infra.md` §9).
-
-**Fixed (2026-09-29): concealed-kong leak.** `SeatView.melds` carries the full `Meld` for every
-seat (only the wire path redacts), so reading it directly encoded the tile type of other seats'
-concealed kongs. `server/ml/raw.py` (numpy-free) now owns `visible_meld_counts34` — another
-seat's concealed kong is skipped, the observer's own is kept, same rule as `bots/features.py`
-`seen34` — and both `encode.py` and `generate_dataset.py` read through it. Datasets generated
-before this fix (schema v2) carry the leak and shouldn't be trained on.
-
-Not built: anything that consumes `EncodedSeatView` — the opponent-danger model itself (`06-ml.md`
-§6.2), so this is still a pure input-shaping function with no trained weights behind it anywhere.
 
 ### `no_chance` counts the observer's own tiles (found 2026-09-29, not fixed)
 
 `bots/safety.py` `deal_in_probability` returns exactly 0 when `seen34(view)[t] >= 4`, and
 `seen34` includes the observer's own hand. The tile being discarded is one of those copies, so
 when the other three are visible elsewhere the opponent can still win on this very discard, yet
-it scores 0. The offline baseline (`ml/heuristic_baseline.py`) found 1,075 of 32,080 candidate
-discards (3.4%) scored exactly 0 this way. The fix is to count `seen34` minus the candidate copy.
-`FaanBot` is deliberately left alone until the danger model replaces `deal_in_probability`
-(`06-ml.md` §6.2), so the baseline measures the shipped behaviour.
-
-### PettingZoo AEC environment wrapper
-
-Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
-
-[PettingZoo AEC](https://pettingzoo.farama.org/api/aec/) wrapper around the pure engine, for
-training-loop compatibility with standard RL tooling.
-
-### Behaviour cloning from `FaanBot`
-
-Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
-
-Blocked on two things beyond just "day 2": `FaanBot` existing (now M4 per D11, not M6), and a
-compute budget / target metric being defined somewhere — neither exists in the doc set yet. See
-`06-ml.md` §3 for the honest version of this constraint.
-
-**Third thing, added 2026-09-26:** `FaanBot` is now ruleset-conditioned (`04-bots.md` §9), so
-"clone `FaanBot`" is underspecified until someone decides which ruleset(s) generate the training
-corpus. Cloning from single-ruleset self-play (e.g. `hk_classic` only) is straightforward and
-matches this section's original framing. Cloning from a *mix* of rulesets to get a network that
-generalizes across tables additionally requires the "Feature-plane encoding" entry above's
-ruleset-as-input point — without it, the same hand shape carries contradictory labels across
-examples and behaviour cloning has nothing consistent to fit.
-
-**Superseded teacher (2026-09-28):** `06-ml.md` §6.4 now plans to clone `ORACLE`, not `FaanBot` —
-`ORACLE` is measurably stronger (+12.1 points/game vs `FaanBot`, `04-bots.md` §10), so cloning it
-raises the ceiling instead of capping at `FaanBot`. Cloning from a *mix* of similar-strength
-teachers is rejected for the contradictory-labels reason in `06-ml.md` §6.6.
-
-### Self-play PPO + batched inference serving
-
-**Un-deferred (2026-09-29):** planned as phase 4, [08-rl.md](08-rl.md). Batched inference is
-training-only; serving stays single-sample ≤ 5 ms, so the serving-process design below is still
-not needed.
-
-Provenance: `06-ml.md` §6 (pre-audit), "Day-2 work" list.
-
-Was listed as a casual day-2 bullet alongside behaviour cloning. Realistically thousands of
-GPU-hours (see Suphx, arXiv:2003.13590) with no compute budget or success metric defined
-anywhere in this doc set — do not schedule this against a milestone until both exist.
-**Update (2026-09-28):** `06-ml.md` §6.5 now defines the success metric; the compute budget is
-still open, and §7 there measures why local CPU-only RL is marginal. A ≤5 ms single-sample CPU
-model (§7 "Serving") would avoid the batched-serving requirement below entirely.
-
-**Execution-model finding (2026-09-26, ml-readiness scoping pass):** batched inference is
-architecturally incompatible with `bots/worker.py`'s per-decision `ProcessPoolExecutor` job model
-(`00-architecture.md §3`, `04-bots.md §1`) — each worker is an isolated process handling one bot's
-decision at a time, with no channel to batch several seats'/tables' forward passes into a single
-GPU call. A learned policy fast enough to serve real tables needs a separate long-lived
-inference-serving process (model loaded once, requests batched across callers) that `Table`/the
-worker pool talk to over IPC or a socket, instead of a `ProcessPoolExecutor` job. **Not designed
-or built now** — no model exists yet to serve, and designing a serving protocol before there's a
-policy to put behind it would be speculative. **Un-deferring T4 concretely requires:** (a) a
-trained policy worth serving (blocked on the compute-budget/target-metric gap above); (b) an
-inference-serving process design (batching strategy, IPC/socket shape, how `Table`/`worker.py`
-call it instead of submitting a `ProcessPoolExecutor` job) — neither is scoped yet.
+it scores 0 — 1,075 of 32,080 sampled candidate discards (3.4%). The fix is to count `seen34`
+minus the candidate copy. Left alone so far because `FaanBot` is the RL evaluation baseline
+(`06-ml.md` §12) and changing it moves that baseline; fix it between gate runs, not during one.
 
 ## From 07-infra.md
 

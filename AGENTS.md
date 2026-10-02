@@ -10,7 +10,7 @@ Project outline lives in `docs/`.
 | `core game logic, server mechanics`         | [server/AGENTS.md](server/AGENTS.md), `docs/00-architecture.md` |
 | `user interface, gameplay`                  | [web/AGENTS.md](web/AGENTS.md), `docs/03-frontend.md`           |
 | `shared/protocol.schema.json`               | `docs/02-protocol.md`                                           |
-| `bots and machine learning`                 | `docs/04-bots.md`, `docs/06-ml.md`, `docs/08-rl.md`             |
+| `bots and machine learning`                 | `docs/04-bots.md`, `docs/06-ml.md`                              |
 | `Dockerfile`, `docker-compose*`, `Makefile` | `docs/07-infra.md`                                              |
 | Milestones, scope, what to build next       | `docs/05-roadmap.md`                                            |
 
@@ -55,7 +55,7 @@ the task on tooling. This is the only exception; otherwise these are not suggest
 - Default to tables, lists and code blocks over prose.
 - Rationale is allowed, and encouraged, where a decision is non-obvious or the reason it was made
   is itself load-bearing (why a constraint exists, why the obvious alternative doesn't work) —
-  see `00-architecture.md §1`, `04-bots.md §4`, `06-ml.md §5` for the level to aim for. The rule
+  see `00-architecture.md §1`, `04-bots.md §4`, `06-ml.md §3` for the level to aim for. The rule
   being replaced ("no rationale beyond a clause") was cutting exactly this kind of content; don't
   gut a section to satisfy terseness.
 - Update the relevant `docs/` file in the same change as the code.

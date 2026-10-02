@@ -25,7 +25,7 @@ calls `_omniscient_seat_view`. See §10 for the full design.
 ```python
 class Bot(Protocol):
     async def act(self, view: SeatView, mask: list[bool], deadline: float) -> int:
-        """-> an action id from the fixed 109-action space (docs/06-ml.md §3)."""
+        """-> an action id from the fixed 109-action space (docs/06-ml.md §1)."""
 ```
 
 `mask` is `legal_mask(state, seat) -> list[bool]` (docs/06-ml.md §1) — `GameState`-based, not
@@ -83,7 +83,7 @@ bare action id. `app/table.py`'s `_handle_bot_result` decodes it, since it alrea
 | **T1** `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak | ~400 lines | "Easy". Ship in M4. |
 | **T2** `FaanBot` | T1 + hand-value planning + discard safety | ~900 lines | "Normal"/"Hard". Moved into M4 (see §4) — the real product. **Built (M4)** — see §4/§5/§8 for the shipped design and real arena numbers. |
 | **T3** `SearchBot` | determinized-world rollout search over the pure engine | ~350 lines | **Built (M6), then removed** — statistically worse than `FaanBot` after two real debugging rounds; a structural ceiling, not a bug. No tier currently occupies "Expert" — see §6/§7. |
-| **T4** learned policy | distilled from `FaanBot` + learned heads, DAgger-relabelled ([06-ml §6.4](06-ml.md)) | research | optional, later — preceded by a learned `tile_risk` inside `FaanBot` ([06-ml §6.2](06-ml.md)); see §6's closing note on what would make a future search-based tier viable |
+| **T4** learned policy | self-play RL, independent of `FaanBot` ([06-ml](06-ml.md)) | research | "Expert", M6 — milestones R0–R4 in [06-ml §14](06-ml.md); see §6's closing note on what would make a future search-based tier viable |
 | **`ORACLE`** | a plain `FaanBot()` fed full-information (`view.hands`) instead of the ordinary view | 0 extra lines (reuses `FaanBot`) | practice mode's "Impossible" difficulty (§7), selectable per seat via `POST /tables`'s `bot_tiers`. **Built** — see §10 for the shipped design and the safety argument. |
 
 Ship T1 and T2 in M4 (§4 explains why T1 alone can't satisfy M4's done-gate). T3 was out of scope
@@ -367,8 +367,7 @@ Not attempted in this pass; full requirements captured in
 [99-deferred.md](99-deferred.md) so a revival starts from the real constraint list instead of
 re-discovering it. In rough order of realism: (a) a rollout leaf evaluator meaningfully better
 than a shallow rollout of the same heuristic used as the policy — realistically a learned value
-function (T4), itself blocked on compute-budget/training-corpus/success-metric decisions nobody
-has made yet; (b) real information-set MCTS (solves strategy fusion/non-locality properly, unlike
+function (the T4 RL critic, [06-ml](06-ml.md)); (b) real information-set MCTS (solves strategy fusion/non-locality properly, unlike
 determinization) — already flagged as non-trivial, undone design work, not a parameter change;
 (c) materially more rollout budget — arithmetically incompatible with the measured ~4.7ms/decision
 × ~83 decisions/hand economics at this project's target concurrency (200 tables × 3 bot seats)
@@ -646,7 +645,7 @@ carries `ruleset: RuleSet` (Tier 1), and every Tier 2 item below is now closed t
   **Closed (2026-09-28):** the housekeeping note this paragraph used to carry — `bots/arena.py`'s
   own direct `shanten()` calls (tenpai-rate/winning-tile stats, not a bot decision) not being
   `hand_sets`-aware — is fixed as a side effect of extracting that logic into `bots/labels.py`
-  (docs/06-ml.md §6.2's ground-truth label module): `_hand_record`'s tenpai loop now calls
+  (docs/06-ml.md §5's ground-truth label module): `_hand_record`'s tenpai loop now calls
   `labels.is_tenpai(state, s)`, which threads `state.ruleset.hand_sets` through, in place of the
   old direct hand_sets-oblivious `shanten()` call. `_tenpai_can_reach_min_faan` likewise now calls
   `labels.winning_tile_types(..., hand_sets=state.ruleset.hand_sets)`. Behavior-preserving for

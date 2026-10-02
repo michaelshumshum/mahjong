@@ -249,8 +249,8 @@ miscategorized in earlier passes of the gap table, not open work. See
 [04-bots.md §9](04-bots.md) for the full closure writeup and
 [99-deferred.md](99-deferred.md) for the historical record.
 
-**ML:** phases 1–3 per [06-ml.md](06-ml.md), then phase 4 self-play RL
-([08-rl.md](08-rl.md)), which ships as the T4 "Expert" tier.
+**ML:** self-play RL agent per [06-ml.md](06-ml.md) (milestones R0–R4, §14), shipping as the T4
+"Expert" tier.
 
 Stats, rating, hand history. i18n
 (zh-Hant/en). Mobile layout pass. M6 has no done gate by design — see §7 for what actually has to
@@ -329,7 +329,7 @@ milestones' `EfficiencyBot`/`FaanBot`) worth re-measuring once they exist.
 | **Python perf — server** | Low | Turn-based, ~5 msg/s/table; I/O-bound, not CPU-bound. |
 | **Python perf — bots** | Medium–High | Bots run in-process, not gated by network I/O the way the server's message rate is: each decision is roughly 470 pure-Python shanten evaluations, against a stated target of 200 concurrent tables × 3 bot seats. That's a CPU-bound hot loop at real concurrency, not "turn-based so it's fine" — the server row above does not cover it. **Partially mitigated (M4):** `mahjong_core/shanten.py`'s per-suit `functools.cache` turns repeat shapes into O(1) lookups instead of a fresh recursive scan every time — but this is single-process caching, not the 200-concurrent-table load test itself, which still hasn't run. Still worth doing before this becomes a scaling wall for real. |
 | Someone "uses all the cores" by raising `--workers`, silently splitting tables across processes | Medium | Comment in Compose + Dockerfile, and a startup assertion in `main.py` ([07-infra §2](07-infra.md)) |
-| ML retrofit turns into an engine rewrite | Low, if M1/M2 items land | [06-ml §5](06-ml.md) checklist — ~1 day total, all of it useful for heuristic bots anyway |
+| ML retrofit turns into an engine rewrite | Low, if M1/M2 items land | [06-ml §1–§2](06-ml.md) — action encoding and `GameRecord`, both met |
 | **Cold start — nobody's online at the same time** | High | No current mitigation beyond "bring your own group" via M5's invite-code private tables. See §6; this is the primary product risk for a 4-player realtime game and was missing from this table entirely before this revision. |
 | **Silent table failure** — a wedged table destroys a game with no signal to anyone | Unrated — there is currently no way to detect it, which is the problem | See §8; minimum viable fix is per-table structured logs plus a liveness check, not just process-level `/healthz`. |
 

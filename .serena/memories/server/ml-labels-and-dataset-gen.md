@@ -1,39 +1,34 @@
-# ML labels + dataset gen + training pipeline (updated 2026-09-29)
+# ML: supervised pieces kept for the RL plan (updated 2026-10-02)
 
-Phase 1 (docs/06-ml.md §6.2) status: encoder, labels, dataset gen (schema v3), packing, model,
-training loop, eval, both baselines and numpy export are BUILT and committed. NOT done: the real
-training run, running the baselines/eval on real data, recording results (docs stage 11),
-`tile_risk` integration + arena gate.
+Direction (2026-10-02): the learned bot is a self-play RL policy independent of FaanBot,
+docs/06-ml.md §6-§15 (milestones R0-R4). The old phases (learned tile_risk inside FaanBot,
+afterstate evaluator, FaanBot distillation) are DROPPED; docs/08-rl.md was merged into 06-ml.md.
+Deleted: ml/heuristic_baseline.py, ml/gbdt_baseline.py, configs/bc.yaml, fit_platt/apply_platt,
+play_and_label's row_hook, pettingzoo + lightgbm deps. Don't reintroduce FaanBot as a teacher,
+reward baseline, feature source or training opponent (only §10's contingency bootstrap).
 
-**Labels — `bots/labels.py`:** pure `GameState`-based ground truth (`is_tenpai`, `winning_tile_types`,
-`expected_faan_if_won`, `danger_labels_for_opponents`). `tests/test_oracle_containment.py` forbids
-`_omniscient_seat_view` outside `Table._submit_bot_job`, so labels read `GameState` directly.
-Faan values in `tests/test_labels.py` come from the real scorer, never hand-derived (平糊/無花/門前清
-stack, so a plain closed tenpai hand scores 3).
+Kept (docs/06-ml.md §5): encoder, bots/labels.py, dataset gen/pack/splits, DangerNet + train/eval,
+metrics, numpy export. DangerNet test results (v3, 1,125 test games): legal-wait AUC 0.889,
+tenpai AUC 0.868; GBDT baseline 0.853; FaanBot deal_in_probability ~0.50 pooled (0.66 within
+tenpai opponents; genbutsu factor is anti-correlated with tenpai since HK has no furiten).
 
-**Dataset gen — `ml/generate_dataset.py`:** schema v3 rows via `ml/raw.py::raw_row` (per-tile counts,
-`discard_seq`, `concealed_kongs`, `flowers`, relative-seat order). Other seats' concealed-kong tile
-types are hidden (`visible_meld_counts34`); v2 data leaked them and must not be trained on.
-`play_and_label(..., row_hook)` gives baselines the live GameState. Seat<->personality shuffled per
-game from the game seed. Real run: `data/danger_v3` (`--games 21800 --parallel 10`, ~1.2 games/s,
-~5 h; started 2026-09-29 ~12:45 under `setsid nohup`, log `server/data/danger_v3_gen.log`). Held-out
-EfficiencyBot set still to generate (`data/danger_v3_heldout_eff`, seed-start 10000000).
-Repo-root `data/` is root-owned; local data lives under `server/data/`.
+**Labels — `bots/labels.py`:** pure `GameState`-based ground truth. `tests/test_oracle_containment.py`
+forbids `_omniscient_seat_view` outside `Table._submit_bot_job`, so labels read `GameState`
+directly. Faan values in `tests/test_labels.py` come from the real scorer (平糊/無花/門前清 stack, so a
+plain closed tenpai hand scores 3).
 
-**Pipeline commands (cwd server/):**
-- `uv run python -m ml.pack --src data/danger_v3 --out data/danger_v3_packed`
-- `uv run python -m ml.train --config ml/configs/danger.yaml [--resume]` -> `runs/danger/`
-- `uv run python -m ml.evaluate --ckpt runs/danger/ckpt_best.pt --data data/danger_v3_packed --split test`
-  (`--split all` on the held-out pack)
-- `python -m ml.heuristic_baseline --data ... --ckpt ...` (replays games; slow), `python -m
-  ml.gbdt_baseline ...`, `python -m ml.export --ckpt ... --out danger.npz`
+**Local data (gitignored, cwd server/):** `data/danger_v3` (10,674 games), `data/danger_v3_packed`
+(5.07M rows), `data/danger_v3_heldout_eff_packed` (2,000 EfficiencyBot games, NOT yet evaluated),
+`runs/danger/ckpt_best.pt` + eval jsons. Repo-root `data/` is root-owned.
+
+**Commands (cwd server/):** see docs/06-ml.md §5's code block (generate_dataset, pack, train,
+evaluate, export).
 
 **Gotchas:**
-- Splits are game-level (`ml/splits.py`, TRAIN/VAL/TEST = 0/1/2; seed 2 is val, 6 is test).
-- `ml/heuristic_baseline.py` tests are slow-marked (~100 s under load); latency test in
-  `test_ml_export.py` is slow-marked and noisy under CPU load (~5 ms for 3 opponents, 96x6).
+- Splits are game-level (`ml/splits.py`, TRAIN/VAL/TEST = 0/1/2).
+- `test_ml_export.py`'s <5 ms latency test (slow-marked) fails under `-n 8` CPU contention,
+  passes alone (~0.9 s run). Not a regression signal under parallel load.
 - `tests/ml_synthetic.py` builds a synthetic packed dataset for ml tests.
-- Known heuristic bug logged in docs/99-deferred.md: `no_chance` counts the observer's own copy
-  (3.4% of candidate discards scored exactly 0). FaanBot intentionally untouched.
+- `ml.load_packed` needs a `Path`, not a str.
 - lefthook comment-length hook: max 2 consecutive comment lines.
-- numpy is not a base dependency; serving the model in the api image needs numpy added.
+- numpy is not a base dependency; R4 serving adds it.
