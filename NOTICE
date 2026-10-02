@@ -8,5 +8,5 @@ Source:  samoheen/mahjong-tiles
 License: Public domain (CC0 1.0 Universal), per the source repository's README.
 
 Vendored: all 42 Hong Kong tile faces (Man1-9, Pin1-9, Sou1-9, Ton, Nan, Shaa, Pei, Chun,
-Hatsu, Haku, Flor1-4, Seas1-4). The tile back (Back.svg) is retained from the previous
-FluffyStuff/riichi-mahjong-tiles set, which is also public domain (CC0 1.0 Universal).
+Hatsu, Haku, Flor1-4, Seas1-4). The tile back (Back.svg) is an original design by this
+project, not third-party, and carries no separate license entry.

@@ -767,8 +767,9 @@ doesn't actually send this way):
 - Tile art: **[samoheen/mahjong-tiles](https://github.com/samoheen/mahjong-tiles)**
   — public domain SVG Hong Kong set. Vendored (`web/static/tiles/`, see `NOTICE`): all 42 faces
   (Man1-9, Pin1-9, Sou1-9, Ton, Nan, Shaa, Pei, Chun, Hatsu, Haku, Flor1-4, Seas1-4). The tile
-  back (Back.svg) is retained from the previous FluffyStuff/riichi-mahjong-tiles set, which is
-  also public domain.
+  back (Back.svg) is this project's own original design, not vendored — a single flat `--color-
+  border` (`#4a3826`) rounded rect, no center motif, matching the samoheen set's 300×420/rx40
+  geometry so it drops into `TileFace.svelte`'s `.tile-face--back` (full-bleed, no box) unchanged.
 - Rendered via `<img src>` per face, not inlined/`<use>`: the vendored SVGs carry
   non-namespaced ids (clipPath/filter/gradient) that collide when the same or different tiles are
   inlined into the DOM more than once, which a hand of tiles does constantly. `<img>` isolates
