@@ -60,6 +60,39 @@ def _conv3(x: np.ndarray, weight: np.ndarray, bias: np.ndarray) -> np.ndarray:
     return flat @ stacked + bias[None, :, None]
 
 
+def numpy_trunk(
+    w: dict[str, np.ndarray], prefix: str, tiles: np.ndarray, scalars: np.ndarray, blocks: int
+) -> np.ndarray:
+    """`DangerNet`'s trunk (weights under `prefix`) on `tiles (B, C, 34)`: the final-norm,
+    ReLU'd features `(B, channels, 37)`, pad columns zero."""
+    b = tiles.shape[0]
+    x = np.zeros((b, tiles.shape[1], _PADDED_WIDTH), dtype=np.float32)
+    x[:, :, _POSITIONS] = tiles
+    scalar_bias = scalars @ w[prefix + "scalar_proj.weight"].T + w[prefix + "scalar_proj.bias"]
+    h = _conv3(x, w[prefix + "stem.weight"], w[prefix + "stem.bias"])
+    h = (h + scalar_bias[:, :, None]) * _MASK
+
+    for i in range(blocks):
+        p = f"{prefix}blocks.{i}."
+        r = _conv3(
+            np.maximum(_group_norm(h, w[p + "norm1.weight"], w[p + "norm1.bias"]), 0) * _MASK,
+            w[p + "conv1.weight"],
+            w[p + "conv1.bias"],
+        )
+        r = _conv3(
+            np.maximum(_group_norm(r, w[p + "norm2.weight"], w[p + "norm2.bias"]), 0) * _MASK,
+            w[p + "conv2.weight"],
+            w[p + "conv2.bias"],
+        )
+        pooled = (r * _MASK).sum(-1) / _N_TILE_TYPES
+        hidden = np.maximum(pooled @ w[p + "se1.weight"].T + w[p + "se1.bias"], 0)
+        gate = _sigmoid(hidden @ w[p + "se2.weight"].T + w[p + "se2.bias"])
+        h = (h + r * gate[:, :, None]) * _MASK
+
+    norm = _group_norm(h, w[prefix + "final_norm.weight"], w[prefix + "final_norm.bias"])
+    return np.maximum(norm, 0) * _MASK
+
+
 class NumpyDangerNet:
     def __init__(self, arrays: dict[str, np.ndarray], config: dict[str, int]) -> None:
         self.w = arrays
@@ -76,30 +109,7 @@ class NumpyDangerNet:
         """Logits for `tiles (B, C, 34)` and `scalars (B, S)`: `tenpai (B,)`, `legal_wait` and
         `struct_wait` `(B, 34)`, `faan (B, 34, classes)`."""
         w = self.w
-        b = tiles.shape[0]
-        x = np.zeros((b, tiles.shape[1], _PADDED_WIDTH), dtype=np.float32)
-        x[:, :, _POSITIONS] = tiles
-        scalar_bias = scalars @ w["scalar_proj.weight"].T + w["scalar_proj.bias"]
-        h = (_conv3(x, w["stem.weight"], w["stem.bias"]) + scalar_bias[:, :, None]) * _MASK
-
-        for i in range(self.config["blocks"]):
-            p = f"blocks.{i}."
-            r = _conv3(
-                np.maximum(_group_norm(h, w[p + "norm1.weight"], w[p + "norm1.bias"]), 0) * _MASK,
-                w[p + "conv1.weight"],
-                w[p + "conv1.bias"],
-            )
-            r = _conv3(
-                np.maximum(_group_norm(r, w[p + "norm2.weight"], w[p + "norm2.bias"]), 0) * _MASK,
-                w[p + "conv2.weight"],
-                w[p + "conv2.bias"],
-            )
-            pooled = (r * _MASK).sum(-1) / _N_TILE_TYPES
-            hidden = np.maximum(pooled @ w[p + "se1.weight"].T + w[p + "se1.bias"], 0)
-            gate = _sigmoid(hidden @ w[p + "se2.weight"].T + w[p + "se2.bias"])
-            h = (h + r * gate[:, :, None]) * _MASK
-
-        h = np.maximum(_group_norm(h, w["final_norm.weight"], w["final_norm.bias"]), 0) * _MASK
+        h = numpy_trunk(w, "", tiles, scalars, self.config["blocks"])
         head = np.einsum("oc,bcw->bow", w["tile_head.weight"][:, :, 0], h)
         per_tile = (head + w["tile_head.bias"][None, :, None])[:, :, _POSITIONS]
 
