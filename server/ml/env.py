@@ -5,8 +5,8 @@ all four seats. Decisions with exactly one legal action are auto-played and neve
 A trajectory is a pure function of `(ruleset, env_seed, actions)`: the deal comes from the
 engine's own seed derivation, claim-window ordering from a `Random` seeded off `env_seed`.
 
-Observations go through `seat_view` -> `encode_seat_view`, the redacted path, flattened into one
-float32 vector of `OBS_DIM`.
+Observations are `encode_seat_view(seat_view(...))` flattened into one float32 vector of
+`OBS_DIM`, computed by the fast encoder (`ml/fast_encode.py`) that is parity-tested against it.
 """
 
 from __future__ import annotations
@@ -17,13 +17,12 @@ from typing import Any
 
 import numpy as np
 
-from app.views import seat_view
 from mahjong_core.actions import Action, action_from_dict, action_to_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, IllegalActionError, reduce
 from mahjong_core.ml import N_ACTIONS, decode_action, legal_mask
 from mahjong_core.state import GameOutcome, GameState, Phase, new_game
-from ml.encode import N_RULESET_FEATURES, N_THERMOMETER, N_TILE_TYPES, encode_seat_view
+from ml.fast_encode import OBS_DIM, encode_state
 
 __all__ = [
     "N_ACTIONS",
@@ -35,33 +34,14 @@ __all__ = [
 ]
 
 REWARD_SCALE = 32
-_N_CONTEXT = 4 + 4 + 4 + 4 + len(Phase)
-OBS_DIM = N_THERMOMETER * N_TILE_TYPES * (1 + 4 + 4) + 4 + _N_CONTEXT + 1 + N_RULESET_FEATURES
 _STEP_CAP = 2000  # one hand is a few hundred engine steps at most
 _ENDED = (Phase.HAND_OVER, Phase.GAME_OVER)
 
 
 def encode_obs(state: GameState, seat: int, out: np.ndarray | None = None) -> np.ndarray:
-    """`encode_seat_view(seat_view(state, seat))` flattened to `(OBS_DIM,)` float32."""
-    enc = encode_seat_view(seat_view(state, seat))
-    parts = (
-        enc.hand,
-        enc.melds,
-        enc.discards,
-        enc.concealed_counts,
-        enc.context,
-        enc.wall_remaining,
-        enc.ruleset,
-    )
-    if out is None:
-        out = np.empty(OBS_DIM, dtype=np.float32)
-    i = 0
-    for p in parts:
-        n = p.size
-        out[i : i + n] = p.ravel()
-        i += n
-    assert i == OBS_DIM
-    return out
+    """`seat`'s observation, `(OBS_DIM,)` float32: `ml.fast_encode.encode_state`, parity-tested
+    against `encode_reference` (`seat_view` -> `encode_seat_view`)."""
+    return encode_state(state, seat, out)
 
 
 def _scores(state: GameState) -> tuple[int, int, int, int]:

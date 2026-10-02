@@ -11,7 +11,8 @@ np = pytest.importorskip("numpy")
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import ENGINE_VERSION, IllegalActionError
 from mahjong_core.state import Phase
-from ml.env import OBS_DIM, HandEnv, encode_obs, replay_hand
+from ml.env import OBS_DIM, HandEnv, replay_hand
+from ml.fast_encode import encode_reference
 
 
 def _play(env: HandEnv, seed: int, policy_seed: int, actions: list[int] | None = None):
@@ -53,7 +54,7 @@ def test_obs_matches_encoder_and_has_fixed_shape():
     env = HandEnv()
     seat, obs, _ = env.reset(5)
     assert obs.shape == (OBS_DIM,) and obs.dtype == np.float32
-    assert np.array_equal(obs, encode_obs(env.state, seat))
+    assert np.array_equal(obs, encode_reference(env.state, seat))
 
 
 def test_rewards_zero_sum_and_only_at_hand_end():
