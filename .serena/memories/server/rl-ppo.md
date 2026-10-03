@@ -49,8 +49,8 @@ smoke only; not the gate. Launch script: server/runs/ppo_c0_full.sh (worktree, g
   behaviour change. `tests/data/` would be gitignored (root `data/` rule): hence `tests/pins/`.
 - `Learner.state_dict()` returns CPU tensors; resume uses `map_location="cpu"`;
   `Optimizer.load_state_dict` moves AdamW moments to the params' device (step stays CPU).
-- `device_info` initialises CUDA in the parent; env workers are forked before that matters only
-  if they touch CUDA (they don't). Keep workers CUDA-free.
+- `device_info` initialises CUDA in the parent before `SubprocVecTrainEnv` forks; fine because
+  workers never touch CUDA (a forked child can't). Keep workers CUDA-free.
 - Locked torch 2.14.0+cu130 has sm_75 SASS (checked `torch.cuda.get_arch_list()` without a GPU);
   needs Windows driver R580+. Fallback cu128 via `uv pip install --reinstall` + `uv run --no-sync`.
 - CUDA tests are `-m cuda` + skipif; none have been run (no GPU in dev/cloud). First thing on the
