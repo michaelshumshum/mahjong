@@ -47,8 +47,8 @@ def _cfg(packed: Path, out: Path, **over):  # type: ignore[no-untyped-def]
 
 
 def test_unimplemented_algorithm_fails_loudly(tmp_path: Path) -> None:
-    config = tmp_path / "ppo.yaml"
-    config.write_text("algorithm: ppo\n")
+    config = tmp_path / "ach.yaml"
+    config.write_text("algorithm: ach\n")
     with pytest.raises(NotImplementedError):
         ml_train.main(["--config", str(config)])
 
