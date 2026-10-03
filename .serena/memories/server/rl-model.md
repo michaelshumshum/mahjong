@@ -29,6 +29,12 @@ Gotchas:
   run alone with OPENBLAS_NUM_THREADS=1.
 - Worktree-isolated agents can't launch `setsid nohup ... python` (sandbox refuses); the long run
   is a script, `server/runs/r1_full.sh`.
-- Short run (400 games, 1,500 steps, ~0.28 s/step on 8 CPU threads): danger legal-wait AUC
-  0.810 vs DangerNet 0.889 (R1 gate open); hidden-tile NLL gain 0.028 over uniform (met);
-  serve p99 3.54 ms (met). Full run = `server/runs/r1_full.sh` (gitignored; ~2 h gen + ~3 h train).
+- R1 DONE (2026-10-03). Full run: 10,000 games, 40k steps, best ckpt step 30k. Danger legal-wait
+  AUC 0.8705 vs DangerNet 0.8885 (-0.0181, CI [-0.0191,-0.0168]: passes by a hair); hidden-tile NLL
+  gain 0.041; deal-in head weak (AUC 0.58). Artifacts: server/runs/rl_aux/{ckpt_best.pt,
+  eval_test.json,policy.npz} (gitignored).
+- Training doesn't scale past 2 torch threads (0.445 s/step at 2 vs 0.57 at 8); 8 threads on
+  this laptop drained the battery even on the 65 W charger and hit 400 MHz power clamps. Use 2.
+- Stopping a run: SIGKILL the driver script FIRST (else set -e continues to eval/export on a
+  partial ckpt), then SIGTERM the trainer (saves ckpt_last). pgrep -f 'bash runs/...' can match
+  the calling shell too: use exact pids. Resume: server/runs/r1_resume.sh (gitignored).
