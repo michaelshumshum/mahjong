@@ -18,9 +18,12 @@ from bots.arena import (
     _mean_ci95,
     _paired_differences,
     _run_duplicate_set,
+    _tenpai_can_reach_min_faan,
     main,
 )
-from mahjong_core.state import HandOutcome, WinType
+from mahjong_core.engine import new_game
+from mahjong_core.melds import Meld, MeldKind
+from mahjong_core.state import HandOutcome, SeatState, WinType
 
 
 def test_make_bot_rejects_unknown_name() -> None:
@@ -200,3 +203,16 @@ def test_never_deadlocks_within_step_cap() -> None:
     for record in records:
         assert record.hands
         assert record.hands[-1].hand_no >= 1
+
+
+def test_sub_minimum_check_skips_a_wait_on_the_seats_own_kong_type() -> None:
+    """kong of 5m + 6m7m waits on 5m/8m by counts, but every 5m is in the kong."""
+    import dataclasses
+
+    state = new_game(_ARENA_RULESET, 0)
+    kong = Meld(MeldKind.CONCEALED_KONG, (16, 17, 18, 19))
+    concealed = (20, 24, 36, 40, 44, 48, 52, 56, 104, 105)  # 6m 7m 123p 456p 9s9s
+    seat = SeatState(concealed=concealed, melds=(kong,))
+    seats = (seat, *state.seats[1:])
+    state = dataclasses.replace(state, seats=seats)
+    assert _tenpai_can_reach_min_faan(state, 0) in (True, False)

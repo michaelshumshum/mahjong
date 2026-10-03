@@ -128,7 +128,10 @@ def _tenpai_can_reach_min_faan(state: GameState, seat: int) -> bool:
     closed = not seat_state.melds
     ctx = build_scoring_context(state, seat, self_drawn=True)
     for t in winning_tile_types(hand34, closed=closed, hand_sets=state.ruleset.hand_sets):
-        tile_id = unused_tile_id_for_type(t, seat_state)
+        try:
+            tile_id = unused_tile_id_for_type(t, seat_state)
+        except AssertionError:
+            continue  # a kong counts 3 in hand34: a wait on its own type has no 5th copy
         concealed = (*seat_state.concealed, tile_id)
         result = score_winning_hand(concealed, seat_state.melds, ctx, state.ruleset)
         if result.clears_min_faan:
