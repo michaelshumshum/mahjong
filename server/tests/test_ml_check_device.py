@@ -1,0 +1,29 @@
+"""`ml/check_device.py` runs end to end on a CPU-only machine (docs/06-ml.md §13)."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+pytest.importorskip("numpy")
+torch = pytest.importorskip("torch")
+
+from ml.check_device import main
+
+
+def test_check_device_reports_cpu_and_skips_missing_cuda(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    out = tmp_path / "report.json"
+    small = ["--envs", "4", "--workers", "0", "--batch-size", "64", "--channels", "8"]
+    report = main(
+        [*small, "--blocks", "1", "--bench-updates", "1", "--act-steps", "2", "--updates", "2"]
+        + ["--json", str(out)]
+    )
+    assert "skipping cuda" in capsys.readouterr().out
+    assert report["environment"]["cuda_available"] is False
+    assert list(report["devices"]) == ["cpu"]
+    assert report["learner"]["cpu"]["learner_decisions_per_s"] > 0
+    assert report["end_to_end"]["cpu"]["updates"] == 2
+    assert report["end_to_end"]["cpu"]["decisions_per_s"] > 0
+    assert json.loads(out.read_text())["config"]["envs"] == 4
