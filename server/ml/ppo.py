@@ -132,6 +132,7 @@ class Schedule(Protocol):
     def complete(self) -> bool: ...
     def clone_coef(self, decisions: int) -> float: ...
     def teacher(self) -> str | None: ...
+    def snapshot_due(self, decisions: int) -> str | None: ...
     def metrics(self) -> dict[str, float]: ...
     def state_dict(self) -> dict[str, Any]: ...
     def load_state_dict(self, state: dict[str, Any]) -> None: ...
@@ -159,6 +160,9 @@ class FixedSchedule:
         return 0.0
 
     def teacher(self) -> str | None:
+        return None
+
+    def snapshot_due(self, decisions: int) -> str | None:
         return None
 
     def metrics(self) -> dict[str, float]:
@@ -749,8 +753,8 @@ def train_ppo(
         learner.load_state_dict(ckpt["learner"])
     collector = Collector(venv, round(cfg.envs * cfg.blind_frac), rng)
 
-    def save() -> None:
-        tmp = last_path.with_suffix(".tmp")
+    def save(path: Path = last_path) -> None:
+        tmp = path.with_suffix(".tmp")
         torch.save(
             {
                 "learner": learner.state_dict(),
@@ -765,7 +769,7 @@ def train_ppo(
             },
             tmp,
         )
-        tmp.replace(last_path)
+        tmp.replace(path)
 
     stop = False
 
@@ -832,6 +836,9 @@ def train_ppo(
                     on_update(record)
                 if updates % cfg.save_every == 0:
                     save()
+                snapshot = schedule.snapshot_due(decisions)
+                if snapshot is not None:
+                    save(out / f"ckpt_{snapshot}.pt")
         save()
     finally:
         for sig, handler in previous.items():
