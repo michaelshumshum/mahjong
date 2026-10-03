@@ -3,8 +3,9 @@
 
 `algorithm: danger` trains the opponent-danger model (`DangerNet`, docs/06-ml.md §5) on a packed
 dataset (`ml.pack`). `algorithm: rl_aux` trains `PolicyNet`'s trunk and auxiliary heads
-(`ml.aux_train`, §8) on an `ml.aux_data` dataset. Any other algorithm raises
-`NotImplementedError`.
+(`ml.aux_train`, §8) on an `ml.aux_data` dataset. `algorithm: ppo` runs the cold-start PPO
+learner (`ml.ppo.train_ppo`, §9/§10) from its own config schema (`ml.ppo.PPOConfig`). Any other
+algorithm raises `NotImplementedError`.
 
 A run directory holds `ckpt_last.pt` (resumable), `ckpt_best.pt` (best validation total) and an
 append-only `metrics.jsonl`. SIGINT/SIGTERM save a checkpoint after the current step and exit 0.
@@ -26,7 +27,7 @@ import yaml
 
 __all__ = ["ALGORITHMS", "TrainConfig", "build_parser", "load_config", "main", "train"]
 
-ALGORITHMS = ("danger", "rl_aux")
+ALGORITHMS = ("danger", "rl_aux", "ppo")
 
 
 @dataclass
@@ -58,6 +59,8 @@ def load_config(path: Path) -> tuple[str, TrainConfig]:
         raise NotImplementedError(
             f"ml.train implements {sorted(ALGORITHMS)}, got {algorithm!r} (config={str(path)!r})."
         )
+    if algorithm == "ppo":
+        raise ValueError("ppo configs load through ml.ppo.main_config")
     unknown = set(raw) - set(TrainConfig.__dataclass_fields__)
     if unknown:
         raise ValueError(f"unknown config keys: {sorted(unknown)}")
@@ -78,7 +81,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", required=True, help="e.g. ml/configs/danger.yaml")
     parser.add_argument("--resume", action="store_true", help="continue from <out>/ckpt_last.pt")
-    parser.add_argument("--max-steps", type=int, help="stop after this many total steps")
+    parser.add_argument(
+        "--max-steps", type=int, help="stop after this many steps (ppo: updates in this session)"
+    )
+    parser.add_argument("--max-minutes", type=float, help="ppo only: stop after this wall time")
     parser.add_argument("--out", help="override the config's run directory")
     parser.add_argument("--data", help="override the config's packed dataset directory")
     return parser
@@ -210,6 +216,16 @@ def train(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None = Non
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    if yaml.safe_load(Path(args.config).read_text()).get("algorithm") == "ppo":
+        from ml.ppo import main_config, train_ppo
+
+        ppo_cfg = main_config(Path(args.config))
+        if args.out:
+            ppo_cfg.out = args.out
+        train_ppo(
+            ppo_cfg, resume=args.resume, max_updates=args.max_steps, max_minutes=args.max_minutes
+        )
+        return
     algorithm, cfg = load_config(Path(args.config))
     if args.out:
         cfg.out = args.out

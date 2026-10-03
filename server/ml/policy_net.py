@@ -97,10 +97,16 @@ class Trunk(nn.Module):
         mask[..., self.positions] = 1.0
         self.register_buffer("mask", mask, persistent=False)
 
-    def forward(self, tiles: torch.Tensor, scalars: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, tiles: torch.Tensor, scalars: torch.Tensor, stem_bias: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """`stem_bias` `(B, channels, 37)` is added after the stem (the PPO oracle input)."""
         x = tiles.new_zeros(tiles.shape[0], tiles.shape[1], _PADDED_WIDTH)
         x[:, :, self.positions] = tiles
-        h = (self.stem(x) + self.scalar_proj(scalars).unsqueeze(-1)) * self.mask
+        h = self.stem(x) + self.scalar_proj(scalars).unsqueeze(-1)
+        if stem_bias is not None:
+            h = h + stem_bias
+        h = h * self.mask
         for block in self.blocks:
             h = block(h, self.mask)
         return torch.relu(self.final_norm(h)) * self.mask
@@ -189,10 +195,15 @@ class PolicyNet(nn.Module):
         )
 
     def forward(
-        self, tiles: torch.Tensor, scalars: torch.Tensor, *, aux: bool = True
+        self,
+        tiles: torch.Tensor,
+        scalars: torch.Tensor,
+        *,
+        aux: bool = True,
+        stem_bias: torch.Tensor | None = None,
     ) -> PolicyOutput:
         trunk = self.trunk
-        h = trunk(tiles, scalars)
+        h = trunk(tiles, scalars, stem_bias)
         h_tiles = h[:, :, trunk.positions]  # (B, ch, 34)
         pooled = trunk.pooled(h, scalars)
         claim = torch.einsum("bct,bt->bc", h_tiles, tiles[:, CLAIM_CHANNEL])
