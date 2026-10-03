@@ -38,3 +38,22 @@ smoke only; not the gate. Launch script: server/runs/ppo_c0_full.sh (worktree, g
 - bots.arena._tenpai_can_reach_min_faan crashed when a seat waited on its own kong's type
   (hand34 counts a kong as 3, so winning_tile_types reports it); fixed by skipping that wait.
 - Don't run `--max-minutes` smoke runs concurrently with tests: throughput numbers are CPU-bound.
+
+## GPU support (branch rl/r2-gpu, 2026-10-03)
+- `PPOConfig.device` auto|cpu|cuda (`resolve_device`; explicit cuda without a GPU raises, no
+  fallback), `amp` (fp16 autocast + GradScaler, cuda only; scaler saved under learner["scaler"]).
+  `ml/check_device.py` = env report + cpu/cuda learner bench + end-to-end throughput.
+- CPU path is pinned by `tests/test_ml_ppo_cpu_pin.py` + `tests/pins/ml_ppo_cpu.json` (taken
+  before the device change; bitwise identical after). Any new NUMERIC key in metrics records breaks
+  it (string keys like device/gpu are filtered). Regenerate only with `--write` for an intended
+  behaviour change. `tests/data/` would be gitignored (root `data/` rule): hence `tests/pins/`.
+- `Learner.state_dict()` returns CPU tensors; resume uses `map_location="cpu"`;
+  `Optimizer.load_state_dict` moves AdamW moments to the params' device (step stays CPU).
+- `device_info` initialises CUDA in the parent; env workers are forked before that matters only
+  if they touch CUDA (they don't). Keep workers CUDA-free.
+- Locked torch 2.14.0+cu130 has sm_75 SASS (checked `torch.cuda.get_arch_list()` without a GPU);
+  needs Windows driver R580+. Fallback cu128 via `uv pip install --reinstall` + `uv run --no-sync`.
+- CUDA tests are `-m cuda` + skipif; none have been run (no GPU in dev/cloud). First thing on the
+  2060: `uv run --extra ml pytest -q -m cuda tests/test_ml_ppo_device.py`.
+- AMP branch was smoke-tested only on CPU by forcing fp16 autocast (metrics within ~1e-3 of fp32).
+- Measured this cloud box (4 cores, CPU, 48 envs x 3 workers): learner 20.4 s/update, e2e ~156 dec/s.
