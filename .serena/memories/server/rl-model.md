@@ -38,3 +38,6 @@ Gotchas:
 - Stopping a run: SIGKILL the driver script FIRST (else set -e continues to eval/export on a
   partial ckpt), then SIGTERM the trainer (saves ckpt_last). pgrep -f 'bash runs/...' can match
   the calling shell too: use exact pids. Resume: server/runs/r1_resume.sh (gitignored).
+- R1 assessment (docs/06-ml.md §14 "Reading the results"): danger gap is from no opponent rotation
+  + shared trunk, not undertraining; levers = bigger trunk / danger loss weight / distil DangerNet /
+  more games. Deferred until R3 shows a defence weakness. Deal-in/win heads are policy-dependent.
