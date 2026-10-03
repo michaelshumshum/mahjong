@@ -43,6 +43,7 @@ testpaths = ["tests"]
 markers = [
     "slow: long-running self-play / arena runs",
     "fast: fast tests (everything except slow)",
+    "cuda: needs a CUDA GPU; skipped without one",
 ]
 
 [tool.coverage.run]

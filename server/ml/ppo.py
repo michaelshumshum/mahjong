@@ -18,6 +18,9 @@
 
 A run directory holds `meta.json` (pins `ENGINE_VERSION`), `ckpt_last.pt`, `metrics.jsonl`.
 SIGINT/SIGTERM save after the current update and exit 0. Resume refuses a different engine.
+
+`device` (`auto` | `cpu` | `cuda`) places the learner and the batched rollout forward; envs and
+encoding stay numpy on CPU. Checkpoints are saved on CPU and load onto either device.
 """
 
 from __future__ import annotations
@@ -64,6 +67,7 @@ from ml.policy_net import (
     OracleCritic,
     PolicyNet,
     PolicyNetConfig,
+    PolicyOutput,
     masked_entropy,
     masked_log_softmax,
 )
@@ -87,9 +91,11 @@ __all__ = [
     "Schedule",
     "StageParams",
     "critic_from_policy",
+    "device_info",
     "gae",
     "load_ppo_config",
     "ppo_policy_loss",
+    "resolve_device",
     "shaped_rewards",
     "train_ppo",
 ]
@@ -182,6 +188,8 @@ class PPOConfig:
     ruleset: str = "hk_classic"
     seed: int = 0
     threads: int = 2
+    device: str = "auto"
+    amp: bool = False
     envs: int = 64
     workers: int = 4
     blind_frac: float = 0.125
@@ -216,6 +224,52 @@ def load_ppo_config(raw: dict[str, Any]) -> PPOConfig:
     if unknown:
         raise ValueError(f"unknown ppo config keys: {sorted(unknown)}")
     return PPOConfig(**raw)
+
+
+def resolve_device(name: str) -> torch.device:
+    """`auto` is CUDA when available, else CPU. An explicit `cuda` never falls back."""
+    if name == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(name)
+    if device.type == "cpu":
+        return device
+    if device.type != "cuda":
+        raise ValueError(f"device must be auto, cpu or cuda[:N], got {name!r}")
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            f"device: {name} requested but torch.cuda.is_available() is False "
+            f"(torch {torch.__version__}, built for CUDA {torch.version.cuda}); "
+            "check the NVIDIA driver (`nvidia-smi`) or set device: cpu / auto"
+        )
+    if device.index is not None and device.index >= torch.cuda.device_count():
+        raise RuntimeError(f"device: {name} requested, {torch.cuda.device_count()} GPU(s) visible")
+    return device
+
+
+def device_info(device: torch.device) -> dict[str, str]:
+    """Strings only: they go into `meta.json` and every `metrics.jsonl` record."""
+    info = {"device": str(device), "torch": torch.__version__}
+    if device.type == "cuda":
+        major, minor = torch.cuda.get_device_capability(device)
+        info.update(
+            {
+                "gpu": torch.cuda.get_device_name(device),
+                "gpu_capability": f"sm_{major}{minor}",
+                "cuda": str(torch.version.cuda),
+            }
+        )
+    return info
+
+
+def to_cpu(state: Any) -> Any:
+    """`state_dict` trees with every tensor on CPU, so a checkpoint loads without a GPU."""
+    if isinstance(state, torch.Tensor):
+        return state.cpu()
+    if isinstance(state, dict):
+        return {k: to_cpu(v) for k, v in state.items()}
+    if isinstance(state, list | tuple):
+        return type(state)(to_cpu(v) for v in state)
+    return state
 
 
 def shaped_rewards(final: float, potentials: np.ndarray) -> np.ndarray:
@@ -364,19 +418,22 @@ class Encoder:
         return out
 
 
-def _to(x: np.ndarray) -> torch.Tensor:
-    return torch.from_numpy(np.ascontiguousarray(x))
-
-
 class Learner:
-    """Models, optimiser and the update step; independent of how samples were collected."""
+    """Models, optimiser and the update step; independent of how samples were collected. Every
+    module and update-time tensor lives on `device`; inputs and outputs are numpy on CPU."""
 
-    def __init__(self, cfg: PPOConfig, policy: PolicyNet) -> None:
+    def __init__(
+        self, cfg: PPOConfig, policy: PolicyNet, device: torch.device | str = "cpu"
+    ) -> None:
         self.cfg = cfg
-        self.policy = policy
-        self.adapter = OracleAdapter(policy.config.channels)
-        self.critic = critic_from_policy(policy)
-        self.popart = PopArt(cfg.popart_beta)
+        self.device = torch.device(device)
+        if cfg.amp and self.device.type != "cuda":
+            raise ValueError("amp needs device: cuda (fp16 autocast + GradScaler)")
+        self.policy = policy.to(self.device)
+        self.adapter = OracleAdapter(policy.config.channels).to(self.device)
+        self.critic = critic_from_policy(policy).to(self.device)
+        self.popart = PopArt(cfg.popart_beta).to(self.device)
+        self.scaler = torch.amp.GradScaler("cuda", enabled=cfg.amp)
         params = [
             *self.policy.parameters(),
             *self.adapter.parameters(),
@@ -386,25 +443,38 @@ class Learner:
         self.encoder = Encoder(cfg.base_ruleset())
 
     def state_dict(self) -> dict[str, Any]:
-        return {
+        """On CPU whatever the device."""
+        state = {
             "policy": self.policy.state_dict(),
             "adapter": self.adapter.state_dict(),
             "critic": self.critic.state_dict(),
             "popart": self.popart.state_dict(),
             "opt": self.opt.state_dict(),
         }
+        if self.cfg.amp:
+            state["scaler"] = self.scaler.state_dict()
+        return to_cpu(state)
 
     def load_state_dict(self, state: dict[str, Any]) -> None:
+        """From either device; `Optimizer.load_state_dict` moves its moments onto the params'."""
         self.policy.load_state_dict(state["policy"])
         self.adapter.load_state_dict(state["adapter"])
         self.critic.load_state_dict(state["critic"])
         self.popart.load_state_dict(state["popart"])
         self.opt.load_state_dict(state["opt"])
+        if self.cfg.amp and "scaler" in state:
+            self.scaler.load_state_dict(state["scaler"])
+
+    def _to(self, x: np.ndarray) -> torch.Tensor:
+        return torch.from_numpy(np.ascontiguousarray(x)).to(self.device)
+
+    def _autocast(self) -> torch.autocast:
+        return torch.autocast(self.device.type, dtype=torch.float16, enabled=self.cfg.amp)
 
     def stem_bias(self, masked_oracle: np.ndarray | None) -> torch.Tensor | None:
         if masked_oracle is None or not masked_oracle.any():
             return None
-        return self.adapter(_to(masked_oracle))
+        return self.adapter(self._to(masked_oracle))
 
     @torch.no_grad()
     def act(
@@ -420,10 +490,11 @@ class Learner:
             p = keep_prob[:, None, None]
             keep = np.where(p >= 1.0, True, rng.random(keep.shape) < p)
             masked = self.encoder.oracle(u, k) * keep
-        logits = self.policy(
-            _to(tiles), _to(scalars), aux=False, stem_bias=self.stem_bias(masked)
-        ).logits
-        logp_all = masked_log_softmax(logits, _to(masks)).numpy()
+        with self._autocast():
+            logits = self.policy(
+                self._to(tiles), self._to(scalars), aux=False, stem_bias=self.stem_bias(masked)
+            ).logits
+        logp_all = masked_log_softmax(logits.float(), self._to(masks)).cpu().numpy()
         gumbel = -np.log(-np.log(rng.random(logp_all.shape).clip(1e-12, 1.0)))
         actions = np.argmax(logp_all + gumbel, axis=1)
         logp = logp_all[np.arange(b), actions]
@@ -451,8 +522,8 @@ class Learner:
         pol_oracle = self.encoder.oracle(u, k) * keep.reshape(n, N_ORACLE_CHANNELS, 34)
         has_oracle = pol_oracle.reshape(n, -1).any(axis=1)
 
-        t_tiles, t_scalars, t_oracle = _to(tiles), _to(scalars), _to(oracle_full)
-        with torch.no_grad():
+        t_tiles, t_scalars, t_oracle = self._to(tiles), self._to(scalars), self._to(oracle_full)
+        with torch.no_grad(), self._autocast():
             v_norm = torch.cat(
                 [
                     self.critic(
@@ -461,7 +532,7 @@ class Learner:
                     for i in range(0, n, 1024)
                 ]
             )
-            values = self.popart.denormalize(v_norm).numpy()
+            values = self.popart.denormalize(v_norm.float()).cpu().numpy()
 
         adv = np.zeros(n, dtype=np.float32)
         ret = np.zeros(n, dtype=np.float32)
@@ -482,7 +553,7 @@ class Learner:
                 dealt[idx] = discarder == s and winner != s
             at += m
 
-        t_ret = _to(ret)
+        t_ret = self._to(ret)
         self.popart.update(t_ret, self.critic.value[-1])
         target_n = self.popart.normalize(t_ret)
         adv_n = (adv - adv.mean()) / (adv.std() + 1e-8)
@@ -490,13 +561,13 @@ class Learner:
         aux_rows = u["aux"].astype(bool)
         aux_raw = {name: u[name] for name in u}
         aux_raw.update({"win": won, "deal_in": dealt, "payment": payment})
-        targets = {key: _to(v) for key, v in aux_targets(aux_raw).items()}
+        targets = {key: self._to(v) for key, v in aux_targets(aux_raw).items()}
         teacher = u["teacher"].astype(np.int64)
         aux_coef = self.aux_coef(decisions)
 
-        t_masks, t_actions, t_old = _to(masks), _to(actions), _to(old_logp)
-        t_adv, t_pol_oracle = _to(adv_n.astype(np.float32)), _to(pol_oracle)
-        t_teacher = _to(teacher)
+        t_masks, t_actions, t_old = self._to(masks), self._to(actions), self._to(old_logp)
+        t_adv, t_pol_oracle = self._to(adv_n.astype(np.float32)), self._to(pol_oracle)
+        t_teacher = self._to(teacher)
         rng = np.random.default_rng([c.seed, decisions])
         sums: dict[str, float] = {}
         n_mb = 0
@@ -504,13 +575,17 @@ class Learner:
             order = rng.permutation(n)
             for lo in range(0, n, c.minibatch):
                 mb = order[lo : lo + c.minibatch]
-                mb_t = torch.from_numpy(mb)
-                bias = self.adapter(t_pol_oracle[mb_t]) if has_oracle[mb].any() else None
-                out = self.policy(t_tiles[mb_t], t_scalars[mb_t], aux=True, stem_bias=bias)
+                mb_t = self._to(mb)
+                with self._autocast():
+                    bias = self.adapter(t_pol_oracle[mb_t]) if has_oracle[mb].any() else None
+                    out = self.policy(t_tiles[mb_t], t_scalars[mb_t], aux=True, stem_bias=bias)
+                    v = self.critic(t_tiles[mb_t], t_oracle[mb_t], t_scalars[mb_t])
+                if c.amp:
+                    out = _float_output(out)
+                    v = v.float()
                 pl = ppo_policy_loss(
                     out.logits, t_masks[mb_t], t_actions[mb_t], t_old[mb_t], t_adv[mb_t], c.clip
                 )
-                v = self.critic(t_tiles[mb_t], t_oracle[mb_t], t_scalars[mb_t])
                 v_loss = 0.5 * F.mse_loss(v, target_n[mb_t])
                 loss = pl["pg"] + c.value_coef * v_loss - c.entropy_coef * pl["entropy"]
                 logs = {
@@ -523,11 +598,11 @@ class Learner:
                 sel = mb[aux_rows[mb]]
                 if len(sel):
                     assert out.aux is not None
-                    pos = torch.from_numpy(np.flatnonzero(aux_rows[mb]))
+                    pos = self._to(np.flatnonzero(aux_rows[mb]))
                     sub = AuxOutput(
                         **{f.name: getattr(out.aux, f.name)[pos] for f in fields(AuxOutput)}
                     )
-                    sel_t = torch.from_numpy(sel)
+                    sel_t = self._to(sel)
                     al = aux_loss(sub, {key: v[sel_t] for key, v in targets.items()}, AuxWeights())
                     loss = loss + aux_coef * al["total"]
                     logs["aux"] = al["total"].item()
@@ -538,11 +613,19 @@ class Learner:
                         loss = loss + clone_coef * ce
                         logs["clone_ce"] = ce.item()
                 self.opt.zero_grad(set_to_none=True)
-                loss.backward()
+                if c.amp:
+                    self.scaler.scale(loss).backward()
+                    self.scaler.unscale_(self.opt)
+                else:
+                    loss.backward()
                 nn.utils.clip_grad_norm_(
                     [p for g in self.opt.param_groups for p in g["params"]], c.grad_clip
                 )
-                self.opt.step()
+                if c.amp:
+                    self.scaler.step(self.opt)
+                    self.scaler.update()
+                else:
+                    self.opt.step()
                 for key, val in logs.items():
                     sums[key] = sums.get(key, 0.0) + val
                 n_mb += 1
@@ -561,6 +644,13 @@ class Learner:
             }
         )
         return out_metrics
+
+
+def _float_output(out: PolicyOutput) -> PolicyOutput:
+    aux = None
+    if out.aux is not None:
+        aux = AuxOutput(**{f.name: getattr(out.aux, f.name).float() for f in fields(AuxOutput)})
+    return PolicyOutput(out.logits.float(), aux)
 
 
 class Collector:
@@ -696,7 +786,7 @@ def load_policy(cfg: PPOConfig) -> PolicyNet:
     return model
 
 
-def _check_meta(out: Path, cfg: PPOConfig, resume: bool) -> None:
+def _check_meta(out: Path, cfg: PPOConfig, resume: bool, info: dict[str, str]) -> None:
     path = out / "meta.json"
     if resume and path.exists():
         meta = json.loads(path.read_text())
@@ -706,7 +796,8 @@ def _check_meta(out: Path, cfg: PPOConfig, resume: bool) -> None:
                 f"engine is {ENGINE_VERSION!r}; refusing to resume"
             )
         return
-    path.write_text(json.dumps({"engine_version": ENGINE_VERSION, "config": asdict(cfg)}, indent=2))
+    meta = {"engine_version": ENGINE_VERSION, "config": asdict(cfg), "device": info}
+    path.write_text(json.dumps(meta, indent=2))
 
 
 def train_ppo(
@@ -717,11 +808,15 @@ def train_ppo(
     max_minutes: float | None = None,
     on_update: Callable[[dict[str, Any]], None] | None = None,
 ) -> Path:
+    # also on cuda: host threads only feed the GPU and contend with the env workers
     torch.set_num_threads(cfg.threads)
     torch.manual_seed(cfg.seed)
+    device = resolve_device(cfg.device)
+    info = device_info(device)
+    print(f"device: {json.dumps(info)}", flush=True)
     out = Path(cfg.out)
     out.mkdir(parents=True, exist_ok=True)
-    _check_meta(out, cfg, resume)
+    _check_meta(out, cfg, resume, info)
 
     schedule = build_schedule(cfg)
     decisions = updates = 0
@@ -729,7 +824,7 @@ def train_ppo(
     last_path = out / "ckpt_last.pt"
     ckpt = None
     if resume and last_path.exists():
-        ckpt = torch.load(last_path, weights_only=False)
+        ckpt = torch.load(last_path, weights_only=False, map_location="cpu")
         if ckpt["engine_version"] != ENGINE_VERSION:
             raise RuntimeError(
                 f"checkpoint ENGINE_VERSION {ckpt['engine_version']!r} != {ENGINE_VERSION!r}"
@@ -748,7 +843,7 @@ def train_ppo(
     else:
         venv = VecTrainEnv(cfg.envs, base_seed, env_cfg)
 
-    learner = Learner(cfg, load_policy(cfg))
+    learner = Learner(cfg, load_policy(cfg), device)
     if ckpt is not None:
         learner.load_state_dict(ckpt["learner"])
     collector = Collector(venv, round(cfg.envs * cfg.blind_frac), rng)
@@ -824,6 +919,7 @@ def train_ppo(
                         "decisions_per_s": round(n / max(t2 - t0, 1e-9), 1),
                         "env_steps": steps,
                         "elapsed_s": round(time.monotonic() - started, 1),
+                        **info,
                     }
                 )
                 if advanced:

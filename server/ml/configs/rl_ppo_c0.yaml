@@ -5,6 +5,10 @@ ruleset: hk_classic
 seed: 0
 # more torch threads don't speed up the learner on the i7-1265U and drain the battery
 threads: 2
+# auto: cuda when available, else cpu. cuda without a gpu fails at startup
+device: auto
+# fp16 autocast + GradScaler, cuda only
+amp: false
 envs: 96
 workers: 6
 blind_frac: 0.125
