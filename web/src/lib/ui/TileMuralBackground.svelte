@@ -240,8 +240,9 @@
 		inset: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
-		backdrop-filter: blur(3px) brightness(0.55);
+		// prefixed first: the prod minifier keeps the last of an identical pair, so unprefixed must come last
 		-webkit-backdrop-filter: blur(3px) brightness(0.55);
+		backdrop-filter: blur(3px) brightness(0.55);
 		background: rgb(0 0 0 / 0.25);
 		transition: opacity 220ms ease;
 	}
