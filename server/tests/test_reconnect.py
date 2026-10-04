@@ -1,11 +1,11 @@
-"""Reconnect/resync from `last_seq` (docs/02-protocol.md §5, docs/00-architecture.md §8;
-docs/05-roadmap.md M3 sub-task 5) -- M3's literal done-when gate: "killing one mid-hand and
+"""Reconnect/resync from `last_seq` (docs/protocol.md §5, docs/architecture.md §8;
+docs/decisions/0018-milestone-plan.md M3 sub-task 5) -- M3's literal done-when gate: "killing one mid-hand and
 reconnecting resumes correctly from last_seq".
 
 Each scenario drives a real `Table` over real WebSocket connections
 (`fastapi.testclient`, same style `tests/test_ws_gameplay.py` established): a seat's connection
 is closed to simulate a disconnect (its `SeatBinding` -- idempotency cache, ready flag, ring
-buffer -- survives that; only the live-socket half is gone, 02-protocol.md §1/§5), fresh events
+buffer -- survives that; only the live-socket half is gone, protocol.md §1/§5), fresh events
 are driven through the table while that seat has no live socket, then a new connection re-`hello`s
 with `seat` + `last_seq` and the result is checked against what was actually missed. Timer-heap
 assertions read `Table`'s private per-seat tracking dicts directly, the same white-box style
@@ -105,7 +105,7 @@ def _join_and_ready_all(wss: list) -> tuple[dict[int, int], dict[int, str]]:  # 
     about what happens *after* a disconnect/reconnect). Returns each seat's own last-seen `seq`,
     read straight off the frames actually received rather than hand-derived, so later
     `last_seq=` values in this file are always exactly what that connection really has -- plus
-    each seat's `reconnect_secret` from its own `join` ack (00-architecture.md §2.1), needed by
+    each seat's `reconnect_secret` from its own `join` ack (architecture.md §2.1), needed by
     any later `_hello(seat=..., secret=...)` reconnect in this file."""
     for ws in wss:
         ws.send_json(_hello())
@@ -382,7 +382,7 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
     reconnected (`Table.resume()`'s `_rearm_seat_claim_timer`, re-arming a fresh full window) or
     the original deadline timed it out to Pass. That re-arm was never actually reachable through
     a full-`state_sync` reconnect (the common case once a page reload persists its own seat,
-    docs/03-frontend.md) -- `StateSyncPayload.claim_options` carries no `window_id`, so the
+    docs/frontend.md) -- `StateSyncPayload.claim_options` carries no `window_id`, so the
     client had nothing to render a dialog against or submit a `claim` with, even though the
     server was still nominally waiting on it. Now a disconnect forfeits the offer immediately
     instead, so there's nothing left for any later reconnect to hand back.
@@ -470,7 +470,7 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
 
 
 def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
-    """M5 (docs/02-protocol.md §2/§5): `join.name` is set once and lives on `SeatBinding.name`
+    """M5 (docs/protocol.md §2/§5): `join.name` is set once and lives on `SeatBinding.name`
     for the rest of the game -- a `hello` reconnect carries only `seat`/`last_seq`, never
     `name`, and the server must still know it (and broadcast it) without a resend."""
     table_id = f"reconnect-name-{uuid.uuid4()}"
@@ -529,7 +529,7 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
 
 
 def test_hello_wrong_or_missing_secret_refuses_the_reclaim() -> None:
-    """00-architecture.md §2.1: a `hello{seat}` naming an already-bound seat must present that
+    """architecture.md §2.1: a `hello{seat}` naming an already-bound seat must present that
     seat's own `reconnect_secret` (from its `join` ack) back, or the reclaim is refused --
     `error{code:'bad_secret'}` -- rather than silently handing the seat to whoever asks. Covers
     both a wrong secret and an altogether missing one (a stale/never-had-one client)."""

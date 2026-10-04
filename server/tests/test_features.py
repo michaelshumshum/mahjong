@@ -1,4 +1,4 @@
-"""Unit tests for `bots/features.py`'s `seen34` (docs/04-bots.md §3/§10). Per this sub-task's
+"""Unit tests for `bots/features.py`'s `seen34` (docs/bots.md §3/§9). Per this sub-task's
 requirements: prove the hands-aware branch actually changes something real (undercounts an
 opponent's real concealed tiles fixed, a concealed kong's identity correctly flipped from
 "skip" to "count"), not just that it runs, while `view.hands is None` stays byte-identical to
@@ -209,5 +209,5 @@ def test_seen34_hands_aware_counts_an_opponents_concealed_kong() -> None:
         "bot really can't see it"
     )
     # a kong contributes 3 to a 34-count array, matching `_add_meld`'s existing convention for
-    # every other meld this module counts (docs/04-bots.md §3).
+    # every other meld this module counts (docs/bots.md §3).
     assert seen34(hands_view)[sou9] == 3

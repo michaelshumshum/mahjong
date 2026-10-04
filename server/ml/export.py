@@ -1,4 +1,4 @@
-"""Torch-free export of a trained danger model (docs/06-ml.md §5) or `PolicyNet` (§8):
+"""Torch-free export of a trained danger model (docs/ml.md §5) or `PolicyNet` (§8):
 
     python -m ml.export --ckpt runs/danger/ckpt_best.pt --out runs/danger/danger.npz
     python -m ml.export --ckpt runs/rl_aux/ckpt_best.pt --out runs/rl_aux/policy.npz

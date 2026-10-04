@@ -1,4 +1,4 @@
-"""Offline metrics for wait/danger scores (docs/06-ml.md §5): AUC, log-loss and Brier with
+"""Offline metrics for wait/danger scores (docs/ml.md §5): AUC, log-loss and Brier with
 game-level bootstrap confidence intervals.
 
 Rows within a game are correlated, so resampling is over games, never samples. Each game is

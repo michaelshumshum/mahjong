@@ -51,7 +51,7 @@ const LOBBY_TABLES = [
 // app; don't add every mock scenario.
 const PAGES = [
 	{ name: 'lobby', url: '/' },
-	// the ruleset picker `POST /tables` (docs/02-protocol.md §10) needs before a table can be
+	// the ruleset picker `POST /tables` (docs/protocol.md §10) needs before a table can be
 	// created -- genuinely distinct from the plain lobby buttons above.
 	{
 		name: 'lobby-create-dialog',
@@ -62,7 +62,7 @@ const PAGES = [
 	},
 	{ name: 'tables', url: '/tables' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
-	// `[id]` as a table id (docs/03-frontend.md §6) -- there's no backend running during a
+	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
 	// rather than relying on it being the unauthenticated default.
 	{ name: 'table-your-turn', url: '/table/demo123?mock=1' },
@@ -81,7 +81,7 @@ const PAGES = [
 			await page.waitForTimeout(150); // FaanBreakdown's own entrance, not a fixed animation wait
 		}
 	},
-	// exhaustive draw gets its own plain summary card, not FaanBreakdown (docs/00-architecture.md
+	// exhaustive draw gets its own plain summary card, not FaanBreakdown (docs/architecture.md
 	// §3 "Hand-end hold" -- the hold itself is uniform across outcomes, but a draw has no
 	// winner/patterns/payments to show), genuinely distinct enough to warrant its own capture.
 	{
@@ -92,7 +92,7 @@ const PAGES = [
 			await page.waitForTimeout(150);
 		}
 	},
-	// Auto-shown once a real `game_end` lands (docs/03-frontend.md §6 "Game-end summary") --
+	// Auto-shown once a real `game_end` lands (docs/frontend.md §7 "Game-end summary") --
 	// genuinely distinct from `table-hand-ended` above: a full-game score summary with
 	// expandable per-round detail and a link back to the lobby, not a single hand's overlay.
 	{
@@ -111,7 +111,7 @@ const PAGES = [
 			await page.getByRole('button', { name: 'Settings' }).click();
 		}
 	},
-	// Pre-game states (docs/03-frontend.md's "/table/[id] wiring") only ever occur on the real
+	// Pre-game states (docs/frontend.md's "/table/[id] wiring") only ever occur on the real
 	// `liveStore`-driven path -- `?mock=` always renders a fully-seated, already-dealt table
 	// (`tableReady` is unconditionally true when `isMock`), so there's no MOCK_SCENARIOS entry
 	// that could stand in for "not seated yet" or "seated, waiting for others". `?pregame=

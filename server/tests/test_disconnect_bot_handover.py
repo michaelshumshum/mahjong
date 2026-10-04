@@ -1,5 +1,5 @@
-"""Disconnect -> bot handover (docs/00-architecture.md §8 "Player disconnects", §3 D12;
-docs/05-roadmap.md M3 sub-task 6) -- driven over real WebSocket connections, same
+"""Disconnect -> bot handover (docs/architecture.md §8 "Player disconnects", §3 D12;
+docs/decisions/0018-milestone-plan.md M3 sub-task 6) -- driven over real WebSocket connections, same
 `fastapi.testclient` style `tests/test_ws_gameplay.py`/`tests/test_reconnect.py` established.
 
 `disconnect_grace_seconds=0` is this file's test-time-control pattern for the grace timer --
@@ -82,7 +82,7 @@ def _join_and_ready_all(wss: list) -> dict[int, str]:  # type: ignore[type-arg]
     """Join all four seats (seat i on connection i) and ready them up -- same choreography
     `tests/test_reconnect.py`'s helper of the same name established, minus its `last_seq`
     bookkeeping (this file never needs a gap-replay `last_seq`). Returns each seat's
-    `reconnect_secret` from its own `join` ack (00-architecture.md §2.1), needed by this file's
+    `reconnect_secret` from its own `join` ack (architecture.md §2.1), needed by this file's
     own `_hello(seat=..., secret=...)` reconnect."""
     for ws in wss:
         ws.send_json(_hello())
@@ -307,7 +307,7 @@ def _rig_faan_discard_state(seed: int) -> GameState:
 
 def test_disconnect_bot_runs_faanbot_not_random() -> None:
     """Regression for the sub-task that wired real bot tiers into the live disconnect-handover
-    path (docs/04-bots.md §1, docs/05-roadmap.md M4.5): `Table`'s default `bot_tier` is now
+    path (docs/bots.md §1, docs/decisions/0018-milestone-plan.md M4.5): `Table`'s default `bot_tier` is now
     `T2`/`FaanBot`, not the old hardcoded `T0`/`RandomBot` `bots/worker.py.compute_action` used
     to run unconditionally. `_rig_faan_discard_state`'s hand has a *unique* shanten-minimising
     discard (see its own docstring); `FaanBot`'s choice is a deterministic function of the hand

@@ -1,10 +1,10 @@
-"""pydantic -> TypeScript codegen for the wire protocol (docs/02-protocol.md §6).
+"""pydantic -> TypeScript codegen for the wire protocol (docs/protocol.md §6).
 
 Walks the pydantic model graph in app.protocol directly and emits TS — no JSON
 Schema hop, because pydantic's tagged-union JSON Schema (`$defs` + `oneOf` +
 `discriminator`) doesn't reliably survive a generic JSON-Schema->TS generator:
 `const` tags get widened to `string` and narrowing breaks. See the docstring
-in app/protocol.py and docs/02-protocol.md §6 for the full rationale.
+in app/protocol.py and docs/protocol.md §6 for the full rationale.
 
 Usage: uv run python tools/gen_protocol.py --ts-out <path> [--schema-out <path>]
 """
@@ -28,7 +28,7 @@ _TS_NAME_OVERRIDES = {"Error": "ErrorEvent"}
 
 _GENERATED_HEADER = (
     "// GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.\n"
-    "// Source of truth: server/app/protocol.py (docs/02-protocol.md §6).\n"
+    "// Source of truth: server/app/protocol.py (docs/protocol.md §6).\n"
 )
 
 
@@ -178,12 +178,12 @@ def render_ts(*, client_message: Any, server_message: Any, any_message: Any) -> 
         parts.append(_render_interface(cls, extends=extends))
 
     parts.append(
-        "/** Client -> server intents (docs/02-protocol.md §2). */\n"
+        "/** Client -> server intents (docs/protocol.md §2). */\n"
         f"export type ClientMessage = {' | '.join(ts_name(m) for m in client_members)};"
     )
     parts.append(
         "/**\n"
-        " * Server -> client events (docs/02-protocol.md §3). Keep the reducer's\n"
+        " * Server -> client events (docs/protocol.md §3). Keep the reducer's\n"
         " * switch over this type exhaustive (assertNever, protocol.assertNever.ts)\n"
         " * so a new member fails the build.\n"
         " */\n"
@@ -204,7 +204,7 @@ def render_assert_never_fixture(*, server_message: Any) -> str:
     )
     return (
         "// GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.\n"
-        "// Compile-time exhaustiveness check (docs/02-protocol.md §6): fails to\n"
+        "// Compile-time exhaustiveness check (docs/protocol.md §6): fails to\n"
         "// compile if ServerEvent gains a member this switch doesn't handle, or\n"
         "// if codegen ever regresses `t` from a literal to a widened `string`.\n"
         "import type { ServerEvent } from './protocol';\n\n"
@@ -222,7 +222,7 @@ def render_assert_never_fixture(*, server_message: Any) -> str:
 
 
 def render_json_schema() -> dict[str, Any]:
-    """Secondary, informational artifact only (docs/07-infra.md) — not what the
+    """Secondary, informational artifact only (docs/infra.md) — not what the
     TS above is generated from; see the module docstring for why."""
     return TypeAdapter(AnyMessage).json_schema()
 

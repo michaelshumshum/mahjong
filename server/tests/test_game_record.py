@@ -1,10 +1,10 @@
-"""`GameRecord` persistence (docs/06-ml.md §2, docs/05-roadmap.md §2's M1 gate).
+"""`GameRecord` persistence (docs/ml.md §2, docs/decisions/0018-milestone-plan.md M1).
 
 Runs against SQLite (`aiosqlite`), not Postgres -- see the commit message / report for the
 testing-strategy tradeoff. SQLite has no JSONB, so this only proves the model/save-function
 logic and the action-log round trip; `app/db/models.py`'s `.with_variant(JSONB(), ...)` split
 and the migration itself were separately applied-tested against a real `docker compose up -d
-postgres` (see that report), which CI cannot do today (docs/07-infra.md §9: no Postgres
+postgres` (see that report), which CI cannot do today (docs/infra.md §9: no Postgres
 service in CI).
 """
 
@@ -148,7 +148,7 @@ async def test_save_game_record_action_log_replays_to_the_same_outcome(
     session: AsyncSession,
 ) -> None:
     """The actual point of persisting the log: replaying it from `new_game(ruleset, seed)`
-    must reproduce the same finished game (docs/00-architecture.md §3)."""
+    must reproduce the same finished game (docs/architecture.md §3)."""
     state, actions = await play_game(seed=7, ruleset=_BOUNDED_RULESET)
     saved = await save_game_record(session, state, actions, players=["bot:RandomBot"] * 4)
     fetched = await get_game_record(session, saved.id)

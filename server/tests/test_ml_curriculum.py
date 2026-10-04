@@ -1,5 +1,5 @@
 """`ml/curriculum.py`: stage schedules, advancement on rolling statistics, and the off-by-default
-§10 contingency (docs/06-ml.md §10)."""
+§10 contingency (docs/ml.md §10)."""
 
 from __future__ import annotations
 

@@ -205,7 +205,7 @@ class GameState:
 
     ruleset: RuleSet
     game_seed: int
-    # never leaves this process, not even redacted, not ever during play (00-architecture.md §3);
+    # never leaves this process, not even redacted, not ever during play (architecture.md §3);
     # kept here, not just passed to new_game, because engine.py derives every hand_seed from it.
     hand_seed: bytes
     wall: Wall

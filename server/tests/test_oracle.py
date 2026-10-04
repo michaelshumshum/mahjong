@@ -1,9 +1,9 @@
-"""The `"ORACLE"` bot tier (docs/04-bots.md §10, `bots/worker.py`'s `_make_bot`).
+"""The `"ORACLE"` bot tier (docs/bots.md §9, `bots/worker.py`'s `_make_bot`).
 
 **Design history, briefly:** an earlier version of this tier was `bots/oracle.py`'s `OracleBot`,
 a full-information determinized-wall rollout search reusing `bots/search.py`'s machinery
 (`bots/search.py` no longer exists -- its `SearchBot`/T3 tier was removed for the same structural
-reason, docs/04-bots.md §6). Two rounds of arena validation found it was *still* statistically
+reason, docs/decisions/0012-searchbot-removed.md). Two rounds of arena validation found it was *still* statistically
 worse than plain `FaanBot` despite full information, because full information was only ever used
 to pick which worlds got sampled -- every candidate was still evaluated through the same noisy
 few-sample `FaanBot`-driven rollout that gave `SearchBot` its own ceiling. The actual fix needed
@@ -17,7 +17,7 @@ to `faanbot.py`. `bots/oracle.py` is deleted; `_make_bot("ORACLE", seed)` now ju
 This file covers: (1) the dispatch wiring (`_make_bot` builds a plain `FaanBot`); (2) a scripted
 behavioral proof that an omniscient view changes `FaanBot`'s real discard choice -- avoiding a
 real deal-in the probabilistic-only view walks straight into, the concrete case
-docs/04-bots.md §5 item 1 warns about (genbutsu is not a guarantee in HK -- an opponent can
+docs/bots.md §5 item 1 warns about (genbutsu is not a guarantee in HK -- an opponent can
 discard a tile and still legally win on it later); (3) a full self-play smoke test.
 
 Exact per-opponent-danger unit coverage (the win-legality check itself, the min_faan boundary,
@@ -158,7 +158,7 @@ _FOLD_HAND_OWN_POOL = (
 
 
 async def test_omniscient_view_avoids_a_real_deal_in_the_probabilistic_view_walks_into() -> None:
-    """The concrete case docs/04-bots.md §5 item 1 warns about: genbutsu is not a guarantee in
+    """The concrete case docs/bots.md §5 item 1 warns about: genbutsu is not a guarantee in
     HK. Seat 1 already discarded 北 (`WIND_NORTH`) -- the probabilistic model reads that as
     (weak) evidence 北 is safe against them -- but their real hand (reshaped since that discard)
     is one 北 away from a live Seven Pairs, clearing the default `min_faan=3`. Seat 2 separately
@@ -245,7 +245,7 @@ async def test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_a
     `FaanBot` avoids 4萬 specifically. Both mechanisms have to fire for this outcome: fold mode
     alone (a threat flag with no exact per-tile danger) wouldn't single out 4萬 over any other
     candidate, and exact `tile_risk` alone with fold mode never engaging wouldn't change
-    `_best_discard`'s scoring formula at all -- this is the concrete gap docs/04-bots.md §10
+    `_best_discard`'s scoring formula at all -- this is the concrete gap docs/bots.md §9
     names as the reason `opponent_threat_level` needed the same hands-aware treatment
     `tile_risk` already got."""
     tenpai_hand = _pool(
@@ -313,7 +313,7 @@ _UKEIRE_HAND = [
 
 
 async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> None:
-    """`seen34` becoming hands-aware (docs/04-bots.md §10) closes an offense-side gap distinct
+    """`seen34` becoming hands-aware (docs/bots.md §9) closes an offense-side gap distinct
     from `tile_risk`/`opponent_threat_level`'s defense-side fixes above. Turn 3 (well before
     `late_turn`) keeps `fold_mode` off entirely, isolating this from both of those fixes.
 
@@ -322,7 +322,7 @@ async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> 
     discarding 9筒 (`PIN_9`) reads as the speed-maximising choice (16 kinds/58 tiles of ukeire,
     all 4 WIND_EAST copies counted as still live). Under the omniscient view, `seen34` correctly
     counts seat 1's 3 real copies as seen, PIN_9's ukeire drops to 14 kinds/51 tiles, and
-    `FaanBot`'s composite score (docs/04-bots.md §4) picks a different discard (北, `WIND_NORTH`)
+    `FaanBot`'s composite score (docs/bots.md §4) picks a different discard (北, `WIND_NORTH`)
     instead. `tile_risk` is not the mechanism flipping this choice -- it reads identically for
     both candidate discards within each view (0.9 probabilistic / 0.0 exact, checked below), so
     it cannot be what tips PIN_9 below WIND_NORTH; the only thing that differs between the two
@@ -422,7 +422,7 @@ async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """`bots/faanbot.py`'s kong loop (`_act_on_turn`) declares whichever legal self-kong strictly
-    reduces shanten furthest -- with no safety check at all before this fix, docs/04-bots.md §10.
+    reduces shanten furthest -- with no safety check at all before this fix, docs/bots.md §9.
 
     Provable, pre-existing fact about `mahjong_core.shanten.shanten`, unrelated to this fix:
     removing a redundant 4th copy from an already-complete group (exactly what declaring a

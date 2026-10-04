@@ -1,4 +1,4 @@
-"""Golden fixtures for `bots/valuation.py` (docs/04-bots.md §4).
+"""Golden fixtures for `bots/valuation.py` (docs/bots.md §4).
 
 Two kinds of coverage, per this sub-task's testing requirements: (1) `ROUTE_FAAN`'s constants
 cross-checked directly against the real scorer (`mahjong_core.scoring.patterns.score_hand`) on
@@ -280,7 +280,7 @@ def test_pattern_optionality_counts_distinct_reachable_routes() -> None:
     assert pattern_optionality(multi_route, closed=True) == 3
 
 
-# --- faan_overrides-aware ROUTE_FAAN (docs/04-bots.md §9 Tier 2) ----------------------------
+# --- faan_overrides-aware ROUTE_FAAN (docs/bots.md §8 Tier 2) ----------------------------
 
 
 def test_route_faan_for_empty_overrides_returns_route_faan_unchanged() -> None:
@@ -336,7 +336,7 @@ def test_estimate_best_faan_with_empty_overrides_matches_the_fixed_default() -> 
     """Same hand as `test_estimate_best_faan_picks_the_highest_reachable_route`, run through
     `route_faan_for({})` explicitly -- must match the no-`route_faan`-argument call exactly,
     pinning that an empty `faan_overrides` reproduces today's fixed `ROUTE_FAAN` behavior
-    structurally, not just "probably" (docs/99-deferred.md's Tier 2 revival requirement)."""
+    structurally, not just "probably" (docs/decisions/0014-ruleset-aware-bots.md)."""
     hand = _hand34(
         TileType.MAN_1,
         TileType.MAN_1,

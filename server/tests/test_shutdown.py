@@ -1,4 +1,4 @@
-"""Graceful shutdown drain (docs/00-architecture.md §8.1, docs/05-roadmap.md M3).
+"""Graceful shutdown drain (docs/architecture.md §8.1, docs/decisions/0018-milestone-plan.md M3).
 
 `TableRegistry.begin_shutdown`/`Table.wait_for_shutdown_boundary` are driven directly (bare
 `Table`/`TableRegistry`, no real WebSocket -- `tests/test_table.py`'s style: a `TableRegistry`'s

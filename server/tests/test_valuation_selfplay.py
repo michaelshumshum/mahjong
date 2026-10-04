@@ -1,4 +1,4 @@
-"""Organic validation of `bots/valuation.py` against the real scorer (docs/04-bots.md §4's own
+"""Organic validation of `bots/valuation.py` against the real scorer (docs/bots.md §4's own
 "measure it, don't assume" precedent, the same one `mahjong_core/shanten.py`'s frontier-table
 tradeoff sets). Plays real `RandomBot` self-play games, and for every real win, compares this
 module's `estimate_best_faan` (computed on the winning seat's pre-win, already-tenpai hand

@@ -1,4 +1,4 @@
-"""Single-hand self-play env over `mahjong_core` (docs/06-ml.md §7). `ml`-extra only.
+"""Single-hand self-play env over `mahjong_core` (docs/ml.md §7). `ml`-extra only.
 
 One episode is a fresh hand from `engine.new_hand(ruleset, env_seed, dealer, prevailing)`,
 played to `HAND_OVER`; the caller drives all four seats. Dealer and prevailing wind are drawn

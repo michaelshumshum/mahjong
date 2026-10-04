@@ -1,4 +1,4 @@
-"""Auxiliary-head dataset for `PolicyNet` (docs/06-ml.md §8, R1): states from self-play, exact
+"""Auxiliary-head dataset for `PolicyNet` (docs/ml.md §8, R1): states from self-play, exact
 labels from `GameState`.
 
     python -m ml.generate_aux --out data/rl_aux --games N --parallel 10

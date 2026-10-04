@@ -1,4 +1,4 @@
-"""Process-pool worker for bot-driven decisions (docs/00-architecture.md §3, docs/04-bots.md §1).
+"""Process-pool worker for bot-driven decisions (docs/architecture.md §3, docs/bots.md §1).
 
 Returns a bare action id, not a decoded `Action`: a worker process never receives `GameState`
 (`game_seed` must never leave the table's own process), so `app/table.py`'s `_handle_bot_result`
@@ -25,11 +25,11 @@ from bots.random import RandomBot
 __all__ = ["BOT_TIERS", "DEFAULT_BOT_TIER", "compute_action"]
 
 # "ORACLE", not "T4": not one more rung on the T0-T2 ladder (T3/SearchBot, Expert, was removed --
-# docs/04-bots.md §6) but a full-information bot a table opts into explicitly.
+# docs/decisions/0012-searchbot-removed.md) but a full-information bot a table opts into explicitly.
 BOT_TIERS: Final = ("T0", "T1", "T2", "ORACLE")
 DEFAULT_BOT_TIER: Final = "T2"
 """A bot-filled table runs `FaanBot`, not a weaker tier -- an all-T1 table produces endless
-exhaustive draws under `min_faan=3` (docs/04-bots.md §4)."""
+exhaustive draws under `min_faan=3` (docs/bots.md §4)."""
 
 
 def _make_bot(tier: str, seed: int) -> Bot:

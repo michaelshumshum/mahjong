@@ -10,7 +10,7 @@
 	const MIN_DISPLAY_MS = 1000;
 
 	// mock scenarios and /demo are built to run with no backend at all (screenshot pipeline, mock
-	// e2e specs -- docs/03-frontend.md's "/table/[id] wiring") -- the gate never applies there.
+	// e2e specs -- docs/frontend.md's "/table/[id] wiring") -- the gate never applies there.
 	let skip = $derived(page.url.searchParams.has('mock') || page.url.pathname.startsWith('/demo'));
 
 	let status = $state<'connecting' | 'ready' | 'error'>('connecting');
@@ -19,7 +19,7 @@
 	// attempt in Ns" text, not a ticking countdown (web/AGENTS.md's "never a JS ticker" rule).
 	let nextRetryDelayMs = $state<number | null>(null);
 
-	// claims mural visibility until `ready` (docs/03-frontend.md §2's "Shared across routes"),
+	// claims mural visibility until `ready` (docs/frontend.md §2's "Shared across routes"),
 	// releasing the instant children mount so the underlying page's own claim takes over.
 	claimMuralVisible(() => !skip && status !== 'ready');
 

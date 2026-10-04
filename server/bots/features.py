@@ -1,4 +1,4 @@
-"""`SeatView` -> `mahjong_core.shanten`'s 34-count-array contract (docs/04-bots.md §3), shared by
+"""`SeatView` -> `mahjong_core.shanten`'s 34-count-array contract (docs/bots.md §3), shared by
 every heuristic bot tier. Lives in `bots/`, not `mahjong_core/`, since it reads `SeatView`/
 `ClaimOffer` -- `app/`-layer types `mahjong_core` must never depend on.
 
@@ -6,7 +6,7 @@ every heuristic bot tier. Lives in `bots/`, not `mahjong_core/`, since it reads 
 non-concealed melds, public discard pools. Another seat's concealed kong is deliberately excluded
 -- a human wouldn't see its tile type either, and `mahjong_core` never redacts, so this module is
 where that boundary is drawn. `seen34` is the one exception: when `view.hands` is populated (the
-`"ORACLE"` tier's omniscient view, docs/04-bots.md §10) it also counts every opponent's real
+`"ORACLE"` tier's omniscient view, docs/bots.md §9) it also counts every opponent's real
 concealed tiles, including concealed kongs -- see its own docstring.
 """
 
@@ -49,11 +49,11 @@ def is_closed(view: SeatView) -> bool:
 
 
 def seen34(view: SeatView) -> list[int]:
-    """Every tile type publicly visible plus this seat's own concealed hand (docs/04-bots.md §3's
+    """Every tile type publicly visible plus this seat's own concealed hand (docs/bots.md §3's
     ukeire contract) -- never the wall.
 
     Hands-aware when `view.hands` is populated (the `"ORACLE"` tier's omniscient view,
-    docs/04-bots.md §10): every opponent's real concealed tiles count as seen too, since they're
+    docs/bots.md §9): every opponent's real concealed tiles count as seen too, since they're
     genuinely known rather than merely inferred -- otherwise `ukeire`'s live-tile count
     (`4 - seen34[t]`) would treat tiles actually sitting in an opponent's hand as still drawable
     from the wall. `view.hands is None` (every other tier) is untouched, byte-for-byte.

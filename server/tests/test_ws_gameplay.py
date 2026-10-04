@@ -1,4 +1,4 @@
-"""Real gameplay over the wire (docs/05-roadmap.md M3 sub-task 4) -- the M3 gate in miniature:
+"""Real gameplay over the wire (docs/decisions/0018-milestone-plan.md M3 sub-task 4) -- the M3 gate in miniature:
 four scripted WS clients `join` the same table, `ready` up, and play a hand through real
 `discard`/`claim`/`declare` intents, asserting correctly-sequenced, correctly-redacted frames.
 
@@ -141,7 +141,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             # (seat 0's sync above already reflects the rig -- rigged before any ready fired.)
 
             # --- ready: each ack fires immediately; the 4th also cascades hand_start/deal/turn
-            # to every seat (dealing gates on all-four-ready, 02-protocol.md §2).
+            # to every seat (dealing gates on all-four-ready, protocol.md §2).
             for seat in range(3):
                 wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
                 ack = wss[seat].receive_json()
@@ -203,12 +203,12 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             window_id = offer2["d"]["window_id"]
 
             # an option's `tiles` names only the claimer's own tiles, never the discard, so a
-            # client can echo it straight back as the claim disambiguator (02-protocol.md §2).
+            # client can echo it straight back as the claim disambiguator (protocol.md §2).
             pung_option = next(o for o in offer2["d"]["options"] if o["kind"] == "pung")
             assert sorted(pung_option["tiles"]) == sorted([_MAN_5[1], _MAN_5[2]])
 
             # --- seat 2 pungs (higher priority than seat 1's un-answered chow -- early exit,
-            # 00-architecture.md §4). No response is ever sent for seat 1's offer.
+            # architecture.md §4). No response is ever sent for seat 1's offer.
             claim_id = _next_id()
             wss[2].send_json(
                 _msg(
@@ -265,7 +265,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             assert hand_end["outcome"] == "exhaustive_draw"
             assert hand_end["hand_no"] == 1
             assert hand_end["winner"] is None
-            # hand-end hold (docs/00-architecture.md §3): every seat gets the same deadline,
+            # hand-end hold (docs/architecture.md §3): every seat gets the same deadline,
             # held until all four ack (below) or it elapses, whichever first.
             assert isinstance(hand_end["deadline_ts"], int)
 

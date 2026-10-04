@@ -59,7 +59,7 @@
 		<p class="practice-hint">{m.practiceSetupDialog_hint()}</p>
 
 		<!-- Same ring arrangement as the real seat-selection screen (SeatRing/SeatPicker,
-			docs/03-frontend.md's "Pre-game states") -- right/across/left are the bot seats this
+			docs/frontend.md's "Pre-game states") -- right/across/left are the bot seats this
 			dialog configures; self is always the human seat, never one of them. -->
 		<div class="seat-ring">
 			<div class="seat-ring-pos seat-ring-pos--across">
@@ -145,7 +145,7 @@
 		color: var(--color-text-muted);
 	}
 
-	// same geometry as SeatRing/SeatPicker's seat-ring (docs/03-frontend.md's "Pre-game states"),
+	// same geometry as SeatRing/SeatPicker's seat-ring (docs/frontend.md's "Pre-game states"),
 	// sized up since each slot here carries a difficulty word + caption, not just seat status.
 	.seat-ring {
 		display: grid;

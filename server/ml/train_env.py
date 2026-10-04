@@ -1,4 +1,4 @@
-"""PPO rollout env (docs/06-ml.md §7, §9, §10): `HandEnv`s whose surfaced decisions come back as
+"""PPO rollout env (docs/ml.md §7, §9, §10): `HandEnv`s whose surfaced decisions come back as
 packed encoder-v2 rows, with non-learning seats played inside the env. `ml`-extra only.
 
 Each episode seats `EnvConfig.learners` learning seats (drawn from the episode seed) and fills the

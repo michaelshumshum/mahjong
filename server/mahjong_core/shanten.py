@@ -160,7 +160,7 @@ def shanten(
     is assumed to carry -- unlike Seven Pairs it isn't gated here. Seven Pairs (七對子) is
     `HandSet.NEW_18` and is only mandatory-parsed when `NEW_18` is in `hand_sets`; a ruleset with
     it off (e.g. `hk_strict`) must not have bots chase a shape they can never legally complete
-    (docs/01-rules-spec.md "New 18", docs/04-bots.md §9).
+    (docs/rules.md "New 18", docs/bots.md §8).
     """
     best = standard_shanten(tiles34)
     if closed:

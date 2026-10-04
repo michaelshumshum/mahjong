@@ -1,4 +1,4 @@
-"""CPU-path pin for `ml.ppo` (docs/06-ml.md §13): a fixed-seed tiny run (2 updates, then a resume
+"""CPU-path pin for `ml.ppo` (docs/ml.md §13): a fixed-seed tiny run (2 updates, then a resume
 for 1 more) must keep producing the same metrics and parameters on CPU. Pinned before the device
 handling landed, so a mismatch means the CPU path changed behaviour.
 

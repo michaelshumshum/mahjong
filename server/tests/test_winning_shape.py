@@ -1,5 +1,5 @@
 """Equivalence of the table-driven winning-shape check with the `decompose`-based reference it
-replaced (docs/06-ml.md §7: behaviour-neutral engine speed-ups)."""
+replaced (docs/ml.md §7: behaviour-neutral engine speed-ups)."""
 
 from __future__ import annotations
 

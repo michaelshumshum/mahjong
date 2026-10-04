@@ -1,4 +1,4 @@
-"""R1 exit measurements for `PolicyNet`'s auxiliary heads (docs/06-ml.md §8, §14):
+"""R1 exit measurements for `PolicyNet`'s auxiliary heads (docs/ml.md §8, §14):
 
     python -m ml.aux_eval --ckpt runs/rl_aux/ckpt_best.pt --data data/rl_aux_packed \
         --danger-ckpt runs/danger/ckpt_best.pt [--split test]

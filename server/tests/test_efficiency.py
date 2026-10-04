@@ -1,4 +1,4 @@
-"""T1 `EfficiencyBot` (docs/04-bots.md §2/§3).
+"""T1 `EfficiencyBot` (docs/bots.md §2/§3).
 
 Two kinds of coverage: (1) legality -- `EfficiencyBot.act` never returns an id the live mask
 doesn't mark legal, swept across real self-play states (same machinery as `tests/test_ml.py`),

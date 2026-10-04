@@ -1,5 +1,5 @@
 // GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.
-// Source of truth: server/app/protocol.py (docs/02-protocol.md §6).
+// Source of truth: server/app/protocol.py (docs/protocol.md §6).
 
 export interface Envelope {
 	v: 1;
@@ -353,7 +353,7 @@ export interface HandHistoryEntryPayload {
 	winner_melds: Record<string, unknown>[] | null;
 }
 
-/** Client -> server intents (docs/02-protocol.md §2). */
+/** Client -> server intents (docs/protocol.md §2). */
 export type ClientMessage =
 	| Hello
 	| Ping
@@ -367,7 +367,7 @@ export type ClientMessage =
 	| HandEndAck;
 
 /**
- * Server -> client events (docs/02-protocol.md §3). Keep the reducer's
+ * Server -> client events (docs/protocol.md §3). Keep the reducer's
  * switch over this type exhaustive (assertNever, protocol.assertNever.ts)
  * so a new member fails the build.
  */

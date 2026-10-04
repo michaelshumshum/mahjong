@@ -1,5 +1,5 @@
 """`ml/encode_v2.py`: the fast `GameState` path equals the `seat_view` reference on every swept
-state and seat, and the policy input never moves when hidden information does (docs/06-ml.md §8)."""
+state and seat, and the policy input never moves when hidden information does (docs/ml.md §8)."""
 
 from __future__ import annotations
 

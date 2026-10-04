@@ -306,20 +306,20 @@
 	"timerRingDemo_durationButton": "{ms}毫秒",
 
 	"claimButtonsDemo_heading": "ClaimButtons 示範",
-	"claimButtonsDemo_hint": "模擬同一張棄牌的兩個上牌選項（4s-5s 與 5s-7s）的 claim_offer，加上碰、食糊、過。固定於視窗底部正中，詳見 docs/03-frontend.md §5。",
+	"claimButtonsDemo_hint": "模擬同一張棄牌的兩個上牌選項（4s-5s 與 5s-7s）的 claim_offer，加上碰、食糊、過。固定於視窗底部正中，詳見 docs/frontend.md §5。",
 
 	"faanBreakdownDemo_heading": "FaanBreakdown 示範",
 	"faanBreakdownDemo_hintBeforeHandEnd": "模擬",
-	"faanBreakdownDemo_hintBetween": "資料（docs/02-protocol.md §3）— 目前尚未有真實的計分邏輯。第一張卡：普通的 5 番棄糊。第二張：四種牌型疊加至 11 番，被封頂至預設的",
+	"faanBreakdownDemo_hintBetween": "資料（docs/protocol.md §3）— 目前尚未有真實的計分邏輯。第一張卡：普通的 5 番棄糊。第二張：四種牌型疊加至 11 番，被封頂至預設的",
 	"faanBreakdownDemo_hintAfterFaanCap": "10。",
 
 	"scoreSheetDemo_heading": "ScoreSheet 示範",
 	"scoreSheetDemo_hintIntro": "模擬",
-	"scoreSheetDemo_hintBody": "資料（docs/02-protocol.md §3）— 和上面的 FaanBreakdown 示範一樣，這些事件目前尚未有真實的伺服器模型。一圈（",
+	"scoreSheetDemo_hintBody": "資料（docs/protocol.md §3）— 和上面的 FaanBreakdown 示範一樣，這些事件目前尚未有真實的伺服器模型。一圈（",
 	"scoreSheetDemo_hintTail": "一局制）遊戲的四手牌；每手的得失分相加為零，並累積成下方頁尾顯示的總分及最終排名。第一局及第三局有詳細記錄 — 點擊該列可展開勝出牌型（或流局備註）。",
 
 	"settingsDemo_heading": "Settings 示範",
-	"settingsDemo_hint": "預設開關對應 `auto` 訊息的 `no_calls`／`auto_pass_chow` 欄位（docs/02-protocol.md §2）— 沒有 `auto_win`，詳見該章節的「刻意拒絕叫糊」。音效／動態效果只是搶先於正式設定介面推出的純客戶端偏好設定。",
+	"settingsDemo_hint": "預設開關對應 `auto` 訊息的 `no_calls`／`auto_pass_chow` 欄位（docs/protocol.md §2）— 沒有 `auto_win`，詳見該章節的「刻意拒絕叫糊」。音效／動態效果只是搶先於正式設定介面推出的純客戶端偏好設定。",
 
 	"toastDemo_heading": "Toast 示範",
 	"toastDemo_hint": "一般性的暫時通知，透過 toasts.ts 的純函式在本機排隊顯示。自動消失是每個提示各自的一次性計時器（並非 JS ticker）；亦可按 × 按鈕手動關閉。",

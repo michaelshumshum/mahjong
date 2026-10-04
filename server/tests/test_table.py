@@ -1,4 +1,4 @@
-"""`app/table.py`'s core dispatch loop (docs/05-roadmap.md M3 sub-task 2), driven purely through
+"""`app/table.py`'s core dispatch loop (docs/decisions/0018-milestone-plan.md M3 sub-task 2), driven purely through
 `Table.submit()`/`process_one()` -- never `reduce()`/`start_next_hand()` directly, so these tests
 actually exercise the Table's own dispatch, not the pure engine underneath it.
 
@@ -104,7 +104,7 @@ async def test_full_game_through_table_progresses_and_publishes_gapless_redacted
 
 
 async def test_hand_history_accumulates_across_full_game_and_reconciles_with_final_scores() -> None:
-    """`state_sync.hand_history` (docs/02-protocol.md §3) exists so a client with no live memory
+    """`state_sync.hand_history` (docs/protocol.md §3) exists so a client with no live memory
     of earlier hands can still reconstruct the full scoresheet -- same reconciliation check
     `web/src/lib/ui/ScoreSheet.svelte`'s `historyComplete` runs client-side: summed per-hand
     `payments` must reach the same totals `state.seats[*].score` already holds."""
@@ -184,7 +184,7 @@ async def test_illegal_command_is_rejected_without_corrupting_state() -> None:
     assert table.event_id == pre_event_id + 1
 
 
-# --- M5 guest display name normalization (docs/02-protocol.md §2 join.name) --------------------
+# --- M5 guest display name normalization (docs/protocol.md §2 join.name) --------------------
 
 
 def test_join_name_is_trimmed_and_stored() -> None:
@@ -213,7 +213,7 @@ def test_join_name_over_length_is_truncated_not_rejected() -> None:
     assert len(binding.name) == 24
 
 
-# --- hand-end hold (docs/00-architecture.md §3, "Hand-end hold") ------------------------------
+# --- hand-end hold (docs/architecture.md §3, "Hand-end hold") ------------------------------
 # holds the table at HAND_OVER until every non-bot/autoplay seat acks or hand_end_seconds elapses; these drive a bare Table() to the first landing and exercise the hold directly.
 
 
@@ -337,7 +337,7 @@ async def test_t2_bot_jobs_route_to_the_default_pool_only() -> None:
     assert len(default_pool.submissions) == 1
 
 
-# --- per-seat bot tier override (practice mode's difficulty picker, docs/03-frontend.md) -------
+# --- per-seat bot tier override (practice mode's difficulty picker, docs/frontend.md) -------
 
 
 def test_seat_bot_tiers_overrides_bot_tier_per_seat_falling_back_for_seats_it_omits() -> None:
@@ -385,7 +385,7 @@ def test_seat_bot_tiers_rejects_a_seat_out_of_range() -> None:
         Table("table-bad-seat", RuleSet(), game_seed=1, seat_bot_tiers={4: "T1"})
 
 
-# --- ORACLE dispatch + disconnect-handover pinning (docs/04-bots.md §10) -----------------------
+# --- ORACLE dispatch + disconnect-handover pinning (docs/bots.md §9) -----------------------
 # "ORACLE" is a plain FaanBot() fed an omniscient view -- no dedicated pool, so only the view-building special case and disconnect-handover (never for a human's seat) need pinning here.
 
 
@@ -415,7 +415,7 @@ async def test_oracle_bot_job_view_has_hands_populated_for_a_practice_bot_seat()
 
 async def test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_oracle() -> None:
     """The one explicit product requirement behind the `ORACLE` tier's live-dispatch wiring
-    (docs/04-bots.md): a real human's seat gone quiet (`autoplay`) must never be driven by the
+    (docs/bots.md): a real human's seat gone quiet (`autoplay`) must never be driven by the
     table's own `bot_tier` when that tier is `ORACLE` -- a human never opted into a bot that
     sees every other seat's concealed tiles. Verified: the view built for that job is an
     ordinary `seat_view` (`.hands is None`), never the omniscient one -- both tiers already share

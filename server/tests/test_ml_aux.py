@@ -1,4 +1,4 @@
-"""Auxiliary-head pipeline (docs/06-ml.md §8): `ml.generate_aux` labels, `ml.aux_data` packing and
+"""Auxiliary-head pipeline (docs/ml.md §8): `ml.generate_aux` labels, `ml.aux_data` packing and
 targets, `ml.train`'s `rl_aux` dispatch and `ml.aux_eval`. Uses `EfficiencyBot` states for speed."""
 
 from __future__ import annotations

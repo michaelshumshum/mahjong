@@ -1,4 +1,4 @@
-"""Cold-start curriculum (docs/06-ml.md §10): C0 -> C0b -> C1, then C2 (the R3 league, a stub).
+"""Cold-start curriculum (docs/ml.md §10): C0 -> C0b -> C1, then C2 (the R3 league, a stub).
 
 Each stage fixes the env seating (learning seats, in-env opponent) and linearly anneals, over
 `anneal_decisions` from the stage's start, the oracle the policy sees (next-`k` draws, keep

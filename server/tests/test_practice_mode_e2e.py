@@ -1,4 +1,4 @@
-"""M4.5's bot-filled-table mechanism (docs/05-roadmap.md M4.5, docs/04-bots.md §1): one real WS
+"""M4.5's bot-filled-table mechanism (docs/frontend.md §7 "Practice mode", docs/bots.md §1): one real WS
 client joins a `practice=true` table, seats 1-3 are bot-bound from table *creation* -- no `join`
 ever sent for them -- and a full game plays out to `Phase.GAME_OVER` with the human acting on
 its own turns and the real `FaanBot` (T2, the table's default `bot_tier`) tier acting on the
@@ -12,7 +12,7 @@ real heuristic bots do with an unrigged wall.
 Marked `slow`, unlike `tests/test_full_game_e2e.py`'s own comparable real 4-hand WS-driven game:
 that file scripts every seat itself, but this one lets three real `FaanBot`s decide ~150-250
 turns across the game, each a real `ProcessPoolExecutor` round-trip against
-`mahjong_core.shanten`'s per-process, lazily-warmed frontier cache (docs/04-bots.md §"Built
+`mahjong_core.shanten`'s per-process, lazily-warmed frontier cache (docs/bots.md §"Built
 (M4)") -- 20-50ms/decision once warm, slower while cold, and a fresh test process never gets the
 sustained multi-table load that keeps the cache warm in production. Measured at ~45s standalone;
 capping the shared pool's worker count to force faster warm-up was tried and made it *worse*

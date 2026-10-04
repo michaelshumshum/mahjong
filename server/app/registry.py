@@ -1,4 +1,4 @@
-"""`TableRegistry` -- module-level table lookup/creation/cleanup (docs/00-architecture.md §6):
+"""`TableRegistry` -- module-level table lookup/creation/cleanup (docs/architecture.md §6):
 an in-process dict plus the bookkeeping to run each `Table`'s `asyncio.Task` and stop leaking
 finished ones.
 
@@ -211,7 +211,7 @@ class TableRegistry:
     async def begin_shutdown(
         self, *, grace_seconds: float = 90.0, deadline_ts: int | None = None
     ) -> None:
-        """docs/00-architecture.md §8.1 drain, this registry's half. Broadcasts
+        """docs/architecture.md §8.1 drain, this registry's half. Broadcasts
         `server_shutdown` to every table with a bound seat, then waits on each via
         `asyncio.gather` (one grace window total, not per table). A timed-out table is logged,
         not torn down here -- the process exiting is what ends it.

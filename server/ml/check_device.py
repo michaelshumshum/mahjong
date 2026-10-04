@@ -1,4 +1,4 @@
-"""Device check and PPO throughput benchmark (docs/06-ml.md §13). `ml`-extra only.
+"""Device check and PPO throughput benchmark (docs/ml.md §13). `ml`-extra only.
 
     uv run --extra ml python -m ml.check_device [--updates 3] [--workers 6] [--envs 96]
 

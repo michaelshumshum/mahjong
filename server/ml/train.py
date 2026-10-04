@@ -1,7 +1,7 @@
 """CLI entry point: `python -m ml.train --config ml/configs/danger.yaml [--resume]`
 (docker-compose.yml's `trainer` service, this repo's `make train`).
 
-`algorithm: danger` trains the opponent-danger model (`DangerNet`, docs/06-ml.md §5) on a packed
+`algorithm: danger` trains the opponent-danger model (`DangerNet`, docs/ml.md §5) on a packed
 dataset (`ml.pack`). `algorithm: rl_aux` trains `PolicyNet`'s trunk and auxiliary heads
 (`ml.aux_train`, §8) on an `ml.aux_data` dataset. `algorithm: ppo` runs the cold-start PPO
 learner (`ml.ppo.train_ppo`, §9/§10) from its own config schema (`ml.ppo.PPOConfig`). Any other

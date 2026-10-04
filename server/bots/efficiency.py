@@ -1,4 +1,4 @@
-"""T1 `EfficiencyBot` (docs/04-bots.md §2/§3): shanten-minimising discard, ukeire tiebreak.
+"""T1 `EfficiencyBot` (docs/bots.md §2/§3): shanten-minimising discard, ukeire tiebreak.
 
 Never claims/declares kongs: a kong always contributes 3 tiles to the shanten count array
 regardless of source, so doing so never changes shanten -- falls out of the shanten model, not a

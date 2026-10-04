@@ -1,4 +1,4 @@
-"""`HandRecord` persistence (docs/06-ml.md §2): standalone hands from `engine.new_hand`, stored in
+"""`HandRecord` persistence (docs/ml.md §2): standalone hands from `engine.new_hand`, stored in
 `hand_records`, replayed from `(ruleset, seed, dealer, prevailing, action_log)`. SQLite, as
 `test_game_record.py`."""
 

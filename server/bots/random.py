@@ -1,4 +1,4 @@
-"""`RandomBot` -- T0, uniform over legal actions (docs/04-bots.md §2): the arena's baseline, not
+"""`RandomBot` -- T0, uniform over legal actions (docs/bots.md §2): the arena's baseline, not
 meant to play well.
 
 `random_action(state, seat, rng)` is a separate, `GameState`-based helper used by self-play/tests

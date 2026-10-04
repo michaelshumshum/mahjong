@@ -4,7 +4,7 @@ import { initialClientGameState, type ClientGameState, type ConnectionStatus } f
 import type { MahjongSocket } from '../net/socket';
 import type { ServerEvent } from '../net/protocol';
 
-/** Client game state store (docs/03-frontend.md §6). `#apply` is the only mutator, driven
+/** Client game state store (docs/frontend.md §6). `#apply` is the only mutator, driven
  * exclusively by events the socket receives. */
 export class GameStore {
 	state = $state<ClientGameState>(initialClientGameState());

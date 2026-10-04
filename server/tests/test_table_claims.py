@@ -1,5 +1,5 @@
 """`app/table.py`'s claim-window timer heap, D17 race fix, and early exit/timeout wiring
-(docs/00-architecture.md §3 D17, §4; docs/05-roadmap.md M3 sub-task 3).
+(docs/architecture.md §3 D17, §4; docs/decisions/0018-milestone-plan.md M3 sub-task 3).
 
 Fixtures mirror `tests/test_engine.py`'s `_claims_window_state()`: seat 0 discards 5m, seat 1
 can chow it (holding 4m/6m), seat 2 can pung it (holding two more 5m) -- injected straight into
@@ -125,9 +125,9 @@ async def test_discard_opening_claim_window_arms_a_deadline() -> None:
 
 async def test_no_claim_deadline_armed_when_a_discard_draws_no_claims() -> None:
     """No claim-window deadline gets armed when a discard draws no claims -- it cascades
-    straight to the next player's draw+`AWAIT_ACTION` instead (00-architecture.md §4). The
+    straight to the next player's draw+`AWAIT_ACTION` instead (architecture.md §4). The
     heap is no longer empty afterward, though: landing in `AWAIT_ACTION` now arms that seat's
-    own turn-timeout deadline too (00-architecture.md §8 "Turn timeout", the turn-timeout
+    own turn-timeout deadline too (architecture.md §8 "Turn timeout", the turn-timeout
     sub-task) -- this asserts the *claim* side specifically (no armed window, no per-seat claim
     timer entries), not "the heap has nothing in it at all"."""
     ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=5)

@@ -1,4 +1,4 @@
-"""M3's literal done-when gate, closeout audit (docs/05-roadmap.md M3, M2 sub-task 10's
+"""M3's literal done-when gate, closeout audit (docs/decisions/0018-milestone-plan.md M3, M2 sub-task 10's
 pattern applied to the server): "four scripted WS clients play a full game; killing one
 mid-hand and reconnecting resumes correctly from `last_seq`; `test_redaction` proves no seat
 ever receives a tile identity it isn't entitled to." `tests/test_ws_gameplay.py` proves one

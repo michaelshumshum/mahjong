@@ -1,5 +1,5 @@
-"""Schema-walking redaction tests (docs/00-architecture.md §5, docs/02-protocol.md §3,
-docs/05-roadmap.md §3's testing table: "render every event type for every seat and assert no
+"""Schema-walking redaction tests (docs/architecture.md §5, docs/protocol.md §3,
+docs/testing.md §1's testing table: "render every event type for every seat and assert no
 unauthorised `tile_id`/`tile` ever appears... fails loudly on new message fields").
 
 Real `GameState`s, not just hand-built minimal ones: `_collect_self_play_samples` plays actual
@@ -249,7 +249,7 @@ def event_samples() -> list[tuple[GameState, Event]]:
 
 def _assert_wire_entitlement(wire: Any, viewer: int | None, *, reveal_hands: bool = False) -> None:
     """Walk one produced wire instance's `Entitlement`-annotated fields structurally
-    (00-architecture.md §5). Every field must carry an annotation -- a field with none fails
+    (architecture.md §5). Every field must carry an annotation -- a field with none fails
     loudly rather than silently passing (see `test_walker_rejects_unannotated_field`).
     `reveal_hands` walks it as the open-hands spectator (`app/views.py`'s module docstring)."""
     open_spectator = reveal_hands and viewer is None
@@ -357,7 +357,7 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
         assert not leaked, f"claim_options leaked {leaked} to seat {seat}: {offer!r}"
 
     # `melds` has hand-rolled serialization (`_meld_wire`), not the schema walker above -- its
-    # aggregate PUBLIC annotation is wrong specifically for a concealed kong's tiles (00-architecture.md §5).
+    # aggregate PUBLIC annotation is wrong specifically for a concealed kong's tiles (architecture.md §5).
     wire = seat_view_wire(view)
     for owner_seat, seat_melds in enumerate(view.melds):
         wire_melds = wire["melds"][owner_seat]
@@ -558,7 +558,7 @@ def test_hand_history_wire_omits_winner_melds_for_exhaustive_draw() -> None:
 
 def test_walker_rejects_unannotated_field() -> None:
     """Proves the walker isn't just a docstring promise: a field with no `Entitlement`
-    metadata fails loudly instead of silently passing (00-architecture.md §5's own framing)."""
+    metadata fails loudly instead of silently passing (architecture.md §5's own framing)."""
 
     @dataclass(frozen=True)
     class _Naked:
@@ -583,7 +583,7 @@ def test_walker_catches_a_leak() -> None:
 def test_public_wire_forms_never_declare_hand_end_or_own_seat_for_group_fields() -> None:
     """Sanity check on the schema itself: `ClaimResolvedWire`/`FlowerReplaceWire`/
     `DiscardWire`/`GameEndWire` carry no restricted fields at all -- nothing in them is ever
-    allowed to differ per viewer, matching 02-protocol.md §3 ("fully public... no redaction")."""
+    allowed to differ per viewer, matching protocol.md §3 ("fully public... no redaction")."""
     for cls in (ClaimResolvedWire, FlowerReplaceWire, DiscardWire, GameEndWire):
         for f in fields(cls):
             assert f.metadata.get("entitlement") in (Entitlement.PUBLIC, None) or f.name == "t", (
@@ -640,7 +640,7 @@ def test_reveal_hands_is_spectator_only() -> None:
             redact_event(state, seat, event, reveal_hands=True)
 
 
-# --- ORACLE tier containment (docs/04-bots.md §10): a real seat's own wire traffic never gets hands
+# --- ORACLE tier containment (docs/bots.md §9): a real seat's own wire traffic never gets hands
 
 
 @pytest.mark.parametrize("bot_tier", BOT_TIERS)

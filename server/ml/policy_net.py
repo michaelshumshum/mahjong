@@ -1,4 +1,4 @@
-"""RL policy network, oracle critic and auxiliary heads (docs/06-ml.md §8). `ml`-extra only.
+"""RL policy network, oracle critic and auxiliary heads (docs/ml.md §8). `ml`-extra only.
 
 `PolicyNet` is a `DangerNet`-style trunk over encoder v2's policy tensors. Its policy head is
 tile-equivariant: a 1x1 conv gives 3 logits per tile (discard / concealed kong / added kong), laid

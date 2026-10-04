@@ -1,11 +1,11 @@
-"""Golden fixtures for mahjong_core/scoring/faan.py (docs/05-roadmap.md §2, sixth sub-task).
+"""Golden fixtures for mahjong_core/scoring/faan.py (docs/testing.md §1).
 
 `test_scoring.py` covers each `Pattern` detector in isolation via `score_hand`; this file
 covers what only `score_winning_hand` does on top of that: decomposition maximisation,
 `hand_sets` filtering, `faan_overrides`, limit-hand non-stacking, the `faan_cap` clamp,
 Chicken Hand, and the `min_faan` gate. Every fixture here is a real, physically legal 14-tile
 hand (verified against `melds.decompose` directly while authoring these, not hand-picked
-faan numbers) -- see docs/01-rules-spec.md §11 edge case 9, the reason decomposition
+faan numbers) -- see docs/rules.md §11 edge case 9, the reason decomposition
 maximisation exists at all.
 """
 
@@ -60,7 +60,7 @@ def _ctx(
 
 
 def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
-    """01-rules-spec.md §11.9, specifically for Seven Pairs (the collision the edge case names):
+    """rules.md §11.9, specifically for Seven Pairs (the collision the edge case names):
     11223344556677m parses both as 七對子 (7 distinct pairs, `decompose()`'s empty-tuple raw
     shape -- patterns.py's "Raw-hand access" note) and as a standard hand (123m 123m 456m 456m
     77m, a real `decompose()` split -- 平糊 too, since every group is a chow). The standard
@@ -99,7 +99,7 @@ def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
 
 def test_maximizes_across_decompositions() -> None:
     """111p 222p 333p 444p 99s parses two ways: four pungs (對對糊 + 三暗刻, 9 total with
-    缺一門), or 123p x3 chows + 444p pung (三般高, 10 total with 缺一門) -- 01-rules-spec.md
+    缺一門), or 123p x3 chows + 444p pung (三般高, 10 total with 缺一門) -- rules.md
     §11 edge case 9. The chow parse scores higher; maximisation must pick it, not whichever
     `decompose()` happens to list first."""
     tiles = _tiles(
@@ -142,7 +142,7 @@ def _nine_gates_tiles(extra_rank: int) -> tuple[TileId, ...]:
 
 def test_limit_shape_vs_standard_decomposition_picks_the_limit() -> None:
     """1112345678999p + 5p is both a valid standard decomposition (清一色 + 無花 + 門前清 =
-    8) and 九蓮寶燈 (limit). Limit hands don't stack with anything (01-rules-spec.md §7
+    8) and 九蓮寶燈 (limit). Limit hands don't stack with anything (rules.md §7
     "Stacking and caps") -- the winning candidate must show only the limit pattern, at
     `faan_cap`, not `patterns.py`'s `LIMIT_FAAN` placeholder and not summed with the classic
     patterns that also matched the same tiles."""
@@ -412,7 +412,7 @@ def test_chicken_hand_gated_by_new_6_hand_set() -> None:
 
 
 def test_kong_replacement_last_tile_exclusion_survives_maximization() -> None:
-    """01-rules-spec.md §7 note ³: a kong replacement that's also the wall's last tile scores
+    """rules.md §7 note ³: a kong replacement that's also the wall's last tile scores
     as 槓上開花 only, never also 海底撈月 -- `patterns.py`'s detectors already enforce this;
     this proves `score_winning_hand`'s maximisation/candidate scoring doesn't reintroduce
     double-counting across candidates."""

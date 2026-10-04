@@ -1,4 +1,4 @@
-"""Masked losses for the opponent-danger model (docs/06-ml.md §5) and `PolicyNet`'s auxiliary
+"""Masked losses for the opponent-danger model (docs/ml.md §5) and `PolicyNet`'s auxiliary
 heads (§8), which follow the same wait/faan conventions.
 
 Wait heads are trained unconditionally on every tile, not only when the opponent is tenpai: the

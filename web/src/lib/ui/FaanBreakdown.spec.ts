@@ -34,7 +34,7 @@ describe('FaanBreakdown', () => {
 
 	it('flags a capped total when the pattern sum exceeds the given total', () => {
 		// Full Flush (6) + All Pungs (3) + Two Dragon Pungs (2) = 11, clamped to faan_cap 10
-		// (docs/01-rules-spec.md §7 stacking example + "Total is clamped").
+		// (docs/rules.md §7 stacking example + "Total is clamped").
 		const stacked: FaanPattern[] = [
 			{ name: 'Full Flush', faan: 6 },
 			{ name: 'All Pungs', faan: 3 },

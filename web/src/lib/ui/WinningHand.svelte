@@ -30,7 +30,7 @@
 		totalFaan: number;
 	} = $props();
 
-	// reading order within a suit (docs/01-rules-spec.md §1's index layout: m, p, s, then honors).
+	// reading order within a suit (docs/rules.md §1's index layout: m, p, s, then honors).
 	const SUIT_ORDER: Record<string, number> = { m: 0, p: 1, s: 2 };
 	function tileSortKey(code: TileCode): number {
 		return code[0] === 'z'

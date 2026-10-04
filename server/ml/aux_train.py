@@ -1,4 +1,4 @@
-"""Supervised training of `PolicyNet`'s trunk and auxiliary heads (docs/06-ml.md §8, R1):
+"""Supervised training of `PolicyNet`'s trunk and auxiliary heads (docs/ml.md §8, R1):
 `python -m ml.train --config ml/configs/rl_aux.yaml` dispatches here.
 
 Only the trunk and auxiliary heads receive gradient; the policy head has no target (no bot

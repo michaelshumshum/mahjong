@@ -1,4 +1,4 @@
-"""T2 `FaanBot` (docs/04-bots.md §2/§4/§5).
+"""T2 `FaanBot` (docs/bots.md §2/§4/§5).
 
 Three kinds of coverage, matching `tests/test_efficiency.py`'s established convention: (1)
 legality -- `FaanBot.act` never returns an id the live mask doesn't mark legal, swept across
@@ -57,7 +57,7 @@ def _build_view(
     """Same convention as `tests/test_efficiency.py`'s `_build_view`, extended with a `melds`
     override so fold-logic scenarios can put an exposed meld on an opponent (safety module
     reads `view.melds`, T1's version never needed to), and a `ruleset` override so claim-guard
-    tests can exercise a non-default `min_faan` (docs/04-bots.md §9 Tier 1)."""
+    tests can exercise a non-default `min_faan` (docs/bots.md §8 Tier 1)."""
     ids = []
     used: dict[TileType, int] = {}
     for t in types:
@@ -180,7 +180,7 @@ async def test_full_games_complete_faanbot_vs_faanbot(seed: int) -> None:
 
 
 # `_weights_for_turn`'s mid-game `w_value=0.9` is tuned against real arena evidence (see
-# docs/04-bots.md §8); these two hands are turn-invariant under it and pin that calibration.
+# docs/bots.md §7); these two hands are turn-invariant under it and pin that calibration.
 
 
 async def test_does_not_chase_a_marginal_value_signal() -> None:
@@ -247,7 +247,7 @@ async def test_commits_to_a_strong_value_signal() -> None:
         assert aid == int(T.PIN_5), f"turn={turn}"
 
 
-# far past 3-shanten, late turn, seat 1 threatening (docs/04-bots.md §4): fold mode must
+# far past 3-shanten, late turn, seat 1 threatening (docs/bots.md §4): fold mode must
 # discard the genbutsu tile (北) over the meld-flagged dragon (發), not the ukeire-best option.
 
 _FOLD_HAND = [
@@ -301,7 +301,7 @@ async def test_folds_to_a_safe_tile_late_against_a_threatening_opponent() -> Non
     assert aid == int(T.WIND_NORTH)
 
 
-# --- weight profiles: persona multipliers for mixed-table evaluation (docs/06-ml.md §12) ------
+# --- weight profiles: persona multipliers for mixed-table evaluation (docs/ml.md §12) ------
 
 
 async def test_aggressive_chases_a_marginal_value_signal_baseline_declines() -> None:
@@ -409,7 +409,7 @@ async def test_declines_a_claim_that_would_drop_the_hand_below_min_faan() -> Non
     Voided Suit *open* (2, no closed bonus, verified directly), below `min_faan`. T1's "only if
     it strictly reduces shanten" rule alone would take this claim (it even reaches tenpai); T2's
     value guard must still decline it -- reaching tenpai on a hand that can no longer clear
-    `min_faan` is exactly the failure mode docs/04-bots.md §4 exists to prevent, not a reason to
+    `min_faan` is exactly the failure mode docs/bots.md §4 exists to prevent, not a reason to
     let speed override the value check (see `_should_claim`'s docstring)."""
     hand = [
         T.MAN_1,
@@ -440,7 +440,7 @@ async def test_should_claim_reads_min_faan_from_the_live_ruleset() -> None:
     closed Voided Suit at 4 faan, 1-shanten, offered pung of 5p drops it to open Voided Suit at
     2 faan, tenpai. That test pins the `hk_classic` default (`min_faan=3`): 4 >= 3 > 2, so the
     guard declines. This test proves the threshold comes from `view.ruleset.min_faan`
-    (docs/04-bots.md §9 Tier 1), not a hardcoded 3, by changing only the ruleset and getting the
+    (docs/bots.md §8 Tier 1), not a hardcoded 3, by changing only the ruleset and getting the
     opposite decision: under `hk_casual` (`min_faan=1`), 2 faan still clears the bar (4 >= 1 > 2
     is false), so the guard now takes the claim -- the exact claim the default-ruleset test
     declines."""
@@ -475,7 +475,7 @@ async def test_should_claim_reads_min_faan_from_the_live_ruleset() -> None:
     assert aid == 106  # pung -- opposite of the min_faan=3 default's "pass"
 
 
-# --- scripted discard: hand_sets-aware shanten (docs/04-bots.md §9 Tier 2) ---------------------
+# --- scripted discard: hand_sets-aware shanten (docs/bots.md §8 Tier 2) ---------------------
 
 
 async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
@@ -488,8 +488,8 @@ async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
     (`NEW_18` off, same `hand_sets` `mahjong_core.presets` ships there) Seven Pairs is illegal,
     so that same discard only reaches shanten 3 (the honors-heavy standard parse) -- worse than
     breaking one of the honor pairs instead (also shanten 3, but with real chow potential kept
-    alive in the ryanmen, so wider ukeire). This is the correctness bug docs/04-bots.md §9 and
-    docs/01-rules-spec.md's "New 18" note describe: pre-fix, `shanten()` ran Seven Pairs
+    alive in the ryanmen, so wider ukeire). This is the correctness bug docs/bots.md §8 and
+    docs/rules.md's "New 18" note describe: pre-fix, `shanten()` ran Seven Pairs
     unconditionally whenever `closed=True` and the bot chased this dead-end shape regardless of
     the table's ruleset."""
     hand = [
@@ -522,7 +522,7 @@ async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
     assert aid_off != int(T.MAN_5)  # keeps the ryanmen -- seven pairs is a dead end here
 
 
-# --- scripted discard: faan_overrides-aware ROUTE_FAAN (docs/04-bots.md §9 Tier 2) --------------
+# --- scripted discard: faan_overrides-aware ROUTE_FAAN (docs/bots.md §8 Tier 2) --------------
 
 
 async def test_discard_follows_faan_overrides_boosting_a_route() -> None:
@@ -616,7 +616,7 @@ def test_turn_breakpoints_match_the_old_hand_tuned_constants_at_default_ruleset(
     tiles - 53 dealt (13*4 + 1 dealer extra) - 0 `wall_reserve`, // 4 seats = 22, and
     `_turn_breakpoints` at that reference must come back exactly `(6, 12)` -- the same numbers
     `_weights_for_turn`'s schedule and the arena tuning history in its docstring were calibrated
-    against (docs/04-bots.md §4/§8)."""
+    against (docs/bots.md §4/§7)."""
     assert max_turns_per_seat(RuleSet()) == 22
     assert _turn_breakpoints(RuleSet()) == (6, 12)
 
@@ -638,7 +638,7 @@ async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
     weighs value/ukeire) but already past the late-turn gate under a ruleset with a much smaller
     real turn budget (`wall_reserve=40` -> late-turn value 7, from the test above) -- the same
     turn number that is "mid-game" under the default ruleset is "late" under a shorter one, per
-    docs/04-bots.md §9's `wall_reserve` row. Verified directly against `FaanBot.act` before
+    docs/bots.md §8's `wall_reserve` row. Verified directly against `FaanBot.act` before
     pinning here, matching this module's convention: default-ruleset turn 8 does *not* pick the
     safe genbutsu tile (aid 3, a different discard); the `wall_reserve=40` ruleset at the same
     turn does, matching the turn-13 fold test's pinned choice."""
@@ -664,7 +664,7 @@ async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
     assert aid_reduced == int(T.WIND_NORTH)  # already late under the smaller turn budget
 
 
-# --- self-kong loop: regression (docs/04-bots.md §10's kong-rob-risk fix) --------------------
+# --- self-kong loop: regression (docs/bots.md §9's kong-rob-risk fix) --------------------
 
 
 async def test_never_declares_a_self_kong_when_hands_is_none() -> None:

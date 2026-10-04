@@ -24,7 +24,7 @@ services:
     build:
       context: ./server
       target: dev
-    # one worker only: tables are in-memory, owned by one process. docs/07-infra.md §2
+    # one worker only: tables are in-memory, owned by one process. docs/infra.md §3
     command: >
       uv run uvicorn app.main:app
       --host 0.0.0.0 --port 8000 --workers 1
@@ -39,7 +39,7 @@ services:
     volumes:
       - ./server:/app
       - ./shared:/shared
-      - ./web/src/lib/net:/web-net    # `make proto` writes protocol.d.ts here directly (docs/02-protocol.md §6)
+      - ./web/src/lib/net:/web-net    # `make proto` writes protocol.d.ts here directly (docs/protocol.md §6)
       - server-venv:/app/.venv        # keeps the container venv off the host mount
     depends_on:
       postgres: {condition: service_healthy}

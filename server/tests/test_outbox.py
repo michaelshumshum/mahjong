@@ -1,5 +1,5 @@
 """`app/outbox.py`'s bounded per-connection queue: the drop-oldest -> collapse-to-`state_sync`
--> dead-connection policy (docs/02-protocol.md §9, docs/00-architecture.md "Outbound
+-> dead-connection policy (docs/protocol.md §9, docs/architecture.md "Outbound
 backpressure"). Exercised directly against `BoundedOutbox`, not over a real socket --
 constructing genuine slow-consumer backpressure through `starlette.testclient`'s in-memory
 transport isn't reliable (there's no real stalled TCP connection to model), so this is the

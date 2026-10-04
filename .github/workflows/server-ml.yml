@@ -1,7 +1,7 @@
 name: server-ml
 
 # Standalone, not a reusable workflow ci.yml calls: workflow_call has no path-filter mechanism of
-# its own, and the `ml` extra pulls in ~180MB->torch/numpy (docs/07-infra.md §3) that server/
+# its own, and the `ml` extra pulls in ~180MB->torch/numpy (docs/infra.md §4) that server/
 # server-slow never install. Gated on paths so it only runs when something ml-relevant actually
 # changed, not on every push/PR the way server.yml/web.yml/proto-check.yml do.
 on:

@@ -1,7 +1,7 @@
-"""Golden fixtures for mahjong_core/scoring/patterns.py (docs/05-roadmap.md §3: "Golden
+"""Golden fixtures for mahjong_core/scoring/patterns.py (docs/testing.md §1: "Golden
 fixtures, one per faan pattern plus combinations"). Fixtures are (hand melds, context) ->
 expected faan at the `score_hand`/detector layer -- `faan.py`'s decomposition-maximisation,
-`min_faan` gate, caps, and `payout.py`'s points/payments (docs/01-rules-spec.md §8) don't exist
+`min_faan` gate, caps, and `payout.py`'s points/payments (docs/rules.md §8) don't exist
 yet (see the M2 sub-task breakdown), so there's no ruleset/payments axis to fixture here yet;
 that's the shape a later sub-task's golden suite adds.
 """
@@ -272,7 +272,7 @@ def test_fully_concealed_true_when_no_open_melds_and_not_self_drawn() -> None:
 
 def test_fully_concealed_false_when_self_drawn() -> None:
     """This ruleset's 門前清 entry is defined as "win on discard" specifically -- a self-draw
-    win never gets it, even fully concealed; it gets 自摸 instead (01-rules-spec.md §7)."""
+    win never gets it, even fully concealed; it gets 自摸 instead (rules.md §7)."""
     hand = (
         _chow(TileType.MAN_1),
         _chow(TileType.MAN_5),
@@ -298,7 +298,7 @@ def test_fully_concealed_false_with_an_open_meld() -> None:
 
 
 def test_seat_and_prevailing_wind_stack_on_dealers_own_hand() -> None:
-    """Dealer's seat wind is always East (01-rules-spec.md §2); in the East round the
+    """Dealer's seat wind is always East (rules.md §2); in the East round the
     prevailing wind is also East, so an East pung earns both patterns -- 2 faan total, not 1.
     See the note in patterns.py's `_detect_prevailing_wind`."""
     hand = (
@@ -414,7 +414,7 @@ def test_two_dragon_pungs_without_dragon_pair_is_neither_small_nor_big() -> None
 
 
 def test_dragon_pung_still_stacks_with_small_three_dragons() -> None:
-    """01-rules-spec.md §7 note ²: 箭刻 keeps firing per dragon pung even once Small/Big Three
+    """rules.md §7 note ²: 箭刻 keeps firing per dragon pung even once Small/Big Three
     Dragons also fires on the same pungs."""
     hand = (
         _pung(TileType.DRAGON_RED),
@@ -471,7 +471,7 @@ def test_three_wind_pungs_without_wind_pair_is_neither_small_nor_big() -> None:
 
 
 def test_seat_wind_still_stacks_with_small_four_winds() -> None:
-    """01-rules-spec.md §7 note ²: 門風/圈風 keep firing on their matching pung even once
+    """rules.md §7 note ²: 門風/圈風 keep firing on their matching pung even once
     Small/Big Four Winds also fires."""
     hand = (
         _pung(TileType.WIND_EAST),
@@ -523,7 +523,7 @@ def test_mixed_terminals_false_with_a_middle_tile_pung() -> None:
 
 
 def test_mixed_terminals_false_terminals_only_no_honors() -> None:
-    """01-rules-spec.md §7 note ²: terminals with no honor present is All Terminals (清么九,
+    """rules.md §7 note ²: terminals with no honor present is All Terminals (清么九,
     limit, not implemented yet) territory, not 混么九."""
     hand = (
         _pung(TileType.MAN_1),
@@ -536,7 +536,7 @@ def test_mixed_terminals_false_terminals_only_no_honors() -> None:
 
 
 def test_mixed_terminals_false_honors_only_no_terminals() -> None:
-    """01-rules-spec.md §7 note ²: honors with no terminal present is All Honors (字一色,
+    """rules.md §7 note ²: honors with no terminal present is All Honors (字一色,
     limit, not implemented yet) territory, not 混么九."""
     hand = (
         _pung(TileType.WIND_EAST),
@@ -549,7 +549,7 @@ def test_mixed_terminals_false_honors_only_no_terminals() -> None:
 
 
 def test_mixed_terminals_stacks_with_voided_suit_and_all_pungs() -> None:
-    """01-rules-spec.md §7 note ²: 混么九 stacks with 缺一門/對對糊 when their own conditions
+    """rules.md §7 note ²: 混么九 stacks with 缺一門/對對糊 when their own conditions
     also hold on the same hand -- nothing forbids the combination."""
     hand = (
         _pung(TileType.MAN_1),
@@ -568,7 +568,7 @@ def test_mixed_terminals_stacks_with_voided_suit_and_all_pungs() -> None:
 
 
 def test_full_flush_stacks_with_all_pungs() -> None:
-    """01-rules-spec.md §7: "Faan stack: Full Flush (6) + All Pungs (3) = 9". Two pungs are
+    """rules.md §7: "Faan stack: Full Flush (6) + All Pungs (3) = 9". Two pungs are
     claimed (open) so this fixture stays about Full Flush + All Pungs only, not also Three
     Concealed Pungs (fourth sub-task, needs 3+ concealed) -- see
     `test_three_concealed_pungs_stacks_with_all_pungs` for that combination instead."""
@@ -828,7 +828,7 @@ def test_score_hand_thirteen_orphans_includes_the_limit_entry() -> None:
     `context`. Every decomposition-shaped detector correctly sees no groups and stays silent;
     `無花`/`門前清` still fire since they read only `ctx`, not `hand` -- `score_hand` doesn't
     suppress that (excluding non-limit faan once a limit pattern applies is faan.py's job, see
-    01-rules-spec.md §7 "Limit hands do not stack with anything")."""
+    rules.md §7 "Limit hands do not stack with anything")."""
     tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
     scored = score_hand((), _ctx(concealed_tiles=tiles))
     assert scored["十三么"] == LIMIT_FAAN
@@ -893,7 +893,7 @@ def test_win_on_last_wall_tile_false_when_flag_unset() -> None:
 
 
 def test_win_on_last_wall_tile_false_for_kong_replacement() -> None:
-    """01-rules-spec.md §7 note ³: a kong replacement that happens to be the wall's last tile
+    """rules.md §7 note ³: a kong replacement that happens to be the wall's last tile
     scores as 槓上開花 only, not also 海底撈月 -- see patterns.py's ladder note."""
     ctx = _ctx(self_drawn=True, is_last_tile=True, is_kong_replacement=True)
     assert _occurrences("海底撈月", (), ctx) == 0
@@ -1025,7 +1025,7 @@ def test_seat_flower_and_flower_set_registered_under_classic() -> None:
         assert pattern.is_limit is False
 
 
-# --- Limit hands don't stack (01-rules-spec.md §7 "Stacking and caps") -------------------------
+# --- Limit hands don't stack (rules.md §7 "Stacking and caps") -------------------------
 
 
 def test_limit_patterns_flagged_for_future_non_stacking() -> None:
@@ -1282,7 +1282,7 @@ def test_two_dragon_pungs_false_with_only_one() -> None:
 
 def test_two_dragon_pungs_false_with_all_three() -> None:
     """Mutually exclusive with Big Three Dragons by construction -- see the footnote added to
-    01-rules-spec.md §7."""
+    rules.md §7."""
     hand = (
         _pung(TileType.DRAGON_RED),
         _pung(TileType.DRAGON_GREEN),
@@ -1347,7 +1347,7 @@ def test_three_identical_sequences() -> None:
 
 
 def test_three_identical_sequences_ladder_excludes_two_identical() -> None:
-    """Ladder rule (01-rules-spec.md §7 note ⁷): a run counted at 三般高 never also counts at
+    """Ladder rule (rules.md §7 note ⁷): a run counted at 三般高 never also counts at
     一般高 -- a count can't be both `== 2` and `>= 3`."""
     hand = (
         _chow(TileType.MAN_1),
@@ -1444,7 +1444,7 @@ def test_four_step_sequences() -> None:
 
 
 def test_four_step_sequences_ladder_excludes_three_step() -> None:
-    """Ladder rule (01-rules-spec.md §7 note ⁸): 四步高's ranks contain 三步高's own pattern
+    """Ladder rule (rules.md §7 note ⁸): 四步高's ranks contain 三步高's own pattern
     twice over, so 三步高 must not also fire on the same hand."""
     hand = (
         _chow(TileType.MAN_1),

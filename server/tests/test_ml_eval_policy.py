@@ -1,5 +1,5 @@
 """`ml/eval_policy.py`: paired-duplicate candidate-vs-heuristic hands with replayable records
-(docs/06-ml.md §12)."""
+(docs/ml.md §12)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Rollout throughput of the vector env (docs/06-ml.md §13, R0).
+"""Rollout throughput of the vector env (docs/ml.md §13, R0).
 
     uv run python -m ml.bench_env --envs 64 --steps 2000 [--workers 4]
 

@@ -1,4 +1,4 @@
-"""Hand-value estimation for T2 `FaanBot` (docs/04-bots.md §4): fast structural proxy for "faan
+"""Hand-value estimation for T2 `FaanBot` (docs/bots.md §4): fast structural proxy for "faan
 of the best reachable pattern from this hand shape", used to rank discards by value, not to
 predict a real score.
 
@@ -32,7 +32,7 @@ _HONOR_START = 27
 _RANKS_PER_SUIT = 9
 _DRAGON_TYPES = (int(TileType.DRAGON_RED), int(TileType.DRAGON_GREEN), int(TileType.DRAGON_WHITE))
 
-# base faan per route, before closed bonus (docs/04-bots.md §4). "Half Flush + dragon/wind pung"
+# base faan per route, before closed bonus (docs/bots.md §4). "Half Flush + dragon/wind pung"
 # isn't modeled separately -- it's half_flush + a dragon block bumping small_three_dragons.
 ROUTE_FAAN: dict[str, int] = {
     "full_flush": 6,
@@ -45,7 +45,7 @@ ROUTE_FAAN: dict[str, int] = {
 }
 
 # route name -> Chinese pattern name (RuleSet.faan_overrides / scoring/patterns.py's registry key,
-# docs/04-bots.md §9 Tier 2); every ROUTE_FAAN value is pinned against it in tests/test_valuation.py.
+# docs/bots.md §8 Tier 2); every ROUTE_FAAN value is pinned against it in tests/test_valuation.py.
 _ROUTE_PATTERN_NAMES: dict[str, str] = {
     "full_flush": "清一色",
     "half_flush": "混一色",

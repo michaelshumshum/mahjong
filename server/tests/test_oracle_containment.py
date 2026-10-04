@@ -10,7 +10,7 @@ omniscient views directly (via `app.views._omniscient_seat_view`) for white-box 
 tests -- that's expected, sanctioned test-only usage, not the dispatch path this test guards.
 This guarantee is unaffected by which bot actually consumes the omniscient view -- it held for
 the original rollout-based `OracleBot` and holds identically now that the tier is a plain
-`FaanBot()` fed an omniscient view (docs/04-bots.md §10).
+`FaanBot()` fed an omniscient view (docs/bots.md §9).
 """
 
 from __future__ import annotations

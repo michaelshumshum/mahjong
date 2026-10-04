@@ -81,8 +81,8 @@ export interface CreateTableRequest {
 	bot_tiers?: Record<number, string>;
 }
 
-// the three real, selectable practice difficulties -- T0/RandomBot is never one (docs/04-bots.md
-// §2/§7). Keep in sync with server/app/main.py's _PRACTICE_BOT_TIERS.
+// the three real, selectable practice difficulties -- T0/RandomBot is never one (docs/bots.md
+// §2/§6). Keep in sync with server/app/main.py's _PRACTICE_BOT_TIERS.
 export type PracticeDifficulty = 'easy' | 'normal' | 'impossible';
 
 export const PRACTICE_DIFFICULTY_TO_TIER: Record<PracticeDifficulty, string> = {

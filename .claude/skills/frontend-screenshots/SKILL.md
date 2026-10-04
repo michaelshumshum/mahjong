@@ -60,7 +60,7 @@ Screenshots section for the embedded images.
 
 ## Live pre-game states: `?pregame=`, not a real backend
 
-The `/table/[id]` connecting / sit-down / waiting-for-players states (docs/03-frontend.md's
+The `/table/[id]` connecting / sit-down / waiting-for-players states (docs/frontend.md's
 "`/table/[id]` wiring") only ever occur on the real `liveStore`-driven path — `?mock=` always
 renders a fully-seated, already-dealt table (`tableReady` is unconditionally true when
 `isMock`), so there's no `MOCK_SCENARIOS` entry that could stand in for "not seated yet" or

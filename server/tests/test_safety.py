@@ -1,4 +1,4 @@
-"""Unit tests for `bots/safety.py` (docs/04-bots.md §5). Per this sub-task's testing
+"""Unit tests for `bots/safety.py` (docs/bots.md §5). Per this sub-task's testing
 requirements: enough to prove each signal actually moves the score in the documented direction,
 not just that the functions run -- genbutsu/suji/meld/tempo/wall-pressure as soft multipliers
 that never reach exactly 0 (except `no_chance`, the one documented hard constraint), each tested
@@ -151,12 +151,12 @@ def test_suji_lowers_probability_less_than_genbutsu() -> None:
     p_genbutsu = deal_in_probability(genbutsu, opponent_seat=1, tile_type=tile)
 
     assert p_suji < p_no_read
-    assert p_genbutsu < p_suji  # genbutsu strictly stronger, docs/04-bots.md §5 item 2
+    assert p_genbutsu < p_suji  # genbutsu strictly stronger, docs/bots.md §5 item 2
 
 
 def test_suji_never_applies_to_honors() -> None:
     """Honors have no suit-adjacency -- a wind/dragon discard must never register as a "suji"
-    read for another wind/dragon type (docs/04-bots.md §5 item 2 only ever discusses suited
+    read for another wind/dragon type (docs/bots.md §5 item 2 only ever discusses suited
     ranks)."""
     tile = int(TileType.DRAGON_RED)
     no_read = _view()
@@ -475,7 +475,7 @@ def test_tile_risk_hands_aware_does_not_flag_a_sub_minimum_structural_win() -> N
     """Opponent 1's real hand structurally completes on PIN_9 (three sequences + a pair, plus one
     already-exposed chow) but the real scorer puts it below the default ruleset's `min_faan=3` --
     losing 門前清 (not fully concealed) leaves it a bare all-sequence hand. A sub-minimum
-    structural win is not a deal-in (docs/04-bots.md §4), so the hands-aware path must return
+    structural win is not a deal-in (docs/bots.md §4), so the hands-aware path must return
     0.0, not the real (sub-minimum) faan value."""
     tile_type = int(TileType.PIN_9)
     opp_seat = 1
@@ -570,7 +570,7 @@ def test_tile_risk_hands_aware_handles_a_concealed_kong_of_the_candidate_type() 
     assert tile_risk(view, tile_type) == 0.0
 
 
-# --- kong_rob_risk: exact 搶槓 danger of declaring a kong (docs/04-bots.md §10) ----------------
+# --- kong_rob_risk: exact 搶槓 danger of declaring a kong (docs/bots.md §9) ----------------
 
 
 def test_kong_rob_risk_added_kong_flags_a_real_deal_in() -> None:

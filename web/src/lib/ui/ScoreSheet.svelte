@@ -7,7 +7,7 @@
 	export type Seat = 0 | 1 | 2 | 3;
 	export type Wind = 'E' | 'S' | 'W' | 'N';
 
-	// mirrors hand_end.payments (docs/02-protocol.md §3): per-seat point delta for one hand.
+	// mirrors hand_end.payments (docs/protocol.md §3): per-seat point delta for one hand.
 	export type Payments = Partial<Record<Seat, number>>;
 
 	export interface SeatInfo {

@@ -1,4 +1,4 @@
-"""`ml/vec_env.py`: batched envs equal K independent `HandEnv`s (docs/06-ml.md §7)."""
+"""`ml/vec_env.py`: batched envs equal K independent `HandEnv`s (docs/ml.md §7)."""
 
 from __future__ import annotations
 

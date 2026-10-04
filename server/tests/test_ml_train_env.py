@@ -1,4 +1,4 @@
-"""`ml/train_env.py`: packed PPO rollout rows, in-env tsumogiri opponents (docs/06-ml.md §9, §10)."""
+"""`ml/train_env.py`: packed PPO rollout rows, in-env tsumogiri opponents (docs/ml.md §9, §10)."""
 
 from __future__ import annotations
 

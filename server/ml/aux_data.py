@@ -1,4 +1,4 @@
-"""Packed auxiliary-head dataset (docs/06-ml.md §8): `ml.generate_aux` shards -> one memory-mapped
+"""Packed auxiliary-head dataset (docs/ml.md §8): `ml.generate_aux` shards -> one memory-mapped
 `.npy` per field, plus the game-level split (`ml.splits`).
 
     python -m ml.aux_data --src data/rl_aux --out data/rl_aux_packed

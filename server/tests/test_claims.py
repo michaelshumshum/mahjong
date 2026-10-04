@@ -31,7 +31,7 @@ def _window(source_seat: int, offers: tuple[ClaimOffer, ...], window_id: int = 1
     )
 
 
-# --- resolve_claims: priority order (01-rules-spec.md §6) -----------------------------------
+# --- resolve_claims: priority order (rules.md §6) -----------------------------------
 
 
 def test_all_pass_produces_no_winner() -> None:
@@ -117,7 +117,7 @@ def test_kong_beats_chow() -> None:
 
 
 def test_kong_beats_pung_different_seats() -> None:
-    """01-rules-spec.md §6 point 2: the kong-vs-pung edge case. Structurally unreachable in
+    """rules.md §6 point 2: the kong-vs-pung edge case. Structurally unreachable in
     a real deal (see the note added to §6 point 5 -- a kong claim already accounts for all 3
     copies left after the discard) but resolve_claims still implements the ordering."""
     window = _window(
@@ -183,7 +183,7 @@ def test_resolve_claims_rejects_stale_window_id() -> None:
 
 
 def test_resolve_claims_rejects_duplicate_pung_kong_across_seats() -> None:
-    """01-rules-spec.md §6 point 5: this can't happen in a real deal, so it's a hard
+    """rules.md §6 point 5: this can't happen in a real deal, so it's a hard
     programming error (mismatched fixtures) rather than a resolvable tie."""
     window = _window(
         0,
@@ -200,7 +200,7 @@ def test_resolve_claims_rejects_duplicate_pung_kong_across_seats() -> None:
         resolve_claims(window, responses)
 
 
-# --- can_close_early: doc-mandated scenarios (00-architecture.md §4) -------------------------
+# --- can_close_early: doc-mandated scenarios (architecture.md §4) -------------------------
 
 
 def test_close_early_true_once_all_responded() -> None:
@@ -336,7 +336,7 @@ def _claim_scenarios(
     """A realistic claim window: at most one seat holds pung/kong-tier eligibility and at
     most one seat (the discarder's next) holds chow eligibility -- the same structural
     constraints `melds.legal_claims` enforces -- plus an arbitrary subset of the other seats
-    each independently eligible to win (01-rules-spec.md §6 point 4's multi-win case)."""
+    each independently eligible to win (rules.md §6 point 4's multi-win case)."""
     source_seat = draw(st.integers(0, 3))
     chow_seat = (source_seat + 1) % 4
     other_seats = [s for s in range(4) if s != source_seat]

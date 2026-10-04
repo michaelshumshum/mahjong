@@ -1,5 +1,5 @@
 """`ml/fast_encode.py`: bit-equal to `encode_seat_view(seat_view(...))` on every state and seat
-swept from real self-play (docs/06-ml.md §7's leak guard)."""
+swept from real self-play (docs/ml.md §7's leak guard)."""
 
 from __future__ import annotations
 

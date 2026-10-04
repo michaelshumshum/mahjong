@@ -1,5 +1,5 @@
 """A real `Table`/`TableRegistry`-driven game over WS reaching `Phase.GAME_OVER` and persisting a
-`GameRecord` (docs/06-ml.md §2, docs/00-architecture.md §6, docs/05-roadmap.md M3's "Postgres
+`GameRecord` (docs/ml.md §2, docs/architecture.md §6, docs/decisions/0018-milestone-plan.md M3's "Postgres
 persistence of finished games" -- the piece M1's `bots/selfplay.py` covered for bot-only games,
 this covers for a real `Table`-driven one).
 

@@ -1,5 +1,5 @@
 """Whole-engine trajectory pin: the guard for behaviour-neutral engine speed-ups
-(docs/06-ml.md §7). Each case plays seeded games through `reduce`/`start_next_hand` and hashes
+(docs/ml.md §7). Each case plays seeded games through `reduce`/`start_next_hand` and hashes
 every action, every event, every hand result and the final `GameState`. The digests were
 generated before any speed-up landed, so a mismatch means an optimisation changed behaviour.
 

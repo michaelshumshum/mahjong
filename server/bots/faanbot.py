@@ -1,10 +1,10 @@
-"""T2 `FaanBot` (docs/04-bots.md §2/§4/§5): T1's shanten/ukeire plus value-planning and a
-defence model, implementing docs/04-bots.md §4's `score(discard) = w_speed*speed + w_value*
+"""T2 `FaanBot` (docs/bots.md §2/§4/§5): T1's shanten/ukeire plus value-planning and a
+defence model, implementing docs/bots.md §4's `score(discard) = w_speed*speed + w_value*
 E[faan] - w_safety*risk + w_flex*optionality`. `_speed_term` folds shanten+ukeire into one
 scalar (not T1's lexicographic key) so `w_value` can trade off against it in the same sum.
 
 Reads `view.ruleset.min_faan` for the claim guard (`_should_claim`) -- the table's real
-minimum, not a hardcoded default (docs/04-bots.md §9 Tier 1).
+minimum, not a hardcoded default (docs/bots.md §8 Tier 1).
 """
 
 from __future__ import annotations
@@ -54,10 +54,10 @@ alone."""
 _REFERENCE_MAX_TURN = max_turns_per_seat(RuleSet())
 """`mahjong_core.wall.max_turns_per_seat` at the default ruleset: 144 total tiles
 (`flowers_enabled`) - 53 dealt (13*4 + 1 dealer extra) - 0 `wall_reserve` = 91 available draws,
-// 4 seats = 22. `_weights_for_turn`'s turn-6/turn-12 schedule (docs/04-bots.md §4/§8) was
+// 4 seats = 22. `_weights_for_turn`'s turn-6/turn-12 schedule (docs/bots.md §4/§7) was
 hand-tuned against exactly this regime -- every shipped preset (`mahjong_core/presets.py`)
 leaves `wall_reserve`/`flowers_enabled` at their defaults, so `_turn_breakpoints` must reproduce
-6 and 12 exactly there (docs/04-bots.md §9's `wall_reserve` row)."""
+6 and 12 exactly there (docs/bots.md §8's `wall_reserve` row)."""
 _EARLY_TURN_AT_REFERENCE = 6
 _LATE_TURN_AT_REFERENCE = 12
 
@@ -83,7 +83,7 @@ def _turn_breakpoints(ruleset: RuleSet) -> tuple[int, int]:
 def _weights_for_turn(
     turn: int, early_turn: int, late_turn: int
 ) -> tuple[float, float, float, float]:
-    """`(w_speed, w_value, w_safety, w_flex)` per docs/04-bots.md §4's "speed early -> value mid
+    """`(w_speed, w_value, w_safety, w_flex)` per docs/bots.md §4's "speed early -> value mid
     -> safety late" schedule, at the `early_turn`/`late_turn` breakpoints `_turn_breakpoints`
     derives (6/12 at the default ruleset). Hand-tuned and retuned twice against arena runs vs
     `EfficiencyBot` (1000 duplicate sets, at those default breakpoints): mean paired difference
@@ -140,9 +140,9 @@ def _speed_term(result_shanten: int, tiles_accepted: int) -> float:
 @dataclass(frozen=True)
 class WeightProfile:
     """Multipliers on `_weights_for_turn`'s `(w_speed, w_value, w_safety, w_flex)` schedule --
-    personas for docs/06-ml.md §12's mixed-table evaluation and the danger dataset's opponent
+    personas for docs/ml.md §12's mixed-table evaluation and the danger dataset's opponent
     variety. `BASELINE`'s all-1.0 multipliers reproduce the shipped, arena-tuned weights exactly
-    (docs/04-bots.md §8's numbers are measured against `BASELINE` specifically) -- every other
+    (docs/bots.md §7's numbers are measured against `BASELINE` specifically) -- every other
     profile is a deliberate, unvalidated-by-arena departure from that tuning, meant to vary the
     opponents a learned model is trained or evaluated against, not to compete with `BASELINE`."""
 
@@ -225,7 +225,7 @@ class FaanBot:
         route_faan: dict[str, int],
     ) -> bool:
         """Refuses to claim into a hand that drops below `min_faan` when it wasn't already
-        sub-minimum -- deliberately no "unless it reaches tenpai" exception (docs/04-bots.md §4's
+        sub-minimum -- deliberately no "unless it reaches tenpai" exception (docs/bots.md §4's
         point is that sub-minimum tenpai is the failure mode to avoid). Already-sub-minimum hands
         claim freely."""
         after_value, _ = estimate_best_faan(resulting_hand, closed=False, route_faan=route_faan)
@@ -257,7 +257,7 @@ class FaanBot:
             return best_kong_aid
 
         assert view.seat is not None
-        # this seat's own discard count -- closest proxy to docs/04-bots.md §4's turn-number
+        # this seat's own discard count -- closest proxy to docs/bots.md §4's turn-number
         # language available from a SeatView alone.
         turn = len(view.discard_pools[view.seat])
         return self._best_discard(view, hand, seen34(view), mask, closed=closed, turn=turn)

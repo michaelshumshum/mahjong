@@ -107,7 +107,7 @@ def test_new_game_starting_dealer_is_seat_0() -> None:
 
 
 def test_new_game_starting_phase_is_await_action_not_await_draw() -> None:
-    # the dealer's 14th tile from the deal stands in for the "draw" step (01-rules-spec.md
+    # the dealer's 14th tile from the deal stands in for the "draw" step (rules.md
     # §4) -- hand 1 starts past AWAIT_DRAW, already waiting on the dealer's first discard.
     state = new_game(DEFAULT_RULESET, game_seed=1)
     assert state.phase == Phase.AWAIT_ACTION

@@ -1,7 +1,7 @@
-"""Real spectator support over the wire ("Spectating" sub-task, docs/05-roadmap.md M5;
-docs/00-architecture.md §3/§5's spectator sketch; docs/02-protocol.md §2/§5). A connection that
+"""Real spectator support over the wire (
+docs/architecture.md §3/§5's spectator sketch; docs/protocol.md §2/§5). A connection that
 opts in via `?spectate=true` (see `app/table.py`'s `Table.register_spectator` docstring for why
-this is an explicit connect-time flag, not the literal passive default docs/02-protocol.md §2
+this is an explicit connect-time flag, not the literal passive default docs/protocol.md §2
 describes) gets the same `seat_view(state, None)`-shaped stream `tests/test_redaction.py`'s
 schema walker has always exercised statically -- this module is the first thing that actually
 drives a live connection through it.
@@ -95,7 +95,7 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             spec_seq = itertools.count()
 
             # immediately on connect: a real spectator-shaped state_sync (seat=None), no
-            # private hand data for any seat (00-architecture.md §5).
+            # private hand data for any seat (architecture.md §5).
             sync = spectator.receive_json()
             assert sync["t"] == "state_sync"
             assert sync["seq"] == next(spec_seq)

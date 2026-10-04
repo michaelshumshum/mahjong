@@ -269,7 +269,7 @@ def test_declare_concealed_kong_draws_replacement_with_no_rob_window() -> None:
 
 def _tenpai_on_man1() -> tuple[int, ...]:
     """13 tiles: standard shape missing only the 1m that completes 123m (a chow-completion
-    wait, the realistic robbable shape -- see engine.py module docstring / 01-rules-spec.md
+    wait, the realistic robbable shape -- see engine.py module docstring / rules.md
     §11.3: robbing needs the robber to hold zero copies of the robbed tile already, since the
     kong declarer already accounts for all 4 physical copies)."""
     return (
@@ -357,11 +357,11 @@ def test_declining_to_rob_the_kong_lets_declarer_draw_replacement() -> None:
     assert any(isinstance(e, KongReplacementDrawn) and e.seat == 0 for e in events)
 
 
-# --- robbing a concealed kong: restricted to Thirteen Orphans (01-rules-spec.md §11.3) -------
+# --- robbing a concealed kong: restricted to Thirteen Orphans (rules.md §11.3) -------
 
 
 def test_concealed_kong_robbing_denied_to_a_non_thirteen_orphans_win() -> None:
-    """01-rules-spec.md §11.3: robbing a **concealed** kong is only for 十三么, even with
+    """rules.md §11.3: robbing a **concealed** kong is only for 十三么, even with
     `concealed_kong_robbable` on -- unlike an added kong (加槓), which any qualifying win may
     rob. Seat 2 is tenpai on 1m via a plain chow completion (`_tenpai_on_man1`), a genuinely
     winning, min_faan-clearing shape once 1m lands -- but not Thirteen Orphans -- so no rob
@@ -382,7 +382,7 @@ def test_concealed_kong_robbing_denied_to_a_non_thirteen_orphans_win() -> None:
 
 
 def test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win() -> None:
-    """The one real exception 01-rules-spec.md §11.3 carves out: a seat whose win would
+    """The one real exception rules.md §11.3 carves out: a seat whose win would
     specifically complete Thirteen Orphans may rob a concealed kong when
     `concealed_kong_robbable` is on. Seat 2 holds 12 of the 13 orphan types plus a doubled
     dragon (single-tile wait on East, §7's narrower Thirteen Orphans tenpai shape); seat 0
@@ -817,7 +817,7 @@ def test_win_on_kong_replacement_scores_kong_replacement() -> None:
 
 
 def test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacement() -> None:
-    """01-rules-spec.md §11.1-2: a kong replacement that's itself a flower chains to a further
+    """rules.md §11.1-2: a kong replacement that's itself a flower chains to a further
     replacement (§11.1); winning on *that* tile still scores 槓上開花 (§11.2), not just a plain
     self-draw -- `last_draw_was_kong_replacement` is set from the original draw's `kong=True`
     once, in `_draw_for_turn`, and untouched by however many flowers the cascade reveals in
@@ -874,7 +874,7 @@ def test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacem
 
 
 def test_last_tile_flag_accounts_for_wall_reserve_after_a_kong_shortens_the_wall() -> None:
-    """01-rules-spec.md §11.6: `wall_exhausted_at_last_draw` (海底撈月/槓上開花's shared
+    """rules.md §11.6: `wall_exhausted_at_last_draw` (海底撈月/槓上開花's shared
     "was this the last usable tile" flag) must compare against `wall_reserve`, not literal
     emptiness -- and a kong replacement draw shrinking the wall by one tile is exactly the
     case that can tip a wall from "above reserve" to "at reserve" mid-hand. Same fixture as
@@ -984,7 +984,7 @@ def test_wall_exhaustion_ends_hand_as_exhaustive_draw() -> None:
 
 
 def test_wall_exhaustion_during_flower_cascade_ends_hand_as_exhaustive_draw() -> None:
-    """01-rules-spec.md §11.11: the wall can run out *during* a flower-replacement cascade,
+    """rules.md §11.11: the wall can run out *during* a flower-replacement cascade,
     not just before a normal draw -- `_draw_and_cascade` checks `_wall_exhausted` before every
     draw in the cascade, including the replacement draw right after a flower reveal. The seat's
     already-revealed flower this cascade stays revealed even though the hand ends before a real
@@ -1120,7 +1120,7 @@ def test_dealer_repeats_on_draw_when_configured() -> None:
 def test_start_next_hand_carries_forward_next_window_id() -> None:
     """`window_id` must stay unique for the life of a game, not just within one hand --
     `app/table.py`'s per-window bookkeeping (`_armed_window_id`, `_active_seat_timer`,
-    `_claim_deadline_ms`) is keyed by `window_id` alone (docs/05-roadmap.md M3 closeout audit)
+    `_claim_deadline_ms`) is keyed by `window_id` alone (docs/decisions/0018-milestone-plan.md M3 closeout audit)
     and is never reset between hands. If `next_window_id` reset to 0 every hand, hand 2's first
     claim window would collide with a window_id already used in hand 1, and `Table.
     _arm_claim_timer`'s once-per-window idempotency guard would silently skip arming it -- no

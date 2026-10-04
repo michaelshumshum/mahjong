@@ -1,4 +1,4 @@
-"""`ml/env.py`: single-hand self-play env (docs/06-ml.md §7)."""
+"""`ml/env.py`: single-hand self-play env (docs/ml.md §7)."""
 
 from __future__ import annotations
 

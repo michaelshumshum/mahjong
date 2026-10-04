@@ -75,15 +75,15 @@ class RuleSet:
 
     # variants
     flowers_enabled: bool = True
-    multi_win: bool = False  # 一炮多響 — deferred, see 99-deferred.md; must stay False in v1
+    multi_win: bool = False  # 一炮多響, reserved: docs/decisions/0007-multi-win-and-pao.md
     kong_rob_enabled: bool = True
     concealed_kong_robbable: bool = False  # only for 十三么 on some tables (§5, §11.3)
     pao_rules: bool = False  # 包 responsibility — deferred to v2 (§8)
 
-    # fairness (docs/02-protocol.md "Fairness")
+    # fairness (docs/protocol.md "Fairness")
     provable_fairness: bool = False  # gates hand_start.seed_commit / hand_end.fairness
 
-    # timing (server-enforced); defaults documented in docs/00-architecture.md §4, §8.
+    # timing (server-enforced); defaults documented in docs/architecture.md §4, §8.
     turn_seconds: int = 15
     claim_seconds: int = 5
     hand_end_seconds: int = 10
@@ -102,7 +102,9 @@ class RuleSet:
         if self.wall_reserve < 0:
             raise ValueError(f"wall_reserve must be >= 0, got {self.wall_reserve}")
         if self.multi_win:
-            raise ValueError("multi_win is reserved and must be False in v1 (see 99-deferred.md)")
+            raise ValueError(
+                "multi_win is reserved and must be False in v1 (see docs/decisions/0007-multi-win-and-pao.md)"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe representation. Round-trips via `RuleSet.from_dict`."""

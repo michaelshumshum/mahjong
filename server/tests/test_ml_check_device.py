@@ -1,4 +1,4 @@
-"""`ml/check_device.py` runs end to end on a CPU-only machine (docs/06-ml.md §13)."""
+"""`ml/check_device.py` runs end to end on a CPU-only machine (docs/ml.md §13)."""
 
 from __future__ import annotations
 

@@ -6,5 +6,5 @@ may import from `ml/`, and nothing in this package may be imported by them. Inst
 the `ml` extra / the Dockerfile's `ml` image stage / `docker-compose.yml`'s `trainer`/`arena`
 services.
 
-Self-play RL agent and the supervised pieces it reuses: docs/06-ml.md.
+Self-play RL agent and the supervised pieces it reuses: docs/ml.md.
 """

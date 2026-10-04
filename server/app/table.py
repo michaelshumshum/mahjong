@@ -1,10 +1,10 @@
-"""`Table` -- the table actor's core dispatch loop (docs/00-architecture.md §3, §5).
+"""`Table` -- the table actor's core dispatch loop (docs/architecture.md §3, §5).
 
 Timer heap. `_next()` races one long-lived `_inbox_getter()` task, never cancelled, against
 a sleep to `self.deadlines`' soonest entry. The heap holds claim-window, disconnect-grace, and
 per-seat turn deadlines, sharing one id space and one `TimerHeap` instance.
 
-Turn timeout (00-architecture.md §8). `_arm_turn_timer` arms a `ruleset.turn_seconds`
+Turn timeout (architecture.md §8). `_arm_turn_timer` arms a `ruleset.turn_seconds`
 deadline whenever a seat's `AWAIT_ACTION` decision is genuinely new. On expiry
 (`_handle_turn_timeout`) the table applies the deterministic default (`_timeout_discard_action`)
 through the normal `_apply()`/`reduce()` path and registers a strike
@@ -139,7 +139,7 @@ WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"
 
 logger = logging.getLogger(__name__)
 
-_BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (00-architecture.md §8 "Bot raises / hangs")
+_BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (architecture.md §8 "Bot raises / hangs")
 
 # disconnect-handover always drives the autoplay bot at T2/FaanBot, never self._bot_tier -- must
 # never land on ORACLE, which would leak every seat's concealed tiles. See _effective_bot_tier.
@@ -150,7 +150,7 @@ _DISCONNECT_HANDOVER_BOT_TIER: Final = "T2"
 _BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
 _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 
-_MAX_NAME_LENGTH = 24  # guest display name cap (docs/02-protocol.md §2 `join.name`)
+_MAX_NAME_LENGTH = 24  # guest display name cap (docs/protocol.md §2 `join.name`)
 
 # every bot seat gets a random Cantonese-pun display name instead of a generic "Bot"
 # placeholder -- cosmetic only, `self._bot_tier` still governs actual strength.
@@ -195,7 +195,7 @@ def _shared_bot_pool() -> ProcessPoolExecutor:
     Every tier shares this pool. A second, dedicated pool for `T3` (`SearchBot`) existed
     historically -- `SearchBot` budgeted 300-800ms per decision, two to three orders of
     magnitude slower than a `T1`/`T2` decision, which would have head-of-line-blocked unrelated
-    tables' jobs sharing this pool. `SearchBot` was removed (docs/04-bots.md §6: determinized
+    tables' jobs sharing this pool. `SearchBot` was removed (docs/decisions/0012-searchbot-removed.md: determinized
     rollout search never beat plain `FaanBot` in arena validation, a structural ceiling from the
     rollout policy's own noise, not a fixable bug), so the isolation problem it existed to solve
     no longer has a tier that needs it."""
@@ -304,14 +304,14 @@ class SeatBinding:
     `autoplay`, `bot` is never reached by `mark_disconnected` and `reconnect` refuses to hijack
     it (`SeatTakenError`) -- there is no human occupant to hand it back to.
 
-    `turn_timeout_strikes` (00-architecture.md §8: three strikes -> `AUTOPLAY` for the rest of
+    `turn_timeout_strikes` (architecture.md §8: three strikes -> `AUTOPLAY` for the rest of
     the game) is never reset anywhere -- that omission *is* the "for the rest of the game"
     policy, since this binding is one long-lived object for the table's entire game.
 
     `name` is this seat's resolved guest display name -- set once at `join` or `_bind_bot_seat`
     and never touched again (a `hello` reconnect never resends it).
 
-    `reconnect_secret` (00-architecture.md §2.1) is a random per-seat credential, minted once
+    `reconnect_secret` (architecture.md §2.1) is a random per-seat credential, minted once
     and handed back exactly once, in `join`'s own `ack`. Every later `hello{seat, secret}` must
     present it back; `reconnect()` compares with `secrets.compare_digest` and refuses the
     reclaim on any mismatch (`SeatAuthError`). A bot seat's secret is never handed to anyone.
@@ -450,7 +450,7 @@ class Table:
     regardless of `bot_tier`, never this table's configured tier -- see
     `_DISCONNECT_HANDOVER_BOT_TIER`/`_effective_bot_tier`. `seat_bot_tiers` overrides `bot_tier`
     per seat -- practice mode's per-seat difficulty picker (`app/main.py`'s `create_table`,
-    docs/03-frontend.md's practice-mode entry point). A seat missing from the mapping falls back
+    docs/frontend.md §7 "Practice mode"). A seat missing from the mapping falls back
     to `bot_tier`, so arena/tests that pass a bare `bot_tier=` and expect it applied uniformly
     (e.g. T0's uniform-random behavior) are unaffected. `practice=True` binds seats 1-3 to their
     resolved tier (`_effective_bot_tier`) immediately at construction, before seat 0's human ever

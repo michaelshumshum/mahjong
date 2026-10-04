@@ -1,4 +1,4 @@
-"""Encoder v2 for the RL policy (docs/06-ml.md §8): policy input and, kept separate, oracle input.
+"""Encoder v2 for the RL policy (docs/ml.md §8): policy input and, kept separate, oracle input.
 
 Two stages. A *raw* row is a dict of small uint8 arrays (counts, discard order, context). It is
 built either straight from `GameState` (`policy_raw`, the fast path) or from

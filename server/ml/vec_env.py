@@ -1,4 +1,4 @@
-"""K `HandEnv`s stepped together into batched arrays, with auto-reset (docs/06-ml.md §7).
+"""K `HandEnv`s stepped together into batched arrays, with auto-reset (docs/ml.md §7).
 
 `VecHandEnv` steps in-process; `SubprocVecHandEnv` splits the K envs across worker processes
 that write into shared-memory buffers, so the learner's batched forward reads them without a

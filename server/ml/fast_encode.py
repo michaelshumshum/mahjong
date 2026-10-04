@@ -1,5 +1,5 @@
 """`encode_seat_view(seat_view(state, seat))`, flattened, computed straight from `GameState` into a
-preallocated buffer (docs/06-ml.md §7). Skips `seat_view`'s legal-action scan and the per-field
+preallocated buffer (docs/ml.md §7). Skips `seat_view`'s legal-action scan and the per-field
 numpy round trips. `tests/test_ml_fast_encode.py` pins it bit-equal to the reference path: that
 parity test is the leak guard, since this module reads `GameState` directly.
 

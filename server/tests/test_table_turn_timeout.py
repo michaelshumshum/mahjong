@@ -1,5 +1,5 @@
-"""`app/table.py`'s per-seat `AWAIT_ACTION` turn-timeout timer (docs/00-architecture.md §3 D17,
-§8 "Turn timeout" / "Bot raises / hangs"; docs/05-roadmap.md's M3 turn-timeout sub-task).
+"""`app/table.py`'s per-seat `AWAIT_ACTION` turn-timeout timer (docs/architecture.md §3 D17,
+§8 "Turn timeout" / "Bot raises / hangs"; docs/decisions/0018-milestone-plan.md M3 turn-timeout sub-task).
 
 `turn_seconds=0` is this file's test-time-control knob for the turn-timeout deadline, matching
 `tests/test_table_claims.py`'s `claim_seconds=0` and `tests/test_disconnect_bot_handover.py`'s
@@ -237,7 +237,7 @@ async def test_three_turn_timeouts_flip_seat_to_autoplay() -> None:
 
 
 async def test_third_turn_timeout_flips_to_autoplay_even_across_a_hand_boundary() -> None:
-    """`SeatBinding.turn_timeout_strikes` accumulates for "the rest of the game" (00-architecture.
+    """`SeatBinding.turn_timeout_strikes` accumulates for "the rest of the game" (architecture.
     md §8), not per hand -- the chosen reading is that a hand boundary must NOT reset the count.
     Two strikes land in one `hand_no`, then `hand_no` changes (simulating a new hand dealt) before
     the third -- proving the count survived that change, not merely three timeouts in a row within

@@ -1,4 +1,4 @@
-"""`Bot` protocol (docs/04-bots.md §1): `act(view, mask, deadline) -> int`. A bot sees only
+"""`Bot` protocol (docs/bots.md §1): `act(view, mask, deadline) -> int`. A bot sees only
 `seat_view`/mask, never `GameState` -- decoding the id to a real `Action` is always the caller's
 job, since `mahjong_core` must never import `app.views` and only the caller holds `GameState`.
 

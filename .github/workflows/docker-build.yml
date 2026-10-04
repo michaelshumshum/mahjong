@@ -1,7 +1,7 @@
 name: docker-build
 
 # Standalone, not one of ci.yml's reusable workflows: workflow_call has no path-filter
-# mechanism of its own (docs/07-infra.md §9), and nothing else in CI ever builds these
+# mechanism of its own (docs/infra.md §9), and nothing else in CI ever builds these
 # images — server.yml/web.yml run tests natively via uv/pnpm, not through Compose. Gated on
 # paths so it only runs when a Dockerfile, lockfile, or Compose file actually changed.
 on:
@@ -73,8 +73,8 @@ jobs:
 
   # Separate job, not a 5th matrix entry: torch's PyPI wheel bundles full CUDA (nvidia-cublas,
   # cudnn, nccl, triton, ...) even though GPU passthrough is commented out in
-  # docker-compose.yml's `trainer` service and docs/99-deferred.md defers GPU training entirely
-  # for now — the `ml` target image is 18.6GB. Kept CUDA-ready rather than switching to a
+  # docker-compose.yml's `trainer` service and GPU training runs natively
+  # instead (docs/ml.md §13) — the `ml` target image is 18.6GB. Kept CUDA-ready rather than switching to a
   # CPU-only torch wheel, since GPU training is still the eventual plan; that size just means
   # this stage needs its own disk/cache handling that the matrix's other four (each well under
   # 1GB) don't. Building it as a plain matrix entry with a `type=gha,mode=max` cache export

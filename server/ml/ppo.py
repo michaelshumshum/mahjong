@@ -1,4 +1,4 @@
-"""PPO for the cold-start curriculum (docs/06-ml.md §9, §10). `ml`-extra only.
+"""PPO for the cold-start curriculum (docs/ml.md §9, §10). `ml`-extra only.
 
     python -m ml.train --config ml/configs/rl_ppo_c0.yaml [--resume] [--max-steps N] [--max-minutes M]
 

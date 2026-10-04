@@ -1,4 +1,4 @@
-"""`ml/ppo.py` device handling (docs/06-ml.md §13): `device` resolution, CPU-saved checkpoints
+"""`ml/ppo.py` device handling (docs/ml.md §13): `device` resolution, CPU-saved checkpoints
 that load on either device, and old checkpoint formats. `cuda`-marked tests need a GPU and are
 skipped without one."""
 

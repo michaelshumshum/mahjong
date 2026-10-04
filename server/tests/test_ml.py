@@ -1,9 +1,9 @@
 """`mahjong_core.ml`: the fixed 109-action space, `legal_mask`, and the `action_id`/
-`decode_action` round trip (docs/06-ml.md §1, docs/05-roadmap.md §2's M2 done gate).
+`decode_action` round trip (docs/ml.md §1, docs/decisions/0018-milestone-plan.md M2).
 
 Decision points are swept from real self-play games (`RandomBot` + `engine.reduce`), the same
 machinery `tests/test_selfplay.py` uses, rather than hand-constructed states -- this is what
-docs/06-ml.md §1's property test calls for: "across every state the self-play harness reaches."
+docs/ml.md §1's property test calls for: "across every state the self-play harness reaches."
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ _EXPECTED_RANGES: list[tuple[str, int, int]] = [
 ]
 
 
-# --- action-space shape (docs/06-ml.md §1's table) --------------------------------------------
+# --- action-space shape (docs/ml.md §1's table) --------------------------------------------
 
 
 def test_action_space_is_109_contiguous_no_gaps_no_duplicates() -> None:
@@ -121,7 +121,7 @@ def _decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, i
 
 
 def _actions_equivalent(a: Action, b: Action) -> bool:
-    """Type-level equivalence: a `Discard` matches iff its `tile_type` matches (06-ml.md §1 --
+    """Type-level equivalence: a `Discard` matches iff its `tile_type` matches (ml.md §1 --
     the action space is type-level only, physical `tile_id` is fungible); every other variant
     reconstructs exactly, since `decode_action` pulls the same meld/window objects
     `legal_actions` itself offered."""
@@ -161,7 +161,7 @@ def test_legal_mask_matches_legal_actions_directly(seed: int) -> None:
 )
 @given(seed=st.integers(min_value=0, max_value=2**31 - 1))
 def test_round_trip_property_across_selfplay(seed: int) -> None:
-    """docs/06-ml.md §1's property test: for every type-level legal action at every state a
+    """docs/ml.md §1's property test: for every type-level legal action at every state a
     self-play game reaches, `action_id` then `decode_action` reproduces an equivalent action --
     checked here as `action_id(decode_action(action_id(a), ...)) == action_id(a)`, since both
     sides operate on `tile_type`, never physical `tile_id` (the doc's own resolution of why the

@@ -1,4 +1,4 @@
-"""Self-play dataset generation for the opponent-danger model (docs/06-ml.md §5).
+"""Self-play dataset generation for the opponent-danger model (docs/ml.md §5).
 
     python -m ml.generate_dataset --out data/danger_model \
         --bots FaanBot,FaanBotAggressive,FaanBotDefensive,FaanBotFlushChasing --parallel 12
@@ -145,7 +145,7 @@ async def play_and_label(
     seat_personalities: list[str],
 ) -> list[dict[str, object]]:
     """Plays one complete game, returning one row per real turn decision, labelled from the real
-    `GameState` at that decision (docs/06-ml.md §5). Claim-window responses are a different
+    `GameState` at that decision (docs/ml.md §5). Claim-window responses are a different
     decision type this model doesn't cover, so they advance the game without emitting a row --
     same as `bots/selfplay.py`'s `play_game`, whose stepping logic this mirrors."""
     rng = random.Random(seed)

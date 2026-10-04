@@ -276,7 +276,7 @@ def _below_min_faan_hand() -> tuple[TileId, ...]:
 
 
 def test_declare_win_not_offered_below_min_faan() -> None:
-    """Real gate, now closed (see actions.py module docstring / 01-rules-spec.md §11.8): a
+    """Real gate, now closed (see actions.py module docstring / rules.md §11.8): a
     structurally complete hand that scores below `min_faan` under real faan counting is not
     offered `DeclareWin`. Seat 1 (non-dealer under dealer 0, seat_wind SOUTH) so this isn't
     confused with a dealer's pre-discard Heavenly Hand; the held flower (FLOWER_1, matches

@@ -1,4 +1,4 @@
-"""Ground-truth per-opponent danger labels from a live `GameState` (docs/06-ml.md §5's danger
+"""Ground-truth per-opponent danger labels from a live `GameState` (docs/ml.md §5's danger
 model and §8's auxiliary heads -- exact, not estimated). `bots/arena.py`'s tenpai/winning-tile stats already computed most of this for its
 own metrics; those helpers live here now and `arena.py` imports them back, rather than this
 module reimplementing them.
@@ -71,7 +71,7 @@ def winning_tile_types(
     hand34: list[int], *, closed: bool, hand_sets: frozenset[HandSet]
 ) -> list[int]:
     """Every tile type that would bring `hand34` (already tenpai) to agari, under `hand_sets`
-    (docs/04-bots.md §9 -- a hand that's only tenpai via a shape `hand_sets` excludes, e.g. Seven
+    (docs/bots.md §8 -- a hand that's only tenpai via a shape `hand_sets` excludes, e.g. Seven
     Pairs under `hk_strict`, must not be reported as a real wait)."""
     out = []
     for t in range(34):
@@ -105,7 +105,7 @@ def unused_tile_id_for_type(tile_type_value: int, seat_state: SeatState) -> Tile
 
 def is_tenpai(state: GameState, seat: int) -> bool:
     """Whether `seat`'s real hand is one tile from a structurally-complete shape -- shanten==0,
-    ruleset-aware (`hand_sets` gates Seven Pairs, docs/04-bots.md §9)."""
+    ruleset-aware (`hand_sets` gates Seven Pairs, docs/bots.md §8)."""
     seat_state = state.seats[seat]
     hand34 = seat_hand34(seat_state)
     closed = not seat_state.melds
@@ -116,7 +116,7 @@ def expected_faan_if_won(state: GameState, seat: int, tile_type: int, *, discard
     """The real faan `seat` would score by winning on `tile_type` right now, or `0.0` if their
     real hand provably can't -- either not a complete shape, or a complete shape that doesn't
     clear `state.ruleset.min_faan` (a sub-minimum structural win is not a deal-in,
-    docs/04-bots.md §4). Mirrors `bots/safety.py`'s `_exact_deal_in_faan` but reads straight from
+    docs/bots.md §4). Mirrors `bots/safety.py`'s `_exact_deal_in_faan` but reads straight from
     `GameState` instead of an omniscient `SeatView` -- see this module's docstring for why."""
     seat_state = state.seats[seat]
     if len({tile_type * 4 + offset for offset in range(4)} & _used_physical_ids(seat_state)) == 4:
@@ -132,7 +132,7 @@ def expected_faan_if_won(state: GameState, seat: int, tile_type: int, *, discard
 
 @dataclass(frozen=True)
 class OpponentDangerLabel:
-    """Ground truth for one seat at one `GameState` snapshot -- docs/06-ml.md §5's three label
+    """Ground truth for one seat at one `GameState` snapshot -- docs/ml.md §5's three label
     heads: `P(tenpai)`, `P(wait on t)` per tile type, expected faan if dealt into."""
 
     is_tenpai: bool

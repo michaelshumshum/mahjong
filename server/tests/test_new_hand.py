@@ -1,5 +1,5 @@
 """`engine.new_hand` / `prevailing_winds`: a first hand dealt with any dealer and reachable
-prevailing wind (docs/06-ml.md §7)."""
+prevailing wind (docs/ml.md §7)."""
 
 from __future__ import annotations
 

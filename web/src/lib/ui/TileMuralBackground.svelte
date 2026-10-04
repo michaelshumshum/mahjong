@@ -1,5 +1,5 @@
 <script lang="ts">
-	// deliberate exception to the "no canvas" rule (docs/03-frontend.md §2) -- decorative only,
+	// deliberate exception to the "no canvas" rule (docs/frontend.md §2) -- decorative only,
 	// aria-hidden, needs a per-frame blit a DOM grid can't do without animating ~200 elements.
 	import { TILE_ASSET, type RenderableTileCode } from '$lib/table/tile-code';
 	import { muralBlitY, stepMuralScroll } from './mural-scroll';

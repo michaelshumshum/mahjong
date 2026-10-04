@@ -1,4 +1,4 @@
-"""Bot evaluation harness (docs/04-bots.md §8):
+"""Bot evaluation harness (docs/bots.md §7):
 
     python -m bots.arena --a EfficiencyBot --b RandomBot --games 2000 --seed 1 --parallel 8
 
@@ -10,7 +10,7 @@ one rotation would make that rotation play a different number of hands than the 
 `tenpai_rate_on_sub_minimum_hand` hypothesizes completing the hand off each of a tenpai seat's
 actual waits via `self_drawn=True` scoring -- a simplification (a real discard win can score
 differently) acceptable for a canary metric that only needs to move when play regresses toward
-pure efficiency (docs/04-bots.md §4).
+pure efficiency (docs/bots.md §4).
 
 `--parallel` runs duplicate sets across a `ProcessPoolExecutor`; each worker plays its own
 4-rotation set start to finish, so nothing needs pickling beyond `(seed, ruleset, bot, bot)`.
@@ -65,7 +65,7 @@ def _faan_bot_factory(seed: int) -> Bot:
 
 
 def _weight_profile_factory(profile: WeightProfile) -> Callable[[int], Bot]:
-    """A `BOT_REGISTRY` factory for a non-`BASELINE` `FaanBot` weight profile (docs/06-ml.md
+    """A `BOT_REGISTRY` factory for a non-`BASELINE` `FaanBot` weight profile (docs/ml.md
     §12's mixed-table personas, also the dataset generator's `--bots`) -- same stateless-seed shape as
     `_faan_bot_factory`, parameterised so `AGGRESSIVE`/`DEFENSIVE`/`FLUSH_CHASING` don't each need
     their own near-identical factory function."""
@@ -108,7 +108,7 @@ class HandRecord:
     """Populated only for `HandOutcome.EXHAUSTIVE_DRAW`."""
     sub_minimum_tenpai_seats: tuple[int, ...] = ()
     """Subset of `tenpai_seats` whose current wait has no legal way to reach `min_faan` --
-    docs/04-bots.md §4's canary, see module docstring."""
+    docs/bots.md §4's canary, see module docstring."""
 
 
 @dataclass(frozen=True)
@@ -318,7 +318,7 @@ def _collect_stats(duplicate_sets: Sequence[tuple[GameRecord, ...]]) -> tuple[Bo
 
 def _paired_differences(duplicate_sets: Sequence[tuple[GameRecord, ...]]) -> list[float]:
     """One sample per duplicate set: mean over its 4 rotations of (A's score in that rotation
-    minus the mean of the other three seats' scores) -- docs/04-bots.md §8 step 2."""
+    minus the mean of the other three seats' scores) -- docs/bots.md §7 step 2."""
     diffs = []
     for records in duplicate_sets:
         per_rotation = []
@@ -345,7 +345,7 @@ def _mean_ci95(values: Sequence[float]) -> tuple[float, float, float]:
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m bots.arena",
-        description="Paired-duplicate bot evaluation (docs/04-bots.md §8).",
+        description="Paired-duplicate bot evaluation (docs/bots.md §7).",
     )
     parser.add_argument("--a", required=True, choices=sorted(BOT_REGISTRY), help="candidate bot")
     parser.add_argument("--b", required=True, choices=sorted(BOT_REGISTRY), help="incumbent bot")

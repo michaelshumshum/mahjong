@@ -1,5 +1,5 @@
 """`mahjong_core.shanten`: standard/seven-pairs/thirteen-orphans shanten and ukeire
-(docs/04-bots.md §3).
+(docs/bots.md §3).
 
 Oracle cross-check uses `mahjong` (`MahjongRepository/mahjong`, dev-only per pyproject.toml --
 "shanten test oracle, not a runtime dep"), same 34-index layout, over random 13/14-tile hands --
@@ -113,7 +113,7 @@ def test_thirteen_orphans_agari() -> None:
 def test_seven_pairs_gated_by_hand_sets() -> None:
     """Same shape as `test_closed_false_skips_seven_pairs_and_kokushi` (six scattered pairs, no
     chow potential, one lone single) but exercising the `hand_sets` gate instead of `closed`
-    (docs/04-bots.md §9 Tier 2): Seven Pairs is `HandSet.NEW_18` (`scoring/patterns.py`), so a
+    (docs/bots.md §8 Tier 2): Seven Pairs is `HandSet.NEW_18` (`scoring/patterns.py`), so a
     ruleset without it (e.g. `hk_strict`) must not let this hand read as tenpai via a pattern it
     can never legally complete there. Thirteen Orphans is `HandSet.CLASSIC` and isn't gated by
     this param at all -- not exercised here, see `thirteen_orphans_shanten`'s own tests above."""
@@ -150,7 +150,7 @@ def test_closed_false_skips_seven_pairs_and_kokushi() -> None:
     assert shanten(counts, closed=False) > shanten(counts, closed=True)
 
 
-# --- the two named bugs (docs/04-bots.md §3) ------------------------------------------------
+# --- the two named bugs (docs/bots.md §3) ------------------------------------------------
 
 
 def test_block_cap_bug_regression() -> None:
@@ -210,7 +210,7 @@ def _random_hand(rng: random.Random, n: int, *, quad_bias: bool) -> list[int]:
 
 
 def test_matches_oracle_over_random_hands() -> None:
-    """Cross-checked against `MahjongRepository/mahjong` (docs/04-bots.md §3) over thousands
+    """Cross-checked against `MahjongRepository/mahjong` (docs/bots.md §3) over thousands
     of random 13/14-tile hands, both plain and quad-biased. The only expected mismatches are
     the documented four-copies edge case (shanten.py's module docstring) -- every mismatch
     found must hold at least one tile type at count 4, and there must be zero mismatches
@@ -297,7 +297,7 @@ def test_ukeire_respects_seen_tiles() -> None:
     assert tiles <= sum(4 - seen[t] for t in range(34) if seen[t] < 4)
 
 
-# --- perf / wiring (docs/04-bots.md §3: "wired in as the hot path") -------------------------
+# --- perf / wiring (docs/bots.md §3: "wired in as the hot path") -------------------------
 
 
 def test_frontier_cache_warms_and_stays_fast() -> None:

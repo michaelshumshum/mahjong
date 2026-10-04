@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 
 // shared claim-counted mural-visibility flag; a plain boolean or a $state-wrapped Set both lose
-// claims under concurrent claim/release -- see docs/03-frontend.md §2's "Shared across routes" for why SvelteSet.
+// claims under concurrent claim/release -- see docs/frontend.md §2's "Shared across routes" for why SvelteSet.
 class MuralVisibility {
 	#claims = new SvelteSet<symbol>();
 	visible = $derived(this.#claims.size > 0);

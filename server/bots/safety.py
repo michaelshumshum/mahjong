@@ -1,16 +1,16 @@
-"""Defence/safety model for T2 `FaanBot` (docs/04-bots.md §5) -- read that section before
+"""Defence/safety model for T2 `FaanBot` (docs/bots.md §5) -- read that section before
 touching this module.
 
 Hand-tuned, not trained. Weights are checked per-signal for *direction* (`tests/test_safety.py`),
 not calibrated accuracy: offline, `deal_in_probability` ranks legal waits at AUC ~0.50 across
-opponents (docs/06-ml.md §5). Kept as-is; the learned bot is a separate RL policy.
+opponents (docs/ml.md §5). Kept as-is; the learned bot is a separate RL policy.
 
 No `is_safe(tile) -> bool`: every signal is a multiplier into `deal_in_probability`, a float in
 `[0, 1]` -- `no_chance` is the only hard zero. Genbutsu/suji only ever scale the estimate down,
 never to exactly zero (HK has no furiten).
 
 **`tile_risk` is hands-aware.** When `view.hands` is populated (the `"ORACLE"` tier's omniscient
-view, `app.views._omniscient_seat_view`, docs/04-bots.md §10) every opponent's real hand is
+view, `app.views._omniscient_seat_view`, docs/bots.md §9) every opponent's real hand is
 known, so "does this exact tile complete seat X's exact hand right now" is a direct, cheap, exact
 check -- no rollout, no sampling, and no need for the statistical signals above at all for that
 tier. `_exact_deal_in_faan` replicates `mahjong_core.engine._can_win_with`'s candidate-hand
@@ -241,7 +241,7 @@ def _exact_deal_in_faan(view: SeatView, opponent_seat: int, tile_type: int) -> f
     populated): the real faan `opponent_seat` would score by winning on `tile_type` right now,
     or `0.0` if their real hand provably can't -- either not a complete shape, or a complete
     shape that doesn't clear `view.ruleset.min_faan` (a sub-minimum structural win is not a
-    deal-in, docs/04-bots.md §4). Mirrors `mahjong_core.engine._can_win_with`'s candidate-hand
+    deal-in, docs/bots.md §4). Mirrors `mahjong_core.engine._can_win_with`'s candidate-hand
     pattern (append the tile, check shape, score, check `clears_min_faan`) but built directly
     from `view` rather than a live `GameState`/claim window, since this is a hypothetical
     "what if this seat discards this tile" check, not resolving a real claim."""
@@ -275,7 +275,7 @@ def tile_risk(view: SeatView, tile_type: int) -> float:
     `1 - prod(1-p_i)` is deliberate: at `_BASE_RATE`'s small magnitude they're nearly identical,
     and summing keeps each opponent's contribution separately testable.
 
-    When `view.hands` is populated (the `"ORACLE"` tier's omniscient view, docs/04-bots.md §10)
+    When `view.hands` is populated (the `"ORACLE"` tier's omniscient view, docs/bots.md §9)
     this is a strict override, not an addition: every opponent's real hand is known, so
     `P(deal_in | tile)` collapses from an estimate to an exact 0-or-1 -- the candidate tile
     either completes that opponent's real hand right now (clearing `min_faan`) or it provably
@@ -321,7 +321,7 @@ def kong_rob_risk(view: SeatView, tile_type: int, *, concealed: bool) -> float:
     Reuses `_exact_deal_in_faan`'s exact win check per opponent -- the same exact-faan-or-zero
     shape `tile_risk` already prices for an ordinary discard of the same tile type, since a
     kong-rob deal-in is structurally identical: the declaring seat pays the whole payout alone
-    (docs/04-bots.md §10). Does not add 搶槓's own +1 bonus faan (`_exact_deal_in_faan` hardcodes
+    (docs/bots.md §9). Does not add 搶槓's own +1 bonus faan (`_exact_deal_in_faan` hardcodes
     `is_robbing_kong=False`), so a hand exactly one faan under `min_faan` that would only clear it
     with that bonus reads as safe here -- a narrow, accepted gap: reusing `_exact_deal_in_faan`
     unmodified (out of scope for this change) is preferred over reimplementing the scoring path
@@ -375,7 +375,7 @@ def opponent_threat_level(view: SeatView, opponent_seat: int) -> float:
     meld count and the tempo signal into a threshold-compared scalar, not a probability.
 
     Hands-aware when `view.hands` is populated (the `"ORACLE"` tier's omniscient view,
-    docs/04-bots.md §10): `opponent_seat`'s real shanten replaces the meld/tempo proxy entirely,
+    docs/bots.md §9): `opponent_seat`'s real shanten replaces the meld/tempo proxy entirely,
     via `_opponent_real_shanten`/`_SHANTEN_THREAT_STEP` below. `view.hands is None` (every other
     tier) is untouched, byte-for-byte."""
     if view.hands is not None:

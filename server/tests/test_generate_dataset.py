@@ -1,4 +1,4 @@
-"""Unit tests for `ml/generate_dataset.py` (docs/06-ml.md §5).
+"""Unit tests for `ml/generate_dataset.py` (docs/ml.md §5).
 Needs pyarrow (`ml`-extra only, not a base dependency) -- `importorskip` keeps this file a clean
 skip, not a collection failure, under `make test-server`'s no-ml-extra environment. Unlike the
 encoder, this module doesn't need numpy itself (see its own module docstring).
@@ -80,7 +80,7 @@ def test_play_and_label_emits_one_row_per_turn_decision_with_the_expected_shapes
     assert row["seat"] in range(4)
     assert row["seat_personalities"] == roster
     assert len(row["hand_counts"]) == 34
-    assert sum(row["hand_counts"]) == 14  # post-draw, pre-discard -- see docs/99-deferred.md
+    assert sum(row["hand_counts"]) == 14  # post-draw, pre-discard -- see docs/bots.md §10
     assert len(row["meld_counts"]) == 4
     assert all(len(m) == 34 for m in row["meld_counts"])
     assert len(row["discard_counts"]) == 4

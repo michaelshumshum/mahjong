@@ -1,5 +1,5 @@
-"""Tests for mahjong_core/scoring/payout.py (docs/05-roadmap.md §2, seventh sub-task):
-faan -> points table lookup and per-seat payment splits (docs/01-rules-spec.md §8).
+"""Tests for mahjong_core/scoring/payout.py (docs/testing.md §1):
+faan -> points table lookup and per-seat payment splits (docs/rules.md §8).
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ def test_points_full_spicy(faan: int, expected: int) -> None:
 
 @pytest.mark.parametrize(
     ("faan", "expected"),
-    # 01-rules-spec.md §8's worked values, plus the 0-2 baseline and the 11-13 extension.
+    # rules.md §8's worked values, plus the 0-2 baseline and the 11-13 extension.
     [
         (0, 1),
         (1, 2),
@@ -118,7 +118,7 @@ def test_discard_win_discarder_cannot_be_winner() -> None:
 
 
 def test_dealer_as_winner_no_multiplier() -> None:
-    """01-rules-spec.md §8 has no dealer-doubling rule; dealer winning pays out identically
+    """rules.md §8 has no dealer-doubling rule; dealer winning pays out identically
     to any other seat winning."""
     non_dealer = payout(1, 8, SelfDraw(), dealer_seat=0, ruleset=_FULL_SPICY)
     dealer_wins = payout(0, 8, SelfDraw(), dealer_seat=0, ruleset=_FULL_SPICY)

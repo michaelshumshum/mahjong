@@ -1,6 +1,6 @@
-"""M1's completion gate (docs/05-roadmap.md §2): `pytest -k selfplay` runs N complete games
+"""M1's completion gate (docs/testing.md §1): `pytest -k selfplay` runs N complete games
 with four `RandomBot`s -- no illegal states, no deadlocks, every game terminates -- plus a
-`hypothesis` property version of the same invariants (docs/05-roadmap.md §3's testing-strategy
+`hypothesis` property version of the same invariants (docs/testing.md §1's testing-strategy
 table: tile conservation, hand sizes in `{1,4,7,10,13}` mod melds, `legal_actions` never empty
 in an active phase, every game terminates).
 
@@ -8,7 +8,7 @@ in an active phase, every game terminates).
 *hand* -- most hands end in an exhaustive draw -- so under `DEFAULT_RULESET`
 (`dealer_repeat_on_draw=True`), a round can take on the order of 150+ hands before a non-dealer
 finally wins and rotates the deal (measured empirically while sizing this test, see
-docs/05-roadmap.md §3). That's real engine behaviour, not a bug -- `dealer_repeat_on_win`/
+docs/testing.md §1). That's real engine behaviour, not a bug -- `dealer_repeat_on_win`/
 `dealer_repeat_on_draw` are exercised directly by test_engine.py's dedicated unit tests -- but
 it makes wall-clock time at 10,000 games unpredictable and turns a legitimate slow-converging
 config into self-play flakiness. Both self-play runs below disable both repeat flags, matching
@@ -40,7 +40,7 @@ _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=Fal
 
 def _total_tiles(state: GameState) -> int:
     """All physical tiles accounted for: concealed + melds + discards per seat, plus flowers,
-    plus what's left in the wall (docs/05-roadmap.md §3's tile-conservation invariant)."""
+    plus what's left in the wall (docs/testing.md §1's tile-conservation invariant)."""
     seat_tiles = sum(
         len(seat.concealed) + sum(len(m.tiles) for m in seat.melds) + len(seat.discards)
         for seat in state.seats
@@ -52,7 +52,7 @@ def _total_tiles(state: GameState) -> int:
 def _assert_hand_sizes(state: GameState) -> None:
     """Every seat's concealed count is `13 - 3*len(melds)` -- one of `{1,4,7,10,13}` -- except
     the seat currently holding an undiscarded draw in `AWAIT_ACTION`, which holds one more
-    (docs/05-roadmap.md §3: "hand sizes always in `{1,4,7,10,13}` mod melds"). Only checked in
+    (docs/testing.md §1's hand-size invariant). Only checked in
     the three active phases -- `HAND_OVER`/`GAME_OVER` legitimately leave a winner's completing
     tile un-discarded, which is a hand-result snapshot, not a live turn state."""
     if state.phase not in (Phase.AWAIT_ACTION, Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
@@ -152,5 +152,5 @@ _RULESET_VARIATIONS = st.builds(
 @given(seed=st.integers(min_value=0, max_value=2**31 - 1), ruleset=_RULESET_VARIATIONS)
 def test_selfplay_hypothesis_properties(seed: int, ruleset: RuleSet) -> None:
     """Same invariants as the fixed-count run, but with hypothesis choosing the seed and a
-    ruleset within its valid space (docs/05-roadmap.md §2: "Run under hypothesis too")."""
+    ruleset within its valid space (docs/decisions/0018-milestone-plan.md M1: "Run under hypothesis too")."""
     _play_one_game(seed, ruleset)

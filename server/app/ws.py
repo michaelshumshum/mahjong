@@ -1,4 +1,4 @@
-"""WS endpoint speaking the envelope protocol (docs/02-protocol.md §1) -- one `Session` per
+"""WS endpoint speaking the envelope protocol (docs/protocol.md §1) -- one `Session` per
 connection, joined to a `Table`. `hello`/`ping` stay on a local per-connection counter, never
 the per-seat `seq` stream everything else uses (see `Session.handle`).
 
@@ -61,7 +61,7 @@ router = APIRouter()
 
 _adapter: TypeAdapter[object] = TypeAdapter(proto.AnyMessage)
 
-_OUTBOX_MAXSIZE = 64  # docs/00-architecture.md "Outbound backpressure" / 02-protocol.md §9
+_OUTBOX_MAXSIZE = 64  # docs/architecture.md "Outbound backpressure" / protocol.md §9
 
 _registry = TableRegistry()
 

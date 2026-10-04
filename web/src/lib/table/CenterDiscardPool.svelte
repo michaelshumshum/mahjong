@@ -2,7 +2,7 @@
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState } from './mock-game-state';
 
-	// all four discard pools live in the centre box (docs/03-frontend.md §3); `position` picks
+	// all four discard pools live in the centre box (docs/frontend.md §3); `position` picks
 	// the box side and, for left/right, the rotation matching that seat's own hand.
 	let {
 		seat,

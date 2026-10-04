@@ -1,5 +1,5 @@
-"""R2 evaluation: paired-duplicate hands, candidate × 1 vs a heuristic bot × 3 (docs/06-ml.md §12,
-docs/04-bots.md §8). `ml`-extra only.
+"""R2 evaluation: paired-duplicate hands, candidate × 1 vs a heuristic bot × 3 (docs/ml.md §12,
+docs/bots.md §7). `ml`-extra only.
 
     python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 200 --seed 1000000 \
         [--opponent EfficiencyBot] [--min-faan 3] [--parallel 6] [--records eval.jsonl]

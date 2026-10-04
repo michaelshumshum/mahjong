@@ -1,5 +1,5 @@
 """`ml/export.py`'s `NumpyPolicyNet`: numpy logits match torch `PolicyNet` on real encoded states,
-and single-sample serving (encode + forward) fits docs/06-ml.md §6's p99 ≤ 5 ms."""
+and single-sample serving (encode + forward) fits docs/ml.md §6's p99 ≤ 5 ms."""
 
 from __future__ import annotations
 

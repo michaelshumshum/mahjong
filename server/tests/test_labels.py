@@ -1,5 +1,5 @@
 """Unit tests for `bots/labels.py` -- ground-truth danger labels from a live `GameState`
-(docs/06-ml.md §5). Every faan value asserted below was computed once via the real
+(docs/ml.md §5). Every faan value asserted below was computed once via the real
 `score_winning_hand` against the exact hand-authored scenario (not hand-derived by eyeballing
 yaku) -- `平糊`/`無花`/`門前清` stack on nearly any closed hand, so a "boring" hand's real faan is
 routinely higher than it looks at a glance; see individual test comments for each hand's real
@@ -123,7 +123,7 @@ def test_expected_faan_if_won_returns_zero_for_a_structurally_complete_sub_minim
     """Same ryanmen shape as the tenpai test above, but with the first sequence claimed (exposed)
     instead of concealed -- kills 門前清, leaving only 平糊 1 + 無花 1 = 2 faan, below the default
     `min_faan=3`. A structurally complete win that can't legally be declared is not a deal-in
-    (docs/04-bots.md §4)."""
+    (docs/bots.md §4)."""
     exposed = Meld(
         kind=MeldKind.CHOW,
         tiles=(*_tids(TileType.MAN_1), *_tids(TileType.MAN_2), *_tids(TileType.MAN_3)),
@@ -156,7 +156,7 @@ def test_expected_faan_if_won_returns_zero_when_all_four_copies_are_already_held
 def test_is_tenpai_seven_pairs_gated_by_hand_sets() -> None:
     """Mirrors `tests/test_shanten.py::test_seven_pairs_gated_by_hand_sets` at the labels layer:
     a hand only tenpai via Seven Pairs (NEW_18) must not be reported tenpai once NEW_18 is off
-    (docs/04-bots.md §9)."""
+    (docs/bots.md §8)."""
     state = _with_seat(_state(), 1, concealed=_SEVEN_PAIRS_HAND, melds=(), flowers=())
     assert is_tenpai(state, 1)
 

@@ -24,7 +24,7 @@ export default defineConfig({
 			outdir: './src/lib/paraglide',
 			emitTsDeclarations: true,
 			// no 'url' strategy: table invite links (/table/ABC123) must stay locale-agnostic
-			// (docs/03-frontend.md §8's locale strategy).
+			// (docs/frontend.md §9's locale strategy).
 			strategy: ['cookie', 'baseLocale'],
 			// pinned: "locale-modules" (the dev default) drops the per-call `{ locale }` override
 			// LocaleSwitcher needs to render each option in its own language regardless of UI locale.

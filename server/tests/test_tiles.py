@@ -150,7 +150,7 @@ def test_all_flowers_count_is_8() -> None:
 
 
 def test_total_physical_tile_count_matches_doc() -> None:
-    # docs/01-rules-spec.md §1: 136 playable + 8 flowers/seasons = 144.
+    # docs/rules.md §1: 136 playable + 8 flowers/seasons = 144.
     assert TOTAL_PHYSICAL_TILES == 144
     assert len(all_tile_ids()) + len(all_flowers()) == TOTAL_PHYSICAL_TILES
 

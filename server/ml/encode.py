@@ -1,10 +1,10 @@
-"""`SeatView` + `RuleSet` -> fixed-shape numpy feature planes for a network (docs/06-ml.md §5). `ml`-extra only -- numpy is not a base dependency
+"""`SeatView` + `RuleSet` -> fixed-shape numpy feature planes for a network (docs/ml.md §5). `ml`-extra only -- numpy is not a base dependency
 (server/AGENTS.md: "mahjong_core is stdlib-only... no numpy, no torch in base deps"), so nothing
 outside `server/ml/` may import this module.
 
 Reads only entitled `SeatView` fields -- own_hand, melds, discard_pools, concealed_counts
 (app/views.py's `Entitlement` contract) -- the same fields a live, non-oracle bot or client
-actually receives. `view.hands` (the `"ORACLE"` tier's omniscient extra, docs/04-bots.md §10) is
+actually receives. `view.hands` (the `"ORACLE"` tier's omniscient extra, docs/bots.md §9) is
 deliberately never read here: a network trained on oracle-only input wouldn't generalize to the
 redacted view it's served at inference.
 """
@@ -139,7 +139,7 @@ def encode_seat_view(view: SeatView) -> EncodedSeatView:
 
 
 def encode_ruleset(ruleset: RuleSet) -> np.ndarray:
-    """The `RuleSet` fields that change correct play (docs/06-ml.md §5) -- not the full `RuleSet.to_dict()`. Timing/
+    """The `RuleSet` fields that change correct play (docs/ml.md §5) -- not the full `RuleSet.to_dict()`. Timing/
     connection/fairness fields (`turn_seconds`, `provable_fairness`, etc.) have no bearing on
     hand-value decisions and are deliberately not encoded.
 

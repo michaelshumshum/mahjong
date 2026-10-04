@@ -1,4 +1,4 @@
-// positional slot-identity model (docs/03-frontend.md §4): a stable per-slot key stands in for an
+// positional slot-identity model (docs/frontend.md §4): a stable per-slot key stands in for an
 // opponent's concealed tile until reveal -- both of §4's resolution rules always name the last slot, so popping from the end is the whole rule.
 
 export interface Slot {

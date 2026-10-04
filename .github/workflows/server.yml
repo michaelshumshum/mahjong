@@ -59,7 +59,7 @@ jobs:
       # running it in parallel costs one extra `uv sync` instead of adding to the fast job's own
       # critical path -- the whole point of never skipping this suite is that it stops being a
       # tax on the fast feedback loop everyone waits on per push.
-      # --games caps the self-play soak (default 10000 -- ~16 min, docs/05-roadmap.md §2) to a
+      # --games caps the self-play soak (default 10000 -- ~16 min, docs/testing.md §1) to a
       # size that fits a per-push job; `make test-server-slow`/`make selfplay` still default to
       # the full 10000 locally.
       - name: pytest (slow)

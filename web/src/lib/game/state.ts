@@ -57,7 +57,7 @@ export interface ClientGameState {
 	turn: number;
 	phase: string;
 	ownHand: number[];
-	/** tile_id held apart from the sorted hand, physical-play style (docs/03-frontend.md §6).
+	/** tile_id held apart from the sorted hand, physical-play style (docs/frontend.md §1).
 	 * `null` after a claimed chow/pung/kong too — a claim never leaves a spare tile to hold apart. */
 	drawnTileId: number | null;
 	concealedCounts: number[];

@@ -73,7 +73,7 @@ proto: ## Regenerate web protocol types (+ shared/protocol.schema.json, informat
 	$(COMPOSE) run --rm --no-deps web pnpm exec oxfmt \
 		src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts
 
-proto-check: proto ## Fail if regenerating changes the committed output (CI gate; see docs/07-infra.md)
+proto-check: proto ## Fail if regenerating changes the committed output (CI gate; see docs/infra.md)
 	@git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts \
 		|| (echo "\n  Protocol types changed — run 'make proto' and commit them.\n" && exit 1)
 

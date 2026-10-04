@@ -1,13 +1,13 @@
-// mirrors the tiles.py parsing scheme and the tile set/index layout in docs/01-rules-spec.md §1.
+// mirrors the tiles.py parsing scheme and the tile set/index layout in docs/rules.md §1.
 
 type ManTile = '1m' | '2m' | '3m' | '4m' | '5m' | '6m' | '7m' | '8m' | '9m';
 type PinTile = '1p' | '2p' | '3p' | '4p' | '5p' | '6p' | '7p' | '8p' | '9p';
 type SouTile = '1s' | '2s' | '3s' | '4s' | '5s' | '6s' | '7s' | '8s' | '9s';
 
-// z1-z4 winds (E S W N), z5-z7 dragons (中 發 白) — docs/01-rules-spec.md §1's index layout.
+// z1-z4 winds (E S W N), z5-z7 dragons (中 發 白) — docs/rules.md §1's index layout.
 type HonorTile = 'z1' | 'z2' | 'z3' | 'z4' | 'z5' | 'z6' | 'z7';
 
-// f1-f4 flowers, f5-f8 seasons — docs/01-rules-spec.md §1.
+// f1-f4 flowers, f5-f8 seasons — docs/rules.md §1.
 type FlowerTile = 'f1' | 'f2' | 'f3' | 'f4' | 'f5' | 'f6' | 'f7' | 'f8';
 
 export type TileCode = ManTile | PinTile | SouTile | HonorTile | FlowerTile;

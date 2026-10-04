@@ -1,5 +1,5 @@
 """Packs `ml.generate_dataset` parquet shards into memory-mappable uint8 `.npy` arrays, one file
-per field, so training reads slices instead of decoding parquet lists (docs/06-ml.md §5).
+per field, so training reads slices instead of decoding parquet lists (docs/ml.md §5).
 
     python -m ml.pack --src data/danger_v3 --out data/danger_v3_packed
 

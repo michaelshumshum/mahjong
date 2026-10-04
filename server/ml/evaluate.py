@@ -1,4 +1,4 @@
-"""Offline evaluation of a danger checkpoint (docs/06-ml.md §5):
+"""Offline evaluation of a danger checkpoint (docs/ml.md §5):
 
     python -m ml.evaluate --ckpt runs/danger/ckpt_best.pt --data data/danger_v3_packed --split test
     python -m ml.evaluate --ckpt ... --data data/danger_v3_heldout_eff --split all

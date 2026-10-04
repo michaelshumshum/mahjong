@@ -119,7 +119,7 @@ def _generate_table_id() -> str:
     raise RuntimeError("could not generate a unique table id")
 
 
-# practice-mode difficulty picker (docs/04-bots.md §7): Easy/Normal/Impossible = T1/T2/ORACLE.
+# practice-mode difficulty picker (docs/bots.md §6): Easy/Normal/Impossible = T1/T2/ORACLE.
 # T0/RandomBot is deliberately excluded -- never shipped as a difficulty (§2).
 _PRACTICE_BOT_TIERS = ("T1", "T2", "ORACLE")
 
