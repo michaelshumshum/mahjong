@@ -332,6 +332,9 @@ matching `_should_claim`'s "never do what provably backfires" precedent. Gating 
 **Measured** (200 duplicate sets, `ORACLE` vs `FaanBot`): paired difference **+27.693
 points/game, 95% CI [25.098, 30.288]**; win rate 0.318 vs 0.152; deal-in rate 0.021 vs 0.163.
 
+Planned improvements, with measured diagnostics (66 of 67 deal-ins were certain and avoidable):
+[ADR 0019](decisions/0019-oracle-improvements-plan.md).
+
 ## 10. Known issues
 
 | Issue | Where | Status |

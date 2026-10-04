@@ -72,3 +72,5 @@ Notes:
 - Every hands-aware helper is byte-identical for `view.hands is None`, pinned by regression tests.
 - Known gap: `kong_rob_risk` reuses `_exact_deal_in_faan` with `is_robbing_kong=False`, so 搶槓's
   own +1 faan isn't counted toward `min_faan` ([bots.md §10](../bots.md)).
+- `_best_discard` still prices an exact, certain deal-in as a soft `w_safety` cost; fix and
+  further improvements planned in [ADR 0019](0019-oracle-improvements-plan.md).
