@@ -222,6 +222,8 @@ def _tiny_cfg(tmp_path: Path, **kw) -> PPOConfig:
         "aux_rate": 0.5,
         "save_every": 1,
         "stage": {"min_faan": 0, "learners": 1, "keep_prob": 0.5, "oracle_k": 5, "beta": 1.0},
+        # cuda runs aren't bit-reproducible (docs/06-ml.md §6); these tests pin exact equality
+        "device": "cpu",
         **_TINY,
     }
     return PPOConfig(**{**base, **kw})

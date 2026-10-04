@@ -37,6 +37,7 @@ def _cfg(tmp: Path) -> PPOConfig:
         minibatch=48,
         aux_rate=0.5,
         save_every=1,
+        device="cpu",
         channels=8,
         blocks=1,
         stage={"min_faan": 0, "learners": 1, "keep_prob": 0.5, "oracle_k": 5, "beta": 1.0},
