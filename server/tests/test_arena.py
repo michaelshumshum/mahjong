@@ -19,8 +19,10 @@ from bots.arena import (
     _paired_differences,
     _run_duplicate_set,
     _tenpai_can_reach_min_faan,
+    _view_for,
     main,
 )
+from bots.faanbot import FaanBot
 from mahjong_core.engine import new_game
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import HandOutcome, SeatState, WinType
@@ -29,6 +31,15 @@ from mahjong_core.state import HandOutcome, SeatState, WinType
 def test_make_bot_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="unknown bot"):
         _make_bot("NotABot", seed=0)
+
+
+def test_oracle_is_a_plain_faanbot_on_an_omniscient_view() -> None:
+    state = new_game(_ARENA_RULESET, 0)
+    assert type(_make_bot("ORACLE", seed=0)) is FaanBot
+    oracle_view = _view_for(state, 1, "ORACLE")
+    assert oracle_view.hands is not None
+    assert oracle_view.hands[2] == state.seats[2].concealed
+    assert _view_for(state, 1, "FaanBot").hands is None
 
 
 @pytest.fixture(scope="module")

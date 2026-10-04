@@ -1335,7 +1335,7 @@ class Table:
         deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
 
         if tier == "ORACLE":
-            # the only call site for _omniscient_seat_view (see its docstring for the safety
+            # the only live call site for _omniscient_seat_view (see its docstring for the safety
             # argument) -- unreachable for a real human seat since disconnect-handover forces T2.
             view = _omniscient_seat_view(self.state, seat)
         else:

@@ -64,7 +64,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from app.views import SeatView, seat_view
-from bots.arena import BOT_REGISTRY
+from bots.arena import BOT_REGISTRY, OMNISCIENT_BOTS
 from bots.base import Bot
 from bots.labels import OpponentDangerLabel, danger_labels_for_opponents
 from mahjong_core.config import RuleSet
@@ -88,6 +88,8 @@ def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
         raise ValueError(f"--bots needs exactly 4 comma-separated names, got {len(names)}")
     bots = []
     for i, name in enumerate(names):
+        if name in OMNISCIENT_BOTS:
+            raise ValueError(f"{name!r} needs an omniscient view; this generator uses seat_view")
         try:
             factory = BOT_REGISTRY[name]
         except KeyError:

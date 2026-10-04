@@ -26,14 +26,15 @@ for a real `seat`. It backs the `"ORACLE"` bot tier (docs/bots.md §9), an expli
 non-ladder tier a live table may be configured to run -- driven by a plain `FaanBot()`
 (`bots/worker.py`), whose `bots/safety.py`-derived discard scoring becomes exact rather than
 probabilistic once it sees `.hands` populated. This is safe to hand across
-the `ProcessPoolExecutor` boundary (`app/table.py`'s `_submit_bot_job`, the only caller) because
+the `ProcessPoolExecutor` boundary (`app/table.py`'s `_submit_bot_job`, the only live caller) because
 `SeatView` never carries `game_seed`/`hand_seed` -- see its field list below, there is no seed
 field -- so `docs/architecture.md §3`'s "`game_seed` never leaves this process" invariant is
 untouched; that invariant is about the seed specifically, not about tile visibility. It is never
 reachable from any wire-facing/protocol-facing path (`seat_view_wire`, `state_sync_wire`, or
 anything a real WS client's own traffic goes through) -- those all go through `seat_view()`'s
 public, unmodified contract. Do not call `_omniscient_seat_view` from anywhere but
-`app/table.py`'s oracle-tier branch, and do not weaken `_check_reveal` to make it "unnecessary" --
+`app/table.py`'s oracle-tier branch and the offline arena's `bots/arena.py` `_view_for` (which
+`app/` never imports), and do not weaken `_check_reveal` to make it "unnecessary" --
 that guard is the real security boundary for every real client and stays exactly as strict as it
 is today.
 """
@@ -217,8 +218,8 @@ def seat_view(
 
 def _omniscient_seat_view(state: GameState, seat: int) -> SeatView:
     """DANGEROUS -- do not call this from anywhere except `app/table.py`'s `_submit_bot_job`,
-    in its oracle-tier branch. That is the ONLY sanctioned call site in the whole codebase
-    (`tests/test_oracle_containment.py` pins this structurally); see the module docstring's
+    in its oracle-tier branch, and the offline arena's `bots/arena.py` `_view_for`. Those are
+    the ONLY sanctioned call sites (`tests/test_oracle_containment.py` pins this structurally); see the module docstring's
     "deliberate, contained exception" section for the full safety argument.
 
     Builds `seat`'s ordinary `seat_view(state, seat)` and then replaces `.hands` with every

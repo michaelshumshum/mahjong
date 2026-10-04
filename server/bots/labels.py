@@ -4,8 +4,8 @@ own metrics; those helpers live here now and `arena.py` imports them back, rathe
 module reimplementing them.
 
 Deliberately never touches `app.views._omniscient_seat_view` -- that function is structurally
-pinned to exactly one call site (`tests/test_oracle_containment.py`'s AST sweep, which scans this
-package). Labels come straight from `GameState`/`SeatState`, which self-play/arena code already
+pinned to its sanctioned call sites (`tests/test_oracle_containment.py`'s AST sweep, which scans
+this package). Labels come straight from `GameState`/`SeatState`, which self-play/arena code already
 holds directly; there's no need for an omniscient `SeatView` detour to get them.
 """
 

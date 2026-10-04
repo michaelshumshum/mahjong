@@ -36,6 +36,7 @@ import torch
 from app.views import SeatView, seat_view
 from bots.arena import (
     BOT_REGISTRY,
+    OMNISCIENT_BOTS,
     GameRecord,
     HandRecord,
     _collect_stats,
@@ -80,6 +81,11 @@ class PolicyBot:
             return int(np.argmax(logp))
         p = np.exp(logp - logp.max())
         return int(self.rng.choice(len(p), p=p / p.sum()))
+
+
+def _opponent_choices() -> list[str]:
+    """`HandEnv` serves opponents a plain `seat_view`, so an omniscient bot can't sit here."""
+    return sorted(set(BOT_REGISTRY) - OMNISCIENT_BOTS)
 
 
 def load_candidate(path: str) -> PolicyNet:
@@ -187,8 +193,8 @@ def evaluate(
     model: PolicyNet | None = None,
     parallel: int = 1,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    if opponent not in BOT_REGISTRY:
-        raise ValueError(f"unknown opponent {opponent!r}; choices: {sorted(BOT_REGISTRY)}")
+    if opponent not in BOT_REGISTRY or opponent in OMNISCIENT_BOTS:
+        raise ValueError(f"unknown opponent {opponent!r}; choices: {_opponent_choices()}")
     sets: list[tuple[GameRecord, ...]] = []
     records: list[dict[str, Any]] = []
     if parallel > 1:
@@ -229,7 +235,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--ckpt", required=True)
     parser.add_argument("--sets", type=int, default=200)
     parser.add_argument("--seed", type=int, default=1_000_000, help="set i uses seed + i")
-    parser.add_argument("--opponent", default="EfficiencyBot", choices=sorted(BOT_REGISTRY))
+    parser.add_argument("--opponent", default="EfficiencyBot", choices=_opponent_choices())
     parser.add_argument("--ruleset", default="hk_classic", choices=sorted(RULESET_PRESETS))
     parser.add_argument("--min-faan", type=int, help="override the preset's min_faan")
     parser.add_argument("--parallel", type=int, default=1)

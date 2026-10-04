@@ -14,6 +14,10 @@ pure efficiency (docs/bots.md §4).
 
 `--parallel` runs duplicate sets across a `ProcessPoolExecutor`; each worker plays its own
 4-rotation set start to finish, so nothing needs pickling beyond `(seed, ruleset, bot, bot)`.
+
+`ORACLE` seats are fed `_omniscient_seat_view` via `_view_for`, the one sanctioned call site
+outside `app/table.py` (docs/bots.md §9). Offline only: `app/` never imports this module
+(`tests/test_oracle_containment.py`).
 """
 
 from __future__ import annotations
@@ -28,7 +32,7 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
-from app.views import seat_view
+from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.base import Bot
 from bots.efficiency import EfficiencyBot
 from bots.faanbot import AGGRESSIVE, DEFENSIVE, FLUSH_CHASING, FaanBot, WeightProfile
@@ -43,6 +47,7 @@ from mahjong_core.state import GameState, HandOutcome, Phase, WinType
 
 __all__ = [
     "BOT_REGISTRY",
+    "OMNISCIENT_BOTS",
     "BotStats",
     "GameRecord",
     "HandRecord",
@@ -84,7 +89,11 @@ BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "FaanBotAggressive": _weight_profile_factory(AGGRESSIVE),
     "FaanBotDefensive": _weight_profile_factory(DEFENSIVE),
     "FaanBotFlushChasing": _weight_profile_factory(FLUSH_CHASING),
+    "ORACLE": _faan_bot_factory,
 }
+
+OMNISCIENT_BOTS: frozenset[str] = frozenset({"ORACLE"})
+"""`BOT_REGISTRY` names played on an omniscient view; any other harness must refuse them."""
 
 _STEP_CAP = 8000
 _NO_DEADLINE = float("inf")
@@ -139,7 +148,15 @@ def _tenpai_can_reach_min_faan(state: GameState, seat: int) -> bool:
     return False
 
 
-async def _play_instrumented_game(seed: int, ruleset: RuleSet, bots: Sequence[Bot]) -> GameRecord:
+def _view_for(state: GameState, seat: int, name: str) -> SeatView:
+    if name in OMNISCIENT_BOTS:
+        return _omniscient_seat_view(state, seat)
+    return seat_view(state, seat)
+
+
+async def _play_instrumented_game(
+    seed: int, ruleset: RuleSet, bots: Sequence[Bot], names: Sequence[str]
+) -> GameRecord:
     """Like `bots/selfplay.py`'s `play_game`, plus per-hand `HandRecord`s. Claim-window order is
     `min(pending)`, not a seeded random choice -- resolution is correct regardless of response
     order, and the arena just needs a reproducible-per-seed run."""
@@ -168,7 +185,7 @@ async def _play_instrumented_game(seed: int, ruleset: RuleSet, bots: Sequence[Bo
         else:
             seat = state.turn
 
-        view = seat_view(state, seat)
+        view = _view_for(state, seat, names[seat])
         mask = legal_mask(state, seat)
         aid = await bots[seat].act(view, mask, _NO_DEADLINE)
         action = decode_action(aid, state, seat)
@@ -244,8 +261,10 @@ async def _run_duplicate_set_async(
     for rotation in range(4):
         seat_bots: list[Bot] = [_make_bot(name_b, seed * 4 + i) for i in range(4)]
         seat_bots[rotation] = _make_bot(name_a, seed * 4 + rotation)
+        names = [name_b] * 4
+        names[rotation] = name_a
         roles = _roles_for_rotation(rotation)
-        record = await _play_instrumented_game(seed, ruleset, seat_bots)
+        record = await _play_instrumented_game(seed, ruleset, seat_bots, names)
         records.append(dataclasses.replace(record, roles=roles))
     return tuple(records)
 

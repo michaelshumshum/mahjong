@@ -3,9 +3,10 @@ deliberate bypass of `seat_view()`'s `_check_reveal` guard (see that function's 
 and `app/table.py`'s `_submit_bot_job`, for the full safety argument). AST-based, not a trust-me
 comment: scans every *production* source file under `server/` (`app/`, `bots/`, `mahjong_core/`,
 `ml/`, `alembic/`, `tools/` -- excluding `tests/` itself, caches, and `.venv`) for `Call` nodes
-naming `_omniscient_seat_view` and asserts there is exactly one, inside `Table._submit_bot_job`
--- not `seat_view_wire`, not `state_sync_wire`, not any other WS/protocol-facing path, nowhere
-else. `tests/` is excluded deliberately: `tests/test_oracle.py` legitimately constructs
+naming `_omniscient_seat_view` and asserts the call sites are exactly `Table._submit_bot_job`
+(the live `ORACLE` tier) and `bots/arena.py`'s `_view_for` (the offline arena's `ORACLE` seat,
+which `app/` must never import) -- not `seat_view_wire`, not `state_sync_wire`, not any other
+WS/protocol-facing path, nowhere else. `tests/` is excluded deliberately: `tests/test_oracle.py` legitimately constructs
 omniscient views directly (via `app.views._omniscient_seat_view`) for white-box `"ORACLE"`-tier
 tests -- that's expected, sanctioned test-only usage, not the dispatch path this test guards.
 This guarantee is unaffected by which bot actually consumes the omniscient view -- it held for
@@ -79,27 +80,52 @@ def _find_calls(path: Path) -> list[tuple[str, int]]:
     return collector.calls
 
 
-def test_omniscient_seat_view_has_exactly_one_call_site_in_the_whole_codebase() -> None:
-    found: dict[Path, list[tuple[str, int]]] = {}
+_ALLOWED_CALL_SITES = {
+    ("app/table.py", "Table._submit_bot_job"),
+    ("bots/arena.py", "_view_for"),
+}
+"""the live dispatch path, plus the offline arena's `ORACLE` seat (docs/bots.md §9)."""
+
+
+def test_omniscient_seat_view_is_called_only_from_the_sanctioned_sites() -> None:
+    found: list[tuple[str, str]] = []
     for path in _iter_source_files():
-        calls = _find_calls(path)
-        if calls:
-            found[path] = calls
+        rel = path.relative_to(_SERVER_ROOT).as_posix()
+        found.extend((rel, qualname) for qualname, _lineno in _find_calls(path))
 
-    total = sum(len(v) for v in found.values())
-    assert total == 1, (
-        f"expected exactly 1 call site for {_TARGET} across server/, found {total}: "
-        f"{ {str(p): c for p, c in found.items()} }"
+    assert sorted(found) == sorted(_ALLOWED_CALL_SITES), (
+        f"{_TARGET} call sites must be exactly {sorted(_ALLOWED_CALL_SITES)}, found {sorted(found)}"
     )
 
-    ((path, calls),) = found.items()
-    assert path.name == "table.py" and path.parent.name == "app", (
-        f"{_TARGET} is called from {path}, expected server/app/table.py"
-    )
-    qualname, _lineno = calls[0]
-    assert qualname == "Table._submit_bot_job", (
-        f"{_TARGET} is called from {qualname!r} in {path}, expected 'Table._submit_bot_job'"
-    )
+
+def _imports_arena(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(a.name == "bots.arena" or a.name.startswith("bots.arena.") for a in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom) and node.level == 0:
+            if node.module == "bots.arena":
+                return True
+            if node.module == "bots" and any(a.name == "arena" for a in node.names):
+                return True
+    return False
+
+
+def test_app_never_imports_the_arena() -> None:
+    """keeps the arena's omniscient call site off every live/WS path."""
+    offenders = [
+        path.relative_to(_SERVER_ROOT).as_posix()
+        for path in (_SERVER_ROOT / "app").rglob("*.py")
+        if "__pycache__" not in path.parts
+        and _imports_arena(ast.parse(path.read_text(), filename=str(path)))
+    ]
+    assert offenders == []
+
+
+def test_imports_arena_detects_every_import_form() -> None:
+    for src in ("import bots.arena", "from bots.arena import x", "from bots import arena"):
+        assert _imports_arena(ast.parse(src)), src
+    assert not _imports_arena(ast.parse("from bots import faanbot"))
 
 
 def test_omniscient_seat_view_is_not_exported_from_views_module() -> None:

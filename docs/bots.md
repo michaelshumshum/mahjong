@@ -5,7 +5,7 @@
 A bot receives exactly the output of `seat_view(state, seat)` — the same redacted `SeatView` a
 human gets ([architecture.md §5](architecture.md)) — and returns an action id. It has no access to
 `GameState`, the wall, or other hands. The one exception is the `ORACLE` tier (§9), contained to
-one call site.
+one live call site plus the offline arena.
 
 ```python
 class Bot(Protocol):
@@ -210,6 +210,11 @@ python -m bots.arena --a FaanBot --b EfficiencyBot --games 20000 --seed 1 --para
 
 (`make arena A=… B=… N=…` runs it in the `tools` Compose profile.)
 
+`--a ORACLE` plays the `ORACLE` tier: `BOT_REGISTRY["ORACLE"]` is the same `FaanBot` factory as
+`FaanBot`, and `bots/arena.py`'s `_view_for` feeds every name in `OMNISCIENT_BOTS` an
+`_omniscient_seat_view` (§9). Harnesses that only build plain `seat_view`s (`ml/eval_policy.py`,
+`ml/generate_dataset.py`) refuse those names.
+
 Reports per bot: average points/hand, win rate, deal-in rate, average winning faan, tenpai-at-draw
 rate, average turns to win, and `tenpai_rate_on_sub_minimum_hand` (§4).
 
@@ -317,9 +322,10 @@ matching `_should_claim`'s "never do what provably backfires" precedent. Gating 
 **Containment** ([architecture.md §5](architecture.md)):
 
 - `app/views.py`'s `_omniscient_seat_view(state, seat)` is the only builder of a real seat's
-  omniscient view; `seat_view()`'s `_check_reveal` still forbids it. Its single caller is
-  `app/table.py`'s `_submit_bot_job`, when the seat's effective tier is `ORACLE`.
-  `tests/test_oracle_containment.py` AST-scans production code for any other call site.
+  omniscient view; `seat_view()`'s `_check_reveal` still forbids it. Exactly two callers:
+  `app/table.py`'s `_submit_bot_job`, when the seat's effective tier is `ORACLE`, and the
+  offline arena's `bots/arena.py` `_view_for` (§7). `tests/test_oracle_containment.py` AST-scans
+  production code for any other call site, and for any `app/` module importing `bots.arena`.
 - A `SeatView` never carries `game_seed`/`hand_seed`, so it may cross the process-pool boundary.
   No `GameState` crosses; `compute_action` is unchanged.
 - **Disconnect handover always uses `T2`.** `Table._effective_bot_tier(seat)` pins an

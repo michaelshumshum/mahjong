@@ -384,15 +384,17 @@ class SeatView:
 
 **The one contained exception to "a real seat never gets another seat's tiles":**
 `_omniscient_seat_view` (`app/views.py`) deliberately bypasses `_check_reveal` to build a real
-seat's view with `.hands` populated. It is a separate, dangerously-named function with exactly one
-caller — `app/table.py`'s `_submit_bot_job`, for the `ORACLE` bot tier
-([bots.md §9](bots.md)). It is safe because:
+seat's view with `.hands` populated. It is a separate, dangerously-named function with exactly two
+callers — `app/table.py`'s `_submit_bot_job`, for the `ORACLE` bot tier
+([bots.md §9](bots.md)), and the offline arena's `bots/arena.py` `_view_for`, which `app/` never
+imports. It is safe because:
 
 - a `SeatView` never carries `game_seed`/`hand_seed` (§3's invariant is about the seed, not tile
   visibility), so it may cross the `ProcessPoolExecutor` boundary;
 - it never reaches a client — disconnect-handover always runs `T2`, so a human's seat is never
   driven by it;
-- `tests/test_oracle_containment.py` AST-scans production code for any other call site, and
+- `tests/test_oracle_containment.py` AST-scans production code for any other call site and for
+  any `app/` import of `bots.arena`, and
   `tests/test_redaction.py` pins that `Table.state_sync_wire` never populates `.hands` for a real
   seat, for every `bot_tier`.
 

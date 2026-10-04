@@ -31,6 +31,11 @@ def test_make_bots_rejects_unknown_name() -> None:
         ml_generate_dataset._make_bots(["NotABot"] * 4, seed=0)
 
 
+def test_make_bots_refuses_an_omniscient_bot() -> None:
+    with pytest.raises(ValueError, match="omniscient"):
+        ml_generate_dataset._make_bots(["ORACLE", "FaanBot", "FaanBot", "FaanBot"], seed=0)
+
+
 def test_shuffled_roster_is_deterministic_per_seed_and_actually_varies() -> None:
     roster = ["FaanBot", "FaanBotAggressive", "FaanBotDefensive", "FaanBotFlushChasing"]
     assert ml_generate_dataset._shuffled_roster(

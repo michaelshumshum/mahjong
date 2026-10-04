@@ -47,6 +47,11 @@ def test_duplicate_sets_rotate_the_candidate_and_records_replay():
     assert seeds == {5, 6}
 
 
+def test_refuses_an_omniscient_opponent():
+    with pytest.raises(ValueError, match="unknown opponent"):
+        evaluate([5], _RULESET, "ORACLE", model=_model())
+
+
 def test_same_seeds_same_report():
     a, _ = evaluate([3], _RULESET, "EfficiencyBot", model=_model())
     b, _ = evaluate([3], _RULESET, "EfficiencyBot", model=_model())
