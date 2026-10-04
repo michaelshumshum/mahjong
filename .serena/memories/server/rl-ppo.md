@@ -57,3 +57,7 @@ smoke only; not the gate. Launch script: server/runs/ppo_c0_full.sh (worktree, g
   2060: `uv run --extra ml pytest -q -m cuda tests/test_ml_ppo_device.py`.
 - AMP branch was smoke-tested only on CPU by forcing fp16 autocast (metrics within ~1e-3 of fp32).
 - Measured this cloud box (4 cores, CPU, 48 envs x 3 workers): learner 20.4 s/update, e2e ~156 dec/s.
+- 2060 desktop measured (2026-10-04): CUDA learner 1.43 s/update vs 22.9 s CPU; end to end
+  ~1.1-1.5k decisions/s at 10 workers / 160 envs, learner ~55% / rollout ~45%; GPU ~42% busy is
+  expected (tiny net, waits on CPU workers). Tests that assert exact equality must pin
+  `device: "cpu"` — `auto` picks cuda on a GPU box and cuda isn't bit-reproducible.
