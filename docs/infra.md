@@ -174,8 +174,13 @@ cache mounts.
 --with-deps chromium`), not alpine: `pnpm test` runs vitest browser mode and Playwright, and
 Playwright ships no musl build. `deps`/`build`/`prod` stay alpine.
 
-- Changing that stage's base invalidates the `web-modules` volume (native deps are built against
-  the image's libc) — `docker volume rm mahjong_web-modules` once after such a change.
+- `web/` is bind-mounted, but the root `package.json`/`pnpm-lock.yaml` and `node_modules` are
+  baked into the image. A dependency change therefore needs a rebuilt image, or pnpm's pre-run
+  check fails with `ERR_PNPM_OUTDATED_LOCKFILE`. `make test-web` runs `docker compose build web`
+  first (a no-op when cached), and `make up` passes `--build --renew-anon-volumes`.
+- `/app/web/node_modules` is an **anonymous** volume, so every new container reseeds it from the
+  current image. A named volume is seeded only once and would keep masking a rebuilt image's
+  dependencies (and its libc-specific native builds) indefinitely.
 - `make test-web` passes `CI=true`: vitest browser mode and Playwright default to *headed* off-CI,
   and the container has no X server.
 - Browsers live in a `playwright-browsers` volume at `/root/.cache/ms-playwright`, seeded from the

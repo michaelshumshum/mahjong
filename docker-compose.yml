@@ -64,7 +64,9 @@ services:
     volumes:
       - ./web:/app/web
       - ./shared:/shared
-      - web-modules:/app/web/node_modules   # keeps the container's node_modules off the host mount
+      # anonymous, not named: reseeded from the image on every new container, so a dependency
+      # change can't leave a stale node_modules masking the rebuilt image's
+      - /app/web/node_modules
       - playwright-browsers:/root/.cache/ms-playwright  # seeded from the image; survives a rebuild
     depends_on: [api]
 
@@ -105,5 +107,4 @@ services:
 volumes:
   pgdata:
   server-venv:
-  web-modules:
   playwright-browsers:

@@ -12,7 +12,7 @@ help: ## Show this help
 
 # ── everyday loop ─────────────────────────────────────────────────────────────
 up: ## Start postgres + api + web
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d --build --renew-anon-volumes
 	@echo "  web  http://localhost:$${WEB_PORT:-5173}"
 	@echo "  api  http://localhost:$${API_PORT:-8000}/docs"
 
@@ -49,7 +49,8 @@ test-server-slow: ## pytest slow suite: soaks, real-bot e2e, hypothesis runs -- 
 # CI=true: vitest browser mode and playwright both default to *headed* off-CI, and the
 # container has no X server. Set here, not in the compose service, so `make up`'s dev server
 # isn't also told it's running in CI.
-test-web: ## vitest + svelte-check
+test-web: ## vitest + Playwright e2e
+	$(COMPOSE) build web
 	$(COMPOSE) run --rm --no-deps -e CI=true web pnpm test
 
 selfplay: ## Engine soak test: N complete games with random bots (default 10000)

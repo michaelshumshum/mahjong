@@ -7,5 +7,5 @@
 - Code cites `docs/<doc>.md §N` everywhere (~440 citations). Renumbering a section = `git grep 'docs/<doc>.md'` and update. Named subsections cited by title (e.g. frontend.md §7 "`/table/[id]` wiring", "Pre-game states", "Practice mode", "Game-end summary").
 - Section map highlights: frontend §7 = Routes, §8 = assets+SCSS, §9 = a11y/i18n; bots §6 = difficulty, §7 = arena, §8 = ruleset awareness, §9 = ORACLE, §10 = known issues; infra §2 = toolchain/native dev (mise), §3 = process model, §9 = CI; testing §1 = strategy, §2 = Vitest gotchas.
 - Routing hook `.claude/hooks/enforce-routing-table.sh` uses the new paths; `mise.toml` routes to docs/infra.md.
-- Gotcha: `make test-web` currently fails with ERR_PNPM_OUTDATED_LOCKFILE inside the container (stale web image/`web-modules` volume, not the repo); `cd web && CI=true pnpm test` natively passes. Rebuild the web image / `docker volume rm mahjong_web-modules` to fix.
+- Fixed 2026-10-04: `make test-web` ERR_PNPM_OUTDATED_LOCKFILE came from a stale web image (root lockfile is baked, only web/ is mounted) plus a named `web-modules` volume seeded once. Now: anonymous node_modules volume, `test-web` builds first, `make up` uses `--renew-anon-volumes` (docs/infra.md §5).
 - Native dev needs `CORS_ORIGINS=http://localhost:5173` on the API or the web dev server can't reach it.
