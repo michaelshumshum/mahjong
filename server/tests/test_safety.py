@@ -7,6 +7,8 @@ in isolation by holding every other signal fixed.
 
 from __future__ import annotations
 
+import pytest
+
 from app.views import SeatView
 from bots.faanbot import _THREAT_THRESHOLD
 from bots.safety import (
@@ -16,6 +18,7 @@ from bots.safety import (
     kong_rob_risk,
     no_chance,
     opponent_threat_level,
+    ron_credit,
     tile_risk,
     wall_pressure_multiplier,
 )
@@ -760,3 +763,41 @@ def test_kong_rob_risk_concealed_kong_ignores_a_non_thirteen_orphans_completion(
         ruleset=RuleSet(concealed_kong_robbable=True),
     )
     assert kong_rob_risk(view, tile_type, concealed=True) == 0.0
+
+
+# --- ron_credit: expected ron copies held by opponents (ORACLE only) --------------------------
+
+# 1-shanten: three melds + a 1p pair + two loose winds.
+_LOOSE_WINDS_HAND = (
+    TileType.MAN_1,
+    TileType.MAN_2,
+    TileType.MAN_3,
+    TileType.MAN_4,
+    TileType.MAN_5,
+    TileType.MAN_6,
+    TileType.MAN_7,
+    TileType.MAN_8,
+    TileType.MAN_9,
+    TileType.PIN_1,
+    TileType.PIN_1,
+    TileType.WIND_EAST,
+    TileType.WIND_SOUTH,
+)
+
+
+def test_ron_credit_counts_surplus_copies_and_not_needed_ones() -> None:
+    view = _view(hands=((), _pool(*_LOOSE_WINDS_HAND), (), ()))
+    east, pin1, sou9 = int(TileType.WIND_EAST), int(TileType.PIN_1), int(TileType.SOU_9)
+    assert ron_credit(view, [east, pin1, sou9]) == {east: 0.5, pin1: 0.0, sou9: 0.0}
+
+
+def test_ron_credit_sums_over_opponents() -> None:
+    hand = _pool(*_LOOSE_WINDS_HAND)
+    view = _view(hands=((), hand, hand, ()))
+    east = int(TileType.WIND_EAST)
+    assert ron_credit(view, [east]) == {east: 1.0}
+
+
+def test_ron_credit_needs_an_omniscient_view() -> None:
+    with pytest.raises(AssertionError):
+        ron_credit(_view(), [int(TileType.WIND_EAST)])

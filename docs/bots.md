@@ -288,7 +288,7 @@ none: bots rank discards by faan within a hand.
 A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a `SeatView` with `.hands` (every
 seat's concealed tiles) populated. No dedicated class, no search, no rollout
 ([ADR 0013](decisions/0013-oracle-full-information.md), improvements in
-[ADR 0019](decisions/0019-oracle-improvements-plan.md)). Four helpers branch on `view.hands`, and
+[ADR 0019](decisions/0019-oracle-improvements-plan.md)). Five helpers branch on `view.hands`, and
 each is byte-identical to its probabilistic form when `view.hands is None`; `FaanBot` itself reads
 it only to gate the hard-avoid rules below. `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
 `seat_view` (4 × `FaanBot`, every preset, hashed action ids), so any `ORACLE`-only change that
@@ -300,6 +300,7 @@ leaks into `FaanBot` fails it:
 | `safety.opponent_threat_level` | meld/tempo proxy | real shanten from `_opponent_real_shanten`, mapped onto the proxy's scale |
 | `features.seen34` | own hand + visible melds + discards | also every opponent's real concealed tiles and concealed kongs |
 | `safety.kong_rob_risk` | not called | exact rob check before declaring a self-kong |
+| `safety.ron_credit` | not called | expected ron copies per tenpai wait: 0.5 per copy an opponent holds but doesn't need (removing it doesn't raise their shanten), 0 per needed copy |
 
 **Exact danger** (`_exact_deal_in_faan`), per opponent, for candidate tile `t`:
 

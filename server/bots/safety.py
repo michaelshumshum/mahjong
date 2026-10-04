@@ -40,6 +40,7 @@ __all__ = [
     "kong_rob_risk",
     "no_chance",
     "opponent_threat_level",
+    "ron_credit",
     "tile_risk",
 ]
 
@@ -368,6 +369,41 @@ def _opponent_real_shanten(view: SeatView, opponent_seat: int) -> int:
     hand34 = _opponent_hand34(view, opponent_seat)
     closed = not view.melds[opponent_seat]
     return shanten(hand34, closed=closed, hand_sets=view.ruleset.hand_sets)
+
+
+_RON_CREDIT_SURPLUS = 0.5
+"""Acceptance credited per wait copy an opponent holds but doesn't need. Measured discard rates
+against `FaanBot` opponents: 26% surplus, 7.6% needed (ADR 0019 §3)."""
+_RON_CREDIT_NEEDED = 0.0
+
+
+def ron_credit(view: SeatView, waits: Sequence[int]) -> dict[int, float]:
+    """`ORACLE`-only (`view.hands` populated): expected ron copies per wait type held in
+    opponents' real hands. A copy counts `_RON_CREDIT_SURPLUS` if removing it doesn't raise its
+    holder's shanten, else `_RON_CREDIT_NEEDED`."""
+    assert view.hands is not None
+    assert view.seat is not None
+    credit = dict.fromkeys(waits, 0.0)
+    hand_sets = view.ruleset.hand_sets
+    for opponent in range(4):
+        if opponent == view.seat:
+            continue
+        held = new_count_array()
+        for t in view.hands[opponent]:
+            held[int(tile_id_type(t))] += 1
+        if not any(held[w] for w in waits):
+            continue
+        hand34 = _opponent_hand34(view, opponent)
+        closed = not view.melds[opponent]
+        base = shanten(hand34, closed=closed, hand_sets=hand_sets)
+        for w in waits:
+            if not held[w]:
+                continue
+            hand34[w] -= 1
+            surplus = shanten(hand34, closed=closed, hand_sets=hand_sets) <= base
+            hand34[w] += 1
+            credit[w] += held[w] * (_RON_CREDIT_SURPLUS if surplus else _RON_CREDIT_NEEDED)
+    return credit
 
 
 def opponent_threat_level(view: SeatView, opponent_seat: int) -> float:
