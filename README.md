@@ -22,13 +22,29 @@ Play solo against bots tuned from easy heuristics to a self-play RL "Expert."
 
 ## Quick start
 
-Requires Docker + Docker Compose; `make up` builds everything else.
+Toolchain (node 24, python 3.13, uv, pnpm) is pinned in [`mise.toml`](mise.toml); Docker runs
+postgres and, optionally, the whole stack.
 
 ```bash
+mise install                          # install pinned toolchain
 cp .env.example .env
+(cd server && uv sync --locked)       # add --extra ml for torch
+pnpm install --frozen-lockfile        # also installs git hooks (lefthook)
+```
+
+Run natively, with postgres in Docker:
+
+```bash
+docker compose up -d postgres
+export DATABASE_URL=postgresql+asyncpg://mahjong:mahjong@localhost:5432/mahjong
+(cd server && uv run alembic upgrade head && uv run uvicorn app.main:app --reload --workers 1)
+pnpm --dir web dev                    # web http://localhost:5173, api http://localhost:8000/docs
+```
+
+Or run everything in containers (no mise needed):
+
+```bash
 make up            # postgres + api + web
-# web  http://localhost:5173
-# api  http://localhost:8000/docs
 make help          # everything else
 ```
 
