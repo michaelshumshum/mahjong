@@ -227,6 +227,122 @@ async def test_omniscient_view_avoids_a_real_deal_in_the_probabilistic_view_walk
     )
 
 
+# --- certain deal-ins: never discarded while a safe tile exists (ADR 0019 §5.1) ----------------
+
+# found by search: 北 is the hands=None discard, and stays the shanten-best one under the omniscient
+# view while it deals in.
+_NORTH_IS_BEST = [
+    TileType.MAN_2,
+    TileType.MAN_3,
+    TileType.MAN_4,
+    TileType.MAN_5,
+    TileType.MAN_6,
+    TileType.MAN_7,
+    TileType.MAN_8,
+    TileType.MAN_9,
+    TileType.PIN_1,
+    TileType.PIN_2,
+    TileType.PIN_3,
+    TileType.SOU_4,
+    TileType.SOU_5,
+    TileType.WIND_NORTH,
+]
+
+# 9 own discards: mid-game, where w_safety is 0.3.
+_MID_GAME_OWN_POOL = _pool(
+    TileType.WIND_EAST,
+    TileType.WIND_SOUTH,
+    TileType.WIND_WEST,
+    TileType.DRAGON_WHITE,
+    TileType.DRAGON_GREEN,
+    TileType.DRAGON_RED,
+    TileType.SOU_9,
+    TileType.PIN_9,
+    TileType.PIN_8,
+)
+
+# seven pairs one 北 short.
+_SEVEN_PAIRS_ON_NORTH = _pool(
+    TileType.SOU_1,
+    TileType.SOU_1,
+    TileType.SOU_3,
+    TileType.SOU_3,
+    TileType.PIN_5,
+    TileType.PIN_5,
+    TileType.PIN_6,
+    TileType.PIN_6,
+    TileType.SOU_6,
+    TileType.SOU_6,
+    TileType.PIN_7,
+    TileType.PIN_7,
+    TileType.WIND_NORTH,
+)
+
+
+@pytest.mark.xfail(strict=True, reason="fixed by ADR 0019 §5.1")
+async def test_omniscient_view_never_discards_a_certain_deal_in_when_a_safe_tile_exists() -> None:
+    discard_pools = (_MID_GAME_OWN_POOL, (), (), ())
+    hands = ((), _SEVEN_PAIRS_ON_NORTH, (), ())
+    mask = _discard_mask(_NORTH_IS_BEST)
+    probabilistic_view = _view(0, _NORTH_IS_BEST, discard_pools=discard_pools)
+    omniscient_view = _view(0, _NORTH_IS_BEST, discard_pools=discard_pools, hands=hands)
+    north = int(TileType.WIND_NORTH)
+    assert tile_risk(omniscient_view, north) > 0.0
+
+    assert await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE) == north, (
+        "sanity: hands=None keeps the shanten-best discard"
+    )
+    chosen = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    assert chosen != north
+    assert tile_risk(omniscient_view, chosen) == 0.0
+
+
+async def test_omniscient_view_discards_the_cheapest_deal_in_when_every_discard_deals_in() -> None:
+    """only 北 and 西 are legal; 西 completes two opponents' hands, 北 one."""
+    seven_pairs_on_west = (
+        _pool(
+            TileType.PIN_1,
+            TileType.PIN_1,
+            TileType.PIN_3,
+            TileType.PIN_3,
+            TileType.PIN_5,
+            TileType.PIN_5,
+            TileType.PIN_6,
+            TileType.PIN_6,
+            TileType.PIN_7,
+            TileType.PIN_7,
+            TileType.DRAGON_RED,
+            TileType.DRAGON_RED,
+        )
+        + (tile_ids_for_type(TileType.WIND_WEST)[0],),
+        _pool(
+            TileType.MAN_1,
+            TileType.MAN_1,
+            TileType.MAN_3,
+            TileType.MAN_3,
+            TileType.MAN_5,
+            TileType.MAN_5,
+            TileType.MAN_6,
+            TileType.MAN_6,
+            TileType.MAN_7,
+            TileType.MAN_7,
+            TileType.DRAGON_WHITE,
+            TileType.DRAGON_WHITE,
+        )
+        + (tile_ids_for_type(TileType.WIND_WEST)[1],),
+    )
+    own = [*_NORTH_IS_BEST]
+    own[-2] = TileType.WIND_WEST  # both honors isolated: the two discards tie on speed and value
+    hands = ((), _SEVEN_PAIRS_ON_NORTH, *seven_pairs_on_west)
+    discard_pools = (_MID_GAME_OWN_POOL[:6], (), (), ())
+    view = _view(0, own, discard_pools=discard_pools, hands=hands)
+    mask = _discard_mask([TileType.WIND_NORTH, TileType.WIND_WEST])
+    north, west = int(TileType.WIND_NORTH), int(TileType.WIND_WEST)
+    assert 0.0 < tile_risk(view, north) < tile_risk(view, west)
+
+    assert await FaanBot().act(view, mask, _NO_DEADLINE) == north
+
+
 # --- behavioral proof: real shanten (not the meld/tempo proxy) decides whether to fold --------
 
 
