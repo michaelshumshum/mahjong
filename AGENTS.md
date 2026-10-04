@@ -71,8 +71,9 @@ the task on tooling. This is the only exception; otherwise these are not suggest
   — is excluded by default; `make test-server-slow` runs it explicitly). CI runs both, in
   parallel, on every push/PR (`docs/07-infra.md §9`) — nothing is ever silently skipped there.
 - New behaviour gets a test in the same change; bugs get a failing regression test first.
-- `mahjong_core` is pure — test it directly. No mocks, no I/O. Golden fixtures (`tests/replays/`,
-  the scoring hand suite) are data, not mocks, and are required — see `05-roadmap.md`.
+- `mahjong_core` is pure — test it directly. No mocks, no I/O. Golden fixtures (the scoring hand
+  suite, `tests/test_engine_trajectory_pin.py`'s seeded trajectory digests; `tests/replays/` is
+  planned, not built) are data, not mocks, and are required — see `05-roadmap.md`.
 - Seeded and deterministic: a failing game is reproducible from `(ruleset, seed, actions)`.
 
 ## Comments
