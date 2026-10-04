@@ -341,6 +341,17 @@ legal discard deals in, the usual `w_safety * risk` trade-off ranks them. Before
 deal-in was priced like a soft risk (0.15–0.9 × its faan against `_SHANTEN_UNIT = 5` per shanten
 step), and 66 of 67 `ORACLE` deal-ins in 200 sets were avoidable.
 
+**Exact tenpai valuation.** For a candidate discard that leaves `ORACLE` tenpai, `_best_discard`
+replaces both structural proxies with `exact_wait_value` over the real waits
+(`labels.winning_tile_types`): the speed term's tile count becomes the acceptance (live wall
+copies, plus `ron_credit` copies in opponents' hands), and `estimate_best_faan` becomes the
+copy-weighted real faan. Wall copies are scored self-drawn, ron copies as a discard win; a wait
+that can't clear `min_faan` in a context counts nothing there, so a sub-minimum or dead tenpai
+stops looking fast. Ron credit is 0.5 per surplus copy, 0 per needed copy (`safety.py`'s
+`_RON_CREDIT_SURPLUS`/`_RON_CREDIT_NEEDED`); calibrated against `FaanBot` opponents, whose
+real discard rates were 26% / 7.6% (ADR 0019 §3). Non-tenpai candidates keep the proxies. A
+decision costs about the same as before (~12 ms on the arena machine).
+
 **Containment** ([architecture.md §5](architecture.md)):
 
 - `app/views.py`'s `_omniscient_seat_view(state, seat)` is the only builder of a real seat's
@@ -360,9 +371,9 @@ step), and 66 of 67 `ORACLE` deal-ins in 200 sets were avoidable.
 - `ORACLE` jobs use the shared pool; a decision costs the same single-digit milliseconds as `T2`.
 
 **Measured** (`python -m bots.arena --a ORACLE --b FaanBot --games 200 --seed 1000000`, 200
-duplicate sets): paired difference **+28.667 points/game, 95% CI [26.037, 31.296]**; win rate
-0.318 vs 0.152; deal-in rate 0.000 vs 0.172. Against the previous `ORACLE` on the same seeds:
-Δ **+1.593 points/game [+1.086, +2.101]**, Δ win rate +0.25pp [+0.08, +0.42]
+duplicate sets): paired difference **+32.860 points/game, 95% CI [30.068, 35.652]**; win rate
+0.338 vs 0.148; deal-in rate 0.000 vs 0.176; tenpai-at-draw 0.448. Against the previous `ORACLE`
+on the same seeds: Δ **+4.193 points/game [+2.853, +5.534]**, Δ win rate +2.09pp [+1.31, +2.88]
 ([ADR 0019](decisions/0019-oracle-improvements-plan.md) has each change's gate run).
 
 ## 10. Known issues

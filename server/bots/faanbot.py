@@ -13,12 +13,18 @@ from dataclasses import dataclass
 
 from app.views import SeatView
 from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
-from bots.safety import kong_rob_risk, opponent_threat_level, tile_risk
-from bots.valuation import estimate_best_faan, pattern_optionality, route_faan_for
+from bots.labels import winning_tile_types
+from bots.safety import kong_rob_risk, opponent_threat_level, ron_credit, tile_risk
+from bots.valuation import (
+    estimate_best_faan,
+    exact_wait_value,
+    pattern_optionality,
+    route_faan_for,
+)
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import tile_id_type
+from mahjong_core.tiles import TileId, tile_id_type
 from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
@@ -131,7 +137,14 @@ def _claimed_type(view: SeatView) -> int | None:
     return int(tile_id_type(pool[-1]))
 
 
-def _speed_term(result_shanten: int, tiles_accepted: int) -> float:
+def _without_one(tiles: tuple[TileId, ...], tile_type: int) -> tuple[TileId, ...]:
+    for i, t in enumerate(tiles):
+        if int(tile_id_type(t)) == tile_type:
+            return tiles[:i] + tiles[i + 1 :]
+    raise ValueError(f"no tile of type {tile_type} in hand")
+
+
+def _speed_term(result_shanten: int, tiles_accepted: float) -> float:
     """One scalar (not T1's lexicographic key) so `w_value` can trade off against it in the same
     weighted sum; lower shanten always wins, ukeire breaks ties within a shanten level."""
     return -_SHANTEN_UNIT * result_shanten + tiles_accepted / _UKEIRE_SCALE
@@ -306,6 +319,14 @@ class FaanBot:
             after[d] -= 1
             result_shanten = shanten(after, closed=closed, hand_sets=hand_sets)
             kinds, tiles = accepts[d]
+            exact_tenpai: tuple[float, float] | None = None
+            if view.hands is not None and result_shanten == 0:
+                waits = winning_tile_types(after, closed=closed, hand_sets=hand_sets)
+                concealed = _without_one(view.own_hand, d)
+                exact_tenpai = exact_wait_value(
+                    view, concealed, waits, seen, ron_credit(view, waits)
+                )
+                tiles = exact_tenpai[0]
             risk = risks[d]
             terminal_rank = 0 if is_terminal_or_honor(d) else 1
 
@@ -313,7 +334,12 @@ class FaanBot:
                 # pure defence: minimise deal-in risk, tie-break like T1.
                 key = (risk, -tiles, terminal_rank)
             else:
-                value_est, _route = estimate_best_faan(after, closed=closed, route_faan=route_faan)
+                if exact_tenpai is not None:
+                    value_est = exact_tenpai[1]
+                else:
+                    value_est, _route = estimate_best_faan(
+                        after, closed=closed, route_faan=route_faan
+                    )
                 optionality = pattern_optionality(after, closed=closed, route_faan=route_faan)
                 score = (
                     w_speed * _speed_term(result_shanten, tiles)

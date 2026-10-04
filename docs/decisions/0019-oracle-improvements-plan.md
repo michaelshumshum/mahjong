@@ -216,8 +216,8 @@ Commits:
 - **Measured:** stacked on §5.1: Δ **+4.867 [+3.724, +6.010]** pts/game, win rate **+2.88pp
   [+2.05, +3.70]** (32.0% → 34.8%), avg winning faan 4.30 → 4.36, tenpai-at-draw 510 → 301.
   Ron credit alone (proxy value, λ up to 1.0) was null both rounds, so the gain is the exact
-  valuation; exact valuation *without* ron credit wasn't run — run it first to decide whether
-  `ron_credit` earns its keep.
+  valuation; exact valuation *without* ron credit wasn't run in the scratch rounds. Built and
+  run since: ron credit earns +1.27 pts/game over exact valuation alone (§12).
 - **Risks:** ron credit is calibrated against `FaanBot` opponents; humans hold differently. A
   real scoring call per wait per tenpai candidate — no measurable run-time change (§4), but take
   a per-decision timing before merging.
@@ -356,3 +356,16 @@ arena reproduced §2's scratch baseline exactly on seeds 1–200 (+27.693 [25.09
 | previous `ORACLE` (gate baseline) | — | +27.073 [24.421, 29.726] | — | — | 1,008 (31.5%) | 59 |
 | §5.0a/b arena seat, `--diffs-out`/`--baseline-diffs`, `FaanBot` pin | `test(bots)`/`feat(arena)` × 2 | — | — | — | — | — |
 | §5.1 hard-avoid certain deal-ins | `fix(bots): ORACLE never discards a certain deal-in …` | +28.667 [26.037, 31.296] | **+1.593 [+1.086, +2.101]** | +0.25 [+0.08, +0.42] | 1,016 (31.75%) | 0 |
+| §5.2 exact tenpai valuation, ron credit 0.5 / 0 | `feat(bots)` × 3: `ron_credit`, `exact_wait_value`, `ORACLE values tenpai candidates …` | +32.860 [30.068, 35.652] | **+4.193 [+2.853, +5.534]** | **+2.09 [+1.31, +2.88]** | 1,083 (33.8%) | 0 |
+
+**§5.2 ron credit on/off** (tune seeds 1–200, both stacked on §5.1; the arena reproduced §4's
+scratch rows exactly: hard-avoid +29.247, exact valuation with ron credit +34.113):
+
+| Variant | vs `FaanBot` | Δ vs §5.1 pts/game | Δ vs §5.1 win rate, pp | Tenpai-at-draw |
+| --- | --- | --- | --- | --- |
+| exact valuation, ron credit 0.5 / 0 | +34.113 [31.437, 36.790] | +4.867 [+3.724, +6.010] | +2.88 [+2.05, +3.70] | 0.441 |
+| exact valuation, no ron credit | +32.840 [30.337, 35.343] | +3.593 [+2.467, +4.719] | +1.97 [+1.13, +2.80] | 0.379 |
+
+On minus off, paired: +1.273 pts/game [+0.457, +2.090], +0.91pp [+0.40, +1.41], so `ron_credit`
+stays. The `(surplus, needed)` grid was not run. Per-decision cost: ~12 ms with and without exact
+valuation (143 `ORACLE` turn decisions, noisy shared machine) — no measurable change.

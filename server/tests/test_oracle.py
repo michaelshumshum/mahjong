@@ -27,6 +27,7 @@ about the `"ORACLE"` tier as a whole, not `tile_risk`'s internals.
 
 from __future__ import annotations
 
+import dataclasses
 import random
 
 import pytest
@@ -340,6 +341,64 @@ async def test_omniscient_view_discards_the_cheapest_deal_in_when_every_discard_
     assert 0.0 < tile_risk(view, north) < tile_risk(view, west)
 
     assert await FaanBot().act(view, mask, _NO_DEADLINE) == north
+
+
+# --- exact tenpai valuation (ADR 0019 §5.2) ------------------------------------------------------
+
+# 3s leaves a 2s/5s shanpon (a pung: no 平糊, 2 faan either way); 2s or 5s leaves a 4s wait (平糊).
+_SHANPON_OR_PINGHU = [
+    TileType.MAN_1,
+    TileType.MAN_2,
+    TileType.MAN_3,
+    TileType.MAN_4,
+    TileType.MAN_5,
+    TileType.MAN_6,
+    TileType.PIN_7,
+    TileType.PIN_8,
+    TileType.PIN_9,
+    TileType.SOU_2,
+    TileType.SOU_2,
+    TileType.SOU_5,
+    TileType.SOU_5,
+    TileType.SOU_3,
+]
+# every 1s and one 4s gone: the pinghu side waits on 3 copies, the shanpon on 4.
+_SHANPON_OR_PINGHU_POOL = _pool(
+    TileType.SOU_1,
+    TileType.SOU_1,
+    TileType.SOU_1,
+    TileType.SOU_1,
+    TileType.SOU_4,
+    TileType.WIND_EAST,
+    TileType.WIND_SOUTH,
+)
+
+
+async def test_omniscient_view_prefers_a_narrower_wait_that_clears_min_faan() -> None:
+    discard_pools = (_SHANPON_OR_PINGHU_POOL, (), (), ())
+    mask = _discard_mask(_SHANPON_OR_PINGHU)
+    probabilistic_view = _view(0, _SHANPON_OR_PINGHU, discard_pools=discard_pools)
+    omniscient_view = _view(
+        0, _SHANPON_OR_PINGHU, discard_pools=discard_pools, hands=((), (), (), ())
+    )
+
+    assert await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE) == int(TileType.SOU_3), (
+        "sanity: the structural proxy takes the wider, sub-minimum shanpon"
+    )
+    chosen = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    assert chosen in (int(TileType.SOU_2), int(TileType.SOU_5))
+
+
+async def test_omniscient_view_prefers_a_live_wait_over_a_dead_one() -> None:
+    """min_faan 1 so both waits clear; the shanpon's last 2s/5s copies are in seat 1's pool."""
+    dead = _pool(TileType.SOU_2, TileType.SOU_2, TileType.SOU_5, TileType.SOU_5)
+    discard_pools = (_SHANPON_OR_PINGHU_POOL, dead, (), ())
+    view = dataclasses.replace(
+        _view(0, _SHANPON_OR_PINGHU, discard_pools=discard_pools, hands=((), (), (), ())),
+        ruleset=RuleSet(min_faan=1),
+    )
+    chosen = await FaanBot().act(view, _discard_mask(_SHANPON_OR_PINGHU), _NO_DEADLINE)
+    assert chosen in (int(TileType.SOU_2), int(TileType.SOU_5))
 
 
 # --- behavioral proof: real shanten (not the meld/tempo proxy) decides whether to fold --------
