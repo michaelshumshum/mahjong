@@ -1,6 +1,6 @@
 # 0019. `ORACLE` improvements plan
 
-- **Status:** Deferred (plan, not built)
+- **Status:** Accepted, partially built (§12)
 - **Date:** 2026-10-04
 
 ## 1. Context
@@ -339,8 +339,20 @@ the same commit. bots.md section numbers don't change, so no citation sweep is n
 
 ## 11. Consequences
 
-- Nothing here is built. Before starting, re-read bots.md §9/§10 and ADR 0013 — numbers here are
-  against the 2026-10-04 baseline.
+- Built so far: §12. Numbers in §3–§4 are against the 2026-10-04 baseline (seeds 1–200); gate runs
+  in §12 are on fresh seeds.
 - §5.1 (defensive, +1.55) and §5.2 (offensive, +4.87 pts, +2.9pp win rate) both pass the points
   gate in scratch measurement; they land first, in that order. §5.3 raises win rate but needs a
   value threshold to pass on points.
+
+## 12. Build log
+
+All gate runs: `bots/arena.py`, `ORACLE` vs `FaanBot` × 3, 200 duplicate sets, seeds
+1,000,000–1,000,199, Δ paired per set against the previous `ORACLE` (`--baseline-diffs`). The
+arena reproduced §2's scratch baseline exactly on seeds 1–200 (+27.693 [25.098, 30.288]).
+
+| Change | Commit | vs `FaanBot` [95% CI] | Δ pts/game [95% CI] | Δ win rate, pp [95% CI] | Wins | Deal-ins |
+| --- | --- | --- | --- | --- | --- | --- |
+| previous `ORACLE` (gate baseline) | — | +27.073 [24.421, 29.726] | — | — | 1,008 (31.5%) | 59 |
+| §5.0a/b arena seat, `--diffs-out`/`--baseline-diffs`, `FaanBot` pin | `test(bots)`/`feat(arena)` × 2 | — | — | — | — | — |
+| §5.1 hard-avoid certain deal-ins | `fix(bots): ORACLE never discards a certain deal-in …` | +28.667 [26.037, 31.296] | **+1.593 [+1.086, +2.101]** | +0.25 [+0.08, +0.42] | 1,016 (31.75%) | 0 |

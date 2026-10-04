@@ -287,9 +287,10 @@ none: bots rank discards by faan within a hand.
 
 A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a `SeatView` with `.hands` (every
 seat's concealed tiles) populated. No dedicated class, no search, no rollout
-([ADR 0013](decisions/0013-oracle-full-information.md)). `FaanBot` itself never reads
-`view.hands`; four helpers branch on it, and each is byte-identical to its probabilistic form when
-`view.hands is None`. `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
+([ADR 0013](decisions/0013-oracle-full-information.md), improvements in
+[ADR 0019](decisions/0019-oracle-improvements-plan.md)). Four helpers branch on `view.hands`, and
+each is byte-identical to its probabilistic form when `view.hands is None`; `FaanBot` itself reads
+it only to gate the hard-avoid rules below. `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
 `seat_view` (4 × `FaanBot`, every preset, hashed action ids), so any `ORACLE`-only change that
 leaks into `FaanBot` fails it:
 
@@ -330,6 +331,14 @@ matching `_should_claim`'s "never do what provably backfires" precedent. Gating 
 `_kong_rob_offers`: `kong_rob_enabled` for both kinds; a concealed kong only when
 `concealed_kong_robbable` and the robbing hand is 十三么.
 
+**Certain deal-ins.** Under `view.hands`, `tile_risk > 0` is not a likelihood: every tier always
+takes `_WIN`, so it is a certain deal-in. `_best_discard` therefore drops every discard with
+`tile_risk > 0` from its candidates while any zero-risk legal discard exists, in fold and non-fold
+mode alike. Same "never do what provably backfires" precedent as kong-rob avoidance. When every
+legal discard deals in, the usual `w_safety * risk` trade-off ranks them. Before this, a certain
+deal-in was priced like a soft risk (0.15–0.9 × its faan against `_SHANTEN_UNIT = 5` per shanten
+step), and 66 of 67 `ORACLE` deal-ins in 200 sets were avoidable.
+
 **Containment** ([architecture.md §5](architecture.md)):
 
 - `app/views.py`'s `_omniscient_seat_view(state, seat)` is the only builder of a real seat's
@@ -348,12 +357,11 @@ matching `_should_claim`'s "never do what provably backfires" precedent. Gating 
   real seat.
 - `ORACLE` jobs use the shared pool; a decision costs the same single-digit milliseconds as `T2`.
 
-**Measured** (200 duplicate sets, `ORACLE` vs `FaanBot`): paired difference **+27.693
-points/game, 95% CI [25.098, 30.288]**; win rate 0.318 vs 0.152; deal-in rate 0.021 vs 0.163.
-
-Planned improvements, with scratch measurements — 66 of 67 deal-ins were certain and avoidable;
-exact tenpai valuation adds ~2.9pp win rate:
-[ADR 0019](decisions/0019-oracle-improvements-plan.md).
+**Measured** (`python -m bots.arena --a ORACLE --b FaanBot --games 200 --seed 1000000`, 200
+duplicate sets): paired difference **+28.667 points/game, 95% CI [26.037, 31.296]**; win rate
+0.318 vs 0.152; deal-in rate 0.000 vs 0.172. Against the previous `ORACLE` on the same seeds:
+Δ **+1.593 points/game [+1.086, +2.101]**, Δ win rate +0.25pp [+0.08, +0.42]
+([ADR 0019](decisions/0019-oracle-improvements-plan.md) has each change's gate run).
 
 ## 10. Known issues
 

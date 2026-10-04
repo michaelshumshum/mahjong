@@ -279,7 +279,6 @@ _SEVEN_PAIRS_ON_NORTH = _pool(
 )
 
 
-@pytest.mark.xfail(strict=True, reason="fixed by ADR 0019 §5.1")
 async def test_omniscient_view_never_discards_a_certain_deal_in_when_a_safe_tile_exists() -> None:
     discard_pools = (_MID_GAME_OWN_POOL, (), (), ())
     hands = ((), _SEVEN_PAIRS_ON_NORTH, (), ())

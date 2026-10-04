@@ -290,17 +290,23 @@ class FaanBot:
         w_flex *= profile.w_flex
         accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
 
+        risks = {d: tile_risk(view, d) for d in range(34) if mask[_DISCARD_BASE + d]}
+        candidates = list(risks)
+        if view.hands is not None:
+            # exact risk is a certain deal-in, not a likelihood: never pay it while a safe tile exists
+            safe = [d for d, r in risks.items() if r == 0.0]
+            if safe:
+                candidates = safe
+
         best_key: tuple[float, int, int] | None = None
         best_aid = -1
-        for d in range(34):
+        for d in candidates:
             aid = _DISCARD_BASE + d
-            if not mask[aid]:
-                continue
             after = list(hand)
             after[d] -= 1
             result_shanten = shanten(after, closed=closed, hand_sets=hand_sets)
             kinds, tiles = accepts[d]
-            risk = tile_risk(view, d)
+            risk = risks[d]
             terminal_rank = 0 if is_terminal_or_honor(d) else 1
 
             if fold_mode:
