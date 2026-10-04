@@ -450,7 +450,10 @@ stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per
 plus Limit, each a list of patterns with a description and a tile example. The data lives in
 `lib/ui/faan-guide.ts` (`GUIDE`, keyed by faan value; examples are strings of concatenated tile
 codes, one group each); a spec pins it to `FAAN_PATTERN_LABEL` so a new pattern can't be left out.
-Situational patterns (self-draw, last tile, ...) show the description only.
+Situational patterns (self-draw, last tile, ...) show the description only. A ruleset select (All or
+one of the `RULESET_PRESET_OPTIONS`) hides patterns whose hand set the preset disables and tabs left
+empty; `GUIDE_PRESET_RULES` mirrors the server presets' `hand_sets`/`min_faan`, and 雞糊 only
+shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md)).
 
 ### Practice mode
 

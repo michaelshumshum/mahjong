@@ -420,5 +420,7 @@
 	"guide_descNineGates": "同一花色的 1112345678999，再加該花色任何一張，且全為暗牌。",
 	"guide_descHeavenlyHand": "莊家在發牌後、未打出任何牌前已糊牌。",
 	"guide_descEarthlyHand": "閒家食莊家打出的第一張牌糊牌。",
-	"faanPattern_chickenHand": "雞糊"
+	"faanPattern_chickenHand": "雞糊",
+	"guide_rulesetLabel": "規則",
+	"guide_rulesetAll": "全部規則"
 }

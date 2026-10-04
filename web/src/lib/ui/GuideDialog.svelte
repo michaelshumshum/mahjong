@@ -5,24 +5,32 @@
 	import CloseButton from './CloseButton.svelte';
 	import { faanPatternLabel } from './faan-pattern-labels';
 	import { GUIDE_TABS, guideEntries, parseGroup, type GuideTab } from './faan-guide';
+	import { RULESET_PRESET_OPTIONS } from '$lib/net/ruleset';
 	import PanelHeader from './PanelHeader.svelte';
 
 	let { onClose }: { onClose: () => void } = $props();
 
 	let active = $state<GuideTab>(1);
-	let entries = $derived(guideEntries(active));
+	let presetId = $state<string | null>(null);
+	let tabs = $derived(GUIDE_TABS.filter((t) => guideEntries(t, presetId).length > 0));
+	let entries = $derived(guideEntries(active, presetId));
 	let showChinese = $derived(getLocale() !== 'zh-Hant');
 
 	function tabLabel(tab: GuideTab): string {
 		return tab === 'limit' ? m.guide_tabLimit() : m.guide_tabFaan({ count: tab });
 	}
 
+	function onPresetChange(event: Event): void {
+		presetId = (event.currentTarget as HTMLSelectElement).value || null;
+		if (!tabs.includes(active)) active = tabs[0];
+	}
+
 	function onTabKeydown(event: KeyboardEvent, index: number): void {
 		const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
 		if (step === 0) return;
 		event.preventDefault();
-		const next = (index + step + GUIDE_TABS.length) % GUIDE_TABS.length;
-		active = GUIDE_TABS[next];
+		const next = (index + step + tabs.length) % tabs.length;
+		active = tabs[next];
 		document.getElementById(`guide-tab-${next}`)?.focus();
 	}
 </script>
@@ -38,8 +46,18 @@
 		<CloseButton onclick={onClose} />
 		<PanelHeader title={m.guide_title()} titleId="guide-heading" />
 
+		<label class="filter">
+			<span>{m.guide_rulesetLabel()}</span>
+			<select data-testid="guide-ruleset" value={presetId ?? ''} onchange={onPresetChange}>
+				<option value="">{m.guide_rulesetAll()}</option>
+				{#each RULESET_PRESET_OPTIONS as option (option.id)}
+					<option value={option.id}>{option.label()}</option>
+				{/each}
+			</select>
+		</label>
+
 		<div class="tabs" role="tablist" aria-label={m.guide_tabsLabel()}>
-			{#each GUIDE_TABS as tab, i (tab)}
+			{#each tabs as tab, i (tab)}
 				<button
 					type="button"
 					role="tab"
@@ -105,6 +123,20 @@
 		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
+	}
+
+	.filter {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+
+		select {
+			font: inherit;
+			min-height: var(--tap-target-min);
+			padding: 0 var(--space-2);
+		}
 	}
 
 	.tabs {

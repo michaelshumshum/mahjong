@@ -420,5 +420,7 @@
 	"guide_descNineGates": "One suit, fully concealed, 1112345678999 plus any one more tile of that suit.",
 	"guide_descHeavenlyHand": "The dealer wins on the initial deal, before any discard.",
 	"guide_descEarthlyHand": "A non-dealer wins on the dealer's first discard.",
-	"faanPattern_chickenHand": "Chicken Hand"
+	"faanPattern_chickenHand": "Chicken Hand",
+	"guide_rulesetLabel": "Ruleset",
+	"guide_rulesetAll": "All rulesets"
 }

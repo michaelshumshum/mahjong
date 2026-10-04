@@ -3,6 +3,9 @@ import { hasTileArt } from '$lib/table/tile-code';
 import { FAAN_PATTERN_LABEL } from './faan-pattern-labels';
 import { GUIDE, GUIDE_TABS, guideEntries, parseGroup } from './faan-guide';
 
+const names = (preset: string | null) =>
+	GUIDE_TABS.flatMap((t) => guideEntries(t, preset).map((e) => e.pattern));
+
 describe('faan guide', () => {
 	it('lists every scoring pattern exactly once', () => {
 		const listed = GUIDE_TABS.flatMap((t) => guideEntries(t).map((e) => e.pattern));
@@ -30,5 +33,18 @@ describe('faan guide', () => {
 			for (const entry of guideEntries(tab))
 				if (fullHands.includes(entry.pattern))
 					expect(entry.example.flatMap(parseGroup)).toHaveLength(14);
+	});
+
+	it('filters patterns by preset hand sets', () => {
+		expect(names(null)).toHaveLength(Object.keys(FAAN_PATTERN_LABEL).length);
+		expect(names('hk_classic')).toContain('七對子');
+		expect(names('hk_strict')).not.toContain('七對子');
+		expect(names('hk_strict')).toContain('混么九');
+	});
+
+	it('hides chicken hand under presets that need min faan above 0', () => {
+		for (const id of ['hk_classic', 'hk_casual', 'hk_strict'])
+			expect(names(id)).not.toContain('雞糊');
+		expect(names(null)).toContain('雞糊');
 	});
 });

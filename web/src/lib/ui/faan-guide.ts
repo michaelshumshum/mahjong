@@ -1,4 +1,5 @@
 import { m } from '$lib/paraglide/messages.js';
+import type { HandSet } from '$lib/net/ruleset';
 import type { TileCode } from '$lib/table/tile-code';
 
 export interface GuideEntry {
@@ -176,6 +177,28 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 	]
 };
 
-export function guideEntries(tab: GuideTab): GuideEntry[] {
-	return GUIDE[String(tab)] ?? [];
+const NEW_6 = ['混么九', '雞糊', '海底撈月', '河底撈魚', '槓上開花', '搶槓'];
+const NEW_18 = ['七對子', '三暗刻', '全求人', '雙箭', '一般高', '三般高', '三步高', '四步高'];
+
+export function handSetOf(pattern: string): HandSet {
+	return NEW_6.includes(pattern) ? 'NEW_6' : NEW_18.includes(pattern) ? 'NEW_18' : 'CLASSIC';
+}
+
+// mirrors server RULESET_PRESETS' hand_sets/min_faan; update both together
+export const GUIDE_PRESET_RULES: Record<string, { handSets: HandSet[]; minFaan: number }> = {
+	hk_classic: { handSets: ['CLASSIC', 'NEW_6', 'NEW_18'], minFaan: 3 },
+	hk_casual: { handSets: ['CLASSIC', 'NEW_6', 'NEW_18'], minFaan: 1 },
+	hk_strict: { handSets: ['CLASSIC', 'NEW_6'], minFaan: 5 }
+};
+
+export function inPreset(pattern: string, presetId: string | null): boolean {
+	if (presetId === null) return true;
+	const rules = GUIDE_PRESET_RULES[presetId];
+	if (!rules) return true;
+	if (pattern === '雞糊' && rules.minFaan > 0) return false;
+	return rules.handSets.includes(handSetOf(pattern));
+}
+
+export function guideEntries(tab: GuideTab, presetId: string | null = null): GuideEntry[] {
+	return (GUIDE[String(tab)] ?? []).filter((e) => inPreset(e.pattern, presetId));
 }

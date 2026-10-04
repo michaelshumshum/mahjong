@@ -285,6 +285,16 @@ test('guide button opens a faan library with a tab per faan count', async ({ pag
 	await expect(page.getByTestId('guide-panel')).toContainText('Thirteen Orphans');
 });
 
+test('guide ruleset filter hides patterns a preset disables', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await expect(page.getByTestId('guide-tab-4')).toBeVisible();
+	await page.getByTestId('guide-ruleset').selectOption('hk_strict');
+	await expect(page.getByTestId('guide-tab-4')).toHaveCount(0);
+	await page.getByTestId('guide-ruleset').selectOption('');
+	await expect(page.getByTestId('guide-tab-4')).toBeVisible();
+});
+
 test('language button on the lobby switches to zh-Hant and back', async ({ page }) => {
 	await page.goto('/');
 	await page.getByTestId('lobby-language').click();
