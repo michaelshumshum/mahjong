@@ -127,15 +127,17 @@
 
 	.filter {
 		display: flex;
-		align-items: center;
+		flex-direction: column;
 		gap: var(--space-2);
+		flex-shrink: 0;
 		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
 
 		select {
 			font: inherit;
-			min-height: var(--tap-target-min);
-			padding: 0 var(--space-2);
+			min-height: 36px;
+			padding: var(--space-1) var(--space-2);
+			color: var(--color-text);
+			@include buttons.input-recessed;
 		}
 	}
 
