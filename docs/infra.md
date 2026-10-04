@@ -137,9 +137,9 @@ The API runs uvicorn with **one worker**.
 ([ADR 0006](decisions/0006-multi-node-and-durability.md)).
 
 **Shutdown.** `TableRegistry.begin_shutdown` drains on SIGTERM, letting a mid-hand table finish
-within `SHUTDOWN_GRACE_SECONDS` (default 90s) ([architecture.md §8.1](architecture.md)). Neither
-Compose file sets `stop_grace_period`, so Compose's default (10s before SIGKILL) cuts the drain
-short. Set it before relying on graceful deploys.
+within `SHUTDOWN_GRACE_SECONDS` (default 90s) ([architecture.md §8.1](architecture.md)). The prod
+overlay sets `api` `stop_grace_period: 100s`; the dev file doesn't, so Compose's default (10s before
+SIGKILL) cuts the drain short there.
 
 ## 4. Compose profiles
 

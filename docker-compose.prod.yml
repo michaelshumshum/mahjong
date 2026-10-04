@@ -12,7 +12,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
-    volumes: []
+    # !override: base file publishes 0.0.0.0; only the host-side tunnel connector should reach it
+    ports: !override ["127.0.0.1:${API_PORT:-8000}:8000"]
+    stop_grace_period: 100s   # > SHUTDOWN_GRACE_SECONDS (90)
+    volumes: !reset []
     restart: unless-stopped
 
   web:
@@ -26,8 +29,8 @@ services:
     # !override, not plain ports: — compose concatenates ports: across -f files
     # rather than replacing them, so a bare list here would keep the dev
     # 5173 mapping alongside this one instead of replacing it.
-    ports: !override ["${WEB_PORT:-3000}:3000"]
-    volumes: []
+    ports: !override ["127.0.0.1:${WEB_PORT:-3000}:3000"]
+    volumes: !reset []
     restart: unless-stopped
 
   postgres:

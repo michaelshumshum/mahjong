@@ -5,7 +5,7 @@ DC_PROD := docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart logs build ps sh-api sh-web test test-server test-server-slow test-web \
-        selfplay arena train proto proto-check migrate revision fmt lint typecheck clean prod-build prod-up
+        selfplay arena train proto proto-check migrate revision fmt lint typecheck clean prod-build prod-up prod-migrate
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -102,6 +102,9 @@ prod-build: ## Build production images
 
 prod-up: ## Run the production overlay locally
 	$(DC_PROD) up -d
+
+prod-migrate: ## Apply migrations in the running prod api container
+	$(DC_PROD) exec api alembic upgrade head
 
 clean: ## Stop and delete volumes (DESTROYS the dev database)
 	$(COMPOSE) down -v
