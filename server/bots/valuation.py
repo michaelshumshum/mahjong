@@ -12,17 +12,27 @@ win-timing faan (箭刻, flowers, 全求人, timing sets) this module doesn't mo
 Still safe to rank discards with: the omitted bonuses are close to shape-independent, so they
 shift every candidate's estimate by about the same amount and barely disturb relative order --
 which is all ranking needs. Not safe as an absolute faan prediction.
+
+`exact_wait_value` is the exception: real-scorer faan for an already-tenpai hand, used only by
+`ORACLE` (docs/bots.md §9), where every wait's live copies are known.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from mahjong_core.tiles import TileType
+from app.views import SeatView
+from bots.safety import synthetic_tile_id
+from mahjong_core.actions import hand_is_winning_shape
+from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
+from mahjong_core.state import SeatState
+from mahjong_core.tiles import TileId, TileType
 
 __all__ = [
     "ROUTE_FAAN",
     "estimate_best_faan",
+    "exact_wait_value",
     "pattern_optionality",
     "reachable_routes",
     "route_faan_for",
@@ -177,3 +187,49 @@ def pattern_optionality(
     """How many distinct routes are reachable right now -- rewards discards that keep more than
     one value route alive rather than committing early."""
     return len(reachable_routes(hand34, closed=closed, route_faan=route_faan))
+
+
+def _wait_faan(view: SeatView, concealed: Sequence[TileId], wait: int, *, self_drawn: bool) -> int:
+    """Real faan of completing this seat's hand on `wait`, or 0 below `min_faan`."""
+    assert view.seat is not None
+    synthetic = synthetic_tile_id(wait, concealed)
+    if synthetic is None:
+        return 0
+    candidate = (*concealed, synthetic)
+    melds = view.melds[view.seat]
+    if not hand_is_winning_shape(SeatState(concealed=candidate, melds=melds)):
+        return 0
+    ctx = ScoringContext(
+        seat_wind=seat_wind_for(view.seat, view.dealer),
+        prevailing_wind=view.prevailing,
+        self_drawn=self_drawn,
+        flowers=view.flowers[view.seat],
+        flowers_score=view.ruleset.flowers_score,
+    )
+    result = score_winning_hand(candidate, melds, ctx, view.ruleset)
+    return result.total_faan if result.clears_min_faan else 0
+
+
+def exact_wait_value(
+    view: SeatView,
+    concealed: Sequence[TileId],
+    waits: Sequence[int],
+    seen: Sequence[int],
+    ron: Mapping[int, float],
+) -> tuple[float, float]:
+    """`(acceptance, value)` of a tenpai hand scored with the real scorer, per wait: live wall
+    copies (`4 - seen`) in the self-draw context, plus `ron` credited copies in the discard
+    context. A wait that can't clear `min_faan` in a context adds nothing in it; `value` is the
+    copy-weighted mean faan, 0 when nothing clears. Exact only when `seen` is hands-aware
+    (`ORACLE`, docs/bots.md §9) -- otherwise opponents' tiles read as live."""
+    acceptance = total = 0.0
+    for w in waits:
+        live = 4 - seen[w]
+        if live > 0 and (faan := _wait_faan(view, concealed, w, self_drawn=True)):
+            acceptance += live
+            total += live * faan
+        copies = ron.get(w, 0.0)
+        if copies and (faan := _wait_faan(view, concealed, w, self_drawn=False)):
+            acceptance += copies
+            total += copies * faan
+    return acceptance, (total / acceptance if acceptance else 0.0)

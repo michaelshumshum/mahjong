@@ -15,16 +15,22 @@ pass/fail regression suite of the same kind as the fixtures below.
 
 from __future__ import annotations
 
+import pytest
+
+from app.views import SeatView
 from bots.valuation import (
     ROUTE_FAAN,
     estimate_best_faan,
+    exact_wait_value,
     pattern_optionality,
     reachable_routes,
     route_faan_for,
 )
+from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, MeldKind
+from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, score_hand
-from mahjong_core.state import Wind
+from mahjong_core.state import Phase, Wind
 from mahjong_core.tiles import TileType, tile_ids_for_type
 
 
@@ -351,3 +357,103 @@ def test_estimate_best_faan_with_empty_overrides_matches_the_fixed_default() -> 
     assert estimate_best_faan(hand, closed=False) == estimate_best_faan(
         hand, closed=False, route_faan=route_faan_for({})
     )
+
+
+# --- exact_wait_value: real-scorer tenpai valuation (ORACLE, ADR 0019 §5.2) -------------------
+
+
+def _wait_view(melds: tuple[Meld, ...], concealed: tuple[TileType, ...]) -> SeatView:
+    used: dict[TileType, int] = {}
+    ids = []
+    for t in concealed:
+        n = used.get(t, 0)
+        ids.append(tile_ids_for_type(t)[n])
+        used[t] = n + 1
+    return SeatView(
+        seat=1,
+        hand_no=1,
+        prevailing=Wind.EAST,
+        dealer=0,
+        turn=1,
+        phase=Phase.AWAIT_ACTION,
+        own_hand=tuple(ids),
+        concealed_counts=(13, len(ids), 13, 13),
+        melds=((), melds, (), ()),
+        discard_pools=((), (), (), ()),
+        flowers=((), (), (), ()),
+        wall_remaining=50,
+        seat_status=("bot", "bot", "bot", "bot"),
+        names=(None, None, None, None),
+        scores=(0, 0, 0, 0),
+        legal_actions=(),
+        claim_options=(),
+        deadline_ts=None,
+        host_seat=None,
+        ruleset=RuleSet(),
+        hands=None,
+    )
+
+
+_SOU_5 = int(TileType.SOU_5)
+_CLAIMED_RED_PUNG = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.DRAGON_RED)[:3], from_seat=0)
+_CLAIMED_PIN_CHOW = Meld(
+    MeldKind.CHOW,
+    tuple(tile_ids_for_type(TileType(int(TileType.PIN_2) + k))[0] for k in range(3)),
+    from_seat=0,
+)
+# 123m 456m + 5s tanki
+_TANKI_CONCEALED = (
+    TileType.MAN_1,
+    TileType.MAN_2,
+    TileType.MAN_3,
+    TileType.MAN_4,
+    TileType.MAN_5,
+    TileType.MAN_6,
+    TileType.SOU_5,
+)
+
+
+def _seen_with(tile_type: int, n: int) -> list[int]:
+    seen = [0] * 34
+    seen[tile_type] = n
+    return seen
+
+
+def _real_faan(view: SeatView, *, self_drawn: bool) -> int:
+    candidate = (*view.own_hand, tile_ids_for_type(TileType.SOU_5)[3])
+    ctx = ScoringContext(
+        seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST, self_drawn=self_drawn, flowers=()
+    )
+    return score_winning_hand(candidate, view.melds[1], ctx, view.ruleset).total_faan
+
+
+def test_exact_wait_value_scores_ron_copies_in_the_discard_context() -> None:
+    view = _wait_view((_CLAIMED_RED_PUNG,), _TANKI_CONCEALED)
+    self_faan, ron_faan = _real_faan(view, self_drawn=True), _real_faan(view, self_drawn=False)
+    assert self_faan > ron_faan >= view.ruleset.min_faan  # an open hand loses 自摸 on a ron
+
+    assert exact_wait_value(view, view.own_hand, [_SOU_5], _seen_with(_SOU_5, 2), {}) == (
+        2.0,
+        self_faan,
+    )
+    acceptance, value = exact_wait_value(
+        view, view.own_hand, [_SOU_5], _seen_with(_SOU_5, 2), {_SOU_5: 1.0}
+    )
+    assert acceptance == 3.0
+    assert value == pytest.approx((2 * self_faan + ron_faan) / 3)
+
+
+def test_exact_wait_value_counts_nothing_for_a_sub_minimum_context() -> None:
+    view = _wait_view((_CLAIMED_PIN_CHOW,), _TANKI_CONCEALED)
+    assert _real_faan(view, self_drawn=False) < view.ruleset.min_faan
+    assert _real_faan(view, self_drawn=True) >= view.ruleset.min_faan
+
+    ron_only = exact_wait_value(view, view.own_hand, [_SOU_5], _seen_with(_SOU_5, 4), {_SOU_5: 1.0})
+    assert ron_only == (0.0, 0.0)
+    both = exact_wait_value(view, view.own_hand, [_SOU_5], _seen_with(_SOU_5, 3), {_SOU_5: 1.0})
+    assert both == (1.0, _real_faan(view, self_drawn=True))
+
+
+def test_exact_wait_value_counts_nothing_for_a_dead_wait() -> None:
+    view = _wait_view((_CLAIMED_RED_PUNG,), _TANKI_CONCEALED)
+    assert exact_wait_value(view, view.own_hand, [_SOU_5], _seen_with(_SOU_5, 4), {}) == (0.0, 0.0)

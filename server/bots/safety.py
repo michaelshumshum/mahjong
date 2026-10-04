@@ -41,6 +41,7 @@ __all__ = [
     "no_chance",
     "opponent_threat_level",
     "ron_credit",
+    "synthetic_tile_id",
     "tile_risk",
 ]
 
@@ -216,7 +217,7 @@ def expected_cost(view: SeatView, opponent_seat: int, tile_type: int) -> float:
     return cost
 
 
-def _synthetic_tile_id(tile_type: int, hand: Sequence[TileId]) -> TileId | None:
+def synthetic_tile_id(tile_type: int, hand: Sequence[TileId]) -> TileId | None:
     """A placeholder physical id for a hypothetical tile of `tile_type`, distinct from every id
     already in `hand`. Every function this feeds (`hand_is_winning_shape`, `decompose`,
     `score_winning_hand`) only ever reads a tile's *type* back out via `tile_id_type` -- never
@@ -250,7 +251,7 @@ def _exact_deal_in_faan(view: SeatView, opponent_seat: int, tile_type: int) -> f
     assert view.seat is not None
     hand = view.hands[opponent_seat]
     melds = view.melds[opponent_seat]
-    synthetic = _synthetic_tile_id(tile_type, hand)
+    synthetic = synthetic_tile_id(tile_type, hand)
     if synthetic is None:
         return 0.0
     candidate = (*hand, synthetic)
@@ -338,7 +339,7 @@ def kong_rob_risk(view: SeatView, tile_type: int, *, concealed: bool) -> float:
         if opponent == view.seat:
             continue
         if concealed:
-            synthetic = _synthetic_tile_id(tile_type, view.hands[opponent])
+            synthetic = synthetic_tile_id(tile_type, view.hands[opponent])
             if synthetic is None or not _is_thirteen_orphans((*view.hands[opponent], synthetic)):
                 continue
         best = max(best, _exact_deal_in_faan(view, opponent, tile_type))

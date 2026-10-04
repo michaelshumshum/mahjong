@@ -548,7 +548,7 @@ def test_tile_risk_hands_aware_handles_a_concealed_kong_of_the_candidate_type() 
     (a concealed kong candidate) -- a naive synthetic id (`tile_type * 4`, always the block's
     first id) collides with a real id already in the hand once `decompose` materializes a
     candidate `Meld`, and `Meld.__post_init__` (mahjong_core/melds.py) raises on a meld built
-    from two equal physical ids. `_synthetic_tile_id` must recognize no 5th-copy placeholder id
+    from two equal physical ids. `synthetic_tile_id` must recognize no 5th-copy placeholder id
     is available and return `None` instead -- `_exact_deal_in_faan` must then read that as 0.0,
     not propagate a crash: a 5th physical PIN_5 can't exist, so this discard provably can't deal
     in via it, the same fact the probabilistic `no_chance` signal captures for the non-hands-aware
