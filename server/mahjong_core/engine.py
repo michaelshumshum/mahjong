@@ -97,7 +97,7 @@ __all__ = [
     "start_next_hand",
 ]
 
-ENGINE_VERSION = "1.0.0"
+ENGINE_VERSION = "1.1.0"
 # bump on any reducer/wall-order/flower-replacement change; persisted GameRecords stamp this --
 # a mismatch means the record isn't replayable, full stop, no migration path.
 
@@ -352,7 +352,12 @@ def _can_win_with(
     if not _is_winning_shape(concealed, closed=not seat_state.melds):
         return False
     ctx = build_scoring_context(
-        state, seat, self_drawn=False, is_robbing_kong=is_robbing_kong, discarder=discarder
+        state,
+        seat,
+        self_drawn=False,
+        is_robbing_kong=is_robbing_kong,
+        discarder=discarder,
+        winning_tile=tile,
     )
     result = score_winning_hand(concealed, seat_state.melds, ctx, state.ruleset)
     return result.clears_min_faan
@@ -640,6 +645,7 @@ def _apply_claim_response(
             discarder=window.source_seat,
             concealed_tiles=concealed_tiles,
             melds=winner_state.melds,
+            winning_tile=window.tile,
         )
         return more_state, events + more_events
 
@@ -766,6 +772,7 @@ def _end_win(
     discarder: int | None,
     concealed_tiles: tuple[TileId, ...],
     melds: tuple[Meld, ...],
+    winning_tile: TileId | None = None,
 ) -> tuple[GameState, list[Event]]:
     """Score a normal (non-instant-win) win -- `concealed_tiles`/`melds` are the winner's hand
     at the moment of the win, including the winning tile. Passed explicitly rather than read
@@ -776,6 +783,7 @@ def _end_win(
         self_drawn=win_type == WinType.SELF_DRAW,
         is_robbing_kong=win_type == WinType.KONG_ROB,
         discarder=discarder,
+        winning_tile=winning_tile,
     )
     result = score_winning_hand(concealed_tiles, melds, ctx, state.ruleset)
     return _finish_win(

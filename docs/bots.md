@@ -127,8 +127,8 @@ T2 plans toward a **value target**. The realistic 3-faan routes (`bots/valuation
 | Half Flush 混一色 | 3 | ≥7 tiles in one suit + honors by turn 6 |
 | All Pungs 對對糊 | 3 | ≥2 pairs/triplets early, few sequence shapes |
 | Half Flush + dragon/wind pung | 4–5 | strongest common line |
-| Full Flush 清一色 | 6 | ≥9 tiles in one suit by turn 5 |
-| Small Three Dragons 小三元 | 3 | two dragon pairs |
+| Full Flush 清一色 | 7 | ≥9 tiles in one suit by turn 5 |
+| Small Three Dragons 小三元 | 5 | two dragon pairs |
 | Seven Pairs 七對子 | 4 | ≥4 pairs by turn 5, honors-heavy |
 | Voided Suit 缺一門 | 2 | cheap top-up on almost any hand |
 | Self-draw + concealed | +2 | keeps a cheap hand viable if you stay closed |

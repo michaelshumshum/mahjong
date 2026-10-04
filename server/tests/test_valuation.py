@@ -92,7 +92,7 @@ def test_full_flush_route_faan_matches_real_scorer() -> None:
 def test_all_pungs_route_faan_matches_real_scorer() -> None:
     hand = (
         _pung(TileType.MAN_1),
-        _pung(TileType.PIN_5),
+        Meld(MeldKind.PUNG, tile_ids_for_type(TileType.PIN_5)[:3], from_seat=2),
         _pung(TileType.SOU_9),
         _pung(TileType.WIND_EAST),
         _pair(TileType.DRAGON_RED),
@@ -128,7 +128,7 @@ def test_all_sequences_route_faan_matches_real_scorer() -> None:
         _chow(TileType.PIN_2),
         _chow(TileType.SOU_4),
         _chow(TileType.MAN_5),
-        _pair(TileType.DRAGON_RED),
+        _pair(TileType.SOU_9),
     )
     assert score_hand(hand, _ctx())["平糊"] == ROUTE_FAAN["all_sequences"]
 

@@ -46,10 +46,10 @@ _DRAGON_TYPES = (int(TileType.DRAGON_RED), int(TileType.DRAGON_GREEN), int(TileT
 # base faan per route, before closed bonus (docs/bots.md §4). "Half Flush + dragon/wind pung"
 # isn't modeled separately -- it's half_flush + a dragon block bumping small_three_dragons.
 ROUTE_FAAN: dict[str, int] = {
-    "full_flush": 6,
+    "full_flush": 7,
     "half_flush": 3,
     "all_pungs": 3,
-    "small_three_dragons": 3,
+    "small_three_dragons": 5,
     "seven_pairs": 4,
     "voided_suit": 2,
     "all_sequences": 1,  # 平糊 -- the floor every hand can reach, T1's whole failure mode
@@ -212,6 +212,7 @@ def _wait_faan(
         self_drawn=self_drawn,
         flowers=view.flowers[view.seat],
         flowers_score=view.ruleset.flowers_score,
+        winning_tile=None if self_drawn else candidate[-1],
     )
     result = score_winning_hand(candidate, melds, ctx, view.ruleset)
     return result.total_faan if result.clears_min_faan else 0

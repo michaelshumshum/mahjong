@@ -8,6 +8,8 @@ that's the shape a later sub-task's golden suite adds.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from mahjong_core.actions import _is_seven_pairs as _actions_is_seven_pairs
@@ -125,9 +127,35 @@ def test_all_sequences() -> None:
         _chow(TileType.MAN_5),
         _chow(TileType.PIN_2),
         _chow(TileType.SOU_7),
-        _pair(TileType.DRAGON_GREEN),
+        _pair(TileType.SOU_9),
     )
     assert _occurrences("平糊", hand, _ctx()) == 1
+
+
+@pytest.mark.parametrize(
+    "pair",
+    [TileType.DRAGON_GREEN, TileType.WIND_SOUTH, TileType.WIND_EAST],
+)
+def test_all_sequences_rejects_a_faan_pair(pair: TileType) -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(pair),
+    )
+    assert _occurrences("平糊", hand, _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)) == 0
+
+
+def test_all_sequences_accepts_an_off_wind_pair() -> None:
+    hand = (
+        _chow(TileType.MAN_1),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.WIND_NORTH),
+    )
+    assert _occurrences("平糊", hand, _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)) == 1
 
 
 def test_all_sequences_false_with_one_pung() -> None:
@@ -355,7 +383,7 @@ def test_dragon_pung_counts_each() -> None:
     )
     ctx = _ctx()
     assert _occurrences("箭刻", hand, ctx) == 2
-    assert score_hand(hand, ctx)["箭刻"] == 2  # 2 occurrences * 1 faan each
+    assert score_hand(hand, ctx)["雙箭"] == 2
 
 
 def test_dragon_pair_alone_does_not_count() -> None:
@@ -413,9 +441,8 @@ def test_two_dragon_pungs_without_dragon_pair_is_neither_small_nor_big() -> None
     assert _occurrences("大三元", hand, ctx) == 0
 
 
-def test_dragon_pung_still_stacks_with_small_three_dragons() -> None:
-    """rules.md §7 note ²: 箭刻 keeps firing per dragon pung even once Small/Big Three
-    Dragons also fires on the same pungs."""
+def test_small_three_dragons_includes_the_dragon_pungs() -> None:
+    """rules.md §7 note ²: 小三元 is 5 in total, so 箭刻 is dropped when it fires."""
     hand = (
         _pung(TileType.DRAGON_RED),
         _pung(TileType.DRAGON_GREEN),
@@ -424,8 +451,9 @@ def test_dragon_pung_still_stacks_with_small_three_dragons() -> None:
         _pair(TileType.DRAGON_WHITE),
     )
     scored = score_hand(hand, _ctx())
-    assert scored["小三元"] == 3
-    assert scored["箭刻"] == 2
+    assert scored["小三元"] == 5
+    assert "箭刻" not in scored
+    assert "雙箭" not in scored
 
 
 # --- Small Four Winds (小四喜) / Big Four Winds (大四喜) -------------------------------------
@@ -470,9 +498,8 @@ def test_three_wind_pungs_without_wind_pair_is_neither_small_nor_big() -> None:
     assert _occurrences("大四喜", hand, ctx) == 0
 
 
-def test_seat_wind_still_stacks_with_small_four_winds() -> None:
-    """rules.md §7 note ²: 門風/圈風 keep firing on their matching pung even once
-    Small/Big Four Winds also fires."""
+def test_small_four_winds_includes_the_wind_pungs() -> None:
+    """rules.md §7 note ²: 小四喜 is 6 in total, so 門風/圈風 are dropped when it fires."""
     hand = (
         _pung(TileType.WIND_EAST),
         _pung(TileType.WIND_SOUTH),
@@ -482,8 +509,9 @@ def test_seat_wind_still_stacks_with_small_four_winds() -> None:
     )
     ctx = _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)
     scored = score_hand(hand, ctx)
-    assert scored["小四喜"] == 5
-    assert scored["門風"] == 1
+    assert scored["小四喜"] == 6
+    assert "門風" not in scored
+    assert "圈風" not in scored
 
 
 # --- Mixed Terminals (混么九) ------------------------------------------------------------------
@@ -553,7 +581,7 @@ def test_mixed_terminals_stacks_with_voided_suit_and_all_pungs() -> None:
     also hold on the same hand -- nothing forbids the combination."""
     hand = (
         _pung(TileType.MAN_1),
-        _pung(TileType.PIN_9),
+        _pung(TileType.PIN_9, from_seat=2),
         _pung(TileType.WIND_EAST),
         _pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
@@ -568,7 +596,7 @@ def test_mixed_terminals_stacks_with_voided_suit_and_all_pungs() -> None:
 
 
 def test_full_flush_stacks_with_all_pungs() -> None:
-    """rules.md §7: "Faan stack: Full Flush (6) + All Pungs (3) = 9". Two pungs are
+    """rules.md §7: "Faan stack: Full Flush (7) + All Pungs (3) = 10". Two pungs are
     claimed (open) so this fixture stays about Full Flush + All Pungs only, not also Three
     Concealed Pungs (fourth sub-task, needs 3+ concealed) -- see
     `test_three_concealed_pungs_stacks_with_all_pungs` for that combination instead."""
@@ -581,12 +609,12 @@ def test_full_flush_stacks_with_all_pungs() -> None:
     )
     ctx = _ctx(seat_wind=Wind.WEST, prevailing_wind=Wind.WEST)
     scored = score_hand(hand, ctx)
-    assert scored["清一色"] == 6
+    assert scored["清一色"] == 7
     assert scored["對對糊"] == 3
     assert "混一色" not in scored
     assert "缺一門" not in scored
     assert "三暗刻" not in scored
-    assert sum(scored.values()) == 9 + scored.get("無花", 0) + scored.get("門前清", 0)
+    assert sum(scored.values()) == 10 + scored.get("無花", 0) + scored.get("門前清", 0)
 
 
 def test_self_draw_all_sequences_no_flowers_combination() -> None:
@@ -1033,7 +1061,7 @@ def test_limit_patterns_flagged_for_future_non_stacking() -> None:
     pattern counts when more than one applies (§7). `score_hand` doesn't implement that rule
     itself -- it's faan.py's job, once that module exists -- so this proves the flag/value it
     will need are set correctly on every limit pattern registered so far."""
-    limit_names = {"字一色", "清么九", "九蓮寶燈", "十三么", "天糊", "地糊"}
+    limit_names = {"字一色", "清么九", "九蓮寶燈", "十三么", "天糊", "地糊", "大四喜", "十八羅漢"}
     for pattern in PATTERNS:
         assert pattern.is_limit == (pattern.name in limit_names)
         if pattern.is_limit:
@@ -1294,7 +1322,7 @@ def test_two_dragon_pungs_false_with_all_three() -> None:
     assert _occurrences("大三元", hand, _ctx()) == 1
 
 
-def test_two_dragon_pungs_stacks_with_small_three_dragons_and_dragon_pung() -> None:
+def test_two_dragon_pungs_yield_to_small_three_dragons() -> None:
     hand = (
         _pung(TileType.DRAGON_RED),
         _pung(TileType.DRAGON_GREEN),
@@ -1303,9 +1331,46 @@ def test_two_dragon_pungs_stacks_with_small_three_dragons_and_dragon_pung() -> N
         _pair(TileType.DRAGON_WHITE),
     )
     scored = score_hand(hand, _ctx())
-    assert scored["雙箭"] == 2
-    assert scored["小三元"] == 3
-    assert scored["箭刻"] == 2
+    assert scored["小三元"] == 5
+    assert "雙箭" not in scored
+    assert "箭刻" not in scored
+
+
+def test_four_concealed_pungs_supersede_three_and_all_pungs() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_2),
+        _pung(TileType.SOU_3),
+        _pung(TileType.MAN_4),
+        _pair(TileType.PIN_9),
+    )
+    scored = score_hand(hand, _ctx())
+    assert scored["四暗刻"] == 8
+    assert "三暗刻" not in scored
+    assert "對對糊" not in scored
+
+
+def test_pung_completed_by_the_winning_discard_is_not_concealed() -> None:
+    hand = (
+        _pung(TileType.MAN_1),
+        _pung(TileType.PIN_2),
+        _pung(TileType.SOU_3),
+        _chow(TileType.MAN_4),
+        _pair(TileType.PIN_9),
+    )
+    ron = replace(_ctx(), winning_tile=tile_ids_for_type(TileType.SOU_3)[0])
+    assert _occurrences("三暗刻", hand, ron) == 0
+    assert _occurrences("三暗刻", hand, replace(ron, self_drawn=True)) == 1
+    elsewhere = replace(ron, winning_tile=tile_ids_for_type(TileType.MAN_4)[0])
+    assert _occurrences("三暗刻", hand, elsewhere) == 1
+
+
+def test_four_kongs_is_a_limit_hand() -> None:
+    kongs = tuple(
+        Meld(MeldKind.EXPOSED_KONG, tile_ids_for_type(t), from_seat=2)
+        for t in (TileType.MAN_1, TileType.PIN_2, TileType.SOU_3, TileType.MAN_4)
+    )
+    assert _occurrences("十八羅漢", (*kongs, _pair(TileType.PIN_9)), _ctx()) == 1
 
 
 # --- Two/Three Identical Sequences (一般高/三般高) -----------------------------------------------

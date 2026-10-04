@@ -241,6 +241,7 @@ def build_scoring_context(
     self_drawn: bool,
     is_robbing_kong: bool = False,
     discarder: int | None = None,
+    winning_tile: TileId | None = None,
 ) -> ScoringContext:
     """The `ScoringContext` for `seat` winning *right now*. Shared by `can_declare_win` here
     and `engine.py`'s claim-offer construction/win scoring, so there's exactly one place that
@@ -262,6 +263,7 @@ def build_scoring_context(
         is_kong_replacement=state.last_draw_was_kong_replacement,
         is_robbing_kong=is_robbing_kong,
         flowers_score=state.ruleset.flowers_score,
+        winning_tile=winning_tile,
     )
 
 

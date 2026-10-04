@@ -60,16 +60,9 @@ def _ctx(
 
 
 def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
-    """rules.md §11.9, specifically for Seven Pairs (the collision the edge case names):
-    11223344556677m parses both as 七對子 (7 distinct pairs, `decompose()`'s empty-tuple raw
-    shape -- patterns.py's "Raw-hand access" note) and as a standard hand (123m 123m 456m 456m
-    77m, a real `decompose()` split -- 平糊 too, since every group is a chow). The standard
-    parse scores far higher here (清一色 alone outvalues 七對子), so maximization must pick it
-    over the raw-shape candidate. Also proves the fix for a real bug the audit found: 七對子
-    must NOT also leak onto the winning standard-decomposition candidate just because the raw
-    14 tiles separately happen to satisfy the seven-pairs shape too (see
-    `patterns._detect_seven_pairs`'s docstring) -- `七對子` must be entirely absent below, not
-    just outweighed."""
+    """rules.md §11.9: 11223344556677m parses as 七對子 (raw shape, stacking with 清一色) and as
+    123m 123m 456m 456m 77m (平糊 + 清一色 + 一般高). The seven-pairs candidate scores 13 against
+    12, so maximisation picks it; 七對子 must not leak onto the standard candidate."""
     tiles = _tiles(
         TileType.MAN_1,
         TileType.MAN_1,
@@ -90,18 +83,16 @@ def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
     ruleset = RuleSet(faan_cap=13, min_faan=0)
     result = score_winning_hand(tiles, (), ctx, ruleset)
     assert result == FaanResult(
-        total_faan=11,
-        breakdown={"平糊": 1, "清一色": 6, "一般高": 2, "無花": 1, "門前清": 1},
+        total_faan=13,
+        breakdown={"七對子": 4, "清一色": 7, "無花": 1, "門前清": 1},
         clears_min_faan=True,
     )
-    assert "七對子" not in result.breakdown
 
 
 def test_maximizes_across_decompositions() -> None:
-    """111p 222p 333p 444p 99s parses two ways: four pungs (對對糊 + 三暗刻, 9 total with
-    缺一門), or 123p x3 chows + 444p pung (三般高, 10 total with 缺一門) -- rules.md
-    §11 edge case 9. The chow parse scores higher; maximisation must pick it, not whichever
-    `decompose()` happens to list first."""
+    """111p 222p 333p 444p 99s parses two ways: four concealed pungs (四暗刻 8, 12 total with
+    缺一門), or 123p x3 chows + 444p pung (三般高 6, 10 total) -- rules.md §11 edge case 9.
+    Maximisation must pick the pung parse, not whichever `decompose()` lists first."""
     tiles = _tiles(
         TileType.PIN_1,
         TileType.PIN_1,
@@ -119,11 +110,11 @@ def test_maximizes_across_decompositions() -> None:
         TileType.SOU_9,
     )
     ctx = _ctx()
-    ruleset = RuleSet(faan_cap=10, min_faan=0)
+    ruleset = RuleSet(faan_cap=13, min_faan=0)
     result = score_winning_hand(tiles, (), ctx, ruleset)
     assert result == FaanResult(
-        total_faan=10,
-        breakdown={"缺一門": 2, "無花": 1, "門前清": 1, "三般高": 6},
+        total_faan=12,
+        breakdown={"缺一門": 2, "無花": 1, "門前清": 1, "四暗刻": 8},
         clears_min_faan=True,
     )
 
@@ -197,8 +188,8 @@ def test_two_simultaneous_limit_patterns_collapse_to_one() -> None:
 
 
 def test_faan_cap_clamps_a_hand_that_exceeds_it() -> None:
-    """111p 333p 555p 777p 99p, self-drawn: 對對糊(3) + 清一色(6) + 三暗刻(2) + 自摸(1) +
-    無花(1) = 13 raw, clamped to the default `faan_cap` of 10."""
+    """111p 333p 555p 777p 99p, self-drawn: 四暗刻(8) + 清一色(7) + 自摸(1) + 無花(1) =
+    17 raw, clamped to the default `faan_cap` of 10."""
     tiles = _tiles(
         TileType.PIN_1,
         TileType.PIN_1,
@@ -218,7 +209,7 @@ def test_faan_cap_clamps_a_hand_that_exceeds_it() -> None:
     ctx = _ctx(seat_wind=Wind.WEST, prevailing_wind=Wind.WEST, self_drawn=True)
     ruleset = RuleSet(faan_cap=10, min_faan=0)
     result = score_winning_hand(tiles, (), ctx, ruleset)
-    assert sum(result.breakdown.values()) == 13  # raw breakdown stays uncapped, for display
+    assert sum(result.breakdown.values()) == 17  # raw breakdown stays uncapped, for display
     assert result.total_faan == 10  # the clamped value a payout calculation uses
     assert result.clears_min_faan is True
 

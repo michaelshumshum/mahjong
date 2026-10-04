@@ -111,6 +111,8 @@ class ScoringContext:
     `is_kong_replacement` (槓上開花): this win's tile came from a kong-replacement draw.
     `is_robbing_kong` (搶槓): this win claimed a tile another seat just added to a kong.
     `flowers_score` (座位花): mirrors `RuleSet.flowers_score`, default `True`.
+    `winning_tile`: the tile that completed the hand, for off-discard wins -- a pung it
+    completes is open, not concealed (三暗刻/四暗刻).
 
     The win-timing fields all default `False` -- real values come from engine.py; the
     detectors below are already correct against them.
@@ -127,6 +129,7 @@ class ScoringContext:
     is_kong_replacement: bool = False
     is_robbing_kong: bool = False
     flowers_score: bool = True
+    winning_tile: TileId | None = None
 
 
 DetectorFn = Callable[[tuple[Meld, ...], ScoringContext], int]
@@ -181,12 +184,40 @@ def _suits_used(groups: tuple[Meld, ...], pair: Meld) -> tuple[set[int], bool]:
     return suits, honors
 
 
-def _detect_all_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+def _suit_profile(hand: tuple[Meld, ...], ctx: ScoringContext) -> tuple[set[int], bool] | None:
+    """`_suits_used` for a standard decomposition, or the same read off the raw tiles for a
+    Seven Pairs hand, so flush patterns stack with 七對子. `None` for any other shape."""
+    split = _groups_and_pair(hand)
+    if split is not None:
+        return _suits_used(*split)
+    if not _detect_seven_pairs(hand, ctx):
+        return None
+    suits: set[int] = set()
+    honors = False
+    for t in ctx.concealed_tiles:
+        v = int(tile_id_type(t))
+        if v < 27:
+            suits.add(v // 9)
+        else:
+            honors = True
+    return suits, honors
+
+
+def _detect_all_sequences(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """平糊: four chows and a pair worth no faan -- a dragon, seat-wind or prevailing-wind
+    pair disqualifies it."""
     split = _groups_and_pair(hand)
     if split is None:
         return 0
-    groups, _pair = split
-    return 1 if all(m.kind == MeldKind.CHOW for m in groups) else 0
+    groups, pair = split
+    if not all(m.kind == MeldKind.CHOW for m in groups):
+        return 0
+    scoring_pair = (
+        pair.tile_type in _DRAGON_TYPES
+        or pair.tile_type == TileType(27 + int(ctx.seat_wind))
+        or pair.tile_type == TileType(27 + int(ctx.prevailing_wind))
+    )
+    return 0 if scoring_pair else 1
 
 
 def _detect_all_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
@@ -197,35 +228,32 @@ def _detect_all_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     return 1 if all(m.kind in _PUNG_OR_KONG for m in groups) else 0
 
 
-def _detect_voided_suit(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+def _detect_voided_suit(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """缺一門: tiles from exactly two of the three numbered suits, the third completely
     absent. Deliberately not "at most two suits" -- a hand using only one suit is Half/Full
     Flush/All Honors territory, and requiring exactly two keeps this pattern mutually
     exclusive with those by construction.
     """
-    split = _groups_and_pair(hand)
-    if split is None:
+    profile = _suit_profile(hand, ctx)
+    if profile is None:
         return 0
-    groups, pair = split
-    suits, _honors = _suits_used(groups, pair)
+    suits, _honors = profile
     return 1 if len(suits) == 2 else 0
 
 
-def _detect_half_flush(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    split = _groups_and_pair(hand)
-    if split is None:
+def _detect_half_flush(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    profile = _suit_profile(hand, ctx)
+    if profile is None:
         return 0
-    groups, pair = split
-    suits, honors = _suits_used(groups, pair)
+    suits, honors = profile
     return 1 if len(suits) == 1 and honors else 0
 
 
-def _detect_full_flush(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    split = _groups_and_pair(hand)
-    if split is None:
+def _detect_full_flush(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    profile = _suit_profile(hand, ctx)
+    if profile is None:
         return 0
-    groups, pair = split
-    suits, honors = _suits_used(groups, pair)
+    suits, honors = profile
     return 1 if len(suits) == 1 and not honors else 0
 
 
@@ -354,13 +382,14 @@ def _detect_mixed_terminals(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int
     return 1 if has_terminal and has_honor else 0
 
 
-def _detect_all_honors(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+def _detect_all_honors(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """字一色: every group and the pair is an honor tile. No chow-exclusion needed (contrast
     `_detect_mixed_terminals`/`_detect_all_terminals`): honors never form chows, so any chow
     present already fails `_is_honor` on its (necessarily suited) `tile_type`."""
     split = _groups_and_pair(hand)
     if split is None:
-        return 0
+        profile = _suit_profile(hand, ctx)
+        return 1 if profile is not None and not profile[0] else 0
     groups, pair = split
     return 1 if all(_is_honor(m.tile_type) for m in (*groups, pair)) else 0
 
@@ -509,22 +538,48 @@ def _detect_seven_pairs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     return 1 if len(counts) == 7 and all(c == 2 for c in counts.values()) else 0
 
 
-def _detect_three_concealed_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """三暗刻: at least three concealed pungs/kongs. "At least," not "exactly" -- a fourth
-    concealed pung has no separate, higher-value pattern to catch it, so folding it into this
-    one is correct, not a gap. `CONCEALED_KONG` counts as a concealed pung (a self-declared
-    kong doesn't break concealment); `EXPOSED_KONG`/`ADDED_KONG` are always open and never
-    qualify."""
+def _concealed_pung_count(hand: tuple[Meld, ...], ctx: ScoringContext) -> int | None:
+    """Concealed pungs/kongs in a standard decomposition, `None` for other shapes.
+    `CONCEALED_KONG` counts (a self-declared kong doesn't break concealment); exposed/added
+    kongs never do. On an off-discard win, a pung of the winning tile's type is open --
+    maximisation over decompositions covers the case where that tile sits in a chow or pair."""
+    split = _groups_and_pair(hand)
+    if split is None:
+        return None
+    groups, _pair = split
+    completing = (
+        tile_id_type(ctx.winning_tile)
+        if ctx.winning_tile is not None and not ctx.self_drawn
+        else None
+    )
+    return sum(
+        1
+        for m in groups
+        if m.from_seat is None
+        and (
+            m.kind == MeldKind.CONCEALED_KONG
+            or (m.kind == MeldKind.PUNG and m.tile_type != completing)
+        )
+    )
+
+
+def _detect_three_concealed_pungs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """三暗刻: exactly three concealed pungs/kongs; four is 四暗刻."""
+    return 1 if _concealed_pung_count(hand, ctx) == 3 else 0
+
+
+def _detect_four_concealed_pungs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """四暗刻 (坎坎糊): all four groups concealed pungs/kongs."""
+    return 1 if _concealed_pung_count(hand, ctx) == 4 else 0
+
+
+def _detect_four_kongs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """十八羅漢: all four groups are kongs."""
     split = _groups_and_pair(hand)
     if split is None:
         return 0
     groups, _pair = split
-    concealed_pungs = sum(
-        1
-        for m in groups
-        if m.kind in (MeldKind.PUNG, MeldKind.CONCEALED_KONG) and m.from_seat is None
-    )
-    return 1 if concealed_pungs >= 3 else 0
+    return 1 if all(m.kind in KONG_KINDS for m in groups) else 0
 
 
 def _detect_all_revealed(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -544,18 +599,16 @@ def _detect_all_revealed(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
 
 
 def _detect_two_dragon_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """雙箭: pungs/kongs of exactly two dragon types, independent of what the pair is --
-    stacks with Small Three Dragons when the pair happens to be the third dragon. "Exactly
-    two," not "at least two," keeps this mutually exclusive with Big Three Dragons (three
-    dragon pungs already commit 9 of the 12 physical dragon tiles)."""
+    """雙箭: pungs/kongs of exactly two dragon types and a non-dragon pair. A dragon pair makes
+    it 小三元 instead, and three dragon pungs are 大三元 (9 of the 12 dragon tiles)."""
     split = _groups_and_pair(hand)
     if split is None:
         return 0
-    groups, _pair = split
+    groups, pair = split
     dragon_pungs = sum(
         1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
     )
-    return 1 if dragon_pungs == 2 else 0
+    return 1 if dragon_pungs == 2 and pair.tile_type not in _DRAGON_TYPES else 0
 
 
 def _chow_run_counts(groups: tuple[Meld, ...]) -> dict[TileType, int]:
@@ -651,17 +704,18 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("對對糊", HandSet.CLASSIC, 3, _detect_all_pungs),
     Pattern("缺一門", HandSet.CLASSIC, 2, _detect_voided_suit),
     Pattern("混一色", HandSet.CLASSIC, 3, _detect_half_flush),
-    Pattern("清一色", HandSet.CLASSIC, 6, _detect_full_flush),
+    Pattern("清一色", HandSet.CLASSIC, 7, _detect_full_flush),
     Pattern("無花", HandSet.CLASSIC, 1, _detect_no_flowers),
     Pattern("自摸", HandSet.CLASSIC, 1, _detect_self_draw),
     Pattern("門前清", HandSet.CLASSIC, 1, _detect_fully_concealed),
     Pattern("門風", HandSet.CLASSIC, 1, _detect_seat_wind),
     Pattern("圈風", HandSet.CLASSIC, 1, _detect_prevailing_wind),
     Pattern("箭刻", HandSet.CLASSIC, 1, _detect_dragon_pung),
-    Pattern("小三元", HandSet.CLASSIC, 3, _detect_small_three_dragons),
-    Pattern("大三元", HandSet.CLASSIC, 7, _detect_big_three_dragons),
-    Pattern("小四喜", HandSet.CLASSIC, 5, _detect_small_four_winds),
-    Pattern("大四喜", HandSet.CLASSIC, 8, _detect_big_four_winds),
+    Pattern("小三元", HandSet.CLASSIC, 5, _detect_small_three_dragons),
+    Pattern("大三元", HandSet.CLASSIC, 8, _detect_big_three_dragons),
+    Pattern("小四喜", HandSet.CLASSIC, 6, _detect_small_four_winds),
+    Pattern("大四喜", HandSet.CLASSIC, LIMIT_FAAN, _detect_big_four_winds, is_limit=True),
+    Pattern("十八羅漢", HandSet.CLASSIC, LIMIT_FAAN, _detect_four_kongs, is_limit=True),
     Pattern("混么九", HandSet.NEW_6, 3, _detect_mixed_terminals),
     Pattern("海底撈月", HandSet.NEW_6, 1, _detect_win_on_last_wall_tile),
     Pattern("河底撈魚", HandSet.NEW_6, 1, _detect_win_on_last_discard),
@@ -677,6 +731,7 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("地糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_earthly_hand, is_limit=True),
     Pattern("七對子", HandSet.NEW_18, 4, _detect_seven_pairs),
     Pattern("三暗刻", HandSet.NEW_18, 2, _detect_three_concealed_pungs),
+    Pattern("四暗刻", HandSet.NEW_18, 8, _detect_four_concealed_pungs),
     Pattern("全求人", HandSet.NEW_18, 2, _detect_all_revealed),
     Pattern("雙箭", HandSet.NEW_18, 2, _detect_two_dragon_pungs),
     Pattern("一般高", HandSet.NEW_18, 1, _detect_two_identical_sequences),
@@ -684,6 +739,17 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("三步高", HandSet.NEW_18, 2, _detect_three_step_sequences),
     Pattern("四步高", HandSet.NEW_18, 6, _detect_four_step_sequences),
 )
+
+
+_SUPERSEDES: dict[str, frozenset[str]] = {
+    "小三元": frozenset({"箭刻"}),
+    "大三元": frozenset({"箭刻"}),
+    "雙箭": frozenset({"箭刻"}),
+    "小四喜": frozenset({"門風", "圈風"}),
+    "四暗刻": frozenset({"三暗刻", "對對糊"}),
+}
+"""Patterns whose faan already includes the listed ones, so those are dropped when both match
+-- real tables quote 小三元 5 and 大三元 8 as totals, not on top of 箭刻."""
 
 
 def score_hand(hand: tuple[Meld, ...], context: ScoringContext) -> dict[str, int]:
@@ -697,4 +763,8 @@ def score_hand(hand: tuple[Meld, ...], context: ScoringContext) -> dict[str, int
         occurrences = pattern.detect(hand, context)
         if occurrences:
             result[pattern.name] = occurrences * pattern.faan
+    for name, superseded in _SUPERSEDES.items():
+        if name in result:
+            for gone in superseded:
+                result.pop(gone, None)
     return result

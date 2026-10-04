@@ -267,6 +267,7 @@ def _exact_deal_in_faan(view: SeatView, opponent_seat: int, tile_type: int) -> f
         won_on_dealer_first_discard=(view.seat == view.dealer and discards_before_this_one == 0),
         is_last_tile=view.wall_remaining == 0,
         flowers_score=view.ruleset.flowers_score,
+        winning_tile=candidate[-1],
     )
     result = score_winning_hand(candidate, melds, ctx, view.ruleset)
     return float(result.total_faan) if result.clears_min_faan else 0.0

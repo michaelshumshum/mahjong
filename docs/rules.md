@@ -157,7 +157,7 @@ Individual patterns can be re-valued or disabled via `faan_overrides`.
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
-| 1 | All Sequences | 平糊 |
+| 1 | All Sequences (pair is not a dragon, seat wind or prevailing wind) | 平糊 |
 | 1 | Seat Wind pung/kong | 門風 |
 | 1 | Prevailing Wind pung/kong | 圈風 |
 | 1 | Dragon pung/kong (each) | 箭刻 / 番牌 |
@@ -167,12 +167,13 @@ Individual patterns can be re-valued or disabled via `faan_overrides`.
 | 2 | Voided Suit (exactly one of the three numbered suits absent)¹ | 缺一門 |
 | 3 | All Pungs | 對對糊 |
 | 3 | Half Flush (one suit + honors) | 混一色 |
-| 3 | Small Three Dragons (pair of one dragon + pungs of the other two)² | 小三元 |
+| 5 | Small Three Dragons (pair of one dragon + pungs of the other two)² | 小三元 |
 | 3 | All four Flowers *or* all four Seasons (as a set) | 正花 (flower set) |
-| 5 | Small Four Winds (pair of one wind + pungs of the other three)² | 小四喜 |
-| 6 | Full Flush (one suit, no honors) | 清一色 |
-| 7 | Big Three Dragons (pungs of all three)² | 大三元 |
-| 8 | Big Four Winds (pungs of all four)² | 大四喜 |
+| 6 | Small Four Winds (pair of one wind + pungs of the other three)² | 小四喜 |
+| 7 | Full Flush (one suit, no honors) | 清一色 |
+| 8 | Big Three Dragons (pungs of all three)² | 大三元 |
+| **Limit** | Big Four Winds (pungs of all four)² | 大四喜 |
+| **Limit** | Four Kongs | 十八羅漢 |
 | **Limit** | Thirteen Orphans | 十三么 |
 | **Limit** | All Honors | 字一色 |
 | **Limit** | All Terminals | 清么九 |
@@ -184,10 +185,11 @@ Individual patterns can be re-valued or disabled via `faan_overrides`.
 Full Flush / All Honors territory. Requiring *exactly two* suits present keeps 缺一門 mutually
 exclusive with those by construction — no separate "don't stack" rule.
 
-² **Small vs. Big are mutually exclusive by construction, and both stack with per-pung faan.**
+² **Small vs. Big are mutually exclusive by construction; the dragon/wind ladders are inclusive totals.**
 Pungs of all three dragons (or all four winds) commit 3 of each type's 4 tiles, leaving at most 1
-— never enough for the pair Small needs. 箭刻 (per dragon pung) and 門風/圈風 keep applying to the
-same pungs, the same way Seat Wind and Prevailing Wind stack on a dealer's East pung.
+— never enough for the pair Small needs. 小三元 (5) and 大三元 (8) already include their dragon
+pungs, so they replace 箭刻 rather than stacking with it; 小四喜 (6) likewise replaces 門風/圈風.
+Big Four Winds is a limit, so nothing stacks.
 
 ³ **Nine Gates:** one suit, fully concealed (self-drawn or won on discard), 1-1-1-2-3-4-5-6-7-8-9-9-9
 plus exactly one more tile of that suit, any rank 1-9. All nine 14th-tile ranks qualify.
@@ -225,24 +227,25 @@ cares about: `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` run the Seven Pa
 | Faan | Hand | Chinese |
 | --- | --- | --- |
 | 4 | Seven Pairs (plain faan, not a limit hand) | 七對子 |
-| 2 | Three or more concealed pungs/kongs⁴ | 三暗刻 |
+| 2 | Exactly three concealed pungs/kongs⁴ | 三暗刻 |
+| 8 | Four concealed pungs/kongs⁴ | 四暗刻 |
 | 2 | All Revealed (every group claimed, win claimed off a discard)⁵ | 全求人 |
-| 2 | Two Dragon pungs/kongs, any pair⁶ | 雙箭 |
+| 2 | Two Dragon pungs/kongs, non-dragon pair⁶ | 雙箭 |
 | 1 | Two Identical Sequences⁷ | 一般高 |
 | 6 | Three or more identical sequences⁷ | 三般高 |
 | 2 | Three Step Sequences⁸ | 三步高 |
 | 6 | Four Step Sequences⁸ | 四步高 |
 
-⁴ **"At least three."** A fourth concealed pung has no higher tier here, so an all-concealed-pungs
-hand folds into this one. A concealed kong counts as a concealed pung; an exposed or added kong
-never does.
+⁴ **Concealed counts ron-aware.** A concealed kong counts; an exposed or added kong never does. On a
+win off a discard, a pung of the winning tile's type is treated as completed by that discard, so it
+is not concealed (`ScoringContext.winning_tile`). 四暗刻 replaces 三暗刻 and 對對糊.
 
 ⁵ **All four groups open, and the win claimed off a discard** — the mirror of 門前清. `decompose()`
 never marks a group as "claimed to complete the win," so the only unambiguous check is "no group
 came from `decompose()` at all."
 
-⁶ **Exactly two dragon pungs, independent of the pair.** Stacks with 小三元 (when the pair is the
-third dragon) and with 箭刻; exclusive with 大三元 by the same tile-count argument as Small vs. Big.
+⁶ **Exactly two dragon pungs with a non-dragon pair.** A dragon pair makes it 小三元, which
+replaces 雙箭 and 箭刻 (inclusive total, §7 note ²); 雙箭 itself replaces the two 箭刻.
 
 ⁷ **Ladder:** "exactly two" vs. "three or more" identical chows — exclusive by construction.
 

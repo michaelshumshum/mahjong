@@ -125,7 +125,9 @@ def expected_faan_if_won(state: GameState, seat: int, tile_type: int, *, discard
     candidate = (*seat_state.concealed, tile_id)
     if not hand_is_winning_shape(SeatState(concealed=candidate, melds=seat_state.melds)):
         return 0.0
-    ctx = build_scoring_context(state, seat, self_drawn=False, discarder=discarder)
+    ctx = build_scoring_context(
+        state, seat, self_drawn=False, discarder=discarder, winning_tile=tile_id
+    )
     result = score_winning_hand(candidate, seat_state.melds, ctx, state.ruleset)
     return float(result.total_faan) if result.clears_min_faan else 0.0
 
