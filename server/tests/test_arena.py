@@ -6,6 +6,9 @@ CI-gated here, matching this repo's `-m slow` convention for expensive runs.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from bots.arena import (
@@ -14,9 +17,11 @@ from bots.arena import (
     GameRecord,
     HandRecord,
     _collect_stats,
+    _compare_to_baseline,
     _make_bot,
     _mean_ci95,
     _paired_differences,
+    _per_set_wins,
     _run_duplicate_set,
     _tenpai_can_reach_min_faan,
     _view_for,
@@ -169,6 +174,62 @@ def test_main_smoke_end_to_end(capsys: pytest.CaptureFixture[str]) -> None:
     assert "EfficiencyBot (A) vs RandomBot (B)" in out
     assert "paired difference" in out
     assert "95% CI" in out
+
+
+def test_per_set_wins_counts_only_the_a_seat(sample_duplicate_set: tuple[GameRecord, ...]) -> None:
+    ((wins, hands),) = _per_set_wins([sample_duplicate_set])
+    assert hands == sum(len(r.hands) for r in sample_duplicate_set)
+    expected = sum(
+        1 for r in sample_duplicate_set for h in r.hands if h.winner == r.roles.index("A")
+    )
+    assert wins == expected
+
+
+def test_compare_to_baseline_pairs_points_and_win_rate_per_set() -> None:
+    base = {
+        "a": "X",
+        "b": "B",
+        "seeds": [1, 2],
+        "diffs": [1.0, 3.0],
+        "wins": [2, 4],
+        "hands": [16, 16],
+    }
+    cur = {
+        "a": "Y",
+        "b": "B",
+        "seeds": [1, 2],
+        "diffs": [2.0, 6.0],
+        "wins": [4, 4],
+        "hands": [16, 16],
+    }
+    (pm, plo, phi), (wm, _wlo, _whi) = _compare_to_baseline(cur, base)
+    assert pm == pytest.approx(2.0)
+    assert plo < pm < phi
+    assert wm == pytest.approx(100.0 * 2 / 16 / 2)
+
+
+def test_compare_to_baseline_refuses_different_seeds_or_opponent() -> None:
+    base = {"a": "X", "b": "B", "seeds": [1], "diffs": [0.0], "wins": [0], "hands": [16]}
+    with pytest.raises(ValueError, match="seeds"):
+        _compare_to_baseline({**base, "seeds": [2]}, base)
+    with pytest.raises(ValueError, match="baseline B"):
+        _compare_to_baseline({**base, "b": "C"}, base)
+
+
+def test_main_writes_diffs_and_compares_to_a_baseline(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "base.json"
+    argv = ["--a", "EfficiencyBot", "--b", "RandomBot", "--games", "1", "--seed", "100"]
+    main([*argv, "--diffs-out", str(out)])
+    payload = json.loads(out.read_text())
+    assert payload["seeds"] == [100]
+    assert len(payload["diffs"]) == len(payload["wins"]) == len(payload["hands"]) == 1
+    capsys.readouterr()
+    main([*argv, "--baseline-diffs", str(out)])
+    report = capsys.readouterr().out
+    assert "Δ points/game: +0.000" in report
+    assert "Δ win rate (pp): +0.00" in report
 
 
 def test_main_smoke_with_parallel_matches_serial(capsys: pytest.CaptureFixture[str]) -> None:

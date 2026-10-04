@@ -25,12 +25,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+import json
 import random
 import statistics
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.base import Bot
@@ -350,6 +353,58 @@ def _paired_differences(duplicate_sets: Sequence[tuple[GameRecord, ...]]) -> lis
     return diffs
 
 
+def _per_set_wins(duplicate_sets: Sequence[tuple[GameRecord, ...]]) -> list[tuple[int, int]]:
+    """`(A's wins, A's hands)` per duplicate set, summed over its 4 rotations."""
+    out = []
+    for records in duplicate_sets:
+        wins = hands = 0
+        for record in records:
+            a_seat = record.roles.index("A")
+            hands += len(record.hands)
+            wins += sum(1 for h in record.hands if h.winner == a_seat)
+        out.append((wins, hands))
+    return out
+
+
+def _diffs_payload(
+    name_a: str,
+    name_b: str,
+    seeds: Sequence[int],
+    duplicate_sets: Sequence[tuple[GameRecord, ...]],
+) -> dict[str, Any]:
+    wins = _per_set_wins(duplicate_sets)
+    return {
+        "a": name_a,
+        "b": name_b,
+        "seeds": list(seeds),
+        "diffs": _paired_differences(duplicate_sets),
+        "wins": [w for w, _ in wins],
+        "hands": [h for _, h in wins],
+    }
+
+
+def _compare_to_baseline(
+    current: Mapping[str, Any], baseline: Mapping[str, Any]
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """Per-set `(current - baseline)` paired over the same seeds and opponents: `(Δ points/game,
+    Δ win rate in percentage points)`, each as `(mean, lo, hi)`. Valid only when both runs share
+    `b` and seeds."""
+    if current["seeds"] != baseline["seeds"]:
+        raise ValueError(
+            "baseline was run on different seeds; the paired comparison needs the same"
+        )
+    if current["b"] != baseline["b"]:
+        raise ValueError(f"baseline B is {baseline['b']!r}, this run's is {current['b']!r}")
+    points = [c - b for c, b in zip(current["diffs"], baseline["diffs"], strict=True)]
+    rate = [
+        100.0 * (cw / ch - bw / bh)
+        for cw, ch, bw, bh in zip(
+            current["wins"], current["hands"], baseline["wins"], baseline["hands"], strict=True
+        )
+    ]
+    return _mean_ci95(points), _mean_ci95(rate)
+
+
 def _mean_ci95(values: Sequence[float]) -> tuple[float, float, float]:
     """Normal-approximation 95% CI over the paired differences."""
     n = len(values)
@@ -373,6 +428,16 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0, help="base seed; set i uses seed+i")
     parser.add_argument("--parallel", type=int, default=1, help="worker processes")
+    parser.add_argument(
+        "--diffs-out",
+        type=Path,
+        help="write per-set paired differences and A's per-set wins as JSON",
+    )
+    parser.add_argument(
+        "--baseline-diffs",
+        type=Path,
+        help="a previous --diffs-out on the same seeds and B: report Δ points and Δ win rate vs it",
+    )
     return parser.parse_args(argv)
 
 
@@ -427,6 +492,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     stats_a, stats_b = _collect_stats(duplicate_sets)
     diffs = _paired_differences(duplicate_sets)
     _print_report(args.a, args.b, stats_a, stats_b, diffs)
+
+    payload = _diffs_payload(args.a, args.b, seeds, duplicate_sets)
+    if args.diffs_out is not None:
+        args.diffs_out.write_text(json.dumps(payload))
+    if args.baseline_diffs is not None:
+        baseline = json.loads(args.baseline_diffs.read_text())
+        (pm, plo, phi), (wm, wlo, whi) = _compare_to_baseline(payload, baseline)
+        print(f"\nvs baseline {baseline['a']} ({args.baseline_diffs}), paired per set:")
+        print(f"  Δ points/game: {pm:+.3f}  95% CI [{plo:+.3f}, {phi:+.3f}]")
+        print(f"  Δ win rate (pp): {wm:+.2f}  95% CI [{wlo:+.2f}, {whi:+.2f}]")
 
 
 if __name__ == "__main__":

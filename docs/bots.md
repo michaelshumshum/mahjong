@@ -230,6 +230,17 @@ seeded, so the arena pairs instead:
 
 **Merge gate for any bot change:** the paired-difference CI excludes zero in the candidate's favour.
 
+**Candidate vs previous version.** `--diffs-out PATH` writes each set's paired difference and the
+candidate's wins/hands per set as JSON; `--baseline-diffs PATH` (a previous run, same `--b` and
+seeds) also prints Δ points/game and Δ win rate (pp), each paired per set with a 95% CI. Same
+seeds and opponents make `(candidate − B) − (baseline − B)` a valid paired sample.
+
+```
+python -m bots.arena --a ORACLE --b FaanBot --games 200 --seed 1000000 --parallel 4 --diffs-out base.json
+python -m bots.arena --a <candidate> --b FaanBot --games 200 --seed 1000000 --parallel 4 \
+    --baseline-diffs base.json
+```
+
 ### Current numbers: `FaanBot` vs `EfficiencyBot`
 
 `python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 12` (1000
