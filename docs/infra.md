@@ -240,6 +240,24 @@ reload.
   across `-f` files, so a bare `ports: []` for `postgres` would leave the dev file's `5432:5432`
   mapping in place.
 - `JWT_SECRET` is required by the overlay but unused (§2).
+- The overlay publishes `api` and `web` on `127.0.0.1` only, so a host-side proxy or tunnel
+  connector is the sole way in.
+- `make prod-migrate` applies migrations inside the prod `api` container (`make migrate` targets the
+  dev stack).
+
+**Cloudflare Tunnel (temporary hosting).** `cloudflared` on the Docker host, ingress
+`mahjong.shumshum.dev` → `http://localhost:3000` (`web`), `mahjong-api.shumshum.dev` →
+`http://localhost:8000` (`api`, incl. `wss://…/ws`). Cloudflare terminates TLS. `.env`:
+
+| Variable | Value |
+| --- | --- |
+| `PUBLIC_API_URL` | `https://mahjong-api.shumshum.dev` |
+| `PUBLIC_WS_URL` | `wss://mahjong-api.shumshum.dev/ws` |
+| `CORS_ORIGINS` | `https://mahjong.shumshum.dev` |
+| `TRUSTED_PROXY_IPS` | `172.16.0.0/12` (published-port traffic reaches the container via the Docker bridge gateway) |
+| `JWT_SECRET`, `POSTGRES_PASSWORD` | `openssl rand -hex 32`; change `POSTGRES_PASSWORD` before the first `up` (the volume keeps the initial one) |
+
+Client IPs seen by the app are the tunnel host's, not the player's (`CF-Connecting-IP` isn't read).
 
 **Required before real users, not yet in place:**
 
