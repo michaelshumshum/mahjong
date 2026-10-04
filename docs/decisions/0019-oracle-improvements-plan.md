@@ -7,7 +7,8 @@
 
 `ORACLE` is a plain `FaanBot()` fed `_omniscient_seat_view` ([bots.md §9](../bots.md),
 [ADR 0013](0013-oracle-full-information.md)). Shipped: +27.693 pts/game vs `FaanBot`, 95% CI
-[25.098, 30.288], 200 duplicate sets. Goal: make it win more.
+[25.098, 30.288], 200 duplicate sets. Goal: make it win more — points first (the merge gate),
+win rate tracked alongside. Wall-order knowledge is out of scope (measured anyway, §8).
 
 Constraints every change below keeps:
 
@@ -28,6 +29,7 @@ counters. Variants were `FaanBot` subclasses overriding `_best_discard`.
   re-implemented `_best_discard` with all variant switches off reproduced the 8-set number exactly.
 - **Variant vs baseline:** same seeds, same opponents, so per-set `(variant − FaanBot) −
   (baseline − FaanBot)` is a valid paired sample. "Δ" below is its mean and normal 95% CI.
+  Win rate is paired the same way: per set, `(variant wins − baseline wins) / 16` hands.
 - `ORACLE` is not in `bots/arena.py`'s `BOT_REGISTRY` — the containment test forbids a second
   `_omniscient_seat_view` call site in `bots/` (§5.0 fixes this).
 
@@ -60,13 +62,37 @@ per shanten step. An exact, certain loss is priced like a soft risk.
 
 ## 4. Results
 
-| Variant | Paired vs `FaanBot` [95% CI] | Δ vs baseline [95% CI] | Sets changed | Deal-ins | Wins |
-| --- | --- | --- | --- | --- | --- |
-| baseline | +27.693 [25.098, 30.288] | — | — | 67 | 1,018 |
-| hard-avoid certain deal-ins (§5.1) | +29.247 [26.634, 31.860] | **+1.553 [+1.113, +1.994]** | 52/200 | 1 | 1,023 |
-| ron-aware tenpai acceptance, λ=0.25 (§5.2) | +28.187 [25.587, 30.787] | +0.493 [−0.168, +1.155] | 60/200 | 66 | 1,032 |
-| hard-avoid + ron-aware λ=0.5 | +29.680 [27.063, 32.297] | +1.987 [+1.144, +2.829]; vs hard-avoid alone +0.433 [−0.280, +1.147] | 103/200 | 1 | 1,035 |
-| `w_value` × 1.3 (§7) | +27.947 [25.331, 30.562] | +0.253 [−0.393, +0.900] | 54/200 | 68 | 1,018 |
+Two rounds, seeds 1–200, 3,200 `ORACLE` hands per row. Round 1 compares to the shipped
+`ORACLE`; round 2 stacks on the best round-1 change (hard-avoid).
+
+| Variant | vs `FaanBot` [95% CI] | Δ pts/game [95% CI] | Δ win rate, pp [95% CI] | Wins | Avg win faan | Deal-ins |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Round 1, Δ vs shipped `ORACLE`** | | | | | | |
+| shipped `ORACLE` | +27.693 [25.098, 30.288] | — | — | 1,018 (31.8%) | 4.30 | 67 |
+| hard-avoid certain deal-ins (§5.1) | +29.247 [26.634, 31.860] | **+1.553 [+1.113, +1.994]** | — ¹ | 1,023 | 4.30 | 1 |
+| ron credit λ=0.25, proxy value | +28.187 [25.587, 30.787] | +0.493 [−0.168, +1.155] | — ¹ | 1,032 | 4.30 | 66 |
+| `w_value` × 1.3 | +27.947 [25.331, 30.562] | +0.253 [−0.393, +0.900] | — ¹ | 1,018 | 4.32 | 68 |
+| **Round 2, Δ vs hard-avoid** | | | | | | |
+| + ron credit λ=1.0 (surplus) / 0.1 (needed), proxy value | +29.200 [26.588, 31.812] | −0.047 [−1.111, +1.018] | +0.09 [−0.61, +0.80] | 1,026 | — | 1 |
+| + exact tenpai valuation, ron credit λ=0.5 (§5.2) | +34.113 [31.437, 36.790] | **+4.867 [+3.724, +6.010]** | **+2.88 [+2.05, +3.70]** | 1,115 (34.8%) | 4.36 | 0 |
+| **Round 2, Δ vs exact tenpai valuation** | | | | | | |
+| + free self-kongs (121 declared) | +34.033 [31.401, 36.666] | −0.080 [−0.647, +0.487] | −0.03 [−0.33, +0.26] | 1,114 | — | 0 |
+| + claims to tenpai (§5.3) | +34.560 [31.817, 37.303] | +0.447 [−1.053, +1.947] | **+3.00 [+1.95, +4.05]** | 1,211 (37.8%) | 4.17 | 0 |
+| + wall preview, 4 own draws (§8, out of scope) | +39.113 [36.294, 41.933] | +5.000 [+3.589, +6.411] | +2.56 [+1.99, +3.13] | 1,197 (37.4%) | 4.33 | 0 |
+| + wall preview, 8 own draws (§8, out of scope) | +42.153 [39.173, 45.133] | +8.040 [+6.199, +9.881] | +4.66 [+3.75, +5.57] | 1,264 (39.5%) | 4.30 | 0 |
+
+¹ round 1 didn't record per-set wins; only totals.
+
+- **Win rate.** The defensive fix barely moves it (+5 wins). Exact tenpai valuation adds 2.9pp;
+  claims, stacked on it, add another 3.0pp — 32.0% → 37.8% together.
+- **Exact tenpai valuation** also cut `ORACLE`'s tenpai-at-draw from 510 to 301 of ~700 draws:
+  it stops sitting on waits that can't clear `min_faan` or have no live copies.
+- **Claims** win more but cheaper (avg 4.17 vs 4.36 faan; open hands lose 門前清/self-draw
+  bonuses), so points don't move. 5,044 offers that would have improved shanten were still
+  passed — the threshold is the lever.
+- **Cost.** Whole-run wall time, 4 sets, 4 cores (dominated by the three `FaanBot`s): hard-avoid
+  15.2 s, exact valuation 15.2 s, claims 15.7 s, 8-draw wall preview 23.5 s. No per-decision
+  timing was taken.
 
 Everything else in this plan is **estimated, not measured**.
 
@@ -90,10 +116,11 @@ def _view_for(state, seat, name):                    # the only arena caller
 - `tests/test_oracle_containment.py`: allowlist becomes exactly
   `{"Table._submit_bot_job", "_view_for"}` (in `bots/arena.py`), plus a new AST check that no
   module under `app/` imports `bots.arena`. Offline-only, never on a WS path.
-- Add `--diffs-out PATH` (per-set paired differences as JSON) and `--baseline-diffs PATH`
-  (prints Δ vs a previous run on the same seeds) — the diff-of-diffs used in §4. Candidate
-  `ORACLE` variants are registered as `BOT_REGISTRY` entries during development (as the
-  `FaanBot` weight profiles are), never as live tiers.
+- Add `--diffs-out PATH` (per-set paired differences **and per-set candidate wins** as JSON) and
+  `--baseline-diffs PATH` (prints Δ points and Δ win rate, each with a paired CI, vs a previous
+  run on the same seeds) — the comparison used in §4. Candidate `ORACLE` variants are
+  `BOT_REGISTRY` entries during development (as the `FaanBot` weight profiles are), never live
+  tiers.
 
 **b. `FaanBot` trajectory pin.** `tests/test_engine_trajectory_pin.py` pins the engine, not
 `FaanBot`. Add `tests/test_faanbot_trajectory_pin.py`: 4 × `FaanBot` (plain `seat_view`), a few
@@ -104,9 +131,9 @@ Commits:
 
 1. `test(bots): pin FaanBot self-play trajectory digests`
 2. `feat(arena): ORACLE seat via sanctioned omniscient view` (+ containment test, bots.md §7/§9)
-3. `feat(arena): dump and compare per-set paired differences`
+3. `feat(arena): dump and compare per-set paired differences and win rates`
 
-### 5.1 Hard-avoid certain deal-ins — **do first**
+### 5.1 Hard-avoid certain deal-ins — defensive, do first
 
 - **What:** under `view.hands`, never discard a tile with `tile_risk > 0` while a zero-risk
   legal discard exists. Same precedent as kong-rob avoidance and `_should_claim`: never do what
@@ -130,7 +157,7 @@ Commits:
   dict computed once is behaviour-neutral for `hands is None` (same calls, same order) — the §5.0b
   pin proves it.
 - **Measured:** Δ **+1.553 [+1.113, +1.994]**, deal-ins 67 → 1, wins 1,018 → 1,023. Passes the
-  gate on its own.
+  points gate on its own; doesn't move win rate.
 - **Risks:** none known for bots. Against humans the certainty assumption is slightly strong (a
   human may skip a sub-ideal win), which only makes the filter conservative.
 - **Tests (regression first):**
@@ -143,114 +170,99 @@ Commits:
   line updated), ADR 0013 Consequences (one line pointing here).
 - **Commit:** `fix(bots): ORACLE never discards a certain deal-in when a safe tile exists`
 
-### 5.2 Ron-aware tenpai acceptance — measure further before merging
+### 5.2 Exact tenpai valuation with ron credit — offensive, the main win-rate lever
 
-- **What:** `seen34`'s hands-aware branch treats every tile in an opponent's hand as dead. Right
-  for draws, wrong for ron: an opponent discards a surplus copy 26% of the time, a needed one
-  7.6% (§3). Credit those copies when a candidate discard leaves `ORACLE` tenpai.
-- **Where:** `bots/faanbot.py`'s `_best_discard` (the `tiles` fed to `_speed_term`); a new
-  `bots/safety.py` (or `bots/features.py`) helper `ron_acceptance(view, waits) -> float`,
-  hands-only, asserting `view.hands is not None` like `kong_rob_risk`. Reuses
-  `safety._opponent_hand34` and `bots/labels.py`'s `winning_tile_types`.
+- **What:** at every candidate discard that leaves `ORACLE` tenpai, replace the structural proxy
+  with the real outcome of each wait:
+  - **acceptance** = Σ over waits that *clear `min_faan`* of (live wall copies + ron credit for
+    copies in opponents' hands). A wait that can't clear `min_faan` counts 0, so a sub-minimum or
+    dead tenpai stops looking fast.
+  - **value** = copy-weighted mean real faan over those waits (self-draw context for wall copies,
+    discard context for ron copies), replacing `estimate_best_faan` for that candidate; 0 when no
+    wait clears.
+  - **ron credit** per copy held by an opponent: 0.5 if it's surplus to them (removing it doesn't
+    raise their shanten), else 0. §3 measured real discard rates of 26% / 7.6%; 0.5 was the value
+    run. Tune `(surplus, needed)` on seeds 1–200.
+- **Where:**
+  - `bots/valuation.py`: `exact_wait_value(view, after_concealed, waits, ron) ->
+    (acceptance, value)` — calls `mahjong_core.scoring.faan.score_winning_hand` per wait, with
+    `ScoringContext` built like `safety._exact_deal_in_faan` but for `view.seat`; reuses
+    `safety._synthetic_tile_id` (promote to a shared helper, no leading underscore, since two
+    modules now use it).
+  - `bots/safety.py` (or `bots/features.py`): `ron_credit(view, waits) -> dict[int, float]`,
+    hands-only, asserting `view.hands is not None` like `kong_rob_risk`; reuses
+    `_opponent_hand34`.
+  - `bots/faanbot.py`'s `_best_discard`: under `view.hands is not None and result_shanten == 0`,
+    `tiles, value_est = exact_wait_value(...)`; everything else unchanged.
 - **Design:**
 
   ```python
   if view.hands is not None and result_shanten == 0:
       waits = winning_tile_types(after, closed=closed, hand_sets=hand_sets)
-      tiles += ron_acceptance(view, waits)
-
-  def ron_acceptance(view, waits):
-      total = 0.0
-      for opp in opponents:
-          base = shanten(opp_hand34)
-          for w in waits held by opp (count c):
-              surplus = shanten(opp_hand34 - w) <= base
-              total += c * (_RON_SURPLUS if surplus else _RON_NEEDED)
-      return total
+      ron = ron_credit(view, waits)
+      acc = val = 0.0
+      for w in waits:
+          live = 4 - seen[w]                       # hands-aware seen34: wall copies only
+          if live and (f := wait_faan(w, self_drawn=True)):
+              acc += live; val += live * f
+          if ron[w] and (f := wait_faan(w, self_drawn=False)):
+              acc += ron[w]; val += ron[w] * f
+      tiles, value_est = acc, (val / acc if acc else 0.0)
   ```
 
-  `_RON_SURPLUS = 0.26`, `_RON_NEEDED = 0.08` from §3; refine to the probability of discard
-  *before the hand ends* by the opponent's shanten if a larger sample supports it. Optionally
-  also weight by whether the copy would clear `min_faan` for `ORACLE` (a ron and a self-draw
-  can score differently).
-- **Measured:** flat λ on surplus copies only. Alone, λ = 0.25: Δ +0.493 [−0.168, +1.155].
-  Stacked on §5.1, λ = 0.5: +0.433 [−0.280, +1.147] over §5.1 alone. Consistently positive
-  (~+0.45), CI includes zero both times, so not yet a gate pass.
-- **Risks:** the discard rates are `FaanBot`'s; humans hold differently. Per-candidate cost is
-  ~3 opponents × few waits × 1 shanten call, only on tenpai candidates — negligible.
-- **Gate:** 700 sets. The per-set SD of Δ measured 3.2 (§5.1) to 4.8 (this variant); 80% power
-  at δ = 0.5 with SD 4.8 needs ~720 sets. Read the Δ CI, not the vs-`FaanBot` CI. Tune λ on seeds 1–200, gate on
-  fresh seeds (1,000,000+) — winner's curse.
-- **Tests:** helper unit tests (surplus copy credited, needed copy credited less, own-seat
-  excluded); `tests/test_oracle.py` decision test where two tenpai shapes tie on wall copies but
-  one wait sits as an isolated tile in an opponent's hand; `hands=None` path unchanged.
-- **Commits:** `feat(bots): ron_acceptance helper for omniscient tenpai waits`, then
-  `feat(bots): ORACLE credits ron-able wait copies in opponents' hands`.
+- **Why `ORACLE`-gated:** acceptance needs `view.hands` (wall copies, ron credit). The
+  value-only half needs just the own hand and would help `FaanBot` too, but changing `FaanBot`
+  moves the RL baseline (ml.md §12) — a separate, between-gate-runs change.
+- **Measured:** stacked on §5.1: Δ **+4.867 [+3.724, +6.010]** pts/game, win rate **+2.88pp
+  [+2.05, +3.70]** (32.0% → 34.8%), avg winning faan 4.30 → 4.36, tenpai-at-draw 510 → 301.
+  Ron credit alone (proxy value, λ up to 1.0) was null both rounds, so the gain is the exact
+  valuation; exact valuation *without* ron credit wasn't run — run it first to decide whether
+  `ron_credit` earns its keep.
+- **Risks:** ron credit is calibrated against `FaanBot` opponents; humans hold differently. A
+  real scoring call per wait per tenpai candidate — no measurable run-time change (§4), but take
+  a per-decision timing before merging.
+- **Tests:** `exact_wait_value`: a sub-minimum wait contributes 0; a dead wait (all copies seen)
+  contributes 0; ron copies use the discard context. Decision tests in `tests/test_oracle.py`:
+  prefers a narrower wait that clears `min_faan` over a wider one that doesn't; prefers a live
+  wait over a dead one at equal shanten. `hands=None` unchanged (pin).
+- **Commits:** `feat(bots): ron_credit helper for omniscient tenpai waits`,
+  `feat(bots): exact_wait_value scores tenpai waits with the real scorer`,
+  `feat(bots): ORACLE values tenpai candidates by exact waits`.
 
-### 5.3 Exact tenpai valuation
+### 5.3 Claims to a clearing tenpai — offensive, needs a value threshold
 
-- **What:** at a tenpai-after-discard candidate, replace `estimate_best_faan`'s structural proxy
-  with the real scorer: for each wait, `score_winning_hand` on the completed hand (ron and
-  self-draw contexts), keep `total_faan` where `clears_min_faan`, weight by that wait's copies
-  (wall copies + §5.2's ron credit). A wait that can't clear `min_faan` contributes 0.
-- **Where:** new `bots/valuation.py` helper `exact_wait_value(view, after) -> float`; called from
-  `_best_discard` under `view.hands is not None and result_shanten == 0`.
-- **Why `ORACLE`-gated though it only needs the own hand:** changing `FaanBot` would move the RL
-  baseline (ml.md §12). The copy weighting does need `view.hands`. If it wins for `ORACLE`, a
-  `FaanBot` version is a separate, between-gate-runs change (bots.md §10 policy).
-- **Measured:** nothing. The proxy's mean absolute error is 2.46 faan (valuation.py docstring);
-  `ORACLE`'s dead-in-wall waits (15.8%) and sub-minimum tenpai are where it should show.
-  Add `tenpai_rate_on_sub_minimum_hand` for `ORACLE` to the §5.0a arena report before/after.
-- **Risks:** cost — a scoring call per wait per tenpai candidate (~2–6 per decision); measure
-  ms/decision. Scale: the real faan must replace, not add to, `w_value * value_est` for those
-  candidates, or tenpai candidates get double-counted value.
-- **Commit:** `feat(bots): ORACLE values tenpai waits with the real scorer`
-
-### 5.4 Voluntary self-kongs (`ORACLE`-only)
-
-- **What:** `_act_on_turn`'s kong loop compares `s < best_kong_shanten`, which can never be true
-  (bots.md §10). Replace with a heuristic that declares a kong when it is free:
-
-  ```python
-  if view.hands is not None:                       # exact rob check available
-      after_kong = hand - one copy of t
-      if shanten(after_kong) == base                  # kong doesn't break the shape
-         and ukeire(after_kong) >= ukeire_best_discard(hand)   # waits not narrowed
-         and kong_rob_risk(view, t, concealed=...) == 0.0:
-          declare
-  ```
-
-  Gain: one extra (back-of-wall) draw and a 槓上開花 chance. Concealed kongs keep 門前清
-  (`scoring/patterns.py` treats `CONCEALED_KONG` as concealed).
-- **Gating:** `view.hands is not None` only — `FaanBot` stays byte-identical (ml.md §12), and
-  only `ORACLE` can prove the kong isn't robbed.
-- **Bug to fix first:** `bots/features.py`'s `is_closed` returns `False` for a hand whose only
-  meld is its own concealed kong, so `estimate_best_faan` drops `_SELF_DRAW_CONCEALED_BONUS` and
-  the Seven Pairs route after any concealed kong. Fix it hands-gated or not at all for `FaanBot`
-  (its own kong never fires today, so the `FaanBot` path is unaffected in practice — confirm
-  with the §5.0b pin).
-- **Measured:** opportunity rate only: 492 / 50,118 decisions (1.0%) had a legal kong. Expected
-  effect small (≲ +0.3 pts/game, estimate). Read the declared-kong count and the decision-level
-  divergence count first; 700+ sets for points.
-- **Tests:** `tests/test_oracle.py`: declares a free concealed kong; declines one that narrows
-  ukeire; declines one `kong_rob_risk` flags (replaces the current test that stubs `shanten`);
-  `hands=None` never declares.
-- **Commits:** `fix(bots): is_closed counts an own concealed kong as closed` (hands-gated),
-  `feat(bots): ORACLE declares free self-kongs`. bots.md §9 kong paragraph, §10 row removed or
-  narrowed to "`FaanBot` still never declares".
+- **What:** `_act_on_claim` claims only when shanten strictly drops *and* `_should_claim`'s proxy
+  allows it, and `ORACLE` claimed just 109 of 15,423 chow/pung offers. Add: under `view.hands`,
+  when the default would pass and the hand is ≥ 1-shanten, claim a pung/chow if some safe
+  (`tile_risk == 0`) post-claim discard reaches tenpai with §5.2 acceptance ≥ 1 copy.
+- **Where:** `bots/faanbot.py`'s `_act_on_claim` (new hands-gated branch after the existing
+  logic); `exact_wait_value` from §5.2 extended to take the hypothetical meld list (the new
+  `Meld` built from the real tile ids and `from_seat=view.turn`).
+- **Measured (scratch, threshold 1 copy):** win rate **+3.00pp [+1.95, +4.05]** over §5.2
+  (34.8% → 37.8%), claims 109 → 750, but Δ points +0.447 [−1.053, +1.947] — wins are cheaper
+  (4.36 → 4.17 avg faan). **Fails the points gate as built.**
+- **Next experiment:** claim only when the claimed tenpai's expected value beats keeping the
+  closed hand: `acceptance × value(claimed) > k × acceptance × value(closed best)` or a
+  simpler `value(claimed) ≥ min_faan + 1`; sweep on seeds 1–200, gate on fresh seeds. Points
+  gate; report win rate.
+- **Risks:** an exposed meld changes `is_closed`, so every later `_best_discard` uses the open
+  path — the measurement already includes that.
+- **Tests:** claims into a clearing tenpai; passes when the only reachable tenpai is sub-minimum;
+  passes when every post-claim discard deals in; `hands=None` unchanged.
+- **Commit:** `feat(bots): ORACLE claims into a clearing tenpai`.
 
 ## 6. Measurement protocol
 
-All runs: `_ARENA_RULESET`, `--parallel` = cores, `ORACLE` vs `FaanBot` × 3 via §5.0a.
+All runs: `_ARENA_RULESET`, `--parallel` = cores, `ORACLE` vs `FaanBot` × 3 via §5.0a. Report Δ
+points (gate) and Δ win rate (tracked) with paired CIs.
 
-| Change | Tune seeds | Gate seeds / sets | Primary metric | Secondary / divergence |
+| Change | Tune seeds | Gate seeds / sets | Gate | Also read |
 | --- | --- | --- | --- | --- |
 | §5.0b pin | — | — | digests unchanged | — |
-| §5.1 hard-avoid | 1–200 (done) | 1,000,000+, 200 sets | Δ CI excludes 0 | deal-in count → ~0 |
-| §5.2 ron-aware | 1–200 | 1,000,000+, 700 sets | Δ CI excludes 0 | ron-win count, dead-in-wall tenpai % |
-| §5.3 exact wait value | 1–200 | fresh, 700 sets | Δ CI | `ORACLE` `tenpai_rate_on_sub_minimum_hand`, ms/decision |
-| §5.4 self-kongs | 1–200 | fresh, 700+ sets | Δ CI | kongs declared, decisions changed |
-| §7 weight profile | 1–200 | fresh, 700 sets | Δ CI | — |
+| §5.1 hard-avoid | 1–200 (done) | 1,000,000+, 200 sets | Δ points CI > 0 | deal-ins → ~0 |
+| §5.2 exact valuation | 1–200: ron credit on/off, `(surplus, needed)` grid | fresh, 200 sets (Δ ≈ 4.9, SD ≈ 8 per set) | Δ points CI > 0 | win rate, tenpai-at-draw, `tenpai_rate_on_sub_minimum_hand`, ms/decision |
+| §5.3 claims | 1–200: threshold sweep | fresh, 700 sets | Δ points CI > 0 | win rate, claims made, avg winning faan |
+| §7 weight profile | 1–200 | fresh, 700 sets | Δ points CI > 0 | win rate |
 
 ```
 uv run python -m bots.arena --a ORACLE --b FaanBot --games 200 --seed 1 --parallel 4 \
@@ -260,54 +272,75 @@ uv run python -m bots.arena --a OracleCandidate --b FaanBot --games 200 --seed 1
 ```
 
 - Each change is measured stacked on everything merged before it; re-baseline after each merge.
-- Divergence count for rare mechanisms: run baseline and candidate `_best_discard`/`act` on the
-  same view at every `ORACLE` decision of a fixed 20-set run, count differing action ids (the
-  ADR 0013 threat-level method).
+- Per-set SDs measured: Δ points 3.2–10.8, Δ win rate 2–8pp. 700 sets resolve δ ≈ 0.5 pts at SD
+  4.8; a small-gain change like §5.3 with a threshold needs it.
+- Divergence count for rare mechanisms: run baseline and candidate on the same view at every
+  `ORACLE` decision of a fixed 20-set run, count differing action ids (the ADR 0013 method).
 - Cost: ~20 min per 200 sets on 4 cores (measured).
 
 ## 7. Weight profile for `ORACLE`
 
 `_make_bot("ORACLE")` could pass `FaanBot(weight_profile=ORACLE_PROFILE)`; `FaanBot` unaffected.
-Measured `w_value` × 1.3: Δ +0.253 [−0.393, +0.900] — null. After §5.1, `w_safety` only acts
-when every discard deals in, so the useful axes are `w_speed`/`w_value`/`w_flex`. Low priority:
-a small grid on seeds 1–200, gate the winner on fresh seeds, only after §5.1–§5.3.
-Commit: `feat(bots): ORACLE weight profile`.
+Measured `w_value` × 1.3 (round 1): Δ +0.253 [−0.393, +0.900] — null. After §5.1, `w_safety` only
+acts when every discard deals in; after §5.2, value at tenpai is exact. Re-run a small
+`w_speed`/`w_value`/`w_flex` grid only after §5.2–§5.3. Commit: `feat(bots): ORACLE weight
+profile`.
 
-## 8. Order of work
+## 8. Wall-order knowledge — measured, out of scope
+
+Out of scope by decision (2026-10-04). Measured only to size what it's worth.
+
+- **Scratch design:** the harness handed the bot `state.wall.tiles` through a side attribute
+  (never `SeatView`). The bot assumed its own next draws are front-wall tiles 3, 7, 11, … after
+  its discard (no claims, flowers skipped), simulated them greedily (draw; win if the hand
+  completes and clears `min_faan`; else discard the shanten-minimising tile), and among safe
+  discards picked the one that self-draws a win soonest, else the §5.2 choice.
+- **Result:** over §5.2, 4 own draws: Δ +5.000 pts [+3.589, +6.411], win rate +2.56pp; 8 own
+  draws: Δ +8.040 [+6.199, +9.881], win rate **+4.66pp** (39.5%), self-draw wins 355 → 639. A
+  crude, claim-blind greedy; a proper planner would get more.
+- **Why still out:** (1) a new `SeatView` field widens what the one sanctioned bypass carries
+  (redaction schema-walker and AST guards would need to cover it); (2) ml.md §12 uses `ORACLE` as
+  the gap-to-ceiling reference, and future draws are information no policy can ever have;
+  (3) its gain is comparable to §5.2 + §5.3, which need no new information. If revived:
+  `wall_preview: tuple[TileId, ...] | None`, set only by `_omniscient_seat_view`, `None` on every
+  wire path; precedent `ml/encode_v2.py`'s `oracle_raw` (next draws, training-only critic).
+
+## 9. Order of work
 
 | # | Commit | Depends on |
 | --- | --- | --- |
 | 1 | `test(bots): pin FaanBot self-play trajectory digests` | — |
 | 2 | `feat(arena): ORACLE seat via sanctioned omniscient view` | — |
-| 3 | `feat(arena): dump and compare per-set paired differences` | 2 |
+| 3 | `feat(arena): dump and compare per-set paired differences and win rates` | 2 |
 | 4 | `test(bots): ORACLE discards a certain deal-in when a safe tile exists` (failing) | — |
 | 5 | `fix(bots): ORACLE never discards a certain deal-in when a safe tile exists` | 1, 4 |
-| 6 | `feat(bots): ron_acceptance helper for omniscient tenpai waits` | — |
-| 7 | `feat(bots): ORACLE credits ron-able wait copies in opponents' hands` | 3, 5, 6 |
-| 8 | `feat(bots): ORACLE values tenpai waits with the real scorer` | 7 |
-| 9 | `fix(bots): is_closed counts an own concealed kong as closed` | 1 |
-| 10 | `feat(bots): ORACLE declares free self-kongs` | 9 |
-| 11 | `feat(bots): ORACLE weight profile` | 8 |
+| 6 | `feat(bots): ron_credit helper for omniscient tenpai waits` | — |
+| 7 | `feat(bots): exact_wait_value scores tenpai waits with the real scorer` | — |
+| 8 | `feat(bots): ORACLE values tenpai candidates by exact waits` | 3, 5, 6, 7 |
+| 9 | `feat(bots): ORACLE claims into a clearing tenpai` (only if the threshold passes the gate) | 8 |
+| 10 | `feat(bots): ORACLE weight profile` (optional) | 9 |
 
 Each behaviour commit updates bots.md §9's table / measured line and ADR 0013's Consequences in
 the same commit. bots.md section numbers don't change, so no citation sweep is needed.
 
-## 9. Considered and rejected
+## 10. Considered and rejected
 
 | Candidate | Why not (now) |
 | --- | --- |
-| **Claim-blocking** — price discards that give an opponent a useful chow/pung | Reach is small: 164 `ORACLE` discards claimed in 3,200 hands, and the claimer went on to win only 42 times (2.9% of opponent wins) — an upper bound, since many of those wins didn't hinge on the claim. Pricing "advances toward tenpai/value" needs a new cost scale competing with the exact deal-in term. Revisit only if §5.1–§5.3 are exhausted. |
-| **Smarter fold gate** (fold only when a needed discard hits a real wait) | Fold mode fires on 0.26% of decisions. After §5.1, a certain deal-in is already excluded in every mode, so the gate only reorders safe tiles (ukeire vs value). Mostly subsumed; no measurable lever. |
-| **Hands-aware `E[faan]` route feasibility** (e.g. a route whose needed tiles all sit in opponents' hands) | Real but unmeasured and overlapping §5.3, which fixes the tenpai case exactly. Route-level feasibility before tenpai is a second proxy on top of the first; do §5.3 first. |
-| **Exact-wall exploitation** (draw order in the view) | Recommend against for now. (1) Cost: a new `SeatView` field (`wall_preview: tuple[TileId, ...] \| None`, set only by `_omniscient_seat_view`, `None` in `seat_view_wire` and every redaction path, schema-walker and AST pinned) — doesn't leak the seed but widens what the one sanctioned bypass carries. (2) A seat's own future draws depend on claims and kong replacements (back of the wall), so turning the front N tiles into "my next draws" needs a turn-order simulation that every opponent claim invalidates. (3) It changes what `ORACLE` *is*: ml.md §12 uses it as the "gap to ceiling" reference; a future-seeing bot inflates that gap with information no policy can ever have. (4) The full-information view is not yet exploited — §5.1 alone found +1.55 that was left on the table. Precedent if revived: `ml/encode_v2.py`'s `oracle_raw` already reads the next draws for the training-only critic. |
+| **Voluntary self-kongs** (`ORACLE`-only, rob-checked) | Measured null: 121 kongs declared, Δ −0.080 [−0.647, +0.487], win rate −0.03pp. Legal on only 1.0% of decisions. Side finding if ever revisited: `bots/features.py`'s `is_closed` returns `False` for a hand whose only meld is its own concealed kong, so valuation drops the closed bonus and Seven Pairs although scoring keeps 門前清. |
+| **Ron credit without exact valuation** | Null twice (λ = 0.25: +0.493 [−0.168, +1.155]; λ = 1.0/0.1: −0.047 [−1.111, +1.018]). Kept only as a component of §5.2, pending the on/off check. |
+| **Claim-blocking** — price discards that give an opponent a useful chow/pung | Reach is small: 164 `ORACLE` discards claimed in 3,200 hands, and the claimer went on to win only 42 times (2.9% of opponent wins) — an upper bound. Needs a new cost scale competing with the exact deal-in term. |
+| **Smarter fold gate** | Fold mode fires on 0.26% of decisions. After §5.1 a certain deal-in is excluded in every mode, so the gate only reorders safe tiles. |
+| **Hands-aware `E[faan]` route feasibility before tenpai** | Unmeasured; §5.2 fixes the tenpai case exactly. A second proxy on top of the first. |
+| **Wall-order knowledge** | Out of scope; measured in §8. |
 | **Retuning shared weights** (`_weights_for_turn`) | Would move `FaanBot` (RL baseline). A separate `ORACLE` profile (§7) is the only route. |
-| **Voluntary kongs for every tier** | Moves `FaanBot`; other tiers can't check 搶槓 exactly. `ORACLE`-only (§5.4). |
-| **Declining a cheap win to wait for a bigger one** | `act` always takes `_WIN`. HK has no furiten, so passing is legal, but the hand can still end on someone else's win or a draw, and without wall order (rejected above) the bigger win isn't knowable. Not measured; low expected value next to §5.1–§5.3. |
+| **Declining a cheap win to wait for a bigger one** | `act` always takes `_WIN`. Without wall order the bigger win isn't knowable. Not measured. |
 | **Search / rollouts over the omniscient view** | ADR 0012 / 0013: same heuristic as policy and leaf evaluator, structural ceiling. |
 
-## 10. Consequences
+## 11. Consequences
 
 - Nothing here is built. Before starting, re-read bots.md §9/§10 and ADR 0013 — numbers here are
   against the 2026-10-04 baseline.
-- §5.1 is the one change measured to pass the gate on its own; it should land first and become
-  the new baseline for everything after it.
+- §5.1 (defensive, +1.55) and §5.2 (offensive, +4.87 pts, +2.9pp win rate) both pass the points
+  gate in scratch measurement; they land first, in that order. §5.3 raises win rate but needs a
+  value threshold to pass on points.
