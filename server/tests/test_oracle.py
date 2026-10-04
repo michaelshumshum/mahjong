@@ -33,7 +33,7 @@ import random
 import pytest
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
-from bots.faanbot import _ADDED_KONG_BASE, _THREAT_THRESHOLD, FaanBot
+from bots.faanbot import _ADDED_KONG_BASE, _PASS, _PUNG, _THREAT_THRESHOLD, FaanBot
 from bots.features import own_hand34, seen34
 from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
@@ -42,7 +42,7 @@ from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.shanten import shanten, ukeire
-from mahjong_core.state import GameState, Phase, Wind
+from mahjong_core.state import ClaimOffer, GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 
 _NO_DEADLINE = float("inf")
@@ -399,6 +399,87 @@ async def test_omniscient_view_prefers_a_live_wait_over_a_dead_one() -> None:
     )
     chosen = await FaanBot().act(view, _discard_mask(_SHANPON_OR_PINGHU), _NO_DEADLINE)
     assert chosen in (int(TileType.SOU_2), int(TileType.SOU_5))
+
+
+# --- claims into a clearing tenpai (ADR 0019 §5.3) ---------------------------------------------
+
+# 1-shanten; ponging seat 3's 東 (double wind for the dealer) and discarding 8m waits on 7p.
+_EAST_PAIR_HAND = [
+    TileType.WIND_EAST,
+    TileType.WIND_EAST,
+    TileType.PIN_1,
+    TileType.PIN_2,
+    TileType.PIN_3,
+    TileType.PIN_6,
+    TileType.PIN_8,
+    TileType.PIN_9,
+    TileType.PIN_9,
+    TileType.SOU_5,
+    TileType.SOU_6,
+    TileType.SOU_7,
+    TileType.MAN_8,
+]
+_CLAIMED_EAST = tile_ids_for_type(TileType.WIND_EAST)[3]
+
+
+def _east_claim_view(
+    hands: tuple[tuple[TileId, ...], ...] | None, seat1_pool: tuple[TileId, ...] = ()
+) -> SeatView:
+    own_pool = _pool(TileType.WIND_SOUTH, TileType.SOU_9, TileType.PIN_9, TileType.MAN_9)
+    base = _view(
+        0,
+        _EAST_PAIR_HAND,
+        discard_pools=(own_pool, seat1_pool, (), (_CLAIMED_EAST,)),
+        hands=hands,
+    )
+    pung = Meld(MeldKind.PUNG, (*base.own_hand[:2], _CLAIMED_EAST), from_seat=3)
+    return dataclasses.replace(
+        base,
+        phase=Phase.AWAIT_CLAIMS,
+        turn=3,
+        claim_options=(ClaimOffer(seat=0, can_win=False, melds=(pung,)),),
+    )
+
+
+def _pung_mask() -> list[bool]:
+    mask = [False] * 109
+    mask[_PASS] = mask[_PUNG] = True
+    return mask
+
+
+async def test_omniscient_view_claims_into_a_clearing_tenpai() -> None:
+    assert await FaanBot().act(_east_claim_view(None), _pung_mask(), _NO_DEADLINE) == _PASS, (
+        "sanity: the structural claim guard declines this pung"
+    )
+    omniscient = _east_claim_view(((), (), (), ()))
+    assert await FaanBot().act(omniscient, _pung_mask(), _NO_DEADLINE) == _PUNG
+
+
+async def test_omniscient_view_passes_when_the_claimed_tenpai_is_dead() -> None:
+    every_7p = _pool(TileType.PIN_7, TileType.PIN_7, TileType.PIN_7, TileType.PIN_7)
+    view = _east_claim_view(((), (), (), ()), seat1_pool=every_7p)
+    assert await FaanBot().act(view, _pung_mask(), _NO_DEADLINE) == _PASS
+
+
+async def test_omniscient_view_passes_when_the_tenpai_discard_deals_in() -> None:
+    seven_pairs_on_8m = _pool(
+        TileType.MAN_1,
+        TileType.MAN_1,
+        TileType.MAN_3,
+        TileType.MAN_3,
+        TileType.MAN_5,
+        TileType.MAN_5,
+        TileType.SOU_1,
+        TileType.SOU_1,
+        TileType.SOU_3,
+        TileType.SOU_3,
+        TileType.DRAGON_RED,
+        TileType.DRAGON_RED,
+        TileType.MAN_8,
+    )
+    view = _east_claim_view(((), seven_pairs_on_8m, (), ()))
+    assert tile_risk(view, int(TileType.MAN_8)) > 0.0
+    assert await FaanBot().act(view, _pung_mask(), _NO_DEADLINE) == _PASS
 
 
 # --- behavioral proof: real shanten (not the meld/tempo proxy) decides whether to fold --------

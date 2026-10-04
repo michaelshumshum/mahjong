@@ -22,9 +22,10 @@ from bots.valuation import (
     route_faan_for,
 )
 from mahjong_core.config import HandSet, RuleSet
+from mahjong_core.melds import MeldKind
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import TileId, tile_id_type
+from mahjong_core.tiles import TileId, new_count_array, tile_id_type
 from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
@@ -50,6 +51,11 @@ _UKEIRE_SCALE = 8.0
 """Puts the speed term's ukeire component on the same scale as `_SHANTEN_UNIT`/`w_value*E[faan]`.
 Measured: 8 is the smallest divisor letting a strong value signal (Full Flush) still win a
 discard, while a weak one (Voided Suit vs Half Flush) still correctly loses to ukeire."""
+
+_CLAIM_MIN_ACCEPTANCE = 1.0
+_CLAIM_VALUE_MARGIN = 1
+"""`ORACLE` claims into a tenpai only if its exact value reaches `min_faan` + this. Margin 0 won
+more but cheaper hands and failed the points gate; 1 passed, 2 and 3 were null (ADR 0019 §12)."""
 
 _FOLD_SHANTEN = 3
 _THREAT_THRESHOLD = 0.3
@@ -228,7 +234,69 @@ class FaanBot:
                     best_shanten, best_aid = s, chow_aid
 
         # claiming an exposed kong never helps shanten (same reason as bots/efficiency.py) -- skip.
+        # ORACLE-only: the proxy claim guard passed, but the exact post-claim tenpai may be worth it.
+        if (
+            best_aid == _PASS
+            and view.hands is not None
+            and claimed_type is not None
+            and before_shanten >= 1
+        ):
+            return self._claim_into_clearing_tenpai(view, mask)
         return best_aid
+
+    def _claim_into_clearing_tenpai(self, view: SeatView, mask: list[bool]) -> int:
+        """The pung/chow whose best safe post-claim discard leaves a tenpai with the highest
+        `exact_wait_value` acceptance × value, if one clears the thresholds above; else pass."""
+        assert view.seat is not None
+        hand_sets = view.ruleset.hand_sets
+        claimed_id = view.discard_pools[view.turn][-1]
+        claimed_type = int(tile_id_type(claimed_id))
+        seen = seen34(view)
+        best = (0.0, _PASS)
+        for offer in view.claim_options:
+            for meld in offer.melds:
+                if meld.kind == MeldKind.PUNG:
+                    aid = _PUNG
+                elif meld.kind == MeldKind.CHOW:
+                    aid = _CHOW_LOW + claimed_type - int(meld.tile_type)
+                else:
+                    continue
+                if not mask[aid]:
+                    continue
+                concealed = list(view.own_hand)
+                for t in meld.tiles:
+                    if t != claimed_id:
+                        concealed.remove(t)
+                melds = (*view.melds[view.seat], meld)
+                hand34 = new_count_array()
+                for t in concealed:
+                    hand34[int(tile_id_type(t))] += 1
+                for m in melds:
+                    for t in m.tiles[:3]:
+                        hand34[int(tile_id_type(t))] += 1
+                for d in sorted({int(tile_id_type(t)) for t in concealed}):
+                    if tile_risk(view, d) > 0.0:
+                        continue
+                    after = list(hand34)
+                    after[d] -= 1
+                    if shanten(after, closed=False, hand_sets=hand_sets) != 0:
+                        continue
+                    waits = winning_tile_types(after, closed=False, hand_sets=hand_sets)
+                    acc, val = exact_wait_value(
+                        view,
+                        _without_one(tuple(concealed), d),
+                        waits,
+                        seen,
+                        ron_credit(view, waits),
+                        melds=melds,
+                    )
+                    if (
+                        acc >= _CLAIM_MIN_ACCEPTANCE
+                        and val >= view.ruleset.min_faan + _CLAIM_VALUE_MARGIN
+                        and acc * val > best[0]
+                    ):
+                        best = (acc * val, aid)
+        return best[1]
 
     def _should_claim(
         self,

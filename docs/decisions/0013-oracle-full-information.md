@@ -74,5 +74,5 @@ Notes:
   own +1 faan isn't counted toward `min_faan` ([bots.md §10](../bots.md)).
 - `_best_discard` priced an exact, certain deal-in as a soft `w_safety` cost; since
   [ADR 0019](0019-oracle-improvements-plan.md) §5.1 it never discards one while a safe tile
-  exists, and §5.2 values tenpai candidates by their exact waits. Further `ORACLE` changes are
-  recorded there.
+  exists, §5.2 values tenpai candidates by their exact waits, and §5.3 claims into a tenpai
+  that clears `min_faan + 1`. Further `ORACLE` changes are recorded there.

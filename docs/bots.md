@@ -152,7 +152,7 @@ score(discard) = w_speed  * ukeire_after
   threatening` — a far-from-tenpai hand against a threatening opponent discards safe tiles
   instead of chasing.
 - **Claim guard** (`_should_claim`): never claim a meld that drops the hand's reachable value below
-  `view.ruleset.min_faan`.
+  `view.ruleset.min_faan`. `ORACLE` can still claim past it into an exactly-valued tenpai (§9).
 
 `tenpai_rate_on_sub_minimum_hand` is the canary metric for this section (§7). A regression means a
 candidate has drifted back toward pure-efficiency play.
@@ -290,7 +290,7 @@ seat's concealed tiles) populated. No dedicated class, no search, no rollout
 ([ADR 0013](decisions/0013-oracle-full-information.md), improvements in
 [ADR 0019](decisions/0019-oracle-improvements-plan.md)). Six helpers branch on `view.hands`, and
 each is byte-identical to its probabilistic form when `view.hands is None`; `FaanBot` itself reads
-it only to gate the hard-avoid rules below. `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
+it only to gate the `ORACLE`-only rules below (certain deal-ins, exact tenpai valuation, claims). `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
 `seat_view` (4 × `FaanBot`, every preset, hashed action ids), so any `ORACLE`-only change that
 leaks into `FaanBot` fails it:
 
@@ -352,6 +352,14 @@ stops looking fast. Ron credit is 0.5 per surplus copy, 0 per needed copy (`safe
 real discard rates were 26% / 7.6% (ADR 0019 §3). Non-tenpai candidates keep the proxies. A
 decision costs about the same as before (~12 ms on the arena machine).
 
+**Claims into a clearing tenpai.** When `_act_on_claim`'s default would pass and the hand is
+≥ 1-shanten, `ORACLE` tries each offered pung/chow (`view.claim_options`): for every post-claim
+discard with `tile_risk == 0` that reaches tenpai, `exact_wait_value` (with the new meld) gives
+acceptance and value. It claims the option with the largest acceptance × value among those with
+acceptance ≥ 1 copy and value ≥ `min_faan + 1` (`_CLAIM_VALUE_MARGIN`); otherwise it passes. The
+margin matters: an exposed meld loses 門前清 and the self-draw bonus, and claiming into any
+clearing tenpai won more but cheaper hands with no points gain.
+
 **Containment** ([architecture.md §5](architecture.md)):
 
 - `app/views.py`'s `_omniscient_seat_view(state, seat)` is the only builder of a real seat's
@@ -371,9 +379,9 @@ decision costs about the same as before (~12 ms on the arena machine).
 - `ORACLE` jobs use the shared pool; a decision costs the same single-digit milliseconds as `T2`.
 
 **Measured** (`python -m bots.arena --a ORACLE --b FaanBot --games 200 --seed 1000000`, 200
-duplicate sets): paired difference **+32.860 points/game, 95% CI [30.068, 35.652]**; win rate
-0.338 vs 0.148; deal-in rate 0.000 vs 0.176; tenpai-at-draw 0.448. Against the previous `ORACLE`
-on the same seeds: Δ **+4.193 points/game [+2.853, +5.534]**, Δ win rate +2.09pp [+1.31, +2.88]
+duplicate sets): paired difference **+35.153 points/game, 95% CI [32.255, 38.052]**; win rate
+0.364 vs 0.143; deal-in rate 0.000 vs 0.178; avg winning faan 4.29. Against the previous `ORACLE`
+on the same seeds: Δ **+2.293 points/game [+1.142, +3.445]**, Δ win rate +2.53pp [+1.87, +3.19]
 ([ADR 0019](decisions/0019-oracle-improvements-plan.md) has each change's gate run).
 
 ## 10. Known issues

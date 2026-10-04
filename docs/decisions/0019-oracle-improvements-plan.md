@@ -1,6 +1,6 @@
 # 0019. `ORACLE` improvements plan
 
-- **Status:** Accepted, partially built (§12)
+- **Status:** Accepted — §5.0–§5.3 built (§12); §7 not built; §8 out of scope
 - **Date:** 2026-10-04
 
 ## 1. Context
@@ -241,14 +241,14 @@ Commits:
 - **Measured (scratch, threshold 1 copy):** win rate **+3.00pp [+1.95, +4.05]** over §5.2
   (34.8% → 37.8%), claims 109 → 750, but Δ points +0.447 [−1.053, +1.947] — wins are cheaper
   (4.36 → 4.17 avg faan). **Fails the points gate as built.**
-- **Next experiment:** claim only when the claimed tenpai's expected value beats keeping the
-  closed hand: `acceptance × value(claimed) > k × acceptance × value(closed best)` or a
-  simpler `value(claimed) ≥ min_faan + 1`; sweep on seeds 1–200, gate on fresh seeds. Points
-  gate; report win rate.
+- **Built** with the simpler threshold, `value(claimed) ≥ min_faan + 1`, swept against + 2 and
+  + 3 on seeds 1–200 and gated on fresh seeds (§12). The planned alternative, `acceptance ×
+  value(claimed) > k × acceptance × value(closed best)`, was not run.
 - **Risks:** an exposed meld changes `is_closed`, so every later `_best_discard` uses the open
   path — the measurement already includes that.
-- **Tests:** claims into a clearing tenpai; passes when the only reachable tenpai is sub-minimum;
-  passes when every post-claim discard deals in; `hands=None` unchanged.
+- **Tests:** claims into a clearing tenpai; passes when the claimed tenpai's wait is dead;
+  passes when the tenpai discard deals in; `hands=None` declines the same claim. A
+  sub-`min_faan + 1` case wasn't built: at a lower `min_faan` the default guard claims anyway.
 - **Commit:** `feat(bots): ORACLE claims into a clearing tenpai`.
 
 ## 6. Measurement protocol
@@ -339,11 +339,11 @@ the same commit. bots.md section numbers don't change, so no citation sweep is n
 
 ## 11. Consequences
 
-- Built so far: §12. Numbers in §3–§4 are against the 2026-10-04 baseline (seeds 1–200); gate runs
-  in §12 are on fresh seeds.
-- §5.1 (defensive, +1.55) and §5.2 (offensive, +4.87 pts, +2.9pp win rate) both pass the points
-  gate in scratch measurement; they land first, in that order. §5.3 raises win rate but needs a
-  value threshold to pass on points.
+- Built: §5.0–§5.3 (§12). §7 (an `ORACLE` weight profile) is not built; revisit with a small grid
+  now that §5.2–§5.3 have landed. Numbers in §3–§4 are against the 2026-10-04 baseline (seeds
+  1–200); gate runs in §12 are on fresh seeds.
+- §5.1, §5.2 and §5.3 each passed the points gate on fresh seeds (§12): together +8.08
+  pts/game vs `FaanBot` and +4.9pp win rate over the previous `ORACLE`.
 
 ## 12. Build log
 
@@ -369,3 +369,20 @@ scratch rows exactly: hard-avoid +29.247, exact valuation with ron credit +34.11
 On minus off, paired: +1.273 pts/game [+0.457, +2.090], +0.91pp [+0.40, +1.41], so `ron_credit`
 stays. The `(surplus, needed)` grid was not run. Per-decision cost: ~12 ms with and without exact
 valuation (143 `ORACLE` turn decisions, noisy shared machine) — no measurable change.
+
+**§5.3 threshold sweep** (tune seeds 1–200, stacked on §5.2, Δ vs §5.2 on the same seeds). Claim
+when the best safe post-claim tenpai has acceptance ≥ 1 copy and exact value ≥ `min_faan + k`:
+
+| k | vs `FaanBot` | Δ pts/game [95% CI] | Δ win rate, pp [95% CI] | Win rate | Avg win faan |
+| --- | --- | --- | --- | --- | --- |
+| 0 (scratch, §4) | +34.560 [31.817, 37.303] | +0.447 [−1.053, +1.947] | +3.00 [+1.95, +4.05] | 37.8% | 4.17 |
+| **1** | +35.353 [32.645, 38.061] | **+1.240 [+0.032, +2.448]** | **+2.34 [+1.64, +3.05]** | 37.2% | 4.26 |
+| 2 | +34.380 | +0.267 [−0.720, +1.254] | +0.59 [+0.15, +1.03] | 35.4% | 4.34 |
+| 3 | +33.960 | −0.153 [−0.583, +0.276] | +0.03 [−0.15, +0.22] | 34.9% | 4.36 |
+
+k = 1 was gated alone on the fresh seeds (row below). §6 planned 700 gate sets for §5.3; 200 were
+run, and the CI already excludes zero.
+| §5.3 claims into a tenpai clearing `min_faan + 1` | `feat(bots): ORACLE claims into a clearing tenpai` | +35.153 [32.255, 38.052] | **+2.293 [+1.142, +3.445]** | **+2.53 [+1.87, +3.19]** | 1,164 (36.4%), avg 4.29 faan | 0 |
+
+Stacked, the gate seeds went from +27.073 to +35.153 vs `FaanBot`, and win rate from 31.5% to
+36.4%.
