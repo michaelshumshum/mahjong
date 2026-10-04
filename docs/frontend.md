@@ -450,7 +450,7 @@ stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per
 plus Limit, each a list of patterns with a description and a tile example. The data lives in
 `lib/ui/faan-guide.ts` (`GUIDE`, keyed by faan value; examples are strings of concatenated tile
 codes, one group each); a spec pins it to `FAAN_PATTERN_LABEL` so a new pattern can't be left out.
-Situational patterns (self-draw, last tile, ...) have no tile example.
+Situational patterns (self-draw, last tile, ...) show the description only.
 
 ### Practice mode
 

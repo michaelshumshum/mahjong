@@ -383,7 +383,6 @@
 	"guide_tabsLabel": "番數",
 	"guide_tabFaan": "{count} 番",
 	"guide_tabLimit": "滿番",
-	"guide_noExample": "無牌例：視乎糊牌方式。",
 	"guide_descAllSequences": "四組順子加一對將；不可有刻子或槓。",
 	"guide_descSeatWind": "自己門風的刻子或槓。",
 	"guide_descPrevailingWind": "圈風的刻子或槓；與門風同一刻子可同時計算。",

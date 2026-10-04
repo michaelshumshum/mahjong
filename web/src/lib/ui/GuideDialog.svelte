@@ -79,8 +79,6 @@
 									</div>
 								{/each}
 							</div>
-						{:else}
-							<p class="no-example">{m.guide_noExample()}</p>
 						{/if}
 					</li>
 				{/each}
@@ -164,15 +162,10 @@
 		color: var(--color-text-muted);
 	}
 
-	.entry-desc,
-	.no-example {
+	.entry-desc {
 		margin: 0;
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
-	}
-
-	.no-example {
-		font-style: italic;
 	}
 
 	.example {

@@ -383,7 +383,6 @@
 	"guide_tabsLabel": "Faan count",
 	"guide_tabFaan": "{count} faan",
 	"guide_tabLimit": "Limit",
-	"guide_noExample": "No tile example: depends on how the hand is won.",
 	"guide_descAllSequences": "Four sequences and a pair; no pungs or kongs.",
 	"guide_descSeatWind": "A pung or kong of your own seat wind.",
 	"guide_descPrevailingWind": "A pung or kong of the prevailing wind. Stacks with seat wind on the same pung.",
