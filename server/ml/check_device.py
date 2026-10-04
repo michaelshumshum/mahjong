@@ -48,14 +48,24 @@ from ml.train_env import VecTrainEnv
 __all__ = ["main"]
 
 _DEFAULT_CONFIG = Path(__file__).parent / "configs" / "rl_ppo_c0.yaml"
+# the windows driver mounts it here; not on a non-interactive WSL PATH
+_WSL_NVIDIA_SMI = "/usr/lib/wsl/lib/nvidia-smi"
+
+
+def _on(cfg: PPOConfig, device: torch.device) -> PPOConfig:
+    """`cfg` for `device`: amp is cuda-only, so a cpu leg runs without it."""
+    return replace(cfg, device=str(device), amp=cfg.amp and device.type == "cuda")
 
 
 def _driver() -> str | None:
-    if shutil.which("nvidia-smi") is None:
+    exe = shutil.which("nvidia-smi")
+    if exe is None and os.path.isfile(_WSL_NVIDIA_SMI):
+        exe = _WSL_NVIDIA_SMI
+    if exe is None:
         return None
     try:
         out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            [exe, "--query-gpu=driver_version", "--format=csv,noheader"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -106,7 +116,9 @@ def _batch(cfg: PPOConfig) -> tuple[list[Episode], np.ndarray, np.ndarray]:
     params = schedule.params(0)
     venv = VecTrainEnv(cfg.envs, cfg.seed, _env_config(cfg, params, None))
     torch.manual_seed(cfg.seed)
-    learner = Learner(cfg, PolicyNet(PolicyNetConfig(channels=cfg.channels, blocks=cfg.blocks)))
+    cpu = torch.device("cpu")
+    policy = PolicyNet(PolicyNetConfig(channels=cfg.channels, blocks=cfg.blocks))
+    learner = Learner(_on(cfg, cpu), policy, cpu)
     collector = Collector(venv, round(cfg.envs * cfg.blind_frac), np.random.default_rng(cfg.seed))
     step_rows, step_masks = collector.buf.rows.copy(), collector.buf.mask.copy()
     episodes, _, _ = collector.collect(learner, params, cfg.batch_size)
@@ -126,7 +138,7 @@ def bench_learner(
     for device in devices:
         torch.manual_seed(cfg.seed)
         policy = PolicyNet(PolicyNetConfig(channels=cfg.channels, blocks=cfg.blocks))
-        learner = Learner(cfg, policy, device)
+        learner = Learner(_on(cfg, device), policy, device)
         rng = np.random.default_rng(0)
         learner.act(rows, masks, keep, k, rng)
         learner.update(episodes, params, 0, 0.0)
@@ -146,6 +158,7 @@ def bench_learner(
             "learner_decisions_per_s": round(n / per_update, 1),
             "act_ms_per_step": round(1000 * (t1 - t0) / steps, 2),
             "envs_per_step": len(rows),
+            "amp": learner.cfg.amp,
         }
         if device.type == "cuda":
             out[str(device)]["max_memory_gb"] = round(torch.cuda.max_memory_allocated() / 2**30, 2)
@@ -175,7 +188,7 @@ def bench_end_to_end(cfg: PPOConfig, devices: list[torch.device], updates: int) 
     for device in devices:
         records: list[dict[str, Any]] = []
         with tempfile.TemporaryDirectory() as d:
-            run = replace(cfg, out=str(Path(d) / "run"), device=str(device), save_every=10**9)
+            run = replace(_on(cfg, device), out=str(Path(d) / "run"), save_every=10**9)
             t0 = time.perf_counter()
             train_ppo(run, max_updates=updates, on_update=records.append)
             wall = time.perf_counter() - t0
@@ -211,6 +224,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--batch-size", type=int, default=None)
     p.add_argument("--channels", type=int, default=None)
     p.add_argument("--blocks", type=int, default=None)
+    p.add_argument(
+        "--amp", action="store_true", help="fp16 autocast on cuda legs (cpu legs ignore it)"
+    )
     p.add_argument("--json", type=Path, default=None, help="also write the report here")
     return p
 
@@ -226,7 +242,7 @@ def main(argv: list[str] | None = None) -> dict[str, Any]:
         "blocks": args.blocks,
     }
     cfg = replace(cfg, **{k: v for k, v in overrides.items() if v is not None})
-    cfg = replace(cfg, minibatch=min(cfg.minibatch, cfg.batch_size))
+    cfg = replace(cfg, minibatch=min(cfg.minibatch, cfg.batch_size), amp=cfg.amp or args.amp)
     torch.set_num_threads(cfg.threads)
 
     report: dict[str, Any] = {"environment": environment()}
@@ -243,7 +259,7 @@ def main(argv: list[str] | None = None) -> dict[str, Any]:
     report["config"] = {
         k: getattr(cfg, k)
         for k in ("envs", "workers", "threads", "batch_size", "minibatch", "epochs")
-    } | {"channels": cfg.channels, "blocks": cfg.blocks}
+    } | {"channels": cfg.channels, "blocks": cfg.blocks, "amp": cfg.amp}
 
     report["learner"] = bench_learner(cfg, devices, args.bench_updates, args.act_steps)
     print(json.dumps({"learner": report["learner"]}, indent=2), flush=True)
