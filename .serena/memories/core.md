@@ -6,7 +6,7 @@ Browser multiplayer Hong Kong mahjong. Monorepo; Docker Compose runs everything 
 - `server/` — Python/FastAPI api, rules engine, bots. Module rules: `mem:server/core`
 - `web/` — SvelteKit client (DOM + SCSS, no canvas). Module rules: `mem:web/core`
 - `shared/protocol.schema.json` — generated from `server/app/protocol.py`, informational only
-- `docs/` — authoritative project outline (00-architecture, 01-rules-spec, 02-protocol, 03-frontend, 04-bots, 05-roadmap, 06-ml, 07-infra, 99-deferred)
+- `docs/` — reference docs (architecture, rules, protocol, frontend, bots, ml, infra, testing; index `docs/README.md`) + `docs/decisions/` ADR log (history, deferred designs)
 - `.claude/hooks/enforce-routing-table.sh` — blocks edits to server/web/shared/infra until the matching doc (per root `CLAUDE.md` table) was read this session
 - `Makefile` — the only seam between uv (python) and pnpm (js); all targets run inside compose containers
 

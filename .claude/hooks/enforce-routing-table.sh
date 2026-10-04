@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # enforces AGENTS.md's "Context triggers" table: blocks writes to server/**, web/**,
-# shared/**, and infra files (Dockerfile*, docker-compose*.yml, Makefile) until the
+# shared/**, and infra files (Dockerfile*, docker-compose*.yml, Makefile, mise.toml) until the
 # matching docs have been referenced earlier in this session.
 #
 # "Referenced" = the doc's relative path shows up in the input of any prior Read,
@@ -44,7 +44,7 @@ case "$tool_name" in
     # pull path-shaped tokens under server/, web/, shared/, docs/, or known infra filenames
     while IFS= read -r tok; do
       targets+=("$tok")
-    done < <(grep -oE '([A-Za-z0-9_./-]*/)?(server|web|shared|docs)/[A-Za-z0-9_./-]+|Dockerfile[A-Za-z0-9._-]*|docker-compose[A-Za-z0-9._-]*\.yml|Makefile' <<<"$command" || true)
+    done < <(grep -oE '([A-Za-z0-9_./-]*/)?(server|web|shared|docs)/[A-Za-z0-9_./-]+|Dockerfile[A-Za-z0-9._-]*|docker-compose[A-Za-z0-9._-]*\.yml|Makefile|mise\.toml' <<<"$command" || true)
     [[ ${#targets[@]} -eq 0 ]] && exit 0
     ;;
   *)
@@ -62,21 +62,21 @@ doc_for_target() {
   esac
   base=$(basename -- "$rel")
   case "$base" in
-    Dockerfile|Dockerfile.*|docker-compose*.yml|Makefile)
-      echo "docs/07-infra.md" ;;
+    Dockerfile|Dockerfile.*|docker-compose*.yml|Makefile|mise.toml)
+      echo "docs/infra.md" ;;
     *)
       case "$rel" in
         server/AGENTS.md|web/AGENTS.md) ;;
-        server/*) echo "server/AGENTS.md"; echo "docs/00-architecture.md" ;;
-        web/*) echo "web/AGENTS.md"; echo "docs/03-frontend.md" ;;
-        shared/*) echo "docs/02-protocol.md" ;;
+        server/*) echo "server/AGENTS.md"; echo "docs/architecture.md" ;;
+        web/*) echo "web/AGENTS.md"; echo "docs/frontend.md" ;;
+        shared/*) echo "docs/protocol.md" ;;
       esac
       ;;
   esac
   # test files additionally route to the testing doc, on top of whatever their
   # path prefix above already required.
   case "$base" in
-    *.spec.ts|*.test.ts) echo "docs/09-testing.md" ;;
+    *.spec.ts|*.test.ts) echo "docs/testing.md" ;;
   esac
 }
 

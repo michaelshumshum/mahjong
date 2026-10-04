@@ -1,0 +1,328 @@
+# Infrastructure
+
+Repository layout, toolchain, local development, containers, database, deployment and CI.
+
+## 1. Layout
+
+```
+mahjong/
+├── mise.toml                   # pinned toolchain: node, python, uv, pnpm (§2)
+├── Makefile                    # day-to-day interface (Docker-based); `make help`
+├── docker-compose.yml          # dev: postgres, api, web; profiles: ml, tools
+├── docker-compose.prod.yml     # overlay: prod targets, no mounts, no reload
+├── .env.example
+├── package.json                # root: lefthook + commitlint only; pins pnpm via packageManager
+├── pnpm-workspace.yaml         # web only — shared/ isn't an npm package
+├── lefthook.yml                # git hooks (§9)
+├── commitlint.config.js        # `action(scope): description`
+├── scripts/                    # repo tooling (check_comment_length.py, a pre-commit hook)
+├── server/
+│   ├── pyproject.toml, uv.lock, Dockerfile, alembic/
+│   ├── mahjong_core/           # PURE. no asyncio, no I/O, no deps beyond stdlib
+│   │   ├── tiles.py            # TileType/TileId, 34-array helpers, parsing ("5s", "1m")
+│   │   ├── wall.py             # seeded shuffle, dice, draw front/back, flower replacement
+│   │   ├── melds.py            # meld types, legality, decomposition
+│   │   ├── shanten.py          # standard / seven pairs / thirteen orphans + ukeire
+│   │   ├── state.py            # GameState, SeatState, Phase (frozen dataclasses)
+│   │   ├── actions.py          # Action union, legal_actions(state, seat)
+│   │   ├── engine.py           # reduce(state, action) -> (state, events)
+│   │   ├── claims.py           # claim priority resolution (pure part)
+│   │   ├── config.py           # RuleSet
+│   │   ├── presets.py          # RULESET_PRESETS, resolve_ruleset
+│   │   ├── ml.py               # action_id / decode_action / legal_mask
+│   │   └── scoring/            # patterns.py (faan detectors), faan.py (maximise over
+│   │                           # decompositions), payout.py (faan -> points -> payments)
+│   ├── app/
+│   │   ├── main.py             # FastAPI app, lifespan, /healthz, GET/POST /tables
+│   │   ├── ws.py               # WebSocket endpoint, Session
+│   │   ├── table.py            # Table actor: task loop, timers, claim windows, seq/ring
+│   │   ├── registry.py         # TableRegistry, showcase table, graceful-shutdown drain
+│   │   ├── views.py            # seat_view() + redact_event()
+│   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
+│   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
+│   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
+│   │   └── db/                 # SQLAlchemy models, session, save_game_record
+│   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay
+│   ├── ml/                     # RL + supervised training (ml.md)
+│   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6
+│   └── tests/                  # pytest; pins/ holds pinned fixtures
+├── web/
+│   ├── package.json, Dockerfile, vite.config.ts, playwright.config.ts
+│   ├── messages/               # i18n sources (frontend.md §9)
+│   └── src/
+│       ├── routes/             # /, /tables, /demo, /table/[id], /replay/[id], /profile
+│       └── lib/                # net/ game/ table/ ui/ i18n/ styles/ (frontend.md §1)
+├── shared/protocol.schema.json # GENERATED, informational
+└── docs/
+```
+
+`uv` owns Python, `pnpm` owns JS, the `Makefile` is the Docker-based seam. Generated files
+(`shared/protocol.schema.json`, `web/src/lib/net/protocol.d.ts`,
+`web/src/lib/net/protocol.assertNever.ts`) are never hand-edited — `make proto`
+([protocol.md §6](protocol.md)); CI enforces it (§9).
+
+## 2. Toolchain and local development
+
+### Pinned versions
+
+| Tool | Version | Pinned in |
+| --- | --- | --- |
+| Python | 3.13 | `mise.toml`, `server/Dockerfile` (`python:3.13-slim`), `pyproject.toml` (`requires-python >=3.13`, floor only) |
+| Node | 24 | `mise.toml`, `web/Dockerfile` (`node:24-*`) |
+| pnpm | 12.4.2 | `mise.toml`, root `package.json` `packageManager` (corepack, used inside images) |
+| uv | 0.12 | `mise.toml` |
+| Postgres | 17 | `docker-compose.yml` (`postgres:17-alpine`) |
+
+Keep these in sync when bumping. CI does not read `mise.toml`: `web.yml`/`proto-check.yml` use
+`node-version: lts/*` and no workflow pins Python, so CI runs whatever the actions resolve (§9).
+
+### Two ways to run
+
+**Containers** — no host toolchain needed beyond Docker:
+
+```bash
+cp .env.example .env
+make up            # postgres + api + web; web :5173, api :8000/docs
+make migrate       # once per fresh database
+make help          # everything else
+```
+
+**Native** — host toolchain from `mise`, Postgres still in Docker:
+
+```bash
+mise install                          # node, python, uv, pnpm per mise.toml
+cp .env.example .env
+(cd server && uv sync --locked)       # add --extra ml for torch; a plain sync removes it
+pnpm install --frozen-lockfile        # root + web; root `prepare` installs lefthook hooks
+
+docker compose up -d postgres
+export DATABASE_URL=postgresql+asyncpg://mahjong:mahjong@localhost:5432/mahjong
+export CORS_ORIGINS=http://localhost:5173
+(cd server && uv run alembic upgrade head)
+(cd server && uv run uvicorn app.main:app --reload --workers 1)
+pnpm --dir web dev
+```
+
+| Variable | Native default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | unset → no persistence | Compose sets it for `api` |
+| `CORS_ORIGINS` | unset → **no cross-origin requests**, so the web dev server can't reach the API | comma-separated; Compose sets `http://localhost:${WEB_PORT}` |
+| `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:8000` / `ws://localhost:8000/ws` (`lib/net/lobby.ts`, `lib/net/socket.ts`) | web, read at runtime via `$env/dynamic/public` |
+| `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
+| `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
+| `LOG_LEVEL` | `info` | |
+| `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7) |
+| `JWT_SECRET` | — | passed by both Compose files but read by nothing — vestigial from the cut auth design ([ADR 0001](decisions/0001-guest-only-identity.md)) |
+
+Native equivalents of the Docker targets:
+
+| Make target | Native |
+| --- | --- |
+| `make test-server` | `cd server && uv run pytest -q -m fast -n auto` |
+| `make test-server-slow` | `cd server && uv run pytest -q -m slow -n auto --games=10000` |
+| `make test-web` | `pnpm --dir web test` |
+| `make migrate` | `cd server && uv run alembic upgrade head` (with `DATABASE_URL`) |
+| `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts` |
+
+## 3. Process model
+
+The API runs uvicorn with **one worker**.
+
+> Tables are in-memory objects owned by one process. Two workers mean two disjoint sets of tables
+> with no routing between them — players 1 and 2 land in worker A's table #7 while players 3 and
+> 4 land in worker B's *different* table #7.
+
+`--workers 1` is pinned, with a comment, in both Compose files, the server Dockerfile, and
+`main.py`'s `uvicorn.run` entry point. Nothing asserts it at startup. Multi-node is out of scope
+([ADR 0006](decisions/0006-multi-node-and-durability.md)).
+
+**Shutdown.** `TableRegistry.begin_shutdown` drains on SIGTERM, letting a mid-hand table finish
+within `SHUTDOWN_GRACE_SECONDS` (default 90s) ([architecture.md §8.1](architecture.md)). Neither
+Compose file sets `stop_grace_period`, so Compose's default (10s before SIGKILL) cuts the drain
+short. Set it before relying on graceful deploys.
+
+## 4. Compose profiles
+
+| Command | Brings up |
+| --- | --- |
+| `make up` | postgres, api, web |
+| `docker compose --profile ml up trainer` | torch-enabled training container |
+| `make arena A=FaanBot B=EfficiencyBot N=20000` | one-shot bot evaluation (`tools` profile) |
+
+Only `ml` and `tools` profiles exist.
+
+The base `server` image has no torch or numpy; the `ml` extra adds both. The API never imports
+either. `trainer` runs `python -m ml.train --config ml/configs/danger.yaml` by default
+([ml.md](ml.md)); RL configs (`ml/configs/rl_*.yaml`) run in the same service. GPU passthrough is
+commented out in `trainer`; GPU training runs natively ([ml.md §13](ml.md)).
+
+## 5. Image layering
+
+Both Dockerfiles are multi-stage with a shared `base`:
+
+```
+base ──┬── deps    (lockfile only; cached across source edits)
+       ├── dev     (+ dev deps, source mounted at runtime, hot reload)
+       ├── prod    (venv copied from deps, non-root user, no build tools)
+       └── ml      (venv copied from deps+ml extra, non-root user, for trainer and arena)
+```
+
+Dependency install is a separate layer keyed on the lockfile; `uv` and `pnpm` caches are BuildKit
+cache mounts.
+
+**`web`'s `dev` stage** sits on `node:24-bookworm-slim` with chromium baked in (`playwright install
+--with-deps chromium`), not alpine: `pnpm test` runs vitest browser mode and Playwright, and
+Playwright ships no musl build. `deps`/`build`/`prod` stay alpine.
+
+- Changing that stage's base invalidates the `web-modules` volume (native deps are built against
+  the image's libc) — `docker volume rm mahjong_web-modules` once after such a change.
+- `make test-web` passes `CI=true`: vitest browser mode and Playwright default to *headed* off-CI,
+  and the container has no X server.
+- Browsers live in a `playwright-browsers` volume at `/root/.cache/ms-playwright`, seeded from the
+  image, so a lockfile-triggered rebuild doesn't re-fetch ~170MB of chromium.
+
+**Every stage that runs `pnpm`** (`deps`, `dev`, `build`) copies the root `package.json` in and
+strips its `scripts`:
+
+- corepack resolves the pinned pnpm (`packageManager`) from the *stage's own* `/app`; a stage that
+  skips the copy silently installs with latest pnpm (which broke `allowBuilds`, surfacing as
+  `ERR_PNPM_IGNORED_BUILDS` on `@parcel/watcher`).
+- `scripts` is stripped because the root `prepare` (`lefthook install`) hard-fails without a real
+  `.git`, which the build context never has.
+
+**`ml`** mirrors `prod`'s non-root setup with the `ml` extra. `trainer`/`arena` don't bind-mount
+source: that would shadow the baked venv and force a ~3GB torch reinstall. Rebuild (`make train` /
+`make arena`) to pick up source changes. The image is ~18.6GB because torch's default wheel bundles
+CUDA ([ml.md §13](ml.md)).
+
+## 6. Database and migrations
+
+Alembic, wired into the `Makefile` (`make migrate`, `make revision M="…"`). A fresh database needs
+migrating once; against an unmigrated database every finished game logs a lost record
+(`app/table.py`'s `process_one`).
+
+| Table | Holds | Status |
+| --- | --- | --- |
+| `games` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `action_log` (JSONB), `players` (JSONB — each seat's guest name), `result` (JSONB), `created_at` — a finished game ([ml.md §2](ml.md)) | built |
+| `hand_records` | `id`, `engine_version`, `ruleset`, `seed`, `dealer`, `prevailing`, `action_log`, `players`, `result`, `created_at` — a standalone hand from `engine.new_hand`, e.g. an RL eval episode ([ml.md §2](ml.md)) | built |
+| `leaderboard` | aggregated from `games.players`/`games.result` by name — a guest reusing a name resumes the same row; may be a materialized view | not built |
+
+There is no `users` table — identity is guest-only by design
+([ADR 0001](decisions/0001-guest-only-identity.md)).
+
+- Models: `server/app/db/models.py`; migrations: `server/alembic/versions/`.
+- JSON columns use `JSON().with_variant(JSONB(), "postgresql")` — JSONB on Postgres, generic `JSON`
+  elsewhere, so tests run against SQLite (CI has no Postgres service, §9).
+- `save_game_record` (`server/app/db/records.py`) is the only write path; `bots/selfplay.py`'s
+  `play_and_record_game` records bot-only games through it.
+- Live table state is never persisted ([architecture.md §7](architecture.md)).
+
+## 7. Deployment
+
+No hosting target, domain or TLS termination is chosen. Single-node by design
+([ADR 0003](decisions/0003-product-scope.md)): a single VM fits the one-process model; nothing that
+implies horizontally scaling the table registry.
+
+**Production overlay.** `make prod-build` / `make prod-up` run
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml`: prod targets, no mounts, no
+reload.
+
+- A reverse proxy (Caddy or nginx) in front of `api` and `web` terminates TLS and forwards
+  `X-Forwarded-*`. The overlay requires `TRUSTED_PROXY_IPS` (passed to uvicorn's
+  `--forwarded-allow-ips`) to be that proxy's address — never `*`, which lets any client spoof
+  `X-Forwarded-For`.
+- The overlay uses `!override`/`!reset` YAML tags on `ports:` — Compose concatenates `ports:` lists
+  across `-f` files, so a bare `ports: []` for `postgres` would leave the dev file's `5432:5432`
+  mapping in place.
+- `JWT_SECRET` is required by the overlay but unused (§2).
+
+**Required before real users, not yet in place:**
+
+| Item | Minimum |
+| --- | --- |
+| TLS + domain | a real certificate for `wss://`, domain decided up front |
+| Postgres backups | finished games are the only durable asset, currently with zero redundancy: scheduled `pg_dump` to off-box storage with a tested restore. WAL archiving / PITR not needed until history has real users depending on it |
+| Grace period | `stop_grace_period` sized to `SHUTDOWN_GRACE_SECONDS` (§3) |
+| Cost | a rough monthly figure (VM + Postgres + domain) |
+
+## 8. Observability
+
+| Area | Current state |
+| --- | --- |
+| Logging | stdout, `LOG_LEVEL` via env, captured by Docker. Not structured, no shipping |
+| Health | process-level `/healthz` (the `api` healthcheck; `503` while draining). No per-table liveness |
+| Metrics | none |
+| Error tracking | none — an uncaught exception in a table's task goes only to the log |
+| Tracing | not needed at one process |
+
+A wedged table silently destroys a game in progress, and nothing would tell anyone. Minimum bar
+before real users:
+
+- Structured (JSON) logs per table (`table_id`, `seq`, phase transitions), shipped off-box.
+- A per-table liveness check — a process can be up while one table's task loop is stuck.
+- An alert on "table hasn't advanced `seq` in N minutes while players are connected."
+- Metrics: table count, active connections, per-table hand duration.
+
+## 9. CI
+
+`.github/workflows/ci.yml` triggers on push and PR to `main` and calls three **reusable workflows**
+(`workflow_call`):
+
+| File | Jobs | Runs |
+| --- | --- | --- |
+| `server.yml` | `server`, `server-slow` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs |
+| `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` |
+| `proto-check.yml` | `proto-check` | regenerates protocol types natively (§2's `make proto` equivalent), then `git diff --exit-code` |
+
+All jobs run in parallel with no `needs:` — they share no artifacts. `server-slow` is its own job
+so it stays off the fast job's critical path. Within a job, lint/typecheck/test are sequential
+steps so dependencies install once.
+
+**Native tooling, not Compose.** CI runs `uv`/`pnpm` directly; nothing needs Postgres, so
+containers would only add cold-start time.
+
+**Standalone, path-filtered workflows.** `workflow_call` can't filter by path, so heavy checks are
+separate workflows with their own `on.push.paths`/`on.pull_request.paths`:
+
+| File | Triggers on | Runs |
+| --- | --- | --- |
+| `server-ml.yml` | `server/ml/**`, `server/pyproject.toml`, `server/uv.lock`, itself | `uv sync --locked --extra ml`, `import ml`/`ml.train`, `python -m ml.train --help`, and the ml unit tests (`tests/test_ml_*.py`, `tests/test_generate_dataset.py`), which skip without the extra |
+| `docker-build.yml` | either Dockerfile, either lockfile, either Compose file, itself | build-only (`push: false`) matrix of `server` `dev`/`prod` and `web` `dev`/`prod`, plus `build-server-ml` |
+
+`build-server-ml` is its own job because the ~18.6GB `ml` image exhausted a standard runner's disk
+as a matrix entry. It first removes unused preinstalled toolchains (dotnet, Android SDK, GHC,
+CodeQL — ~25-30GB) and caches via GHCR (`type=registry`, `ghcr.io/<repo>/cache:server-ml`, needs
+`packages: write`) rather than `type=gha`, whose cache-blob upload of that layer crashed the runner.
+
+**Coverage.** `server.yml` reruns pytest with coverage as a separate, non-blocking step
+(`continue-on-error: true`) — line tracing trips `test_frontier_cache_warms_and_stays_fast`'s
+wall-clock ceiling, so that test is deselected from the rerun. `web.yml`'s `test:coverage` is
+`vitest --run --coverage` (v8, `json-summary`). `ci.yml`'s own `coverage-badge` job (push to
+`main` only, `needs: [server, web]`) renders both summaries into SVGs
+(`.github/scripts/coverage_badge.py`) and commits `.github/badges/coverage-*.svg` if changed. The
+README references them by relative path: the repo is private, so shields.io can't fetch them.
+`GITHUB_TOKEN` pushes don't retrigger workflows.
+
+**Gates** (all hard): `ruff check`, `ruff format --check`, fast pytest, slow pytest
+(`--games=1000`), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,
+`proto-check`.
+
+**Local vs. CI.** `make test*` runs the fast suite only; the slow suite (`@pytest.mark.slow`) costs
+~15 min at 10,000 games, so it runs locally via `make test-server-slow` and on every push in CI
+([testing.md §1](testing.md)).
+
+**Git hooks** (`lefthook.yml`, installed by root `pnpm install`):
+
+| Hook | Job | Runs |
+| --- | --- | --- |
+| pre-commit | `web-lint`, `web-format` | oxlint / `oxfmt --check` on staged web files |
+| pre-commit | `web-typecheck` | `pnpm check` on the whole project — svelte-check can't be scoped to staged files without losing context |
+| pre-commit | `server-format`, `server-check` | `ruff format` / `ruff check` on staged `.py` files |
+| pre-commit | `comment-length` | `scripts/check_comment_length.py` |
+| commit-msg | `commitlint` | `action(scope): description` |
+
+## 10. Licensing and attribution
+
+Project code: MIT (`LICENSE`). Bundled third-party assets are credited in `NOTICE` — notably the
+public-domain [samoheen/mahjong-tiles](https://github.com/samoheen/mahjong-tiles) set
+([frontend.md §8](frontend.md)).

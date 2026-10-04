@@ -1,6 +1,6 @@
 # server/
 
-Full rules: `server/AGENTS.md`, `docs/00-architecture.md`.
+Full rules: `server/AGENTS.md`, `docs/architecture.md`.
 
 ## Layout
 - `mahjong_core/` — pure rules engine: `reduce(state, action) -> (state, events)`. No asyncio, I/O, clock, or unseeded randomness; stdlib-only. Modules: tiles, wall, melds, claims, actions, state, engine, shanten, scoring/, config, ml (feature encoding).
@@ -13,4 +13,4 @@ Full rules: `server/AGENTS.md`, `docs/00-architecture.md`.
 - One table = one asyncio.Task = sole writer of its `GameState`.
 - `seat_view(state, seat)` / `redact_event(state, seat, event)` are the only paths to seat-visible state — bots included.
 - Server computes legal-action set; never trust the client's.
-- uvicorn `--workers 1` (`docs/07-infra.md §2`).
+- uvicorn `--workers 1` (`docs/infra.md §3`).

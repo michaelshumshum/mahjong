@@ -1,6 +1,6 @@
 # i18n Phase 10 (tests & QA) — done, 2026-09-28
 
-Full plan: `mem:web/core`, `docs/03-frontend.md` §8.
+Full plan: `mem:web/core`, `docs/frontend.md` §9.
 
 ## What changed
 - Converted fragile English-text e2e selectors to `data-testid`/stable classes for core flows only

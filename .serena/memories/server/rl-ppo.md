@@ -5,7 +5,7 @@ Files: `ml/train_env.py` (EnvConfig, TrainEnv, VecTrainEnv, SubprocVecTrainEnv, 
 `ml/curriculum.py` (StageSpec, DEFAULT_STAGES, Curriculum, Contingency), `ml/eval_policy.py`
 (PolicyBot, evaluate), `ml/configs/rl_ppo_c0.yaml`. `ml.train` dispatches `algorithm: ppo`
 before `load_config` (PPOConfig is its own schema). Tests: `tests/test_ml_{train_env,ppo,
-curriculum,eval_policy}.py`. Doc: docs/06-ml.md §7 (train env), §9, §10, §12, §13, §14.
+curriculum,eval_policy}.py`. Doc: docs/ml.md §7 (train env), §9, §10, §12, §13, §14.
 
 Gotchas:
 - Rows are one flat uint8 vector (`ROW_FIELDS`, `unpack_rows` returns views). Oracle rows always

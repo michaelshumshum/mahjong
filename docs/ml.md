@@ -1,7 +1,10 @@
-# 06 — ML
+# ML
 
-The learned bot is a self-play RL policy with no dependence on `FaanBot`. It ships as the T4
-"Expert" tier ([04-bots §2/§7](04-bots.md)), under M6 ([05-roadmap](05-roadmap.md)). Two
+In progress — this doc keeps a plan/status structure (§14 milestones, §15 risks) until the agent
+ships.
+
+The learned bot is a self-play RL policy with no dependence on `FaanBot`. It is planned as the T4
+"Expert" tier ([bots.md §2/§6](bots.md)). Two
 engine-side pieces came first because retrofitting them later means touching the engine, the
 bots, the protocol and every stored record at once: the **action encoding** (§1) and
 **persisted `GameRecord`s** (§2).
@@ -44,7 +47,7 @@ A fixed, flat, complete discrete space — every legal action maps to exactly on
   at all; they only ever produce type-level intents.
 
 Two pure functions in `mahjong_core`, plus one property test — no numpy in the core
-([D6, purity](00-architecture.md)):
+([purity](architecture.md)):
 
 ```python
 def legal_mask(state: GameState, seat: int) -> list[bool]:                 # len 109
@@ -55,7 +58,7 @@ def decode_action(aid: int, state: GameState, seat: int) -> Action: ...
 **Built against `GameState`/`Action`, not `SeatView`/`Intent` — permanently, not a stopgap.**
 `mahjong_core` must not depend on `app.views` (layering only runs one way, `app` →
 `mahjong_core`), so `legal_mask`/`action_id`/`decode_action` stay `GameState`-based even though
-`SeatView` (`app/views.py`) exists now. `docs/04-bots.md §1`'s `Bot.act(view, mask, deadline)`
+`SeatView` (`app/views.py`) exists now. `docs/bots.md §1`'s `Bot.act(view, mask, deadline)`
 gets its `mask` from whoever drives the bot calling `legal_mask(state, seat)` against the real
 `GameState` it already holds and passing `(view, mask)` to the bot together.
 
@@ -80,7 +83,7 @@ The mask comes from the engine, never from the encoder or the network. The heuri
 
 ## 2. Game records
 
-Persisted from M1 for replay and crash-recovery. Not a training corpus: RL data is on-policy and
+Persisted for every finished game, bot-only included, for replay. Not a training corpus: RL data is on-policy and
 regenerated from the pure, seeded engine (§13).
 
 ```python
@@ -105,7 +108,7 @@ actually replay it.
 A complete game does not replay from "a few hundred bytes": a 半莊 (four-hand set) runs roughly
 600–1,500 actions, and the action log alone is several times that figure in bytes before
 considering the ruleset body and outcome. Still cheap to store and cheap to regenerate (pure +
-seeded), but size Postgres storage ([05-roadmap §9](05-roadmap.md)) off the real number.
+seeded), but size Postgres storage ([infra.md §7](infra.md)) off the real number.
 
 **Implementation note:** the dataclass above isn't materialized separately — the `games` table
 row (`server/app/db/models.py`) *is* the persisted `GameRecord`, built by `server/app/db/records.py`'s
@@ -133,7 +136,7 @@ An earlier plan improved `FaanBot` piece by piece: a supervised opponent-danger 
 
 | Supervised path, built on `FaanBot` | Self-play RL |
 | --- | --- |
-| ceiling is `ORACLE` — `FaanBot` with perfect information, +27.7 points/game over `FaanBot` ([04-bots §10](04-bots.md)); learned heads only estimate what `ORACLE` knows exactly | no teacher, so no teacher ceiling |
+| ceiling is `ORACLE` — `FaanBot` with perfect information, +27.7 points/game over `FaanBot` ([bots §9](bots.md)); learned heads only estimate what `ORACLE` knows exactly | no teacher, so no teacher ceiling |
 | claim logic, hand-building and the fold structure stay `FaanBot`'s; a danger model covers defence only, while more than half of `ORACLE`'s edge is offence (win rate 0.318 vs 0.152) | learns the whole policy, claims and push/fold included, against the real objective |
 | there is no HK equivalent of the Tenhou corpus Suphx/Mortal trained on; cloning the only teacher caps at that teacher | self-play needs no corpus |
 
@@ -153,7 +156,7 @@ tenpai constantly and is then forbidden from winning, because the fast all-seque
 Published mahjong agents are riichi agents, where riichi is itself a declarable yaku and speed
 therefore aligns with reward. That advice does not transfer: the objective is hand point delta,
 and shanten appears only as annealed potential-based shaping (§9). Keep
-`tenpai_rate_on_sub_minimum_hand` in the arena metrics ([04-bots §8](04-bots.md)) — it's the
+`tenpai_rate_on_sub_minimum_hand` in the arena metrics ([bots §7](bots.md)) — it's the
 canary for this failure mode in heuristic and learned bots alike.
 
 ## 5. Built so far
@@ -193,7 +196,7 @@ uv run python -m ml.export --ckpt runs/danger/ckpt_best.pt --out danger.npz
 
 **Encoder.** Thermometer planes over the 34 tile types, seats in relative order (self, next,
 across, previous), reading only entitled `SeatView` fields — never `view.hands`, the `ORACLE`
-tier's omniscient extra ([04-bots §10](04-bots.md)). `encode_ruleset` is
+tier's omniscient extra ([bots §9](bots.md)). `encode_ruleset` is
 `[min_faan, wall_reserve, hand_sets bitmask, effective faan per PATTERNS entry]`: the correct
 discard for the same hand depends on the ruleset (Seven Pairs under `hk_classic` vs `hk_strict`),
 so a network without it overfits one ruleset or gets contradictory labels across several.
@@ -535,7 +538,7 @@ exhaustive-draw rate as the passivity/collusion canary.
 
 ## 12. Evaluation
 
-- **Gate:** paired-duplicate CI ([04-bots §8](04-bots.md)), candidate × 1 vs `FaanBot` × 3,
+- **Gate:** paired-duplicate CI ([bots §7](bots.md)), candidate × 1 vs `FaanBot` × 3,
   on fresh seeds (tune and gate on different seed sets — picking the best of k configs on the
   gate seeds is a winner's curse), plus a bootstrap CI, since `arena.py`'s CI is a normal
   approximation over heavy-tailed payouts. Also vs `ORACLE` (gap to ceiling, not a target) and

@@ -1,7 +1,8 @@
 # web
 
 SvelteKit 2 + Svelte 5 (runes) client. See [AGENTS.md](AGENTS.md) for layout and rules, and the
-repo root [README.md](../README.md) for the quick start (`make up`).
+repo root [README.md](../README.md) for the quick start (Docker via `make up`, or native via
+`mise` — `docs/infra.md §2`).
 
 Scaffolded with `sv create`:
 

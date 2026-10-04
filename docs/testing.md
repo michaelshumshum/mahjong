@@ -1,0 +1,96 @@
+# Testing
+
+Policy — commands, `mahjong_core` purity, golden fixtures, seeded determinism — is in root
+`AGENTS.md`'s Testing section. This doc covers strategy per layer and the implementation-level
+gotchas that don't belong inline in `web/AGENTS.md` or `server/AGENTS.md`.
+
+## 1. Strategy
+
+| Layer | Approach |
+| --- | --- |
+| `mahjong_core` | Table-driven unit tests + `hypothesis` property tests, no mocks. **Invariants:** tile conservation (all 144 accounted for in hands + melds + pool + wall + flowers at every step); hand sizes consistent with meld count; `legal_actions` never empty in an active phase; every game terminates. |
+| Scoring | Hand-authored parametrized cases in `tests/test_scoring.py`/`test_faan.py`/`test_payout.py` (145 tests): every registered pattern exercised positively, every [rules.md §11](rules.md) edge case named. Shanten cross-checked against `MahjongRepository/mahjong` ([bots.md §3](bots.md)). |
+| Claim windows | Deterministic tests with injected arrival order — a slow high-priority win beats a fast chow, stale `window_id`s drop, early exit fires when it should. |
+| Redaction | Schema walker over every message type × every recipient ([architecture.md §5](architecture.md)); fails loudly on a new unannotated field. |
+| Server | `httpx` + WS test client. `tests/test_full_game_e2e.py` drives four real WS clients through a full `EAST_ONLY` game — a claim exchange, a self-draw win, a mid-claim-window disconnect/reconnect — checking every frame against `Entitlement` rules live. |
+| Protocol | `proto-check` CI job: regenerated TS must match committed TS ([infra.md §9](infra.md)). |
+| Client | Vitest on the pure reducer and components (§2); Playwright e2e for full flows, including a live game against bots (`web/src/routes/table/[id]/live.e2e.ts`). |
+| Bots | Arena paired-difference merge gate ([bots.md §7](bots.md)). |
+| Load | Not built. Target: replay bot sessions as real WS clients, 200 concurrent tables on one node. |
+
+**Fast vs. slow.** `@pytest.mark.slow` marks soaks, the real-bot `ProcessPoolExecutor`
+practice-mode e2e, and hypothesis runs. Local `make test*` runs the fast suite only; `make
+test-server-slow` runs the slow suite (`N=` overrides the soak's game count); CI runs both on every
+push, the soak capped at `--games=1000` ([infra.md §9](infra.md)). The slow suite is real coverage:
+it caught a tile-conservation bug in `mahjong_core.engine`'s claimed-win path that only thousands of
+randomized games reach.
+
+**Self-play soak.** `make selfplay` / `pytest -m slow -k selfplay` plays N complete games with four
+`RandomBot`s — no illegal states, no deadlocks, every game terminates. It runs with
+`dealer_repeat_on_win`/`dealer_repeat_on_draw` off, not `DEFAULT_RULESET`: `RandomBot` wins so
+rarely that repeat-on-draw can chain 150+ hands before a round rotates, turning a legitimate
+slow-converging config into flakiness. With repeats off, a game is exactly 4/8/16 hands for
+`EAST_ONLY`/`EAST_SOUTH`/`FULL`. The repeat paths have dedicated unit coverage in `test_engine.py`.
+
+**Determinism.** A failing game reproduces from `(ruleset, seed, actions)`.
+
+## 2. Web (Vitest)
+
+### 2.1 `client` vs `server` project — runes need a real browser
+
+A `*.svelte.ts` file's runes (`$state`/`$effect`) must run under `vite.config.ts`'s vitest `client`
+project, not `server`. Vitest's `node` environment loads modules through Vite's SSR target even
+with `environment: 'jsdom'`, and Svelte's server runtime never runs `$effect` — it silently no-ops,
+which reads like "nothing subscribed yet," not "this never ran."
+
+The `client` project uses real browser mode (`@vitest/browser-playwright`, reusing the e2e
+Playwright install). Name the spec `*.svelte.spec.ts` to route it there — a plain `.spec.ts`
+importing a `.svelte.ts` module still runs under `server`, and its `$effect`s never fire.
+
+### 2.2 Mounting a `.svelte` component — `test-render.ts` vs inline mount
+
+`lib/table/test-render.ts` (`render`/`cleanup`/`cleanupAll`, wrapping Svelte's `mount`/`unmount`)
+is the shared helper for table-surface specs; `afterEach(cleanupAll)` covers specs that don't keep
+each `render()` result.
+
+A route's top-level `+page.svelte` needs SvelteKit context the table components don't
+(`$app/navigation`, `$lib/net/lobby`'s `$env/dynamic/public` — §2.4), so
+`routes-tests/*.svelte.spec.ts` mount inline with plain `mount`/`unmount`. `test/mocks.ts`
+(`createMessagesProxy`) covers what those routes need mocked.
+
+### 2.3 `vi.mock`/`vi.hoisted` under the `client` project's real browser mode
+
+Vite's import analysis rewrites every static `import` into an awaited dynamic `import()`, so code
+running *synchronously* before imports resolve — a `vi.hoisted()` body in particular — can't
+reference an imported binding. Doing so throws `[vitest] There was an error when mocking a module`
+at hoist time, which reads like a broken mock rather than a timing issue.
+
+- `vi.mock(...)`'s factory may reference an import: factories run lazily, after imports resolve
+  (e.g. `routes-tests/tables/TableCard.svelte.spec.ts`'s
+  `vi.mock('$lib/paraglide/messages.js', () => ({ m: createMessagesProxy() }))`).
+- When a factory needs module-scope data (a fixture, a prior `vi.fn()`), use a **dynamic `import()`
+  inside the factory** (`routes-tests/lobby/page.svelte.spec.ts`), not an outer-scope variable —
+  even one from `vi.hoisted()`.
+- To configure or assert on a mocked function, import the real binding (`import { goto } from
+  '$app/navigation'` after `vi.mock('$app/navigation', () => ({ goto: vi.fn() }))`).
+
+### 2.4 `$env/dynamic/public` must be mocked for anything touching `$lib/net/lobby`
+
+Any route pulling in `$lib/net/lobby` (directly, or via a child like `TableCard`) needs:
+
+```ts
+vi.mock('$env/dynamic/public', () => ({ env: {} }))
+```
+
+SvelteKit's dev/build server populates that module at request time; under Vitest it's `undefined`,
+so `lobby.ts`'s `apiBaseUrl()` throws before the component renders.
+
+## 3. Server (pytest)
+
+No implementation-level gotchas beyond root `AGENTS.md`'s Testing section and `server/AGENTS.md`'s
+Commands table. Add them here as they turn up.
+
+- `server/tests/conftest.py` pins `SHUTDOWN_GRACE_SECONDS=0`: every `TestClient(app)` exit runs the
+  real shutdown drain ([architecture.md §8.1](architecture.md)).
+- CI has no Postgres; DB tests run against SQLite via the JSON/JSONB column variant
+  ([infra.md §6](infra.md)).

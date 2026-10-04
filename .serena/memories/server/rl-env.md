@@ -3,7 +3,7 @@
 Files: `ml/env.py` (HandEnv, encode_obs, replay_hand), `ml/vec_env.py` (VecHandEnv,
 SubprocVecHandEnv, episode_seed), `ml/fast_encode.py` (encode_state, encode_reference),
 `ml/bench_env.py`, `ml/mp.py` (mp_context, moved out of generate_dataset). Tests:
-`tests/test_ml_{env,vec_env,fast_encode,bench_env}.py`. Doc: docs/06-ml.md §7 (API tables), §13
+`tests/test_ml_{env,vec_env,fast_encode,bench_env}.py`. Doc: docs/ml.md §7 (API tables), §13
 (measured numbers), §14 (R0 progress).
 
 Gotchas:

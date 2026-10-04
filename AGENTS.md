@@ -1,19 +1,21 @@
 # AGENTS.md
 
 Browser-based multiplayer Hong Kong mahjong. Python/FastAPI server, SvelteKit (DOM + SCSS) client.
-Project outline lives in `docs/`.
+Reference docs live in `docs/` (index: `docs/README.md`); history, removed designs and deferred
+work in `docs/decisions/` (ADR log).
 
 ## Context triggers
 
-| Working on                                        | Read first                                                       |
-| ------------------------------------------------- | ---------------------------------------------------------------- |
-| `core game logic, server mechanics`               | [server/AGENTS.md](server/AGENTS.md), `docs/00-architecture.md`  |
-| `user interface, gameplay`                        | [web/AGENTS.md](web/AGENTS.md), `docs/03-frontend.md`            |
-| `shared/protocol.schema.json`                     | `docs/02-protocol.md`                                            |
-| `bots and machine learning`                       | `docs/04-bots.md`, `docs/06-ml.md`                               |
-| `Dockerfile`, `docker-compose*`, `Makefile`       | `docs/07-infra.md`                                               |
-| `*.spec.ts`, `*.test.ts`, writing/debugging tests | `docs/09-testing.md`                                             |
-| Milestones, scope, what to build next             | `docs/05-roadmap.md`                                             |
+| Working on                                          | Read first                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| `core game logic, server mechanics`                 | [server/AGENTS.md](server/AGENTS.md), `docs/architecture.md`   |
+| `game rules, scoring, RuleSet`                      | `docs/rules.md`                                                |
+| `user interface, gameplay`                          | [web/AGENTS.md](web/AGENTS.md), `docs/frontend.md`             |
+| `shared/protocol.schema.json`, `app/protocol.py`    | `docs/protocol.md`                                             |
+| `bots and machine learning`                         | `docs/bots.md`, `docs/ml.md`                                   |
+| `Dockerfile`, `docker-compose*`, `Makefile`, `mise.toml`, CI | `docs/infra.md`                                       |
+| `*.spec.ts`, `*.test.ts`, writing/debugging tests   | `docs/testing.md`                                              |
+| Scope, deferred features, "why isn't X built"       | `docs/decisions/README.md`, then the relevant ADR              |
 
 Enforced for `server/`, `web/`, `shared/`, and infra files by
 `.claude/hooks/enforce-routing-table.sh` (Edit/Write/Bash) — it denies the write until the
@@ -21,6 +23,11 @@ matching doc has shown up in this session (Read, or referenced in a Bash command
 
 Compliance: start every task by replying with `**Context read: <docs>**` listing the trigger docs
 read this session, or `**Context read: N/A**` if no trigger applied.
+
+## Local setup
+
+Toolchain pinned in `mise.toml` (`mise install`). Native and Docker workflows, env vars, and native
+equivalents of `make` targets: `docs/infra.md §2`.
 
 ## Session setup
 
@@ -52,11 +59,16 @@ the task on tooling. This is the only exception; otherwise these are not suggest
 
 ## Documentation
 
-- Docs are outlines of what the project _is_, not records of how it was decided.
+- Reference docs (`docs/*.md`) describe what the project _is_, not how it was decided. History,
+  removed designs, measurement logs and deferred designs go in a decision record
+  (`docs/decisions/NNNN-title.md`, see its README); link to it from the reference doc. `docs/ml.md`
+  is the exception: it stays a plan with milestones while the agent is in progress.
+- Sections are numbered and cited from code as `docs/<doc>.md §N`. Renumbering means updating
+  every citation (`git grep 'docs/<doc>.md'`).
 - Default to tables, lists and code blocks over prose.
 - Rationale is allowed, and encouraged, where a decision is non-obvious or the reason it was made
   is itself load-bearing (why a constraint exists, why the obvious alternative doesn't work) —
-  see `00-architecture.md §1`, `04-bots.md §4`, `06-ml.md §3` for the level to aim for. The rule
+  see `architecture.md §1`, `bots.md §4`, `ml.md §3` for the level to aim for. The rule
   being replaced ("no rationale beyond a clause") was cutting exactly this kind of content; don't
   gut a section to satisfy terseness.
 - Update the relevant `docs/` file in the same change as the code.
@@ -69,11 +81,11 @@ the task on tooling. This is the only exception; otherwise these are not suggest
   - in most cases, one of the above is sufficient; if you have a reason to run all tests, do so.
 - Local dev runs the fast suite only (`@pytest.mark.slow` — soaks, real-bot e2e, hypothesis runs
   — is excluded by default; `make test-server-slow` runs it explicitly). CI runs both, in
-  parallel, on every push/PR (`docs/07-infra.md §9`) — nothing is ever silently skipped there.
+  parallel, on every push/PR (`docs/infra.md §9`) — nothing is ever silently skipped there.
 - New behaviour gets a test in the same change; bugs get a failing regression test first.
 - `mahjong_core` is pure — test it directly. No mocks, no I/O. Golden fixtures (the scoring hand
   suite, `tests/test_engine_trajectory_pin.py`'s seeded trajectory digests; `tests/replays/` is
-  planned, not built) are data, not mocks, and are required — see `05-roadmap.md`.
+  planned, not built) are data, not mocks, and are required — see `docs/testing.md §1`.
 - Seeded and deterministic: a failing game is reproducible from `(ruleset, seed, actions)`.
 
 ## Comments

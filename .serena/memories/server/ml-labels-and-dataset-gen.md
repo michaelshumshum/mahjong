@@ -1,13 +1,13 @@
 # ML: supervised pieces kept for the RL plan (updated 2026-10-02)
 
 Direction (2026-10-02): the learned bot is a self-play RL policy independent of FaanBot,
-docs/06-ml.md §6-§15 (milestones R0-R4). The old phases (learned tile_risk inside FaanBot,
-afterstate evaluator, FaanBot distillation) are DROPPED; docs/08-rl.md was merged into 06-ml.md.
+docs/ml.md §6-§15 (milestones R0-R4). The old phases (learned tile_risk inside FaanBot,
+afterstate evaluator, FaanBot distillation) are DROPPED; docs/08-rl.md was merged into ml.md.
 Deleted: ml/heuristic_baseline.py, ml/gbdt_baseline.py, configs/bc.yaml, fit_platt/apply_platt,
 play_and_label's row_hook, pettingzoo + lightgbm deps. Don't reintroduce FaanBot as a teacher,
 reward baseline, feature source or training opponent (only §10's contingency bootstrap).
 
-Kept (docs/06-ml.md §5): encoder, bots/labels.py, dataset gen/pack/splits, DangerNet + train/eval,
+Kept (docs/ml.md §5): encoder, bots/labels.py, dataset gen/pack/splits, DangerNet + train/eval,
 metrics, numpy export. DangerNet test results (v3, 1,125 test games): legal-wait AUC 0.889,
 tenpai AUC 0.868; GBDT baseline 0.853; FaanBot deal_in_probability ~0.50 pooled (0.66 within
 tenpai opponents; genbutsu factor is anti-correlated with tenpai since HK has no furiten).
@@ -21,7 +21,7 @@ plain closed tenpai hand scores 3).
 (5.07M rows), `data/danger_v3_heldout_eff_packed` (2,000 EfficiencyBot games, NOT yet evaluated),
 `runs/danger/ckpt_best.pt` + eval jsons. Repo-root `data/` is root-owned.
 
-**Commands (cwd server/):** see docs/06-ml.md §5's code block (generate_dataset, pack, train,
+**Commands (cwd server/):** see docs/ml.md §5's code block (generate_dataset, pack, train,
 evaluate, export).
 
 **Gotchas:**

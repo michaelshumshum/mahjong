@@ -1,7 +1,7 @@
 # 雀 — Browser Hong Kong Mahjong
 
-[![server coverage](.github/badges/coverage-server.svg)](docs/07-infra.md#9-ci)
-[![web coverage](.github/badges/coverage-web.svg)](docs/07-infra.md#9-ci)
+[![server coverage](.github/badges/coverage-server.svg)](docs/infra.md#9-ci)
+[![web coverage](.github/badges/coverage-web.svg)](docs/infra.md#9-ci)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
@@ -9,98 +9,101 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Hong Kong mahjong, browser-native and server-authoritative — full faan scoring, zero client trust.
-Play solo against bots tuned from easy heuristics to a self-play RL "Expert."
+Play solo against bots from Easy to a full-information "Impossible", or with friends by sharing a
+table link.
 
 **Stack:** Python 3.13 / FastAPI (REST + native WebSocket) · SvelteKit 2 + Svelte 5 (runes), DOM + SCSS · Postgres
 
 ## Features
 
-- **Full HK ruleset** — faan table, claim priority, payouts, configurable `RuleSet` presets ([01](docs/01-rules-spec.md))
-- **Bots from Easy to Impossible** — heuristic tiers, a self-play RL "Expert", and a full-information `ORACLE` ([04](docs/04-bots.md), [06](docs/06-ml.md))
-- **Structural anti-cheat** — per-seat redaction; clients never see what they shouldn't ([00 §5, §9](docs/00-architecture.md))
-- **Deterministic** — any hand reproduces from `(ruleset, seed, actions)` ([00 §3](docs/00-architecture.md))
+- **Full HK ruleset** — faan table, claim priority, payouts, configurable `RuleSet` presets ([rules](docs/rules.md))
+- **Bots from Easy to Impossible** — heuristic tiers and a full-information `ORACLE`; a self-play RL agent is in development ([bots](docs/bots.md), [ml](docs/ml.md))
+- **Structural anti-cheat** — per-seat redaction; clients never see what they shouldn't ([architecture §5, §9](docs/architecture.md))
+- **Deterministic** — any hand reproduces from `(ruleset, seed, actions)` ([architecture §3](docs/architecture.md))
 
 ## Quick start
 
-Toolchain (node 24, python 3.13, uv, pnpm) is pinned in [`mise.toml`](mise.toml); Docker runs
-postgres and, optionally, the whole stack.
+The toolchain (node 24, python 3.13, uv, pnpm) is pinned in [`mise.toml`](mise.toml). Docker runs
+Postgres, and optionally the whole stack.
+
+**Containers** (Docker only):
 
 ```bash
-mise install                          # install pinned toolchain
 cp .env.example .env
-(cd server && uv sync --locked)       # add --extra ml for torch
-pnpm install --frozen-lockfile        # also installs git hooks (lefthook)
-```
-
-Run natively, with postgres in Docker:
-
-```bash
-docker compose up -d postgres
-export DATABASE_URL=postgresql+asyncpg://mahjong:mahjong@localhost:5432/mahjong
-(cd server && uv run alembic upgrade head && uv run uvicorn app.main:app --reload --workers 1)
-pnpm --dir web dev                    # web http://localhost:5173, api http://localhost:8000/docs
-```
-
-Or run everything in containers (no mise needed):
-
-```bash
-make up            # postgres + api + web
+make up            # postgres + api + web — web http://localhost:5173, api http://localhost:8000/docs
+make migrate       # once per fresh database
 make help          # everything else
 ```
+
+**Native** (Postgres in Docker, everything else on the host):
+
+```bash
+mise install                          # pinned toolchain
+cp .env.example .env
+(cd server && uv sync --locked)       # add --extra ml for torch; a plain sync removes it
+pnpm install --frozen-lockfile        # also installs git hooks (lefthook)
+
+docker compose up -d postgres
+export DATABASE_URL=postgresql+asyncpg://mahjong:mahjong@localhost:5432/mahjong
+export CORS_ORIGINS=http://localhost:5173
+(cd server && uv run alembic upgrade head && uv run uvicorn app.main:app --reload --workers 1)
+pnpm --dir web dev                    # in a second shell
+```
+
+Native test and codegen equivalents of the `make` targets: [docs/infra.md §2](docs/infra.md).
 
 ## Screenshots
 
 Captured from `/table/[id]`'s frozen mock-scenario fixture (`?mock=`) or its no-socket pre-game
-preview (`?pregame=`), not a live game — both repeatable without a running backend, even though
-`/table/[id]` itself now opens a real one by default (`docs/03-frontend.md`'s "`/table/[id]`
-wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible frontend change (see
-`.claude/skills/frontend-screenshots/SKILL.md`).
+preview (`?pregame=`) — both repeatable without a backend ([docs/frontend.md §7](docs/frontend.md)
+"`/table/[id]` wiring"). Regenerate with `pnpm --dir web run screenshots` after any visible
+frontend change (see `.claude/skills/frontend-screenshots/SKILL.md`).
 
 | | |
 | --- | --- |
-| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create a table, join one, or play solo vs bots, over a scrolling tile-mural canvas background | ![Lobby, create-table dialog](docs/screenshots/lobby-create-dialog.png) Lobby — create-table dialog: named rules presets or a custom ruleset (`POST /tables`, `docs/02-protocol.md §10`) |
+| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — create a table, join one, or play solo vs bots, over a scrolling tile-mural canvas background | ![Lobby, create-table dialog](docs/screenshots/lobby-create-dialog.png) Lobby — create-table dialog: named rules presets or a custom ruleset (`POST /tables`, `docs/protocol.md §10`) |
 | ![Tables](docs/screenshots/tables.png) Tables (`/tables`) — join by code, or sit down / watch from the grid | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard |
 | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended, faan breakdown |
 | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw | ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended, score summary with winner podium |
 | ![Table, settings](docs/screenshots/table-settings.png) Table — settings panel | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting |
 | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players |
 
-## Planning docs
+## Documentation
 
-| Doc | Contents |
+| Doc | Covers |
 | --- | --- |
-| [00-architecture.md](docs/00-architecture.md) | System design, table-as-actor model, scaling path |
-| [01-rules-spec.md](docs/01-rules-spec.md) | Tiles, state machine, claim priority, faan table, payouts |
-| [02-protocol.md](docs/02-protocol.md) | WebSocket envelope, message catalog, redaction, reconnect/resync, timers |
-| [03-frontend.md](docs/03-frontend.md) | Svelte component layout, scene/DOM structure, asset pipeline, interaction model |
-| [04-bots.md](docs/04-bots.md) | Bot tiers, shanten/ukeire, HK 3-faan trap, safety play, evaluation harness |
-| [05-roadmap.md](docs/05-roadmap.md) | Milestones, testing strategy, risk register, resolved decisions |
-| [06-ml.md](docs/06-ml.md) | Self-play RL agent (T4 "Expert"): action encoding, game records, plan and status |
-| [07-infra.md](docs/07-infra.md) | Monorepo layout, process model, Docker targets and profiles |
-| [09-testing.md](docs/09-testing.md) | Implementation-level testing gotchas (Vitest browser mode, mocking, fixtures) |
+| [architecture.md](docs/architecture.md) | process model, table actor, claim window, redaction, failure handling, anti-cheat |
+| [rules.md](docs/rules.md) | tiles, state machine, claim priority, faan table, payments, `RuleSet` |
+| [protocol.md](docs/protocol.md) | WebSocket envelope, message catalog, reconnect/resync, codegen, HTTP |
+| [frontend.md](docs/frontend.md) | rendering, layout, interaction, client state, routes, assets, a11y/i18n |
+| [bots.md](docs/bots.md) | bot tiers, shanten/ukeire, the HK 3-faan trap, safety, arena, `ORACLE` |
+| [ml.md](docs/ml.md) | self-play RL agent — in progress, plan and status |
+| [infra.md](docs/infra.md) | repo layout, toolchain, local dev, Docker, database, deployment, CI |
+| [testing.md](docs/testing.md) | test strategy, Vitest and pytest gotchas |
+| [decisions/](docs/decisions/README.md) | ADR log: history, removed designs, deferred work |
 
 ## Layout
 
 ```
-server/   Python. mahjong_core/ (pure rules, stdlib-only) + app/ (FastAPI, tables, WS) + bots/
+server/   Python. mahjong_core/ (pure rules, stdlib-only) + app/ (FastAPI, tables, WS) + bots/ + ml/
 web/      SvelteKit 2 + Svelte 5. Lobby and table, DOM throughout, styled with SCSS.
 shared/   Generated protocol JSON schema (make proto)
-docs/     Planning
+docs/     Reference docs + decisions/ (ADR log)
 ```
 
-`uv` owns Python, `pnpm` owns JS, `Makefile` is the seam.
+`uv` owns Python, `pnpm` owns JS, the `Makefile` is the Docker-based seam. Full tree:
+[docs/infra.md §1](docs/infra.md).
 
 ## Compose profiles
 
 | Command | Adds |
 | --- | --- |
 | `make up` | postgres, api, web |
-| `make arena A=FaanBot B=EfficiencyBot N=20000` | one-shot bot evaluation |
-| `docker compose --profile ml up trainer` | torch-enabled container (day 2) |
+| `make arena A=FaanBot B=EfficiencyBot N=20000` | one-shot bot evaluation (`tools`) |
+| `docker compose --profile ml up trainer` | torch-enabled training container (`ml`) |
 
-Only `ml` and `tools` profiles exist — no multi-node/`scale` profile yet ([docs/07-infra.md §3](docs/07-infra.md)).
-
-> `--workers 1` on the API is load-bearing: tables are in-memory objects owned by one process. [docs/07-infra.md §2](docs/07-infra.md)
+> `--workers 1` on the API is load-bearing: tables are in-memory objects owned by one process.
+> [docs/infra.md §3](docs/infra.md)
 
 ## Testing
 
@@ -108,11 +111,12 @@ Only `ml` and `tools` profiles exist — no multi-node/`scale` profile yet ([doc
 make test              # everything (server + web)
 make test-server       # pytest, fast suite only
 make test-server-slow  # pytest, slow suite: soaks, real-bot e2e, hypothesis runs
-make test-web          # vitest + svelte-check
+make test-web          # vitest + Playwright
 ```
 
-`mahjong_core` is pure and tested directly, no mocks. CI runs fast + slow suites in parallel on
-every push ([07 §9](docs/07-infra.md)); gotchas live in [docs/09-testing.md](docs/09-testing.md).
+`mahjong_core` is pure and tested directly, no mocks. CI runs the fast and slow suites in parallel
+on every push ([docs/infra.md §9](docs/infra.md)); strategy and gotchas in
+[docs/testing.md](docs/testing.md).
 
 ## Development
 
@@ -129,4 +133,5 @@ fails the build if they drift.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Bundled third-party assets (tile art) are attributed separately; see [docs/07-infra.md §8](docs/07-infra.md).
+MIT — see [LICENSE](LICENSE). Bundled third-party assets (tile art) are credited in `NOTICE`; see
+[docs/infra.md §10](docs/infra.md).

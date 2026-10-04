@@ -35,7 +35,7 @@ omniscient view. No dedicated bot class, no search, no dedicated process pool.
 
 ## Verification (arena, 15 duplicate sets / 60 games, scratch script deleted after use)
 Paired diff (ORACLE - FaanBot): **+11.644 pts/game, 95% CI [6.220, 17.069]**. deal_in_rate
-0.0083 vs 0.1542 baseline (~18x drop). Full numbers in docs/04-bots.md §10.
+0.0083 vs 0.1542 baseline (~18x drop). Full numbers in docs/bots.md §9.
 
 ## Tests
 - `tests/test_safety.py`: hands-aware tile_risk unit tests (exact deal-in, probabilistic-looks-
@@ -48,8 +48,8 @@ Paired diff (ORACLE - FaanBot): **+11.644 pts/game, 95% CI [6.220, 17.069]**. de
   rewrote hands-populated + disconnect-handover tests (now check the default pool, not a
   separate oracle pool).
 
-docs/04-bots.md §10 fully rewritten with design history + mechanism + verification numbers.
-docs/00-architecture.md §5 and §3 references reworded (not rewritten).
+docs/bots.md §9 fully rewritten with design history + mechanism + verification numbers.
+docs/architecture.md §5 and §3 references reworded (not rewritten).
 
 ## Follow-up 1: `opponent_threat_level` made hands-aware too (fold-timing gap)
 
@@ -106,7 +106,7 @@ sample size, and this took real investigation, not just re-running the script:
   duplicate sets. If a future change to this tier looks like a no-op in the standard-size check,
   don't stop there — instrument decision-level divergence directly before concluding "no effect."
 
-Full mechanism + both verification tables are in docs/04-bots.md §10 ("The fold-timing gap" /
+Full mechanism + both verification tables are in docs/bots.md §9 ("The fold-timing gap" /
 "Re-verification after the fold-timing fix" subsections).
 
 ## Follow-up 2: `seen34` made hands-aware too (offense-side ukeire gap) -- biggest effect of the three
@@ -169,5 +169,5 @@ deal-in check. deal_in_rate ticked up slightly (0.0106->0.0209, still ~8x below 
 0.1628) -- ORACLE now pushes hands further/discards more before hands end, giving the residual
 real-deal-in mechanism marginally more chances to fire; net effect still decisively positive.
 
-Full mechanism + tables in docs/04-bots.md §10 ("The offense-side gap: `seen34` needed the same
+Full mechanism + tables in docs/bots.md §9 ("The offense-side gap: `seen34` needed the same
 treatment" / "Re-verification after the `seen34` fix" subsections).

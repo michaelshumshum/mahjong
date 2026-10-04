@@ -1,6 +1,6 @@
 # web/
 
-Full rules: `web/AGENTS.md`, `docs/03-frontend.md`.
+Full rules: `web/AGENTS.md`, `docs/frontend.md`.
 
 ## Layout
 - `src/routes/` — lobby (root), tables, demo, table/[id], replay/[id], profile
