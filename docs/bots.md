@@ -273,7 +273,9 @@ A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a `SeatView` with
 seat's concealed tiles) populated. No dedicated class, no search, no rollout
 ([ADR 0013](decisions/0013-oracle-full-information.md)). `FaanBot` itself never reads
 `view.hands`; four helpers branch on it, and each is byte-identical to its probabilistic form when
-`view.hands is None`:
+`view.hands is None`. `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
+`seat_view` (4 × `FaanBot`, every preset, hashed action ids), so any `ORACLE`-only change that
+leaks into `FaanBot` fails it:
 
 | Helper (`bots/`) | `view.hands is None` | `view.hands` populated |
 | --- | --- | --- |
