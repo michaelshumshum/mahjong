@@ -2,7 +2,7 @@ algorithm: rl_aux
 data: data/rl_aux_packed
 out: runs/rl_aux
 seed: 0
-threads: 8
+threads: 2
 channels: 96
 blocks: 6
 batch_size: 512
