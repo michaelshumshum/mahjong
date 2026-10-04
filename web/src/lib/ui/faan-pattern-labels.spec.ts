@@ -15,7 +15,7 @@ describe('faanPatternLabel', () => {
 		expect(faanPatternLabel('Chicken Hand')).toBe('Chicken Hand');
 	});
 
-	it('covers all 36 patterns in mahjong_core.scoring.patterns.PATTERNS', () => {
-		expect(Object.keys(FAAN_PATTERN_LABEL)).toHaveLength(36);
+	it('covers all 36 patterns in mahjong_core.scoring.patterns.PATTERNS plus 雞糊 (scoring/faan.py)', () => {
+		expect(Object.keys(FAAN_PATTERN_LABEL)).toHaveLength(37);
 	});
 });

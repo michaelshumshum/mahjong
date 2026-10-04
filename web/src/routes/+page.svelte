@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { getLocale, setLocale } from '$lib/paraglide/runtime.js';
 	import { m } from '$lib/paraglide/messages.js';
 	import CreateTableDialog from '$lib/ui/CreateTableDialog.svelte';
+	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 
@@ -19,6 +21,8 @@
 	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a difficulty-picker
 	// dialog first since bot tier is fixed at construction; `?practice=1` here is unrelated in spelling to the wire's `&practice=true`.
 	let showPracticeDialog = $state(false);
+
+	let showGuide = $state(false);
 
 	function handlePracticeCreated(tableId: string): void {
 		showPracticeDialog = false;
@@ -48,8 +52,30 @@
 		>
 			{m.lobby_practiceButton()}
 		</button>
+		<div class="row">
+			<button
+				type="button"
+				class="secondary"
+				data-testid="lobby-guide"
+				onclick={() => (showGuide = true)}
+			>
+				{m.lobby_guideButton()}
+			</button>
+			<button
+				type="button"
+				class="secondary"
+				data-testid="lobby-language"
+				onclick={() => setLocale(getLocale() === 'en' ? 'zh-Hant' : 'en')}
+			>
+				{m.lobby_languageButton()}
+			</button>
+		</div>
 	</div>
 </div>
+
+{#if showGuide}
+	<GuideDialog onClose={() => (showGuide = false)} />
+{/if}
 
 {#if showCreateDialog}
 	<CreateTableDialog onCreated={handleCreated} onCancel={() => (showCreateDialog = false)} />
@@ -94,6 +120,18 @@
 		flex-direction: column;
 		gap: var(--space-3);
 		width: min(20rem, 100%);
+	}
+
+	.row {
+		display: flex;
+		gap: var(--space-3);
+
+		> .secondary {
+			flex: 1 1 0;
+			min-width: 0;
+			font-size: var(--font-size-base);
+			padding-inline: var(--space-2);
+		}
 	}
 
 	.primary,

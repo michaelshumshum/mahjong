@@ -31,6 +31,7 @@ export const FAAN_PATTERN_LABEL: Record<string, () => string> = {
 	十三么: m.faanPattern_thirteenOrphans,
 	天糊: m.faanPattern_heavenlyHand,
 	地糊: m.faanPattern_earthlyHand,
+	雞糊: m.faanPattern_chickenHand,
 	七對子: m.faanPattern_sevenPairs,
 	三暗刻: m.faanPattern_threeConcealedPungs,
 	全求人: m.faanPattern_allRevealed,

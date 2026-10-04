@@ -412,7 +412,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 
 | Route | SSR | Notes |
 | --- | --- | --- |
-| `/` | on | lobby: "Create a table", "Join a game" (→ `/tables`), "Practice vs Bots" over the mural |
+| `/` | on | lobby: "Create a table", "Join a game" (→ `/tables`), "Practice vs Bots", "Faan guide", a language toggle, over the mural |
 | `/tables` | on | table browser; fetches its listing client-side |
 | `/demo` | on | dev component demos, no backend |
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
@@ -441,6 +441,16 @@ The lobby's "Create a table" opens `CreateTableDialog.svelte`: preset radios, or
 every `RuleSet` field except `multi_win`, grouped scoring/flow/variants/fairness/timing. Submitting
 calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates to `/table/<table_id>`. The
 waiting room shows the resolved preset name (`PretableScreen.svelte`).
+
+### Faan guide and language toggle
+
+Two buttons under "Practice vs Bots". The language button calls `setLocale()` with the other locale
+(label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
+stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per faan count (1-8)
+plus Limit, each a list of patterns with a description and a tile example. The data lives in
+`lib/ui/faan-guide.ts` (`GUIDE`, keyed by faan value; examples are strings of concatenated tile
+codes, one group each); a spec pins it to `FAAN_PATTERN_LABEL` so a new pattern can't be left out.
+Situational patterns (self-draw, last tile, ...) have no tile example.
 
 ### Practice mode
 
@@ -644,7 +654,7 @@ zh-Hant has no grammatical plural; every variant there is the same phrasing.
 Tests assert on `data-testid`/stable classes for core flows, not English wording. Locale switching
 and SSR `<html lang>` have e2e coverage (`lib/i18n/locale-switch.e2e.ts`, `hooks.server.e2e.ts`).
 
-The zh-Hant file (296/296 keys, parity-checked) is machine-generated and not yet reviewed by a
+The zh-Hant file (376/376 keys, parity-checked) is machine-generated and not yet reviewed by a
 fluent Hong Kong mahjong player.
 
 ### Accessibility

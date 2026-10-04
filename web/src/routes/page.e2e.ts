@@ -273,3 +273,22 @@ test('tables page shows Rejoin for a table this browser has joined before', asyn
 	await card.getByTestId('table-card-action').click();
 	await expect(page).toHaveURL('/table/REJOIN');
 });
+
+test('guide button opens a faan library with a tab per faan count', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await expect(page.getByTestId('guide-dialog')).toBeVisible();
+	await expect(page.getByTestId('guide-entry').first()).toContainText('All Sequences');
+	await page.getByTestId('guide-tab-6').click();
+	await expect(page.getByTestId('guide-panel')).toContainText('Full Flush');
+	await page.getByTestId('guide-tab-limit').click();
+	await expect(page.getByTestId('guide-panel')).toContainText('Thirteen Orphans');
+});
+
+test('language button on the lobby switches to zh-Hant and back', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-language').click();
+	await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
+	await page.getByTestId('lobby-language').click();
+	await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
