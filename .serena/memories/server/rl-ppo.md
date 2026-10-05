@@ -61,3 +61,15 @@ smoke only; not the gate. Launch script: server/runs/ppo_c0_full.sh (worktree, g
   ~1.1-1.5k decisions/s at 10 workers / 160 envs, learner ~55% / rollout ~45%; GPU ~42% busy is
   expected (tiny net, waits on CPU workers). Tests that assert exact equality must pin
   `device: "cpu"` — `auto` picks cuda on a GPU box and cuda isn't bit-reproducible.
+
+## Engine 1.3.0 migration (2026-10-05)
+- ADR 0020 scoring change shrank the ruleset scalar block (80 -> 74 policy scalars). `ml.migrate_ckpt`
+  folds the constant hk_classic difference into biases (exact outputs); only works because training
+  uses one ruleset. A future change that alters the encoder elsewhere needs a different approach.
+- Resume now builds PolicyNet from the run ckpt's model_config, never init_ckpt.
+- R2 run migrated at update 23,445 / 98.57M decisions: runs/ppo_c0 (1.0.0) -> runs/ppo_c1 (1.3.0).
+  explained_var jumped 0.52 -> 0.84 (smaller payouts); KL unchanged.
+- C1 win threshold 0.18 -> 0.15: self-play per-seat win = (1 - draws)/4; 1.3.0 doubled arena draws
+  (~15% -> ~31%) since 缺一門 is gone (same hands reaching 3 faan: 34.5% -> 14.2%). Thresholds live in
+  code (DEFAULT_STAGES), not ckpt state: changing them needs only stop + --resume.
+- Remote trains from worktree ~/mahjong-train (detached), not ~/mahjong (live-hosting checkout).
