@@ -329,10 +329,13 @@ standard runner has ~14GB free. It builds without a layer cache:
 (`continue-on-error: true`) — line tracing trips `test_frontier_cache_warms_and_stays_fast`'s
 wall-clock ceiling, so that test is deselected from the rerun. `web.yml`'s `test:coverage` is
 `vitest --run --coverage` (v8, `json-summary`). `ci.yml`'s own `coverage-badge` job (push to
-`main` only, `needs: [server, web]`) renders both summaries into SVGs
-(`.github/scripts/coverage_badge.py`) and commits `.github/badges/coverage-*.svg` if changed. The
-README references them by relative path: the repo is private, so shields.io can't fetch them.
-`GITHUB_TOKEN` pushes don't retrigger workflows.
+`main` only, `needs: [server, web]`, one run at a time) renders both summaries into SVGs
+(`.github/scripts/coverage_badge.py`) and, if either changed, force-pushes them as the single
+commit of the orphan `badges` branch. The README references them as `../../raw/badges/*.svg`: the
+repo is private, so shields.io can't fetch them, but GitHub serves `raw/` to signed-in viewers.
+Committing them to `main` instead put a bot commit on top of nearly every push, so local `main`
+kept diverging. A missing coverage report keeps that badge's previous SVG rather than failing the
+run.
 
 **Gates** (all hard): `ruff check`, `ruff format --check`, fast pytest, slow pytest
 (`--games=1000`), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,

@@ -40,6 +40,7 @@ jobs:
         with:
           name: coverage-server
           path: server/coverage.json
+          if-no-files-found: ignore
           retention-days: 1
 
   server-slow:

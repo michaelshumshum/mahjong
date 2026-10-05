@@ -27,52 +27,50 @@ jobs:
     name: proto-check
     uses: ./.github/workflows/proto-check.yml
 
-  # Pushes updated coverage-badge SVGs back to main, self-rendered rather than shields.io's own
-  # endpoint badge -- this repo is private, and shields.io's anonymous fetch of
-  # raw.githubusercontent.com 401s on a private repo, so an externally-hosted badge would never
-  # resolve. README references these by relative path; GitHub renders that straight from the
-  # repo for any authenticated viewer, no external fetch involved. Only on push, never on a PR
-  # -- forked PRs have no write access, and a PR branch shouldn't mutate main anyway.
-  # GITHUB_TOKEN-authored pushes don't retrigger workflow runs, so this can't loop.
+  # badges live on an orphan `badges` branch, force-pushed as one commit, so main never gets
+  # bot commits; self-rendered because shields.io can't fetch from a private repo.
   coverage-badge:
     name: coverage badge
     needs: [server, web]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      group: coverage-badge
+      cancel-in-progress: true
     permissions:
       contents: write
       actions: read
     steps:
       - uses: actions/checkout@v7
+      # a missing report keeps that badge's previous svg instead of failing the run
       - uses: actions/download-artifact@v7
+        continue-on-error: true
         with:
           name: coverage-server
           path: coverage-server
       - uses: actions/download-artifact@v7
+        continue-on-error: true
         with:
           name: coverage-web
           path: coverage-web
       - name: generate badge SVGs
         run: |
-          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json .github/badges/coverage-server.svg
-          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json .github/badges/coverage-web.svg
-      - name: commit badge SVGs if changed
+          mkdir badges-out
+          if git fetch --depth=1 origin badges; then
+            git --work-tree=badges-out checkout FETCH_HEAD -- .
+            git reset -q
+          fi
+          cp -r badges-out badges-prev
+          python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json badges-out/coverage-server.svg
+          python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json badges-out/coverage-web.svg
+      - name: force-push badges branch if changed
         run: |
+          diff -r badges-prev badges-out >/dev/null && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/coverage-server.svg .github/badges/coverage-web.svg
-          git diff --staged --quiet && exit 0
-          git commit -m "chore(ci): update coverage badges"
-          # Rebase onto any commits that landed while this job waited for artifacts/tests,
-          # then push. Retry a few times in case of a tight race with another workflow run.
-          for attempt in 1 2 3; do
-            git pull --rebase
-            if git push; then
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "failed to push coverage badges after $attempt attempts" >&2
-              exit 1
-            fi
-            sleep $((attempt * 2))
-          done
+          git checkout -q --orphan badges-tmp
+          git rm -rq --cached .
+          cp badges-out/*.svg .
+          git add coverage-*.svg
+          git commit -qm "chore(ci): update coverage badges"
+          git push --force origin HEAD:badges

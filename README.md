@@ -1,7 +1,7 @@
 # 雀 — Browser Hong Kong Mahjong
 
-[![server coverage](.github/badges/coverage-server.svg)](docs/infra.md#9-ci)
-[![web coverage](.github/badges/coverage-web.svg)](docs/infra.md#9-ci)
+[![server coverage](../../raw/badges/coverage-server.svg)](docs/infra.md#9-ci)
+[![web coverage](../../raw/badges/coverage-web.svg)](docs/infra.md#9-ci)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)

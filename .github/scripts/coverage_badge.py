@@ -3,14 +3,18 @@
 
 Self-rendered rather than shields.io's own /badge endpoint: this repo is private, and
 raw.githubusercontent.com (what an endpoint badge would point at) 401s for third-party
-fetchers like shields.io on a private repo. An SVG committed to the repo and referenced by
-a relative path in README.md renders for any authenticated viewer with no external fetch.
+fetchers like shields.io on a private repo. CI force-pushes the SVGs to the orphan `badges`
+branch, which README.md references via `../../raw/badges/`.
+
+A missing report leaves <out-path> untouched, so the previous badge survives.
 
 Usage: coverage_badge.py <server|web> <label> <report-path> <out-path>
 """
 
+import json
+import os
 import sys
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 # shields.io's own flat-badge palette, so this matches what a public shields.io badge would
 # have looked like.
@@ -39,9 +43,8 @@ def color_for(pct: float) -> str:
 
 
 def pct_from(kind: str, path: str) -> float:
-    import json
-
-    data = json.load(open(path))
+    with open(path) as f:
+        data = json.load(f)
     if kind == "server":  # pytest-cov --cov-report=json
         return data["totals"]["percent_covered"]
     if kind == "web":  # vitest --coverage.reporter=json-summary
@@ -59,9 +62,10 @@ def render_svg(label: str, message: str, color: str) -> str:
     msg_w = _text_width(message)
     total_w = label_w + msg_w
     hex_color = _COLOR_HEX[color]
+    aria = quoteattr(f"{label}: {message}")
     label, message = escape(label), escape(message)
     return f"""\
-<svg xmlns="http://www.w3.org/2000/svg" width="{total_w}" height="20" role="img" aria-label="{label}: {message}">
+<svg xmlns="http://www.w3.org/2000/svg" width="{total_w}" height="20" role="img" aria-label={aria}>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
@@ -82,6 +86,9 @@ def render_svg(label: str, message: str, color: str) -> str:
 
 def main() -> None:
     kind, label, in_path, out_path = sys.argv[1:5]
+    if not os.path.exists(in_path):
+        print(f"warning: {in_path} missing, keeping previous {out_path}", file=sys.stderr)
+        return
     pct = pct_from(kind, in_path)
     svg = render_svg(label, f"{pct:.1f}%", color_for(pct))
     with open(out_path, "w") as f:
