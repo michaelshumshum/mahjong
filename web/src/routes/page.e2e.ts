@@ -285,6 +285,17 @@ test('guide button opens a faan library with a tab per faan count', async ({ pag
 	await expect(page.getByTestId('guide-panel')).toContainText('Thirteen Orphans');
 });
 
+test('guide dialog keeps its height across tabs', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	const dialog = page.getByTestId('guide-dialog');
+	const before = (await dialog.boundingBox())!.height;
+	for (const tab of ['3', '8', 'limit']) {
+		await page.getByTestId(`guide-tab-${tab}`).click();
+		expect((await dialog.boundingBox())!.height).toBe(before);
+	}
+});
+
 test('guide ruleset filter hides patterns a preset disables', async ({ page }) => {
 	await page.goto('/');
 	await page.getByTestId('lobby-guide').click();

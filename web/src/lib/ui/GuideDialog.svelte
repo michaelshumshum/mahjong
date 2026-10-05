@@ -119,7 +119,7 @@
 		gap: var(--space-3);
 		width: 100%;
 		max-width: 40rem;
-		max-height: 90dvh;
+		height: 90dvh;
 		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
@@ -163,6 +163,8 @@
 	}
 
 	.panel {
+		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
 	}
 

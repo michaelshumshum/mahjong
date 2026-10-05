@@ -447,7 +447,8 @@ waiting room shows the resolved preset name (`PretableScreen.svelte`).
 Two buttons under "Practice vs Bots". The language button calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
 stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per faan count (1-8)
-plus Limit, each a list of patterns with a description and a tile example. The data lives in
+plus Limit, each a list of patterns with a description and a tile example. The dialog is a fixed
+`90dvh` tall and the tab panel scrolls, so switching to a shorter tab doesn't resize it. The data lives in
 `lib/ui/faan-guide.ts` (`GUIDE`, keyed by faan value; examples are strings of concatenated tile
 codes, one group each); a spec pins it to `FAAN_PATTERN_LABEL` so a new pattern can't be left out.
 Situational patterns (self-draw, last tile, ...) show the description only. A ruleset select (All or
