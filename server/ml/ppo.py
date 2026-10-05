@@ -843,7 +843,11 @@ def train_ppo(
     else:
         venv = VecTrainEnv(cfg.envs, base_seed, env_cfg)
 
-    learner = Learner(cfg, load_policy(cfg), device)
+    # a resumed run keeps its own shape: init_ckpt may predate a migration (ml.migrate_ckpt)
+    policy = (
+        load_policy(cfg) if ckpt is None else PolicyNet(PolicyNetConfig(**ckpt["model_config"]))
+    )
+    learner = Learner(cfg, policy, device)
     if ckpt is not None:
         learner.load_state_dict(ckpt["learner"])
     collector = Collector(venv, round(cfg.envs * cfg.blind_frac), rng)

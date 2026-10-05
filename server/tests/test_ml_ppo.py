@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import random
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -244,6 +245,16 @@ def test_train_ppo_runs_resumes_and_pins_engine_version(tmp_path):
     (out / "meta.json").write_text(json.dumps(meta))
     with pytest.raises(RuntimeError, match="ENGINE_VERSION"):
         train_ppo(cfg, resume=True, max_updates=1)
+
+
+def test_train_ppo_resume_ignores_init_ckpt(tmp_path):
+    cfg = _tiny_cfg(tmp_path)
+    train_ppo(cfg, max_updates=1)
+    # a migrated run's init_ckpt has the pre-migration shape; resume must not load it
+    moved = replace(cfg, init_ckpt=str(tmp_path / "missing.pt"))
+    out = train_ppo(moved, resume=True, max_updates=1)
+    lines = (out / "metrics.jsonl").read_text().splitlines()
+    assert json.loads(lines[-1])["update"] == 2
 
 
 def test_train_ppo_is_deterministic(tmp_path):
