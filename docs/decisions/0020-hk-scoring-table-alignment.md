@@ -48,3 +48,37 @@ Opus audit items previously left open, now applied:
   shanten is gated, the value estimate is not.
 - `ENGINE_VERSION` 1.3.0: totals, labels and the encoded `hand_sets` mask changed; retrain from
   scratch. PPO and trajectory pins regenerated.
+- The R2 PPO run did not retrain from scratch: `ml.migrate_ckpt` carries an engine-1.0.0 checkpoint
+  over with identical outputs on `hk_classic` (`docs/ml.md §9`). It was migrated at 98.6M
+  decisions, still at `min_faan` 0, before the faan-sensitive part of C1.
+
+## Measured impact (2026-10-05)
+
+Same winning hands, both scorers: 1,362 wins captured from 60 `FaanBot`-vs-`EfficiencyBot` duplicate
+sets played at engine 1.3.0, `hk_classic` with `min_faan` 0 (so every completed shape is a win),
+each scored by the 1.0.0 and the 1.3.0 `score_winning_hand` at `min_faan` 3.
+
+| Share of winning hands | 1.0.0 | 1.3.0 |
+| --- | --- | --- |
+| ≥ 3 faan (wins at `hk_classic`) | 0.345 | 0.142 |
+| ≥ 5 faan | 0.053 | 0.006 |
+| mean faan | 2.11 | 1.55 |
+| total changed / fell below 3 / rose to ≥ 3 | | 0.319 / 0.218 / 0.015 |
+
+缺一門 (2 faan, on 26% of wins) was on 93% of the hands that fell below 3, 一般高 on 14%. Flower scoring is unchanged in practice (座位花 → 正花 at the same rate).
+
+Arena, `FaanBot` vs `EfficiencyBot`, 1,000 sets, seed 1, `hk_classic` (`docs/bots.md §7` has the
+1.3.0 table):
+
+| Metric (A / B) | 1.0.0 | 1.3.0 |
+| --- | --- | --- |
+| win rate | 0.175 / 0.224 | 0.197 / 0.163 |
+| deal-in rate | 0.110 / 0.139 | 0.042 / 0.069 |
+| avg winning faan | 4.23 / 3.75 | 3.30 / 3.22 |
+| sub-minimum tenpai | 0.224 / 0.324 | 0.039 / 0.337 |
+| exhaustive draws (derived) | ~15% | ~31% |
+| paired diff, points/game | +0.59 [−0.39, +1.58] | +2.67 [+1.92, +3.42] |
+
+Reaching 3 faan is now the binding constraint: draws double, deal-ins fall (fewer hands are live),
+and a faan-aware bot gains a clear edge over a faan-blind one. The C1 exit win threshold moved
+0.18 → 0.15 accordingly (`docs/ml.md §10`).

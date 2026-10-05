@@ -242,23 +242,24 @@ python -m bots.arena --a <candidate> --b FaanBot --games 200 --seed 1000000 --pa
 
 ### Current numbers: `FaanBot` vs `EfficiencyBot`
 
-`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 12` (1000
-duplicate sets = 4000 games). Shipped weights: `bots/faanbot.py`'s `_weights_for_turn` (its
-docstring carries the tuning history).
+`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 4` (1000
+duplicate sets = 4000 games), engine 1.3.0, `hk_classic`. Shipped weights: `bots/faanbot.py`'s
+`_weights_for_turn` (its docstring carries the tuning history).
 
 | Metric | FaanBot (A) | EfficiencyBot (B) |
 | --- | --- | --- |
-| win_rate | 0.1752 | 0.2239 |
-| deal_in_rate | 0.1096 | 0.1389 |
-| avg_winning_faan | 4.2294 | 3.7456 |
-| tenpai_rate_on_sub_minimum_hand | 0.2243 | 0.3243 |
-| avg_points_per_hand | 0.1108 | -0.0369 |
+| win_rate | 0.1974 | 0.1632 |
+| deal_in_rate | 0.0416 | 0.0685 |
+| avg_winning_faan | 3.3029 | 3.2179 |
+| tenpai_at_draw_rate | 0.6084 | 0.9869 |
+| tenpai_rate_on_sub_minimum_hand | 0.0394 | 0.3374 |
+| avg_points_per_hand | 0.5002 | -0.1668 |
 
-Paired difference (A − B): **+0.591 points/game, 95% CI [-0.393, +1.575]** — positive, but the CI
-includes zero, so on points alone `FaanBot` has not cleared the merge gate against `T1`. It reaches
-a sub-minimum tenpai ~31% less often (0.224 vs 0.324) and deals in less; its win rate is lower.
-`w_safety` has moved the needle most in tuning so far; trimming it, or revisiting
-`bots/safety.py`'s per-signal multipliers, is the next lever.
+Paired difference (A − B): **+2.668 points/game, 95% CI [+1.916, +3.420]**: `FaanBot` clears the
+merge gate against `T1`. It wins more, deals in less, and almost never sits tenpai on a hand that
+can't reach `min_faan` (0.04 vs 0.34). Exhaustive draws are ~31% of hands, about double the
+engine-1.0.0 table, because far fewer hands reach 3 faan without 缺一門. The engine-1.0.0 numbers,
+where the CI still spanned zero, are in [ADR 0020](decisions/0020-hk-scoring-table-alignment.md).
 
 ## 8. Ruleset awareness
 
