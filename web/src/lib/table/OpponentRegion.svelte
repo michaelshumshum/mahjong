@@ -211,6 +211,18 @@
 		}
 	}
 
+	// side strips run vertically; wrapping would push the drawn tile into a second column
+	.seat-hand-strip--left .backs-row,
+	.seat-hand-strip--right .backs-row {
+		@include layout.tablet-up {
+			flex-wrap: nowrap;
+		}
+	}
+
+	.backs-row .drawn-gap {
+		margin-inline-start: var(--space-2);
+	}
+
 	// sub-768px collapse: opponent backs to a thin overlapping strip.
 	@include layout.phone-only {
 		.seat-hand-strip--left,
