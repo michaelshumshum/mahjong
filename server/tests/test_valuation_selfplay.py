@@ -48,7 +48,8 @@ the numbers quoted in `bots/valuation.py`'s module docstring."""
 def _collect_win_samples(seed: int) -> list[tuple[int, int]]:
     """`(estimated_faan, actual_faan)` for every real win across one seeded `RandomBot` game."""
     rng = random.Random(seed)
-    ruleset = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
+    # min_faan=0: under the 3-faan default RandomBot wins ~7 times in _GAMES games (engine 1.3.0)
+    ruleset = RuleSet(min_faan=0, dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
     state = new_game(ruleset, seed)
     samples: list[tuple[int, int]] = []
     steps = 0
@@ -109,7 +110,7 @@ def test_estimate_matches_real_scorer_on_selfplay_sample() -> None:
         f"MAE={mae:.2f} faan, within 1 faan={within_one:.0%}"
     )
 
-    # bounds are the measured baseline (67 samples: MAE 2.46, 9% within 1 faan; see
+    # bounds are the measured baseline (112 samples: MAE 0.72, 91% within 1 faan; see
     # bots/valuation.py's docstring) -- catches a regression past it, not a calibrated accuracy bar (the estimator doesn't model situational/win-timing faan).
-    assert mae <= 4.0, f"mean absolute error {mae:.2f} faan exceeds the measured baseline"
-    assert within_one >= 0.05, f"only {within_one:.0%} of samples within 1 faan"
+    assert mae <= 1.5, f"mean absolute error {mae:.2f} faan exceeds the measured baseline"
+    assert within_one >= 0.75, f"only {within_one:.0%} of samples within 1 faan"

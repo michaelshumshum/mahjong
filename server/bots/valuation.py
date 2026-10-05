@@ -6,8 +6,8 @@ Proxy, not the real scorer: `score_winning_hand` only scores a complete 14-tile 
 route eligibility off the 34-count array instead.
 
 Validated against `score_hand`: `tests/test_valuation_selfplay.py` (slow) measured mean absolute
-error 2.46 faan over 67 real `RandomBot` wins -- large because real wins often carry situational/
-win-timing faan (箭刻, flowers, timing sets) this module doesn't model.
+error 0.72 faan, 91% within 1 faan, over 112 real `RandomBot` wins at `min_faan=0` -- the residual
+is situational/win-timing faan (箭刻, flowers, timing sets) this module doesn't model.
 
 Still safe to rank discards with: the omitted bonuses are close to shape-independent, so they
 shift every candidate's estimate by about the same amount and barely disturb relative order --
