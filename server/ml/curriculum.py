@@ -70,7 +70,8 @@ DEFAULT_STAGES: tuple[StageSpec, ...] = (
         keep_prob=(1.0, 0.0),
         beta=(0.5, 0.0),
         anneal_decisions=200_000_000,
-        win_rate=0.18,
+        # calibrated on engine 1.3.0 heuristic tables (docs/ml.md §10)
+        win_rate=0.15,
         sub_min_tenpai_max=0.32,
     ),
     StageSpec(name="C2", learners=4, min_faan=((3, 0.0),), implemented=False),

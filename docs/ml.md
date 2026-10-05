@@ -494,7 +494,7 @@ enough; hand-building has to be learned first.
 | --- | --- | --- | --- | --- | --- |
 | C0 | frozen tsumogiri bots (never claim or win) | 0 | hands + next 13 draws | 1.0 | win rate ≥ 40% |
 | C0b | same | 0 | draws k: 13 → 0 | 1.0 → 0.5 | blind win rate ≥ 25% |
-| C1 | self-play | 0 → 1 → 3 | keep prob → 0 | 0.5 → 0 | at `min_faan` 3, oracle 0, β 0: win ≥ 18%, sub-min tenpai ≤ 0.32 |
+| C1 | self-play | 0 → 1 → 3 | keep prob → 0 | 0.5 → 0 | at `min_faan` 3, oracle 0, β 0: win ≥ 15%, sub-min tenpai ≤ 0.32 |
 | C2 | league (§11) | 3, 20% other presets | 0 | 0 | R3 gates |
 
 **Contingency:** if C1 is below 10% win rate after 1B decisions, warm-start by cloning
@@ -514,8 +514,22 @@ seat-hands, cleared at anneal completion and at each advance) meeting every thre
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | C0 | 1 learner + 3 tsumogiri | 0 | 13 | 1 | 1.0 | — | rolling win ≥ 0.40 |
 | C0b | same | 0 | 13 → 0 | 1 | 1.0 → 0.5 | 20M | rolling blind win ≥ 0.25 (blind envs, §9) |
-| C1 | 4 learners (self-play) | 0, 1 from ½, 3 at the end | 0 | 1 → 0 | 0.5 → 0 | 200M | win ≥ 0.18 and sub-min tenpai ≤ 0.32 over ≥ 200 tenpai draws |
+| C1 | 4 learners (self-play) | 0, 1 from ½, 3 at the end | 0 | 1 → 0 | 0.5 → 0 | 200M | win ≥ 0.15 and sub-min tenpai ≤ 0.32 over ≥ 200 tenpai draws |
 | C2 | stub: `params` raises `NotImplementedError`, `complete()` stops training | | | | | | R3 |
+
+**C1 thresholds.** With four learners every hand has either one winner or none, so the rolling
+per-seat win rate is (1 − draw rate) / 4: the win threshold is really a cap on exhaustive draws,
+the passivity canary. Both thresholds are anchored to the `FaanBot` vs `EfficiencyBot` arena
+(`docs/bots.md §7`, engine 1.3.0):
+
+| Threshold | Anchor | Value |
+| --- | --- | --- |
+| win | 0.85 × the arena's average per-seat win, (0.197 + 3 × 0.163) / 4 = 0.172 → 0.146. The 0.85 is the engine-1.0.0 ratio (0.18 / 0.212), kept so the bar didn't move relative to the heuristic table | ≥ 0.15 (draws ≤ 40%; the arena table draws ~31%) |
+| sub-min tenpai | `EfficiencyBot`'s rate, the faan-blind baseline: 0.337 (0.324 at engine 1.0.0) | ≤ 0.32, unchanged |
+
+At engine 1.0.0 the win threshold was 0.18 (draws ≤ 28%). Engine 1.3.0 roughly doubled the
+arena's draw rate, so 0.18 would have demanded a less drawish table than the heuristic bots
+achieve ([ADR 0020](decisions/0020-hk-scoring-table-alignment.md) has the measurements).
 
 Keep and β reach 0 exactly when `min_faan` reaches 3, so the C1 exit is measured blind and
 unshaped. Contingency (`Contingency`, `enabled: false` by default): if enabled and C1 has run
@@ -571,7 +585,7 @@ uv run python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 700 --see
 | records | every hand as `HandRecord` columns (`--records`, JSON lines; `players` names the candidate's seat), replayable with `ml.env.replay_hand` |
 | checkpoints | `ml.ppo` (`learner.policy`) or R1 `rl_aux` (`model`) |
 
-**Calibration (2026-10-04).** Heuristic bots substituted as the candidate, hk_classic, 200 sets,
+**Calibration (2026-10-04, engine 1.0.0: predates ADR 0020).** Heuristic bots substituted as the candidate, hk_classic, 200 sets,
 points per hand:
 
 | Candidate vs opponents × 3 | Paired diff [95% CI] | Reading |
