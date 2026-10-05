@@ -288,11 +288,13 @@ test('guide button opens a faan library with a tab per faan count', async ({ pag
 test('guide ruleset filter hides patterns a preset disables', async ({ page }) => {
 	await page.goto('/');
 	await page.getByTestId('lobby-guide').click();
-	await expect(page.getByTestId('guide-tab-4')).toBeVisible();
+	await page.getByTestId('guide-tab-4').click();
+	await expect(page.getByTestId('guide-panel')).toContainText('Seven Pairs');
 	await page.getByTestId('guide-ruleset').selectOption('hk_strict');
-	await expect(page.getByTestId('guide-tab-4')).toHaveCount(0);
+	await expect(page.getByTestId('guide-panel')).toContainText('Mixed Terminals');
+	await expect(page.getByTestId('guide-panel')).not.toContainText('Seven Pairs');
 	await page.getByTestId('guide-ruleset').selectOption('');
-	await expect(page.getByTestId('guide-tab-4')).toBeVisible();
+	await expect(page.getByTestId('guide-panel')).toContainText('Seven Pairs');
 });
 
 test('language button on the lobby switches to zh-Hant and back', async ({ page }) => {
