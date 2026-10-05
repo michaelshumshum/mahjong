@@ -111,17 +111,6 @@ def test_small_three_dragons_route_faan_matches_real_scorer() -> None:
     assert score_hand(hand, _ctx())["小三元"] == ROUTE_FAAN["small_three_dragons"]
 
 
-def test_voided_suit_route_faan_matches_real_scorer() -> None:
-    hand = (
-        _pung(TileType.MAN_1),
-        _chow(TileType.PIN_2),
-        _pung(TileType.WIND_EAST),
-        _chow(TileType.PIN_5),
-        _pair(TileType.DRAGON_RED),
-    )
-    assert score_hand(hand, _ctx())["缺一門"] == ROUTE_FAAN["voided_suit"]
-
-
 def test_all_sequences_route_faan_matches_real_scorer() -> None:
     hand = (
         _chow(TileType.MAN_1),
@@ -179,17 +168,6 @@ def test_full_flush_excluded_once_a_single_honor_appears() -> None:
     routes = _routes(hand, closed=True)
     assert "full_flush" not in routes
     assert routes["half_flush"] == ROUTE_FAAN["half_flush"]
-
-
-def test_voided_suit_needs_exactly_two_suits() -> None:
-    one_suit = _hand34(TileType.MAN_1, TileType.MAN_2)
-    assert "voided_suit" not in _routes(one_suit, closed=True)
-
-    two_suits = _hand34(TileType.MAN_1, TileType.PIN_2)
-    assert _routes(two_suits, closed=True)["voided_suit"] == ROUTE_FAAN["voided_suit"]
-
-    three_suits = _hand34(TileType.MAN_1, TileType.PIN_2, TileType.SOU_3)
-    assert "voided_suit" not in _routes(three_suits, closed=True)
 
 
 def test_seven_pairs_needs_four_pairs_and_a_closed_hand() -> None:
@@ -273,8 +251,8 @@ def test_pattern_optionality_counts_distinct_reachable_routes() -> None:
     scattered = _hand34(TileType.MAN_1, TileType.PIN_4, TileType.SOU_7)
     assert pattern_optionality(scattered, closed=True) == 1  # only the all_sequences floor
 
-    # voided_suit, small_three_dragons, and all_pungs all reach threshold at once here ->
-    # optionality 3, not the all_sequences floor (only added when nothing else is reachable).
+    # small_three_dragons and all_pungs reach threshold at once here -> optionality 2, not the
+    # all_sequences floor (only added when nothing else is reachable).
     multi_route = _hand34(
         TileType.MAN_1,
         TileType.PIN_2,
@@ -283,7 +261,7 @@ def test_pattern_optionality_counts_distinct_reachable_routes() -> None:
         TileType.DRAGON_GREEN,
         TileType.DRAGON_GREEN,
     )
-    assert pattern_optionality(multi_route, closed=True) == 3
+    assert pattern_optionality(multi_route, closed=True) == 2
 
 
 # --- faan_overrides-aware ROUTE_FAAN (docs/bots.md §8 Tier 2) ----------------------------
@@ -306,7 +284,7 @@ def test_route_faan_for_applies_an_override_via_the_pattern_name_mapping() -> No
     overridden = route_faan_for({"混一色": 10, "雞糊": 0})
     assert overridden["half_flush"] == 10
     assert overridden["full_flush"] == ROUTE_FAAN["full_flush"]
-    assert overridden["voided_suit"] == ROUTE_FAAN["voided_suit"]
+    assert overridden["all_pungs"] == ROUTE_FAAN["all_pungs"]
 
 
 def test_estimate_best_faan_reads_route_faan_override() -> None:
@@ -362,7 +340,9 @@ def test_estimate_best_faan_with_empty_overrides_matches_the_fixed_default() -> 
 # --- exact_wait_value: real-scorer tenpai valuation (ORACLE, ADR 0019 §5.2) -------------------
 
 
-def _wait_view(melds: tuple[Meld, ...], concealed: tuple[TileType, ...]) -> SeatView:
+def _wait_view(
+    melds: tuple[Meld, ...], concealed: tuple[TileType, ...], ruleset: RuleSet | None = None
+) -> SeatView:
     used: dict[TileType, int] = {}
     ids = []
     for t in concealed:
@@ -389,7 +369,7 @@ def _wait_view(melds: tuple[Meld, ...], concealed: tuple[TileType, ...]) -> Seat
         claim_options=(),
         deadline_ts=None,
         host_seat=None,
-        ruleset=RuleSet(),
+        ruleset=ruleset or RuleSet(),
         hands=None,
     )
 
@@ -428,7 +408,7 @@ def _real_faan(view: SeatView, *, self_drawn: bool) -> int:
 
 
 def test_exact_wait_value_scores_ron_copies_in_the_discard_context() -> None:
-    view = _wait_view((_CLAIMED_RED_PUNG,), _TANKI_CONCEALED)
+    view = _wait_view((_CLAIMED_RED_PUNG,), _TANKI_CONCEALED, RuleSet(min_faan=1))
     self_faan, ron_faan = _real_faan(view, self_drawn=True), _real_faan(view, self_drawn=False)
     assert self_faan > ron_faan >= view.ruleset.min_faan  # an open hand loses 自摸 on a ron
 

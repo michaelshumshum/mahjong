@@ -89,7 +89,7 @@ _JUNK_HAND = (
 
 
 def _state(**overrides: object) -> GameState:
-    state = new_game(DEFAULT_RULESET, game_seed=1)
+    state = new_game(dataclasses.replace(DEFAULT_RULESET, min_faan=1), game_seed=1)
     return dataclasses.replace(state, **overrides)  # type: ignore[arg-type]
 
 
@@ -325,17 +325,17 @@ def test_robbing_the_kong_ends_the_hand_as_a_kong_rob_win() -> None:
     state, events = reduce(state, win_action)
 
     assert state.phase == Phase.HAND_OVER
-    # 缺一門(2) + 平糊(1) + 門前清(1) + 搶槓(1) + 無花(1) = 6 faan; half-spicy points(6) = 32;
+    # 平糊(1) + 門前清(1) + 搶槓(1) + 無花(1) = 4 faan; half-spicy points(4) = 16;
     # a discard-shaped payment (§8's robbing-the-kong note) with default DiscardPayment.ALL.
     assert state.hand_result == HandResult(
         outcome=HandOutcome.WIN,
         winner=2,
         win_type=WinType.KONG_ROB,
         discarder=0,
-        faan=6,
-        faan_breakdown={"缺一門": 2, "平糊": 1, "門前清": 1, "搶槓": 1, "無花": 1},
-        points=32,
-        payments={0: -32, 1: 0, 2: 32, 3: 0},
+        faan=4,
+        faan_breakdown={"平糊": 1, "門前清": 1, "搶槓": 1, "無花": 1},
+        points=16,
+        payments={0: -16, 1: 0, 2: 16, 3: 0},
     )
     assert any(isinstance(e, HandEnded) for e in events)
     # regression: the robbed tile used to stay in the declarer's ADDED_KONG meld *and* get
@@ -458,16 +458,16 @@ def test_declare_win_ends_hand_as_self_draw() -> None:
     state, events = reduce(state, DeclareWin())
 
     assert state.phase == Phase.HAND_OVER
-    # 缺一門(2) + 自摸(1) + 無花(1) = 4 faan; half-spicy points(4) = 16; self-draw split 3 ways.
+    # 門前清 does not apply to a self-draw; 自摸(1) + 無花(1) = 2 faan; points(2) = 4; split 3 ways.
     assert state.hand_result == HandResult(
         outcome=HandOutcome.WIN,
         winner=0,
         win_type=WinType.SELF_DRAW,
         discarder=None,
-        faan=4,
-        faan_breakdown={"缺一門": 2, "自摸": 1, "無花": 1},
-        points=16,
-        payments={0: 24, 1: -8, 2: -8, 3: -8},
+        faan=2,
+        faan_breakdown={"自摸": 1, "無花": 1},
+        points=4,
+        payments={0: 6, 1: -2, 2: -2, 3: -2},
     )
     assert any(isinstance(e, HandEnded) for e in events)
 
@@ -502,17 +502,17 @@ def test_claim_win_off_discard_scores_and_pays_real_faan() -> None:
     state, events = reduce(state, win_action)
 
     assert state.phase == Phase.HAND_OVER
-    # 缺一門(2) + 門前清(1, claimed not self-drawn) + 無花(1) = 4 faan; points(4) = 16;
+    # 門前清(1, claimed not self-drawn) + 無花(1) = 2 faan; points(2) = 4;
     # DiscardPayment.ALL (default): discarder pays it all, winner takes it all.
     assert state.hand_result == HandResult(
         outcome=HandOutcome.WIN,
         winner=3,
         win_type=WinType.DISCARD,
         discarder=1,
-        faan=4,
-        faan_breakdown={"缺一門": 2, "門前清": 1, "無花": 1},
-        points=16,
-        payments={0: 0, 1: -16, 2: 0, 3: 16},
+        faan=2,
+        faan_breakdown={"門前清": 1, "無花": 1},
+        points=4,
+        payments={0: 0, 1: -4, 2: 0, 3: 4},
     )
     assert any(isinstance(e, HandEnded) for e in events)
 
@@ -735,14 +735,14 @@ def test_win_on_last_wall_tile_scores_last_tile_self_draw() -> None:
     result = state.hand_result
     assert result is not None
     assert result.win_type == WinType.SELF_DRAW
-    # 缺一門(2) + 自摸(1) + 無花(1) + 海底撈月(1) = 5 faan.
-    assert result.faan == 5
+    # 自摸(1) + 無花(1) + 海底撈月(1) = 3 faan.
+    assert result.faan == 3
     assert result.faan_breakdown["海底撈月"] == 1
     assert any(isinstance(e, HandEnded) for e in events)
 
 
 def test_win_on_last_discard_scores_river_bottom() -> None:
-    """河底撈魚: the wall empties on seat 1's draw (a tile they don't need), they discard it
+    """海底撈月 (last discard): the wall empties on seat 1's draw (a tile they don't need), they discard it
     right back out, and seat 3 claims that discard for the win -- `wall_exhausted_at_last_draw`
     carries across the intervening discard/claim-window turns untouched, exactly as it must
     for "the last possible discard" to be claimable at all."""
@@ -764,9 +764,9 @@ def test_win_on_last_discard_scores_river_bottom() -> None:
     assert result is not None
     assert result.win_type == WinType.DISCARD
     assert result.discarder == 1
-    # 缺一門(2) + 門前清(1) + 無花(1) + 河底撈魚(1) = 5 faan.
-    assert result.faan == 5
-    assert result.faan_breakdown["河底撈魚"] == 1
+    # 門前清(1) + 無花(1) + 海底撈月(1) = 3 faan.
+    assert result.faan == 3
+    assert result.faan_breakdown["海底撈月"] == 1
     assert any(isinstance(e, HandEnded) for e in events)
 
 
@@ -810,8 +810,8 @@ def test_win_on_kong_replacement_scores_kong_replacement() -> None:
     result = state.hand_result
     assert result is not None
     assert result.win_type == WinType.SELF_DRAW
-    # 缺一門(2) + 自摸(1) + 無花(1) + 槓上開花(1) = 5 faan.
-    assert result.faan == 5
+    # 自摸(1) + 無花(1) + 槓上開花(1) = 3 faan.
+    assert result.faan == 3
     assert result.faan_breakdown["槓上開花"] == 1
     assert any(isinstance(e, HandEnded) for e in events)
 
@@ -866,10 +866,10 @@ def test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacem
     result = state.hand_result
     assert result is not None
     assert result.win_type == WinType.SELF_DRAW
-    # 缺一門(2) + 自摸(1) + 槓上開花(1) = 4 faan; no 無花 (a flower was held), no 座位花
+    # 自摸(1) + 槓上開花(1) = 2 faan; no 無花 (a flower was held), no 座位花
     # (FLOWER_2 doesn't match East).
-    assert result.faan == 4
-    assert result.faan_breakdown == {"缺一門": 2, "自摸": 1, "槓上開花": 1}
+    assert result.faan == 2
+    assert result.faan_breakdown == {"自摸": 1, "槓上開花": 1}
     assert any(isinstance(e, HandEnded) for e in events)
 
 

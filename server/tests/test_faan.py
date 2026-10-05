@@ -90,8 +90,8 @@ def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
 
 
 def test_maximizes_across_decompositions() -> None:
-    """111p 222p 333p 444p 99s parses two ways: four concealed pungs (四暗刻 8, 12 total with
-    缺一門), or 123p x3 chows + 444p pung (三般高 6, 10 total) -- rules.md §11 edge case 9.
+    """111p 222p 333p 444p 99s parses two ways: four concealed pungs (四暗刻 8, 9 total), or
+    123p x3 chows + 444p pung (無花 1 only) -- rules.md §11 edge case 9.
     Maximisation must pick the pung parse, not whichever `decompose()` lists first."""
     tiles = _tiles(
         TileType.PIN_1,
@@ -113,8 +113,8 @@ def test_maximizes_across_decompositions() -> None:
     ruleset = RuleSet(faan_cap=13, min_faan=0)
     result = score_winning_hand(tiles, (), ctx, ruleset)
     assert result == FaanResult(
-        total_faan=12,
-        breakdown={"缺一門": 2, "無花": 1, "門前清": 1, "四暗刻": 8},
+        total_faan=9,
+        breakdown={"無花": 1, "四暗刻": 8},
         clears_min_faan=True,
     )
 

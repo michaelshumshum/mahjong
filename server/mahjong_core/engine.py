@@ -97,7 +97,7 @@ __all__ = [
     "start_next_hand",
 ]
 
-ENGINE_VERSION = "1.1.0"
+ENGINE_VERSION = "1.2.0"
 # bump on any reducer/wall-order/flower-replacement change; persisted GameRecords stamp this --
 # a mismatch means the record isn't replayable, full stop, no migration path.
 

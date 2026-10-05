@@ -7,7 +7,7 @@ describe('GuideDialog', () => {
 		const { body } = render(GuideDialog, { props: { onClose: () => {} } });
 		expect(body).toContain('role="dialog"');
 		expect(body).toContain('Faan guide');
-		for (const t of ['1', '2', '3', '4', '5', '6', '7', '8', 'limit'])
+		for (const t of ['1', '3', '4', '5', '6', '7', '8', 'limit'])
 			expect(body).toContain(`data-testid="guide-tab-${t}"`);
 	});
 

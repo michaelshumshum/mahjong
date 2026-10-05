@@ -11,7 +11,7 @@ export interface GuideEntry {
 
 export type GuideTab = number | 'limit';
 
-export const GUIDE_TABS: GuideTab[] = [1, 2, 3, 4, 5, 6, 7, 8, 'limit'];
+export const GUIDE_TABS: GuideTab[] = [1, 3, 4, 5, 6, 7, 8, 'limit'];
 
 const TILE_RE = /[1-9][mps]|[zf][1-9]/g;
 
@@ -45,39 +45,10 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 		{ pattern: '無花', description: m.guide_descNoFlowers, example: [] },
 		{ pattern: '自摸', description: m.guide_descSelfDraw, example: [] },
 		{ pattern: '門前清', description: m.guide_descFullyConcealed, example: [] },
-		{
-			pattern: '一般高',
-			description: m.guide_descTwoIdenticalSequences,
-			example: ['4s5s6s', '4s5s6s']
-		},
 		{ pattern: '雞糊', description: m.guide_descChickenHand, example: [] },
 		{ pattern: '海底撈月', description: m.guide_descWinOnLastWallTile, example: [] },
-		{ pattern: '河底撈魚', description: m.guide_descWinOnLastDiscard, example: [] },
 		{ pattern: '槓上開花', description: m.guide_descWinOnKongReplacement, example: [] },
 		{ pattern: '搶槓', description: m.guide_descRobbingTheKong, example: [] }
-	],
-	'2': [
-		{
-			pattern: '缺一門',
-			description: m.guide_descVoidedSuit,
-			example: ['1m2m3m', '7m8m9m', '4s5s6s', '2s2s2s', '9s9s']
-		},
-		{
-			pattern: '三暗刻',
-			description: m.guide_descThreeConcealedPungs,
-			example: ['3m3m3m', '6p6p6p', '9s9s9s', '1p2p3p', '5m5m']
-		},
-		{ pattern: '全求人', description: m.guide_descAllRevealed, example: [] },
-		{
-			pattern: '雙箭',
-			description: m.guide_descTwoDragonPungs,
-			example: ['z5z5z5', 'z6z6z6', '2p3p4p', '7s8s9s', '4m4m']
-		},
-		{
-			pattern: '三步高',
-			description: m.guide_descThreeStepSequences,
-			example: ['1m2m3m', '3m4m5m', '5m6m7m']
-		}
 	],
 	'3': [
 		{
@@ -125,16 +96,6 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 			pattern: '清一色',
 			description: m.guide_descFullFlush,
 			example: ['1s2s3s', '4s5s6s', '7s8s9s', '3s3s3s', '5s5s']
-		},
-		{
-			pattern: '三般高',
-			description: m.guide_descThreeIdenticalSequences,
-			example: ['2p3p4p', '2p3p4p', '2p3p4p', '6m6m6m', '9s9s']
-		},
-		{
-			pattern: '四步高',
-			description: m.guide_descFourStepSequences,
-			example: ['1p2p3p', '3p4p5p', '5p6p7p', '7p8p9p', '2s2s']
 		}
 	],
 	'7': [
@@ -146,12 +107,22 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 	],
 	'8': [
 		{
+			pattern: '四暗刻',
+			description: m.guide_descFourConcealedPungs,
+			example: ['2m2m2m', '5p5p5p', '8s8s8s', 'z5z5z5', '4m4m']
+		},
+		{
 			pattern: '大四喜',
 			description: m.guide_descBigFourWinds,
 			example: ['z1z1z1', 'z2z2z2', 'z3z3z3', 'z4z4z4', '5s5s']
 		}
 	],
 	limit: [
+		{
+			pattern: '十八羅漢',
+			description: m.guide_descEighteenArhats,
+			example: ['2m2m2m2m', '5p5p5p5p', '8s8s8s8s', 'z5z5z5z5', '4m4m']
+		},
 		{
 			pattern: '十三么',
 			description: m.guide_descThirteenOrphans,
@@ -177,8 +148,8 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 	]
 };
 
-const NEW_6 = ['混么九', '雞糊', '海底撈月', '河底撈魚', '槓上開花', '搶槓'];
-const NEW_18 = ['七對子', '三暗刻', '全求人', '雙箭', '一般高', '三般高', '三步高', '四步高'];
+const NEW_6 = ['混么九', '雞糊', '海底撈月', '槓上開花', '搶槓'];
+const NEW_18 = ['七對子'];
 
 export function handSetOf(pattern: string): HandSet {
 	return NEW_6.includes(pattern) ? 'NEW_6' : NEW_18.includes(pattern) ? 'NEW_18' : 'CLASSIC';

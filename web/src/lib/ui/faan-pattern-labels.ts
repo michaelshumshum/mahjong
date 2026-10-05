@@ -5,7 +5,6 @@ import { m } from '$lib/paraglide/messages.js';
 export const FAAN_PATTERN_LABEL: Record<string, () => string> = {
 	平糊: m.faanPattern_allSequences,
 	對對糊: m.faanPattern_allPungs,
-	缺一門: m.faanPattern_voidedSuit,
 	混一色: m.faanPattern_halfFlush,
 	清一色: m.faanPattern_fullFlush,
 	無花: m.faanPattern_noFlowers,
@@ -20,7 +19,6 @@ export const FAAN_PATTERN_LABEL: Record<string, () => string> = {
 	大四喜: m.faanPattern_bigFourWinds,
 	混么九: m.faanPattern_mixedTerminals,
 	海底撈月: m.faanPattern_winOnLastWallTile,
-	河底撈魚: m.faanPattern_winOnLastDiscard,
 	槓上開花: m.faanPattern_winOnKongReplacement,
 	搶槓: m.faanPattern_robbingTheKong,
 	座位花: m.faanPattern_seatFlower,
@@ -33,13 +31,8 @@ export const FAAN_PATTERN_LABEL: Record<string, () => string> = {
 	地糊: m.faanPattern_earthlyHand,
 	雞糊: m.faanPattern_chickenHand,
 	七對子: m.faanPattern_sevenPairs,
-	三暗刻: m.faanPattern_threeConcealedPungs,
-	全求人: m.faanPattern_allRevealed,
-	雙箭: m.faanPattern_twoDragonPungs,
-	一般高: m.faanPattern_twoIdenticalSequences,
-	三般高: m.faanPattern_threeIdenticalSequences,
-	三步高: m.faanPattern_threeStepSequences,
-	四步高: m.faanPattern_fourStepSequences
+	四暗刻: m.faanPattern_fourConcealedPungs,
+	十八羅漢: m.faanPattern_eighteenArhats
 };
 
 export function faanPatternLabel(name: string): string {

@@ -21,7 +21,13 @@ from dataclasses import dataclass, replace
 
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.melds import Meld, decompose
-from mahjong_core.scoring.patterns import PATTERNS, Pattern, ScoringContext, score_hand
+from mahjong_core.scoring.patterns import (
+    PATTERNS,
+    Pattern,
+    ScoringContext,
+    apply_supersedes,
+    score_hand,
+)
 from mahjong_core.tiles import TileId
 
 _PATTERNS_BY_NAME: dict[str, Pattern] = {p.name: p for p in PATTERNS}
@@ -54,7 +60,7 @@ def _candidate_breakdown(
     `hand_set` contributes nothing; an override replaces its per-occurrence value (0 disables
     it outright).
     """
-    raw = score_hand(hand, ctx)
+    raw = score_hand(hand, ctx, supersede=False)
     breakdown: dict[str, int] = {}
     for name, value in raw.items():
         pattern = _PATTERNS_BY_NAME[name]
@@ -65,7 +71,7 @@ def _candidate_breakdown(
         awarded = occurrences * awarded_per_occurrence
         if awarded:
             breakdown[name] = awarded
-    return breakdown
+    return apply_supersedes(breakdown)
 
 
 def _score_candidate(

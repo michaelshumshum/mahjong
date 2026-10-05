@@ -81,7 +81,7 @@ _MAN_6 = tile_ids_for_type(TileType.MAN_6)
 _MAN_7 = tile_ids_for_type(TileType.MAN_7)
 _MAN_8 = tile_ids_for_type(TileType.MAN_8)
 _MAN_9 = tile_ids_for_type(TileType.MAN_9)
-_PIN_1 = tile_ids_for_type(TileType.PIN_1)
+_MAN_3 = tile_ids_for_type(TileType.MAN_3)
 
 
 def _ts() -> int:
@@ -154,8 +154,8 @@ def _recv(ws: WebSocketTestSession, seat: int) -> dict[str, Any]:
 
 def _standard_winning_hand() -> tuple[int, ...]:
     """Same 14-tile shape `tests/test_engine.py::_standard_winning_hand` uses (reproduced
-    locally per this repo's per-module fixture convention): 缺一門 + 自摸 + 無花 = 4 faan under
-    `DEFAULT_RULESET`'s `min_faan=3` -- clears it comfortably without needing a bigger hand."""
+    locally per this repo's per-module fixture convention): 清一色 + 自摸 + 無花 = 9 faan under
+    `DEFAULT_RULESET`'s `min_faan=3`."""
     return (
         *_MAN_1[:3],
         _MAN_4[0],
@@ -164,7 +164,7 @@ def _standard_winning_hand() -> tuple[int, ...]:
         _MAN_7[0],
         _MAN_8[0],
         _MAN_9[0],
-        *_PIN_1[:3],
+        *_MAN_3[:3],
         _MAN_2[0],
         _MAN_2[1],
     )
@@ -368,7 +368,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 },
             )
             # total_discards=1: without it, dealer seat 1's turn-1 win scores as Heavenly Hand
-            # instead of the 缺一門/自摸/無花 breakdown asserted below (won_before_any_discard).
+            # instead of the 清一色/自摸/無花 breakdown asserted below (won_before_any_discard).
             table.state = dataclasses.replace(rigged_2, total_discards=1)
 
             wss[1].send_json(_msg("declare", {"kind": "win"}, id_=_next_id()))
@@ -390,8 +390,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert hand_end_2["outcome"] == "win"
             assert hand_end_2["winner"] == 1
             assert hand_end_2["win_type"] == "self_draw"
-            assert hand_end_2["faan"] == 4
-            assert hand_end_2["faan_breakdown"] == {"缺一門": 2, "自摸": 1, "無花": 1}
+            assert hand_end_2["faan"] == 9
+            assert hand_end_2["faan_breakdown"] == {"清一色": 7, "自摸": 1, "無花": 1}
             score_2 = frames_h2[0][1]["d"]["totals"]
             assert score_2["1"] > 0
             assert score_2["0"] < 0 and score_2["2"] < 0 and score_2["3"] < 0

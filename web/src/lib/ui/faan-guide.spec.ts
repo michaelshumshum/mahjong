@@ -28,7 +28,7 @@ describe('faan guide', () => {
 	});
 
 	it('full-hand examples have 14 tiles unless they use kongs-free partial shapes', () => {
-		const fullHands = ['平糊', '缺一門', '對對糊', '混一色', '清一色', '大四喜', '字一色'];
+		const fullHands = ['平糊', '對對糊', '混一色', '清一色', '大四喜', '字一色'];
 		for (const tab of GUIDE_TABS)
 			for (const entry of guideEntries(tab))
 				if (fullHands.includes(entry.pattern))

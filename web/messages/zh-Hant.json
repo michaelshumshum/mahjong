@@ -213,13 +213,11 @@
 	"tablePage_discardsAriaLabel": "{name}的棄牌",
 	"tablePage_yourDiscardsAriaLabel": "你的棄牌",
 	"tablePage_claimChoiceLabel": "chose: {kind}",
-
 	"rank_first": "第一名",
 	"rank_second": "第二名",
 	"rank_third": "第三名",
 	"rank_fourth": "第四名",
 	"rank_nth": "第{n}名",
-
 	"scoreSheet_handColumnHeader": "局",
 	"scoreSheet_windColumnHeader": "風",
 	"scoreSheet_dealerColumnHeader": "莊家",
@@ -233,15 +231,12 @@
 	"scoreSheet_historyIncompleteNotice": "牌局紀錄不完整（可能是遊戲中途重新連線）— 以上的即時總分未必等於頁尾的正式數字。",
 	"scoreSheet_finalStandingsHeading": "最終排名",
 	"scoreSheet_seatFallbackLabel": "座位 {seat}",
-
 	"faanBreakdown_winsHeading": "{name} 勝出",
 	"faanBreakdown_faanCountLabel": "{faan} 番",
 	"faanBreakdown_totalLabel": "總計",
 	"faanBreakdown_cappedFromLabel": "（原為 {sum}，已封頂）",
-
 	"faanPattern_allSequences": "平糊",
 	"faanPattern_allPungs": "對對糊",
-	"faanPattern_voidedSuit": "缺一門",
 	"faanPattern_halfFlush": "混一色",
 	"faanPattern_fullFlush": "清一色",
 	"faanPattern_noFlowers": "無花",
@@ -256,7 +251,6 @@
 	"faanPattern_bigFourWinds": "大四喜",
 	"faanPattern_mixedTerminals": "混么九",
 	"faanPattern_winOnLastWallTile": "海底撈月",
-	"faanPattern_winOnLastDiscard": "河底撈魚",
 	"faanPattern_winOnKongReplacement": "槓上開花",
 	"faanPattern_robbingTheKong": "搶槓",
 	"faanPattern_seatFlower": "座位花",
@@ -268,66 +262,46 @@
 	"faanPattern_heavenlyHand": "天糊",
 	"faanPattern_earthlyHand": "地糊",
 	"faanPattern_sevenPairs": "七對子",
-	"faanPattern_threeConcealedPungs": "三暗刻",
-	"faanPattern_allRevealed": "全求人",
-	"faanPattern_twoDragonPungs": "雙箭",
-	"faanPattern_twoIdenticalSequences": "一般高",
-	"faanPattern_threeIdenticalSequences": "三般高",
-	"faanPattern_threeStepSequences": "三步高",
-	"faanPattern_fourStepSequences": "四步高",
-
 	"winningHand_ariaLabel": "勝出牌型及番數",
 	"winningHand_faanCountLabel": "{faan} 番",
 	"winningHand_totalLabel": "總計",
 	"winningHand_cappedFromLabel": "（原為 {sum}，已封頂）",
-
 	"gameEndScreen_ariaLabel": "遊戲結束總結",
 	"gameEndScreen_backToHomeLabel": "返回主頁",
 	"gameEndScreen_seatFallbackLabel": "座位 {seat}",
-
 	"handEndOverlay_resultAriaLabel": "本局結果",
 	"handEndOverlay_handHeading": "第 {handNo} 局",
 	"handEndOverlay_drawLabel": "流局",
-
 	"demoPage_backLabel": "大堂",
 	"demoPage_heading": "歡迎使用 SvelteKit",
 	"demoPage_docsLinkPrefix": "前往",
 	"demoPage_docsLinkText": "svelte.dev/docs/kit",
 	"demoPage_docsLinkSuffix": "閱讀文件",
-
 	"wsConnectDemo_heading": "WS 連線／ping／pong 示範",
 	"wsConnectDemo_connectButton": "連線並 ping",
-
 	"tileFaceDemo_heading": "TileFace 示範",
 	"tileFaceDemo_backLabel": "返回",
-
 	"timerRingDemo_heading": "TimerRing 示範",
 	"timerRingDemo_hint": "選擇一個時長；圓環會在該毫秒數內耗盡，並在接近到期時變紅。",
 	"timerRingDemo_durationButton": "{ms}毫秒",
-
 	"claimButtonsDemo_heading": "ClaimButtons 示範",
 	"claimButtonsDemo_hint": "模擬同一張棄牌的兩個上牌選項（4s-5s 與 5s-7s）的 claim_offer，加上碰、食糊、過。固定於視窗底部正中，詳見 docs/frontend.md §5。",
-
 	"faanBreakdownDemo_heading": "FaanBreakdown 示範",
 	"faanBreakdownDemo_hintBeforeHandEnd": "模擬",
 	"faanBreakdownDemo_hintBetween": "資料（docs/protocol.md §3）— 目前尚未有真實的計分邏輯。第一張卡：普通的 5 番棄糊。第二張：四種牌型疊加至 11 番，被封頂至預設的",
 	"faanBreakdownDemo_hintAfterFaanCap": "10。",
-
 	"scoreSheetDemo_heading": "ScoreSheet 示範",
 	"scoreSheetDemo_hintIntro": "模擬",
 	"scoreSheetDemo_hintBody": "資料（docs/protocol.md §3）— 和上面的 FaanBreakdown 示範一樣，這些事件目前尚未有真實的伺服器模型。一圈（",
 	"scoreSheetDemo_hintTail": "一局制）遊戲的四手牌；每手的得失分相加為零，並累積成下方頁尾顯示的總分及最終排名。第一局及第三局有詳細記錄 — 點擊該列可展開勝出牌型（或流局備註）。",
-
 	"settingsDemo_heading": "Settings 示範",
 	"settingsDemo_hint": "預設開關對應 `auto` 訊息的 `no_calls`／`auto_pass_chow` 欄位（docs/protocol.md §2）— 沒有 `auto_win`，詳見該章節的「刻意拒絕叫糊」。音效／動態效果只是搶先於正式設定介面推出的純客戶端偏好設定。",
-
 	"toastDemo_heading": "Toast 示範",
 	"toastDemo_hint": "一般性的暫時通知，透過 toasts.ts 的純函式在本機排隊顯示。自動消失是每個提示各自的一次性計時器（並非 JS ticker）；亦可按 × 按鈕手動關閉。",
 	"toastDemo_reconnectingMessage": "重新連線中…",
 	"toastDemo_copiedMessage": "已複製到剪貼簿",
 	"toastDemo_pushReconnectingButton": "推送「重新連線中…」",
 	"toastDemo_pushCopiedButton": "推送「已複製」（1.5秒）",
-
 	"animationDemoPanel_heading": "播放回合動畫",
 	"animationDemoPanel_hint": "獨立於上方情境的沙盒模擬，用以驗證位置槽位識別機制及純 CSS 轉場效果。",
 	"animationDemoPanel_opponentSeatAriaLabel": "對手座位",
@@ -345,7 +319,6 @@
 	"animationDemoPanel_yourDiscardsAriaLabel": "你的棄牌",
 	"animationDemoPanel_discardTileAriaLabel": "打出{tile}",
 	"animationDemoPanel_resetButton": "重設示範",
-
 	"practiceSetupDialog_title": "對戰機械人",
 	"practiceSetupDialog_hint": "輕觸座位可循環切換該機械人的難度。",
 	"practiceSetupDialog_positionAcross": "對家",
@@ -361,7 +334,6 @@
 	"practiceDifficultySlot_easyLabel": "簡單",
 	"practiceDifficultySlot_normalLabel": "普通",
 	"practiceDifficultySlot_impossibleLabel": "不可能",
-
 	"apiConnectGate_connectingStatus": "連接中…",
 	"apiConnectGate_attemptCounter": "第 {attempt} 次嘗試",
 	"apiConnectGate_nextAttemptCounter": "{seconds} 秒後重試",
@@ -391,17 +363,10 @@
 	"guide_descNoFlowers": "糊牌時沒有任何花牌或季牌。",
 	"guide_descSelfDraw": "以自己摸到的牌糊牌。",
 	"guide_descFullyConcealed": "沒有任何明牌，食別人打出的牌糊牌。",
-	"guide_descTwoIdenticalSequences": "同一花色有兩組相同的順子。",
 	"guide_descChickenHand": "沒有其他番數的糊牌；只在最低番數為 0 時可糊。",
 	"guide_descWinOnLastWallTile": "摸牌墻最後一張牌自摸糊牌。",
-	"guide_descWinOnLastDiscard": "食最後一張打出的牌糊牌。",
 	"guide_descWinOnKongReplacement": "開槓後補牌自摸糊牌。",
 	"guide_descRobbingTheKong": "食別人加槓時加上去的那張牌糊牌。",
-	"guide_descVoidedSuit": "牌型剛好只有三種數字花色中的兩種。",
-	"guide_descThreeConcealedPungs": "三組或以上的暗刻或暗槓。",
-	"guide_descAllRevealed": "所有牌組都已明出，並食別人打出的牌糊牌。",
-	"guide_descTwoDragonPungs": "兩種不同箭牌的刻子或槓，將牌不限。",
-	"guide_descThreeStepSequences": "同一花色三組順子，每組起點遞增兩點。",
 	"guide_descAllPungs": "四組刻子或槓加一對將；不可有順子。",
 	"guide_descHalfFlush": "只由一種花色加字牌組成。",
 	"guide_descSmallThreeDragons": "兩種箭牌的刻子，加第三種箭牌作將。",
@@ -410,8 +375,6 @@
 	"guide_descSevenPairs": "七對不同的對子。",
 	"guide_descSmallFourWinds": "三種風牌的刻子，加第四種風牌作將。",
 	"guide_descFullFlush": "全部牌都是同一花色，沒有字牌。",
-	"guide_descThreeIdenticalSequences": "同一花色有三組或以上相同的順子。",
-	"guide_descFourStepSequences": "同一花色的 123、345、567 和 789。",
 	"guide_descBigThreeDragons": "三種箭牌都是刻子或槓。",
 	"guide_descBigFourWinds": "四種風牌都是刻子或槓。",
 	"guide_descThirteenOrphans": "每種么九牌和字牌各一張，再加其中任何一張作將。",
@@ -422,5 +385,9 @@
 	"guide_descEarthlyHand": "閒家食莊家打出的第一張牌糊牌。",
 	"faanPattern_chickenHand": "雞糊",
 	"guide_rulesetLabel": "規則",
-	"guide_rulesetAll": "全部規則"
+	"guide_rulesetAll": "全部規則",
+	"faanPattern_fourConcealedPungs": "四暗刻",
+	"faanPattern_eighteenArhats": "十八羅漢",
+	"guide_descFourConcealedPungs": "四組暗刻或槓；胡牌時不可靠食出銃完成刻子。",
+	"guide_descEighteenArhats": "四組槓。"
 }

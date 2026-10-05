@@ -228,19 +228,6 @@ def _detect_all_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     return 1 if all(m.kind in _PUNG_OR_KONG for m in groups) else 0
 
 
-def _detect_voided_suit(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """缺一門: tiles from exactly two of the three numbered suits, the third completely
-    absent. Deliberately not "at most two suits" -- a hand using only one suit is Half/Full
-    Flush/All Honors territory, and requiring exactly two keeps this pattern mutually
-    exclusive with those by construction.
-    """
-    profile = _suit_profile(hand, ctx)
-    if profile is None:
-        return 0
-    suits, _honors = profile
-    return 1 if len(suits) == 2 else 0
-
-
 def _detect_half_flush(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     profile = _suit_profile(hand, ctx)
     if profile is None:
@@ -468,17 +455,11 @@ def _detect_win_on_last_wall_tile(_hand: tuple[Meld, ...], ctx: ScoringContext) 
     """海底撈月: self-draw win on the wall's last drawable tile. Excludes
     `ctx.is_kong_replacement` so this stays mutually exclusive with 槓上開花 when a kong
     replacement happens to also be that last tile."""
-    if not ctx.is_last_tile or not ctx.self_drawn or ctx.is_kong_replacement:
+    if not ctx.is_last_tile:
         return 0
-    return 1
-
-
-def _detect_win_on_last_discard(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """河底撈魚: win claimed off the wall's last discard. `not ctx.is_robbing_kong` keeps this
-    from double-firing alongside 搶槓 on the same claim."""
-    if not ctx.is_last_tile or ctx.self_drawn or ctx.is_robbing_kong:
-        return 0
-    return 1
+    if ctx.self_drawn:
+        return 0 if ctx.is_kong_replacement else 1
+    return 0 if ctx.is_robbing_kong else 1
 
 
 def _detect_win_on_kong_replacement(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -563,11 +544,6 @@ def _concealed_pung_count(hand: tuple[Meld, ...], ctx: ScoringContext) -> int | 
     )
 
 
-def _detect_three_concealed_pungs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """三暗刻: exactly three concealed pungs/kongs; four is 四暗刻."""
-    return 1 if _concealed_pung_count(hand, ctx) == 3 else 0
-
-
 def _detect_four_concealed_pungs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """四暗刻 (坎坎糊): all four groups concealed pungs/kongs."""
     return 1 if _concealed_pung_count(hand, ctx) == 4 else 0
@@ -582,117 +558,6 @@ def _detect_four_kongs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     return 1 if all(m.kind in KONG_KINDS for m in groups) else 0
 
 
-def _detect_all_revealed(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """全求人: every one of the four groups is open and the win itself is claimed off a
-    discard, not self-drawn -- "entirely obtained from others," the mirror image of
-    `_detect_fully_concealed`. `self_drawn` still needs its own check -- a hand can have four
-    pre-claimed groups and then self-draw the tile that completes the pair, which isn't "from
-    others."
-    """
-    if ctx.self_drawn:
-        return 0
-    split = _groups_and_pair(hand)
-    if split is None:
-        return 0
-    groups, _pair = split
-    return 1 if all(_is_open(m) for m in groups) else 0
-
-
-def _detect_two_dragon_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """雙箭: pungs/kongs of exactly two dragon types and a non-dragon pair. A dragon pair makes
-    it 小三元 instead, and three dragon pungs are 大三元 (9 of the 12 dragon tiles)."""
-    split = _groups_and_pair(hand)
-    if split is None:
-        return 0
-    groups, pair = split
-    dragon_pungs = sum(
-        1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
-    )
-    return 1 if dragon_pungs == 2 and pair.tile_type not in _DRAGON_TYPES else 0
-
-
-def _chow_run_counts(groups: tuple[Meld, ...]) -> dict[TileType, int]:
-    """How many `CHOW` melds in `groups` share the exact same three ranks -- the building
-    block Two/Three Identical Sequences both need, comparing groups against each other rather
-    than counting a fixed category."""
-    counts: dict[TileType, int] = {}
-    for m in groups:
-        if m.kind == MeldKind.CHOW:
-            counts[m.tile_type] = counts.get(m.tile_type, 0) + 1
-    return counts
-
-
-def _detect_two_identical_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """一般高, "each": how many distinct runs appear as *exactly* two identical chows.
-    "Exactly two," not "at least two," keeps this mutually exclusive with 三般高 by
-    construction -- a run's count can't be both `== 2` and `>= 3` at once."""
-    split = _groups_and_pair(hand)
-    if split is None:
-        return 0
-    groups, _pair = split
-    return sum(1 for c in _chow_run_counts(groups).values() if c == 2)
-
-
-def _detect_three_identical_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """三般高: a run appearing three (or, physically possible, four) times. "At least three,"
-    not "exactly three" -- no separate "Four Identical Sequences" tier exists, so a hand with
-    all four groups identical folds into this one rather than scoring nothing."""
-    split = _groups_and_pair(hand)
-    if split is None:
-        return 0
-    groups, _pair = split
-    return 1 if any(c >= 3 for c in _chow_run_counts(groups).values()) else 0
-
-
-def _chow_start_ranks_by_suit(groups: tuple[Meld, ...]) -> dict[int, set[int]]:
-    """Which ranks (0-8) start a `CHOW` in `groups`, grouped by suit (0=man/1=pin/2=sou) --
-    the building block Three/Four Step Sequences need to find an evenly-spaced run of chows."""
-    result: dict[int, set[int]] = {}
-    for m in groups:
-        if m.kind != MeldKind.CHOW:
-            continue
-        suit, rank = divmod(int(m.tile_type), 9)
-        result.setdefault(suit, set()).add(rank)
-    return result
-
-
-def _has_step_run(ranks: set[int], length: int) -> bool:
-    """Whether `ranks` contains `length` runs each starting two ranks above the previous
-    (三步高/四步高's step is 2, e.g. 123-345-567, not 1 or 3)."""
-    max_start = 6 - 2 * (length - 1)
-    return any(all((s + 2 * i) in ranks for i in range(length)) for s in range(max_start + 1))
-
-
-def _detect_four_step_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """四步高: four chows in one suit, starting ranks spaced two apart. The only shape that
-    fits within one suit's nine ranks is 1-2-3 / 3-4-5 / 5-6-7 / 7-8-9 (starts 0,2,4,6)."""
-    split = _groups_and_pair(hand)
-    if split is None:
-        return 0
-    groups, _pair = split
-    by_suit = _chow_start_ranks_by_suit(groups)
-    return 1 if any(_has_step_run(ranks, 4) for ranks in by_suit.values()) else 0
-
-
-def _detect_three_step_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """三步高: three chows in one suit, starting ranks spaced two apart. Excludes a suit that
-    also satisfies Four Step Sequences -- a 0,2,4,6 four-step hand's ranks contain the 3-step
-    sub-sequences {0,2,4} and {2,4,6} too, so without this exclusion both would fire on the
-    same four groups."""
-    split = _groups_and_pair(hand)
-    if split is None:
-        return 0
-    groups, _pair = split
-    by_suit = _chow_start_ranks_by_suit(groups)
-    return (
-        1
-        if any(
-            _has_step_run(ranks, 3) and not _has_step_run(ranks, 4) for ranks in by_suit.values()
-        )
-        else 0
-    )
-
-
 LIMIT_FAAN = 13
 """Placeholder per-occurrence value for `is_limit` patterns -- a limit hand's real value is
 the table's `faan_cap` (10 or 13), not a fixed number this module knows. `faan.py` special-
@@ -702,7 +567,6 @@ cases `is_limit` and replaces this with the real payout rather than summing it i
 PATTERNS: tuple[Pattern, ...] = (
     Pattern("平糊", HandSet.CLASSIC, 1, _detect_all_sequences),
     Pattern("對對糊", HandSet.CLASSIC, 3, _detect_all_pungs),
-    Pattern("缺一門", HandSet.CLASSIC, 2, _detect_voided_suit),
     Pattern("混一色", HandSet.CLASSIC, 3, _detect_half_flush),
     Pattern("清一色", HandSet.CLASSIC, 7, _detect_full_flush),
     Pattern("無花", HandSet.CLASSIC, 1, _detect_no_flowers),
@@ -718,7 +582,6 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("十八羅漢", HandSet.CLASSIC, LIMIT_FAAN, _detect_four_kongs, is_limit=True),
     Pattern("混么九", HandSet.NEW_6, 3, _detect_mixed_terminals),
     Pattern("海底撈月", HandSet.NEW_6, 1, _detect_win_on_last_wall_tile),
-    Pattern("河底撈魚", HandSet.NEW_6, 1, _detect_win_on_last_discard),
     Pattern("槓上開花", HandSet.NEW_6, 1, _detect_win_on_kong_replacement),
     Pattern("搶槓", HandSet.NEW_6, 1, _detect_robbing_the_kong),
     Pattern("座位花", HandSet.CLASSIC, 1, _detect_seat_flower),
@@ -730,29 +593,32 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("天糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_heavenly_hand, is_limit=True),
     Pattern("地糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_earthly_hand, is_limit=True),
     Pattern("七對子", HandSet.NEW_18, 4, _detect_seven_pairs),
-    Pattern("三暗刻", HandSet.NEW_18, 2, _detect_three_concealed_pungs),
     Pattern("四暗刻", HandSet.NEW_18, 8, _detect_four_concealed_pungs),
-    Pattern("全求人", HandSet.NEW_18, 2, _detect_all_revealed),
-    Pattern("雙箭", HandSet.NEW_18, 2, _detect_two_dragon_pungs),
-    Pattern("一般高", HandSet.NEW_18, 1, _detect_two_identical_sequences),
-    Pattern("三般高", HandSet.NEW_18, 6, _detect_three_identical_sequences),
-    Pattern("三步高", HandSet.NEW_18, 2, _detect_three_step_sequences),
-    Pattern("四步高", HandSet.NEW_18, 6, _detect_four_step_sequences),
 )
 
 
 _SUPERSEDES: dict[str, frozenset[str]] = {
     "小三元": frozenset({"箭刻"}),
     "大三元": frozenset({"箭刻"}),
-    "雙箭": frozenset({"箭刻"}),
-    "小四喜": frozenset({"門風", "圈風"}),
-    "四暗刻": frozenset({"三暗刻", "對對糊"}),
+    "四暗刻": frozenset({"對對糊", "門前清"}),
 }
 """Patterns whose faan already includes the listed ones, so those are dropped when both match
 -- real tables quote 小三元 5 and 大三元 8 as totals, not on top of 箭刻."""
 
 
-def score_hand(hand: tuple[Meld, ...], context: ScoringContext) -> dict[str, int]:
+def apply_supersedes(result: dict[str, int]) -> dict[str, int]:
+    """`result` minus every pattern an also-present pattern's inclusive total already covers."""
+    out = dict(result)
+    for name, superseded in _SUPERSEDES.items():
+        if name in result:
+            for gone in superseded:
+                out.pop(gone, None)
+    return out
+
+
+def score_hand(
+    hand: tuple[Meld, ...], context: ScoringContext, *, supersede: bool = True
+) -> dict[str, int]:
     """Run every registered pattern against one candidate `hand`, returning
     `{pattern_name: faan_awarded}` for patterns that matched. Faan simply sums here with no
     cap and no `hand_sets`/`faan_overrides` filtering -- stacking-with-caps, the `min_faan`
@@ -763,8 +629,4 @@ def score_hand(hand: tuple[Meld, ...], context: ScoringContext) -> dict[str, int
         occurrences = pattern.detect(hand, context)
         if occurrences:
             result[pattern.name] = occurrences * pattern.faan
-    for name, superseded in _SUPERSEDES.items():
-        if name in result:
-            for gone in superseded:
-                result.pop(gone, None)
-    return result
+    return apply_supersedes(result) if supersede else result

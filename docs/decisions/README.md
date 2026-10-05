@@ -34,6 +34,7 @@ moved on.
 | [0017](0017-typescript-7-svelte-check.md) | TypeScript 7 as the primary compiler | Deferred |
 | [0018](0018-milestone-plan.md) | Milestone plan and timeline | Historical |
 | [0019](0019-oracle-improvements-plan.md) | `ORACLE` improvements plan | Accepted |
+| [0020](0020-hk-scoring-table-alignment.md) | Scoring table aligned with standard HK mahjong | Accepted |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).

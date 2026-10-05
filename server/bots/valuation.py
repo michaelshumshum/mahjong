@@ -7,7 +7,7 @@ route eligibility off the 34-count array instead.
 
 Validated against `score_hand`: `tests/test_valuation_selfplay.py` (slow) measured mean absolute
 error 2.46 faan over 67 real `RandomBot` wins -- large because real wins often carry situational/
-win-timing faan (箭刻, flowers, 全求人, timing sets) this module doesn't model.
+win-timing faan (箭刻, flowers, timing sets) this module doesn't model.
 
 Still safe to rank discards with: the omitted bonuses are close to shape-independent, so they
 shift every candidate's estimate by about the same amount and barely disturb relative order --
@@ -51,7 +51,6 @@ ROUTE_FAAN: dict[str, int] = {
     "all_pungs": 3,
     "small_three_dragons": 5,
     "seven_pairs": 4,
-    "voided_suit": 2,
     "all_sequences": 1,  # 平糊 -- the floor every hand can reach, T1's whole failure mode
 }
 
@@ -63,7 +62,6 @@ _ROUTE_PATTERN_NAMES: dict[str, str] = {
     "all_pungs": "對對糊",
     "small_three_dragons": "小三元",
     "seven_pairs": "七對子",
-    "voided_suit": "缺一門",
     "all_sequences": "平糊",
 }
 
@@ -145,8 +143,6 @@ def reachable_routes(
         tiles_in_suit_and_honors = tiles_in_suit + sum(hand34[_HONOR_START:34])
         if tiles_in_suit_and_honors >= _HALF_FLUSH_MIN_TILES:
             routes.append((route_faan["half_flush"], "half_flush"))
-    elif len(suits) == 2:
-        routes.append((route_faan["voided_suit"], "voided_suit"))
 
     block_types = sum(1 for c in hand34 if c >= 2)
     if (

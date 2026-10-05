@@ -164,59 +164,53 @@ Individual patterns can be re-valued or disabled via `faan_overrides`.
 | 1 | No Flowers | 無花 |
 | 1 | Self-Draw | 自摸 |
 | 1 | Fully Concealed (win on discard, no open melds) | 門前清 |
-| 2 | Voided Suit (exactly one of the three numbered suits absent)¹ | 缺一門 |
 | 3 | All Pungs | 對對糊 |
 | 3 | Half Flush (one suit + honors) | 混一色 |
-| 5 | Small Three Dragons (pair of one dragon + pungs of the other two)² | 小三元 |
+| 5 | Small Three Dragons (pair of one dragon + pungs of the other two)¹ | 小三元 |
 | 3 | All four Flowers *or* all four Seasons (as a set) | 正花 (flower set) |
-| 6 | Small Four Winds (pair of one wind + pungs of the other three)² | 小四喜 |
+| 6 | Small Four Winds (pair of one wind + pungs of the other three)¹ | 小四喜 |
 | 7 | Full Flush (one suit, no honors) | 清一色 |
-| 8 | Big Three Dragons (pungs of all three)² | 大三元 |
-| **Limit** | Big Four Winds (pungs of all four)² | 大四喜 |
+| 8 | Big Three Dragons (pungs of all three)¹ | 大三元 |
+| **Limit** | Big Four Winds (pungs of all four)¹ | 大四喜 |
 | **Limit** | Four Kongs | 十八羅漢 |
 | **Limit** | Thirteen Orphans | 十三么 |
 | **Limit** | All Honors | 字一色 |
 | **Limit** | All Terminals | 清么九 |
-| **Limit** | Nine Gates³ | 九蓮寶燈 |
+| **Limit** | Nine Gates² | 九蓮寶燈 |
 | **Limit** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
 | **Limit** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
 
-¹ **Exactly one suit absent, not "at most one."** A one-suit or zero-suit hand is Half Flush /
-Full Flush / All Honors territory. Requiring *exactly two* suits present keeps 缺一門 mutually
-exclusive with those by construction — no separate "don't stack" rule.
-
-² **Small vs. Big are mutually exclusive by construction; the dragon/wind ladders are inclusive totals.**
+¹ **Small vs. Big are mutually exclusive by construction; the dragon/wind ladders are inclusive totals.**
 Pungs of all three dragons (or all four winds) commit 3 of each type's 4 tiles, leaving at most 1
 — never enough for the pair Small needs. 小三元 (5) and 大三元 (8) already include their dragon
 pungs, so they replace 箭刻 rather than stacking with it; 小四喜 (6) likewise replaces 門風/圈風.
 Big Four Winds is a limit, so nothing stacks.
 
-³ **Nine Gates:** one suit, fully concealed (self-drawn or won on discard), 1-1-1-2-3-4-5-6-7-8-9-9-9
+² **Nine Gates:** one suit, fully concealed (self-drawn or won on discard), 1-1-1-2-3-4-5-6-7-8-9-9-9
 plus exactly one more tile of that suit, any rank 1-9. All nine 14th-tile ranks qualify.
 
 ### New 6 (新六番)
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
-| 3 | Mixed Terminals (terminals + honors only, both present)² | 混么九 |
-| 1 | Chicken Hand (zero other faan)¹ | 雞糊 |
-| 1 | Win on last wall tile³ | 海底撈月 |
-| 1 | Win on last discard | 河底撈魚 |
-| 1 | Win on kong replacement³ | 槓上開花 |
+| 3 | Mixed Terminals (terminals + honors only, both present)¹ | 混么九 |
+| 1 | Chicken Hand (zero other faan)² | 雞糊 |
+| 1 | Win on last wall tile (self-draw, not a kong replacement) or on the last discard (claimed, not a kong rob)³ | 海底撈月 |
+| 1 | Win on kong replacement | 槓上開花 |
 | 1 | Robbing the Kong | 搶槓 |
 
-¹ **Conditional:** 雞糊 is only reachable when `min_faan == 0` — at `min_faan >= 1` a
+¹ **Both a terminal and an honor present.** A terminals-only hand is 清么九 (limit) and an
+honors-only hand is 字一色 (limit); requiring both keeps 混么九 exclusive with those. Composition
+is pungs only (any chow includes a middle tile), so 混么九 always stacks with 對對糊, and can stack
+with 混一色 when its suit condition also holds.
+
+² **Conditional:** 雞糊 is only reachable when `min_faan == 0` — at `min_faan >= 1` a
 zero-other-faan hand can't win at all, so the pattern is skipped entirely. Also gated on `NEW_6`:
 disabling `NEW_6` disables 雞糊 even at `min_faan == 0`.
 
-² **Both a terminal and an honor present.** A terminals-only hand is 清么九 (limit) and an
-honors-only hand is 字一色 (limit); requiring both keeps 混么九 exclusive with those. Composition
-is pungs only (any chow includes a middle tile), so 混么九 always stacks with 對對糊, and can stack
-with 缺一門/混一色 when their suit conditions also hold.
-
-³ **Mutually exclusive by construction.** A kong replacement can itself be the wall's last
-drawable tile (§5, edge case §11.6). That scores as 槓上開花 only, not also 海底撈月 — the more
-specific pattern takes it, same ladder convention as Small/Big.
+³ **One pattern for both last-tile wins.** 河底撈魚 is not a separate pattern: the last discard
+claimed for a win scores 海底撈月 as well. A kong replacement that is itself the wall's last tile
+scores 槓上開花 only (§5, edge case §11.6), and a kong rob never scores it.
 
 ### New 18 (新十八番) — commonly used subset
 
@@ -227,31 +221,22 @@ cares about: `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` run the Seven Pa
 | Faan | Hand | Chinese |
 | --- | --- | --- |
 | 4 | Seven Pairs (plain faan, not a limit hand) | 七對子 |
-| 2 | Exactly three concealed pungs/kongs⁴ | 三暗刻 |
-| 8 | Four concealed pungs/kongs⁴ | 四暗刻 |
-| 2 | All Revealed (every group claimed, win claimed off a discard)⁵ | 全求人 |
-| 2 | Two Dragon pungs/kongs, non-dragon pair⁶ | 雙箭 |
-| 1 | Two Identical Sequences⁷ | 一般高 |
-| 6 | Three or more identical sequences⁷ | 三般高 |
-| 2 | Three Step Sequences⁸ | 三步高 |
-| 6 | Four Step Sequences⁸ | 四步高 |
+| 8 | Four concealed pungs/kongs¹ | 四暗刻 |
 
-⁴ **Concealed counts ron-aware.** A concealed kong counts; an exposed or added kong never does. On a
+¹ **Concealed counts ron-aware.** A concealed kong counts; an exposed or added kong never does. On a
 win off a discard, a pung of the winning tile's type is treated as completed by that discard, so it
-is not concealed (`ScoringContext.winning_tile`). 四暗刻 replaces 三暗刻 and 對對糊.
+is not concealed (`ScoringContext.winning_tile`). 四暗刻 replaces 對對糊 and 門前清 (inclusive
+total, §7 note ¹).
 
-⁵ **All four groups open, and the win claimed off a discard** — the mirror of 門前清. `decompose()`
-never marks a group as "claimed to complete the win," so the only unambiguous check is "no group
-came from `decompose()` at all."
+### Patterns deliberately not scored
 
-⁶ **Exactly two dragon pungs with a non-dragon pair.** A dragon pair makes it 小三元, which
-replaces 雙箭 and 箭刻 (inclusive total, §7 note ²); 雙箭 itself replaces the two 箭刻.
+Removed because they are not standard Hong Kong faan; the history is in the ADR log.
 
-⁷ **Ladder:** "exactly two" vs. "three or more" identical chows — exclusive by construction.
-
-⁸ **Step is two ranks** — chows at `r`, `r+2`, `r+4` in one suit (e.g. 123-345-567). Four Step
-Sequences has exactly one shape: 123-345-567-789. Since that shape contains 三步高's pattern twice,
-三步高 excludes any suit that also satisfies 四步高 (ladder rule).
+| Pattern | Why not |
+| --- | --- |
+| 缺一門, 三暗刻, 全求人, 雙箭 | not in the standard HK table (雙箭 is just two 箭刻) |
+| 一般高, 三般高, 三步高, 四步高 | Taiwanese / Japanese-style sequence bonuses; HK pays no faan for chow patterns beyond 平糊 |
+| 河底撈魚 | folded into 海底撈月 (§7 New 6 note ³) |
 
 ### Flower faan
 
