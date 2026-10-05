@@ -1,6 +1,7 @@
 algorithm: ppo
 out: runs/ppo_c0
-init_ckpt: runs/rl_aux/ckpt_best.pt
+# R1 ckpt_best.pt carried to engine 1.3.0 by ml.migrate_ckpt
+init_ckpt: runs/rl_aux/ckpt_best_engine130.pt
 ruleset: hk_classic
 seed: 0
 # more torch threads don't speed up the learner on the i7-1265U and drain the battery
