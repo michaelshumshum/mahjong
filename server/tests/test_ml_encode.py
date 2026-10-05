@@ -178,12 +178,12 @@ def test_wall_remaining_passes_through() -> None:
     assert list(encoded.wall_remaining) == [17.0]
 
 
-def test_encode_ruleset_default_hand_sets_all_on_and_faan_overrides_unapplied() -> None:
+def test_encode_ruleset_default_hand_sets_and_faan_overrides_unapplied() -> None:
     encoded = ml_encode.encode_ruleset(RuleSet())
     assert encoded.shape == (ml_encode.N_RULESET_FEATURES,)
     assert encoded[0] == RuleSet().min_faan
     assert encoded[1] == RuleSet().wall_reserve
-    assert list(encoded[2:5]) == [1.0, 1.0, 1.0]  # CLASSIC, NEW_6, NEW_18 all on by default
+    assert list(encoded[2:5]) == [1.0, 1.0, 0.0]  # CLASSIC, NEW_6 on, NEW_18 (七對子) opt-in
     effective_faan = encoded[5:]
     assert len(effective_faan) == len(PATTERNS)
     assert list(effective_faan) == [float(p.faan) for p in PATTERNS]

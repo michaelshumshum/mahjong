@@ -109,6 +109,8 @@ class ScoringContext:
     `is_last_tile` (海底撈月/河底撈魚): wall was exhausted on the draw/discard that produced
     this win -- `self_drawn` disambiguates which.
     `is_kong_replacement` (槓上開花): this win's tile came from a kong-replacement draw.
+    `is_chained_kong_replacement` (連槓開花): the kong replacement itself followed a kong
+    declared on a kong-replacement draw.
     `is_robbing_kong` (搶槓): this win claimed a tile another seat just added to a kong.
     `flowers_score` (座位花): mirrors `RuleSet.flowers_score`, default `True`.
     `winning_tile`: the tile that completed the hand, for off-discard wins -- a pung it
@@ -127,6 +129,7 @@ class ScoringContext:
     won_on_dealer_first_discard: bool = False
     is_last_tile: bool = False
     is_kong_replacement: bool = False
+    is_chained_kong_replacement: bool = False
     is_robbing_kong: bool = False
     flowers_score: bool = True
     winning_tile: TileId | None = None
@@ -203,21 +206,13 @@ def _suit_profile(hand: tuple[Meld, ...], ctx: ScoringContext) -> tuple[set[int]
     return suits, honors
 
 
-def _detect_all_sequences(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """平糊: four chows and a pair worth no faan -- a dragon, seat-wind or prevailing-wind
-    pair disqualifies it."""
+def _detect_all_sequences(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
+    """平糊: four chows and any pair."""
     split = _groups_and_pair(hand)
     if split is None:
         return 0
-    groups, pair = split
-    if not all(m.kind == MeldKind.CHOW for m in groups):
-        return 0
-    scoring_pair = (
-        pair.tile_type in _DRAGON_TYPES
-        or pair.tile_type == TileType(27 + int(ctx.seat_wind))
-        or pair.tile_type == TileType(27 + int(ctx.prevailing_wind))
-    )
-    return 0 if scoring_pair else 1
+    groups, _pair = split
+    return 1 if all(m.kind == MeldKind.CHOW for m in groups) else 0
 
 
 def _detect_all_pungs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
@@ -253,13 +248,11 @@ def _detect_self_draw(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
 
 
 def _detect_fully_concealed(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """門前清: win on a discard (not self-draw -- that's the separate 自摸 pattern, and the two
-    don't stack) with no open melds. The winning tile itself never counts as "open" here --
-    winning off a discard doesn't itself break concealment.
-    """
-    if ctx.self_drawn:
+    """門前清: no claimed melds and no concealed kong, on a self-draw or a discard win. Seven
+    Pairs never earns it (and 四暗刻 replaces it, `_SUPERSEDES`)."""
+    if _detect_seven_pairs(hand, ctx):
         return 0
-    return 1 if not any(_is_open(m) for m in hand) else 0
+    return 0 if any(_is_open(m) or m.kind == MeldKind.CONCEALED_KONG for m in hand) else 1
 
 
 def _detect_seat_wind(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -352,7 +345,7 @@ def _is_honor(tile_type: TileType) -> bool:
 
 
 def _detect_mixed_terminals(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
-    """混么九: every group and the pair is a terminal or an honor, with at least one of each
+    """花么九: every group and the pair is a terminal or an honor, with at least one of each
     present. Excludes chows outright -- `Meld.tile_type` is a chow's lowest tile and would
     wrongly call 1-2-3 "terminal"."""
     split = _groups_and_pair(hand)
@@ -468,6 +461,11 @@ def _detect_win_on_kong_replacement(_hand: tuple[Meld, ...], ctx: ScoringContext
     return 1 if ctx.is_kong_replacement and ctx.self_drawn else 0
 
 
+def _detect_chained_kong_win(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """連槓開花: self-draw win on the replacement tile of a second consecutive kong."""
+    return 1 if ctx.is_chained_kong_replacement and ctx.self_drawn else 0
+
+
 def _detect_robbing_the_kong(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """搶槓: win by claiming a tile another seat just added to a kong. `not ctx.self_drawn` is
     redundant with `ctx.is_robbing_kong` but checked explicitly, same convention as above."""
@@ -483,24 +481,29 @@ def _seat_flower_types(seat_wind: Wind) -> frozenset[Flower]:
     return frozenset({Flower(int(seat_wind)), Flower(int(seat_wind) + _SEASON_OFFSET)})
 
 
-def _detect_seat_flower(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """座位花, "each": up to 2 (the seat-matching flower and season). Gated by
-    `ctx.flowers_score`, mirroring `RuleSet.flowers_score`."""
-    if not ctx.flowers_score:
-        return 0
-    want = _seat_flower_types(ctx.seat_wind)
-    return sum(1 for f in ctx.flowers if f in want)
-
-
 _FULL_FLOWER_SET = frozenset({Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4})
 _FULL_SEASON_SET = frozenset({Flower.SEASON_1, Flower.SEASON_2, Flower.SEASON_3, Flower.SEASON_4})
 
 
-def _detect_flower_set(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
-    """正花: holding all four flowers, or all four seasons, at once. "Each," not "either/or"
-    -- can report 2 if a hand holds both complete sets."""
+def _complete_flower_sets(ctx: ScoringContext) -> list[frozenset[Flower]]:
     held = frozenset(ctx.flowers)
-    return int(_FULL_FLOWER_SET <= held) + int(_FULL_SEASON_SET <= held)
+    return [s for s in (_FULL_FLOWER_SET, _FULL_SEASON_SET) if s <= held]
+
+
+def _detect_seat_flower(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """正花, "each": up to 2 (the seat-matching flower and season), not counting one that
+    belongs to a complete set -- 一台花 already pays for it. Gated by `ctx.flowers_score`,
+    mirroring `RuleSet.flowers_score`."""
+    if not ctx.flowers_score:
+        return 0
+    want = _seat_flower_types(ctx.seat_wind)
+    in_sets = frozenset().union(*_complete_flower_sets(ctx))
+    return sum(1 for f in ctx.flowers if f in want and f not in in_sets)
+
+
+def _detect_flower_set(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
+    """一台花: all four flowers, or all four seasons, held at once. "Each," so 2 sets report 2."""
+    return len(_complete_flower_sets(ctx))
 
 
 def _detect_seven_pairs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -559,9 +562,9 @@ def _detect_four_kongs(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
 
 
 LIMIT_FAAN = 13
-"""Placeholder per-occurrence value for `is_limit` patterns -- a limit hand's real value is
-the table's `faan_cap` (10 or 13), not a fixed number this module knows. `faan.py` special-
-cases `is_limit` and replaces this with the real payout rather than summing it in."""
+LOW_LIMIT_FAAN = 10
+"""`is_limit` patterns' own tier: 13 for most, 10 for 字一色/清么九/九蓮寶燈. `faan.py` pays
+`min(tier, faan_cap)` and never sums a limit with anything else."""
 
 
 PATTERNS: tuple[Pattern, ...] = (
@@ -580,20 +583,21 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern("小四喜", HandSet.CLASSIC, 6, _detect_small_four_winds),
     Pattern("大四喜", HandSet.CLASSIC, LIMIT_FAAN, _detect_big_four_winds, is_limit=True),
     Pattern("十八羅漢", HandSet.CLASSIC, LIMIT_FAAN, _detect_four_kongs, is_limit=True),
-    Pattern("混么九", HandSet.NEW_6, 3, _detect_mixed_terminals),
+    Pattern("花么九", HandSet.CLASSIC, 4, _detect_mixed_terminals),
     Pattern("海底撈月", HandSet.NEW_6, 1, _detect_win_on_last_wall_tile),
     Pattern("槓上開花", HandSet.NEW_6, 1, _detect_win_on_kong_replacement),
     Pattern("搶槓", HandSet.NEW_6, 1, _detect_robbing_the_kong),
-    Pattern("座位花", HandSet.CLASSIC, 1, _detect_seat_flower),
-    Pattern("正花", HandSet.CLASSIC, 3, _detect_flower_set),
-    Pattern("字一色", HandSet.CLASSIC, LIMIT_FAAN, _detect_all_honors, is_limit=True),
-    Pattern("清么九", HandSet.CLASSIC, LIMIT_FAAN, _detect_all_terminals, is_limit=True),
-    Pattern("九蓮寶燈", HandSet.CLASSIC, LIMIT_FAAN, _detect_nine_gates, is_limit=True),
+    Pattern("連槓開花", HandSet.NEW_6, 8, _detect_chained_kong_win),
+    Pattern("正花", HandSet.CLASSIC, 1, _detect_seat_flower),
+    Pattern("一台花", HandSet.CLASSIC, 2, _detect_flower_set),
+    Pattern("字一色", HandSet.CLASSIC, LOW_LIMIT_FAAN, _detect_all_honors, is_limit=True),
+    Pattern("清么九", HandSet.CLASSIC, LOW_LIMIT_FAAN, _detect_all_terminals, is_limit=True),
+    Pattern("九蓮寶燈", HandSet.CLASSIC, LOW_LIMIT_FAAN, _detect_nine_gates, is_limit=True),
     Pattern("十三么", HandSet.CLASSIC, LIMIT_FAAN, _detect_thirteen_orphans, is_limit=True),
     Pattern("天糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_heavenly_hand, is_limit=True),
     Pattern("地糊", HandSet.CLASSIC, LIMIT_FAAN, _detect_earthly_hand, is_limit=True),
+    Pattern("四暗刻", HandSet.CLASSIC, 8, _detect_four_concealed_pungs),
     Pattern("七對子", HandSet.NEW_18, 4, _detect_seven_pairs),
-    Pattern("四暗刻", HandSet.NEW_18, 8, _detect_four_concealed_pungs),
 )
 
 
@@ -601,6 +605,8 @@ _SUPERSEDES: dict[str, frozenset[str]] = {
     "小三元": frozenset({"箭刻"}),
     "大三元": frozenset({"箭刻"}),
     "四暗刻": frozenset({"對對糊", "門前清"}),
+    "花么九": frozenset({"對對糊"}),
+    "連槓開花": frozenset({"槓上開花", "自摸"}),
 }
 """Patterns whose faan already includes the listed ones, so those are dropped when both match
 -- real tables quote 小三元 5 and 大三元 8 as totals, not on top of 箭刻."""

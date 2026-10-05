@@ -226,6 +226,8 @@ class GameState:
     # 河底撈魚's "last tile" flag. monotonic within a hand, reset only by the next deal.
     last_draw_was_kong_replacement: bool = False
     # whether the most recent draw was a kong replacement (back-of-wall) -- 槓上開花's flag.
+    kong_replacement_streak: int = 0
+    # consecutive kong-replacement draws -- 連槓開花's flag (2+).
     self_draw_win_allowed: bool = True
     # whether the current AWAIT_ACTION turn may still end by self-draw win: true at hand start
     # and after any draw; false after a chow/pung claim (claimer didn't draw).

@@ -458,16 +458,16 @@ def test_declare_win_ends_hand_as_self_draw() -> None:
     state, events = reduce(state, DeclareWin())
 
     assert state.phase == Phase.HAND_OVER
-    # 門前清 does not apply to a self-draw; 自摸(1) + 無花(1) = 2 faan; points(2) = 4; split 3 ways.
+    # 自摸(1) + 無花(1) + 門前清(1) = 3 faan; points(3) = 8; split 3 ways.
     assert state.hand_result == HandResult(
         outcome=HandOutcome.WIN,
         winner=0,
         win_type=WinType.SELF_DRAW,
         discarder=None,
-        faan=2,
-        faan_breakdown={"自摸": 1, "無花": 1},
-        points=4,
-        payments={0: 6, 1: -2, 2: -2, 3: -2},
+        faan=3,
+        faan_breakdown={"自摸": 1, "無花": 1, "門前清": 1},
+        points=8,
+        payments={0: 12, 1: -4, 2: -4, 3: -4},
     )
     assert any(isinstance(e, HandEnded) for e in events)
 
@@ -735,8 +735,8 @@ def test_win_on_last_wall_tile_scores_last_tile_self_draw() -> None:
     result = state.hand_result
     assert result is not None
     assert result.win_type == WinType.SELF_DRAW
-    # 自摸(1) + 無花(1) + 海底撈月(1) = 3 faan.
-    assert result.faan == 3
+    # 自摸(1) + 無花(1) + 門前清(1) + 海底撈月(1) = 4 faan.
+    assert result.faan == 4
     assert result.faan_breakdown["海底撈月"] == 1
     assert any(isinstance(e, HandEnded) for e in events)
 
@@ -824,7 +824,7 @@ def test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacem
     between (`_draw_and_cascade` never re-derives it). Wall back-to-front:
     `(_SOU_1[3], _MAN_2[1], Flower.FLOWER_2)` -- `draw_back` pops FLOWER_2 first (revealed,
     cascades), then _MAN_2[1] (lands, completes the hand); _SOU_1[3] stays unpicked so the wall
-    isn't emptied. FLOWER_2 doesn't match seat 0's East seat wind, so it also proves 座位花
+    isn't emptied. FLOWER_2 doesn't match seat 0's East seat wind, so it also proves 正花
     correctly stays off (and 無花 correctly drops out, since a flower was held) rather than
     accidentally cancelling out in the total."""
     state = _state(
@@ -866,7 +866,7 @@ def test_win_after_flower_chain_from_kong_replacement_still_scores_kong_replacem
     result = state.hand_result
     assert result is not None
     assert result.win_type == WinType.SELF_DRAW
-    # 自摸(1) + 槓上開花(1) = 2 faan; no 無花 (a flower was held), no 座位花
+    # 自摸(1) + 槓上開花(1) = 2 faan; no 無花 (a flower was held), no 正花
     # (FLOWER_2 doesn't match East).
     assert result.faan == 2
     assert result.faan_breakdown == {"自摸": 1, "槓上開花": 1}

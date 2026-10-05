@@ -23,7 +23,7 @@ from bots.safety import (
     wall_pressure_multiplier,
 )
 from mahjong_core.actions import hand_is_winning_shape
-from mahjong_core.config import RuleSet
+from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
@@ -402,8 +402,7 @@ def test_tile_risk_excludes_own_seat() -> None:
 
 
 def test_tile_risk_hands_aware_flags_an_exact_deal_in() -> None:
-    """Opponent 1's real 13-tile hand is one tile short of Seven Pairs (default ruleset: NEW_18
-    on, min_faan=3) -- adding SOU_9 completes it. `tile_risk` under an omniscient view must
+    """Opponent 1's real 13-tile hand is one tile short of Seven Pairs (NEW_18 on, min_faan=3) -- adding SOU_9 completes it. `tile_risk` under an omniscient view must
     report exactly the real faan the scorer computes, not `_ASSUMED_DEALIN_FAAN`'s 5.0 proxy."""
     tile_type = int(TileType.SOU_9)
     opp_seat = 1
@@ -425,7 +424,9 @@ def test_tile_risk_hands_aware_flags_an_exact_deal_in() -> None:
     # a prior discard from this seat means the candidate discard isn't the dealer's first --
     # avoids entangling with the 地糊 timing bonus, tested separately.
     view = _view(
-        hands=((), opp_hand, (), ()), discard_pools=(_pool(TileType.WIND_EAST), (), (), ())
+        ruleset=RuleSet(hand_sets=frozenset(HandSet)),
+        hands=((), opp_hand, (), ()),
+        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
     )
 
     candidate = (*opp_hand, TileId(int(TileType.SOU_9) * 4 + 1))
@@ -599,7 +600,9 @@ def test_kong_rob_risk_added_kong_flags_a_real_deal_in() -> None:
         TileType.SOU_9,
     )
     view = _view(
-        hands=((), opp_hand, (), ()), discard_pools=(_pool(TileType.WIND_EAST), (), (), ())
+        ruleset=RuleSet(hand_sets=frozenset(HandSet)),
+        hands=((), opp_hand, (), ()),
+        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
     )
 
     candidate = (*opp_hand, TileId(int(TileType.SOU_9) * 4 + 1))

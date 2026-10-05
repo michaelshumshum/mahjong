@@ -26,7 +26,7 @@ from mahjong_core.tiles import TileType, tile_ids_for_type
 
 
 def _state(**overrides: object) -> GameState:
-    state = new_game(RuleSet(), game_seed=1)
+    state = new_game(RuleSet(hand_sets=frozenset(HandSet)), game_seed=1)
     return dataclasses.replace(state, **overrides)  # type: ignore[arg-type]
 
 
@@ -100,7 +100,7 @@ def test_expected_faan_if_won_returns_zero_for_a_non_winning_tile_type() -> None
 
 def test_expected_faan_if_won_matches_the_real_scorer_for_a_valuable_hand() -> None:
     """123p 456p 789p + East pair + a 2p/4p kanchan waiting 3p -- a real half-flush. Verified
-    breakdown: 混一色 3 + 無花 1 + 門前清 1 = 5 (the East pair voids 平糊), clears the default `min_faan=3`."""
+    breakdown: 混一色 3 + 平糊 1 + 無花 1 + 門前清 1 = 6, clears the default `min_faan=3`."""
     hand = (
         *_tids(TileType.PIN_1),
         *_tids(TileType.PIN_2),
@@ -116,7 +116,7 @@ def test_expected_faan_if_won_matches_the_real_scorer_for_a_valuable_hand() -> N
         tile_ids_for_type(TileType.PIN_4)[1],
     )
     state = _with_seat(_state(), 1, concealed=hand, melds=(), flowers=())
-    assert expected_faan_if_won(state, 1, int(TileType.PIN_3), discarder=2) == 5.0
+    assert expected_faan_if_won(state, 1, int(TileType.PIN_3), discarder=2) == 6.0
 
 
 def test_expected_faan_if_won_returns_zero_for_a_structurally_complete_sub_minimum_hand() -> None:
@@ -181,7 +181,7 @@ def test_danger_labels_for_opponents_covers_every_seat_but_self_with_real_labels
 
     assert labels[2].is_tenpai
     assert labels[2].winning_tiles == (int(TileType.WIND_EAST),)
-    assert labels[2].expected_faan_by_tile_type[int(TileType.WIND_EAST)] == 6.0
+    assert labels[2].expected_faan_by_tile_type[int(TileType.WIND_EAST)] == 5.0
 
     assert not labels[3].is_tenpai
     assert labels[3].winning_tiles == ()

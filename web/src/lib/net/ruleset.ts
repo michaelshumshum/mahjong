@@ -49,7 +49,7 @@ export const DEFAULT_RULESET: RuleSet = {
 	min_faan: 3,
 	faan_cap: 10,
 	score_table: 'half_spicy',
-	hand_sets: ['CLASSIC', 'NEW_6', 'NEW_18'],
+	hand_sets: ['CLASSIC', 'NEW_6'],
 	faan_overrides: {},
 	discard_payment: 'all',
 	self_draw_multiplier: 1.5,
@@ -78,7 +78,7 @@ export const DEFAULT_RULESET: RuleSet = {
 };
 
 export const VALID_MIN_FAAN = [0, 1, 3, 5] as const;
-export const VALID_FAAN_CAP = [10, 13] as const;
+export const VALID_FAAN_CAP = [8, 10, 13] as const;
 export const HAND_SET_OPTIONS: { value: HandSet; label: () => string }[] = [
 	{ value: 'CLASSIC', label: m.ruleset_handSetClassic },
 	{ value: 'NEW_6', label: m.ruleset_handSetNew6 },

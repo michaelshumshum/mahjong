@@ -11,7 +11,7 @@ export interface GuideEntry {
 
 export type GuideTab = number | 'limit';
 
-export const GUIDE_TABS: GuideTab[] = [1, 3, 4, 5, 6, 7, 8, 'limit'];
+export const GUIDE_TABS: GuideTab[] = [1, 2, 3, 4, 5, 6, 7, 8, 'limit'];
 
 const TILE_RE = /[1-9][mps]|[zf][1-9]/g;
 
@@ -41,7 +41,7 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 			description: m.guide_descDragonPung,
 			example: ['z5z5z5']
 		},
-		{ pattern: '座位花', description: m.guide_descSeatFlower, example: ['f1'] },
+		{ pattern: '正花', description: m.guide_descSeatFlower, example: ['f1'] },
 		{ pattern: '無花', description: m.guide_descNoFlowers, example: [] },
 		{ pattern: '自摸', description: m.guide_descSelfDraw, example: [] },
 		{ pattern: '門前清', description: m.guide_descFullyConcealed, example: [] },
@@ -49,6 +49,13 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 		{ pattern: '海底撈月', description: m.guide_descWinOnLastWallTile, example: [] },
 		{ pattern: '槓上開花', description: m.guide_descWinOnKongReplacement, example: [] },
 		{ pattern: '搶槓', description: m.guide_descRobbingTheKong, example: [] }
+	],
+	'2': [
+		{
+			pattern: '一台花',
+			description: m.guide_descFlowerSet,
+			example: ['f1f2f3f4']
+		}
 	],
 	'3': [
 		{
@@ -65,19 +72,14 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 			pattern: '小三元',
 			description: m.guide_descSmallThreeDragons,
 			example: ['z5z5z5', 'z6z6z6', 'z7z7', '3s4s5s', '2m2m2m']
-		},
-		{
-			pattern: '混么九',
-			description: m.guide_descMixedTerminals,
-			example: ['1m1m1m', '9p9p9p', '1s1s1s', 'z4z4z4', 'z7z7']
-		},
-		{
-			pattern: '正花',
-			description: m.guide_descFlowerSet,
-			example: ['f1f2f3f4']
 		}
 	],
 	'4': [
+		{
+			pattern: '花么九',
+			description: m.guide_descMixedTerminals,
+			example: ['1m1m1m', '9p9p9p', '1s1s1s', 'z4z4z4', 'z7z7']
+		},
 		{
 			pattern: '七對子',
 			description: m.guide_descSevenPairs,
@@ -115,7 +117,8 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 			pattern: '大四喜',
 			description: m.guide_descBigFourWinds,
 			example: ['z1z1z1', 'z2z2z2', 'z3z3z3', 'z4z4z4', '5s5s']
-		}
+		},
+		{ pattern: '連槓開花', description: m.guide_descChainedKong, example: [] }
 	],
 	limit: [
 		{
@@ -148,7 +151,7 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 	]
 };
 
-const NEW_6 = ['混么九', '雞糊', '海底撈月', '槓上開花', '搶槓'];
+const NEW_6 = ['海底撈月', '槓上開花', '搶槓', '連槓開花'];
 const NEW_18 = ['七對子'];
 
 export function handSetOf(pattern: string): HandSet {
@@ -157,7 +160,7 @@ export function handSetOf(pattern: string): HandSet {
 
 // mirrors server RULESET_PRESETS' hand_sets/min_faan; update both together
 export const GUIDE_PRESET_RULES: Record<string, { handSets: HandSet[]; minFaan: number }> = {
-	hk_classic: { handSets: ['CLASSIC', 'NEW_6', 'NEW_18'], minFaan: 3 },
+	hk_classic: { handSets: ['CLASSIC', 'NEW_6'], minFaan: 3 },
 	hk_casual: { handSets: ['CLASSIC', 'NEW_6', 'NEW_18'], minFaan: 1 },
 	hk_strict: { handSets: ['CLASSIC', 'NEW_6'], minFaan: 5 }
 };

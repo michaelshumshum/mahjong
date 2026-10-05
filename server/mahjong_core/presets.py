@@ -11,10 +11,14 @@ from .config import DEFAULT_RULESET, DiscardPayment, HandSet, RuleSet, ScoreTabl
 
 RULESET_PRESETS: dict[str, RuleSet] = {
     "hk_classic": DEFAULT_RULESET,
-    "hk_casual": RuleSet(min_faan=1, faan_cap=13, score_table=ScoreTable.FULL_SPICY),
+    "hk_casual": RuleSet(
+        min_faan=1,
+        faan_cap=13,
+        score_table=ScoreTable.FULL_SPICY,
+        hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18}),
+    ),
     "hk_strict": RuleSet(
         min_faan=5,
-        hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6}),  # NEW_18 off
         discard_payment=DiscardPayment.HALF,
     ),
 }

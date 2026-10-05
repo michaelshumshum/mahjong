@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
-from mahjong_core.config import HandSet, RuleSet
+from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, decompose
 from mahjong_core.scoring.patterns import (
     PATTERNS,
@@ -33,8 +33,8 @@ from mahjong_core.tiles import TileId
 _PATTERNS_BY_NAME: dict[str, Pattern] = {p.name: p for p in PATTERNS}
 
 CHICKEN_HAND_NAME = "雞糊"
-CHICKEN_HAND_FAAN = 1
-"""New 6 table: Chicken Hand (雞糊), 1 faan when every other pattern scores zero. Not a
+CHICKEN_HAND_FAAN = 0
+"""Chicken Hand (雞糊): a win with every other pattern scoring zero, worth 0 faan. Not a
 `Pattern` -- its condition needs this module's own maximisation loop to already have run, so
 it can't be a `DetectorFn`."""
 
@@ -83,23 +83,22 @@ def _score_candidate(
 
     Limit hands don't stack with anything, including each other: if any matched pattern is
     `is_limit`, every non-limit pattern on this candidate is discarded, and only the single
-    highest-scoring limit pattern survives, resolved against `ruleset.faan_cap`.
+    highest-paying limit pattern survives, worth `min(its tier, ruleset.faan_cap)`.
     """
     raw = _candidate_breakdown(hand, ctx, ruleset)
     limit_names = [name for name in raw if _PATTERNS_BY_NAME[name].is_limit]
     if limit_names:
-        best = max(limit_names, key=lambda name: raw[name])
-        return ruleset.faan_cap, {best: ruleset.faan_cap}
+        best = max(limit_names, key=lambda name: min(raw[name], ruleset.faan_cap))
+        paid = min(raw[best], ruleset.faan_cap)
+        return paid, {best: paid}
     total = sum(raw.values())
     return min(total, ruleset.faan_cap), raw
 
 
 def _chicken_hand_allowed(ruleset: RuleSet) -> bool:
     """雞糊 is only reachable at `min_faan == 0` -- at any higher minimum a zero-faan hand can
-    never win, so evaluating it would be dead config. Also gated on the `NEW_6` hand_set, like
-    every other pattern in that table.
-    """
-    return ruleset.min_faan == 0 and HandSet.NEW_6 in ruleset.hand_sets
+    never win, so evaluating it would be dead config."""
+    return ruleset.min_faan == 0
 
 
 def score_winning_hand(
@@ -133,9 +132,8 @@ def score_winning_hand(
 
     if best_total <= 0 and _chicken_hand_allowed(ruleset):
         chicken_faan = ruleset.faan_overrides.get(CHICKEN_HAND_NAME, CHICKEN_HAND_FAAN)
-        if chicken_faan:
-            best_total = chicken_faan
-            best_breakdown = {CHICKEN_HAND_NAME: chicken_faan}
+        best_total = chicken_faan
+        best_breakdown = {CHICKEN_HAND_NAME: chicken_faan}
 
     return FaanResult(
         total_faan=max(best_total, 0),

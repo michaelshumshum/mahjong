@@ -97,7 +97,7 @@ __all__ = [
     "start_next_hand",
 ]
 
-ENGINE_VERSION = "1.2.0"
+ENGINE_VERSION = "1.3.0"
 # bump on any reducer/wall-order/flower-replacement change; persisted GameRecords stamp this --
 # a mismatch means the record isn't replayable, full stop, no migration path.
 
@@ -444,6 +444,11 @@ def _draw_for_turn(
         claim_window=None,
         wall_exhausted_at_last_draw=_wall_exhausted(state),
         last_draw_was_kong_replacement=kong,
+        kong_replacement_streak=(
+            state.kong_replacement_streak + 1 if state.last_draw_was_kong_replacement else 1
+        )
+        if kong
+        else 0,
         self_draw_win_allowed=True,
     )
     draw_event: Event = (

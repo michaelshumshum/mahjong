@@ -37,7 +37,7 @@ from bots.faanbot import _ADDED_KONG_BASE, _PASS, _PUNG, _THREAT_THRESHOLD, Faan
 from bots.features import own_hand34, seen34
 from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
-from mahjong_core.config import RuleSet
+from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import decode_action, legal_mask
@@ -97,7 +97,7 @@ def _view(
         claim_options=(),
         deadline_ts=None,
         host_seat=None,
-        ruleset=RuleSet(),
+        ruleset=RuleSet(hand_sets=frozenset(HandSet)),
         hands=hands,
     )
 

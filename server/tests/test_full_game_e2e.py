@@ -390,8 +390,8 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert hand_end_2["outcome"] == "win"
             assert hand_end_2["winner"] == 1
             assert hand_end_2["win_type"] == "self_draw"
-            assert hand_end_2["faan"] == 9
-            assert hand_end_2["faan_breakdown"] == {"清一色": 7, "自摸": 1, "無花": 1}
+            assert hand_end_2["faan"] == 10
+            assert hand_end_2["faan_breakdown"] == {"清一色": 7, "自摸": 1, "無花": 1, "門前清": 1}
             score_2 = frames_h2[0][1]["d"]["totals"]
             assert score_2["1"] > 0
             assert score_2["0"] < 0 and score_2["2"] < 0 and score_2["3"] < 0

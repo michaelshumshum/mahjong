@@ -253,14 +253,12 @@ def test_declare_win_not_offered_for_incomplete_hand() -> None:
 
 def _below_min_faan_hand() -> tuple[TileId, ...]:
     """A real, structurally complete 14-tile hand that scores exactly 2 faan under
-    `DEFAULT_RULESET` for a self-declared win: 平糊 (all sequences, 1) + 自摸 (1). Three suits
-    used (man/pin/sou) so 缺一門/half/full-flush all miss; a plain 9s pair so no wind/dragon
-    faan; paired with a held flower that does *not* match the acting seat's wind in the test
-    below, killing 無花 without adding 座位花."""
+    `DEFAULT_RULESET` for a self-declared win: 平糊 (all sequences, 1) + 自摸 (1), with the
+    man 234 chow claimed (the test adds it as an open meld) so 門前清 misses. Three suits
+    used (man/pin/sou) so half/full-flush miss; a plain 9s pair so no wind/dragon faan; paired
+    with a held flower that does *not* match the acting seat's wind in the test below, killing
+    無花 without adding 正花."""
     return (
-        _MAN_2[0],
-        _MAN_3[0],
-        _MAN_4[0],
         _MAN_5[0],
         _MAN_6[0],
         _MAN_7[0],
@@ -280,12 +278,16 @@ def test_declare_win_not_offered_below_min_faan() -> None:
     structurally complete hand that scores below `min_faan` under real faan counting is not
     offered `DeclareWin`. Seat 1 (non-dealer under dealer 0, seat_wind SOUTH) so this isn't
     confused with a dealer's pre-discard Heavenly Hand; the held flower (FLOWER_1, matches
-    EAST) doesn't match seat 1's own wind, so it kills 無花 without adding 座位花 either."""
+    EAST) doesn't match seat 1's own wind, so it kills 無花 without adding 正花 either."""
     assert DEFAULT_RULESET.min_faan == 3
     state = _base_state(phase=Phase.AWAIT_ACTION, turn=1)
     seats = list(state.seats)
+    open_chow = Meld(MeldKind.CHOW, (_MAN_2[0], _MAN_3[0], _MAN_4[0]), from_seat=0)
     seats[1] = dataclasses.replace(
-        seats[1], concealed=_below_min_faan_hand(), flowers=(Flower.FLOWER_1,)
+        seats[1],
+        concealed=_below_min_faan_hand(),
+        melds=(open_chow,),
+        flowers=(Flower.FLOWER_1,),
     )
     state = dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 

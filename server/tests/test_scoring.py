@@ -18,6 +18,7 @@ from mahjong_core.config import HandSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.patterns import (
     LIMIT_FAAN,
+    LOW_LIMIT_FAAN,
     PATTERNS,
     ScoringContext,
     score_hand,
@@ -136,7 +137,7 @@ def test_all_sequences() -> None:
     "pair",
     [TileType.DRAGON_GREEN, TileType.WIND_SOUTH, TileType.WIND_EAST],
 )
-def test_all_sequences_rejects_a_faan_pair(pair: TileType) -> None:
+def test_all_sequences_accepts_any_pair(pair: TileType) -> None:
     hand = (
         _chow(TileType.MAN_1),
         _chow(TileType.MAN_5),
@@ -144,7 +145,7 @@ def test_all_sequences_rejects_a_faan_pair(pair: TileType) -> None:
         _chow(TileType.SOU_7),
         _pair(pair),
     )
-    assert _occurrences("平糊", hand, _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)) == 0
+    assert _occurrences("平糊", hand, _ctx(seat_wind=Wind.SOUTH, prevailing_wind=Wind.EAST)) == 1
 
 
 def test_all_sequences_accepts_an_off_wind_pair() -> None:
@@ -262,9 +263,8 @@ def test_fully_concealed_true_when_no_open_melds_and_not_self_drawn() -> None:
     assert _occurrences("門前清", hand, _ctx(self_drawn=False)) == 1
 
 
-def test_fully_concealed_false_when_self_drawn() -> None:
-    """This ruleset's 門前清 entry is defined as "win on discard" specifically -- a self-draw
-    win never gets it, even fully concealed; it gets 自摸 instead (rules.md §7)."""
+def test_fully_concealed_also_on_self_draw() -> None:
+    """門前清 stacks with 自摸 on a concealed self-draw (rules.md §7)."""
     hand = (
         _chow(TileType.MAN_1),
         _chow(TileType.MAN_5),
@@ -272,7 +272,18 @@ def test_fully_concealed_false_when_self_drawn() -> None:
         _chow(TileType.SOU_7),
         _pair(TileType.DRAGON_GREEN),
     )
-    assert _occurrences("門前清", hand, _ctx(self_drawn=True)) == 0
+    assert _occurrences("門前清", hand, _ctx(self_drawn=True)) == 1
+
+
+def test_fully_concealed_false_with_a_concealed_kong() -> None:
+    hand = (
+        Meld(MeldKind.CONCEALED_KONG, tile_ids_for_type(TileType.MAN_1)),
+        _chow(TileType.MAN_5),
+        _chow(TileType.PIN_2),
+        _chow(TileType.SOU_7),
+        _pair(TileType.DRAGON_GREEN),
+    )
+    assert _occurrences("門前清", hand, _ctx(self_drawn=False)) == 0
 
 
 def test_fully_concealed_false_with_an_open_meld() -> None:
@@ -462,7 +473,7 @@ def test_small_four_winds_includes_the_wind_pungs() -> None:
     assert scored["圈風"] == 1
 
 
-# --- Mixed Terminals (混么九) ------------------------------------------------------------------
+# --- Mixed Terminals (花么九) ------------------------------------------------------------------
 
 
 def test_mixed_terminals() -> None:
@@ -473,7 +484,7 @@ def test_mixed_terminals() -> None:
         _pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
-    assert _occurrences("混么九", hand, _ctx()) == 1
+    assert _occurrences("花么九", hand, _ctx()) == 1
 
 
 def test_mixed_terminals_false_with_a_chow() -> None:
@@ -484,7 +495,7 @@ def test_mixed_terminals_false_with_a_chow() -> None:
         _pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
-    assert _occurrences("混么九", hand, _ctx()) == 0
+    assert _occurrences("花么九", hand, _ctx()) == 0
 
 
 def test_mixed_terminals_false_with_a_middle_tile_pung() -> None:
@@ -495,12 +506,12 @@ def test_mixed_terminals_false_with_a_middle_tile_pung() -> None:
         _pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
-    assert _occurrences("混么九", hand, _ctx()) == 0
+    assert _occurrences("花么九", hand, _ctx()) == 0
 
 
 def test_mixed_terminals_false_terminals_only_no_honors() -> None:
     """rules.md §7 note ²: terminals with no honor present is All Terminals (清么九,
-    limit, not implemented yet) territory, not 混么九."""
+    limit, not implemented yet) territory, not 花么九."""
     hand = (
         _pung(TileType.MAN_1),
         _pung(TileType.PIN_9),
@@ -508,12 +519,12 @@ def test_mixed_terminals_false_terminals_only_no_honors() -> None:
         _pung(TileType.MAN_9),
         _pair(TileType.SOU_9),
     )
-    assert _occurrences("混么九", hand, _ctx()) == 0
+    assert _occurrences("花么九", hand, _ctx()) == 0
 
 
 def test_mixed_terminals_false_honors_only_no_terminals() -> None:
     """rules.md §7 note ²: honors with no terminal present is All Honors (字一色,
-    limit, not implemented yet) territory, not 混么九."""
+    limit, not implemented yet) territory, not 花么九."""
     hand = (
         _pung(TileType.WIND_EAST),
         _pung(TileType.WIND_SOUTH),
@@ -521,7 +532,7 @@ def test_mixed_terminals_false_honors_only_no_terminals() -> None:
         _pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
-    assert _occurrences("混么九", hand, _ctx()) == 0
+    assert _occurrences("花么九", hand, _ctx()) == 0
 
 
 # --- Combinations, via score_hand -------------------------------------------------------------
@@ -558,7 +569,7 @@ def test_self_draw_all_sequences_no_flowers_combination() -> None:
     )
     ctx = _ctx(seat_wind=Wind.WEST, prevailing_wind=Wind.WEST, self_drawn=True, flowers=())
     scored = score_hand(hand, ctx)
-    assert scored == {"平糊": 1, "自摸": 1, "無花": 1}
+    assert scored == {"平糊": 1, "自摸": 1, "無花": 1, "門前清": 1}
 
 
 def test_empty_when_no_pattern_matches() -> None:
@@ -619,7 +630,7 @@ def test_all_terminals() -> None:
 
 
 def test_all_terminals_false_with_an_honor() -> None:
-    """An honor present is 混么九 (Mixed Terminals) territory, not 清么九 -- see
+    """An honor present is 花么九 (Mixed Terminals) territory, not 清么九 -- see
     `_detect_all_terminals`'s docstring."""
     hand = (
         _pung(TileType.MAN_1),
@@ -632,7 +643,7 @@ def test_all_terminals_false_with_an_honor() -> None:
 
 
 def test_all_terminals_false_with_a_chow() -> None:
-    """Boundary mirrored from 混么九: a 1-2-3 chow's `tile_type` (its lowest tile) reads as
+    """Boundary mirrored from 花么九: a 1-2-3 chow's `tile_type` (its lowest tile) reads as
     terminal even though 2m/3m aren't."""
     hand = (
         _pung(TileType.MAN_1),
@@ -901,67 +912,72 @@ def test_win_timing_patterns_registered_under_new_6() -> None:
             assert pattern.faan == 1
 
 
-# --- Seat Flower (座位花) / Flower Set (正花) ----------------------------------------------------
+# --- Seat Flower (正花) / Flower Set (一台花) -----------------------------------------------------
 
 
 def test_seat_flower_matches_flower_and_season() -> None:
     """East (seat_wind index 0) matches FLOWER_1 (index 0) and SEASON_1 (index 4)."""
     ctx = _ctx(seat_wind=Wind.EAST, flowers=(Flower.FLOWER_1, Flower.SEASON_1))
-    assert _occurrences("座位花", (), ctx) == 2
+    assert _occurrences("正花", (), ctx) == 2
 
 
 def test_seat_flower_counts_only_matching_seat() -> None:
     ctx = _ctx(seat_wind=Wind.SOUTH, flowers=(Flower.FLOWER_1, Flower.SEASON_2))
-    assert _occurrences("座位花", (), ctx) == 1  # only SEASON_2 (index 5) matches South (index 1)
+    assert _occurrences("正花", (), ctx) == 1  # only SEASON_2 (index 5) matches South (index 1)
 
 
 def test_seat_flower_zero_when_no_flowers_held() -> None:
-    assert _occurrences("座位花", (), _ctx(seat_wind=Wind.WEST, flowers=())) == 0
+    assert _occurrences("正花", (), _ctx(seat_wind=Wind.WEST, flowers=())) == 0
 
 
 def test_seat_flower_gated_by_flowers_score() -> None:
-    """`ctx.flowers_score` mirrors `RuleSet.flowers_score` (config.py) -- some tables disable
-    seat-flower faan outright."""
     ctx = _ctx(seat_wind=Wind.EAST, flowers=(Flower.FLOWER_1,), flowers_score=False)
-    assert _occurrences("座位花", (), ctx) == 0
+    assert _occurrences("正花", (), ctx) == 0
+
+
+def test_seat_flower_in_a_complete_set_is_not_counted_twice() -> None:
+    ctx = _ctx(
+        seat_wind=Wind.EAST,
+        flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4),
+    )
+    assert _occurrences("正花", (), ctx) == 0
+    assert _occurrences("一台花", (), ctx) == 1
 
 
 def test_flower_set_all_flowers() -> None:
     ctx = _ctx(
         flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4),
     )
-    assert _occurrences("正花", (), ctx) == 1
+    assert _occurrences("一台花", (), ctx) == 1
 
 
 def test_flower_set_all_seasons() -> None:
     ctx = _ctx(
         flowers=(Flower.SEASON_1, Flower.SEASON_2, Flower.SEASON_3, Flower.SEASON_4),
     )
-    assert _occurrences("正花", (), ctx) == 1
+    assert _occurrences("一台花", (), ctx) == 1
 
 
 def test_flower_set_both_complete_sets() -> None:
     ctx = _ctx(flowers=tuple(Flower))  # all 8
-    assert _occurrences("正花", (), ctx) == 2
+    assert _occurrences("一台花", (), ctx) == 2
 
 
 def test_flower_set_false_when_incomplete() -> None:
     ctx = _ctx(flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3))
-    assert _occurrences("正花", (), ctx) == 0
+    assert _occurrences("一台花", (), ctx) == 0
 
 
 def test_flower_set_not_gated_by_flowers_score() -> None:
-    """正花 is a Classic-table pattern, distinct from the `flowers_score`-gated 座位花 -- it
-    keeps firing even with `flowers_score=False`."""
     ctx = _ctx(
         flowers=(Flower.FLOWER_1, Flower.FLOWER_2, Flower.FLOWER_3, Flower.FLOWER_4),
         flowers_score=False,
     )
-    assert _occurrences("正花", (), ctx) == 1
+    assert _occurrences("一台花", (), ctx) == 1
 
 
 def test_seat_flower_and_flower_set_registered_under_classic() -> None:
-    for name, expected_faan in (("座位花", 1), ("正花", 3)):
+    for name, expected_faan in (("正花", 1), ("一台花", 2)):
         pattern = next(p for p in PATTERNS if p.name == name)
         assert pattern.hand_set == HandSet.CLASSIC
         assert pattern.faan == expected_faan
@@ -980,7 +996,8 @@ def test_limit_patterns_flagged_for_future_non_stacking() -> None:
     for pattern in PATTERNS:
         assert pattern.is_limit == (pattern.name in limit_names)
         if pattern.is_limit:
-            assert pattern.faan == LIMIT_FAAN
+            low = pattern.name in {"字一色", "清么九", "九蓮寶燈"}
+            assert pattern.faan == (LOW_LIMIT_FAAN if low else LIMIT_FAAN)
 
 
 # --- Seven Pairs (七對子) ----------------------------------------------------------------------

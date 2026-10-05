@@ -61,8 +61,9 @@ def _ctx(
 
 def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
     """rules.md §11.9: 11223344556677m parses as 七對子 (raw shape, stacking with 清一色) and as
-    123m 123m 456m 456m 77m (平糊 + 清一色 + 一般高). The seven-pairs candidate scores 13 against
-    12, so maximisation picks it; 七對子 must not leak onto the standard candidate."""
+    123m 123m 456m 456m 77m (平糊 + 清一色 + 一般高). Both parses tie at 12 (門前清 never
+    stacks on seven pairs); the raw-shape candidate wins ties; 七對子 must not leak onto the
+    standard candidate."""
     tiles = _tiles(
         TileType.MAN_1,
         TileType.MAN_1,
@@ -80,11 +81,15 @@ def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
         TileType.MAN_7,
     )
     ctx = _ctx()
-    ruleset = RuleSet(faan_cap=13, min_faan=0)
+    ruleset = RuleSet(
+        faan_cap=13,
+        min_faan=0,
+        hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18}),
+    )
     result = score_winning_hand(tiles, (), ctx, ruleset)
     assert result == FaanResult(
-        total_faan=13,
-        breakdown={"七對子": 4, "清一色": 7, "無花": 1, "門前清": 1},
+        total_faan=12,
+        breakdown={"七對子": 4, "清一色": 7, "無花": 1},
         clears_min_faan=True,
     )
 
@@ -141,18 +146,16 @@ def test_limit_shape_vs_standard_decomposition_picks_the_limit() -> None:
     ctx = _ctx()
     ruleset = RuleSet(faan_cap=13, min_faan=0)
     result = score_winning_hand(tiles, (), ctx, ruleset)
-    assert result == FaanResult(total_faan=13, breakdown={"九蓮寶燈": 13}, clears_min_faan=True)
+    assert result == FaanResult(total_faan=10, breakdown={"九蓮寶燈": 10}, clears_min_faan=True)
 
 
-def test_limit_shape_resolves_against_the_actual_faan_cap_not_the_placeholder() -> None:
-    """Same hand, `faan_cap=10` -- proves the award tracks `ruleset.faan_cap`, not a value
-    baked into the pattern."""
+def test_low_tier_limit_is_clamped_by_a_lower_faan_cap() -> None:
+    """九蓮寶燈 is a 10-tier limit; `faan_cap=8` pays 8."""
     tiles = _nine_gates_tiles(extra_rank=4)
     ctx = _ctx()
-    ruleset = RuleSet(faan_cap=10, min_faan=0)
+    ruleset = RuleSet(faan_cap=8, min_faan=0)
     result = score_winning_hand(tiles, (), ctx, ruleset)
-    assert result.total_faan == 10
-    assert result.breakdown == {"九蓮寶燈": 10}
+    assert result.total_faan == 8
 
 
 def test_two_simultaneous_limit_patterns_collapse_to_one() -> None:
@@ -300,8 +303,14 @@ def test_faan_overrides_replace_a_patterns_value() -> None:
         TileType.PIN_7,
     )
     ctx = _ctx(self_drawn=True)
-    overridden = RuleSet(faan_overrides={"七對子": 8})
-    disabled = RuleSet(faan_overrides={"七對子": 0})
+    overridden = RuleSet(
+        faan_overrides={"七對子": 8},
+        hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18}),
+    )
+    disabled = RuleSet(
+        faan_overrides={"七對子": 0},
+        hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18}),
+    )
 
     assert score_winning_hand(tiles, (), ctx, overridden).breakdown["七對子"] == 8
     assert "七對子" not in score_winning_hand(tiles, (), ctx, disabled).breakdown
@@ -312,9 +321,9 @@ def test_faan_overrides_replace_a_patterns_value() -> None:
 
 def test_genuine_chicken_hand() -> None:
     """234m 345s 678p (open, claimed) 99m: three suits (no 缺一門), one open meld (no 自摸,
-    no 門前清), a flower held that doesn't match the seat (no 無花, no 座位花), no wind/dragon
+    no 門前清), a flower held that doesn't match the seat (no 無花, no 正花), no wind/dragon
     pung. `score_hand` matches nothing at all on this hand -- only reachable at `min_faan ==
-    0` (§7 note ¹), where Chicken Hand's floor faan applies."""
+    0` (§7 note ¹), where Chicken Hand's 0-faan floor applies."""
     open_pung = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.PIN_2)[:3], from_seat=2)
     concealed = _tiles(
         TileType.MAN_2,
@@ -338,7 +347,7 @@ def test_genuine_chicken_hand() -> None:
     ruleset = RuleSet(min_faan=0)
     result = score_winning_hand(concealed, (open_pung,), ctx, ruleset)
     assert result == FaanResult(
-        total_faan=1, breakdown={CHICKEN_HAND_NAME: 1}, clears_min_faan=True
+        total_faan=0, breakdown={CHICKEN_HAND_NAME: 0}, clears_min_faan=True
     )
 
 
@@ -371,9 +380,8 @@ def test_chicken_hand_does_not_apply_above_min_faan_zero() -> None:
     assert result == FaanResult(total_faan=0, breakdown={}, clears_min_faan=False)
 
 
-def test_chicken_hand_gated_by_new_6_hand_set() -> None:
-    """Chicken Hand is tabled under New 6 (§7) -- disabling that `hand_set` must suppress it
-    even at `min_faan == 0`, same as every other New 6 pattern."""
+def test_chicken_hand_not_gated_by_hand_sets() -> None:
+    """Chicken Hand is a baseline win, not a hand_set pattern."""
     open_pung = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.PIN_2)[:3], from_seat=2)
     concealed = _tiles(
         TileType.MAN_2,
@@ -396,7 +404,9 @@ def test_chicken_hand_gated_by_new_6_hand_set() -> None:
     )
     ruleset = RuleSet(min_faan=0, hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_18}))
     result = score_winning_hand(concealed, (open_pung,), ctx, ruleset)
-    assert result == FaanResult(total_faan=0, breakdown={}, clears_min_faan=True)
+    assert result == FaanResult(
+        total_faan=0, breakdown={CHICKEN_HAND_NAME: 0}, clears_min_faan=True
+    )
 
 
 # --- Stacking rules that survive end-to-end through score_winning_hand ------------------------

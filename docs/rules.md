@@ -157,28 +157,31 @@ Individual patterns can be re-valued or disabled via `faan_overrides`.
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
-| 1 | All Sequences (pair is not a dragon, seat wind or prevailing wind) | 平糊 |
+| 1 | All Sequences (any pair) | 平糊 |
 | 1 | Seat Wind pung/kong | 門風 |
 | 1 | Prevailing Wind pung/kong | 圈風 |
 | 1 | Dragon pung/kong (each) | 箭刻 / 番牌 |
 | 1 | No Flowers | 無花 |
 | 1 | Self-Draw | 自摸 |
-| 1 | Fully Concealed (win on discard, no open melds) | 門前清 |
+| 1 | Fully Concealed (no open melds, no concealed kong; self-draw or discard; never on Seven Pairs)³ | 門前清 |
+| 1 | Seat Flower (each flower/season matching the seat, not counting one in a set) | 正花 |
+| 2 | All four Flowers *or* all four Seasons (per set; replaces that set's Seat Flower faan) | 一台花 |
+| 4 | Mixed Terminals (terminals + honors only, both present; replaces 對對糊)⁴ | 花么九 |
 | 3 | All Pungs | 對對糊 |
 | 3 | Half Flush (one suit + honors) | 混一色 |
 | 5 | Small Three Dragons (pair of one dragon + pungs of the other two)¹ | 小三元 |
-| 3 | All four Flowers *or* all four Seasons (as a set) | 正花 (flower set) |
 | 6 | Small Four Winds (pair of one wind + pungs of the other three)¹ | 小四喜 |
 | 7 | Full Flush (one suit, no honors) | 清一色 |
 | 8 | Big Three Dragons (pungs of all three)¹ | 大三元 |
-| **Limit** | Big Four Winds (pungs of all four)¹ | 大四喜 |
-| **Limit** | Four Kongs | 十八羅漢 |
-| **Limit** | Thirteen Orphans | 十三么 |
-| **Limit** | All Honors | 字一色 |
-| **Limit** | All Terminals | 清么九 |
-| **Limit** | Nine Gates² | 九蓮寶燈 |
-| **Limit** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
-| **Limit** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
+| 8 | Four concealed pungs/kongs⁵ | 四暗刻 |
+| **Limit 13** | Big Four Winds (pungs of all four)¹ | 大四喜 |
+| **Limit 13** | Four Kongs | 十八羅漢 |
+| **Limit 13** | Thirteen Orphans | 十三么 |
+| **Limit 10** | All Honors | 字一色 |
+| **Limit 10** | All Terminals | 清么九 |
+| **Limit 10** | Nine Gates² | 九蓮寶燈 |
+| **Limit 13** | Heavenly Hand (dealer wins on the deal, before any discard) | 天糊 |
+| **Limit 13** | Earthly Hand (non-dealer wins on the dealer's first discard) | 地糊 |
 
 ¹ **Small vs. Big are mutually exclusive by construction; the dragon/wind ladders are inclusive totals.**
 Pungs of all three dragons (or all four winds) commit 3 of each type's 4 tiles, leaving at most 1
@@ -189,44 +192,46 @@ Big Four Winds is a limit, so nothing stacks.
 ² **Nine Gates:** one suit, fully concealed (self-drawn or won on discard), 1-1-1-2-3-4-5-6-7-8-9-9-9
 plus exactly one more tile of that suit, any rank 1-9. All nine 14th-tile ranks qualify.
 
+³ **門前清 stacks with 自摸** on a concealed self-draw ("fully concealed self-drawn" = 2). A
+concealed kong breaks it. 四暗刻 replaces it.
+
+⁴ **花么九** (renamed from 混么九): composition is pungs only, so it always matches 對對糊's
+shape and replaces it (inclusive total); can stack with 混一色.
+
+⁵ **Concealed counts ron-aware.** A concealed kong counts; an exposed or added kong never does. On a
+win off a discard, a pung of the winning tile's type is treated as completed by that discard, so it
+is not concealed (`ScoringContext.winning_tile`). 四暗刻 replaces 對對糊 and 門前清.
+
 ### New 6 (新六番)
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
-| 3 | Mixed Terminals (terminals + honors only, both present)¹ | 混么九 |
-| 1 | Chicken Hand (zero other faan)² | 雞糊 |
+| 0 | Chicken Hand (zero other faan)² | 雞糊 |
 | 1 | Win on last wall tile (self-draw, not a kong replacement) or on the last discard (claimed, not a kong rob)³ | 海底撈月 |
 | 1 | Win on kong replacement | 槓上開花 |
 | 1 | Robbing the Kong | 搶槓 |
-
-¹ **Both a terminal and an honor present.** A terminals-only hand is 清么九 (limit) and an
-honors-only hand is 字一色 (limit); requiring both keeps 混么九 exclusive with those. Composition
-is pungs only (any chow includes a middle tile), so 混么九 always stacks with 對對糊, and can stack
-with 混一色 when its suit condition also holds.
+| 8 | Chained Kong Win (replacement tile after a kong declared on a kong replacement; replaces 槓上開花 and 自摸)⁴ | 連槓開花 |
 
 ² **Conditional:** 雞糊 is only reachable when `min_faan == 0` — at `min_faan >= 1` a
-zero-other-faan hand can't win at all, so the pattern is skipped entirely. Also gated on `NEW_6`:
-disabling `NEW_6` disables 雞糊 even at `min_faan == 0`.
+zero-other-faan hand can't win at all. It is a baseline win worth 0 faan, not gated by a hand set.
 
 ³ **One pattern for both last-tile wins.** 河底撈魚 is not a separate pattern: the last discard
 claimed for a win scores 海底撈月 as well. A kong replacement that is itself the wall's last tile
 scores 槓上開花 only (§5, edge case §11.6), and a kong rob never scores it.
 
+⁴ **Assumption:** 連槓開花 value (8) and its replacement of 槓上開花/自摸 follow common
+HK house tables; no single authoritative source. Off by disabling `NEW_6`.
+
 ### New 18 (新十八番) — commonly used subset
 
-**On by default** (`hand_sets`, §10). Seven Pairs is the one `NEW_18` pattern bot shanten also
+**Off by default** (`hand_sets`, §10; opt-in, on in `hk_casual`). Seven Pairs is the one `NEW_18` pattern bot shanten also
 cares about: `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` run the Seven Pairs parse only when
 `NEW_18` is present ([bots.md §8](bots.md)). Thirteen Orphans (十三么) is `CLASSIC` and always on.
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |
 | 4 | Seven Pairs (plain faan, not a limit hand) | 七對子 |
-| 8 | Four concealed pungs/kongs¹ | 四暗刻 |
 
-¹ **Concealed counts ron-aware.** A concealed kong counts; an exposed or added kong never does. On a
-win off a discard, a pung of the winning tile's type is treated as completed by that discard, so it
-is not concealed (`ScoringContext.winning_tile`). 四暗刻 replaces 對對糊 and 門前清 (inclusive
-total, §7 note ¹).
 
 ### Patterns deliberately not scored
 
@@ -240,9 +245,9 @@ Removed because they are not standard Hong Kong faan; the history is in the ADR 
 
 ### Flower faan
 
-`1` per flower matching the player's seat — 座位花 (a single matching tile; not 正花, the complete
-set in the Classic table) — plus `無花` above. 座位花 and 正花 are `HandSet.CLASSIC`; 座位花 is also
-gated by `flowers_score`.
+`1` per flower matching the player's seat — 正花 (gated by `flowers_score`) — plus `無花` above. A
+complete set of four flowers or four seasons is 一台花, `2` per set, replacing the seat flower of
+that set. Both are `HandSet.CLASSIC`.
 
 `seven_flowers_instant_win` (3 faan) and `eight_flowers_instant_win` (limit) aren't faan patterns:
 an instant win ends the hand on flower count alone, with no decomposition to score, so they live
@@ -257,10 +262,10 @@ A hand holding 7+ flowers straight off the initial deal's replacement pass
 - Faan **stack**: Full Flush (6) + All Pungs (3) = 9.
 - **Seat Wind and Prevailing Wind stack on the same pung.** In the East round, the dealer's own
   East pung earns both 門風 and 圈風 — 2 faan.
-- **Limit hands do not stack with anything** — not wind/dragon/flower faan, not each other. A
-  qualifying hand scores the table's `faan_cap`; if it qualifies for more than one limit hand,
-  take the highest, not the sum.
-- `faan_cap`: `10` (HK Mahjong Association) or `13` (common casual). Total is clamped.
+- **Limit hands do not stack with anything** — not wind/dragon/flower faan, not each other. Two
+  tiers: 字一色/清么九/九蓮寶燈 are worth 10, the rest 13; a limit pays `min(tier, faan_cap)` and
+  the highest-paying limit wins.
+- `faan_cap`: `8`, `10` (HK Mahjong Association) or `13` (common casual). Total is clamped.
 - `min_faan`: `0 | 1 | 3 | 5`, default **3**. **A hand below the minimum cannot be declared a
   win** — enforced server-side (§11.8). This changes bot strategy fundamentally
   ([bots.md §4](bots.md)).
@@ -327,15 +332,15 @@ repeats or passes per `dealer_repeat_on_draw`.
 class RuleSet:
     # scoring
     min_faan: int = 3                       # one of 0 | 1 | 3 | 5; below this a hand cannot win
-    faan_cap: int = 10                      # one of 10 (HKMA) | 13 (casual); total is clamped
+    faan_cap: int = 10                      # one of 8 | 10 (HKMA) | 13 (casual); total is clamped
     score_table: ScoreTable = ScoreTable.HALF_SPICY
-    hand_sets: frozenset[HandSet] = frozenset({CLASSIC, NEW_6, NEW_18})
+    hand_sets: frozenset[HandSet] = frozenset({CLASSIC, NEW_6})
     faan_overrides: dict[str, int] = field(default_factory=dict)
         # per-pattern faan overrides, keyed by the Chinese name in §7 (e.g. {"雞糊": 0} to
         # disable, {"清一色": 7}) — applied after hand_sets selection, before stacking/caps.
     discard_payment: DiscardPayment = DiscardPayment.ALL
     self_draw_multiplier: float = 1.5
-    flowers_score: bool = True              # 座位花: +1 faan per flower matching seat, see §7
+    flowers_score: bool = True              # 正花: +1 faan per flower matching seat, see §7
     seven_flowers_instant_win: bool = False # 3 faan, see §7
     eight_flowers_instant_win: bool = False # limit hand, see §7
     thirteen_orphans_wait_bonus: bool = False  # declared, not implemented (§11.10)
@@ -372,7 +377,7 @@ class RuleSet:
 `pao_rules` have no reader — setting them has no effect.
 
 **Presets** (`mahjong_core.presets.RULESET_PRESETS`): `hk_classic` (the defaults above),
-`hk_casual` (`min_faan=1`), `hk_strict` (`min_faan=5`, `NEW_18` off). `custom` takes a full
+`hk_casual` (`min_faan=1`, `faan_cap=13`, `NEW_18` on), `hk_strict` (`min_faan=5`). `custom` takes a full
 `RuleSet.from_dict` body. `resolve_ruleset` never hard-rejects: an unknown preset or invalid custom
 body falls back to `hk_classic`.
 

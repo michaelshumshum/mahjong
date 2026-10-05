@@ -43,23 +43,23 @@ class GameLength(StrEnum):
 
 
 _VALID_MIN_FAAN = frozenset({0, 1, 3, 5})
-_VALID_FAAN_CAP = frozenset({10, 13})
+_VALID_FAAN_CAP = frozenset({8, 10, 13})
 
 
 @dataclass(frozen=True)
 class RuleSet:
     min_faan: int = 3  # one of 0 | 1 | 3 | 5 (§7); below this a hand cannot win
-    faan_cap: int = 10  # one of 10 (HKMA) | 13 (casual); total is clamped (§7)
+    faan_cap: int = 10  # one of 8 | 10 (HKMA) | 13 (casual); total is clamped (§7)
     score_table: ScoreTable = ScoreTable.HALF_SPICY
     hand_sets: frozenset[HandSet] = field(
-        default_factory=lambda: frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18})
+        default_factory=lambda: frozenset({HandSet.CLASSIC, HandSet.NEW_6})
     )
     faan_overrides: dict[str, int] = field(default_factory=dict)
     # per-pattern faan override keyed by Chinese name (e.g. {"雞糊": 0}), applied after
     # hand_sets selection, before stacking/caps. dataclass freezing is shallow — still mutable.
     discard_payment: DiscardPayment = DiscardPayment.ALL
     self_draw_multiplier: float = 1.5
-    flowers_score: bool = True  # 座位花: +1 faan per flower matching seat (§7)
+    flowers_score: bool = True  # 正花: +1 faan per flower matching seat (§7)
     seven_flowers_instant_win: bool = False
     eight_flowers_instant_win: bool = False
     thirteen_orphans_wait_bonus: bool = False  # flower instant-win + wait doubling (§7, §11.10)

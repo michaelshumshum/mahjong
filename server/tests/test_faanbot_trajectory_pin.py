@@ -60,7 +60,7 @@ def _case_digest(preset: str) -> str:
 
 _PINNED: dict[str, str] = {
     "hk_casual": "8d995b036268e8c0c07f43573547cdb5ca958a135aa1e91a78f6e28816ce3756",
-    "hk_classic": "d9fd3e48ba80bcbedd427b1328ad419ef77c49eb3269430b5b773944570cdeae",
+    "hk_classic": "da7a640a16d0bddf0a0ac20a4d33957d445dd0f40d495eae0ae888c9857b2ce5",
     "hk_strict": "67fc2a0f61d7384936391d58405de48eaba44d2d29c0fc15b96e86e7d358f202",
 }
 

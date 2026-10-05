@@ -492,8 +492,8 @@ async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
     tiles) -- 14 tiles, turn 0 so `w_speed` dominates (`_weights_for_turn`). Discarding either
     manzu tile abandons the ryanmen but completes the shape for a narrow Seven Pairs tenpai
     (`shanten`=0, only the 3 remaining copies of the surviving manzu tile bring it home) --
-    verified directly against `mahjong_core.shanten` before pinning here: under the `hk_classic`
-    default (`NEW_18` on) this beats every other discard, so the bot takes it. Under `hk_strict`
+    verified directly against `mahjong_core.shanten` before pinning here: with
+    `NEW_18` on this beats every other discard, so the bot takes it. Under `hk_strict`
     (`NEW_18` off, same `hand_sets` `mahjong_core.presets` ships there) Seven Pairs is illegal,
     so that same discard only reaches shanten 3 (the honors-heavy standard parse) -- worse than
     breaking one of the honor pairs instead (also shanten 3, but with real chow potential kept
@@ -519,7 +519,7 @@ async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
     ]
     mask = _discard_mask(hand)
 
-    view_new_18_on = _build_view(0, hand, ruleset=RuleSet())
+    view_new_18_on = _build_view(0, hand, ruleset=RuleSet(hand_sets=frozenset(HandSet)))
     aid_on = await FaanBot().act(view_new_18_on, mask, _NO_DEADLINE)
     assert aid_on == int(T.MAN_4)  # chases the seven-pairs tenpai, ryanmen sacrificed
 

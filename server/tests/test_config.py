@@ -26,7 +26,7 @@ def test_default_score_table() -> None:
 
 
 def test_default_hand_sets() -> None:
-    assert DEFAULT_RULESET.hand_sets == frozenset({HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18})
+    assert DEFAULT_RULESET.hand_sets == frozenset({HandSet.CLASSIC, HandSet.NEW_6})
 
 
 def test_default_faan_overrides() -> None:

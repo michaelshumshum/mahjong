@@ -37,9 +37,10 @@ describe('faan guide', () => {
 
 	it('filters patterns by preset hand sets', () => {
 		expect(names(null)).toHaveLength(Object.keys(FAAN_PATTERN_LABEL).length);
-		expect(names('hk_classic')).toContain('七對子');
+		expect(names('hk_classic')).not.toContain('七對子');
+		expect(names('hk_casual')).toContain('七對子');
 		expect(names('hk_strict')).not.toContain('七對子');
-		expect(names('hk_strict')).toContain('混么九');
+		expect(names('hk_strict')).toContain('花么九');
 	});
 
 	it('hides chicken hand under presets that need min faan above 0', () => {

@@ -261,6 +261,7 @@ def build_scoring_context(
         ),
         is_last_tile=state.wall_exhausted_at_last_draw,
         is_kong_replacement=state.last_draw_was_kong_replacement,
+        is_chained_kong_replacement=state.kong_replacement_streak >= 2,
         is_robbing_kong=is_robbing_kong,
         flowers_score=state.ruleset.flowers_score,
         winning_tile=winning_tile,
