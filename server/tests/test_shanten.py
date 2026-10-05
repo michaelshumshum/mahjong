@@ -321,8 +321,9 @@ def test_frontier_cache_warms_and_stays_fast() -> None:
         for h, s in zip(hands, seen, strict=True):
             ukeire(h, s)
     elapsed = time.perf_counter() - start
-    # 20 hands * 20 repeats * ~470 shanten evals/hand = ~188k warm lookups; generous ceiling.
-    assert elapsed < 5.0, f"warm ukeire scans took {elapsed:.2f}s -- cache not doing its job"
+    # 20 hands * 20 repeats * ~470 shanten evals/hand = ~188k warm lookups; ~1.5s locally, ~5s on
+    # CI runners under coverage, so the ceiling has headroom for the latter.
+    assert elapsed < 10.0, f"warm ukeire scans took {elapsed:.2f}s -- cache not doing its job"
 
 
 def test_importing_module_does_no_eager_table_build() -> None:
