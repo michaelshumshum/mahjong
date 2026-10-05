@@ -16,7 +16,16 @@ COPY pyproject.toml uv.lock* ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
+# torch + cuda pins only, so an unrelated uv.lock bump leaves deps-ml's torch layer cached
+FROM base AS torch-pins
+COPY pyproject.toml uv.lock* ./
+RUN uv export --frozen --no-dev --extra ml --no-hashes --no-emit-project \
+    | grep -E '^(torch|triton|nvidia-|cuda-)' > /torch.txt
+
 FROM base AS deps-ml
+COPY --from=torch-pins /torch.txt /tmp/torch.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv venv /app/.venv && uv pip install --python /app/.venv --no-deps -r /tmp/torch.txt
 COPY pyproject.toml uv.lock* ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev --extra ml

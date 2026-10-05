@@ -1,0 +1,49 @@
+name: docker-build-ml
+
+# Own workflow, not a job in docker-build.yml: that one also triggers on web-only changes
+# (web/Dockerfile, pnpm-lock.yaml), which never touch this image. torch's PyPI wheel bundles
+# full CUDA, so the `ml` target is ~18.6GB (docs/infra.md §5) and a standard runner has
+# ~14GB free.
+#
+# Uncached on purpose: a `type=gha` export of the torch layer crashed the runner
+# (2026-09-27, run 36332754927), and a `type=registry` cache needs a GHCR package that
+# shows on the repo page. This only runs on server dependency changes, which mostly miss
+# the cache anyway.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/Dockerfile"
+      - "server/pyproject.toml"
+      - "server/uv.lock"
+      - ".github/workflows/docker-build-ml.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/Dockerfile"
+      - "server/pyproject.toml"
+      - "server/uv.lock"
+      - ".github/workflows/docker-build-ml.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-server-ml:
+    name: build server ml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # frees ~25-30GB: these preinstalled toolchains (dotnet, Android SDK, GHC, CodeQL) are
+      # unused by this job and dwarf the runner's default ~14GB free.
+      - name: free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker image prune --all --force
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: server/Dockerfile
+          target: ml
+          push: false

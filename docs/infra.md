@@ -198,7 +198,10 @@ strips its `scripts`:
 **`ml`** mirrors `prod`'s non-root setup with the `ml` extra. `trainer`/`arena` don't bind-mount
 source: that would shadow the baked venv and force a ~3GB torch reinstall. Rebuild (`make train` /
 `make arena`) to pick up source changes. The image is ~18.6GB because torch's default wheel bundles
-CUDA ([ml.md §13](ml.md)).
+CUDA ([ml.md §13](ml.md)). `deps-ml` installs the torch/CUDA wheels in their own layer first, from a
+`torch-pins` stage that filters `uv export` down to `torch`/`triton`/`nvidia-*`/`cuda-*`. `COPY` is
+keyed on content, so a `uv.lock` change that leaves those pins alone reuses the multi-GB layer and
+only reruns the following `uv sync`.
 
 ## 6. Database and migrations
 
@@ -310,12 +313,17 @@ separate workflows with their own `on.push.paths`/`on.pull_request.paths`:
 | File | Triggers on | Runs |
 | --- | --- | --- |
 | `server-ml.yml` | `server/ml/**`, `server/pyproject.toml`, `server/uv.lock`, itself | `uv sync --locked --extra ml`, `import ml`/`ml.train`, `python -m ml.train --help`, and the ml unit tests (`tests/test_ml_*.py`, `tests/test_generate_dataset.py`), which skip without the extra |
-| `docker-build.yml` | either Dockerfile, either lockfile, either Compose file, itself | build-only (`push: false`) matrix of `server` `dev`/`prod` and `web` `dev`/`prod`, plus `build-server-ml` |
+| `docker-build.yml` | either Dockerfile, either lockfile, either Compose file, itself | build-only (`push: false`) matrix of `server` `dev`/`prod` and `web` `dev`/`prod`, `type=gha` cache per entry |
+| `docker-build-ml.yml` | `server/Dockerfile`, `server/pyproject.toml`, `server/uv.lock`, itself | build-only `server` `ml` target, uncached |
 
-`build-server-ml` is its own job because the ~18.6GB `ml` image exhausted a standard runner's disk
-as a matrix entry. It first removes unused preinstalled toolchains (dotnet, Android SDK, GHC,
-CodeQL — ~25-30GB) and caches via GHCR (`type=registry`, `ghcr.io/<repo>/cache:server-ml`, needs
-`packages: write`) rather than `type=gha`, whose cache-blob upload of that layer crashed the runner.
+The `ml` image (~18.6GB, §5) is its own workflow so web-only changes don't rebuild it. It first
+removes unused preinstalled toolchains (dotnet, Android SDK, GHC, CodeQL — ~25-30GB), since a
+standard runner has ~14GB free. It builds without a layer cache:
+
+- `type=gha` crashed the runner exporting the torch layer.
+- `type=registry` on GHCR worked, but publishes a package that shows on the repo page.
+- The job only runs on server dependency changes, which miss the cache anyway unless the torch
+  pins are unchanged.
 
 **Coverage.** `server.yml` reruns pytest with coverage as a separate, non-blocking step
 (`continue-on-error: true`) — line tracing trips `test_frontier_cache_warms_and_stays_fast`'s
