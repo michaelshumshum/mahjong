@@ -132,6 +132,9 @@ export interface MockGameState {
 	/** Set only on the one scenario that's actually reached `game_end` -- lets `GameEndScreen`
 	 * be reachable/screenshot-able with no backend running. */
 	gameEnd?: MockGameEndSummary;
+	/** Most recent unclaimed discard, by its index in that seat's own `discards` array -- the
+	 * pool marker (CenterDiscardPool). `undefined`/`null` in every static mock scenario. */
+	lastDiscard?: { seat: Seat; index: number } | null;
 }
 
 // (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left.
@@ -167,6 +170,7 @@ export const yourTurnToDiscard: MockGameState = {
 	handResult: null,
 	handEndHoldMs: null,
 	turnDurationMs: 15000,
+	lastDiscard: { seat: 2, index: 4 },
 	seats: [
 		emptySeat(0, {
 			concealedHand: ['1m', '2m', '3m', '4p', '5p', '6p', '2s', '3s', '4s', 'z5', 'z5', 'z5', '9s'],

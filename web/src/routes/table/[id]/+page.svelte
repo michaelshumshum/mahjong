@@ -312,6 +312,11 @@
 		return gameState.seats.find((s) => relativeSeat(s.seat, gameState.you) === position)!;
 	}
 
+	function lastDiscardIndexFor(seat: Seat): number | null {
+		const d = gameState.lastDiscard;
+		return d && d.seat === seat ? d.index : null;
+	}
+
 	// --- your hand: real discard/declare interactivity (live only) -------------------------
 	interface OwnHandTile {
 		key: string;
@@ -648,16 +653,19 @@
 						seat={seatAt(2)}
 						position="across"
 						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(2).name })}
+						lastDiscardIndex={lastDiscardIndexFor(seatAt(2).seat)}
 					/>
 					<CenterDiscardPool
 						seat={seatAt(3)}
 						position="left"
 						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(3).name })}
+						lastDiscardIndex={lastDiscardIndexFor(seatAt(3).seat)}
 					/>
 					<CenterDiscardPool
 						seat={seatAt(1)}
 						position="right"
 						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(1).name })}
+						lastDiscardIndex={lastDiscardIndexFor(seatAt(1).seat)}
 					/>
 					<CenterDiscardPool
 						seat={seatAt(0)}
@@ -665,6 +673,7 @@
 						ariaLabel={spectating
 							? m.tablePage_discardsAriaLabel({ name: seatAt(0).name })
 							: m.tablePage_yourDiscardsAriaLabel()}
+						lastDiscardIndex={lastDiscardIndexFor(seatAt(0).seat)}
 					/>
 				</div>
 

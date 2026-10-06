@@ -444,12 +444,19 @@ seat's *resolved* name back: set from `state_sync.names`, kept live from `seat_s
 seats get a random per-table-unique display name (`server/app/table.py`'s `_draw_bot_name`, from
 `_BOT_NAME_POOL`) — cosmetic, not the tier.
 
-### Last discard
+### Last-discard marker
 
-`lastDiscard` is set on `discard`, cleared on `meld` (claimed or not) and `hand_start`. It feeds
-`ClaimDialog`'s `sourceSeat`/`tile` only; a `state_sync` derives it just for an embedded claim
-window. The discard pools carry no recency marker: its landing animation's `transform` overrode
-the side pools' rotated faces for its duration, so they flashed upright.
+`lastDiscard` is set on `discard`, cleared on `meld` (claimed or not — the marked tile either left
+the pool or the turn moved on) and `hand_start`. `live-view.ts`'s `viewFromClientState()` resolves
+the real `tileId` to that seat's position in its own (unclaimed-filtered) `discards` array —
+`null` once claimed, since the tile no longer appears there. `CenterDiscardPool` gives that tile a
+brief landing pulse (`motion-ok`) and a `title` tooltip ("`<name>` discarded"); there is no
+persistent underline. The pulse animates the standalone `scale` property, not `transform`: a
+`transform` keyframe replaces the side pools' rotation for its duration, so the tile flashed
+upright. A `state_sync` only derives `lastDiscard` for an embedded claim window (needed there
+for `ClaimDialog`'s `sourceSeat`/`tile`) — a resync outside an active claim window loses the
+marker until the next discard, a deliberate, cosmetic-only tradeoff (no wire field names "last
+discard" generally).
 
 ### Hand history
 

@@ -1,23 +1,33 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState } from './mock-game-state';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// all four discard pools live in the centre box (docs/frontend.md §3); `position` picks
 	// the box side and, for left/right, the rotation matching that seat's own hand.
 	let {
 		seat,
 		position,
-		ariaLabel
+		ariaLabel,
+		lastDiscardIndex = null
 	}: {
 		seat: MockSeatState;
 		position: 'across' | 'left' | 'right' | 'self';
 		ariaLabel: string;
+		lastDiscardIndex?: number | null;
 	} = $props();
 </script>
 
 <div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
 	{#each seat.discards as code, i (i)}
-		<div class="discard-tile" role="listitem">
+		<div
+			class="discard-tile"
+			class:discard-tile--last={i === lastDiscardIndex}
+			role="listitem"
+			title={i === lastDiscardIndex
+				? m.centerDiscardPool_lastDiscardTitle({ name: seat.name })
+				: undefined}
+		>
 			<TileFace {code} />
 		</div>
 	{/each}
@@ -25,6 +35,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/a11y';
 
 	// tracks are sized to the tile's own footprint (long edge --discard-h, short edge
 	// --discard-w) so every pool, rotated or not, gets the same 2px gap between tiles.
@@ -44,6 +55,25 @@
 	.discard-tile :global(.tile-face) {
 		height: 100%;
 		box-shadow: none;
+	}
+
+	// landing pulse on the most recent discard. animates the standalone `scale` property, which
+	// composes with the side pools' rotate `transform` instead of replacing it.
+	.discard-tile--last :global(.tile-face) {
+		@include a11y.motion-ok {
+			animation: discard-landing var(--dur-2) var(--ease-out);
+		}
+	}
+
+	@keyframes discard-landing {
+		from {
+			scale: 1.16;
+			opacity: 0.6;
+		}
+		to {
+			scale: 1;
+			opacity: 1;
+		}
 	}
 
 	.discard-pool--across {

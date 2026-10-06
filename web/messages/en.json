@@ -273,6 +273,7 @@
 	"tablePage_titleYourTurn": "Your turn · Mahjong",
 	"tablePage_titleClaim": "Claim? · Mahjong",
 	"tablePage_titleTable": "Table {code} · Mahjong",
+	"centerDiscardPool_lastDiscardTitle": "{name} discarded",
 	"rank_first": "1st",
 	"rank_second": "2nd",
 	"rank_third": "3rd",

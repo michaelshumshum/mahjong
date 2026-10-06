@@ -69,19 +69,44 @@ describe('CenterDiscardPool', () => {
 		expect(target.querySelectorAll('.discard-tile')).toHaveLength(0);
 	});
 
-	// no recency marker: its landing animation overrode the rotated faces' transform.
-	it('renders every tile the same, with no recency marker', () => {
+	it('marks the tile at lastDiscardIndex and no other', () => {
 		const { target } = render(CenterDiscardPool, {
-			seat: mockSeat({ discards: ['1m', '2m', '3m'] }),
-			position: 'left',
-			ariaLabel: 'Discards'
+			seat: mockSeat({ discards: ['1m', '2m', '3m'], name: 'Carol' }),
+			position: 'self',
+			ariaLabel: 'Your discards',
+			lastDiscardIndex: 1
 		});
-		const tiles = [...target.querySelectorAll('.discard-tile')];
-		expect(tiles.map((t) => t.className.replace(/\s*svelte-\S+/g, ''))).toEqual([
-			'discard-tile',
-			'discard-tile',
-			'discard-tile'
-		]);
-		expect(tiles.some((t) => t.hasAttribute('title'))).toBe(false);
+		const tiles = target.querySelectorAll('.discard-tile');
+		expect(tiles[0].classList.contains('discard-tile--last')).toBe(false);
+		expect(tiles[1].classList.contains('discard-tile--last')).toBe(true);
+		expect(tiles[2].classList.contains('discard-tile--last')).toBe(false);
+		expect(tiles[1].getAttribute('title')).toBe('Carol discarded');
+	});
+
+	it('marks nothing when lastDiscardIndex is null', () => {
+		const { target } = render(CenterDiscardPool, {
+			seat: mockSeat({ discards: ['1m', '2m'] }),
+			position: 'self',
+			ariaLabel: 'Your discards',
+			lastDiscardIndex: null
+		});
+		expect(target.querySelectorAll('.discard-tile--last')).toHaveLength(0);
+	});
+
+	// a `transform` keyframe replaced the side pools' rotation, flashing the tile upright.
+	it('lands without animating transform', () => {
+		render(CenterDiscardPool, {
+			seat: mockSeat({ discards: ['1m'] }),
+			position: 'left',
+			ariaLabel: 'Discards',
+			lastDiscardIndex: 0
+		});
+		const rules = [...document.styleSheets]
+			.flatMap((sheet) => [...sheet.cssRules])
+			.flatMap((rule) => (rule instanceof CSSMediaRule ? [...rule.cssRules] : [rule]))
+			.filter((rule): rule is CSSKeyframesRule => rule instanceof CSSKeyframesRule)
+			.filter((rule) => rule.name.endsWith('discard-landing'));
+		expect(rules.length).toBeGreaterThan(0);
+		for (const rule of rules) expect(rule.cssText).not.toContain('transform');
 	});
 });
