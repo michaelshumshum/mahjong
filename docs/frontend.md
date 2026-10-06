@@ -207,17 +207,26 @@ always matches the server's redacted `count`.
 
 ## 5. Interaction
 
-| Action               | Desktop                                                                 | Touch                                       |
-| -------------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
-| Select tile          | hover lifts it, click selects                                           | tap lifts                                   |
-| Discard              | click a lifted tile (pending state, below), or drag up past a threshold | tap again, or swipe up (gesture note below) |
-| Claim                | DOM buttons, bottom-center, with CSS countdown ring                     | same, ≥44px targets                         |
-| Sort hand            | automatic; no manual reorder                                            | automatic                                   |
-| Inspect discard pool | hover shows who discarded and when                                      | long-press                                  |
+Built today:
 
-- **Swipe vs. scroll:** the swipe gesture is scoped to the lifted tile (`touch-action: none` on
-  that element while lifted) with distance + direction thresholds, so the rest of the page scrolls
-  normally. Tap-to-discard is the safe default; swipe is a convenience on top.
+| Action    | Desktop and touch                                                                          |
+| --------- | ------------------------------------------------------------------------------------------ |
+| Discard   | one click/tap on a legal hand tile (a `.hand-tile-btn`) sends `discard` immediately         |
+| Claim     | `ClaimDialog`: one button per offered option plus Pass, with a CSS countdown ring, ≥44px    |
+| Declare   | win / concealed kong / added kong buttons under your hand (`.declare-actions`)              |
+| Sort hand | automatic; no manual reorder                                                               |
+
+**Planned, not built:**
+
+| Action               | Desktop                                                       | Touch                       |
+| -------------------- | ------------------------------------------------------------- | --------------------------- |
+| Select tile          | hover lifts it, click selects                                 | tap lifts                   |
+| Discard              | a setting: two-step (lift, then confirm) or one-tap (today's) | same, plus swipe up         |
+| Inspect discard pool | hover shows who discarded and when                            | long-press                  |
+
+- **Swipe vs. scroll (planned):** the swipe gesture is scoped to the lifted tile (`touch-action:
+  none` on that element while lifted) with distance + direction thresholds, so the rest of the
+  page scrolls normally. Tap-to-discard stays the safe default; swipe is a convenience on top.
 - **Pre-arm toggles** ("no calls this hand", "auto-pass chow") are sent via `auto` and enforced
   server-side.
 - **Claim buttons** appear only when the server offered them; never speculatively.
@@ -229,7 +238,10 @@ always matches the server's redacted `count`.
   reimplementation would duplicate the pure Python engine
   ([ADR 0010](decisions/0010-client-scope-cuts.md)).
 
-### Discard: pending state
+### Discard: pending state (planned)
+
+Not built yet: today a discard click sends the intent and the tile simply stays put until the
+echo arrives. The design:
 
 A mobile round trip to one server is 100–300ms — long enough that a tile with no feedback between
 tap and server echo reads as broken. Still no local mutation of game truth; a **pending**
@@ -407,13 +419,15 @@ breakdown, so the score sheet needs the running list.
 ### `state_sync` and resync
 
 A `state_sync` is a store replace — set every field from the snapshot, bump `version`. Keyed
-`{#each}` blocks reconcile existing elements automatically, so there is no teardown path. A brief
-CSS crossfade on the table container (disabled under reduced motion) makes a full resync read as
-"refreshed," not a glitch.
+`{#each}` blocks reconcile existing elements automatically, so there is no teardown path.
 
 On reconnecting to your own seat after the `AUTOPLAY` handover
-([architecture.md §8](architecture.md)), the snapshot already reflects what the bot did. A
-one-line dismissable banner says so once; missed turns are not replayed as animation.
+([architecture.md §8](architecture.md)), the snapshot already reflects what the bot did; missed
+turns are not replayed as animation.
+
+**Planned, not built:** a brief CSS crossfade on the table container (`motion-ok` only, §9) so a
+full resync reads as "refreshed," not a glitch; and a one-line dismissable banner, shown once,
+saying the bot played for you during the `AUTOPLAY` handover.
 
 ### Wire-shape gotchas
 
@@ -604,7 +618,8 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
   (clipPath/filter/gradient) that collide when tiles are inlined more than once. `<img>` isolates
   each instance, at the cost of `currentColor` styling.
 - **No build step, no atlas, no DPR split** — SVG is resolution-independent.
-- **Sound:** draw click, discard clack, shuffle — short, preloaded, muted until opt-in. No recorded
+- **Sound (planned, deferred):** draw click, discard clack, shuffle — short, preloaded, muted
+  until opt-in. Settings' "Sound effects" toggle is persisted but nothing plays yet. No recorded
   call-outs ([ADR 0010](decisions/0010-client-scope-cuts.md)).
 
 ### Styling: SCSS
@@ -625,6 +640,22 @@ src/lib/styles/
                     `globals` (the :focus-visible ring and .sr-only class) that app.scss emits
   app.scss          entry: tokens, layout, a11y globals, global resets
 ```
+
+Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
+
+| Group | Tokens | Use |
+| --- | --- | --- |
+| chrome | `--color-bg/surface/surface-raised/border/text/text-muted` | walnut app chrome |
+| table materials | `--color-rim`, `--color-rim-hi`, `--color-felt`, `--color-felt-deep`, `--color-felt-lit`, `--color-felt-line`, `--color-text-on-felt` | dark green felt inside a walnut rim (defined; applied to the table in a later change) |
+| tile body | `--color-tile`, `--color-tile-ink`, `--color-tile-edge`, `--color-tile-side`, `--color-tile-back`, `--color-tile-back-edge` | face, edge/side layers, jade back |
+| signal | `--color-accent`, `--color-accent-glow` | the one urgent signal (turn, claim window, win marker); never decorative |
+| highlight | `--color-brass` | selection, focus ring, your own seat, dealer; never a signal |
+| deltas | `--color-positive`, `--color-negative` | score/faan gains and losses only |
+| seats | `--color-seat-right/across/left` | opponent seat hues (self uses brass) |
+| status | `--color-status-error`, `--color-rank-gold/silver/bronze` | error states; game-end podium |
+| shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
+| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
+| layers | `--z-table/tiles/hud/overlay/modal` | |
 
 Conventions:
 
@@ -694,9 +725,13 @@ fluent Hong Kong mahjong player.
 ### Accessibility
 
 - **Colourblind-safe:** dragons are distinguished by glyph, not just red/green.
-- **Keyboard:** hand tiles are real focusable elements (roving `tabindex`, arrow keys move focus,
-  `Enter`/`Space` lift/discard) — the same elements pointer and touch use, so there is one
-  selection model.
+- **Focus:** `_a11y.scss`'s global `:focus-visible` ring (2px `--color-brass`, 2px offset) covers
+  every control; components don't restyle it.
+- **Keyboard:** legal hand tiles are native `<button>`s in normal tab order, `Enter`/`Space`
+  discards — the same elements pointer and touch use, so there is one selection model.
+  **Planned:** roving `tabindex` over the hand with arrow keys moving focus, and `Enter`/`Space`
+  lift-then-discard once the two-step discard setting exists (§5).
+- **Names:** tiles are announced by localized name, never code (§9 i18n "Tile names").
 - **Reduced motion:** Settings' Motion radio (`system`/`reduced`/`full`, persisted in
   `clientPrefs`) is mirrored onto `html[data-motion]` by `lib/ui/motion.ts`'s `applyMotionPref`
   — from the root `+layout.svelte` on load, and on every Settings change. `reduced`/`full`
