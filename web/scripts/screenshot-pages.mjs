@@ -20,6 +20,9 @@ const REPO_ROOT = path.dirname(WEB_DIR);
 const OUT_DIR = path.join(REPO_ROOT, 'docs', 'screenshots');
 const PORT = 5199; // scratch port, distinct from the normal dev port (5173) to avoid collisions
 const BASE = `http://127.0.0.1:${PORT}`;
+const DESKTOP = { width: 1400, height: 900 };
+// iPhone 12-14 logical size -- the phone layout (docs/frontend.md §3) below 768px.
+const PHONE = { width: 390, height: 844 };
 
 const LOBBY_TABLES = [
 	{
@@ -48,7 +51,7 @@ const LOBBY_TABLES = [
 
 // The "notable pages" list — keep this curated and small (this is what ends up in the
 // README), not exhaustive. Add a page here when it becomes a meaningful, stable part of the
-// app; don't add every mock scenario.
+// app; don't add every mock scenario. `viewport` defaults to DESKTOP.
 const PAGES = [
 	{ name: 'lobby', url: '/' },
 	// the ruleset picker `POST /tables` (docs/protocol.md §10) needs before a table can be
@@ -123,7 +126,19 @@ const PAGES = [
 		url: '/table/demo123?pregame=connecting'
 	},
 	{ name: 'table-pregame-join', url: '/table/demo123?pregame=join' },
-	{ name: 'table-pregame-waiting', url: '/table/demo123?pregame=waiting' }
+	{ name: 'table-pregame-waiting', url: '/table/demo123?pregame=waiting' },
+	// phone captures are viewport-only (not fullPage): what fits on one screen is the point,
+	// including the sticky hand footer.
+	{ name: 'lobby-phone', url: '/', viewport: PHONE },
+	{ name: 'table-your-turn-phone', url: '/table/demo123?mock=1', viewport: PHONE },
+	{
+		name: 'table-claim-window-phone',
+		url: '/table/demo123?mock=1',
+		viewport: PHONE,
+		async before(page) {
+			await page.getByRole('button', { name: 'Claim window open (you)' }).click();
+		}
+	}
 ];
 
 async function waitForServer(url, timeoutMs = 30_000) {
@@ -169,9 +184,7 @@ async function main() {
 	try {
 		await waitForServer(BASE + '/');
 		browser = await chromium.launch();
-		const page = await browser.newPage({
-			viewport: { width: 1400, height: 900 }
-		});
+		const page = await browser.newPage({ viewport: DESKTOP });
 		page.on('pageerror', (e) => errors.push(String(e)));
 		page.on('console', (msg) => {
 			if (msg.type() === 'error') errors.push(msg.text());
@@ -190,7 +203,8 @@ async function main() {
 		// don't use `?mock=` (they're not table-scoped), so this stands in for the missing backend.
 		await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 
-		for (const { name, url, before } of PAGES) {
+		for (const { name, url, before, viewport } of PAGES) {
+			await page.setViewportSize(viewport ?? DESKTOP);
 			await page.goto(BASE + url, { waitUntil: 'networkidle' });
 			// ApiConnectGate holds the "Connecting…" panel for a minimum of 1s even once /healthz
 			// (mocked above) resolves instantly -- wait it out so the screenshot captures the
@@ -198,7 +212,7 @@ async function main() {
 			await page.locator('.connect-gate').waitFor({ state: 'detached' });
 			if (before) await before(page);
 			const dest = path.join(OUT_DIR, `${name}.png`);
-			await page.screenshot({ path: dest, fullPage: true });
+			await page.screenshot({ path: dest, fullPage: viewport !== PHONE });
 			console.log('captured', dest);
 		}
 	} finally {

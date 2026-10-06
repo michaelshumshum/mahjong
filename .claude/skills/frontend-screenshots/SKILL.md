@@ -22,6 +22,9 @@ visible surface (a pure logic module, a test-only change, a refactor with identi
 pnpm --dir web run screenshots
 ```
 
+(`node web/scripts/screenshot-pages.mjs` skips the script's `playwright install chromium`
+step when the browser is already installed.)
+
 This is fully self-contained: it starts its own dev server on a scratch port (5199, distinct
 from the normal dev port so it can run alongside `pnpm dev` without colliding), waits for it to
 actually respond (polls, never a fixed sleep), captures every page in the list, and shuts the
@@ -47,16 +50,23 @@ top of `web/scripts/screenshot-pages.mjs`.
 ## Editing the notable-pages list
 
 Add/remove entries in the `PAGES` array in `web/scripts/screenshot-pages.mjs` — each entry is
-`{ name, url, before? }`, where `before(page)` is an optional Playwright action (click a
-scenario button, open a panel) run after navigation and before the screenshot. Keep names
-stable once they're referenced from `README.md`.
+`{ name, url, before?, viewport? }`, where `before(page)` is an optional Playwright action
+(click a scenario button, open a panel) run after navigation and before the screenshot, and
+`viewport` is `DESKTOP` (default, 1400×900, full-page capture) or `PHONE` (390×844, viewport-only
+capture — one phone screen, sticky hand footer included). Keep names stable once they're
+referenced from `README.md`; phone variants use a `-phone` suffix.
 
 ## Current notable pages
 
-`lobby`, `tables`, `table-your-turn`, `table-claim-window`, `table-hand-ended`,
-`table-hand-ended-draw`, `table-game-ended`, `table-pregame-connecting`, `table-pregame-join`,
-`table-pregame-waiting` — see `README.md`'s
-Screenshots section for the embedded images.
+Desktop: `lobby`, `lobby-create-dialog`, `tables`, `table-your-turn`, `table-claim-window`,
+`table-hand-ended`, `table-hand-ended-draw`, `table-game-ended`, `table-settings`,
+`table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting`.
+
+Phone (390×844): `lobby-phone`, `table-your-turn-phone`, `table-claim-window-phone` — the
+phone layout (docs/frontend.md §3) differs enough that a desktop capture says nothing about it.
+Look at these after any layout change too.
+
+See `README.md`'s Screenshots section for the embedded images.
 
 ## Live pre-game states: `?pregame=`, not a real backend
 

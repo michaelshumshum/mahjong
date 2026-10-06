@@ -68,6 +68,12 @@ frontend change (see `.claude/skills/frontend-screenshots/SKILL.md`).
 | ![Table, settings](docs/screenshots/table-settings.png) Table — settings panel | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting |
 | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players |
 
+Phone (390×844, one screen — the hand stays pinned to the bottom):
+
+| | | |
+| --- | --- | --- |
+| ![Lobby, phone](docs/screenshots/lobby-phone.png) Lobby | ![Table, your turn, phone](docs/screenshots/table-your-turn-phone.png) Table — your turn | ![Table, claim window, phone](docs/screenshots/table-claim-window-phone.png) Table — claim window |
+
 ## Documentation
 
 | Doc | Covers |
