@@ -18,10 +18,11 @@ describe('TileFace', () => {
 		expect(body).toContain('src="/tiles/Flor1.svg"');
 	});
 
-	it('renders the tile back for a concealed (null) tile', () => {
+	it('renders the tile back as CSS (no image asset) for a concealed (null) tile', () => {
 		const { body } = render(TileFace, { props: { code: null } });
-		expect(body).toContain('src="/tiles/Back.svg"');
-		expect(body).toContain('alt="concealed tile"');
+		expect(body).toMatch(/class="tile-face[^"]*\btile-face--back\b/);
+		expect(body).not.toContain('<img');
+		expect(body).toContain('concealed tile');
 		expect(body).not.toContain('data-tile');
 	});
 

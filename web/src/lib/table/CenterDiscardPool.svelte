@@ -26,13 +26,13 @@
 
 	.discard-pool {
 		display: grid;
-		grid-template-columns: repeat(6, minmax(20px, 28px));
+		grid-template-columns: repeat(6, minmax(26px, 36px));
 		gap: 2px;
 		max-width: 14rem;
 	}
 
 	.discard-tile {
-		height: clamp(22px, 3.5vw, 32px);
+		height: clamp(30px, 3.2vw, 44px);
 	}
 
 	.discard-tile :global(.tile-face) {
@@ -69,14 +69,14 @@
 	// here pushes the self seat region off-screen.
 	.discard-pool {
 		@include layout.tablet-up {
-			grid-template-columns: repeat(12, minmax(20px, 28px));
+			grid-template-columns: repeat(12, minmax(26px, 36px));
 			max-width: 26rem;
 		}
 	}
 
 	.discard-tile {
 		@include layout.tablet-up {
-			height: clamp(26px, 4vw, 36px);
+			height: clamp(30px, 3.2vw, 44px);
 		}
 	}
 
@@ -86,7 +86,7 @@
 	.discard-pool--right {
 		@include layout.tablet-up {
 			grid-template-columns: none;
-			grid-template-rows: repeat(6, minmax(24px, 32px));
+			grid-template-rows: repeat(6, minmax(30px, 40px));
 			grid-auto-flow: column;
 		}
 	}
@@ -119,8 +119,8 @@
 	.discard-pool--right .discard-tile {
 		@include layout.tablet-up {
 			position: relative;
-			width: clamp(26px, 4vw, 36px);
-			height: calc(clamp(26px, 4vw, 36px) * 3 / 4);
+			width: clamp(30px, 3.2vw, 44px);
+			height: calc(clamp(30px, 3.2vw, 44px) * 3 / 4);
 		}
 	}
 
@@ -129,7 +129,7 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			height: clamp(26px, 4vw, 36px);
+			height: clamp(30px, 3.2vw, 44px);
 			transform: translate(-50%, -50%) rotate(90deg);
 		}
 	}
@@ -139,7 +139,7 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			height: clamp(26px, 4vw, 36px);
+			height: clamp(30px, 3.2vw, 44px);
 			transform: translate(-50%, -50%) rotate(-90deg);
 		}
 	}

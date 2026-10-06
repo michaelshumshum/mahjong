@@ -21,6 +21,9 @@
 	--color-felt-lit: #2a6150;
 	--color-felt-line: rgb(255 255 255 / 0.06);
 	--color-text-on-felt: #e9f1ea;
+	// --color-text-muted (#a99a85) falls under 4.5:1 on felt; this is its felt-surface
+	// replacement, set as a local override of --color-text-muted on .table-surface (frontend.md §8).
+	--color-felt-muted: #c3d4c8;
 
 	// tile body layers: face (--color-tile), edge, side, and the jade back.
 	--color-tile-edge: #dccdb1;

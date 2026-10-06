@@ -21,6 +21,8 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 	await expect(page.getByTestId('claim-overlay')).toHaveCount(0);
 	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
 	expect(errors).toEqual([]);
+	// mock scenarios are frozen snapshots, not live turn state -- always the generic table title.
+	await expect(page).toHaveTitle('Table abc123 · Mahjong');
 });
 
 test('switching to the claim-window scenario surfaces claim buttons, and choosing one records the choice', async ({

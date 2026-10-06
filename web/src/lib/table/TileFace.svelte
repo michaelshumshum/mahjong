@@ -6,23 +6,29 @@
 	// `null` = concealed (render the back).
 	let { code = null }: { code?: TileCode | null } = $props();
 
-	// plain <img src>, not inlined SVG: the vendored files carry non-namespaced ids that collide
-	// across repeated inline copies of the same tile. Costs currentColor/CSS stylability.
-	const BACK_SRC = '/tiles/Back.svg';
-
 	let face = $derived(code !== null && hasTileArt(code) ? code : null);
-	let src = $derived(face !== null ? `/tiles/${TILE_ASSET[face]}.svg` : BACK_SRC);
+	let src = $derived(face !== null ? `/tiles/${TILE_ASSET[face]}.svg` : null);
 	let alt = $derived(face !== null ? tileName(face) : m.tileFace_concealedTileAlt());
 </script>
 
-<!-- data-tile: a locale-independent hook for specs, since alt is now a localized name -->
-<span class="tile-face" class:tile-face--back={face === null} data-tile={face}>
-	<img {src} {alt} draggable="false" />
+<!-- data-tile: a locale-independent hook for specs, since alt is now a localized name.
+     back has no image asset (CSS jade, see .tile-face--back); role/aria-label stand in for the
+     alt text an <img> would otherwise carry. -->
+<span
+	class="tile-face"
+	class:tile-face--back={face === null}
+	data-tile={face}
+	role={face === null ? 'img' : undefined}
+	aria-label={face === null ? alt : undefined}
+>
+	{#if src}
+		<img {src} {alt} draggable="false" />
+	{/if}
 </span>
 
 <style lang="scss">
-	// background-color and <img> each clip to border-radius through a different rendering path
-	// and can anti-alias the corner differently -- overflow: hidden clips both through one box.
+	// overflow: hidden clips background and <img> through one box, avoiding mismatched corner aa.
+	// box-shadow layers (edge/side bands + drop shadow) give the face thickness, not a bevel.
 	.tile-face {
 		display: inline-flex;
 		align-items: center;
@@ -33,9 +39,9 @@
 		border-radius: calc(var(--radius-tile) * 4 / 3) / var(--radius-tile);
 		background: var(--color-tile);
 		box-shadow:
-			0 1px 2px rgb(0 0 0 / 0.35),
-			inset 0 0 0 1px rgb(36 27 20 / 0.35),
-			inset 0 -2px 3px rgb(36 27 20 / 0.18);
+			0 1px 0 var(--color-tile-edge),
+			0 3px 0 var(--color-tile-side),
+			0 5px 8px rgb(0 0 0 / 0.35);
 	}
 
 	.tile-face img {
@@ -48,12 +54,14 @@
 		user-select: none;
 	}
 
-	.tile-face--back img {
-		padding: 0;
-	}
-
+	// jade back: a gradient standing in for the vendored Back.svg flat rect, with a lighter top
+	// edge reading as the glazed ridge of a real tile back. Same thickness shadow as the face.
 	.tile-face--back {
-		background: none;
-		box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+		background: linear-gradient(
+			180deg,
+			var(--color-tile-back-edge) 0%,
+			var(--color-tile-back) 18%,
+			var(--color-tile-back) 100%
+		);
 	}
 </style>

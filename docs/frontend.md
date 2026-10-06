@@ -100,6 +100,26 @@ No fixed logical canvas, no letterbox — a 16:10 letterboxed scene on a 390×84
 table at ~35% of the screen. Each region sizes to its own content via `clamp()`; there is no
 global scale factor.
 
+**Table surface material.** `.table-surface` (`routes/table/[id]/+page.svelte`) is a radial felt
+gradient (`--color-felt-lit` at 50% 35% fading to `--color-felt`, then `--color-felt-deep` at the
+rails) inside a 10px `--color-rim` walnut border, with an inset `--color-rim-hi` highlight ring and
+an outer drop shadow. A `::before` layer adds a static inline-SVG `feTurbulence` grain at ~4%
+opacity (`background-image`, not canvas — ADR 0002) for a felt-woven texture cue;
+`position: absolute` keeps it out of the grid so it never competes with `seat-region-grid`'s own
+layout. `--color-text-muted` (tuned for walnut chrome) drops under 4.5:1 on the felt greens, so
+`.table-surface` locally overrides it to `--color-felt-muted` (`#c3d4c8`) — every descendant using
+the token (seat-wind, seat-score, …) picks it up for free via custom-property inheritance, no
+per-component change needed. Tile faces get real thickness from a layered `box-shadow`
+(`--color-tile-edge`/`--color-tile-side` bands + a drop shadow) instead of an inset bevel; backs
+are CSS jade (`--color-tile-back`/`--color-tile-back-edge` gradient, lighter top edge), no image
+asset — `Back.svg` stays only for the canvas mural (§2), which draws tile art directly rather than
+through `TileFace`.
+
+Discard tiles are `clamp(30px, 3.2vw, 44px)` (up from `clamp(22px, 3.5vw, 36px)`) — legible at
+arm's length without crowding the centre box at 390×844 or 1024×768. `.table-center` carries a
+1px `--color-felt-line` outline (offset `--space-2`) as a zone guide, reading as a dealt-area
+marking on the felt rather than UI chrome.
+
 Seats are rendered relative to **your** seat, at the bottom. Wall count and prevailing wind live
 in the page header. Dealer and turn are not repeated there: the dealer badge and the acting seat's
 outline (`.seat-region--turn`) already show both. The turn indicator is a non-layout-affecting
@@ -516,6 +536,11 @@ WS URL, which binds seats 1-3 at construction (`server/app/ws.py`'s `ws_endpoint
 | `?mock=<scenarioId>` (or bare `?mock`) | a frozen `MOCK_SCENARIOS` fixture, no backend — used by the screenshot workflow (`.claude/skills/frontend-screenshots/SKILL.md`) and design iteration |
 | `?pregame=connecting\|join\|waiting` | freezes one pre-game state (below) with no socket — mock scenarios are always fully seated |
 
+**Tab title.** `<svelte:head><title>` reads live turn/claim state: "Your turn · Mahjong" while this
+seat has a legal discard, "Claim? · Mahjong" while a claim offer is open, else "Table `<id>` ·
+Mahjong". Mock scenarios are frozen snapshots, not live turn state, so they always show the
+generic table title regardless of which scenario is selected.
+
 **One view model, two sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a real
 `ClientGameState` into the same `MockGameState` shape the template renders, so mock and live share
 one render tree (`TileFace`/`ClaimButtons`/`TimerRing`/`FaanBreakdown`/`ScoreSheet`/…) and can't
@@ -646,7 +671,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | Group | Tokens | Use |
 | --- | --- | --- |
 | chrome | `--color-bg/surface/surface-raised/border/text/text-muted` | walnut app chrome |
-| table materials | `--color-rim`, `--color-rim-hi`, `--color-felt`, `--color-felt-deep`, `--color-felt-lit`, `--color-felt-line`, `--color-text-on-felt` | dark green felt inside a walnut rim (defined; applied to the table in a later change) |
+| table materials | `--color-rim`, `--color-rim-hi`, `--color-felt`, `--color-felt-deep`, `--color-felt-lit`, `--color-felt-line`, `--color-text-on-felt`, `--color-felt-muted` | dark green felt inside a walnut rim, applied to `.table-surface` (`routes/table/[id]/+page.svelte`) |
 | tile body | `--color-tile`, `--color-tile-ink`, `--color-tile-edge`, `--color-tile-side`, `--color-tile-back`, `--color-tile-back-edge` | face, edge/side layers, jade back |
 | signal | `--color-accent`, `--color-accent-glow` | the one urgent signal (turn, claim window, win marker); never decorative |
 | highlight | `--color-brass` | selection, focus ring, your own seat, dealer; never a signal |

@@ -571,7 +571,21 @@
 	}
 
 	let showAnimationDemo = $state(false);
+
+	// tab title: your-turn/claim beats the generic table label. Mock scenarios are frozen
+	// snapshots, not live turn state, so they always show the generic table title.
+	let pageTitle = $derived(
+		!isMock && claimOptions && claimOptions.length > 0
+			? m.tablePage_titleClaim()
+			: !isMock && discardableTileIds.size > 0
+				? m.tablePage_titleYourTurn()
+				: m.tablePage_titleTable({ code: tableId })
+	);
 </script>
+
+<svelte:head>
+	<title>{pageTitle}</title>
+</svelte:head>
 
 {#if tableReady}
 	<h1 class="sr-only">{m.tablePage_heading()}</h1>
@@ -601,7 +615,7 @@
 			/>
 		{/if}
 
-		<div class="table-tilt">
+		<div class="table-wrap">
 			<div class="table-surface" data-testid="table-scene">
 				<OpponentRegion
 					seat={seatAt(2)}
@@ -798,21 +812,47 @@
 		padding: var(--space-5);
 	}
 
-	.table-tilt {
+	.table-wrap {
 		flex: 1;
 		min-height: 0;
 	}
 
 	.table-surface {
 		@include layout.seat-region-grid;
+		position: relative;
 		height: 100%;
 		min-height: 420px;
 		padding: var(--space-3);
-		// faint overhead-light falloff -- a believable material cue, not a texture asset.
-		background:
-			radial-gradient(ellipse 80% 60% at 50% 10%, rgb(255 255 255 / 0.035), transparent 65%),
-			var(--color-surface);
-		border-radius: var(--radius-md);
+		overflow: hidden;
+		border-radius: var(--radius-lg);
+		// local override: --color-text-muted (walnut chrome) fails contrast on felt green;
+		// every descendant using it (seat-wind, seat-score, …) gets the felt-safe value for free.
+		--color-text-muted: var(--color-felt-muted);
+		// walnut rim: a solid border plus an inner highlight ring (the lip catching light) and an
+		// outer shadow (the rim sitting above the room, not flush with it).
+		border: 10px solid var(--color-rim);
+		box-shadow:
+			inset 0 0 0 2px var(--color-rim-hi),
+			0 10px 28px rgb(0 0 0 / 0.5);
+		// felt: lit from above-centre, falling off to a deeper green at the rails.
+		background: radial-gradient(
+			ellipse 120% 85% at 50% 35%,
+			var(--color-felt-lit),
+			var(--color-felt) 55%,
+			var(--color-felt-deep) 100%
+		);
+	}
+
+	// static woven-felt grain (inline SVG feTurbulence, ~4% opacity), not a texture asset.
+	// position: absolute keeps it out of the surface's own grid; pointer-events: none below it.
+	.table-surface::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		opacity: 0.04;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+		background-size: 180px 180px;
 	}
 
 	// all four discard pools live in the centre, forming a box instead of each sitting at its own
@@ -831,6 +871,16 @@
 				'.    self   .';
 			grid-template-columns: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
 			grid-template-rows: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
+		}
+	}
+
+	// zone guide: a faint felt-line box around the discard area, reading as a dealt-in-the-centre
+	// marking on the felt (like a real table's rail line), not a UI chrome border.
+	.table-center {
+		@include layout.tablet-up {
+			outline: 1px solid var(--color-felt-line);
+			outline-offset: var(--space-2);
+			border-radius: var(--radius-sm);
 		}
 	}
 
@@ -867,7 +917,7 @@
 			overflow: visible;
 		}
 
-		.table-tilt {
+		.table-wrap {
 			display: flex;
 			flex-direction: column;
 		}
