@@ -618,12 +618,15 @@ not mock, `effectiveSeat !== null`, including the pre-start waiting room) confir
 seat switches to autoplay until you reconnect"); otherwise it navigates straight to `/`. Either way
 `goto('/')` runs the socket effect's cleanup, which disconnects.
 
-### Bot seat badge
+### Bot seat badge and status chips
 
 `MockSeatState.status` (populated from `ClientGameState.seatStatus` by `viewFromClientState`, never
 set by mocks) drives a `.bot-badge` chip ("Bot") next to the dealer badge when `status === 'bot'` —
-a quiet bordered chip, not `--color-accent`, since a bot seat doesn't change mid-hand. Other
-statuses have no visual treatment.
+a quiet bordered chip, not `--color-accent`, since a bot seat doesn't change mid-hand.
+`disconnected`/`autoplay` get their own `.status-chip--away`/`.status-chip--autoplay` chips
+(`OpponentRegion.svelte`), tinted (`--color-status-error`/`--color-accent`) rather than neutral —
+both are transient, in-hand signals, unlike the bot badge's fixed identity. `connected` has no
+visual treatment. Own-seat equivalents and a one-time AUTOPLAY-handover toast are not built yet.
 
 ### Game-end summary
 

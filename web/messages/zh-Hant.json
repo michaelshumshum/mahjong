@@ -177,6 +177,10 @@
 	"opponentRegion_dealerBadgeTitle": "莊家",
 	"opponentRegion_botBadgeTitle": "電腦操控座位",
 	"opponentRegion_botBadgeLabel": "機械人",
+	"opponentRegion_awayChipTitle": "已斷線 -- 可能會轉為自動遊玩",
+	"opponentRegion_awayChipLabel": "離線",
+	"opponentRegion_autoplayChipTitle": "伺服器正代為遊玩此座位，直至重新連線",
+	"opponentRegion_autoplayChipLabel": "自動遊玩",
 	"opponentRegion_concealedHandAriaLabel": "{name}的暗牌",
 	"opponentRegion_concealedTilesAriaLabel": [
 		{

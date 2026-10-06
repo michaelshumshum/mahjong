@@ -63,6 +63,38 @@ describe('OpponentRegion', () => {
 		expect(target.querySelector('.bot-badge')).not.toBeNull();
 	});
 
+	it('shows an away chip for a disconnected seat', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ status: 'disconnected' }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.status-chip--away')).not.toBeNull();
+		expect(target.querySelector('.status-chip--autoplay')).toBeNull();
+	});
+
+	it('shows an autoplay chip when the server is playing a seat', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ status: 'autoplay' }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.status-chip--autoplay')).not.toBeNull();
+		expect(target.querySelector('.status-chip--away')).toBeNull();
+	});
+
+	it('shows no status chip for a connected seat', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ status: 'connected' }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.status-chip')).toBeNull();
+	});
+
 	it('renders concealed backs when concealedHand is not provided', () => {
 		const { target } = render(OpponentRegion, {
 			seat: mockSeat({ concealedCount: 10 }),

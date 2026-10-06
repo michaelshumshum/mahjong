@@ -177,6 +177,10 @@
 	"opponentRegion_dealerBadgeTitle": "Dealer",
 	"opponentRegion_botBadgeTitle": "Bot-controlled seat",
 	"opponentRegion_botBadgeLabel": "Bot",
+	"opponentRegion_awayChipTitle": "Disconnected -- autoplay may take over",
+	"opponentRegion_awayChipLabel": "Away",
+	"opponentRegion_autoplayChipTitle": "The server is playing this seat until it reconnects",
+	"opponentRegion_autoplayChipLabel": "Autoplay",
 	"opponentRegion_concealedHandAriaLabel": "{name}'s concealed hand",
 	"opponentRegion_concealedTilesAriaLabel": [
 		{
