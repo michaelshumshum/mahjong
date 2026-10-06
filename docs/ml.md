@@ -515,7 +515,7 @@ seat-hands, cleared at anneal completion and at each advance) meeting every thre
 | C0 | 1 learner + 3 tsumogiri | 0 | 13 | 1 | 1.0 | — | rolling win ≥ 0.40 |
 | C0b | same | 0 | 13 → 0 | 1 | 1.0 → 0.5 | 20M | rolling blind win ≥ 0.25 (blind envs, §9) |
 | C1 | 4 learners (self-play) | 0, 1 from ½, 3 at the end | 0 | 1 → 0 | 0.5 → 0 | 200M | win ≥ 0.15 and sub-min tenpai ≤ 0.32 over ≥ 200 tenpai draws |
-| C2 | stub: `params` raises `NotImplementedError`, `complete()` stops training | | | | | | R3 |
+| C2 | stub: `params` raises `NotImplementedError`, `complete()` stops training: the update that advances into it writes its record (`advanced_to: "C2"`), saves `ckpt_last.pt` with the advanced state and exits; resuming that checkpoint returns at once | | | | | | R3 |
 
 **C1 thresholds.** With four learners every hand has either one winner or none, so the rolling
 per-seat win rate is (1 − draw rate) / 4: the win threshold is really a cap on exhaustive draws,

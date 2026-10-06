@@ -832,6 +832,9 @@ def train_ppo(
         decisions, updates = ckpt["decisions"], ckpt["updates"]
         schedule.load_state_dict(ckpt["schedule"])
         rng.bit_generator.state = ckpt["rng"]
+    if schedule.complete():
+        print("curriculum complete, nothing to train", flush=True)
+        return out
 
     params = schedule.params(decisions)
     env_cfg = _env_config(cfg, params, schedule.teacher())
@@ -901,7 +904,8 @@ def train_ppo(
                 updates += 1
                 schedule.observe(stats)
                 advanced = schedule.advance(decisions)
-                new_params = schedule.params(decisions)
+                # a completed schedule has no params; the loop exits after this record
+                new_params = params if schedule.complete() else schedule.params(decisions)
                 if _env_config(cfg, new_params, schedule.teacher()) != env_cfg:
                     env_cfg = _env_config(cfg, new_params, schedule.teacher())
                     venv.configure(env_cfg)

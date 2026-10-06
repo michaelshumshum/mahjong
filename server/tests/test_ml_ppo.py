@@ -257,6 +257,28 @@ def test_train_ppo_resume_ignores_init_ckpt(tmp_path):
     assert json.loads(lines[-1])["update"] == 2
 
 
+def _quick_c1_curriculum(**kw) -> dict:
+    # anneal 0 and no thresholds: C1 exits on the first full window, on update 2
+    stage = {"name": "C1", "anneal_decisions": 0, "win_rate": 0.0, "sub_min_tenpai_max": None}
+    return {"start": "C1", "window": 4, "stages": [stage], **kw}
+
+
+def _records(out: Path) -> list[dict]:
+    return [json.loads(x) for x in (out / "metrics.jsonl").read_text().splitlines()]
+
+
+def test_train_ppo_stops_cleanly_when_the_curriculum_completes(tmp_path):
+    cfg = _tiny_cfg(tmp_path, curriculum=_quick_c1_curriculum())
+    out = train_ppo(cfg, max_updates=10)
+    lines = _records(out)
+    assert lines[-1]["advanced_to"] == "C2" and len(lines) < 10
+    ckpt = torch.load(out / "ckpt_last.pt", weights_only=False, map_location="cpu")
+    assert ckpt["updates"] == lines[-1]["update"]
+    assert ckpt["schedule"]["index"] == 3
+    train_ppo(cfg, resume=True, max_updates=10)
+    assert _records(out) == lines
+
+
 def test_train_ppo_is_deterministic(tmp_path):
     def run(name):
         cfg = _tiny_cfg(tmp_path, out=str(tmp_path / name))
