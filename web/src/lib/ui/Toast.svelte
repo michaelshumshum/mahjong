@@ -19,6 +19,7 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 
 	.toast {
@@ -28,13 +29,9 @@
 		padding: var(--space-2) var(--space-3);
 		background: var(--color-surface-raised);
 		color: var(--color-text);
-		animation: toast-in 150ms ease-out;
 		@include buttons.panel-elevated;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.toast {
-			animation: none;
+		@include a11y.motion-ok {
+			animation: toast-in var(--dur-1) var(--ease-out);
 		}
 	}
 

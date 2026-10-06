@@ -10,10 +10,15 @@
 	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
 	import ApiConnectGate from '$lib/ui/ApiConnectGate.svelte';
 	import { muralVisibility } from '$lib/ui/mural-visibility.svelte';
-	import { cleanupStaleTableCredentials } from '$lib/ui/settings-storage';
+	import { browser } from '$app/environment';
+	import { cleanupStaleTableCredentials, loadClientPrefs } from '$lib/ui/settings-storage';
+	import { applyMotionPref } from '$lib/ui/motion';
 
 	// clear abandoned per-table reconnect credentials so they don't sit in localStorage forever.
 	cleanupStaleTableCredentials();
+
+	// before children mount, so the mural's one-time motion check already sees it.
+	if (browser) applyMotionPref(loadClientPrefs()?.motion ?? 'system');
 
 	let { children } = $props();
 </script>

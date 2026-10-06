@@ -38,6 +38,7 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	.timer-ring {
 		width: var(--ring-size);
 		height: var(--ring-size);
@@ -61,15 +62,10 @@
 	.progress {
 		stroke: var(--color-accent);
 		stroke-linecap: round;
-		animation:
-			deplete var(--deplete-duration) linear forwards,
-			warn-pulse var(--warn-duration) var(--warn-delay) linear forwards;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.progress {
-			animation: none;
-			stroke-dashoffset: 0;
+		@include a11y.motion-ok {
+			animation:
+				deplete var(--deplete-duration) linear forwards,
+				warn-pulse var(--warn-duration) var(--warn-delay) linear forwards;
 		}
 	}
 

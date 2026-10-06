@@ -25,6 +25,7 @@
 	} from '$lib/ui/ScoreSheet.svelte';
 	import GameEndScreen from '$lib/ui/GameEndScreen.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
+	import { applyMotionPref } from '$lib/ui/motion';
 	import {
 		clearSeatForTable,
 		clearSecretForTable,
@@ -733,6 +734,7 @@
 					onPrefsChange={(next) => {
 						clientPrefs = next;
 						saveClientPrefs(next);
+						applyMotionPref(next.motion);
 					}}
 				/>
 			</DismissablePanel>

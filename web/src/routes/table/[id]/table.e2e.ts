@@ -189,6 +189,33 @@ test('reloading the page preserves clientPrefs toggled in Settings', async ({ pa
 	await expect(page.getByRole('radio', { name: 'Reduce motion' })).toBeChecked();
 });
 
+test('the motion setting drives html[data-motion] and overrides prefers-reduced-motion', async ({
+	page
+}) => {
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	const html = page.locator('html');
+	const ring = page.locator('.seat-region--self .progress').first();
+	await expect(html).toHaveAttribute('data-motion', 'system');
+	await expect(ring).toHaveCSS('animation-name', 'none');
+
+	await page.getByTestId('toggle-settings').click();
+	await page.getByRole('radio', { name: 'Full motion' }).check();
+	await expect(html).toHaveAttribute('data-motion', 'full');
+	await expect(ring).not.toHaveCSS('animation-name', 'none');
+
+	await page.emulateMedia({ reducedMotion: 'no-preference' });
+	await page.getByRole('radio', { name: 'Reduce motion' }).check();
+	await expect(html).toHaveAttribute('data-motion', 'reduced');
+	await expect(ring).toHaveCSS('animation-name', 'none');
+
+	await page.reload();
+	await page.waitForLoadState('networkidle');
+	await expect(html).toHaveAttribute('data-motion', 'reduced');
+});
+
 // Covers the scripted draw/discard/claim/kong animation demo -- the pure slot-resolution
 // algorithm is unit-tested in tile-slots.spec.ts; this proves it's wired up end to end.
 test('animation demo: draw, discard, claim, and concealed kong run the full sequence without errors', async ({

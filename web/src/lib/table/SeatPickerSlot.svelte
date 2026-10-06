@@ -36,6 +36,7 @@
 </button>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	.seat-ring-slot {
 		display: flex;
 		align-items: center;
@@ -69,8 +70,8 @@
 		}
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.seat-ring-slot {
+	.seat-ring-slot:not(.seat-ring-slot--pickable) {
+		@include a11y.motion-reduced {
 			animation: none;
 			opacity: 0.85;
 		}

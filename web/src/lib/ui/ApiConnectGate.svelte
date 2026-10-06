@@ -78,6 +78,7 @@
 {/if}
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 
 	.connect-gate {
@@ -138,8 +139,8 @@
 		}
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.connect-spinner {
+	.connect-spinner {
+		@include a11y.motion-reduced {
 			animation: none;
 			opacity: 0.6;
 		}

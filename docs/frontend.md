@@ -73,7 +73,7 @@ off-screen buffer.
 | Behaviour | Detail |
 | --- | --- |
 | Tile faces | the same ivory `--color-tile` box `TileFace.svelte` uses; backs drawn without a box per `.tile-face--back`. No two backs share an edge (a cluster reads as a hole); adjacent cells never share a suit (honors and backs exempt) |
-| Reduced motion | `prefers-reduced-motion` renders the grid once, statically |
+| Reduced motion | reduced motion (§9: the setting, else `prefers-reduced-motion`) renders the grid once, statically |
 | Resize | the grid is persistent — a resize only appends cells to cover the new viewport, never re-rolls placed ones, so a spurious `resize` (webfont swap, scrollbar toggle) can't read as the mural "switching". Unchanged `innerWidth`/`innerHeight` short-circuits the handler |
 | Scroll | the buffer's row window advances one row each time its leading row scrolls out of view, rather than wrapping a fixed buffer (which reads as the layout snapping back) |
 
@@ -669,8 +669,17 @@ fluent Hong Kong mahjong player.
 - **Keyboard:** hand tiles are real focusable elements (roving `tabindex`, arrow keys move focus,
   `Enter`/`Space` lift/discard) — the same elements pointer and touch use, so there is one
   selection model.
-- **Reduced motion:** `prefers-reduced-motion` disables non-essential transitions (lift, drag,
-  resync crossfade); state changes still apply instantly.
+- **Reduced motion:** Settings' Motion radio (`system`/`reduced`/`full`, persisted in
+  `clientPrefs`) is mirrored onto `html[data-motion]` by `lib/ui/motion.ts`'s `applyMotionPref`
+  — from the root `+layout.svelte` on load, and on every Settings change. `reduced`/`full`
+  override the OS; `system` defers to `prefers-reduced-motion`.
+  - CSS: `_a11y.scss`'s `motion-ok` mixin emits its content only when motion is allowed —
+    the default for new motion (toast entry, timer ring). `motion-reduced` is the inverse, for
+    neutralizing motion a base rule must keep (seat-slot breathing, spinners, mural fade, the
+    animation demo's near-instant transitions).
+  - JS: `isMotionReduced()` applies the same resolution (the mural canvas checks it once at
+    mount).
+  - State changes always apply instantly; only the motion is dropped.
 - **Discard pools** are real DOM and stay fully present when visually truncated on mobile.
 
 **Designed, not implemented:** per-discard announcements. Intended shape: each discard a focusable

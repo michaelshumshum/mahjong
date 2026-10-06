@@ -120,6 +120,7 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 
@@ -242,8 +243,8 @@
 		}
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.pretable-spinner {
+	.pretable-spinner {
+		@include a11y.motion-reduced {
 			animation: none;
 			opacity: 0.6;
 		}

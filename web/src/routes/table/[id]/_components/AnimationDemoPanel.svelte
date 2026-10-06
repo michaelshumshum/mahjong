@@ -240,6 +240,7 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/tile';
 
@@ -355,13 +356,15 @@
 
 	// keep a near-instant transition running -- `transition: none` would leave the demo stuck
 	// mid-flight, since ontransitionend is what commits the data change.
-	@media (prefers-reduced-motion: reduce) {
-		.demo-tile-leaving {
+	.demo-tile-leaving {
+		@include a11y.motion-reduced {
 			transition-duration: 1ms;
 			transform: none;
 		}
+	}
 
-		.demo-meld-entering {
+	.demo-meld-entering {
+		@include a11y.motion-reduced {
 			animation-duration: 1ms;
 		}
 	}

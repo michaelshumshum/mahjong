@@ -3,6 +3,7 @@
 	// aria-hidden, needs a per-frame blit a DOM grid can't do without animating ~200 elements.
 	import { TILE_ASSET, type RenderableTileCode } from '$lib/table/tile-code';
 	import { muralBlitY, stepMuralScroll } from './mural-scroll';
+	import { isMotionReduced } from './motion';
 
 	// the tile back joins the pool as its own pseudo-code, same "no suit" treatment as honors.
 	type MuralTile = RenderableTileCode | 'back';
@@ -73,7 +74,7 @@
 		// re-bound to a non-null const: TS doesn't narrow into the nested closures below.
 		const bufferCtx: CanvasRenderingContext2D = bufferCtxOrNull;
 
-		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const reduceMotion = isMotionReduced();
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 		// persistent across resizes/scroll: cells already assigned a tile keep it, both resize
@@ -226,6 +227,7 @@
 <div class="mural-scrim" class:mural--hidden={!visible} aria-hidden="true"></div>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	.mural {
 		position: fixed;
 		inset: 0;
@@ -252,9 +254,9 @@
 		opacity: 0;
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.mural,
-		.mural-scrim {
+	.mural,
+	.mural-scrim {
+		@include a11y.motion-reduced {
 			transition: none;
 		}
 	}
