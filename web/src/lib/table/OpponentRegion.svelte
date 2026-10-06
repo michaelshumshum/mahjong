@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
+	import SeatPlate from './SeatPlate.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
@@ -18,28 +19,28 @@
 	class:seat-region--turn={seat.seat === turn}
 	aria-label={m.opponentRegion_seatAriaLabel({ name: seat.name })}
 >
-	<header class="seat-meta">
-		<span class="seat-name">{seat.name}</span>
-		<span
-			class="seat-wind"
-			aria-label={m.opponentRegion_windAriaLabel({ wind: windWord(seatWind(seat.seat, dealer)) })}
-			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
-		>
-		{#if seat.seat === dealer}<span class="dealer-badge" title={m.opponentRegion_dealerBadgeTitle()}
-				>莊</span
-			>{/if}
-		{#if seat.status === 'bot'}<span class="bot-badge" title={m.opponentRegion_botBadgeTitle()}
-				>{m.opponentRegion_botBadgeLabel()}</span
-			>{/if}
-		{#if seat.status === 'disconnected'}<span
-				class="status-chip status-chip--away"
-				title={m.opponentRegion_awayChipTitle()}>{m.opponentRegion_awayChipLabel()}</span
-			>{:else if seat.status === 'autoplay'}<span
-				class="status-chip status-chip--autoplay"
-				title={m.opponentRegion_autoplayChipTitle()}>{m.opponentRegion_autoplayChipLabel()}</span
-			>{/if}
-		<span class="seat-score">{seat.score}</span>
-	</header>
+	<SeatPlate
+		name={seat.name}
+		windChar={WIND_CHAR[seatWind(seat.seat, dealer)]}
+		windAriaLabel={m.opponentRegion_windAriaLabel({ wind: windWord(seatWind(seat.seat, dealer)) })}
+		isDealer={seat.seat === dealer}
+		dealerTitle={m.opponentRegion_dealerBadgeTitle()}
+		score={seat.score}
+		isTurn={seat.seat === turn}
+	>
+		{#snippet badges()}
+			{#if seat.status === 'bot'}<span class="bot-badge" title={m.opponentRegion_botBadgeTitle()}
+					>{m.opponentRegion_botBadgeLabel()}</span
+				>{/if}
+			{#if seat.status === 'disconnected'}<span
+					class="status-chip status-chip--away"
+					title={m.opponentRegion_awayChipTitle()}>{m.opponentRegion_awayChipLabel()}</span
+				>{:else if seat.status === 'autoplay'}<span
+					class="status-chip status-chip--autoplay"
+					title={m.opponentRegion_autoplayChipTitle()}>{m.opponentRegion_autoplayChipLabel()}</span
+				>{/if}
+		{/snippet}
+	</SeatPlate>
 
 	<div class="seat-hand-strip seat-hand-strip--{position}">
 		{#if seat.concealedHand}
@@ -111,28 +112,6 @@
 		grid-area: right;
 	}
 
-	.seat-region--turn {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-		border-radius: var(--radius-sm);
-	}
-
-	.seat-meta {
-		@include tile.seat-meta;
-	}
-
-	.seat-name {
-		@include tile.seat-name;
-	}
-
-	.seat-wind {
-		@include tile.seat-wind;
-	}
-
-	.dealer-badge {
-		@include tile.dealer-badge;
-	}
-
 	// persistent identity marker, not transient like dealer/turn -- a quiet chip, not --color-accent.
 	.bot-badge {
 		display: inline-flex;
@@ -175,10 +154,6 @@
 		border: 1px solid var(--color-accent);
 		color: var(--color-accent);
 		background: rgb(0 0 0 / 0.15);
-	}
-
-	.seat-score {
-		@include tile.seat-score;
 	}
 
 	.seat-hand-strip {

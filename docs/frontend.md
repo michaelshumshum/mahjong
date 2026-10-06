@@ -123,14 +123,22 @@ next row of the pool. `.table-center` carries a
 1px `--color-felt-line` outline (offset `--space-2`) as a zone guide, reading as a dealt-area
 marking on the felt rather than UI chrome.
 
-Seats are rendered relative to **your** seat, at the bottom. Wall count and prevailing wind live
-in the page header. Dealer and turn are not repeated there: the dealer badge and the acting seat's
-outline (`.seat-region--turn`) already show both. The turn indicator is a non-layout-affecting
-outline because a text badge mounting/unmounting every turn shifted the seat header's
-auto-positioned score. Desktop/tablet (≥768px):
+Seats are rendered relative to **your** seat, at the bottom. Each seat's header is `SeatPlate`
+(`lib/table/SeatPlate.svelte`): name, wind glyph, dealer badge, a slot for extra badges (the bot/
+status chips on an opponent, nothing extra on your own), and the score. The toolbar shows your own
+wind glyph instead of "seat N" — wall count and prevailing wind moved to `CenterHub` (below).
+
+**Turn indication.** The acting seat's `SeatPlate` gets a red halo (`--color-accent` border plus a
+`--color-accent-glow` box-shadow) and a gentle `motion-ok` pulse, via an absolutely-positioned
+`::before` so the plate's own box — and the header's layout — never changes size between turns (the
+original whole-region outline is gone from `OpponentRegion`, which previously shifted against the
+felt grain; `.seat-region--turn` stays as a class-only hook so existing specs/e2e still find it,
+carrying no visual rule of its own). Your own seat gets the same plate plus a
+"Your turn — discard a tile" prompt above the hand, since a halo alone on the seat you're always
+looking at is easy to miss. Desktop/tablet (≥768px):
 
 ```
-  header: table/scenario · wall count · prevailing wind (東南西北) · chrome toggles
+  header: table/scenario · your wind · chrome toggles
 
                     ┌─────────── opponent (across) ───────────┐
                     │       13 backs · melds · flowers        │
@@ -138,7 +146,7 @@ auto-positioned score. Desktop/tablet (≥768px):
   │ left    │       │     across's discard pool (top)         │       │ right   │
   │ opponent│       │                                          │       │ opponent│
   │ vertical│       │  left's   ┌──────────────┐   right's    │       │ vertical│
-  │  strip  │       │  discards │    (empty)   │   discards   │       │  strip  │
+  │  strip  │       │  discards │  (CenterHub) │   discards   │       │  strip  │
   │         │       │  (rotated)│              │   (rotated)  │       │         │
   │         │       │           └──────────────┘              │       │         │
   │         │       │        YOUR discard pool (bottom)        │       │         │
@@ -147,6 +155,21 @@ auto-positioned score. Desktop/tablet (≥768px):
                     │  tile held out at right, melds, flowers │
                     └─────────────────────────────────────────┘
 ```
+
+**Centre compass hub.** `CenterHub.svelte` sits in `.table-center`'s own middle grid cell
+(`grid-area: hub`, previously unused — the pools form a box around it, never over it): the
+prevailing wind glyph, "Hand N", the wall-remaining count (`.wall-count strong`, pinned by
+`table.e2e.ts`), a min-faan chip (this table's `RuleSet.min_faan`; mocks default to the server's own
+default of 3 since no fixture carries a ruleset), and one small wind marker per seat positioned
+toward that seat (top/left/right/bottom, matching the box above). The acting seat's marker gets the
+same halo treatment as its `SeatPlate` and additionally carries `TimerRing` — but only when this
+client actually knows that seat's deadline, which protocol-wise is only ever true for your own turn
+(`ClientGameState.deadlineTs` is this seat's own `AWAIT_ACTION` deadline, never an opponent's,
+§6); an opponent's turn glows the marker with no ring rather than fabricating a duration. Below
+768px the pools stack instead of forming a box, leaving the markers nowhere to sit without
+overlapping a pool, so the hub collapses to a compact single-row summary (wind/hand/wall/faan only,
+no markers); `TableToolbar`'s own wall/prevailing span is kept as a phone-only fallback copy for
+the same reason.
 
 **Discard pools: all four in the centre** (`.table-center`), forming a box — across on top,
 left/right along the sides (rotated), self on the bottom — each still keyed to its own seat so

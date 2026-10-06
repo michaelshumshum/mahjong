@@ -452,5 +452,13 @@
 	"faanPattern_fourConcealedPungs": "四暗刻",
 	"faanPattern_eighteenArhats": "十八羅漢",
 	"guide_descFourConcealedPungs": "四組暗刻或槓；胡牌時不可靠食出銃完成刻子。",
-	"guide_descEighteenArhats": "四組槓。"
+	"guide_descEighteenArhats": "四組槓。",
+	"yourSeatRegion_yourTurnPrompt": "你的回合 — 打出一張牌",
+	"tableToolbar_yourWindAriaLabel": "你的座位是{wind}",
+	"centerHub_ariaLabel": "牌桌狀態",
+	"centerHub_handLabel": "第{n}局",
+	"centerHub_wallLabel": "牌牆",
+	"centerHub_minFaanLabel": "最低{n}番",
+	"centerHub_windMarkerAriaLabel": "{wind}風",
+	"centerHub_turnTitle": "現在輪到"
 }

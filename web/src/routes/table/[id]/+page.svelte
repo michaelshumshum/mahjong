@@ -49,6 +49,7 @@
 	import type { TileCode } from '$lib/table/tile-code';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
+	import CenterHub from '$lib/table/CenterHub.svelte';
 	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
@@ -317,6 +318,12 @@
 		return d && d.seat === seat ? d.index : null;
 	}
 
+	// CenterHub's min-faan chip: the mock fixtures carry no ruleset, so they fall back to the
+	// server default; live reads the real per-table ruleset once state_sync has landed.
+	let minFaan = $derived(
+		isMock ? (gameState.minFaan ?? 3) : (liveStore?.state.ruleset?.min_faan ?? null)
+	);
+
 	// --- your hand: real discard/declare interactivity (live only) -------------------------
 	interface OwnHandTile {
 		key: string;
@@ -361,6 +368,7 @@
 		label: string;
 		tiles?: TileCode[];
 		onClick: () => void;
+		hero?: boolean;
 	}
 
 	// legal_actions' own kind tags are the longer declare_*/claim_* forms; the wire declare{kind}
@@ -372,10 +380,13 @@
 			const meld = action.meld as { tiles?: number[] } | undefined;
 			if (action.kind === 'declare_win') {
 				const store = liveStore;
+				// a declare{win} option only ever appears after this seat's own draw (a discard/
+				// kong-rob win goes through the claim window, not here) -- always a self-draw.
 				options.push({
 					key: 'win',
 					label: m.tablePage_declareWinLabel(),
-					onClick: () => store.socket.declareWin()
+					onClick: () => store.socket.declareWin(),
+					hero: true
 				});
 			} else if (action.kind === 'declare_concealed_kong' && meld?.tiles) {
 				const store = liveStore;
@@ -615,6 +626,7 @@
 				{tableId}
 				{isPractice}
 				seat={liveStore?.state.seat ?? null}
+				dealer={gameState.dealer as Seat}
 				wallCount={gameState.wallCount}
 				prevailing={gameState.prevailing}
 				connection={liveStore?.connection}
@@ -649,6 +661,16 @@
 				/>
 
 				<div class="table-center">
+					<CenterHub
+						prevailing={gameState.prevailing}
+						handNo={gameState.handNo}
+						dealer={gameState.dealer as Seat}
+						turn={gameState.turn as Seat}
+						you={gameState.you}
+						wallCount={gameState.wallCount}
+						{minFaan}
+						turnDurationMs={gameState.turnDurationMs}
+					/>
 					<CenterDiscardPool
 						seat={seatAt(2)}
 						position="across"
@@ -682,7 +704,6 @@
 					{spectating}
 					dealer={gameState.dealer as Seat}
 					turn={gameState.turn}
-					turnDurationMs={gameState.turnDurationMs}
 					{isMock}
 					{ownHandTiles}
 					{discardableTileIds}
@@ -884,10 +905,19 @@
 			display: grid;
 			grid-template-areas:
 				'.    across .'
-				'left .      right'
+				'left hub    right'
 				'.    self   .';
 			grid-template-columns: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
 			grid-template-rows: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
+		}
+	}
+
+	// the compass hub owns the grid's centre cell; the pools form the box around it (frontend.md §2/§3).
+	.table-center :global(.center-hub) {
+		@include layout.tablet-up {
+			grid-area: hub;
+			align-self: center;
+			justify-self: center;
 		}
 	}
 

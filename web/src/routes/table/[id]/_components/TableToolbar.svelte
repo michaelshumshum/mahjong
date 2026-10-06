@@ -1,14 +1,16 @@
 <script lang="ts">
-	import { WIND_CHAR, type WindLetter } from '$lib/table/wind';
+	import { seatWind, windWord, WIND_CHAR, type WindLetter } from '$lib/table/wind';
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 	import type { ConnectionStatus } from '$lib/game/state';
+	import type { Seat } from '$lib/table/mock-game-state';
 
 	let {
 		spectating,
 		tableId,
 		isPractice,
 		seat,
+		dealer,
 		wallCount,
 		prevailing,
 		connection,
@@ -20,6 +22,7 @@
 		tableId: string;
 		isPractice: boolean;
 		seat: number | null;
+		dealer: Seat;
 		wallCount: number;
 		prevailing: WindLetter;
 		connection?: ConnectionStatus;
@@ -27,6 +30,10 @@
 		onToggleScoreSheet: () => void;
 		onToggleSettings: () => void;
 	} = $props();
+
+	// your own wind, not "seat N" -- CenterHub (frontend.md §3) now owns the table-wide wall/
+	// prevailing readout, so this toolbar keeps only what's specific to you.
+	let yourWind = $derived(seat !== null ? seatWind(seat as Seat, dealer) : null);
 </script>
 
 <header class="table-toolbar">
@@ -37,9 +44,13 @@
 		</p>
 	{:else}
 		<p class="table-label">
-			{m.tableToolbar_tableLabel()} <strong>{tableId}</strong> · {m.tableToolbar_seatLabel({
-				seat: seat ?? ''
-			})}{#if isPractice}
+			{m.tableToolbar_tableLabel()} <strong>{tableId}</strong> ·
+			<strong
+				class="your-wind"
+				aria-label={yourWind
+					? m.tableToolbar_yourWindAriaLabel({ wind: windWord(yourWind) })
+					: undefined}>{yourWind ? WIND_CHAR[yourWind] : ''}</strong
+			>{#if isPractice}
 				· {m.tableToolbar_practiceVsBotsLabel()}{/if}
 		</p>
 	{/if}
@@ -52,8 +63,12 @@
 					: m.tableToolbar_connectionReconnectingLabel()}
 			</span>
 		{/if}
-		<span>{m.tableToolbar_wallLabel()} <strong>{wallCount}</strong></span>
-		<span>{m.tableToolbar_prevailingLabel()} <strong>{WIND_CHAR[prevailing]}</strong></span>
+		<!-- CenterHub shows wall/prevailing at tablet-up; kept here, compact, for phones only
+		     (frontend.md §3) where the hub collapses out of the way of the discard pools. -->
+		<span class="phone-only-status">{m.tableToolbar_wallLabel()} <strong>{wallCount}</strong></span>
+		<span class="phone-only-status"
+			>{m.tableToolbar_prevailingLabel()} <strong>{WIND_CHAR[prevailing]}</strong></span
+		>
 	</div>
 
 	<div class="chrome-toggles">
@@ -71,6 +86,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/a11y';
+	@use '$lib/styles/layout';
 
 	.connection-pill {
 		padding: 0 var(--space-2);
@@ -129,6 +145,20 @@
 
 		strong {
 			color: var(--color-text);
+		}
+	}
+
+	.your-wind {
+		color: var(--color-text);
+	}
+
+	// CenterHub (frontend.md §3) is the tablet-up source for wall/prevailing; below that it
+	// collapses out of the pools' way, so this compact copy fills in.
+	.phone-only-status {
+		display: none;
+
+		@include layout.phone-only {
+			display: inline;
 		}
 	}
 </style>

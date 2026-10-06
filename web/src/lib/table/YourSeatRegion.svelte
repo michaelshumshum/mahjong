@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
-	import TimerRing from '$lib/ui/TimerRing.svelte';
+	import SeatPlate from './SeatPlate.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
@@ -20,6 +20,9 @@
 		label: string;
 		tiles?: TileCode[];
 		onClick: () => void;
+		// a self-drawn win: the one declare option worth making unmissable (P1.10) -- kongs stay
+		// secondary buttons alongside it, never competing for the eye.
+		hero?: boolean;
 	}
 
 	let {
@@ -27,7 +30,6 @@
 		spectating,
 		dealer,
 		turn,
-		turnDurationMs,
 		isMock,
 		ownHandTiles,
 		discardableTileIds,
@@ -38,13 +40,16 @@
 		spectating: boolean;
 		dealer: Seat;
 		turn: number;
-		turnDurationMs: number | null;
 		isMock: boolean;
 		ownHandTiles: OwnHandTile[];
 		discardableTileIds: Set<number>;
 		onDiscard: (tileId: number) => void;
 		declareOptions: DeclareOption[];
 	} = $props();
+
+	// CenterHub carries the timer ring; this plain-text prompt is for your own seat, where a
+	// ring alone (on a seat you're always looking at) is easy to miss.
+	let isYourTurn = $derived(!spectating && seat.seat === turn && discardableTileIds.size > 0);
 </script>
 
 <section
@@ -84,27 +89,21 @@
 		{/each}
 	</div>
 
-	<header class="seat-meta">
-		<span class="seat-name">{seat.name}</span>
-		<span
-			class="seat-wind"
-			aria-label={m.yourSeatRegion_windAriaLabel({ wind: windWord(seatWind(seat.seat, dealer)) })}
-			>{WIND_CHAR[seatWind(seat.seat, dealer)]}</span
-		>
-		{#if seat.seat === dealer}<span class="dealer-badge" title={m.yourSeatRegion_dealerBadgeTitle()}
-				>莊</span
-			>{/if}
-		<div class="turn-timer">
-			{#if turnDurationMs !== null}
-				{#key turn}
-					<TimerRing durationMs={turnDurationMs} size={24} />
-				{/key}
-			{/if}
-		</div>
-		<span class="seat-score">{seat.score}</span>
-	</header>
+	<SeatPlate
+		name={seat.name}
+		windChar={WIND_CHAR[seatWind(seat.seat, dealer)]}
+		windAriaLabel={m.yourSeatRegion_windAriaLabel({ wind: windWord(seatWind(seat.seat, dealer)) })}
+		isDealer={seat.seat === dealer}
+		dealerTitle={m.yourSeatRegion_dealerBadgeTitle()}
+		score={seat.score}
+		isTurn={seat.seat === turn}
+	/>
 
 	<div class="your-hand">
+		{#if isYourTurn || (isMock && seat.seat === turn && !spectating)}
+			<p class="turn-prompt">{m.yourSeatRegion_yourTurnPrompt()}</p>
+		{/if}
+
 		<!-- spectators get the opponents' tile size: no seat here is "yours" -->
 		{#if spectating && seat.concealedHand}
 			<div
@@ -155,6 +154,8 @@
 				{#each declareOptions as opt (opt.key)}
 					<button
 						type="button"
+						class="declare-btn"
+						class:declare-btn--hero={opt.hero}
 						aria-label={opt.tiles?.length ? tileOptionAriaLabel(opt.label, opt.tiles) : undefined}
 						onclick={opt.onClick}
 					>
@@ -185,32 +186,12 @@
 		container-type: inline-size;
 	}
 
-	.seat-meta {
-		@include tile.seat-meta;
-	}
-
-	.seat-name {
-		@include tile.seat-name;
-	}
-
-	.seat-wind {
-		@include tile.seat-wind;
-	}
-
-	// fixed footprint so the header doesn't reflow -- .seat-score's margin-inline-start: auto
-	// shifts with any preceding sibling that mounts/unmounts, and this toggles every turn.
-	.turn-timer {
-		width: 24px;
-		height: 24px;
-		pointer-events: none;
-	}
-
-	.dealer-badge {
-		@include tile.dealer-badge;
-	}
-
-	.seat-score {
-		@include tile.seat-score;
+	// echoes SeatPlate's halo colour so the prompt reads as the same signal, not a second one.
+	.turn-prompt {
+		margin: 0;
+		color: var(--color-accent);
+		font-weight: 600;
+		font-size: var(--font-size-sm);
 	}
 
 	.tile-row {
@@ -278,20 +259,34 @@
 	.declare-actions {
 		display: flex;
 		flex-wrap: wrap;
+		align-items: center;
 		gap: var(--space-2);
+	}
 
-		button {
-			min-height: var(--tap-target-min);
-			padding: var(--space-2) var(--space-3);
-			font: inherit;
-			cursor: pointer;
-			@include buttons.btn-primary;
+	// kongs are secondary: real but unhurried, never competing with a self-drawn win for the eye.
+	.declare-btn {
+		min-height: var(--tap-target-min);
+		padding: var(--space-2) var(--space-3);
+		font: inherit;
+		cursor: pointer;
+		@include buttons.btn-secondary;
 
-			// btn-primary's :active translateY(3px) moves the button out from under mouseup's
-			// hit-test, so the click lands on the row's own div and the action never sends.
-			&:active:not(:disabled) {
-				transform: none;
-			}
+		// the hero variant below uses btn-primary's :active translateY(3px), which moves the
+		// button out from under mouseup's hit-test so the click lands on the row's div instead.
+		&:active:not(:disabled) {
+			transform: none;
+		}
+	}
+
+	// P1.10: a self-drawn win is the one declare option worth making unmissable -- bigger, the
+	// accent hero treatment, not just another same-sized button in the row.
+	.declare-btn--hero {
+		padding: var(--space-3) var(--space-5);
+		font-size: var(--font-size-lg);
+		@include buttons.btn-primary;
+
+		&:active:not(:disabled) {
+			transform: none;
 		}
 	}
 

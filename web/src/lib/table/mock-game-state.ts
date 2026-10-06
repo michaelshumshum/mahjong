@@ -135,6 +135,9 @@ export interface MockGameState {
 	/** Most recent unclaimed discard, by its index in that seat's own `discards` array -- the
 	 * pool marker (CenterDiscardPool). `undefined`/`null` in every static mock scenario. */
 	lastDiscard?: { seat: Seat; index: number } | null;
+	/** This table's `RuleSet.min_faan`, for CenterHub's chip. Optional since no scenario below
+	 * sets it -- callers fall back to the server default (3, `lib/net/ruleset.ts`). */
+	minFaan?: number;
 }
 
 // (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left.
