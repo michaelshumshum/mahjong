@@ -858,11 +858,23 @@
 		margin-block: auto;
 	}
 
-	// sub-768px collapse: opponent backs to a thin overlapping strip, discard pools to
-	// horizontal scroll, your hand pinned to the safe-area bottom.
+	// sub-768px: the page scrolls instead of clipping; the surface fills at least the rest of the
+	// viewport so the self row (sticky, last grid row) starts at the bottom.
 	@include layout.phone-only {
+		.table-page {
+			height: auto;
+			min-height: 100dvh;
+			overflow: visible;
+		}
+
+		.table-tilt {
+			display: flex;
+			flex-direction: column;
+		}
+
 		.table-surface {
-			padding-bottom: 30vh; // reserve room under YourSeatRegion's fixed phone-width footer
+			flex: 1 0 auto;
+			height: auto;
 		}
 	}
 </style>

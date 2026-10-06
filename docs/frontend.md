@@ -177,7 +177,10 @@ Below 768px (phone portrait):
   tracked.
 - Each opponent's discard pool collapses to a horizontally-scrollable strip; full history stays in
   the DOM (§9).
-- Your hand is pinned to the bottom safe area (`env(safe-area-inset-bottom)`).
+- Your hand is `position: sticky; bottom: 0` with `env(safe-area-inset-bottom)` padding. It keeps
+  its own last grid row (`auto 1fr auto`, the surface filling at least the rest of the viewport),
+  so it starts at the bottom and nothing above needs padding reserved under it; the page scrolls
+  rather than clipping when the table is taller than the screen.
 - Claim buttons stay ≥44px, pinned above the safe-area inset.
 
 ## 4. Tile identity

@@ -291,13 +291,13 @@
 		}
 	}
 
-	// sub-768px collapse: pinned to the safe-area bottom.
+	// sub-768px collapse: sticky to the safe-area bottom. it keeps its own grid row, so nothing
+	// above needs padding reserved under it (unlike position: fixed).
 	@include layout.phone-only {
 		@include tile.backs-row-overlap;
 
 		.seat-region--self {
-			position: fixed;
-			inset-inline: 0;
+			position: sticky;
 			bottom: 0;
 			background: var(--color-surface);
 			border-top: 1px solid var(--color-border);

@@ -148,7 +148,7 @@ test('leaving the hand-end hold untouched auto-closes it once its timer runs out
 	await expect(overlay).toHaveCount(0, { timeout: 10000 });
 });
 
-test('phone-width viewport applies the sub-768px collapse to the self hand region', async ({
+test('phone-width viewport applies the sub-768px sticky collapse to the self hand region', async ({
 	page
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
@@ -156,7 +156,7 @@ test('phone-width viewport applies the sub-768px collapse to the self hand regio
 	await page.waitForLoadState('networkidle');
 
 	const selfRegion = page.locator('.seat-region--self');
-	await expect(selfRegion).toHaveCSS('position', 'fixed');
+	await expect(selfRegion).toHaveCSS('position', 'sticky');
 });
 
 // the hand sizes to its container (docs/frontend.md §3); these two viewports used to push the
@@ -193,13 +193,13 @@ for (const [width, height] of [
 	});
 }
 
-test('desktop-width viewport does not apply the fixed self-hand collapse', async ({ page }) => {
+test('desktop-width viewport does not apply the sticky self-hand collapse', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 800 });
 	await page.goto('/table/abc123?mock=1');
 	await page.waitForLoadState('networkidle');
 
 	const selfRegion = page.locator('.seat-region--self');
-	await expect(selfRegion).not.toHaveCSS('position', 'fixed');
+	await expect(selfRegion).not.toHaveCSS('position', 'sticky');
 });
 
 // proves clientPrefs/autoArm persistence survives an actual reload, not just unit-level save/load
