@@ -263,8 +263,8 @@ Built today:
 | Action    | Desktop and touch                                                                          |
 | --------- | ------------------------------------------------------------------------------------------ |
 | Discard   | one click/tap on a legal hand tile (a `.hand-tile-btn`) sends `discard` immediately         |
-| Claim     | `ClaimDialog`: one button per offered option plus Pass, with a CSS countdown ring, ≥44px    |
-| Declare   | win / concealed kong / added kong buttons under your hand (`.declare-actions`)              |
+| Claim     | `ClaimDialog`: one big button per offered option plus Pass, with a CSS countdown ring, ≥44px |
+| Declare   | win (hero when self-drawn) / concealed kong / added kong under your hand (`.declare-actions`) |
 | Sort hand | automatic; no manual reorder                                                               |
 
 **Planned, not built:**
@@ -325,6 +325,20 @@ Accepted tradeoff: a click in the last few ms before the local timer fires can l
 auto-pass, since the server treats a seat's first-received choice as final. Preferred over a
 dialog that never closes on its own. `hand_end_ack` gets the same auto-close with none of this
 risk: it's an acknowledgment, and the table advances at the same `deadline_ts` regardless.
+
+**`ClaimDialog` layout.** Each option is a big button (meld preview above it, a CJK call glyph
+碰/上/槓/食糊 inside, a short localized sub-label, a `1`-`N` key-hint badge) — Win gets the same
+accent-glow treatment as a `SeatPlate` turn halo, sized up from its siblings, since it's the one
+choice worth making unmissable; Pass carries an "Esc" hint instead of a number. Initial focus lands
+on Pass (an `$effect` with no reactive reads, so it fires once per mount — the dialog only mounts
+while a claim window is open, i.e. once per window, not on every unrelated state update) so
+keyboard users have a safe default under their fingers immediately; number keys `1`-`N` and `Esc`
+drive the same `onChoose` path as a click. Below 768px the dialog becomes a bottom sheet
+(`align-self: flex-end` on the overlay's centering flexbox, full width, top corners only) instead of
+a centred card. **Not built:** a CSS-only (`@property`/`counter()`) seconds-remaining readout on
+the ring — skipped for now; the ring's `aria-label` already states the remaining seconds for
+assistive tech, and a purely visual number is a small enough win to defer rather than risk the
+`@property`-registration edge cases cross-browser.
 
 ### Countdown mechanics
 

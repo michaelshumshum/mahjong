@@ -80,10 +80,34 @@ describe('ClaimDialog', () => {
 		const { body } = render(ClaimDialog, {
 			props: { discardTile: '6s', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
 		});
-		expect(body.match(/>Chow</g)).toHaveLength(2);
+		expect(body.match(/class="claim-btn-label[^"]*">Chow</g)).toHaveLength(2);
 		expect(body).toContain('aria-label="Chow: 4 Bamboo, 5 Bamboo"');
 		expect(body).toContain('aria-label="Chow: 5 Bamboo, 7 Bamboo"');
-		expect(body).toContain('>Pass<');
+		expect(body).toMatch(/class="claim-btn-label[^"]*">Pass</);
 		expect(body).toContain('claim-btn--pass');
+	});
+
+	it('shows a CJK glyph and a sub-label for pung/chow/kong/win, not for pass', () => {
+		const options: ClaimOption[] = [
+			{ kind: 'pung', tiles: ['z5', 'z5'] },
+			{ kind: 'win' },
+			{ kind: 'pass' }
+		];
+		const { body } = render(ClaimDialog, {
+			props: { discardTile: 'z5', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
+		});
+		expect(body).toMatch(/class="claim-btn-glyph[^"]*"[^>]*>碰</);
+		expect(body).toMatch(/class="claim-btn-glyph[^"]*"[^>]*>食糊</);
+		expect(body).not.toMatch(/claim-btn--pass[\s\S]*?claim-btn-glyph/);
+		expect(body).toContain('claim-btn-sublabel');
+	});
+
+	it('shows a 1-based key hint on every option and an Esc hint on pass', () => {
+		const options: ClaimOption[] = [{ kind: 'pung', tiles: ['z5', 'z5'] }, { kind: 'pass' }];
+		const { body } = render(ClaimDialog, {
+			props: { discardTile: 'z5', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
+		});
+		expect(body).toMatch(/class="claim-btn-key[^"]*"[^>]*>1</);
+		expect(body).toMatch(/class="claim-btn-key[^"]*"[^>]*>Esc</);
 	});
 });

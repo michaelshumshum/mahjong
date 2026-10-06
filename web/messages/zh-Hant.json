@@ -460,5 +460,11 @@
 	"centerHub_wallLabel": "牌牆",
 	"centerHub_minFaanLabel": "最低{n}番",
 	"centerHub_windMarkerAriaLabel": "{wind}風",
-	"centerHub_turnTitle": "現在輪到"
+	"centerHub_turnTitle": "現在輪到",
+	"claimDialog_pungSubLabel": "湊成一對加此牌",
+	"claimDialog_chowSubLabel": "湊成一組順子",
+	"claimDialog_kongSubLabel": "湊成四張一組",
+	"claimDialog_winSubLabel": "宣告食糊",
+	"claimDialog_passEscHint": "Esc",
+	"claimDialog_keyHintAriaLabel": "按{n}鍵"
 }

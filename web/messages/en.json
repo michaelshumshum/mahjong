@@ -460,5 +460,11 @@
 	"centerHub_wallLabel": "Wall",
 	"centerHub_minFaanLabel": "Min {n} faan",
 	"centerHub_windMarkerAriaLabel": "{wind} wind",
-	"centerHub_turnTitle": "Current turn"
+	"centerHub_turnTitle": "Current turn",
+	"claimDialog_pungSubLabel": "Claim two more of this tile",
+	"claimDialog_chowSubLabel": "Claim a running sequence",
+	"claimDialog_kongSubLabel": "Claim all four of this tile",
+	"claimDialog_winSubLabel": "Declare your winning hand",
+	"claimDialog_passEscHint": "Esc",
+	"claimDialog_keyHintAriaLabel": "press {n}"
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
-	import type { ClaimOption } from './ClaimButtons.svelte';
+	import type { ClaimKind, ClaimOption } from './ClaimButtons.svelte';
 	import { claimOptionAriaLabel, claimOptionKey, claimOptionLabel } from './claim-option';
 	import DialogTimer from './DialogTimer.svelte';
 	import { m } from '$lib/paraglide/messages.js';
@@ -37,13 +37,71 @@
 		return tiles;
 	}
 
+	// exempt literals (web/AGENTS.md "No literal user-facing strings" §9) -- same Cantonese call
+	// glyphs as the declare-actions buttons, not translated.
+	const CLAIM_GLYPH: Record<ClaimKind, string> = {
+		pass: '',
+		chow: '上',
+		pung: '碰',
+		kong: '槓',
+		win: '食糊'
+	};
+
+	function claimSubLabel(kind: ClaimKind): string | null {
+		switch (kind) {
+			case 'pung':
+				return m.claimDialog_pungSubLabel();
+			case 'chow':
+				return m.claimDialog_chowSubLabel();
+			case 'kong':
+				return m.claimDialog_kongSubLabel();
+			case 'win':
+				return m.claimDialog_winSubLabel();
+			case 'pass':
+				return null;
+		}
+	}
+
+	function findPassOption(): ClaimOption | undefined {
+		return options.find((option) => option.kind === 'pass');
+	}
+
 	// deadline reached with no explicit choice: resolve the same way the server does on its own
 	// timeout, reusing the exact onChoose path a manual Pass click takes.
 	function handleTimeout(): void {
-		const passOption = options.find((option) => option.kind === 'pass');
+		const passOption = findPassOption();
 		if (passOption) onChoose(passOption);
 	}
+
+	let passButtonEl: HTMLButtonElement | null = null;
+
+	// `bind:this` only takes a plain identifier, not a per-option conditional -- this action
+	// captures the Pass button's node directly from the {#each} without a second branch.
+	function captureIfPass(node: HTMLButtonElement, kind: ClaimKind) {
+		if (kind === 'pass') passButtonEl = node;
+	}
+
+	// no reactive reads inside -- runs once per mount, i.e. once per window (+page.svelte's
+	// `{#if claimOptions}`), not re-stealing focus on every unrelated state update.
+	$effect(() => {
+		passButtonEl?.focus();
+	});
+
+	// 1-4 pick the Nth option by position, Esc passes -- the same onChoose path a click takes.
+	function handleKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Escape') {
+			const passOption = findPassOption();
+			if (passOption) onChoose(passOption);
+			return;
+		}
+		const index = Number(e.key) - 1;
+		if (Number.isInteger(index) && index >= 0 && index < options.length) {
+			onChoose(options[index]);
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="claim-dialog" role="dialog" aria-label={m.claimDialog_ariaLabel()}>
 	<div class="claim-dialog-timer">
@@ -63,6 +121,7 @@
 	<div class="claim-options" role="group" aria-label={m.claimDialog_optionsGroupAriaLabel()}>
 		{#each options as option, index (claimOptionKey(option, index))}
 			{@const meld = meldPreview(option)}
+			{@const subLabel = claimSubLabel(option.kind)}
 			<div class="claim-option">
 				{#if meld}
 					<div class="claim-meld" aria-hidden="true">
@@ -74,12 +133,22 @@
 					</div>
 				{/if}
 				<button
+					use:captureIfPass={option.kind}
 					type="button"
 					class="claim-btn claim-btn--{option.kind}"
 					aria-label={claimOptionAriaLabel(option)}
 					onclick={() => onChoose(option)}
 				>
-					{claimOptionLabel(option)}
+					<span class="claim-btn-key" aria-hidden="true"
+						>{option.kind === 'pass' ? m.claimDialog_passEscHint() : index + 1}</span
+					>
+					{#if CLAIM_GLYPH[option.kind]}
+						<span class="claim-btn-glyph" aria-hidden="true">{CLAIM_GLYPH[option.kind]}</span>
+					{/if}
+					<span class="claim-btn-label">{claimOptionLabel(option)}</span>
+					{#if subLabel}
+						<span class="claim-btn-sublabel">{subLabel}</span>
+					{/if}
 				</button>
 			</div>
 		{/each}
@@ -88,6 +157,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.claim-dialog {
 		display: flex;
@@ -170,12 +240,45 @@
 		outline-offset: 1px;
 	}
 
+	// each option is a big button, not a plain label -- key badge, CJK glyph, label, sub-label.
 	.claim-btn {
-		min-width: var(--tap-target-min);
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+		min-width: 6rem;
 		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-4);
+		padding: var(--space-3) var(--space-4);
 		font: inherit;
 		cursor: pointer;
+	}
+
+	.claim-btn-key {
+		position: absolute;
+		top: var(--space-1);
+		right: var(--space-1);
+		padding: 0 0.3rem;
+		border-radius: var(--radius-sm);
+		background: rgb(0 0 0 / 0.25);
+		font-size: var(--font-size-xs);
+		font-variant-numeric: tabular-nums;
+		opacity: 0.8;
+	}
+
+	.claim-btn-glyph {
+		font-size: var(--font-size-xl);
+		line-height: 1;
+	}
+
+	.claim-btn-label {
+		font-weight: 700;
+	}
+
+	.claim-btn-sublabel {
+		font-size: var(--font-size-xs);
+		font-weight: 400;
+		opacity: 0.8;
 	}
 
 	.claim-btn--chow,
@@ -188,7 +291,28 @@
 		@include buttons.btn-ghost;
 	}
 
+	// Win is the one option worth making unmissable -- accent background, bigger than its
+	// siblings, with the same glow treatment as SeatPlate's turn halo.
 	.claim-btn--win {
+		min-width: 7rem;
+		padding: var(--space-4) var(--space-5);
+		box-shadow: 0 0 0 4px var(--color-accent-glow);
 		@include buttons.btn-primary;
+	}
+
+	.claim-btn--win .claim-btn-glyph {
+		font-size: calc(var(--font-size-xl) * 1.2);
+	}
+
+	// phone: a bottom sheet instead of a centred card -- `.claim-overlay` (+page.svelte) still
+	// centers by default, but align-self here pins this one child to the bottom edge.
+	@include layout.phone-only {
+		.claim-dialog {
+			align-self: flex-end;
+			width: 100%;
+			max-width: 100%;
+			border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+			padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+		}
 	}
 </style>
