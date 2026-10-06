@@ -2,6 +2,7 @@
 	import { WIND_CHAR, type WindLetter } from '$lib/table/wind';
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import { m } from '$lib/paraglide/messages.js';
+	import type { ConnectionStatus } from '$lib/game/state';
 
 	let {
 		spectating,
@@ -10,6 +11,7 @@
 		seat,
 		wallCount,
 		prevailing,
+		connection,
 		onLeaveClick,
 		onToggleScoreSheet,
 		onToggleSettings
@@ -20,6 +22,7 @@
 		seat: number | null;
 		wallCount: number;
 		prevailing: WindLetter;
+		connection?: ConnectionStatus;
 		onLeaveClick: () => void;
 		onToggleScoreSheet: () => void;
 		onToggleSettings: () => void;
@@ -42,6 +45,13 @@
 	{/if}
 
 	<div class="table-status" aria-label={m.tableToolbar_tableStatusAriaLabel()}>
+		{#if connection === 'resyncing' || connection === 'closed' || connection === 'connecting'}
+			<span class="connection-pill" data-testid="connection-pill">
+				{connection === 'resyncing'
+					? m.tableToolbar_connectionResyncingLabel()
+					: m.tableToolbar_connectionReconnectingLabel()}
+			</span>
+		{/if}
 		<span>{m.tableToolbar_wallLabel()} <strong>{wallCount}</strong></span>
 		<span>{m.tableToolbar_prevailingLabel()} <strong>{WIND_CHAR[prevailing]}</strong></span>
 	</div>
@@ -60,6 +70,24 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/a11y';
+
+	.connection-pill {
+		padding: 0 var(--space-2);
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-accent);
+		color: var(--color-accent);
+		font-weight: 700;
+		@include a11y.motion-ok {
+			animation: connection-pill-pulse 1.4s ease-in-out infinite;
+		}
+	}
+
+	@keyframes connection-pill-pulse {
+		50% {
+			opacity: 0.5;
+		}
+	}
 
 	.table-toolbar {
 		display: flex;

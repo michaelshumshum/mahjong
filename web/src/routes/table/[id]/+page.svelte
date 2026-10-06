@@ -41,6 +41,7 @@
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
 	import ToastStack from '$lib/ui/ToastStack.svelte';
+	import ConnectionBanner from '$lib/ui/ConnectionBanner.svelte';
 	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
@@ -616,6 +617,7 @@
 				seat={liveStore?.state.seat ?? null}
 				wallCount={gameState.wallCount}
 				prevailing={gameState.prevailing}
+				connection={liveStore?.connection}
 				onLeaveClick={handleLeaveClick}
 				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
 				onToggleSettings={() => (showSettings = !showSettings)}
@@ -623,6 +625,9 @@
 		{/if}
 
 		<div class="table-wrap">
+			{#if !isMock}
+				<ConnectionBanner connection={liveStore?.connection} />
+			{/if}
 			<div class="table-surface" data-testid="table-scene">
 				<OpponentRegion
 					seat={seatAt(2)}
@@ -824,6 +829,7 @@
 	}
 
 	.table-wrap {
+		position: relative;
 		flex: 1;
 		min-height: 0;
 	}

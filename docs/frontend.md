@@ -471,6 +471,15 @@ On reconnecting to your own seat after the `AUTOPLAY` handover
 ([architecture.md §8](architecture.md)), the snapshot already reflects what the bot did; missed
 turns are not replayed as animation.
 
+**In-game connection status.** `GameStore.connection` (`'idle' | 'connecting' | 'open' |
+'resyncing' | 'closed'`) drives two layers, both live-only (no socket in `?mock=`):
+`TableToolbar`'s `.connection-pill` (a quiet pulsing label — "Resyncing…"/"Reconnecting…") shows
+the instant the connection leaves `'open'`, no delay — it's a toolbar detail, not alarming on its
+own. `lib/ui/ConnectionBanner.svelte` dims the whole table (`--z-overlay`, inside `.table-wrap`)
+with a "Reconnecting…" card, but only once `'closed'`/`'resyncing'` outlasts 2s
+(`scheduleAutoDismiss`'s disposer cancels the pending reveal the instant the connection recovers
+first) — a brief drop reads as a glitch, not an outage worth dimming over.
+
 **Planned, not built:** a brief CSS crossfade on the table container (`motion-ok` only, §9) so a
 full resync reads as "refreshed," not a glitch; and a one-line dismissable banner, shown once,
 saying the bot played for you during the `AUTOPLAY` handover.
