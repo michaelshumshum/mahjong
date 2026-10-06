@@ -142,6 +142,23 @@ Each pool overflows toward the centre:
 CSS: `grid-template-areas` for the four seat regions + centre; `transform`/`opacity` only in
 animated paths.
 
+Side columns are `minmax(88px, auto)`: they hug their vertical strips, so the centre column (and
+your hand under it) gets the rest of the width.
+
+**Hand sizing.** The hand sizes to its own seat region, not the viewport:
+`.seat-region--self` is a `container-type: inline-size` container, and `YourSeatRegion`'s
+`.hand-row` computes the tile width from `100cqi` so 13 tiles + the drawn tile (2px gaps, a
+`--space-4` drawn-tile gap) always fit, at every breakpoint:
+
+| Fit width | Tile |
+| --- | --- |
+| > 63px | capped at 63×84px |
+| 44–63px | shrinks to fit |
+| < 44px | stays 44px (touch target) and overlaps via negative `margin-inline-start`, same formula |
+
+No horizontal scroll. Pinned by `table.e2e.ts` at 390×844 and 1024×768 (last tile and drawn tile
+inside the viewport, clear of the right opponent at 1024).
+
 **Side seats.** Left/right hand strips run top-to-bottom via `writing-mode: vertical-lr`/
 `vertical-rl`, not `transform: rotate()` — rotate repaints in place without resizing the box the
 grid reserves, so the rotated footprint spills outside its grid area. Tiles inside are rotated 90°
@@ -160,9 +177,7 @@ Below 768px (phone portrait):
   tracked.
 - Each opponent's discard pool collapses to a horizontally-scrollable strip; full history stays in
   the DOM (§9).
-- Your hand is pinned to the bottom safe area (`env(safe-area-inset-bottom)`); tile width is
-  `clamp()`-computed and never below a 44px touch target. If 13 tiles + the drawn tile can't all
-  fit at 44px, tiles overlap slightly rather than shrink.
+- Your hand is pinned to the bottom safe area (`env(safe-area-inset-bottom)`).
 - Claim buttons stay ≥44px, pinned above the safe-area inset.
 
 ## 4. Tile identity

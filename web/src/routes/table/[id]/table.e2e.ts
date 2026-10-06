@@ -159,6 +159,40 @@ test('phone-width viewport applies the sub-768px collapse to the self hand regio
 	await expect(selfRegion).toHaveCSS('position', 'fixed');
 });
 
+// the hand sizes to its container (docs/frontend.md §3); these two viewports used to push the
+// drawn tile off-screen (390) and under the right opponent's strip (1024).
+for (const [width, height] of [
+	[390, 844],
+	[1024, 768]
+] as const) {
+	test(`the full hand and drawn tile fit inside the viewport at ${width}x${height}`, async ({
+		page
+	}) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/table/abc123?mock=your-turn');
+		await page.waitForLoadState('networkidle');
+
+		const tiles = page.locator('.seat-region--self .hand-tile');
+		await expect(tiles).toHaveCount(14);
+		const last = await tiles.last().boundingBox();
+		const drawn = await page.locator('.seat-region--self .hand-tile--drawn').boundingBox();
+		for (const box of [last, drawn]) {
+			expect(box).not.toBeNull();
+			expect(box!.x).toBeGreaterThanOrEqual(0);
+			expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+			expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+		}
+		expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+			width
+		);
+
+		if (width >= 768) {
+			const right = await page.locator('.seat-region--right').boundingBox();
+			expect(last!.x + last!.width).toBeLessThanOrEqual(right!.x);
+		}
+	});
+}
+
 test('desktop-width viewport does not apply the fixed self-hand collapse', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 800 });
 	await page.goto('/table/abc123?mock=1');

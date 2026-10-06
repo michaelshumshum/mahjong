@@ -179,8 +179,10 @@
 		min-height: 0;
 	}
 
+	// hand tiles size from this box's width (cqi), not the viewport.
 	.seat-region--self {
 		grid-area: self;
+		container-type: inline-size;
 	}
 
 	.seat-meta {
@@ -229,21 +231,36 @@
 		gap: var(--space-2);
 	}
 
+	// 13 tiles + the drawn one fit the container: shrink to fit down to the 44px touch target
+	// (docs/frontend.md §3), then overlap via negative margins instead of shrinking further.
 	.hand-row {
+		--hand-gap: 2px;
+		--hand-drawn-gap: var(--space-4);
+		--hand-fit-w: calc((100cqi - 13 * var(--hand-gap) - var(--hand-drawn-gap)) / 14);
+		--hand-tile-w: clamp(44px, var(--hand-fit-w), 63px);
+		--hand-step: min(
+			var(--hand-gap),
+			calc((100cqi - var(--hand-drawn-gap) - 14 * var(--hand-tile-w)) / 13)
+		);
 		display: flex;
-		gap: 2px;
 	}
 
 	.hand-tile {
-		height: clamp(48px, 9vw, 84px);
+		flex: none;
+		width: var(--hand-tile-w);
+		height: calc(var(--hand-tile-w) * 4 / 3);
+	}
+
+	.hand-tile + .hand-tile {
+		margin-inline-start: var(--hand-step);
 	}
 
 	.hand-tile :global(.tile-face) {
 		height: 100%;
 	}
 
-	.hand-tile--drawn {
-		margin-inline-start: var(--space-4);
+	.hand-row .hand-tile--drawn {
+		margin-inline-start: calc(var(--hand-drawn-gap) + var(--hand-step));
 	}
 
 	// same box as the plain .hand-tile div -- a button reset, not a second style.
@@ -274,7 +291,7 @@
 		}
 	}
 
-	// sub-768px collapse: pinned to the safe-area bottom, horizontal scroll once a hand overflows.
+	// sub-768px collapse: pinned to the safe-area bottom.
 	@include layout.phone-only {
 		@include tile.backs-row-overlap;
 
@@ -286,16 +303,6 @@
 			border-top: 1px solid var(--color-border);
 			padding: var(--space-2) var(--space-2) max(var(--space-2), env(safe-area-inset-bottom));
 			z-index: var(--z-hud);
-		}
-
-		.hand-tile {
-			height: clamp(44px, 12vw, 60px);
-		}
-
-		// .seat-region--self is position: fixed (no scrollable ancestor) -- without this, tiles
-		// past the edge are unreachable rather than scrolled-to.
-		.hand-row {
-			overflow-x: auto;
 		}
 	}
 </style>
