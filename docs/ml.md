@@ -545,7 +545,8 @@ arena's draw rate, so 0.18 would have demanded a less drawish table than the heu
 achieve ([ADR 0020](decisions/0020-hk-scoring-table-alignment.md) has the measurements).
 
 Keep and β reach 0 exactly when `min_faan` reaches 3, so the C1 exit is measured blind and
-unshaped. Contingency (`Contingency`, `enabled: false` by default): if enabled and C1 has run
+unshaped. How fast each stage actually exited, and what the thresholds do and don't measure in
+practice: [rl-learnings.md §2/§6](rl-learnings.md). Contingency (`Contingency`, `enabled: false` by default): if enabled and C1 has run
 `after_decisions` (1B) with rolling win < 0.10, the env computes `FaanBot`'s action on every
 surfaced decision (`EnvConfig.teacher`) and the loss adds `clone_coef · −log π(a_teacher)` —
 cross-entropy to the teacher, i.e. a KL(teacher ‖ π) anchor — decaying linearly from 1.0 to 0 over
@@ -847,9 +848,18 @@ Reproduce: `server/runs/r1_full.sh` (generate → pack → train → eval → ex
 
 R0 and R1 depend only on what §5 already provides.
 
-R2 progress: **built, not run to exit** — `ml/train_env.py` (§7), `ml/ppo.py` (§9),
-`ml/curriculum.py` + `ml/configs/rl_ppo_c0.yaml` (§10), `ml/eval_policy.py` (§12). Exit criteria
-need the full run on a GPU/cloud machine (§13).
+R2 progress: **done** — `ml/train_env.py` (§7), `ml/ppo.py` (§9), `ml/curriculum.py` +
+`ml/configs/rl_ppo_c0.yaml` (§10), `ml/eval_policy.py` (§12); full run on the RTX 2060 desktop
+(§13). Exit criteria:
+
+| Criterion | Result | Status |
+| --- | --- | --- |
+| C1 exit (§10) | update 52,402, 220.4M decisions: rolling win 0.200 (≥ 0.15), sub-min tenpai 0.108 (≤ 0.32), draws 20.2%, deal-in 0.099 over 4,000 hands | met |
+| paired CI > 0 vs `EfficiencyBot` | `ckpt_C1_exit.pt` × 1 vs `EfficiencyBot` × 3, 700 fresh sets (seeds 3,000,000+), `hk_classic`: **+8.74 points/hand [+7.67, +9.80]** (bootstrap [+7.69, +9.81]); win 0.299 / 0.145, deal-in 0.043 / 0.092, avg faan 4.64 / 3.22, sub-min tenpai 0.140 / 0.335 | met |
+
+Training continues at C1's end parameters via `curriculum.hold_final` (§10) until R3's league
+exists. Curriculum timeline, metrics, evaluation over training and observed play:
+[rl-learnings.md](rl-learnings.md).
 
 Smoke run (15 min from R1 `ckpt_best.pt`, C0 config, i7-1265U, CPU): 271k decisions, 65 updates.
 
@@ -873,7 +883,7 @@ candidate win 0.264 / deal-in 0.119 / avg faan 4.57 / sub-min tenpai 0.174 vs `E
 first, then a fresh-seed gate); it says more about `EfficiencyBot`'s weakness under `min_faan` 3
 than about the policy, which has never played `min_faan` > 0.
 
-Launch (not started): `server/runs/ppo_c0_full.sh` (gitignored; resumes from
+Launch: `server/runs/ppo_c0_full.sh` (gitignored; resumes from
 `runs/ppo_c0/ckpt_last.pt`, needs `runs/rl_aux/ckpt_best.pt`).
 
 GPU support (§13): `device: auto | cpu | cuda` for the learner and the rollout forward,
