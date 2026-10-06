@@ -20,6 +20,10 @@ on:
       - "server/uv.lock"
       - ".github/workflows/server-ml.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   server-ml:
     name: ml extra smoke test

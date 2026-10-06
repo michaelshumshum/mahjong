@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# one run per ref; a newer PR push cancels the old run, main pushes queue instead
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Three independent domains (server, web, proto-check) with no shared artifact and no
 # genuine precondition between them -- each `uses:` job below runs in parallel with no
 # `needs:`. (Within server.yml/web.yml, lint+typecheck+test *within* a language are also

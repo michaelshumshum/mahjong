@@ -325,6 +325,14 @@ standard runner has ~14GB free. It builds without a layer cache:
 - The job only runs on server dependency changes, which miss the cache anyway unless the torch
   pins are unchanged.
 
+**Concurrency.** Every top-level workflow (`ci.yml` and the three standalone ones) sets
+`concurrency.group: ${{ github.workflow }}-${{ github.ref }}`, so each runs at most once per ref. On a
+PR a newer push cancels the in-progress run (`cancel-in-progress` only for `pull_request`); on
+`main` runs queue rather than cancel, so every pushed commit is still checked and the
+`coverage-badge` job isn't killed mid-push. GitHub keeps only the newest pending run per group, so a
+burst of `main` pushes skips the middle ones. The reusable workflows don't set it: called from
+`ci.yml`, `github.workflow` resolves to the caller, so a nested group would deadlock against it.
+
 **Coverage.** `server.yml` reruns pytest with coverage as a separate, non-blocking step
 (`continue-on-error: true`) — line tracing trips `test_frontier_cache_warms_and_stays_fast`'s
 wall-clock ceiling, so that test is deselected from the rerun. `web.yml`'s `test:coverage` is
