@@ -2,7 +2,7 @@
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
 	import type { ClaimOption } from './ClaimButtons.svelte';
-	import { claimOptionKey, claimOptionLabel } from './claim-option';
+	import { claimOptionAriaLabel, claimOptionKey, claimOptionLabel } from './claim-option';
 	import DialogTimer from './DialogTimer.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -76,6 +76,7 @@
 				<button
 					type="button"
 					class="claim-btn claim-btn--{option.kind}"
+					aria-label={claimOptionAriaLabel(option)}
 					onclick={() => onChoose(option)}
 				>
 					{claimOptionLabel(option)}

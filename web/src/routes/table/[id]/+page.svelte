@@ -351,6 +351,7 @@
 	interface DeclareOption {
 		key: string;
 		label: string;
+		tiles?: TileCode[];
 		onClick: () => void;
 	}
 
@@ -373,9 +374,8 @@
 				const tiles = meld.tiles;
 				options.push({
 					key: `ck-${tiles.join(',')}`,
-					label: m.tablePage_declareConcealedKongLabel({
-						tiles: tiles.map(tileIdToCode).join('-')
-					}),
+					label: m.tablePage_declareConcealedKongLabel(),
+					tiles: tiles.map(tileIdToCode),
 					onClick: () => store.socket.declareConcealedKong(tiles)
 				});
 			} else if (action.kind === 'declare_added_kong' && meld?.tiles) {
@@ -383,9 +383,8 @@
 				const tiles = meld.tiles;
 				options.push({
 					key: `ak-${tiles.join(',')}`,
-					label: m.tablePage_declareAddedKongLabel({
-						tiles: tiles.map(tileIdToCode).join('-')
-					}),
+					label: m.tablePage_declareAddedKongLabel(),
+					tiles: tiles.map(tileIdToCode),
 					onClick: () => store.socket.declareAddedKong(tiles)
 				});
 			}

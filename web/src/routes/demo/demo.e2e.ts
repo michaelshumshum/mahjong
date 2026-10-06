@@ -12,7 +12,7 @@ test('claim buttons demo: choosing an option reports the right one, disambiguate
 	await page.goto('/demo');
 	await page.waitForLoadState('networkidle');
 
-	await page.getByRole('button', { name: 'Chow 5s-7s' }).click();
+	await page.getByRole('button', { name: 'Chow: 5 Bamboo, 7 Bamboo' }).click();
 	await expect(page.getByTestId('claim-choice')).toHaveText('chose: chow 5s-7s');
 
 	await page.getByRole('button', { name: 'Pass', exact: true }).click();

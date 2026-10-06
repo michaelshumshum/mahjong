@@ -3,7 +3,8 @@
 	import TimerRing from '$lib/ui/TimerRing.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
-	import { tileName } from './tile-name';
+	import { tileName, tileOptionAriaLabel } from './tile-name';
+	import TileOptionLabel from '$lib/ui/TileOptionLabel.svelte';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -17,6 +18,7 @@
 	interface DeclareOption {
 		key: string;
 		label: string;
+		tiles?: TileCode[];
 		onClick: () => void;
 	}
 
@@ -151,7 +153,13 @@
 				aria-label={m.yourSeatRegion_declareOptionsAriaLabel()}
 			>
 				{#each declareOptions as opt (opt.key)}
-					<button type="button" onclick={opt.onClick}>{opt.label}</button>
+					<button
+						type="button"
+						aria-label={opt.tiles?.length ? tileOptionAriaLabel(opt.label, opt.tiles) : undefined}
+						onclick={opt.onClick}
+					>
+						<TileOptionLabel label={opt.label} tiles={opt.tiles} />
+					</button>
 				{/each}
 			</div>
 		{/if}

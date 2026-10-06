@@ -20,6 +20,7 @@ describe('ClaimButtons', () => {
 		expect(body).toContain('>Pung<');
 		expect(body).toContain('>Kong<');
 		expect(body).toContain('>Win<');
+		expect(body).not.toContain('aria-label="Pung');
 	});
 
 	it('disambiguates two simultaneous chow options by their claimed tiles', () => {
@@ -28,8 +29,23 @@ describe('ClaimButtons', () => {
 			{ kind: 'chow', tiles: ['5s', '7s'] }
 		];
 		const { body } = render(ClaimButtons, { props: { options, onChoose: noop } });
-		expect(body).toContain('>Chow 4s-5s<');
-		expect(body).toContain('>Chow 5s-7s<');
+		expect(body).toContain('aria-label="Chow: 4 Bamboo, 5 Bamboo"');
+		expect(body).toContain('aria-label="Chow: 5 Bamboo, 7 Bamboo"');
+		expect([...body.matchAll(/data-tile="(\w+)"/g)].map((m) => m[1])).toEqual([
+			'4s',
+			'5s',
+			'5s',
+			'7s'
+		]);
+	});
+
+	it('never shows raw tile codes as text, and previews a pung tile once', () => {
+		const options: ClaimOption[] = [{ kind: 'pung', tiles: ['z5', 'z5'] }];
+		const { body } = render(ClaimButtons, { props: { options, onChoose: noop } });
+		expect(body).toContain('>Pung<');
+		expect(body).not.toMatch(/>[^<]*z5[^<]*</);
+		expect(body.match(/data-tile="z5"/g)).toHaveLength(1);
+		expect(body).toContain('aria-label="Pung: Red Dragon"');
 	});
 
 	it('renders nothing when there are no options', () => {

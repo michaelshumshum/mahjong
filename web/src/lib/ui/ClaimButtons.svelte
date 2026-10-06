@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TileCode } from '../table/tile-code';
-	import { claimOptionKey, claimOptionLabel } from './claim-option';
+	import { claimOptionAriaLabel, claimOptionKey, claimOptionLabel } from './claim-option';
+	import TileOptionLabel from './TileOptionLabel.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 
 	export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
@@ -21,9 +22,10 @@
 		<button
 			type="button"
 			class="claim-btn claim-btn--{option.kind}"
+			aria-label={claimOptionAriaLabel(option)}
 			onclick={() => onChoose(option)}
 		>
-			{claimOptionLabel(option)}
+			<TileOptionLabel label={claimOptionLabel(option)} tiles={option.tiles} />
 		</button>
 	{/each}
 </div>

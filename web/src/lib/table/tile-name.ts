@@ -50,3 +50,14 @@ export const TILE_NAME: Record<TileCode, () => string> = {
 export function tileName(code: TileCode): string {
 	return TILE_NAME[code]();
 }
+
+/** Distinct tiles in first-seen order: a kong/pung option's tiles are one face repeated. */
+export function distinctTiles(codes: readonly TileCode[]): TileCode[] {
+	return [...new Set(codes)];
+}
+
+/** "{label}: {tile names}" for a button whose visible tiles are aria-hidden previews. */
+export function tileOptionAriaLabel(label: string, codes: readonly TileCode[]): string {
+	const tiles = distinctTiles(codes).map(tileName).join(m.tileOption_listSeparator());
+	return m.tileOption_ariaLabel({ label, tiles });
+}

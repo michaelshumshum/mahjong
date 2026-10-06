@@ -80,8 +80,9 @@ describe('ClaimDialog', () => {
 		const { body } = render(ClaimDialog, {
 			props: { discardTile: '6s', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
 		});
-		expect(body).toContain('>Chow 4s-5s<');
-		expect(body).toContain('>Chow 5s-7s<');
+		expect(body.match(/>Chow</g)).toHaveLength(2);
+		expect(body).toContain('aria-label="Chow: 4 Bamboo, 5 Bamboo"');
+		expect(body).toContain('aria-label="Chow: 5 Bamboo, 7 Bamboo"');
 		expect(body).toContain('>Pass<');
 		expect(body).toContain('claim-btn--pass');
 	});

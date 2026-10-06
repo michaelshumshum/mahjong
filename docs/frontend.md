@@ -203,6 +203,10 @@ always matches the server's redacted `count`.
 - **Pre-arm toggles** ("no calls this hand", "auto-pass chow") are sent via `auto` and enforced
   server-side.
 - **Claim buttons** appear only when the server offered them; never speculatively.
+- **Claim/declare button labels** are the kind only ("Pung", "Concealed kong") plus small
+  `TileFace` previews of the option's distinct tiles (`lib/ui/TileOptionLabel.svelte`), never
+  raw codes. The previews are `aria-hidden`; the accessible name spells the tiles out
+  (`tile-name.ts`'s `tileOptionAriaLabel`: "Chow: 4 Bamboo, 5 Bamboo").
 - There is no faan/shanten preview — no protocol message carries it, and a TypeScript
   reimplementation would duplicate the pure Python engine
   ([ADR 0010](decisions/0010-client-scope-cuts.md)).

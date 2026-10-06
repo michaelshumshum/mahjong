@@ -1,4 +1,5 @@
 import type { ClaimKind, ClaimOption } from './ClaimButtons.svelte';
+import { tileOptionAriaLabel } from '$lib/table/tile-name';
 import { m } from '$lib/paraglide/messages.js';
 
 function claimKindLabel(kind: ClaimKind): string {
@@ -16,9 +17,16 @@ function claimKindLabel(kind: ClaimKind): string {
 	}
 }
 
+/** Visible label: the kind only. Tiles render as TileFace previews beside it. */
 export function claimOptionLabel(option: ClaimOption): string {
-	const label = claimKindLabel(option.kind);
-	return option.tiles?.length ? `${label} ${option.tiles.join('-')}` : label;
+	return claimKindLabel(option.kind);
+}
+
+/** Accessible name; `undefined` when the visible label already says everything. */
+export function claimOptionAriaLabel(option: ClaimOption): string | undefined {
+	return option.tiles?.length
+		? tileOptionAriaLabel(claimKindLabel(option.kind), option.tiles)
+		: undefined;
 }
 
 // index included because two chow options can otherwise share the same (kind, tiles); tiles
