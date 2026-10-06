@@ -28,4 +28,26 @@ describe('Toast', () => {
 		const { body } = render(Toast, { props: { message: 'x', onDismiss: noop } });
 		expect(body).toContain('aria-label="Dismiss"');
 	});
+
+	it('defaults to info severity: status role, toast--info class', () => {
+		const { body } = render(Toast, { props: { message: 'x', onDismiss: noop } });
+		expect(body).toMatch(/class="toast[^"]*\btoast--info\b/);
+		expect(body).toContain('role="status"');
+	});
+
+	it('error severity uses alert role and the error class', () => {
+		const { body } = render(Toast, {
+			props: { message: 'x', severity: 'error', onDismiss: noop }
+		});
+		expect(body).toMatch(/class="toast[^"]*\btoast--error\b/);
+		expect(body).toContain('role="alert"');
+	});
+
+	it('warn severity keeps status role and gets the warn class', () => {
+		const { body } = render(Toast, {
+			props: { message: 'x', severity: 'warn', onDismiss: noop }
+		});
+		expect(body).toMatch(/class="toast[^"]*\btoast--warn\b/);
+		expect(body).toContain('role="status"');
+	});
 });

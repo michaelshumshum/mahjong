@@ -10,6 +10,7 @@
 		<Toast
 			message={toast.message}
 			durationMs={toast.durationMs}
+			severity={toast.severity}
 			onDismiss={() => onDismiss(toast.id)}
 		/>
 	{/each}
@@ -24,6 +25,7 @@
 		flex-direction: column;
 		gap: var(--space-2);
 		max-width: 20rem;
-		z-index: var(--z-overlay);
+		// above --z-modal: a toast (e.g. a rejected intent) must stay legible over an open dialog.
+		z-index: var(--z-toast);
 	}
 </style>

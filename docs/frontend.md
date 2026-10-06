@@ -308,6 +308,19 @@ risk: it's an acknowledgment, and the table advances at the same `deadline_ts` r
 - **No clock-offset correction** ([protocol.md §4](protocol.md)): the ring reads early/late by the
   client clock's drift.
 
+### Toasts
+
+`Toast.svelte` takes a `severity: 'info' | 'warn' | 'error'` (`lib/ui/toasts.ts`'s `ToastEntry`,
+default `'info'`), each with its own accent colour and glyph icon (colourblind-safe, matching the
+dragon-glyph convention) rather than colour alone; `error` renders `role="alert"` instead of
+`role="status"`. `ToastStack` sits at `--z-toast`, above `--z-modal`, so a toast stays legible over
+an open dialog. Current call sites (`routes/table/[id]/+page.svelte`): a rejected `ack` is `warn`,
+a server `error` frame is `error`, a waiting-room arrival is the default `info`. `error` frames map
+through `lib/net/server-error-messages.ts`'s `serverErrorToastMessage()` — the known
+`server/app/ws.py` codes (`bad_frame`, `already_joined`, `no_such_seat`, `seat_taken`,
+`bad_secret`, `not_joined`) get a human Paraglide message; an unrecognized code falls back to the
+raw wire message via `tablePage_serverErrorToast`.
+
 ## 6. Client state
 
 ```ts
@@ -696,7 +709,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | status | `--color-status-error`, `--color-rank-gold/silver/bronze` | error states; game-end podium |
 | shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
 | motion | `--dur-1` 120ms … `--dur-4` 600ms, `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
-| layers | `--z-table/tiles/hud/overlay/modal` | |
+| layers | `--z-table/tiles/hud/overlay/modal/toast` | `--z-toast` sits above `--z-modal` so a toast stays legible over an open dialog |
 
 Conventions:
 

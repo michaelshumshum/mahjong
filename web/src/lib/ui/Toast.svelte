@@ -1,17 +1,32 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
 	import { scheduleAutoDismiss } from './auto-close';
+	import type { ToastSeverity } from './toasts';
 
 	let {
 		message,
 		durationMs = 4000,
+		severity = 'info',
 		onDismiss
-	}: { message: string; durationMs?: number; onDismiss: () => void } = $props();
+	}: {
+		message: string;
+		durationMs?: number;
+		severity?: ToastSeverity;
+		onDismiss: () => void;
+	} = $props();
 
 	$effect(() => scheduleAutoDismiss(durationMs, onDismiss));
+
+	// text glyphs, not an icon asset -- one more thing colourblind-safe like the dragon glyphs.
+	const ICON: Record<ToastSeverity, string> = { info: 'ⓘ', warn: '▲', error: '⛔' };
 </script>
 
-<div class="toast" role="status" data-duration-ms={durationMs}>
+<div
+	class="toast toast--{severity}"
+	role={severity === 'error' ? 'alert' : 'status'}
+	data-duration-ms={durationMs}
+>
+	<span class="icon" aria-hidden="true">{ICON[severity]}</span>
 	<span class="message">{message}</span>
 	<button type="button" class="dismiss" aria-label={m.toast_dismissLabel()} onclick={onDismiss}
 		>×</button
@@ -29,10 +44,25 @@
 		padding: var(--space-2) var(--space-3);
 		background: var(--color-surface-raised);
 		color: var(--color-text);
+		border-inline-start: 3px solid var(--toast-accent, var(--color-border));
 		@include buttons.panel-elevated;
 		@include a11y.motion-ok {
 			animation: toast-in var(--dur-1) var(--ease-out);
 		}
+	}
+
+	// severity sets one accent custom property the rule above reads -- info stays the neutral
+	// default border (no --toast-accent override).
+	.toast--warn {
+		--toast-accent: var(--color-status-error);
+	}
+
+	.toast--error {
+		--toast-accent: var(--color-accent);
+	}
+
+	.toast .icon {
+		color: var(--toast-accent, var(--color-text-muted));
 	}
 
 	@keyframes toast-in {

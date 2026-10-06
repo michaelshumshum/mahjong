@@ -43,7 +43,8 @@
 	import ToastStack from '$lib/ui/ToastStack.svelte';
 	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
-	import { createToast, removeToast, type ToastEntry } from '$lib/ui/toasts';
+	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
+	import { serverErrorToastMessage } from '$lib/net/server-error-messages';
 	import type { TileCode } from '$lib/table/tile-code';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
@@ -144,7 +145,8 @@
 				pushToast(
 					m.tablePage_actionFailedToast({
 						error: event.d.error ?? m.tablePage_unknownErrorLabel()
-					})
+					}),
+					'warn'
 				);
 			}
 			// persist join's one-time reconnect credential so a later reload can present it back
@@ -153,7 +155,7 @@
 				saveSecretForTable(tableId, event.d.reconnect_secret);
 			}
 			if (event.t === 'error') {
-				pushToast(m.tablePage_serverErrorToast({ message: event.d.message }));
+				pushToast(serverErrorToastMessage(event.d.code, event.d.message), 'error');
 				// a stale/wrong secret can never reclaim the seat; drop it so the next connect
 				// falls back to spectator/seat-picker instead of retrying it.
 				if (event.d.code === 'bad_secret') {
@@ -568,8 +570,8 @@
 	let autoArmSent = $state(false);
 
 	let toastQueue: ToastEntry[] = $state([]);
-	function pushToast(message: string): void {
-		toastQueue = [...toastQueue, createToast(message)];
+	function pushToast(message: string, severity: ToastSeverity = 'info'): void {
+		toastQueue = [...toastQueue, createToast(message, undefined, severity)];
 	}
 	function dismissToast(id: number): void {
 		toastQueue = removeToast(toastQueue, id);

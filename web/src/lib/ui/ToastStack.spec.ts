@@ -9,8 +9,8 @@ describe('ToastStack', () => {
 		const { body } = render(ToastStack, {
 			props: {
 				queue: [
-					{ id: 1, message: 'first', durationMs: 4000 },
-					{ id: 2, message: 'second', durationMs: 4000 }
+					{ id: 1, message: 'first', durationMs: 4000, severity: 'info' },
+					{ id: 2, message: 'second', durationMs: 4000, severity: 'error' }
 				],
 				onDismiss: noop
 			}
