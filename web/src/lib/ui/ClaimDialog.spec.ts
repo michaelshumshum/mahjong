@@ -18,7 +18,7 @@ describe('ClaimDialog', () => {
 			}
 		});
 		expect(body).toContain('Bob discarded');
-		expect(body).toContain('alt="z5 tile"');
+		expect(body).toContain('alt="Red Dragon"');
 	});
 
 	it('falls back to a generic subtitle when the discarder name is unknown', () => {
@@ -29,12 +29,12 @@ describe('ClaimDialog', () => {
 		expect(body).toContain('Someone discarded');
 	});
 
-	// `.claim-meld-tile` wrapper immediately followed by its `<img alt>` -- scopes the match to
+	// `.claim-meld-tile` wrapper immediately followed by its TileFace `data-tile` -- scopes the match to
 	// meld-preview tiles only; the "X discarded" subtitle uses a differently-classed wrapper.
 	function meldTileCodes(body: string): string[] {
-		return [
-			...body.matchAll(/class="claim-meld-tile[^"]*"><span[^>]*><img[^>]*alt="(\ds) tile"/g)
-		].map((m) => m[1]);
+		return [...body.matchAll(/class="claim-meld-tile[^"]*"><span[^>]*data-tile="(\ds)"/g)].map(
+			(m) => m[1]
+		);
 	}
 
 	it('previews a pung meld as the two hand tiles plus the claimed discard, with the claimed one marked', () => {
@@ -42,7 +42,7 @@ describe('ClaimDialog', () => {
 		const { body } = render(ClaimDialog, {
 			props: { discardTile: 'z5', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
 		});
-		expect(body.match(/alt="z5 tile"/g)).toHaveLength(4); // 1 subtitle + 3 meld tiles
+		expect(body.match(/data-tile="z5"/g)).toHaveLength(4); // 1 subtitle + 3 meld tiles
 		expect([...body.matchAll(/claim-meld-tile--claimed/g)]).toHaveLength(1);
 	});
 

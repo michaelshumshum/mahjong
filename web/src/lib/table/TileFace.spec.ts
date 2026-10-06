@@ -21,5 +21,13 @@ describe('TileFace', () => {
 	it('renders the tile back for a concealed (null) tile', () => {
 		const { body } = render(TileFace, { props: { code: null } });
 		expect(body).toContain('src="/tiles/Back.svg"');
+		expect(body).toContain('alt="concealed tile"');
+		expect(body).not.toContain('data-tile');
+	});
+
+	it('uses the localized tile name as alt text, never the raw code', () => {
+		const { body } = render(TileFace, { props: { code: 'z5' } });
+		expect(body).toContain('alt="Red Dragon"');
+		expect(body).toContain('data-tile="z5"');
 	});
 });

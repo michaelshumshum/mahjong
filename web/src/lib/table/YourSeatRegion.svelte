@@ -3,6 +3,7 @@
 	import TimerRing from '$lib/ui/TimerRing.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
+	import { tileName } from './tile-name';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -129,7 +130,7 @@
 							type="button"
 							class="hand-tile hand-tile-btn"
 							class:hand-tile--drawn={tile.drawn}
-							aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tile.code })}
+							aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
 							onclick={() => onDiscard(tile.tileId as number)}
 						>
 							<TileFace code={tile.code} />

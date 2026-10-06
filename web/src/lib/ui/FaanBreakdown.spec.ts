@@ -95,7 +95,7 @@ describe('FaanBreakdown', () => {
 				payments
 			}
 		});
-		const order = [...body.matchAll(/alt="([^"]+) tile"/g)].map((m) => m[1]);
+		const order = [...body.matchAll(/data-tile="([^"]+)"/g)].map((m) => m[1]);
 		expect(order).toEqual(['1m', '5p', '1s', '9s', 'z5']);
 	});
 
@@ -114,7 +114,7 @@ describe('FaanBreakdown', () => {
 		});
 		expect(body).toMatch(/class="melds\b/);
 		expect(body).toMatch(/class="concealed-hand\b/);
-		const order = [...body.matchAll(/alt="([^"]+) tile"/g)].map((m) => m[1]);
+		const order = [...body.matchAll(/data-tile="([^"]+)"/g)].map((m) => m[1]);
 		expect(order).toEqual(['9s', '9s', '9s', '1m', '2m', '3m']);
 	});
 
@@ -139,6 +139,6 @@ describe('FaanBreakdown', () => {
 			props: { winner: 2, seatNames, winningHand: [], melds, patterns, totalFaan: 5, payments }
 		});
 		expect(body).toContain('concealed tile');
-		expect(body).not.toContain('alt="z1 tile"');
+		expect(body).not.toContain('data-tile="z1"');
 	});
 });

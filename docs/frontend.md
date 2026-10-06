@@ -657,10 +657,16 @@ zh-Hant has no grammatical plural; every variant there is the same phrasing.
 `table.e2e.ts`), `AnimationDemoPanel` controls, demo `data-testid` readouts. `lib/table/wind.ts`'s
 `WIND_LABEL` is only ever interpolated into already-translated messages.
 
+**Tile names.** `lib/table/tile-name.ts`'s `tileName(code)` maps every `TileCode` to a localized
+spoken name (`tileName_<code>` keys: "3 Bamboo"/三索, "Red Dragon"/紅中, "Plum Flower"/梅) —
+`TileFace`'s `alt`, discard/claim/declare `aria-label`s. A raw code (`z5`) never reaches a
+player. `tile-name.spec.ts` pins the map to `TILE_ASSET` and both locale files. `TileFace` also
+sets `data-tile="<code>"` as the locale-independent hook specs match on.
+
 Tests assert on `data-testid`/stable classes for core flows, not English wording. Locale switching
 and SSR `<html lang>` have e2e coverage (`lib/i18n/locale-switch.e2e.ts`, `hooks.server.e2e.ts`).
 
-The zh-Hant file (376/376 keys, parity-checked) is machine-generated and not yet reviewed by a
+The zh-Hant file (406/406 keys, parity-checked) is machine-generated and not yet reviewed by a
 fluent Hong Kong mahjong player.
 
 ### Accessibility

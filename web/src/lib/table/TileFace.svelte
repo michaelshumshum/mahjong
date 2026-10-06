@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { TILE_ASSET, hasTileArt, type TileCode } from './tile-code';
+	import { tileName } from './tile-name';
 	import { m } from '$lib/paraglide/messages.js';
 
 	// `null` = concealed (render the back).
@@ -9,16 +10,13 @@
 	// across repeated inline copies of the same tile. Costs currentColor/CSS stylability.
 	const BACK_SRC = '/tiles/Back.svg';
 
-	let isBack = $derived(!(code !== null && hasTileArt(code)));
-	let src = $derived(
-		code !== null && hasTileArt(code) ? `/tiles/${TILE_ASSET[code]}.svg` : BACK_SRC
-	);
-	let alt = $derived(
-		code !== null && hasTileArt(code) ? m.tileFace_tileAlt({ code }) : m.tileFace_concealedTileAlt()
-	);
+	let face = $derived(code !== null && hasTileArt(code) ? code : null);
+	let src = $derived(face !== null ? `/tiles/${TILE_ASSET[face]}.svg` : BACK_SRC);
+	let alt = $derived(face !== null ? tileName(face) : m.tileFace_concealedTileAlt());
 </script>
 
-<span class="tile-face" class:tile-face--back={isBack}>
+<!-- data-tile: a locale-independent hook for specs, since alt is now a localized name -->
+<span class="tile-face" class:tile-face--back={face === null} data-tile={face}>
 	<img {src} {alt} draggable="false" />
 </span>
 
