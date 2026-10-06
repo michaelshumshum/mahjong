@@ -1,8 +1,8 @@
-// entry point: forwards the token and layout partials, plus a minimal global reset. _a11y.scss
-// isn't scaffolded yet — a11y hooks land whenever that work starts.
-
 @use 'tokens';
 @use 'layout';
+@use 'a11y';
+
+@include a11y.globals;
 
 * {
 	box-sizing: border-box;

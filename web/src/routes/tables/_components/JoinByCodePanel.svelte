@@ -78,11 +78,6 @@
 		@include buttons.input-recessed;
 	}
 
-	input:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-	}
-
 	button {
 		font: inherit;
 		padding: var(--space-2) var(--space-4);

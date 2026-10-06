@@ -92,15 +92,6 @@
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
-	}
-
 	.lobby {
 		position: relative;
 		z-index: var(--z-hud);

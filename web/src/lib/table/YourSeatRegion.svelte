@@ -243,11 +243,6 @@
 		border: none;
 		background: none;
 		cursor: pointer;
-
-		&:focus-visible {
-			outline: 2px solid var(--color-accent);
-			outline-offset: 2px;
-		}
 	}
 
 	.declare-actions {

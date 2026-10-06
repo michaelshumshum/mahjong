@@ -1,0 +1,55 @@
+// mixins only: a component's own `@use` would otherwise re-emit global rules into its scoped
+// stylesheet. app.scss emits the globals once via `globals`.
+
+@mixin focus-ring {
+	outline: 2px solid var(--color-brass);
+	outline-offset: 2px;
+}
+
+@mixin sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+// html[data-motion] mirrors the motion setting (lib/ui/motion.ts); `system` defers to the os.
+// svelte components only (`:global`), included inside a selector.
+@mixin motion-ok {
+	@media (prefers-reduced-motion: no-preference) {
+		:global(html:not([data-motion='reduced'])) & {
+			@content;
+		}
+	}
+	:global(html[data-motion='full']) & {
+		@content;
+	}
+}
+
+// inverse of motion-ok, for neutralizing motion a base rule must keep (e.g. a transition whose
+// transitionend commits state).
+@mixin motion-reduced {
+	@media (prefers-reduced-motion: reduce) {
+		:global(html:not([data-motion='full'])) & {
+			@content;
+		}
+	}
+	:global(html[data-motion='reduced']) & {
+		@content;
+	}
+}
+
+@mixin globals {
+	:focus-visible {
+		@include focus-ring;
+	}
+
+	.sr-only {
+		@include sr-only;
+	}
+}

@@ -62,9 +62,4 @@
 		padding: 0;
 		@include buttons.btn-ghost;
 	}
-
-	.dismiss:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-	}
 </style>

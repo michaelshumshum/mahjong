@@ -599,8 +599,9 @@ src/lib/styles/
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
   _layout.scss      seat-region grid, breakpoint mixins
-  _a11y.scss        focus rings, high-contrast hooks, reduced-motion guards
-  app.scss          entry: forwards the above, global resets
+  _a11y.scss        mixins only: focus-ring, sr-only, motion-ok/motion-reduced (§9), and
+                    `globals` (the :focus-visible ring and .sr-only class) that app.scss emits
+  app.scss          entry: tokens, layout, a11y globals, global resets
 ```
 
 Conventions:

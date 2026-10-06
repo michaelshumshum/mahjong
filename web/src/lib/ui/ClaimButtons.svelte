@@ -70,9 +70,4 @@
 	.claim-btn--win {
 		@include buttons.btn-primary;
 	}
-
-	.claim-btn:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-	}
 </style>
