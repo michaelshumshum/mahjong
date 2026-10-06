@@ -345,17 +345,17 @@
 	}
 
 	.delta--gain {
-		color: var(--color-accent-jade);
+		color: var(--color-positive);
 		font-weight: 700;
 	}
 
 	.delta--loss {
-		color: var(--color-accent);
+		color: var(--color-negative);
 		font-weight: 700;
 	}
 
 	.delta--dealer {
-		background: rgb(187 157 88 / 0.12);
+		background: color-mix(in srgb, var(--color-brass) 12%, transparent);
 	}
 
 	.running {
@@ -363,15 +363,15 @@
 	}
 
 	.running--dealer {
-		background: rgb(187 157 88 / 0.12);
+		background: color-mix(in srgb, var(--color-brass) 12%, transparent);
 	}
 
 	.dealer-badge {
 		display: inline-block;
 		padding: var(--space-1) var(--space-2);
 		border-radius: var(--radius-sm);
-		background: rgb(187 157 88 / 0.18);
-		color: var(--color-seat-self);
+		background: color-mix(in srgb, var(--color-brass) 18%, transparent);
+		color: var(--color-brass);
 		font-size: var(--font-size-sm);
 		font-weight: 700;
 	}
@@ -497,10 +497,10 @@
 	}
 
 	.standing-total--positive {
-		color: var(--color-accent-jade);
+		color: var(--color-positive);
 	}
 
 	.standing-total--negative {
-		color: var(--color-accent);
+		color: var(--color-negative);
 	}
 </style>

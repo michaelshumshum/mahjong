@@ -132,10 +132,10 @@
 	}
 
 	.podium-score--positive {
-		color: var(--color-accent-jade);
+		color: var(--color-positive);
 	}
 
 	.podium-score--negative {
-		color: var(--color-accent);
+		color: var(--color-negative);
 	}
 </style>

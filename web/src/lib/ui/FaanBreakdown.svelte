@@ -225,10 +225,10 @@
 	}
 
 	.payment-row--gain .payment-amount {
-		color: var(--color-accent-jade);
+		color: var(--color-positive);
 	}
 
 	.payment-row--loss .payment-amount {
-		color: var(--color-accent);
+		color: var(--color-negative);
 	}
 </style>

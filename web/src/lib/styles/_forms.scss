@@ -88,8 +88,8 @@
 }
 
 @mixin option-checked {
-	border-color: color-mix(in srgb, var(--color-seat-self) 55%, var(--color-border) 45%);
-	background: rgb(187 157 88 / 0.08);
+	border-color: color-mix(in srgb, var(--color-brass) 55%, var(--color-border) 45%);
+	background: color-mix(in srgb, var(--color-brass) 8%, transparent);
 }
 
 @mixin option-control {
@@ -108,8 +108,8 @@
 }
 
 @mixin option-control-checked {
-	border-color: var(--color-seat-self);
-	background: var(--color-seat-self);
+	border-color: var(--color-brass);
+	background: var(--color-brass);
 }
 
 // native input overlay: invisible but clickable, covering the whole option row.

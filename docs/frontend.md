@@ -592,7 +592,8 @@ compiles to plain CSS, so it's an authoring-layer choice only.
 
 ```
 src/lib/styles/
-  _tokens.scss      colour, spacing, type scale, z-layers, seat colours
+  _tokens.scss      colour (walnut chrome, felt/rim/tile materials, accent, brass, ±deltas),
+                    spacing, radii, type scale, motion durations/easings, z-layers
   _buttons.scss     btn-primary/secondary/ghost, panel-elevated, modal-scrim, input-recessed
   _forms.scss       panel-header/title/badge, form-group, option row chrome
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every

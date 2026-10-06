@@ -13,10 +13,31 @@
 	--color-tile: #f2e8d5;
 	--color-tile-ink: #241b14;
 
-	// the ONE urgent signal (turn/claim window/win-marker), never decorative. --color-accent-jade
-	// is reserved for positive score/faan deltas only.
+	// table materials: walnut rim around a felt playing surface.
+	--color-rim: #2b1d13;
+	--color-rim-hi: #4a3322;
+	--color-felt: #1d4a3c;
+	--color-felt-deep: #123329;
+	--color-felt-lit: #2a6150;
+	--color-felt-line: rgb(255 255 255 / 0.06);
+	--color-text-on-felt: #e9f1ea;
+
+	// tile body layers: face (--color-tile), edge, side, and the jade back.
+	--color-tile-edge: #dccdb1;
+	--color-tile-side: #b89f74;
+	--color-tile-back: #2f7a63;
+	--color-tile-back-edge: #1b4d3e;
+
+	// the ONE urgent signal (turn/claim window/win-marker), never decorative.
 	--color-accent: #c23b2e;
-	--color-accent-jade: #3c6e52;
+	--color-accent-glow: rgb(200 55 45 / 0.45);
+
+	// selection/highlight and your own seat; never a signal.
+	--color-brass: #d6ae5c;
+
+	// score/faan deltas only, tuned for contrast on both felt and walnut.
+	--color-positive: #7fd1a3;
+	--color-negative: #ef7a6b;
 
 	// distinct hue from both accents so an error state never reads as either one.
 	--color-status-error: #e77e40;
@@ -30,9 +51,10 @@
 	--radius-tile: 10%;
 	--radius-sm: 6px;
 	--radius-md: 12px;
+	--radius-lg: 20px;
 
-	// self/right/across/left, clockwise from you — muted, each hue clear of both accents above.
-	--color-seat-self: #bb9d58;
+	// right/across/left, clockwise from you — muted, each hue clear of both accents above. your
+	// own seat uses --color-brass.
 	--color-seat-right: #5c85a3;
 	--color-seat-across: #a65979;
 	--color-seat-left: #8e73a5;
@@ -53,6 +75,16 @@
 	--font-size-base: 1rem;
 	--font-size-lg: 1.375rem;
 	--font-size-xl: 2rem;
+	--font-size-2xl: 3rem;
+	--font-size-display: clamp(2.5rem, 6vw, 4.5rem);
+
+	// motion: only transform/opacity animate (docs/frontend.md §2). --ease-place overshoots.
+	--dur-1: 120ms;
+	--dur-2: 200ms;
+	--dur-3: 320ms;
+	--dur-4: 600ms;
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease-place: cubic-bezier(0.3, 1.35, 0.5, 1);
 
 	--z-table: 0;
 	--z-tiles: 10;
