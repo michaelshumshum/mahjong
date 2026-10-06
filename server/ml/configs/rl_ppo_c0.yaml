@@ -32,5 +32,7 @@ save_every: 20
 curriculum:
   start: C0
   window: 4000
+  # true: after the C1 exit, keep training at C1's end params (C2 isn't built) instead of stopping
+  hold_final: false
   contingency:
     enabled: false

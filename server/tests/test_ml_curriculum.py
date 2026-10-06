@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ import pytest
 np = pytest.importorskip("numpy")
 pytest.importorskip("torch")
 
-from ml.curriculum import Curriculum
+from ml.curriculum import Contingency, Curriculum
 from ml.encode_v2 import PAD
 from ml.ppo import HandStat, build_schedule, main_config
 from ml.train_env import EnvConfig, TrainEnv, unpack_rows
@@ -97,6 +98,49 @@ def test_c1_exit_needs_win_rate_and_sub_min_tenpai_then_completes():
         cur.params(end + 3)
 
 
+def test_hold_final_keeps_c1_end_params_after_the_exit():
+    cur = Curriculum.from_config({"start": "C1", "window": 1000, "hold_final": True})
+    end = cur.stage.anneal_decisions
+    final = cur.params(end)
+    cur.advance(end)
+    cur.observe(_hands(1000, 0.2, tenpai=0.6, sub_min=0.2, seed=3))
+    assert cur.advance(end + 1) is None
+    assert cur.held_at == end + 1 and not cur.complete()
+    assert cur.metrics()["held_after"] == "C1"
+    assert cur.snapshot_due(end + 1) == "C1_exit"
+    assert cur.snapshot_due(end + 1) is None
+    cur.observe(_hands(500, 0.1, seed=4))
+    assert cur.advance(end + 2) is None
+    m = cur.metrics()
+    assert "held_after" not in m and m["held_at"] == end + 1
+    assert m["rolling_hands"] == 1000 and m["rolling_win_rate"] < 0.2
+    p = cur.params(end + 10**9)
+    assert p == final
+    assert (p.learners, p.min_faan, p.oracle_k, p.keep_prob, p.beta) == (4, 3, 0, 0.0, 0.0)
+
+    resumed = Curriculum.from_config({"start": "C1", "window": 1000, "hold_final": True})
+    resumed.load_state_dict(cur.state_dict())
+    assert resumed.held_at == end + 1 and resumed.advance(end + 3) is None
+    unheld = Curriculum(window=1000)
+    unheld.load_state_dict(cur.state_dict())
+    assert unheld.complete()
+
+
+def test_load_state_dict_accepts_state_without_hold_keys():
+    old = {
+        "index": 2,
+        "stage_start": 123,
+        "annealed_at": 456,
+        "recent": [asdict(h) for h in _hands(30, 0.2)],
+        "contingency": asdict(Contingency()),
+    }
+    cur = Curriculum.from_config({"start": "C0", "window": 4000, "hold_final": True})
+    cur.load_state_dict(old)
+    assert cur.stage.name == "C1" and cur.held_at is None and not cur.complete()
+    assert cur.params(456).name == "C1"
+    assert cur.advance(457) is None
+
+
 def test_contingency_is_off_by_default_even_when_c1_stalls():
     cur = _at(Curriculum(window=100), "C1")
     late = cur.contingency.after_decisions + cur.stage.anneal_decisions
@@ -146,6 +190,7 @@ def test_c0_config_loads_with_two_threads_and_the_curriculum():
     schedule = build_schedule(cfg)
     assert isinstance(schedule, Curriculum)
     assert schedule.stage.name == "C0" and not schedule.contingency.enabled
+    assert not schedule.hold_final
     p = schedule.params(0)
     assert (p.learners, p.opponent, p.min_faan, p.oracle_k, p.keep_prob) == (
         1,

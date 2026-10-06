@@ -279,6 +279,28 @@ def test_train_ppo_stops_cleanly_when_the_curriculum_completes(tmp_path):
     assert _records(out) == lines
 
 
+def test_train_ppo_hold_final_keeps_training_after_the_exit(tmp_path):
+    cfg = _tiny_cfg(tmp_path, curriculum=_quick_c1_curriculum(hold_final=True))
+    out = train_ppo(cfg, max_updates=5)
+    lines = _records(out)
+    assert [r["update"] for r in lines] == [1, 2, 3, 4, 5]
+    exits = [r for r in lines if "held_after" in r]
+    assert len(exits) == 1 and exits[0]["held_after"] == "C1"
+    assert not any("advanced_to" in r for r in lines)
+    exited = exits[0]["update"]
+    after = [r for r in lines if r["update"] > exited]
+    assert after and all(r["held_at"] == exits[0]["decisions"] for r in after)
+    assert all(r["rolling_hands"] > 0 for r in after)
+    assert all(
+        (r["stage"], r["min_faan"], r["oracle_k"], r["keep_prob"], r["beta"]) == ("C1", 3, 0, 0, 0)
+        for r in after
+    )
+    snap = torch.load(out / "ckpt_C1_exit.pt", weights_only=False, map_location="cpu")
+    assert snap["updates"] == exited and snap["schedule"]["held_at"] == exits[0]["decisions"]
+    train_ppo(cfg, resume=True, max_updates=1)
+    assert _records(out)[-1]["update"] == 6
+
+
 def test_train_ppo_is_deterministic(tmp_path):
     def run(name):
         cfg = _tiny_cfg(tmp_path, out=str(tmp_path / name))

@@ -517,6 +517,19 @@ seat-hands, cleared at anneal completion and at each advance) meeting every thre
 | C1 | 4 learners (self-play) | 0, 1 from ½, 3 at the end | 0 | 1 → 0 | 0.5 → 0 | 200M | win ≥ 0.15 and sub-min tenpai ≤ 0.32 over ≥ 200 tenpai draws |
 | C2 | stub: `params` raises `NotImplementedError`, `complete()` stops training: the update that advances into it writes its record (`advanced_to: "C2"`), saves `ckpt_last.pt` with the advanced state and exits; resuming that checkpoint returns at once | | | | | | R3 |
 
+**`hold_final`** (curriculum key, default `false`). With `true`, meeting the exit criteria of the
+last implemented stage (C1) holds that stage instead of advancing into the stub, so training
+continues at its end-of-anneal parameters (C1: 4 learners, `min_faan` 3, `k` 0, keep 0, β 0)
+until `total_decisions`, `--max-steps`/`--max-minutes` or a signal stops it. It exists to keep
+training past the C1 exit while the R3 league isn't built.
+
+| Piece | Behaviour |
+| --- | --- |
+| exit update | its record carries `held_after: "C1"`; `ckpt_C1_exit.pt` is saved right after it (the exact exit checkpoint, for evaluation) |
+| held updates | every record carries `held_at` (decisions at the exit); the rolling window keeps sliding and its `rolling_*` metrics keep being reported; no further advancement |
+| state | `held_at` in the schedule state; a state dict without it (pre-`hold_final` checkpoints) loads as not held |
+| resumed without the key | a held checkpoint resumed with `hold_final: false` counts as complete and stops |
+
 **C1 thresholds.** With four learners every hand has either one winner or none, so the rolling
 per-seat win rate is (1 − draw rate) / 4: the win threshold is really a cap on exhaustive draws,
 the passivity canary. Both thresholds are anchored to the `FaanBot` vs `EfficiencyBot` arena

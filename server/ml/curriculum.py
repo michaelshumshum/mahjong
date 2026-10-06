@@ -6,6 +6,9 @@ probability) and the shaping β; `min_faan` steps up at fractions of the same an
 advances once its anneal is complete and the rolling statistics over the last `window` learner
 hands played since then meet every threshold it sets.
 
+With `hold_final`, exiting the last implemented stage holds it at its end-of-anneal parameters
+instead of completing, so training continues until the run's own limits stop it.
+
 The §10 contingency (clone `FaanBot` with a decaying anchor) is built but off by default: unless
 `contingency.enabled`, `teacher()` is always `None`, so the env never runs `FaanBot`.
 """
@@ -109,6 +112,9 @@ class Curriculum:
     stage_start: int = 0
     annealed_at: int | None = None
     recent: deque[HandStat] = field(default_factory=deque)
+    hold_final: bool = False
+    held_at: int | None = None
+    _held_now: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.recent = deque(self.recent, maxlen=self.window)
@@ -128,10 +134,11 @@ class Curriculum:
         start = raw.pop("start", stages[0].name)
         contingency = Contingency(**raw.pop("contingency", {}))
         window = int(raw.pop("window", 4000))
+        hold_final = bool(raw.pop("hold_final", False))
         if raw:
             raise ValueError(f"unknown curriculum keys: {sorted(raw)}")
         index = [s.name for s in stages].index(start)
-        return Curriculum(stages, window, contingency, index)
+        return Curriculum(stages, window, contingency, index, hold_final=hold_final)
 
     @property
     def stage(self) -> StageSpec:
@@ -198,11 +205,17 @@ class Curriculum:
 
     def advance(self, decisions: int) -> str | None:
         """Call after `observe`; returns the new stage's name when it moves on."""
+        self._held_now = False
         self._check_contingency(decisions)
         if self.annealed_at is None and self.progress(decisions) >= 1.0:
             self.annealed_at = decisions
             self.recent.clear()
-        if not self.ready(decisions):
+        if self.held_at is not None or not self.ready(decisions):
+            return None
+        nxt = self.index + 1
+        if self.hold_final and (nxt == len(self.stages) or not self.stages[nxt].implemented):
+            self.held_at = decisions
+            self._held_now = True
             return None
         self.index += 1
         self.stage_start = decisions
@@ -211,7 +224,8 @@ class Curriculum:
         return self.stage.name
 
     def complete(self) -> bool:
-        return not self.stage.implemented
+        # a held run resumed without hold_final stops like an unheld one
+        return not self.stage.implemented or (self.held_at is not None and not self.hold_final)
 
     def _check_contingency(self, decisions: int) -> None:
         c = self.contingency
@@ -235,19 +249,27 @@ class Curriculum:
         return c.teacher
 
     def snapshot_due(self, decisions: int) -> str | None:
-        """`"anchor_zero"` once, when the contingency's clone coefficient first reaches 0."""
+        """`"<stage>_exit"` on the update that starts a hold; `"anchor_zero"` once, when the
+        contingency's clone coefficient first reaches 0."""
+        if self._held_now:
+            self._held_now = False
+            return f"{self.stage.name}_exit"
         c = self.contingency
         if c.started_at is None or c.anchor_zero_saved or self.clone_coef(decisions) > 0:
             return None
         c.anchor_zero_saved = True
         return "anchor_zero"
 
-    def metrics(self) -> dict[str, float]:
-        out = {f"rolling_{k}": v for k, v in self.rolling().items()}
+    def metrics(self) -> dict[str, float | str]:
+        out: dict[str, float | str] = {f"rolling_{k}": v for k, v in self.rolling().items()}
         out["stage_index"] = self.index
         out["annealed"] = float(self.annealed_at is not None)
         if self.contingency.started_at is not None:
             out["contingency_started_at"] = self.contingency.started_at
+        if self.held_at is not None:
+            out["held_at"] = self.held_at
+        if self._held_now:
+            out["held_after"] = self.stage.name
         return out
 
     def state_dict(self) -> dict[str, Any]:
@@ -257,6 +279,7 @@ class Curriculum:
             "annealed_at": self.annealed_at,
             "recent": [asdict(h) for h in self.recent],
             "contingency": asdict(self.contingency),
+            "held_at": self.held_at,
         }
 
     def load_state_dict(self, state: dict[str, Any]) -> None:
@@ -265,3 +288,4 @@ class Curriculum:
         self.annealed_at = state["annealed_at"]
         self.recent = deque((HandStat(**h) for h in state["recent"]), maxlen=self.window)
         self.contingency = Contingency(**state["contingency"])
+        self.held_at = state.get("held_at")
