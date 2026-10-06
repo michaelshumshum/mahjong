@@ -437,6 +437,40 @@ describe('reduce', () => {
 			expect(next.discardPools[0]).toEqual([9]);
 		});
 
+		it('a claimed meld clears lastDiscard -- the marked tile left the pool', () => {
+			const s = state({
+				seat: 1,
+				ownHand: [88, 31, 5],
+				concealedCounts: [13, 3, 13, 13],
+				discardPools: [[9, 47], [], [], []],
+				lastDiscard: { seat: 0, tileId: 47 }
+			});
+			const next = reduce(s, {
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'meld',
+				d: { seat: 1, meld_kind: 'pung', tiles: [31, 88, 47], from_seat: 0 }
+			});
+			expect(next.lastDiscard).toBeNull();
+		});
+
+		it('a concealed_kong also clears lastDiscard', () => {
+			const s = state({
+				seat: 0,
+				concealedCounts: [6, 13, 13, 13],
+				lastDiscard: { seat: 2, tileId: 9 }
+			});
+			const next = reduce(s, {
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'meld',
+				d: { seat: 0, meld_kind: 'concealed_kong', tiles: [1, 1, 1, 1], from_seat: null }
+			});
+			expect(next.lastDiscard).toBeNull();
+		});
+
 		it('a claimed chow/pung/kong never leaves a held-apart tile -- unlike a real draw, nothing was drawn', () => {
 			// regression: inferring the held-apart tile from ownHand's last entry surfaced an
 			// already-owned tile as if freshly drawn.

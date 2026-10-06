@@ -202,3 +202,33 @@ describe('viewFromClientState spectator', () => {
 		expect(live!.ownHand).toEqual({ concealedIds: [], drawnId: null });
 	});
 });
+
+describe('viewFromClientState lastDiscard', () => {
+	it('resolves the real tile_id to its position in that seat’s pool', () => {
+		const state = {
+			...initialClientGameState(),
+			seat: 0,
+			discardPools: [[], [], [5, 9], []],
+			lastDiscard: { seat: 2, tileId: 9 }
+		};
+		const live = viewFromClientState(state);
+		expect(live!.view.lastDiscard).toEqual({ seat: 2, index: 1 });
+	});
+
+	it('is null once the tile no longer appears in the pool (claimed)', () => {
+		const state = {
+			...initialClientGameState(),
+			seat: 0,
+			discardPools: [[], [], [5], []],
+			lastDiscard: { seat: 2, tileId: 9 }
+		};
+		const live = viewFromClientState(state);
+		expect(live!.view.lastDiscard).toBeNull();
+	});
+
+	it('is null when nothing has been discarded yet', () => {
+		const state = { ...initialClientGameState(), seat: 0 };
+		const live = viewFromClientState(state);
+		expect(live!.view.lastDiscard).toBeNull();
+	});
+});

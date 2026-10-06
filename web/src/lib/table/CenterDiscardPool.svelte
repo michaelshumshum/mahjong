@@ -1,28 +1,41 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState } from './mock-game-state';
+	import { m } from '$lib/paraglide/messages.js';
 
 	// all four discard pools live in the centre box (docs/frontend.md §3); `position` picks
 	// the box side and, for left/right, the rotation matching that seat's own hand.
 	let {
 		seat,
 		position,
-		ariaLabel
+		ariaLabel,
+		lastDiscardIndex = null
 	}: {
 		seat: MockSeatState;
 		position: 'across' | 'left' | 'right' | 'self';
 		ariaLabel: string;
+		lastDiscardIndex?: number | null;
 	} = $props();
 </script>
 
 <div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
 	{#each seat.discards as code, i (i)}
-		<div class="discard-tile" role="listitem"><TileFace {code} /></div>
+		<div
+			class="discard-tile"
+			class:discard-tile--last={i === lastDiscardIndex}
+			role="listitem"
+			title={i === lastDiscardIndex
+				? m.centerDiscardPool_lastDiscardTitle({ name: seat.name })
+				: undefined}
+		>
+			<TileFace {code} />
+		</div>
 	{/each}
 </div>
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/a11y';
 
 	.discard-pool {
 		display: grid;
@@ -37,6 +50,38 @@
 
 	.discard-tile :global(.tile-face) {
 		height: 100%;
+	}
+
+	// marks the most recent unclaimed discard: an accent underline plus a brief landing pulse.
+	.discard-tile--last {
+		position: relative;
+	}
+
+	.discard-tile--last::after {
+		content: '';
+		position: absolute;
+		inset-inline: 10%;
+		bottom: -3px;
+		height: 2px;
+		border-radius: 1px;
+		background: var(--color-accent);
+	}
+
+	.discard-tile--last :global(.tile-face) {
+		@include a11y.motion-ok {
+			animation: discard-landing var(--dur-2) var(--ease-out);
+		}
+	}
+
+	@keyframes discard-landing {
+		from {
+			transform: scale(1.16);
+			opacity: 0.6;
+		}
+		to {
+			transform: scale(1);
+			opacity: 1;
+		}
 	}
 
 	.discard-pool--across {

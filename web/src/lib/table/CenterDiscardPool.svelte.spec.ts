@@ -68,4 +68,28 @@ describe('CenterDiscardPool', () => {
 		});
 		expect(target.querySelectorAll('.discard-tile')).toHaveLength(0);
 	});
+
+	it('marks the tile at lastDiscardIndex and no other', () => {
+		const { target } = render(CenterDiscardPool, {
+			seat: mockSeat({ discards: ['1m', '2m', '3m'], name: 'Carol' }),
+			position: 'self',
+			ariaLabel: 'Your discards',
+			lastDiscardIndex: 1
+		});
+		const tiles = target.querySelectorAll('.discard-tile');
+		expect(tiles[0].classList.contains('discard-tile--last')).toBe(false);
+		expect(tiles[1].classList.contains('discard-tile--last')).toBe(true);
+		expect(tiles[2].classList.contains('discard-tile--last')).toBe(false);
+		expect(tiles[1].getAttribute('title')).toBe('Carol discarded');
+	});
+
+	it('marks nothing when lastDiscardIndex is null', () => {
+		const { target } = render(CenterDiscardPool, {
+			seat: mockSeat({ discards: ['1m', '2m'] }),
+			position: 'self',
+			ariaLabel: 'Your discards',
+			lastDiscardIndex: null
+		});
+		expect(target.querySelectorAll('.discard-tile--last')).toHaveLength(0);
+	});
 });

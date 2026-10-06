@@ -301,7 +301,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 							? updateHand(state.hands, d.seat, (h) => removeOne(h, addedTile))
 							: state.hands,
 					// a kong consumes the held-apart tile; `kong_replace` supplies the next one.
-					drawnTileId: isOwn ? null : state.drawnTileId
+					drawnTileId: isOwn ? null : state.drawnTileId,
+					lastDiscard: null
 				};
 			}
 
@@ -318,7 +319,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					),
 					ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
 					hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles ?? [])),
-					drawnTileId: isOwn ? null : state.drawnTileId
+					drawnTileId: isOwn ? null : state.drawnTileId,
+					lastDiscard: null
 				};
 			}
 
@@ -348,7 +350,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 						: state.discardPools,
 				// a claimed meld is never a draw -- without this, the last tile left in `ownHand`
 				// after removeMany would show as if freshly drawn.
-				drawnTileId: isOwn ? null : state.drawnTileId
+				drawnTileId: isOwn ? null : state.drawnTileId,
+				lastDiscard: null
 			};
 		}
 

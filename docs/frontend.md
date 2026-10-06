@@ -323,6 +323,7 @@ interface ClientGameState {
   concealedCounts: number[]; // length-4, count-only for every seat incl. this one
   melds: MeldState[][]; // length-4; concealed_kong is {tiles:null,count} until reveal
   discardPools: number[][]; // length-4, append-only, indexed by pool_index
+  lastDiscard: { seat: number; tileId: number } | null; // most recent unclaimed discard
   flowers: string[][];
   wallRemaining: number;
   seatStatus: string[];
@@ -421,6 +422,18 @@ server trims/caps/defaults it, so the client doesn't validate. `ClientGameState.
 seat's *resolved* name back: set from `state_sync.names`, kept live from `seat_state.name`. Bot
 seats get a random per-table-unique display name (`server/app/table.py`'s `_draw_bot_name`, from
 `_BOT_NAME_POOL`) — cosmetic, not the tier.
+
+### Last-discard marker
+
+`lastDiscard` is set on `discard`, cleared on `meld` (claimed or not — the marked tile either left
+the pool or the turn moved on) and `hand_start`. `live-view.ts`'s `viewFromClientState()` resolves
+the real `tileId` to that seat's position in its own (unclaimed-filtered) `discards` array —
+`null` once claimed, since the tile no longer appears there. `CenterDiscardPool` marks that index
+with an accent underline and a brief landing pulse (`motion-ok`), plus a `title` tooltip ("`<name>`
+discarded"). A `state_sync` only derives `lastDiscard` for an embedded claim window (needed there
+for `ClaimDialog`'s `sourceSeat`/`tile`) — a resync outside an active claim window loses the
+marker until the next discard, a deliberate, cosmetic-only tradeoff (no wire field names "last
+discard" generally).
 
 ### Hand history
 
