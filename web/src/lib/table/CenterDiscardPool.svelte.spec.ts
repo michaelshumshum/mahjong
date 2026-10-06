@@ -69,27 +69,19 @@ describe('CenterDiscardPool', () => {
 		expect(target.querySelectorAll('.discard-tile')).toHaveLength(0);
 	});
 
-	it('marks the tile at lastDiscardIndex and no other', () => {
+	// no recency marker: its landing animation overrode the rotated faces' transform.
+	it('renders every tile the same, with no recency marker', () => {
 		const { target } = render(CenterDiscardPool, {
-			seat: mockSeat({ discards: ['1m', '2m', '3m'], name: 'Carol' }),
-			position: 'self',
-			ariaLabel: 'Your discards',
-			lastDiscardIndex: 1
+			seat: mockSeat({ discards: ['1m', '2m', '3m'] }),
+			position: 'left',
+			ariaLabel: 'Discards'
 		});
-		const tiles = target.querySelectorAll('.discard-tile');
-		expect(tiles[0].classList.contains('discard-tile--last')).toBe(false);
-		expect(tiles[1].classList.contains('discard-tile--last')).toBe(true);
-		expect(tiles[2].classList.contains('discard-tile--last')).toBe(false);
-		expect(tiles[1].getAttribute('title')).toBe('Carol discarded');
-	});
-
-	it('marks nothing when lastDiscardIndex is null', () => {
-		const { target } = render(CenterDiscardPool, {
-			seat: mockSeat({ discards: ['1m', '2m'] }),
-			position: 'self',
-			ariaLabel: 'Your discards',
-			lastDiscardIndex: null
-		});
-		expect(target.querySelectorAll('.discard-tile--last')).toHaveLength(0);
+		const tiles = [...target.querySelectorAll('.discard-tile')];
+		expect(tiles.map((t) => t.className.replace(/\s*svelte-\S+/g, ''))).toEqual([
+			'discard-tile',
+			'discard-tile',
+			'discard-tile'
+		]);
+		expect(tiles.some((t) => t.hasAttribute('title'))).toBe(false);
 	});
 });

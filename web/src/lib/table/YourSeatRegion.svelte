@@ -53,6 +53,37 @@
 		? m.yourSeatRegion_seatAriaLabel({ name: seat.name })
 		: m.yourSeatRegion_yourHandAriaLabel()}
 >
+	<!-- melds above the name, toward the centre -->
+	<div
+		class="tile-row meld-row"
+		class:meld-row--empty={!seat.flowers.length && !seat.melds.length}
+		aria-label={spectating
+			? m.yourSeatRegion_meldsAriaLabel({ name: seat.name })
+			: m.yourSeatRegion_yourMeldsAriaLabel()}
+	>
+		{#if seat.flowers.length}
+			<div
+				class="meld"
+				aria-label={spectating
+					? m.yourSeatRegion_flowersAriaLabel({ name: seat.name })
+					: m.yourSeatRegion_yourFlowersAriaLabel()}
+			>
+				{#each seat.flowers as code, i (i)}
+					<div class="mini-tile"><TileFace {code} /></div>
+				{/each}
+			</div>
+		{/if}
+		{#each seat.melds as meld, mi (mi)}
+			<div class="meld">
+				{#each meld.tiles as code, ti (ti)}
+					<div class="mini-tile">
+						<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+					</div>
+				{/each}
+			</div>
+		{/each}
+	</div>
+
 	<header class="seat-meta">
 		<span class="seat-name">{seat.name}</span>
 		<span
@@ -74,37 +105,6 @@
 	</header>
 
 	<div class="your-hand">
-		{#if seat.flowers.length || seat.melds.length}
-			<div
-				class="tile-row meld-row"
-				aria-label={spectating
-					? m.yourSeatRegion_meldsAriaLabel({ name: seat.name })
-					: m.yourSeatRegion_yourMeldsAriaLabel()}
-			>
-				{#if seat.flowers.length}
-					<div
-						class="meld"
-						aria-label={spectating
-							? m.yourSeatRegion_flowersAriaLabel({ name: seat.name })
-							: m.yourSeatRegion_yourFlowersAriaLabel()}
-					>
-						{#each seat.flowers as code, i (i)}
-							<div class="mini-tile"><TileFace {code} /></div>
-						{/each}
-					</div>
-				{/if}
-				{#each seat.melds as meld, mi (mi)}
-					<div class="meld">
-						{#each meld.tiles as code, ti (ti)}
-							<div class="mini-tile">
-								<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
-							</div>
-						{/each}
-					</div>
-				{/each}
-			</div>
-		{/if}
-
 		<!-- spectators get the opponents' tile size: no seat here is "yours" -->
 		{#if spectating && seat.concealedHand}
 			<div
@@ -223,6 +223,10 @@
 
 	.meld {
 		@include tile.meld;
+	}
+
+	.meld-row {
+		@include tile.meld-row-reserved;
 	}
 
 	.your-hand {

@@ -136,4 +136,18 @@ describe('OpponentRegion', () => {
 		// concealed kong renders as backs
 		expect(target.querySelectorAll('.meld-row .tile-face--back')).toHaveLength(4);
 	});
+
+	// first meld/flower must not grow the region and shift the centre discard box.
+	it('reserves the meld row while the seat has no melds or flowers', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat(),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		const row = target.querySelector<HTMLElement>('.meld-row');
+		expect(row).not.toBeNull();
+		expect(row!.classList.contains('meld-row--empty')).toBe(true);
+		expect(parseFloat(getComputedStyle(row!).minBlockSize)).toBeGreaterThan(0);
+	});
 });

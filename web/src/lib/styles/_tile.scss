@@ -1,6 +1,8 @@
 // shared seat/tile-display primitives: seat header row and mini-tile/meld layout used by every
 // seat's hand strip. Mixins, not shared selectors -- Svelte scopes <style> per component.
 
+@use 'layout';
+
 @mixin seat-meta {
 	display: flex;
 	align-items: center;
@@ -54,6 +56,18 @@
 	display: flex;
 	gap: 1px;
 	margin-inline-end: var(--space-2);
+}
+
+// reserved even while empty so a first meld/flower doesn't shift the centre discard box.
+// below 768px an empty row collapses instead.
+@mixin meld-row-reserved($size: clamp(24px, 4vw, 36px)) {
+	min-block-size: $size;
+
+	@include layout.phone-only {
+		&.meld-row--empty {
+			display: none;
+		}
+	}
 }
 
 // sub-768px collapse: opponent backs to a thin overlapping strip, count-only.

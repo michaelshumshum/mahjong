@@ -62,29 +62,28 @@
 			</div>
 		{/if}
 
-		{#if seat.flowers.length || seat.melds.length}
-			<div
-				class="tile-row meld-row"
-				aria-label={m.opponentRegion_meldsAriaLabel({ name: seat.name })}
-			>
-				{#if seat.flowers.length}
-					<div class="meld" aria-label={m.opponentRegion_flowersAriaLabel({ name: seat.name })}>
-						{#each seat.flowers as code, i (i)}
-							<div class="mini-tile"><TileFace {code} /></div>
-						{/each}
-					</div>
-				{/if}
-				{#each seat.melds as meld, mi (mi)}
-					<div class="meld">
-						{#each meld.tiles as code, ti (ti)}
-							<div class="mini-tile">
-								<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
-							</div>
-						{/each}
-					</div>
-				{/each}
-			</div>
-		{/if}
+		<div
+			class="tile-row meld-row"
+			class:meld-row--empty={!seat.flowers.length && !seat.melds.length}
+			aria-label={m.opponentRegion_meldsAriaLabel({ name: seat.name })}
+		>
+			{#if seat.flowers.length}
+				<div class="meld" aria-label={m.opponentRegion_flowersAriaLabel({ name: seat.name })}>
+					{#each seat.flowers as code, i (i)}
+						<div class="mini-tile"><TileFace {code} /></div>
+					{/each}
+				</div>
+			{/if}
+			{#each seat.melds as meld, mi (mi)}
+				<div class="meld">
+					{#each meld.tiles as code, ti (ti)}
+						<div class="mini-tile">
+							<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+						</div>
+					{/each}
+				</div>
+			{/each}
+		</div>
 	</div>
 </section>
 
@@ -198,6 +197,10 @@
 
 	.meld {
 		@include tile.meld;
+	}
+
+	.meld-row {
+		@include tile.meld-row-reserved;
 	}
 
 	// writing-mode reflows the flex axes so width/height already reflect the vertical footprint --

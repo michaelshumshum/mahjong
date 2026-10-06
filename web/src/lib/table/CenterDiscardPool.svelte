@@ -1,33 +1,23 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
 	import type { MockSeatState } from './mock-game-state';
-	import { m } from '$lib/paraglide/messages.js';
 
 	// all four discard pools live in the centre box (docs/frontend.md §3); `position` picks
 	// the box side and, for left/right, the rotation matching that seat's own hand.
 	let {
 		seat,
 		position,
-		ariaLabel,
-		lastDiscardIndex = null
+		ariaLabel
 	}: {
 		seat: MockSeatState;
 		position: 'across' | 'left' | 'right' | 'self';
 		ariaLabel: string;
-		lastDiscardIndex?: number | null;
 	} = $props();
 </script>
 
 <div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
 	{#each seat.discards as code, i (i)}
-		<div
-			class="discard-tile"
-			class:discard-tile--last={i === lastDiscardIndex}
-			role="listitem"
-			title={i === lastDiscardIndex
-				? m.centerDiscardPool_lastDiscardTitle({ name: seat.name })
-				: undefined}
-		>
+		<div class="discard-tile" role="listitem">
 			<TileFace {code} />
 		</div>
 	{/each}
@@ -35,53 +25,25 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
-	@use '$lib/styles/a11y';
 
+	// tracks are sized to the tile's own footprint (long edge --discard-h, short edge
+	// --discard-w) so every pool, rotated or not, gets the same 2px gap between tiles.
 	.discard-pool {
+		--discard-h: clamp(30px, 3.2vw, 44px);
+		--discard-w: calc(var(--discard-h) * 3 / 4);
 		display: grid;
-		grid-template-columns: repeat(6, minmax(26px, 36px));
+		grid-template-columns: repeat(6, var(--discard-w));
 		gap: 2px;
-		max-width: 14rem;
 	}
 
 	.discard-tile {
-		height: clamp(30px, 3.2vw, 44px);
+		height: var(--discard-h);
 	}
 
+	// no thickness/drop shadow here: it bleeds onto the next row of the pool.
 	.discard-tile :global(.tile-face) {
 		height: 100%;
-	}
-
-	// marks the most recent unclaimed discard: an accent underline plus a brief landing pulse.
-	.discard-tile--last {
-		position: relative;
-	}
-
-	.discard-tile--last::after {
-		content: '';
-		position: absolute;
-		inset-inline: 10%;
-		bottom: -3px;
-		height: 2px;
-		border-radius: 1px;
-		background: var(--color-accent);
-	}
-
-	.discard-tile--last :global(.tile-face) {
-		@include a11y.motion-ok {
-			animation: discard-landing var(--dur-2) var(--ease-out);
-		}
-	}
-
-	@keyframes discard-landing {
-		from {
-			transform: scale(1.16);
-			opacity: 0.6;
-		}
-		to {
-			transform: scale(1);
-			opacity: 1;
-		}
+		box-shadow: none;
 	}
 
 	.discard-pool--across {
@@ -114,14 +76,7 @@
 	// here pushes the self seat region off-screen.
 	.discard-pool {
 		@include layout.tablet-up {
-			grid-template-columns: repeat(12, minmax(26px, 36px));
-			max-width: 26rem;
-		}
-	}
-
-	.discard-tile {
-		@include layout.tablet-up {
-			height: clamp(30px, 3.2vw, 44px);
+			grid-template-columns: repeat(12, var(--discard-w));
 		}
 	}
 
@@ -131,7 +86,8 @@
 	.discard-pool--right {
 		@include layout.tablet-up {
 			grid-template-columns: none;
-			grid-template-rows: repeat(6, minmax(30px, 40px));
+			grid-template-rows: repeat(6, var(--discard-w));
+			grid-auto-columns: var(--discard-h);
 			grid-auto-flow: column;
 		}
 	}
@@ -164,8 +120,8 @@
 	.discard-pool--right .discard-tile {
 		@include layout.tablet-up {
 			position: relative;
-			width: clamp(30px, 3.2vw, 44px);
-			height: calc(clamp(30px, 3.2vw, 44px) * 3 / 4);
+			width: var(--discard-h);
+			height: var(--discard-w);
 		}
 	}
 
@@ -174,7 +130,7 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			height: clamp(30px, 3.2vw, 44px);
+			height: var(--discard-h);
 			transform: translate(-50%, -50%) rotate(90deg);
 		}
 	}
@@ -184,7 +140,7 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			height: clamp(30px, 3.2vw, 44px);
+			height: var(--discard-h);
 			transform: translate(-50%, -50%) rotate(-90deg);
 		}
 	}
@@ -193,7 +149,7 @@
 		.discard-pool {
 			grid-template-columns: none;
 			grid-auto-flow: column;
-			grid-auto-columns: minmax(22px, 28px);
+			grid-auto-columns: var(--discard-w);
 			overflow-x: auto;
 			max-width: 100%;
 		}

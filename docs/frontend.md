@@ -116,7 +116,10 @@ asset — `Back.svg` stays only for the canvas mural (§2), which draws tile art
 through `TileFace`.
 
 Discard tiles are `clamp(30px, 3.2vw, 44px)` (up from `clamp(22px, 3.5vw, 36px)`) — legible at
-arm's length without crowding the centre box at 390×844 or 1024×768. `.table-center` carries a
+arm's length without crowding the centre box at 390×844 or 1024×768. Pool grid tracks are sized to the tile's
+own footprint (`--discard-h` long edge, `--discard-w` short edge), so every pool, rotated or not,
+has the same 2px gap. Discard faces drop `TileFace`'s thickness/drop `box-shadow`: it bled onto the
+next row of the pool. `.table-center` carries a
 1px `--color-felt-line` outline (offset `--space-2`) as a zone guide, reading as a dealt-area
 marking on the felt rather than UI chrome.
 
@@ -164,6 +167,11 @@ animated paths.
 
 Side columns are `minmax(88px, auto)`: they hug their vertical strips, so the centre column (and
 your hand under it) gets the rest of the width.
+
+**Meld rows are reserved.** Every seat's meld/flower row (`.meld-row`) is always rendered with a
+`min-block-size` of one mini-tile (`_tile.scss`'s `meld-row-reserved`), so a seat's first meld or
+flower doesn't grow its grid row/column and shift the centre box. Below 768px an empty row
+collapses instead. Your own meld row sits above your name, toward the centre.
 
 **Hand sizing.** The hand sizes to its own seat region, not the viewport:
 `.seat-region--self` is a `container-type: inline-size` container, and `YourSeatRegion`'s
@@ -436,17 +444,12 @@ seat's *resolved* name back: set from `state_sync.names`, kept live from `seat_s
 seats get a random per-table-unique display name (`server/app/table.py`'s `_draw_bot_name`, from
 `_BOT_NAME_POOL`) — cosmetic, not the tier.
 
-### Last-discard marker
+### Last discard
 
-`lastDiscard` is set on `discard`, cleared on `meld` (claimed or not — the marked tile either left
-the pool or the turn moved on) and `hand_start`. `live-view.ts`'s `viewFromClientState()` resolves
-the real `tileId` to that seat's position in its own (unclaimed-filtered) `discards` array —
-`null` once claimed, since the tile no longer appears there. `CenterDiscardPool` marks that index
-with an accent underline and a brief landing pulse (`motion-ok`), plus a `title` tooltip ("`<name>`
-discarded"). A `state_sync` only derives `lastDiscard` for an embedded claim window (needed there
-for `ClaimDialog`'s `sourceSeat`/`tile`) — a resync outside an active claim window loses the
-marker until the next discard, a deliberate, cosmetic-only tradeoff (no wire field names "last
-discard" generally).
+`lastDiscard` is set on `discard`, cleared on `meld` (claimed or not) and `hand_start`. It feeds
+`ClaimDialog`'s `sourceSeat`/`tile` only; a `state_sync` derives it just for an embedded claim
+window. The discard pools carry no recency marker: its landing animation's `transform` overrode
+the side pools' rotated faces for its duration, so they flashed upright.
 
 ### Hand history
 

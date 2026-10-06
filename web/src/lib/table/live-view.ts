@@ -104,15 +104,6 @@ function turnDurationMsFromState(state: ClientGameState): number | null {
 		: null;
 }
 
-/** `state.lastDiscard.tileId` -> this seat's position in its own (unclaimed-filtered) pool, for
- * `CenterDiscardPool`'s marker. `null` once claimed (the tile no longer appears in the pool). */
-function lastDiscardToView(state: ClientGameState): { seat: Seat; index: number } | null {
-	const d = state.lastDiscard;
-	if (!d) return null;
-	const index = state.discardPools[d.seat].indexOf(d.tileId);
-	return index === -1 ? null : { seat: d.seat as Seat, index };
-}
-
 function handEndHoldMsFromState(state: ClientGameState): number | null {
 	// same anchored-deadline shape as turnDurationMsFromState; null when there's no open hold.
 	return state.handEndDeadlineTs !== null
@@ -184,8 +175,7 @@ export function viewFromClientState(
 		handResult: handResultToView(state),
 		handEndHoldMs: handEndHoldMsFromState(state),
 		turnDurationMs: turnDurationMsFromState(state),
-		you,
-		lastDiscard: lastDiscardToView(state)
+		you
 	};
 
 	return { view, ownHand };
