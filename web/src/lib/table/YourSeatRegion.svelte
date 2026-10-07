@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flip } from 'svelte/animate';
 	import TileFace from './TileFace.svelte';
 	import SeatPlate from './SeatPlate.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
@@ -7,6 +8,7 @@
 	import TileOptionLabel from '$lib/ui/TileOptionLabel.svelte';
 	import type { DiscardMode } from '$lib/ui/Settings.svelte';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
+	import { motionMs } from '$lib/ui/motion';
 	import { m } from '$lib/paraglide/messages.js';
 
 	// how long a sent discard waits for the server echo before a stalled indicator (§5) --
@@ -40,7 +42,9 @@
 		discardableTileIds,
 		discardMode,
 		onDiscard,
-		declareOptions
+		declareOptions,
+		sealStamp = null,
+		scoreDelta = null
 	}: {
 		seat: MockSeatState;
 		spectating: boolean;
@@ -52,6 +56,8 @@
 		discardMode: DiscardMode;
 		onDiscard: (tileId: number) => void;
 		declareOptions: DeclareOption[];
+		sealStamp?: { glyph: string; key: number } | null;
+		scoreDelta?: { value: number; key: number } | null;
 	} = $props();
 
 	// two-step: the lifted tile is presentation-only state, never game truth. A second tap/Enter
@@ -164,6 +170,8 @@
 		dealerTitle={m.yourSeatRegion_dealerBadgeTitle()}
 		score={seat.score}
 		isTurn={seat.seat === turn}
+		{sealStamp}
+		{scoreDelta}
 	/>
 
 	<div class="your-hand">
@@ -194,33 +202,39 @@
 				bind:this={handRowEl}
 			>
 				{#each ownHandTiles as tile (tile.key)}
-					{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
-						{@const lifted = liftedTileId === tile.tileId}
-						{@const pending = pendingTileId === tile.tileId}
-						<button
-							type="button"
-							class="hand-tile hand-tile-btn"
-							class:hand-tile--drawn={tile.drawn}
-							class:hand-tile--lifted={lifted}
-							class:hand-tile--pending={pending}
-							disabled={pending}
-							aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
-							onclick={() => handleTileActivate(tile.tileId as number)}
-						>
-							<TileFace code={tile.code} />
-							{#if pending}
-								<span
-									class="pending-spinner"
-									class:pending-spinner--stalled={pendingStalled}
-									aria-hidden="true"
-								></span>
-							{/if}
-						</button>
-					{:else}
-						<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
-							<TileFace code={tile.code} />
-						</div>
-					{/if}
+					<div
+						class="hand-tile-slot"
+						class:hand-tile-slot--drawn={tile.drawn}
+						animate:flip={{ duration: motionMs(220) }}
+					>
+						{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
+							{@const lifted = liftedTileId === tile.tileId}
+							{@const pending = pendingTileId === tile.tileId}
+							<button
+								type="button"
+								class="hand-tile hand-tile-btn"
+								class:hand-tile--drawn={tile.drawn}
+								class:hand-tile--lifted={lifted}
+								class:hand-tile--pending={pending}
+								disabled={pending}
+								aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
+								onclick={() => handleTileActivate(tile.tileId as number)}
+							>
+								<TileFace code={tile.code} />
+								{#if pending}
+									<span
+										class="pending-spinner"
+										class:pending-spinner--stalled={pendingStalled}
+										aria-hidden="true"
+									></span>
+								{/if}
+							</button>
+						{:else}
+							<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
+								<TileFace code={tile.code} />
+							</div>
+						{/if}
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -276,6 +290,7 @@
 
 	.meld {
 		@include tile.meld;
+		@include tile.meld-enter;
 	}
 
 	.meld-row {
@@ -302,22 +317,30 @@
 		display: flex;
 	}
 
-	.hand-tile {
+	// the flip-animated flex item -- the inner button/div just fills it. animate: needs the
+	// each-block's sole child, so the slot, not the tile itself, carries it.
+	.hand-tile-slot {
 		flex: none;
 		width: var(--hand-tile-w);
 		height: calc(var(--hand-tile-w) * 4 / 3);
 	}
 
-	.hand-tile + .hand-tile {
+	.hand-tile-slot + .hand-tile-slot {
 		margin-inline-start: var(--hand-step);
+	}
+
+	.hand-row .hand-tile-slot--drawn {
+		margin-inline-start: calc(var(--hand-drawn-gap) + var(--hand-step));
+	}
+
+	.hand-tile {
+		display: block;
+		width: 100%;
+		height: 100%;
 	}
 
 	.hand-tile :global(.tile-face) {
 		height: 100%;
-	}
-
-	.hand-row .hand-tile--drawn {
-		margin-inline-start: calc(var(--hand-drawn-gap) + var(--hand-step));
 	}
 
 	// same box as the plain .hand-tile div -- a button reset, not a second style.

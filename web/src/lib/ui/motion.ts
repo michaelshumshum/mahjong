@@ -16,3 +16,9 @@ export function isMotionReduced(root: HTMLElement = document.documentElement): b
 	if (pref === 'full') return false;
 	return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+
+/** A JS-driven duration (`animate:flip`, `transition:`) that collapses to 0ms under reduced
+ * motion, same resolution as the CSS mixins -- never a per-frame ticker, just the one number. */
+export function motionMs(ms: number, root: HTMLElement = document.documentElement): number {
+	return isMotionReduced(root) ? 0 : ms;
+}

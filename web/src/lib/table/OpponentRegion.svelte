@@ -9,9 +9,17 @@
 		seat,
 		position,
 		dealer,
-		turn
-	}: { seat: MockSeatState; position: 'across' | 'left' | 'right'; dealer: Seat; turn: number } =
-		$props();
+		turn,
+		sealStamp = null,
+		scoreDelta = null
+	}: {
+		seat: MockSeatState;
+		position: 'across' | 'left' | 'right';
+		dealer: Seat;
+		turn: number;
+		sealStamp?: { glyph: string; key: number } | null;
+		scoreDelta?: { value: number; key: number } | null;
+	} = $props();
 </script>
 
 <section
@@ -27,6 +35,8 @@
 		dealerTitle={m.opponentRegion_dealerBadgeTitle()}
 		score={seat.score}
 		isTurn={seat.seat === turn}
+		{sealStamp}
+		{scoreDelta}
 	>
 		{#snippet badges()}
 			{#if seat.status === 'bot'}<span class="bot-badge" title={m.opponentRegion_botBadgeTitle()}
@@ -172,6 +182,7 @@
 
 	.meld {
 		@include tile.meld;
+		@include tile.meld-enter;
 	}
 
 	.meld-row {

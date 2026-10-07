@@ -77,6 +77,7 @@ row, so scrolling runs on the compositor with no per-frame paint or JS.
 | Resize | the grid is persistent — a resize only appends cells to cover the new viewport, never re-rolls placed ones, so a spurious `resize` (webfont swap, scrollbar toggle) can't read as the mural "switching". Unchanged `innerWidth`/`innerHeight` short-circuits the handler |
 | Scroll | the canvas is one row taller than the viewport; `@keyframes mural-scroll` translates it up by exactly one row, and each `animationiteration` (dispatched before that frame paints) advances `topRow` and redraws, so the reset is invisible. The grid grows rather than wrapping (wrapping reads as the layout snapping back) |
 | Blur | CSS `filter` on the canvas itself, not a `backdrop-filter` on the scrim. The earlier `requestAnimationFrame` loop repainted the full-viewport canvas every frame, even while hidden, with a full-viewport `backdrop-filter` re-sampling it. The cursor flickered over every clickable element on macOS Chrome |
+| Atmosphere (P3) | `blur(4px) brightness(0.42) saturate(0.55)` on the canvas, plus a darker centre scrim, read calmer behind the lobby/tables/waiting-room content column than P0's first pass — tuned in the scrim/filter values only, the CSS-transform scroll (below) is unchanged |
 
 **Mounted once, shared across routes.** The mural shows on `/`, `/tables`, and `/table/[id]`'s
 pre-game states — never on the game table itself, mock or live. It is mounted once in the root
@@ -386,6 +387,24 @@ through `lib/net/server-error-messages.ts`'s `serverErrorToastMessage()` — the
 `bad_secret`, `not_joined`) get a human Paraglide message; an unrecognized code falls back to the
 raw wire message via `tablePage_serverErrorToast`.
 
+### Motion (P3)
+
+Durations come from `lib/ui/motion.ts`'s `motionMs(ms)` (JS) or the `_a11y.scss` `motion-ok` mixin
+(CSS) — both collapse to 0ms under reduced motion, never a second code path.
+
+| Surface | Mechanism |
+| --- | --- |
+| Own hand reflow | `YourSeatRegion`'s hand tiles are keyed `{#each ownHandTiles as tile (tile.key)}` with `animate:flip` on a wrapper (`.hand-tile-slot` — `animate:` needs the each-block's sole child, so the slot carries it and the interactive/static tile swap happens inside) |
+| Discard settle | `CenterDiscardPool`'s landing tile slides in a short distance from the discarder's own side (`--discard-enter-x/y`, set per `.discard-pool--*`) plus the existing scale pulse, both via `--ease-place`. `translate`/`scale` are independent CSS properties from `transform`, so this composes with the side pools' static rotate `transform` instead of replacing it — a prior version animated `transform` directly and overrode the rotated faces |
+| Meld slide-in | `_tile.scss`'s `meld-enter` mixin (`@include tile.meld-enter` alongside `@include tile.meld`) — plays automatically on DOM insert, same `demo-meld-in` pattern `AnimationDemoPanel` proved out first |
+| Claim seal stamp | `SeatPlate`'s `sealStamp` prop (`{glyph, key}`, keyed so the CSS entrance replays on a repeat): the call glyph (碰/上/槓) scales 1.4→1 with a slight rotate and ink-fades out. `+page.svelte` derives the signal off a seat's `melds.length` growing between renders — presentation only, never game truth, and never set under reduced motion (the information is redundant with the meld tile itself) |
+| Score-delta chips | `SeatPlate`'s `scoreDelta` prop (`{value, key}`), derived off `handResult.payments` once per hand end, floats up and fades near the plate — same transient-signal pattern as the seal stamp |
+| Haptics | `lib/ui/haptics.ts`'s `vibrate(ms)`: `navigator.vibrate`, feature-detected to `(pointer: coarse)` so it's a no-op on desktop. Fired on your turn starting and a claim offer landing, gated on the new `ClientPrefs.haptics` (default on, separate from `motion`) |
+
+Both the seal stamp and score-delta chip have no mock-scenario trigger (the frozen fixtures never
+produce the state transition that fires them) — `AnimationDemoPanel` previews them directly on a
+real `SeatPlate` instance instead, with buttons that call the same prop shape `+page.svelte` does.
+
 ## 6. Client state
 
 ```ts
@@ -482,7 +501,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | --- | --- | --- |
 | `mahjong:seat:v2:<tableId>` | this browser's seat at that table (`saveSeatForTable`/`loadSeatForTable`) | saved the moment `state_sync` confirms a seat; fed back into `connect()` on mount. Without it a reload falls into the seat picker and `join` fails with `table_full` |
 | `mahjong:reconnectSecret:v2:<tableId>` | `join`'s `reconnect_secret` (`saveSecretForTable`/`loadSecretForTable`) | presented on every `hello{seat, secret}` ([architecture.md §2.1](architecture.md)); stale `v1` keys are swept on load |
-| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode` | purely local; `discardMode` postdates this key, so `loadClientPrefs` defaults it when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
+| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics` | purely local; `discardMode`/`haptics` postdate this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |

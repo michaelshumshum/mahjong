@@ -57,23 +57,41 @@
 		box-shadow: none;
 	}
 
-	// landing pulse on the most recent discard. animates the standalone `scale` property, which
-	// composes with the side pools' rotate `transform` instead of replacing it.
+	// landing settle: a short slide from the discarder's side plus the scale pulse. translate/
+	// scale are independent of `transform`, so this composes with the side pools' own rotate.
 	.discard-tile--last :global(.tile-face) {
 		@include a11y.motion-ok {
-			animation: discard-landing var(--dur-2) var(--ease-out);
+			animation: discard-landing var(--dur-3) var(--ease-place);
 		}
 	}
 
 	@keyframes discard-landing {
 		from {
+			translate: var(--discard-enter-x, 0) var(--discard-enter-y, 0);
 			scale: 1.16;
 			opacity: 0.6;
 		}
 		to {
+			translate: 0 0;
 			scale: 1;
 			opacity: 1;
 		}
+	}
+
+	.discard-pool--across .discard-tile--last :global(.tile-face) {
+		--discard-enter-y: -10px;
+	}
+
+	.discard-pool--left .discard-tile--last :global(.tile-face) {
+		--discard-enter-x: -10px;
+	}
+
+	.discard-pool--right .discard-tile--last :global(.tile-face) {
+		--discard-enter-x: 10px;
+	}
+
+	.discard-pool--self .discard-tile--last :global(.tile-face) {
+		--discard-enter-y: 10px;
 	}
 
 	.discard-pool--across {
