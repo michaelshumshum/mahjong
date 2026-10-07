@@ -97,7 +97,7 @@
 		padding: 0 var(--space-2);
 		border-radius: var(--radius-sm);
 		border: 1px solid var(--color-accent);
-		color: var(--color-accent);
+		color: var(--color-accent-on-dark);
 		font-weight: 700;
 		@include a11y.motion-ok {
 			animation: connection-pill-pulse 1.4s ease-in-out infinite;

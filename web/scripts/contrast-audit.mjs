@@ -110,6 +110,8 @@ const rows = [
 		over(black, 0.55, T['felt-lit']),
 		4.5
 	],
+	['connection pill (accent-on-dark)', 'bg', T['accent-on-dark'], T.bg, 4.5],
+	['score-sheet round toggle hover (accent-on-dark)', 'bg', T['accent-on-dark'], T.bg, 4.5],
 	['open-table chip (positive)', 'surface', T.positive, T.surface, 4.5]
 ];
 const out = rows.map(([fg, bg, f, b, need]) => ({

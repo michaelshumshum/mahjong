@@ -936,6 +936,8 @@ lightest felt stop, so every felt row is the worst case too. Measured (P4):
 | - delta chip | negative 14% on surface-raised | 4.77 | 4.5 |
 | + score-delta float | black 55% pill on felt-lit | 8.20 | 4.5 |
 | - score-delta float | black 55% pill on felt-lit | 5.97 | 4.5 |
+| connection pill (accent-on-dark) | bg | 7.43 | 4.5 |
+| score-sheet round toggle hover (accent-on-dark) | bg | 7.43 | 4.5 |
 | open-table chip (positive) | surface | 9.30 | 4.5 |
 
 Fixes this audit drove: the mural scrim's outer stops went 0.42/0.28 → 0.52/0.5 (muted text measured
@@ -943,7 +945,8 @@ Fixes this audit drove: the mural scrim's outer stops went 0.42/0.28 → 0.52/0.
 `--color-accent-on-dark` (accent on felt was 1.66:1); the dealer badge's fill darkened to 85% accent
 (4.28:1); `--color-negative` `#ef7a6b` → `#f2857a` (4.42:1 on its own chip); the floating score-delta
 chip got a dark pill (bare on felt: 3.95/2.62); the error toast icon uses `--color-accent-on-dark`
-(2.87:1). `--font-size-xs` rose 0.7 → 0.75rem: chip/badge text is bold but not "large" by WCAG's
+(2.87:1); so do the toolbar's connection pill and the score-sheet round toggle's hover (accent on
+`--color-bg` was 3.42:1). `--font-size-xs` rose 0.7 → 0.75rem: chip/badge text is bold but not "large" by WCAG's
 definition, so it gets no 3:1 allowance — every xs row above is held to 4.5.
 
 Conventions:

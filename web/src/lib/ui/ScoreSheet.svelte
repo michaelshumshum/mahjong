@@ -401,7 +401,7 @@
 		&:hover {
 			border-color: var(--color-accent);
 			background: var(--color-bg);
-			color: var(--color-accent);
+			color: var(--color-accent-on-dark);
 		}
 	}
 
