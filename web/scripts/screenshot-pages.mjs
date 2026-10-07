@@ -53,6 +53,14 @@ const LOBBY_TABLES = [
 	}
 ];
 
+// phones collapse the mock scenario buttons into a disclosure (MockTableToolbar); open it first
+// so the same accessible names work at every viewport.
+async function pickScenario(page, name) {
+	const closed = page.locator('[data-testid="scenario-disclosure"]:not([open]) > summary');
+	if (await closed.isVisible()) await closed.click();
+	await page.getByRole('button', { name }).click();
+}
+
 // The "notable pages" list — keep this curated and small (this is what ends up in the
 // README), not exhaustive. Add a page here when it becomes a meaningful, stable part of the
 // app; don't add every mock scenario. `viewport` defaults to DESKTOP.
@@ -77,14 +85,14 @@ const PAGES = [
 		name: 'table-claim-window',
 		url: '/table/demo123?mock=1',
 		async before(page) {
-			await page.getByRole('button', { name: 'Claim window open (you)' }).click();
+			await pickScenario(page, 'Claim window open (you)');
 		}
 	},
 	{
 		name: 'table-hand-ended',
 		url: '/table/demo123?mock=1',
 		async before(page) {
-			await page.getByRole('button', { name: 'Hand just ended' }).click();
+			await pickScenario(page, 'Hand just ended');
 			await page.waitForTimeout(HAND_END_REVEAL_MS);
 		}
 	},
@@ -95,7 +103,7 @@ const PAGES = [
 		name: 'table-hand-ended-draw',
 		url: '/table/demo123?mock=1',
 		async before(page) {
-			await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
+			await pickScenario(page, 'Hand ended in a draw');
 			await page.waitForTimeout(150);
 		}
 	},
@@ -107,7 +115,7 @@ const PAGES = [
 		name: 'table-game-ended',
 		url: '/table/demo123?mock=1&practice=1',
 		async before(page) {
-			await page.getByRole('button', { name: 'Game just ended' }).click();
+			await pickScenario(page, 'Game just ended');
 			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	},
@@ -142,7 +150,7 @@ const PAGES = [
 		url: '/table/demo123?mock=1',
 		viewport: PHONE,
 		async before(page) {
-			await page.getByRole('button', { name: 'Claim window open (you)' }).click();
+			await pickScenario(page, 'Claim window open (you)');
 		}
 	},
 	{
@@ -150,7 +158,7 @@ const PAGES = [
 		url: '/table/demo123?mock=1',
 		viewport: PHONE,
 		async before(page) {
-			await page.getByRole('button', { name: 'Hand just ended' }).click();
+			await pickScenario(page, 'Hand just ended');
 			await page.waitForTimeout(HAND_END_REVEAL_MS);
 		}
 	},
@@ -159,7 +167,7 @@ const PAGES = [
 		url: '/table/demo123?mock=1&practice=1',
 		viewport: PHONE,
 		async before(page) {
-			await page.getByRole('button', { name: 'Game just ended' }).click();
+			await pickScenario(page, 'Game just ended');
 			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	}

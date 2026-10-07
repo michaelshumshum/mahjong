@@ -978,6 +978,13 @@ garbage placeholders. Use the variant-array form:
 
 zh-Hant has no grammatical plural; every variant there is the same phrasing.
 
+**Mock toolbar on phones.** Below `phone-only` `MockTableToolbar`'s scenario buttons collapse into a
+`<details>` disclosure whose summary shows the active scenario; picking one closes it. The buttons
+are the same elements, so `getByRole('button', {name})` works once it's open —
+`scripts/screenshot-pages.mjs`'s `pickScenario()` opens it first. Tablet-up holds it open with
+the summary hidden (the old flat row). The wall/prevailing status hides there too (the hub's compact
+row shows it).
+
 **Not translated, deliberately:** fixture/dev-only strings — `mock-game-state.ts`'s
 `MOCK_SCENARIOS` labels and `MockTableToolbar`'s scenario picker (read verbatim by
 `table.e2e.ts`), `AnimationDemoPanel` controls, demo `data-testid` readouts. `lib/table/wind.ts`'s

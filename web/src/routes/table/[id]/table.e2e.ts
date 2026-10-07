@@ -208,6 +208,23 @@ for (const [width, height] of [
 	});
 }
 
+test('phone mock toolbar collapses the scenario picker into a disclosure with the same buttons', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	const disclosure = page.getByTestId('scenario-disclosure');
+	await expect(disclosure).not.toHaveAttribute('open');
+	await expect(page.getByRole('button', { name: 'Hand just ended' })).toBeHidden();
+	await disclosure.locator('summary').click();
+	await page.getByRole('button', { name: 'Hand just ended' }).click();
+	await expect(page.getByTestId('faan-overlay')).toBeVisible();
+	await expect(disclosure).not.toHaveAttribute('open');
+	await expect(disclosure.locator('summary')).toContainText('Hand just ended');
+});
+
 test('desktop-width viewport does not apply the sticky self-hand collapse', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 800 });
 	await page.goto('/table/abc123?mock=1');
