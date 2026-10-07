@@ -32,7 +32,8 @@
 	width: 1.25rem;
 	height: 1.25rem;
 	border-radius: 50%;
-	background: var(--color-accent);
+	// darkened: --color-text on the plain accent is 4.28:1.
+	background: color-mix(in srgb, var(--color-accent) 85%, black);
 	color: var(--color-text);
 	font-size: var(--font-size-xs);
 	font-weight: 700;

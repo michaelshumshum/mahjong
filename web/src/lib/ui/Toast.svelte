@@ -58,7 +58,7 @@
 	}
 
 	.toast--error {
-		--toast-accent: var(--color-accent);
+		--toast-accent: var(--color-accent-on-dark);
 	}
 
 	.toast .icon {

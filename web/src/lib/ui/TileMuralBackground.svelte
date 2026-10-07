@@ -236,12 +236,13 @@
 		inset: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
-		// darker in the middle, where lobby/pre-game copy sits over the mural.
+		// darker in the middle, where lobby/pre-game copy sits; >= 0.5 everywhere keeps
+		// --color-text-muted at 4.5:1 even over a lit tile face (frontend.md §8 contrast table).
 		background: radial-gradient(
 			ellipse 70% 60% at 50% 50%,
 			rgb(0 0 0 / 0.72),
-			rgb(0 0 0 / 0.42) 75%,
-			rgb(0 0 0 / 0.28)
+			rgb(0 0 0 / 0.52) 75%,
+			rgb(0 0 0 / 0.5)
 		);
 		transition: opacity 220ms ease;
 	}

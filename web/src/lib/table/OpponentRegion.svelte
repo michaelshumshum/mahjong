@@ -158,13 +158,13 @@
 	.status-chip--away {
 		border: 1px solid var(--color-status-error);
 		color: var(--color-status-error);
-		background: rgb(0 0 0 / 0.15);
+		background: rgb(0 0 0 / 0.45);
 	}
 
 	.status-chip--autoplay {
 		border: 1px solid var(--color-accent);
-		color: var(--color-accent);
-		background: rgb(0 0 0 / 0.15);
+		color: var(--color-accent-on-dark);
+		background: rgb(0 0 0 / 0.45);
 	}
 
 	.seat-hand-strip {

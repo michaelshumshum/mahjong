@@ -77,7 +77,7 @@ row, so scrolling runs on the compositor with no per-frame paint or JS.
 | Resize | the grid is persistent — a resize only appends cells to cover the new viewport, never re-rolls placed ones, so a spurious `resize` (webfont swap, scrollbar toggle) can't read as the mural "switching". Unchanged `innerWidth`/`innerHeight` short-circuits the handler |
 | Scroll | the canvas is one row taller than the viewport; `@keyframes mural-scroll` translates it up by exactly one row, and each `animationiteration` (dispatched before that frame paints) advances `topRow` and redraws, so the reset is invisible. The grid grows rather than wrapping (wrapping reads as the layout snapping back) |
 | Blur | CSS `filter` on the canvas itself, not a `backdrop-filter` on the scrim. The earlier `requestAnimationFrame` loop repainted the full-viewport canvas every frame, even while hidden, with a full-viewport `backdrop-filter` re-sampling it. The cursor flickered over every clickable element on macOS Chrome |
-| Atmosphere (P3) | `blur(4px) brightness(0.42) saturate(0.55)` on the canvas, plus a darker centre scrim, read calmer behind the lobby/tables/waiting-room content column than P0's first pass — tuned in the scrim/filter values only, the CSS-transform scroll (below) is unchanged |
+| Atmosphere (P3) | `blur(4px) brightness(0.42) saturate(0.55)` on the canvas, plus a darker centre scrim, read calmer behind the lobby/tables/waiting-room content column than P0's first pass — tuned in the scrim/filter values only, the CSS-transform scroll (below) is unchanged. P4's contrast audit (§8) raised the scrim's outer stops to ≥ 0.5 so muted text holds 4.5:1 anywhere |
 
 **Mounted once, shared across routes.** The mural shows on `/`, `/tables`, and `/table/[id]`'s
 pre-game states — never on the game table itself, mock or live. It is mounted once in the root
@@ -879,7 +879,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | chrome | `--color-bg/surface/surface-raised/border/text/text-muted` | walnut app chrome |
 | table materials | `--color-rim`, `--color-rim-hi`, `--color-felt`, `--color-felt-deep`, `--color-felt-lit`, `--color-felt-line`, `--color-text-on-felt`, `--color-felt-muted` | dark green felt inside a walnut rim, applied to `.table-surface` (`routes/table/[id]/+page.svelte`) |
 | tile body | `--color-tile`, `--color-tile-ink`, `--color-tile-edge`, `--color-tile-side`, `--color-tile-back`, `--color-tile-back-edge` | face, edge/side layers, jade back |
-| signal | `--color-accent`, `--color-accent-glow` | the one urgent signal (turn, claim window, win marker); never decorative |
+| signal | `--color-accent`, `--color-accent-glow`, `--color-accent-on-dark` | the one urgent signal (turn, claim window, win marker); never decorative. `-on-dark` is the same signal as text/icon on dark chrome or felt, where the accent itself is under 3:1 |
 | highlight | `--color-brass` | selection, focus ring, your own seat, dealer; never a signal |
 | deltas | `--color-positive`, `--color-negative` | score/faan gains and losses only |
 | seats | `--color-seat-right/across/left` | opponent seat hues (self uses brass) |
@@ -887,6 +887,48 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
 | motion | `--dur-1` 120ms … `--dur-4` 600ms, `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
 | layers | `--z-table/tiles/hud/overlay/modal/toast` | modal dialogs are in the top layer, which no z-index reaches; toasts move into the open dialog instead (§5 Toasts) |
+
+### Contrast audit
+
+`web/scripts/contrast-audit.mjs` reads the colour tokens straight from `_tokens.scss`, composites
+each translucent layer onto the background it really sits on, and exits non-zero if any pair is
+under WCAG AA (4.5:1 text, 3:1 icons/UI). "Mural" is the worst case: a lit ivory tile face under the
+canvas filter (`brightness(0.42) saturate(0.55)`) behind the scrim at that radius. `felt-lit` is the
+lightest felt stop, so every felt row is the worst case too. Measured (P4):
+
+| Text | Background | Ratio | Needs |
+| --- | --- | --- | --- |
+| text-muted | surface-raised | 5.54 | 4.5 |
+| text-muted | surface | 6.16 | 4.5 |
+| text-muted | bg | 6.61 | 4.5 |
+| felt-muted | felt-lit (lightest felt) | 4.64 | 4.5 |
+| text-on-felt | felt-lit | 6.24 | 4.5 |
+| text-muted | mural, scrim 0.72 (centre) | 6.25 | 4.5 |
+| text-muted | mural, scrim 0.52 (75%) | 4.88 | 4.5 |
+| text-muted | mural, scrim 0.5 (edge) | 4.75 | 4.5 |
+| text | mural, scrim 0.5 (edge) | 10.51 | 4.5 |
+| bot badge text-muted (felt override) | surface-raised | 9.83 | 4.5 |
+| status-chip away (status-error) | black 45% on felt-lit | 4.69 | 4.5 |
+| status-chip autoplay (accent-on-dark) | black 45% on felt-lit | 5.41 | 4.5 |
+| dealer badge text | accent 85% + black | 5.49 | 4.5 |
+| hub min-faan chip (felt-muted) | black 12% on felt-lit | 5.48 | 4.5 |
+| toast text | surface-raised | 12.27 | 4.5 |
+| toast warn icon (status-error) | surface-raised | 5.40 | 3 |
+| toast error icon (accent-on-dark) | surface-raised | 6.23 | 3 |
+| toast info icon (text-muted) | surface-raised | 5.54 | 3 |
+| + delta chip | positive 16% on surface-raised | 5.94 | 4.5 |
+| - delta chip | negative 14% on surface-raised | 4.77 | 4.5 |
+| + score-delta float | black 55% pill on felt-lit | 8.20 | 4.5 |
+| - score-delta float | black 55% pill on felt-lit | 5.97 | 4.5 |
+| open-table chip (positive) | surface | 9.30 | 4.5 |
+
+Fixes this audit drove: the mural scrim's outer stops went 0.42/0.28 → 0.52/0.5 (muted text measured
+4.22/3.42 there); status chips' backing 15% → 45% black and autoplay text to
+`--color-accent-on-dark` (accent on felt was 1.66:1); the dealer badge's fill darkened to 85% accent
+(4.28:1); `--color-negative` `#ef7a6b` → `#f2857a` (4.42:1 on its own chip); the floating score-delta
+chip got a dark pill (bare on felt: 3.95/2.62); the error toast icon uses `--color-accent-on-dark`
+(2.87:1). `--font-size-xs` rose 0.7 → 0.75rem: chip/badge text is bold but not "large" by WCAG's
+definition, so it gets no 3:1 allowance — every xs row above is held to 4.5.
 
 Conventions:
 

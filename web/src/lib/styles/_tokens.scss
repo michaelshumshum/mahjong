@@ -34,13 +34,15 @@
 	// the ONE urgent signal (turn/claim window/win-marker), never decorative.
 	--color-accent: #c23b2e;
 	--color-accent-glow: rgb(200 55 45 / 0.45);
+	// the accent as text/icon on dark chrome or felt, where --color-accent itself is under 3:1.
+	--color-accent-on-dark: #f4877a;
 
 	// selection/highlight and your own seat; never a signal.
 	--color-brass: #d6ae5c;
 
 	// score/faan deltas only, tuned for contrast on both felt and walnut.
 	--color-positive: #7fd1a3;
-	--color-negative: #ef7a6b;
+	--color-negative: #f2857a;
 
 	// distinct hue from both accents so an error state never reads as either one.
 	--color-status-error: #e77e40;
@@ -73,7 +75,7 @@
 	// one family throughout; 'Noto Sans HK' fallback covers CJK faan pattern names (平糊, 對對糊).
 	--font-family-base: 'Schibsted Grotesk', 'Noto Sans HK', sans-serif;
 	// below the scale's floor deliberately — badge/chip text only, never body copy.
-	--font-size-xs: 0.7rem;
+	--font-size-xs: 0.75rem;
 	--font-size-sm: 0.875rem;
 	--font-size-base: 1rem;
 	--font-size-lg: 1.375rem;

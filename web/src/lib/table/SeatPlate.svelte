@@ -97,6 +97,10 @@
 		position: absolute;
 		top: -1.4rem;
 		left: 50%;
+		padding: 0 var(--space-1);
+		border-radius: var(--radius-sm);
+		// a dark pill: bare delta colours on lit felt are under 4:1.
+		background: rgb(0 0 0 / 0.55);
 		font-size: var(--font-size-sm);
 		font-weight: 700;
 		font-variant-numeric: tabular-nums;
