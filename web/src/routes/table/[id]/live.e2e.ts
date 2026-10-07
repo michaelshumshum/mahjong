@@ -49,7 +49,12 @@ test.beforeAll(async () => {
 	backend = spawn(
 		'uv',
 		['run', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', String(BACKEND_PORT)],
-		{ cwd: SERVER_DIR, stdio: 'pipe', detached: true }
+		{
+			cwd: SERVER_DIR,
+			stdio: 'pipe',
+			detached: true,
+			env: { ...process.env, CORS_ORIGINS: BASE }
+		}
 	);
 	frontend = spawn(
 		'pnpm',
@@ -58,7 +63,11 @@ test.beforeAll(async () => {
 			cwd: WEB_DIR,
 			stdio: 'pipe',
 			detached: true,
-			env: { ...process.env, PUBLIC_WS_URL: `ws://127.0.0.1:${BACKEND_PORT}/ws` }
+			env: {
+				...process.env,
+				PUBLIC_WS_URL: `ws://127.0.0.1:${BACKEND_PORT}/ws`,
+				PUBLIC_API_URL: `http://127.0.0.1:${BACKEND_PORT}`
+			}
 		}
 	);
 	await Promise.all([
@@ -186,6 +195,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 		await forceOneTapDiscard(page);
 		await page.goto(BASE, { waitUntil: 'networkidle' });
 		await page.getByTestId('lobby-practice-bots').click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
 
 		await expect(page).toHaveURL(/\/table\/[A-Z0-9]+\?practice=1$/);
 
@@ -200,7 +210,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 
 		// each bot's server-assigned name renders alongside the badge, not in place of it. Each
 		// draws its own random pun name, so this only asserts non-empty and distinct.
-		const botSeatNames = page.locator('.seat-meta:has(.bot-badge) .seat-name');
+		const botSeatNames = page.locator('.seat-plate:has(.bot-badge) .seat-name');
 		await expect(botSeatNames).toHaveCount(3);
 		const names = await botSeatNames.allTextContents();
 		for (const name of names) {
@@ -338,6 +348,7 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 		await forceOneTapDiscard(page);
 		await page.goto(BASE, { waitUntil: 'networkidle' });
 		await page.getByTestId('lobby-practice-bots').click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
 		await page.locator('.seat-ring-slot--open').click();
 		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
 
