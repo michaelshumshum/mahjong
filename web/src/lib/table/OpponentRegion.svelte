@@ -273,6 +273,13 @@
 			align-items: center;
 		}
 
+		// a third of a phone is too narrow for name + wind + badges + score on one line.
+		.seat-region :global(.seat-plate) {
+			flex-wrap: wrap;
+			gap: 0 var(--space-1);
+			min-width: 0;
+		}
+
 		.backs-row {
 			flex-wrap: nowrap;
 			align-items: center;
