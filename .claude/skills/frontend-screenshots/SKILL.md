@@ -62,7 +62,8 @@ Desktop: `lobby`, `lobby-create-dialog`, `tables`, `table-your-turn`, `table-cla
 `table-hand-ended`, `table-hand-ended-draw`, `table-game-ended`, `table-settings`,
 `table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting`.
 
-Phone (390×844): `lobby-phone`, `table-your-turn-phone`, `table-claim-window-phone` — the
+Phone (390×844): `lobby-phone`, `table-your-turn-phone`, `table-claim-window-phone`,
+`table-hand-ended-phone`, `table-game-ended-phone` — the
 phone layout (docs/frontend.md §3) differs enough that a desktop capture says nothing about it.
 Look at these after any layout change too.
 

@@ -914,7 +914,7 @@ sets `data-tile="<code>"` as the locale-independent hook specs match on.
 Tests assert on `data-testid`/stable classes for core flows, not English wording. Locale switching
 and SSR `<html lang>` have e2e coverage (`lib/i18n/locale-switch.e2e.ts`, `hooks.server.e2e.ts`).
 
-The zh-Hant file (406/406 keys, parity-checked) is machine-generated and not yet reviewed by a
+The zh-Hant file (484/484 keys, parity-checked) is machine-generated and not yet reviewed by a
 fluent Hong Kong mahjong player.
 
 ### Accessibility

@@ -23,6 +23,10 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const DESKTOP = { width: 1400, height: 900 };
 // iPhone 12-14 logical size -- the phone layout (docs/frontend.md §3) below 768px.
 const PHONE = { width: 390, height: 844 };
+// the hand-end/game-end panels stagger their entrance (tiles, then faan rows, then payments);
+// capture once it has settled, not mid-reveal.
+const HAND_END_REVEAL_MS = 2500;
+const GAME_END_REVEAL_MS = 1200;
 
 const LOBBY_TABLES = [
 	{
@@ -81,7 +85,7 @@ const PAGES = [
 		url: '/table/demo123?mock=1',
 		async before(page) {
 			await page.getByRole('button', { name: 'Hand just ended' }).click();
-			await page.waitForTimeout(150); // FaanBreakdown's own entrance, not a fixed animation wait
+			await page.waitForTimeout(HAND_END_REVEAL_MS);
 		}
 	},
 	// exhaustive draw gets its own plain summary card, not FaanBreakdown (docs/architecture.md
@@ -98,11 +102,13 @@ const PAGES = [
 	// Auto-shown once a real `game_end` lands (docs/frontend.md §7 "Game-end summary") --
 	// genuinely distinct from `table-hand-ended` above: a full-game score summary with
 	// expandable per-round detail and a link back to the lobby, not a single hand's overlay.
+	// `&practice=1` so the capture shows the practice-only "Play again" action.
 	{
 		name: 'table-game-ended',
-		url: '/table/demo123?mock=1',
+		url: '/table/demo123?mock=1&practice=1',
 		async before(page) {
 			await page.getByRole('button', { name: 'Game just ended' }).click();
+			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	},
 	// Settings panel: a distinct chrome surface (pre-arm toggles, sound, motion) now styled to
@@ -137,6 +143,24 @@ const PAGES = [
 		viewport: PHONE,
 		async before(page) {
 			await page.getByRole('button', { name: 'Claim window open (you)' }).click();
+		}
+	},
+	{
+		name: 'table-hand-ended-phone',
+		url: '/table/demo123?mock=1',
+		viewport: PHONE,
+		async before(page) {
+			await page.getByRole('button', { name: 'Hand just ended' }).click();
+			await page.waitForTimeout(HAND_END_REVEAL_MS);
+		}
+	},
+	{
+		name: 'table-game-ended-phone',
+		url: '/table/demo123?mock=1&practice=1',
+		viewport: PHONE,
+		async before(page) {
+			await page.getByRole('button', { name: 'Game just ended' }).click();
+			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	}
 ];
