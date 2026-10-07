@@ -909,7 +909,9 @@
 		height: 100%;
 		min-height: 420px;
 		padding: var(--space-3);
-		overflow: hidden;
+		// clip, not hidden: hidden makes this a scroll container, which traps the phone self
+		// row's `position: sticky` inside the surface instead of the viewport.
+		overflow: clip;
 		border-radius: var(--radius-lg);
 		// local override: --color-text-muted (walnut chrome) fails contrast on felt green;
 		// every descendant using it (seat-wind, seat-score, …) gets the felt-safe value for free.

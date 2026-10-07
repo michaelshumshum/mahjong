@@ -231,7 +231,9 @@ Below 768px (phone portrait):
 - Your hand is `position: sticky; bottom: 0` with `env(safe-area-inset-bottom)` padding. It keeps
   its own last grid row (`auto 1fr auto`, the surface filling at least the rest of the viewport),
   so it starts at the bottom and nothing above needs padding reserved under it; the page scrolls
-  rather than clipping when the table is taller than the screen.
+  rather than clipping when the table is taller than the screen. `.table-surface` clips its
+  rounded corners with `overflow: clip`, not `hidden` — `hidden` makes it a scroll container and
+  the sticky row would then stick within the surface, scrolling off-screen with it.
 - Claim buttons stay ≥44px, pinned above the safe-area inset.
 
 ## 4. Tile identity

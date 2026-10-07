@@ -173,10 +173,11 @@ test('phone-width viewport applies the sub-768px sticky collapse to the self han
 	await expect(selfRegion).toHaveCSS('position', 'sticky');
 });
 
-// the hand sizes to its container (docs/frontend.md §3); these two viewports used to push the
-// drawn tile off-screen (390) and under the right opponent's strip (1024).
+// the hand sizes to its container (docs/frontend.md §3). 390 pushed the drawn tile off-screen, 1024
+// under the right strip; 390x700 makes the page outgrow the viewport, so the self row must stick.
 for (const [width, height] of [
 	[390, 844],
+	[390, 700],
 	[1024, 768]
 ] as const) {
 	test(`the full hand and drawn tile fit inside the viewport at ${width}x${height}`, async ({
