@@ -488,5 +488,14 @@
 	"pretableScreen_inviteShareText": "嚟同我打番圈麻雀啦。",
 	"handEndOverlay_stampWin": "食糊",
 	"handEndOverlay_stampSelfDraw": "自摸",
-	"handEndOverlay_stampDraw": "流局"
+	"handEndOverlay_stampDraw": "流局",
+	"gameEndScreen_heading": "遊戲結束",
+	"gameEndScreen_youPlaced": "你排{rank}",
+	"gameEndScreen_youTied": "你同人並列{rank}",
+	"gameEndScreen_youTag": "(你)",
+	"gameEndScreen_tiedTag": "並列",
+	"gameEndScreen_playAgainButton": "再玩一局",
+	"gameEndScreen_playAgainPending": "開緊…",
+	"gameEndScreen_playAgainError": "開唔到新枱，請再試。",
+	"gameEndScreen_scoreSheetSummary": "每局分數"
 }

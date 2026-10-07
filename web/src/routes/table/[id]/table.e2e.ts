@@ -99,6 +99,13 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 	await expect(overlay).toBeVisible();
 	await expect(page.locator('.seat-plate--turn')).toHaveCount(0);
 	await expect(overlay.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+	await expect(overlay.getByRole('heading', { name: 'Game over', exact: true })).toBeVisible();
+	// gameJustEnded's You and Carol both finish on -30: a shared 3rd, not 3rd and 4th.
+	await expect(overlay.getByTestId('game-end-you-placed')).toHaveText('You tied for 3rd');
+	await expect(overlay.locator('.final-row')).toHaveCount(4);
+	await expect(overlay.locator('.final-rank')).toHaveText(['1st', '2nd', '3rd', '3rd']);
+	// not a practice table: nothing to replay.
+	await expect(overlay.getByTestId('game-end-play-again')).toHaveCount(0);
 
 	// score sheet shows all 4 rounds; final standings cards are omitted in favor of the podium.
 	await expect(overlay.locator('.score-sheet tbody tr')).toHaveCount(4);
@@ -330,4 +337,28 @@ test('waiting room invite copies the table link and resets its label after 2s', 
 		'/table/abc123?pregame=waiting'
 	);
 	await expect(invite).toHaveText('Invite friends', { timeout: 4000 });
+});
+
+test('practice game end offers Play again, re-creating a table with the last bot levels', async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			'mahjong:practiceSetup:v1',
+			JSON.stringify({ 1: 'easy', 2: 'impossible', 3: 'normal' })
+		);
+	});
+	let body: unknown = null;
+	await page.route('**/tables', async (route) => {
+		body = route.request().postDataJSON();
+		await route.fulfill({ json: { table_id: 'AGAIN1', ruleset_preset: null, ruleset: {} } });
+	});
+	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
+	await page.goto('/table/abc123?mock=1&practice=1');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Game just ended' }).click();
+
+	await page.getByTestId('game-end-play-again').click();
+	await expect(page).toHaveURL('/table/AGAIN1?practice=1');
+	expect(body).toEqual({ practice: true, bot_tiers: { 1: 'T1', 2: 'ORACLE', 3: 'T2' } });
 });

@@ -488,5 +488,14 @@
 	"pretableScreen_inviteShareText": "Pull up a seat at my mahjong table.",
 	"handEndOverlay_stampWin": "食糊",
 	"handEndOverlay_stampSelfDraw": "自摸",
-	"handEndOverlay_stampDraw": "流局"
+	"handEndOverlay_stampDraw": "流局",
+	"gameEndScreen_heading": "Game over",
+	"gameEndScreen_youPlaced": "You placed {rank}",
+	"gameEndScreen_youTied": "You tied for {rank}",
+	"gameEndScreen_youTag": "(you)",
+	"gameEndScreen_tiedTag": "Tied",
+	"gameEndScreen_playAgainButton": "Play again",
+	"gameEndScreen_playAgainPending": "Starting…",
+	"gameEndScreen_playAgainError": "Couldn't start a new table — try again.",
+	"gameEndScreen_scoreSheetSummary": "Hand-by-hand scores"
 }

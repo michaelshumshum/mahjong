@@ -4,6 +4,9 @@ import {
 	AUTO_ARM_STORAGE_KEY,
 	CLIENT_PREFS_STORAGE_KEY,
 	DISPLAY_NAME_STORAGE_KEY,
+	PRACTICE_SETUP_STORAGE_KEY,
+	loadPracticeSetup,
+	savePracticeSetup,
 	TABLE_CREDS_TTL_MS,
 	clearSeatForTable,
 	clearSecretForTable,
@@ -137,6 +140,27 @@ describe('settings-storage', () => {
 		it('falls back to null on a validly-parsed but wrong-shaped value', () => {
 			localStorage.setItem(AUTO_ARM_STORAGE_KEY, JSON.stringify({ noCalls: true }));
 			expect(loadAutoArm()).toBeNull();
+		});
+	});
+
+	describe('practiceSetup', () => {
+		it('round-trips a saved value', () => {
+			savePracticeSetup({ 1: 'easy', 2: 'normal', 3: 'impossible' });
+			expect(loadPracticeSetup()).toEqual({ 1: 'easy', 2: 'normal', 3: 'impossible' });
+		});
+
+		it('returns null when nothing has been stored', () => {
+			expect(loadPracticeSetup()).toBeNull();
+		});
+
+		it('rejects an unknown difficulty or a missing seat', () => {
+			localStorage.setItem(
+				PRACTICE_SETUP_STORAGE_KEY,
+				JSON.stringify({ 1: 'easy', 2: 'godlike', 3: 'normal' })
+			);
+			expect(loadPracticeSetup()).toBeNull();
+			localStorage.setItem(PRACTICE_SETUP_STORAGE_KEY, JSON.stringify({ 1: 'easy', 2: 'normal' }));
+			expect(loadPracticeSetup()).toBeNull();
 		});
 	});
 

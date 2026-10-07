@@ -477,6 +477,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode` | purely local; `discardMode` postdates this key, so `loadClientPrefs` defaults it when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
+| `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
 
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
 full `state_sync`.
@@ -625,7 +626,8 @@ shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md))
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
 fixed at table construction. A seat ring with one tap-to-cycle slot per bot seat (Right opponent /
 Across / Left opponent, matching `mock-game-state.ts`'s `relativeSeat` offsets; seat 0 is the
-human), each Easy/Normal/Impossible ([bots.md §6](bots.md)), default Normal, above a short legend
+human), each Easy/Normal/Impossible ([bots.md §6](bots.md)), defaulting to the last practice setup
+(else Normal), above a short legend
 with a one-line blurb per level. Submitting sends `POST /tables`
 with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/table/<id>?practice=1`.
 
@@ -758,8 +760,18 @@ dismissable. `game_end` only fires after the final hand's hold resolves, so noth
 preempted — but the hold overlay normally clears on the next `hand_start`, which never comes, so
 `+page.svelte` gates it on `!gameEndReached` and the game-end screen replaces it.
 
-- Reuses `ScoreSheet` (score table, running totals, `standings`) plus a "game over" frame and a
-  link home; there is no rematch flow.
+- One panel: a "Game over" heading, a "You placed Nth" line (omitted for spectators), all four
+  final standings as ranked rows, the actions, then the full `ScoreSheet` (score table, running
+  totals) under a "Hand-by-hand scores" label.
+- **Ties** use competition ranking (`rank.ts`'s `placements`: totals 50/10/−30/−30 place
+  1st/2nd/3rd/3rd, never 3rd/4th): tied rows share a place and a "Tied" tag, and the line reads
+  "You tied for 3rd". `ScoreSheet`'s own standings list uses the same places.
+- **Play again** (practice tables only, i.e. `?practice` on the URL) is the primary action:
+  `POST /tables` with the bot levels from `mahjong:practiceSetup:v1` (§6), then a full-page
+  navigation to the new `/table/<id>?practice=1` — not `goto()`, since SvelteKit would reuse this
+  route's component and carry the finished table's local flags (game-started, dismissals) into the
+  new one. "Back to home" is the secondary action there, and the only (primary-styled) one
+  otherwise. Multiplayer rematch is not built.
 - `ScoreSheet`'s per-round expand: when `HandRecord.result` (a `RoundResult`) is present, the hand
   number becomes a toggle revealing that round's winning hand via `FaanBreakdown`'s tile rendering,
   or "Exhaustive draw". Serves both the mid-game "Score sheet" toggle (`mockRoundResult`) and the

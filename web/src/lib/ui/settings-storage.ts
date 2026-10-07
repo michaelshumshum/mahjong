@@ -1,10 +1,12 @@
 import type { AutoArm, ClientPrefs, DiscardMode, MotionPref } from './Settings.svelte';
+import type { PracticeDifficulty } from '$lib/net/lobby';
 
 // Namespaced, versioned keys -- `v1` lets a future shape change fail closed (treated as
 // missing, below) instead of crashing on an old stored shape.
 export const CLIENT_PREFS_STORAGE_KEY = 'mahjong:clientPrefs:v1';
 export const AUTO_ARM_STORAGE_KEY = 'mahjong:autoArm:v1';
 export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
+export const PRACTICE_SETUP_STORAGE_KEY = 'mahjong:practiceSetup:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
@@ -112,6 +114,30 @@ export function loadDisplayName(): string | null {
 
 export function saveDisplayName(name: string): void {
 	writeRaw(DISPLAY_NAME_STORAGE_KEY, JSON.stringify(name));
+}
+
+/** Bot difficulty per relative seat (1 right, 2 across, 3 left) of the last practice table. */
+export type PracticeSetup = Record<1 | 2 | 3, PracticeDifficulty>;
+
+const PRACTICE_DIFFICULTIES: readonly PracticeDifficulty[] = ['easy', 'normal', 'impossible'];
+
+export function isPracticeSetup(value: unknown): value is PracticeSetup {
+	if (typeof value !== 'object' || value === null) return false;
+	const v = value as Record<string, unknown>;
+	return [1, 2, 3].every(
+		(seat) =>
+			typeof v[seat] === 'string' &&
+			(PRACTICE_DIFFICULTIES as readonly string[]).includes(v[seat] as string)
+	);
+}
+
+/** Last practice setup -- prefills the practice dialog and drives game-end "Play again". */
+export function loadPracticeSetup(): PracticeSetup | null {
+	return load(PRACTICE_SETUP_STORAGE_KEY, isPracticeSetup);
+}
+
+export function savePracticeSetup(setup: PracticeSetup): void {
+	writeRaw(PRACTICE_SETUP_STORAGE_KEY, JSON.stringify(setup));
 }
 
 interface StoredSeat {

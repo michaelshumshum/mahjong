@@ -17,3 +17,13 @@ export const RANK_TONE: Record<number, string> = {
 	1: 'var(--color-rank-silver)',
 	2: 'var(--color-rank-bronze)'
 };
+
+/** Competition ranking ("1224") over totals already sorted high to low: tied totals share the
+ * higher place and the next distinct total skips past them. Returns 0-based places. */
+export function placements(sortedTotals: readonly number[]): number[] {
+	const places: number[] = [];
+	sortedTotals.forEach((total, i) => {
+		places.push(i > 0 && total === sortedTotals[i - 1] ? places[i - 1] : i);
+	});
+	return places;
+}

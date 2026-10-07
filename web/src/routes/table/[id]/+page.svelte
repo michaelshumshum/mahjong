@@ -32,6 +32,7 @@
 		loadAutoArm,
 		loadClientPrefs,
 		loadDisplayName,
+		loadPracticeSetup,
 		loadSeatForTable,
 		loadSecretForTable,
 		saveAutoArm,
@@ -47,6 +48,7 @@
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
 	import { serverErrorToastMessage } from '$lib/net/server-error-messages';
 	import { shareOrCopy } from '$lib/ui/share-invite';
+	import { createTable, PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/lobby';
 	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
 	import type { TileCode } from '$lib/table/tile-code';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
@@ -574,6 +576,31 @@
 		isMock ? gameState.gameEnd != null : liveStore?.state.gameEnd != null
 	);
 
+	// practice "Play again": a fresh table with the last-used bot levels. A full navigation, not
+	// goto() -- the reused route component would carry this table's local flags into the next.
+	let playAgainPending = $state(false);
+	let playAgainFailed = $state(false);
+
+	async function playAgain(): Promise<void> {
+		playAgainPending = true;
+		playAgainFailed = false;
+		const setup = loadPracticeSetup() ?? { 1: 'normal', 2: 'normal', 3: 'normal' };
+		try {
+			const { table_id } = await createTable({
+				practice: true,
+				bot_tiers: {
+					1: PRACTICE_DIFFICULTY_TO_TIER[setup[1]],
+					2: PRACTICE_DIFFICULTY_TO_TIER[setup[2]],
+					3: PRACTICE_DIFFICULTY_TO_TIER[setup[3]]
+				}
+			});
+			window.location.assign(`/table/${encodeURIComponent(table_id)}?practice=1`);
+		} catch {
+			playAgainFailed = true;
+			playAgainPending = false;
+		}
+	}
+
 	// the hand is over while a result overlay is up, so no seat should still read as acting --
 	// mock fixtures and the live reducer both leave `turn` on the last actor.
 	let resultOverlayUp = $derived(
@@ -767,6 +794,10 @@
 						totals={scoreTotals}
 						hands={scoreHands}
 						standings={scoreStandings}
+						you={spectating ? null : (gameState.you as Seat)}
+						onPlayAgain={isPractice ? playAgain : undefined}
+						{playAgainPending}
+						{playAgainFailed}
 					/>
 				</div>
 			</div>
@@ -960,6 +991,11 @@
 	.panel-overlay--scrollable {
 		align-items: flex-start;
 		overflow-y: auto;
+		background: rgb(0 0 0 / 0.7);
+
+		> .panel {
+			width: 100%;
+		}
 	}
 
 	// hugs whatever dialog content it wraps so CloseButton is positioned against the panel's own

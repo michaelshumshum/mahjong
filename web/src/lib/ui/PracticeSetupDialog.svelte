@@ -7,6 +7,7 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import PracticeDifficultySlot from './PracticeDifficultySlot.svelte';
+	import { loadPracticeSetup, savePracticeSetup } from './settings-storage';
 
 	let { onCreated, onCancel }: { onCreated: (tableId: string) => void; onCancel: () => void } =
 		$props();
@@ -28,11 +29,9 @@
 
 	// seats 1-3 only -- seat 0 is the human's own seat, never configured here. Offsets from your
 	// own seat, clockwise, matching mock-game-state.ts's relativeSeat: 1 right, 2 across, 3 left.
-	let difficulty = $state<Record<1 | 2 | 3, PracticeDifficulty>>({
-		1: 'normal',
-		2: 'normal',
-		3: 'normal'
-	});
+	let difficulty = $state<Record<1 | 2 | 3, PracticeDifficulty>>(
+		loadPracticeSetup() ?? { 1: 'normal', 2: 'normal', 3: 'normal' }
+	);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 
@@ -48,6 +47,7 @@
 					3: PRACTICE_DIFFICULTY_TO_TIER[difficulty[3]]
 				}
 			});
+			savePracticeSetup($state.snapshot(difficulty));
 			onCreated(table_id);
 		} catch {
 			error = m.practiceSetupDialog_createErrorMessage();

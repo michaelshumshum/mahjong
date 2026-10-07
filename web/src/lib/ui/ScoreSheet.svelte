@@ -1,7 +1,7 @@
 <script lang="ts">
 	import WinningHand, { type FaanPattern, type WinningMeld } from './WinningHand.svelte';
 	import type { TileCode } from '../table/tile-code';
-	import { rankLabel, RANK_TONE } from './rank';
+	import { placements, rankLabel, RANK_TONE } from './rank';
 	import { m } from '$lib/paraglide/messages.js';
 
 	export type Seat = 0 | 1 | 2 | 3;
@@ -72,6 +72,9 @@
 		hands: HandRecord[];
 		standings?: Standing[];
 	} = $props();
+
+	// tied totals share a place ("1224"), matching GameEndScreen.
+	let standingPlaces = $derived(placements((standings ?? []).map((s) => s.total)));
 
 	function seatName(seat: Seat): string {
 		return seats.find((s) => s.seat === seat)?.name ?? m.scoreSheet_seatFallbackLabel({ seat });
@@ -223,7 +226,8 @@
 		<div class="standings">
 			<h3 class="standings-heading">{m.scoreSheet_finalStandingsHeading()}</h3>
 			<ol class="standings-list">
-				{#each standings as standing, index (standing.seat)}
+				{#each standings as standing, i (standing.seat)}
+					{@const index = standingPlaces[i]}
 					<li class="standing-card" class:standing-card--top={index < 3}>
 						<span
 							class="rank"
