@@ -43,7 +43,6 @@
 		discardMode,
 		onDiscard,
 		declareOptions,
-		sealStamp = null,
 		scoreDelta = null
 	}: {
 		seat: MockSeatState;
@@ -56,7 +55,6 @@
 		discardMode: DiscardMode;
 		onDiscard: (tileId: number) => void;
 		declareOptions: DeclareOption[];
-		sealStamp?: { glyph: string; key: number } | null;
 		scoreDelta?: { value: number; key: number } | null;
 	} = $props();
 
@@ -221,7 +219,6 @@
 		dealerTitle={m.yourSeatRegion_dealerBadgeTitle()}
 		score={seat.score}
 		isTurn={seat.seat === turn}
-		{sealStamp}
 		{scoreDelta}
 	/>
 
@@ -248,7 +245,6 @@
 		{:else}
 			<div
 				class="hand-row"
-				class:hand-row--two-step={discardMode === 'two-step'}
 				role="toolbar"
 				tabindex="-1"
 				aria-label={m.yourSeatRegion_yourConcealedHandAriaLabel()}
@@ -430,9 +426,9 @@
 		}
 	}
 
-	// desktop/fine-pointer preview only in two-step mode -- one-tap has no lift to preview.
+	// desktop/fine-pointer hover preview, both discard modes.
 	@media (hover: hover) and (pointer: fine) {
-		.hand-row--two-step .hand-tile-btn:not(.hand-tile--lifted):hover {
+		.hand-tile-btn:not(.hand-tile--lifted):not(:disabled):hover {
 			z-index: 1;
 			transform: translateY(-12%);
 
