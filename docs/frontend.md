@@ -279,7 +279,7 @@ Built today:
 
 | Mode | Desktop and touch |
 | --- | --- |
-| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`) — a CSS-only affordance, not committed state. A raised tile's `::after` extends its hit area down by the lift amount, so hovering its bottom edge can't lift it off the pointer and flicker hover/cursor. |
+| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter`/`Space` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`) — a CSS-only affordance, not committed state. A raised tile's `::after` extends its hit area down by the lift amount, so hovering its bottom edge can't lift it off the pointer and flicker hover/cursor. |
 | `one-tap` | The original behaviour: one click/tap sends `discard` immediately. |
 
 Both modes are presentation only, never a state mutation (`web/AGENTS.md`): the lift is local UI
@@ -972,10 +972,19 @@ fluent Hong Kong mahjong player.
   unmounts the dialog — the DOM never closes itself out from under Svelte. Chrome force-closes a
   dialog whose cancel was already prevented once without user activation in between; the `close`
   handler treats that as a cancel, or reopens a non-dismissable dialog.
-- **Keyboard:** legal hand tiles are native `<button>`s in normal tab order, `Enter`/`Space`
-  discards — the same elements pointer and touch use, so there is one selection model.
-  **Planned:** roving `tabindex` over the hand with arrow keys moving focus, and `Enter`/`Space`
-  lift-then-discard once the two-step discard setting exists (§5).
+- **Keyboard hand model:** legal hand tiles are native `<button>`s — the same elements pointer and
+  touch use, so there is one selection model. The hand row (`role="toolbar"`) is a single tab stop
+  via roving `tabindex`, defaulting to the last discardable tile (the drawn tile), else the focused
+  or lifted one:
+
+  | Key | Effect |
+  | --- | --- |
+  | `←`/`→`, `Home`/`End` | move focus between discardable tiles (clamped, no wrap) |
+  | `Enter`/`Space` | the button's own click: two-step lifts then discards, one-tap discards (§5) |
+  | `Escape` | clears a lift |
+  | `H` | jumps focus to the hand from anywhere (`aria-keyshortcuts`), ignored while typing in an input/select/contenteditable or with a modifier; with nothing discardable the row itself takes focus (`tabindex="-1"`) |
+
+  Spectators have no hand row, so none of this applies there.
 - **Names:** tiles are announced by localized name, never code (§9 i18n "Tile names").
 - **Reduced motion:** Settings' Motion radio (`system`/`reduced`/`full`, persisted in
   `clientPrefs`) is mirrored onto `html[data-motion]` by `lib/ui/motion.ts`'s `applyMotionPref`

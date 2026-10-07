@@ -118,8 +118,59 @@
 		if (handRowEl && !handRowEl.contains(e.target as Node)) liftedTileId = null;
 	}
 
+	// roving tabindex (frontend.md §9): the hand is one tab stop; arrows/Home/End move focus
+	// between discardable tiles, Enter/Space go through the same onclick as a tap.
+	let focusedTileId = $state<number | null>(null);
+	const discardableOrder = $derived(
+		isMock
+			? []
+			: ownHandTiles
+					.map((t) => t.tileId)
+					.filter((id): id is number => id !== null && discardableTileIds.has(id))
+	);
+	// defaults to the last discardable tile: the drawn tile, held out at the right.
+	const rovingTileId = $derived.by(() => {
+		for (const id of [focusedTileId, liftedTileId]) {
+			if (id !== null && discardableOrder.includes(id)) return id;
+		}
+		return discardableOrder.at(-1) ?? null;
+	});
+
+	function focusTile(tileId: number): void {
+		focusedTileId = tileId;
+		handRowEl?.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`)?.focus();
+	}
+
+	function handleHandKeydown(e: KeyboardEvent): void {
+		if (rovingTileId === null) return;
+		const last = discardableOrder.length - 1;
+		const index = discardableOrder.indexOf(rovingTileId);
+		let next: number;
+		if (e.key === 'ArrowRight') next = Math.min(index + 1, last);
+		else if (e.key === 'ArrowLeft') next = Math.max(index - 1, 0);
+		else if (e.key === 'Home') next = 0;
+		else if (e.key === 'End') next = last;
+		else return;
+		e.preventDefault();
+		focusTile(discardableOrder[next]);
+	}
+
+	function isTypingTarget(target: EventTarget | null): boolean {
+		return (
+			target instanceof HTMLElement &&
+			(target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+		);
+	}
+
 	function handleWindowKeydown(e: KeyboardEvent): void {
 		if (e.key === 'Escape' && liftedTileId !== null) liftedTileId = null;
+		const jump = e.key === 'h' || e.key === 'H';
+		if (!jump || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+		if (!handRowEl) return;
+		e.preventDefault();
+		// not your turn: no tile is focusable, so the row itself takes focus (tabindex -1).
+		if (rovingTileId !== null) focusTile(rovingTileId);
+		else handRowEl.focus();
 	}
 </script>
 
@@ -198,8 +249,12 @@
 			<div
 				class="hand-row"
 				class:hand-row--two-step={discardMode === 'two-step'}
+				role="toolbar"
+				tabindex="-1"
 				aria-label={m.yourSeatRegion_yourConcealedHandAriaLabel()}
+				aria-keyshortcuts="h"
 				bind:this={handRowEl}
+				onkeydown={handleHandKeydown}
 			>
 				{#each ownHandTiles as tile (tile.key)}
 					<div
@@ -217,6 +272,9 @@
 								class:hand-tile--lifted={lifted}
 								class:hand-tile--pending={pending}
 								disabled={pending}
+								data-tile-id={tile.tileId}
+								tabindex={rovingTileId === tile.tileId ? 0 : -1}
+								onfocus={() => (focusedTileId = tile.tileId)}
 								aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
 								onclick={() => handleTileActivate(tile.tileId as number)}
 							>

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import { render, cleanupAll } from './test-render';
 import YourSeatRegion from './YourSeatRegion.svelte';
@@ -115,5 +116,113 @@ describe('YourSeatRegion discard modes', () => {
 		vi.advanceTimersByTime(3000);
 		flushSync();
 		expect(target.querySelector('.pending-spinner--stalled')).not.toBeNull();
+	});
+});
+
+describe('YourSeatRegion keyboard hand model', () => {
+	afterEach(cleanupAll);
+
+	function threeTileProps(discardMode: 'two-step' | 'one-tap', onDiscard = vi.fn()) {
+		return {
+			...baseProps(discardMode, onDiscard),
+			ownHandTiles: [
+				{ key: 'c-0', code: '1m' as const, tileId: 10, drawn: false },
+				{ key: 'c-1', code: '2m' as const, tileId: 11, drawn: false },
+				{ key: 'd', code: '3m' as const, tileId: 12, drawn: true }
+			],
+			discardableTileIds: new Set([10, 11, 12])
+		};
+	}
+
+	function buttons(target: HTMLElement): HTMLButtonElement[] {
+		return [...target.querySelectorAll<HTMLButtonElement>('.hand-tile-btn')];
+	}
+
+	it('is a single tab stop, defaulting to the drawn tile', () => {
+		const { target } = render(YourSeatRegion, threeTileProps('two-step'));
+		flushSync();
+		expect(buttons(target).map((b) => b.tabIndex)).toEqual([-1, -1, 0]);
+	});
+
+	it('moves focus with arrows, Home and End, carrying the tab stop along', async () => {
+		const { target } = render(YourSeatRegion, threeTileProps('two-step'));
+		flushSync();
+		const [first, second, drawn] = buttons(target);
+		drawn.focus();
+		await userEvent.keyboard('{ArrowLeft}');
+		expect(document.activeElement).toBe(second);
+		await userEvent.keyboard('{Home}');
+		expect(document.activeElement).toBe(first);
+		await userEvent.keyboard('{ArrowLeft}');
+		expect(document.activeElement).toBe(first);
+		flushSync();
+		expect(buttons(target).map((b) => b.tabIndex)).toEqual([0, -1, -1]);
+		await userEvent.keyboard('{End}');
+		expect(document.activeElement).toBe(drawn);
+		await userEvent.keyboard('{ArrowRight}');
+		expect(document.activeElement).toBe(drawn);
+	});
+
+	it('two-step: Enter lifts the focused tile, a second Enter discards it', async () => {
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, threeTileProps('two-step', onDiscard));
+		flushSync();
+		buttons(target)[2].focus();
+		await userEvent.keyboard('{ArrowLeft}');
+		await userEvent.keyboard('{Enter}');
+		flushSync();
+		expect(onDiscard).not.toHaveBeenCalled();
+		expect(buttons(target)[1].classList.contains('hand-tile--lifted')).toBe(true);
+		await userEvent.keyboard('{Enter}');
+		expect(onDiscard).toHaveBeenCalledExactlyOnceWith(11);
+	});
+
+	it('two-step: Space lifts, Escape clears the lift', async () => {
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, threeTileProps('two-step', onDiscard));
+		flushSync();
+		buttons(target)[0].focus();
+		await userEvent.keyboard(' ');
+		flushSync();
+		expect(buttons(target)[0].classList.contains('hand-tile--lifted')).toBe(true);
+		await userEvent.keyboard('{Escape}');
+		flushSync();
+		expect(buttons(target)[0].classList.contains('hand-tile--lifted')).toBe(false);
+		expect(onDiscard).not.toHaveBeenCalled();
+	});
+
+	it('one-tap: Enter discards the focused tile immediately', async () => {
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, threeTileProps('one-tap', onDiscard));
+		flushSync();
+		buttons(target)[0].focus();
+		await userEvent.keyboard('{Enter}');
+		expect(onDiscard).toHaveBeenCalledExactlyOnceWith(10);
+	});
+
+	it('H jumps focus to the hand, but not while typing in an input', async () => {
+		const { target } = render(YourSeatRegion, threeTileProps('two-step'));
+		flushSync();
+		const input = document.createElement('input');
+		document.body.appendChild(input);
+		input.focus();
+		await userEvent.keyboard('h');
+		expect(document.activeElement).toBe(input);
+		expect(input.value).toBe('h');
+		input.remove();
+
+		document.body.focus();
+		await userEvent.keyboard('h');
+		expect(document.activeElement).toBe(buttons(target)[2]);
+	});
+
+	it('H focuses the hand row itself when no tile is discardable', async () => {
+		const { target } = render(YourSeatRegion, {
+			...threeTileProps('two-step'),
+			discardableTileIds: new Set<number>()
+		});
+		flushSync();
+		await userEvent.keyboard('H');
+		expect(document.activeElement).toBe(target.querySelector('.hand-row'));
 	});
 });
