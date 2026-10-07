@@ -274,7 +274,7 @@ Built today:
 
 | Mode | Desktop and touch |
 | --- | --- |
-| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`) — a CSS-only affordance, not committed state. |
+| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`) — a CSS-only affordance, not committed state. A raised tile's `::after` extends its hit area down by the lift amount, so hovering its bottom edge can't lift it off the pointer and flicker hover/cursor. |
 | `one-tap` | The original behaviour: one click/tap sends `discard` immediately. |
 
 Both modes are presentation only, never a state mutation (`web/AGENTS.md`): the lift is local UI

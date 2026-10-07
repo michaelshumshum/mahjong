@@ -328,6 +328,14 @@
 		background: none;
 		cursor: pointer;
 		transition: transform var(--dur-1) var(--ease-out);
+
+		// hit area extended down by the lift so the pointer stays over a raised tile; without it,
+		// hovering the bottom edge lifts the tile off the pointer and hover/cursor flicker.
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+		}
 	}
 
 	// lifted: translateY only (ADR 0002's transform/opacity rule), raised above its negative-
@@ -335,6 +343,10 @@
 	.hand-tile-btn.hand-tile--lifted {
 		z-index: 1;
 		transform: translateY(-30%);
+
+		&::after {
+			bottom: -30%;
+		}
 	}
 
 	// desktop/fine-pointer preview only in two-step mode -- one-tap has no lift to preview.
@@ -342,6 +354,10 @@
 		.hand-row--two-step .hand-tile-btn:not(.hand-tile--lifted):hover {
 			z-index: 1;
 			transform: translateY(-12%);
+
+			&::after {
+				bottom: -12%;
+			}
 		}
 	}
 
