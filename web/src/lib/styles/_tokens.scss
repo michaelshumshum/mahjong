@@ -72,7 +72,8 @@
 	--space-6: 2rem;
 	--space-8: 3rem;
 
-	// one family throughout; 'Noto Sans HK' fallback covers CJK faan pattern names (平糊, 對對糊).
+	// one family throughout; 'Noto Sans HK' (webfont, loaded in +layout.svelte) covers all CJK:
+	// faan pattern names (平糊, 對對糊), seal/wind/dealer glyphs, zh-Hant UI strings.
 	--font-family-base: 'Schibsted Grotesk', 'Noto Sans HK', sans-serif;
 	// below the scale's floor deliberately — badge/chip text only, never body copy.
 	--font-size-xs: 0.75rem;

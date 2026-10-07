@@ -5,6 +5,13 @@
 	import '@fontsource/schibsted-grotesk/500.css';
 	import '@fontsource/schibsted-grotesk/600.css';
 	import '@fontsource/schibsted-grotesk/700.css';
+	// actually load the CJK fallback: Schibsted has no CJK, so seal/wind/faan glyphs otherwise
+	// use the device system font and their side bearings (seal centring) vary by device.
+	import '@fontsource/noto-sans-hk/400.css';
+	import '@fontsource/noto-sans-hk/500.css';
+	import '@fontsource/noto-sans-hk/600.css';
+	import '@fontsource/noto-sans-hk/700.css';
+	import '@fontsource/noto-sans-hk/800.css';
 	import '$lib/styles/app.scss';
 	import favicon from '$lib/assets/favicon.svg';
 	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';

@@ -178,6 +178,9 @@ importers:
 
   web:
     dependencies:
+      '@fontsource/noto-sans-hk':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource/schibsted-grotesk':
         specifier: ^5.3.0
         version: 5.3.0
@@ -428,6 +431,9 @@ packages:
 
   '@emnapi/wasi-threads@1.2.2':
     resolution: {integrity: sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==}
+
+  '@fontsource/noto-sans-hk@5.3.0':
+    resolution: {integrity: sha512-ojRRmRmb9c41KuhfInLCa7ft+1BBCGoDvOwaZLef1gyU1gO/+6xF7O/7A2/OrGXzHs9g8MyC5PbFl2rgWZZNBA==}
 
   '@fontsource/schibsted-grotesk@5.3.0':
     resolution: {integrity: sha512-9k+Fd2eg7umKxI2JV2HtDcOkXEM0iJx0u4Iu1b+QHikVU8Sl/MtozJ/mtZfsltR6xnVGSQjpcxXQeJPW0KGpIA==}
@@ -2531,6 +2537,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@fontsource/noto-sans-hk@5.3.0': {}
 
   '@fontsource/schibsted-grotesk@5.3.0': {}
 
