@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { m } from '$lib/paraglide/messages.js';
+	import { getLocale } from '$lib/paraglide/runtime.js';
+	import CreateTableDialog from '$lib/ui/CreateTableDialog.svelte';
 	import { fetchTables, type TableSummary } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { hasJoinedTable } from '$lib/ui/settings-storage';
@@ -23,16 +25,30 @@
 	const REFRESH_MS = 5000;
 	let tables = $state<TableSummary[] | null>(null);
 	let tablesError = $state(false);
+	let refreshing = $state(false);
+	// a static stamp of the last successful poll, not a ticking "n seconds ago".
+	let updatedAt = $state<Date | null>(null);
+	let updatedLabel = $derived(
+		updatedAt
+			? updatedAt.toLocaleTimeString(getLocale(), { hour: 'numeric', minute: '2-digit' })
+			: null
+	);
 
 	async function refreshTables(): Promise<void> {
+		refreshing = true;
 		try {
 			const listed = await fetchTables();
 			tables = listed.toSorted((a, b) => Number(b.status === 'open') - Number(a.status === 'open'));
 			tablesError = false;
+			updatedAt = new Date();
 		} catch {
 			tablesError = true;
+		} finally {
+			refreshing = false;
 		}
 	}
+
+	let showCreateDialog = $state(false);
 
 	$effect(() => {
 		refreshTables();
@@ -45,9 +61,32 @@
 	<header class="page-header">
 		<BackButton label={m.tablesPage_backLabel()} href="/" />
 		<h1>{m.tablesPage_title()}</h1>
-		<button type="button" class="ghost" onclick={refreshTables}
-			>{m.tablesPage_refreshButton()}</button
-		>
+		<div class="refresh">
+			{#if updatedLabel}
+				<span class="updated" data-testid="tables-updated"
+					>{m.tablesPage_updatedAt({ time: updatedLabel })}</span
+				>
+			{/if}
+			<button
+				type="button"
+				class="refresh-btn"
+				data-testid="tables-refresh"
+				disabled={refreshing}
+				onclick={refreshTables}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path
+						d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+				{m.tablesPage_refreshButton()}
+			</button>
+		</div>
 	</header>
 
 	<JoinByCodePanel bind:code={joinCode} codeValid={joinCodeValid} onSubmit={joinTable} />
@@ -57,7 +96,16 @@
 	{:else if tables === null}
 		<p class="hint">{m.tablesPage_loadingHint()}</p>
 	{:else if tables.length === 0}
-		<p class="hint">{m.tablesPage_emptyHint()}</p>
+		<div class="empty" data-testid="tables-empty">
+			<p class="empty-title">{m.tablesPage_emptyTitle()}</p>
+			<p class="hint">{m.tablesPage_emptyHint()}</p>
+			<button
+				type="button"
+				class="primary"
+				data-testid="tables-create-table"
+				onclick={() => (showCreateDialog = true)}>{m.lobby_createTableButton()}</button
+			>
+		</div>
 	{:else}
 		<ul class="table-grid" aria-label={m.tablesPage_tablesAriaLabel()}>
 			{#each tables as table (table.id)}
@@ -70,6 +118,16 @@
 		</ul>
 	{/if}
 </div>
+
+{#if showCreateDialog}
+	<CreateTableDialog
+		onCreated={(id) => {
+			showCreateDialog = false;
+			goto(`/table/${id}`);
+		}}
+		onCancel={() => (showCreateDialog = false)}
+	/>
+{/if}
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
@@ -87,8 +145,9 @@
 
 	.page-header {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--space-4);
+		gap: var(--space-3) var(--space-4);
 
 		h1 {
 			margin: 0;
@@ -120,7 +179,47 @@
 		@include buttons.btn-secondary;
 	}
 
-	button.ghost {
-		@include buttons.btn-ghost;
+	button.primary {
+		@include buttons.btn-primary;
+	}
+
+	.refresh {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
+	.updated {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+	}
+
+	.refresh-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+
+		svg {
+			width: 1.1em;
+			height: 1.1em;
+		}
+	}
+
+	.empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-8) var(--space-5);
+		border: 1px dashed var(--color-border);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+		text-align: center;
+	}
+
+	.empty-title {
+		margin: 0;
+		font-size: var(--font-size-lg);
+		font-weight: 700;
 	}
 </style>

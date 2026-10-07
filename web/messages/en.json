@@ -87,12 +87,12 @@
 	"tablesPage_refreshButton": "Refresh",
 	"tablesPage_errorHint": "Couldn't reach the server.",
 	"tablesPage_loadingHint": "Loading…",
-	"tablesPage_emptyHint": "No tables right now — create one from the lobby and invite others.",
+	"tablesPage_emptyHint": "Start one and send the link to your friends.",
 	"tablesPage_tablesAriaLabel": "Tables",
 	"tableCard_openStatus": "Open · {count}/4",
 	"tableCard_inProgressStatus": "In progress · hand {handNo}",
 	"tableCard_seatsAriaLabel": "Seats",
-	"tableCard_openSeatLabel": "Open seat",
+	"tableCard_openSeatLabel": "Open",
 	"tableCard_guestName": "Guest",
 	"tableCard_botBadge": "Bot",
 	"tableCard_rejoinButton": "Rejoin",
@@ -507,5 +507,8 @@
 	"coachMarks_nextButton": "Next",
 	"coachMarks_doneButton": "Got it",
 	"coachMarks_skipButton": "Skip tips",
-	"tableToolbar_guideButton": "Guide"
+	"tableToolbar_guideButton": "Guide",
+	"tablesPage_updatedAt": "Updated {time}",
+	"tablesPage_emptyTitle": "No open tables right now",
+	"tableCard_compassAriaLabel": "Seats around the table"
 }

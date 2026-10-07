@@ -716,7 +716,12 @@ heuristic.
 ### Table browser (`/tables`)
 
 A join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(16rem, 1fr))`)
-showing code, open/in-progress and all four seats. Polls `GET /tables` every 5s
+showing code, an open/in-progress status chip and a mini compass of the four seats around a felt
+square (seat 0 at the bottom, then 1 right / 2 top / 3 left — the same arrangement the table
+itself uses; open seats as dashed "Open" pills, bots badged). The header's Refresh is a real
+secondary button beside a static "Updated <time>" stamp of the last successful poll (not a ticking
+"n seconds ago" — no JS ticker). With no tables, an empty-state panel offers "Create a table",
+opening the same `CreateTableDialog` as the lobby. Polls `GET /tables` every 5s
 ([protocol.md §10](protocol.md)), open tables first. "Sit down" and "Watch" both go to
 `/table/<id>`, which decides picker vs. spectator itself, so a table that fills between poll and
 click still lands sensibly. If the browser holds a reconnect credential for the table, the card

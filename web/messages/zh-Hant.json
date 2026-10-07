@@ -87,7 +87,7 @@
 	"tablesPage_refreshButton": "重新整理",
 	"tablesPage_errorHint": "無法連接伺服器。",
 	"tablesPage_loadingHint": "載入中…",
-	"tablesPage_emptyHint": "暫時沒有牌桌 — 請在大堂建立一個並邀請其他人。",
+	"tablesPage_emptyHint": "開一張枱，再將連結傳俾朋友。",
 	"tablesPage_tablesAriaLabel": "牌桌",
 	"tableCard_openStatus": "開放中 · {count}/4",
 	"tableCard_inProgressStatus": "進行中 · 第 {handNo} 局",
@@ -507,5 +507,8 @@
 	"coachMarks_nextButton": "下一個",
 	"coachMarks_doneButton": "明白",
 	"coachMarks_skipButton": "略過貼士",
-	"tableToolbar_guideButton": "番數指南"
+	"tableToolbar_guideButton": "番數指南",
+	"tablesPage_updatedAt": "更新於 {time}",
+	"tablesPage_emptyTitle": "而家冇枱開緊",
+	"tableCard_compassAriaLabel": "枱邊座位"
 }

@@ -18,15 +18,20 @@
 				: m.tableCard_inProgressStatus({ handNo: table.hand_no })}
 		</span>
 	</header>
-	<ul class="seats" aria-label={m.tableCard_seatsAriaLabel()}>
+	<!-- seat order around the felt as the table itself lays it out: 0 bottom, then
+	counter-clockwise (1 right, 2 top, 3 left). -->
+	<ul class="compass" aria-label={m.tableCard_compassAriaLabel()}>
 		{#each table.seats as seat, i (i)}
-			<li class:seat--open={seat.status === 'empty'}>
-				{seat.status === 'empty'
-					? m.tableCard_openSeatLabel()
-					: (seat.name ?? m.tableCard_guestName())}
+			<li class="compass-seat compass-seat--{i}" class:compass-seat--open={seat.status === 'empty'}>
+				<span class="compass-name"
+					>{seat.status === 'empty'
+						? m.tableCard_openSeatLabel()
+						: (seat.name ?? m.tableCard_guestName())}</span
+				>
 				{#if seat.status === 'bot'}<span class="bot-badge">{m.tableCard_botBadge()}</span>{/if}
 			</li>
 		{/each}
+		<li class="compass-felt" aria-hidden="true"></li>
 	</ul>
 	{#if hasJoined}
 		<button
@@ -67,46 +72,103 @@
 
 	.card-header {
 		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-2);
 	}
 
 	.table-code {
-		font-family: monospace;
+		font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
 		font-size: var(--font-size-lg);
+		font-weight: 700;
 		letter-spacing: 0.15em;
 	}
 
 	.table-state {
-		font-size: var(--font-size-sm);
+		padding: 1px var(--space-2);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
 		color: var(--color-text-muted);
+		font-size: var(--font-size-xs);
+		font-weight: 600;
 		white-space: nowrap;
 	}
 
 	.table-state--open {
-		color: var(--color-text);
+		border-color: color-mix(in srgb, var(--color-positive) 50%, var(--color-border));
+		color: var(--color-positive);
+	}
+
+	.compass {
+		display: grid;
+		grid-template-areas:
+			'top top top'
+			'left felt right'
+			'bottom bottom bottom';
+		grid-template-columns: minmax(0, 1fr) 2.5rem minmax(0, 1fr);
+		align-items: center;
+		gap: var(--space-1);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: var(--font-size-sm);
+	}
+
+	.compass-felt {
+		grid-area: felt;
+		aspect-ratio: 1;
+		border: 2px solid var(--color-rim-hi);
+		border-radius: var(--radius-sm);
+		background: radial-gradient(circle at 50% 40%, var(--color-felt-lit), var(--color-felt-deep));
+	}
+
+	.compass-seat {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-1);
+		min-width: 0;
+	}
+
+	.compass-seat--0 {
+		grid-area: bottom;
+	}
+
+	// side seats stack the bot badge under the name: a side column is too narrow for both.
+	.compass-seat--1,
+	.compass-seat--3 {
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.compass-seat--1 {
+		grid-area: right;
+		align-items: flex-start;
+	}
+
+	.compass-seat--2 {
+		grid-area: top;
+	}
+
+	.compass-seat--3 {
+		grid-area: left;
+		align-items: flex-end;
+	}
+
+	.compass-name {
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		font-weight: 600;
 	}
 
-	.seats {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--space-1) var(--space-3);
-		font-size: var(--font-size-sm);
-
-		li {
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-	}
-
-	.seat--open {
+	.compass-seat--open .compass-name {
+		padding: 0 var(--space-2);
+		border: 1px dashed var(--color-border);
+		border-radius: 999px;
 		color: var(--color-text-muted);
-		font-style: italic;
+		font-weight: 400;
 	}
 
 	.bot-badge {

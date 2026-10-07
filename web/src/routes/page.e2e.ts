@@ -237,6 +237,22 @@ test('tables page lists tables with sit-down for open ones and watch for ones in
 	await expect(page).toHaveURL('/table/OPEN11');
 });
 
+test('tables page empty state offers to create a table, and stamps the last refresh', async ({
+	page
+}) => {
+	await page.route('**/tables', (route) =>
+		route.request().resourceType() === 'fetch'
+			? route.fulfill({ json: { tables: [] } })
+			: route.fallback()
+	);
+	await page.goto('/tables');
+
+	await expect(page.getByTestId('tables-empty')).toBeVisible();
+	await expect(page.getByTestId('tables-updated')).toContainText('Updated');
+	await page.getByTestId('tables-create-table').click();
+	await expect(page.getByTestId('create-table-dialog')).toBeVisible();
+});
+
 test('tables page shows Rejoin for a table this browser has joined before', async ({ page }) => {
 	await page.route('**/tables', (route) => {
 		if (route.request().resourceType() !== 'fetch') return route.fallback();

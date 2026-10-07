@@ -37,6 +37,7 @@ vi.mock('$lib/paraglide/messages.js', async () => {
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$lib/net/lobby', () => ({
 	fetchTables: vi.fn(),
+	createTable: vi.fn(),
 	seatedCount: (table: TableSummary) => table.seats.filter((s) => s.status !== 'empty').length
 }));
 vi.mock('$lib/ui/settings-storage', () => ({
