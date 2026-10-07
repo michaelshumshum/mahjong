@@ -33,7 +33,9 @@
 <div class="lobby">
 	<div class="lobby-inner">
 		<header class="brand">
-			<span class="seal" aria-hidden="true">{m.lobby_sealMark()}</span>
+			<span class="seal" aria-hidden="true"
+				>{#each [...m.lobby_sealMark()] as char}<span class="seal-char">{char}</span>{/each}</span
+			>
 			<div class="brand-text">
 				<h1 class="title">{m.lobby_title()}</h1>
 			</div>
@@ -148,11 +150,12 @@
 	}
 
 	// carved-seal mark: vertical CJK in an ink-red stamp, slightly rotated like a hand press.
+	// stacked chars, not writing-mode: vertical-rl -- vertical mode positions upright glyphs via the font's vertical origin metrics, which browsers synthesise per-font (off-centre column, extra left gap, on some devices).
 	.seal {
 		flex: none;
 		display: grid;
 		place-items: center;
-		writing-mode: vertical-rl;
+		gap: 0.08em;
 		padding: var(--space-2) var(--space-1);
 		border: 3px double var(--color-text);
 		border-radius: var(--radius-sm);
@@ -161,7 +164,6 @@
 		font-size: calc(var(--font-size-display) * 0.42);
 		font-weight: 700;
 		line-height: 1.05;
-		letter-spacing: 0.08em;
 		box-shadow: 0 6px 18px -4px rgb(10 4 2 / 0.7);
 		transform: rotate(-4deg);
 	}
