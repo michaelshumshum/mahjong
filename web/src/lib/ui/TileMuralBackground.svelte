@@ -1,8 +1,7 @@
 <script lang="ts">
 	// deliberate exception to the "no canvas" rule (docs/frontend.md §2) -- decorative only,
-	// aria-hidden, needs a per-frame blit a DOM grid can't do without animating ~200 elements.
+	// aria-hidden; one canvas instead of ~200 DOM tiles. scroll is a CSS transform, not a JS ticker.
 	import { TILE_ASSET, type RenderableTileCode } from '$lib/table/tile-code';
-	import { muralBlitY, stepMuralScroll } from './mural-scroll';
 	import { isMotionReduced } from './motion';
 
 	// the tile back joins the pool as its own pseudo-code, same "no suit" treatment as honors.
@@ -28,8 +27,7 @@
 		return candidates[Math.floor(Math.random() * candidates.length)];
 	}
 
-	// buffer is pre-rendered and blitted with a y offset each frame -- drawing ~200 tiles individually
-	// dropped frames on a phone-class GPU. Exact 3:4 ratio matches TileFace.svelte; drawTile's math depends on it.
+	// exact 3:4 ratio matches TileFace.svelte; drawTile's math depends on it.
 	const TILE_W = 51;
 	const TILE_H = 68;
 	const GAP = 12;
@@ -46,11 +44,15 @@
 	let { visible = true }: { visible?: boolean } = $props();
 
 	let canvasEl: HTMLCanvasElement | undefined = $state();
+	// set once the tiles are drawn; reduced motion leaves it false (static grid).
+	let animated = $state(false);
 
 	$effect(() => {
 		if (!canvasEl) return;
-		const ctx = canvasEl.getContext('2d');
-		if (!ctx) return;
+		const ctxOrNull = canvasEl.getContext('2d');
+		if (!ctxOrNull) return;
+		// re-bound to a non-null const: TS doesn't narrow into the nested closures below.
+		const ctx: CanvasRenderingContext2D = ctxOrNull;
 		let cancelled = false;
 
 		// --color-tile, not a hardcoded hex, so the mural stays in lockstep with TileFace.svelte.
@@ -68,20 +70,12 @@
 			return img.decode().catch(() => {});
 		});
 
-		const buffer = document.createElement('canvas');
-		const bufferCtxOrNull = buffer.getContext('2d');
-		if (!bufferCtxOrNull) return;
-		// re-bound to a non-null const: TS doesn't narrow into the nested closures below.
-		const bufferCtx: CanvasRenderingContext2D = bufferCtxOrNull;
-
 		const reduceMotion = isMotionReduced();
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 		// persistent across resizes/scroll: cells already assigned a tile keep it, both resize
-		// and the scroll loop only ever grow the grid. `topRow` is drawn at the buffer's row 0.
+		// and each row advance only ever grow the grid. `topRow` is drawn at the canvas's row 0.
 		let grid: MuralTile[][] = [];
-		let bufferRows = 0;
-		let bufferCssHeight = 0;
 		let viewW = 0;
 		let viewH = 0;
 		let topRow = 0;
@@ -112,16 +106,16 @@
 
 			if (code === 'back') {
 				// mirrors TileFace.svelte's .tile-face--back: no ivory box, full-bleed art.
-				bufferCtx.drawImage(img, x, y, TILE_W, TILE_H);
+				ctx.drawImage(img, x, y, TILE_W, TILE_H);
 				return;
 			}
 
-			bufferCtx.fillStyle = tileColor;
-			bufferCtx.beginPath();
+			ctx.fillStyle = tileColor;
+			ctx.beginPath();
 			// TileFace.svelte's elliptical border-radius converges to one px value at an exact
 			// 3:4 ratio (TILE_W/H), so a single radius is exact here, not an approximation.
-			bufferCtx.roundRect(x, y, TILE_W, TILE_H, TILE_H * 0.1);
-			bufferCtx.fill();
+			ctx.roundRect(x, y, TILE_W, TILE_H, TILE_H * 0.1);
+			ctx.fill();
 
 			// mirrors TileFace.svelte's 7%-of-width padding + object-fit: contain.
 			const pad = TILE_W * 0.07;
@@ -133,7 +127,7 @@
 				drawH = availH;
 				drawW = drawH * ART_ASPECT;
 			}
-			bufferCtx.drawImage(
+			ctx.drawImage(
 				img,
 				x + pad + (availW - drawW) / 2,
 				y + pad + (availH - drawH) / 2,
@@ -142,59 +136,36 @@
 			);
 		}
 
-		function renderBuffer(): void {
+		// one row taller than the viewport: the CSS animation slides it up by exactly one row,
+		// then each iteration redraws one row further down and the transform snaps back to 0.
+		function render(): void {
 			if (!canvasEl) return;
 			viewW = window.innerWidth;
 			viewH = window.innerHeight;
-
 			const cols = Math.ceil(viewW / CELL_W) + 1;
-			const visibleRows = Math.ceil(viewH / CELL_H) + 1;
-			// one extra row so the sub-row scroll offset never exposes empty space at the bottom.
-			bufferRows = visibleRows + 1;
-			bufferCssHeight = bufferRows * CELL_H;
-			ensureGrid(cols, topRow + bufferRows);
+			const rows = Math.ceil(viewH / CELL_H) + 2;
+			ensureGrid(cols, topRow + rows);
 
-			buffer.width = cols * CELL_W * dpr;
-			buffer.height = bufferCssHeight * dpr;
-			bufferCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			bufferCtx.clearRect(0, 0, cols * CELL_W, bufferCssHeight);
-			for (let r = 0; r < bufferRows; r++) {
+			canvasEl.width = cols * CELL_W * dpr;
+			canvasEl.height = rows * CELL_H * dpr;
+			canvasEl.style.width = `${cols * CELL_W}px`;
+			canvasEl.style.height = `${rows * CELL_H}px`;
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.clearRect(0, 0, cols * CELL_W, rows * CELL_H);
+			for (let r = 0; r < rows; r++) {
 				for (let c = 0; c < cols; c++) {
 					drawTile(c * CELL_W, r * CELL_H, grid[topRow + r][c]);
 				}
 			}
-
-			canvasEl.width = viewW * dpr;
-			canvasEl.height = viewH * dpr;
-			canvasEl.style.width = `${viewW}px`;
-			canvasEl.style.height = `${viewH}px`;
 		}
 
-		let offset = 0;
-		let last = performance.now();
-		let raf = 0;
-
-		function draw(now: number): void {
-			if (!canvasEl || !ctx) return;
-			const dt = (now - last) / 1000;
-			last = now;
-			if (!reduceMotion) {
-				// advances onto a freshly-grown row rather than wrapping via `% CELL_H`, which
-				// would read as the mural periodically snapping/reshuffling. See mural-scroll.ts.
-				const step = stepMuralScroll(offset, dt, SPEED_PX_PER_SEC, CELL_H);
-				offset = step.offset;
-				if (step.rowsAdvanced > 0) {
-					topRow += step.rowsAdvanced;
-					renderBuffer();
-				}
-			}
-
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.clearRect(0, 0, viewW, viewH);
-			ctx.drawImage(buffer, 0, muralBlitY(offset), buffer.width / dpr, bufferCssHeight);
-
-			if (!reduceMotion) raf = requestAnimationFrame(draw);
+		// animationiteration fires before that frame paints, so the redraw and the transform
+		// reset land together -- no visible jump.
+		function onIteration(): void {
+			topRow++;
+			render();
 		}
+		canvasEl.addEventListener('animationiteration', onIteration);
 
 		// only rebuild on a real size change -- window.innerWidth/innerHeight stay stable across
 		// a scrollbar toggling, unlike document.documentElement.clientWidth.
@@ -202,49 +173,67 @@
 		function onResize(): void {
 			if (window.innerWidth === viewW && window.innerHeight === viewH) return;
 			window.clearTimeout(resizeTimer);
-			resizeTimer = window.setTimeout(renderBuffer, 150);
+			resizeTimer = window.setTimeout(render, 150);
 		}
 		window.addEventListener('resize', onResize);
 
 		Promise.all(decoded).then(() => {
 			if (cancelled) return;
-			renderBuffer();
-			last = performance.now();
-			draw(last);
+			render();
+			if (!reduceMotion) animated = true;
 		});
 
 		return () => {
 			cancelled = true;
-			cancelAnimationFrame(raf);
+			canvasEl?.removeEventListener('animationiteration', onIteration);
 			window.clearTimeout(resizeTimer);
 			window.removeEventListener('resize', onResize);
 		};
 	});
 </script>
 
-<canvas bind:this={canvasEl} class="mural" class:mural--hidden={!visible} aria-hidden="true"
+<canvas
+	bind:this={canvasEl}
+	class="mural"
+	class:mural--animated={animated}
+	class:mural--hidden={!visible}
+	style:--mural-row="{CELL_H}px"
+	style:--mural-row-dur="{(CELL_H / SPEED_PX_PER_SEC) * 1000}ms"
+	aria-hidden="true"
 ></canvas>
 <div class="mural-scrim" class:mural--hidden={!visible} aria-hidden="true"></div>
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
+	// filter on the canvas itself, not a backdrop-filter scrim: a full-viewport backdrop-filter
+	// re-sampled every frame made the cursor flicker on macOS Chrome.
 	.mural {
 		position: fixed;
-		inset: 0;
+		top: 0;
+		left: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
+		filter: blur(3px) brightness(0.5);
 		transition: opacity 220ms ease;
 	}
 
-	// sits in front of the canvas and blurs + darkens it so foreground content stays legible.
+	// transform-only, so the scroll runs on the compositor with no per-frame paint.
+	.mural--animated {
+		animation: mural-scroll var(--mural-row-dur) linear infinite;
+	}
+
+	@keyframes mural-scroll {
+		to {
+			transform: translateY(calc(-1 * var(--mural-row)));
+		}
+	}
+
+	// darkens the middle so foreground content stays legible.
 	.mural-scrim {
 		position: fixed;
 		inset: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
-		// prefixed first: the prod minifier keeps the last of an identical pair, so unprefixed must come last
-		-webkit-backdrop-filter: blur(3px) brightness(0.5);
-		backdrop-filter: blur(3px) brightness(0.5);
 		// darker in the middle, where lobby/pre-game copy sits over the mural.
 		background: radial-gradient(
 			ellipse 70% 60% at 50% 50%,
@@ -258,6 +247,7 @@
 	// routes that don't want the mural still have it mounted underneath, just invisible.
 	.mural--hidden {
 		opacity: 0;
+		animation-play-state: paused;
 	}
 
 	.mural,

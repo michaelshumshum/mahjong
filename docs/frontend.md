@@ -64,18 +64,19 @@ Costs:
 
 **Exception: the background mural.** `lib/ui/TileMuralBackground.svelte` is a real `<canvas>`: a
 continuously vertically-scrolling grid of randomized tile faces (the 34 playable faces plus the
-tile back), under a `backdrop-filter: blur() brightness()` scrim (a sibling element in front of the
-canvas, plus a radial darkening toward the centre) so foreground content stays legible. Purely decorative (`aria-hidden`,
+tile back), blurred and dimmed by a CSS `filter: blur() brightness()` on the canvas plus a
+radial-darkening scrim in front of it, so foreground content stays legible. Purely decorative (`aria-hidden`,
 `pointer-events: none`), so it loses nothing the DOM would give. A DOM version would animate ~200
-elements' `transform` every frame; the canvas does one `drawImage` blit of a pre-rendered
-off-screen buffer.
+elements' `transform`; the canvas is one element whose `transform` a CSS animation slides up one
+row, so scrolling runs on the compositor with no per-frame paint or JS.
 
 | Behaviour | Detail |
 | --- | --- |
 | Tile faces | the same ivory `--color-tile` box `TileFace.svelte` uses; backs drawn without a box per `.tile-face--back`. No two backs share an edge (a cluster reads as a hole); adjacent cells never share a suit (honors and backs exempt) |
 | Reduced motion | reduced motion (§9: the setting, else `prefers-reduced-motion`) renders the grid once, statically |
 | Resize | the grid is persistent — a resize only appends cells to cover the new viewport, never re-rolls placed ones, so a spurious `resize` (webfont swap, scrollbar toggle) can't read as the mural "switching". Unchanged `innerWidth`/`innerHeight` short-circuits the handler |
-| Scroll | the buffer's row window advances one row each time its leading row scrolls out of view, rather than wrapping a fixed buffer (which reads as the layout snapping back) |
+| Scroll | the canvas is one row taller than the viewport; `@keyframes mural-scroll` translates it up by exactly one row, and each `animationiteration` (dispatched before that frame paints) advances `topRow` and redraws, so the reset is invisible. The grid grows rather than wrapping (wrapping reads as the layout snapping back) |
+| Blur | CSS `filter` on the canvas itself, not a `backdrop-filter` on the scrim. The earlier `requestAnimationFrame` loop repainted the full-viewport canvas every frame, even while hidden, with a full-viewport `backdrop-filter` re-sampling it. The cursor flickered over every clickable element on macOS Chrome |
 
 **Mounted once, shared across routes.** The mural shows on `/`, `/tables`, and `/table/[id]`'s
 pre-game states — never on the game table itself, mock or live. It is mounted once in the root
@@ -84,8 +85,9 @@ between mural routes. `lib/ui/mural-visibility.svelte.ts` holds the shared visib
 calls `claimMuralVisible()` (or `claimMuralVisible(() => condition)` for a route whose need varies)
 from its `<script>`, which claims visibility in an `$effect` and releases it on unmount.
 
-- Visibility only toggles the canvas's CSS opacity (`transition: opacity 220ms`, skipped under
-  reduced motion); the draw loop keeps running, so there's no pause/resume state.
+- Visibility toggles the canvas's CSS opacity (`transition: opacity 220ms`, skipped under
+  reduced motion) and `animation-play-state`, so a hidden mural costs nothing and resumes where it
+  stopped.
 - Claims are a `SvelteSet` of per-caller tokens, not a boolean: a releasing page and a newly-mounted
   page land in the same reactive flush, and a boolean is last-write-wins (observed stuck hidden).
   A plain `Set` inside `$state` doesn't work either — `$state` makes only the reference reactive,
