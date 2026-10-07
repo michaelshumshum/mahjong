@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 
 	// shared seat header; `isTurn`'s halo never shifts the layout (pseudo-element overlay).
-	// `sealStamp`/`scoreDelta` are the same kind of transient overlay, keyed to replay on repeat.
+	// `scoreDelta` is the same kind of transient overlay, keyed to replay on repeat.
 	let {
 		name,
 		windChar,
@@ -11,7 +11,6 @@
 		dealerTitle,
 		score,
 		isTurn = false,
-		sealStamp = null,
 		scoreDelta = null,
 		badges
 	}: {
@@ -22,7 +21,6 @@
 		dealerTitle: string;
 		score: number;
 		isTurn?: boolean;
-		sealStamp?: { glyph: string; key: number } | null;
 		scoreDelta?: { value: number; key: number } | null;
 		badges?: Snippet;
 	} = $props();
@@ -34,11 +32,6 @@
 	{#if isDealer}<span class="dealer-badge" title={dealerTitle}>莊</span>{/if}
 	{@render badges?.()}
 	<span class="seat-score">{score}</span>
-	{#if sealStamp}
-		{#key sealStamp.key}
-			<span class="seal-stamp" aria-hidden="true">{sealStamp.glyph}</span>
-		{/key}
-	{/if}
 	{#if scoreDelta}
 		{#key scoreDelta.key}
 			<span
@@ -96,47 +89,6 @@
 	@keyframes seat-plate-pulse {
 		50% {
 			opacity: 0.55;
-		}
-	}
-
-	// claim "seal stamp": the call glyph briefly presses over the plate -- caller never sets
-	// it under reduced motion (same for the score-delta chip below).
-	.seal-stamp {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: var(--font-size-2xl);
-		font-weight: 700;
-		color: var(--color-accent);
-		background: rgb(0 0 0 / 0.25);
-		border-radius: var(--radius-md);
-		pointer-events: none;
-		opacity: 0;
-		animation: seal-stamp var(--dur-4) var(--ease-place) forwards;
-	}
-
-	@keyframes seal-stamp {
-		0% {
-			opacity: 0;
-			scale: 1.4;
-			rotate: -8deg;
-		}
-		25% {
-			opacity: 1;
-			scale: 1;
-			rotate: 3deg;
-		}
-		70% {
-			opacity: 1;
-			scale: 1;
-			rotate: 0deg;
-		}
-		100% {
-			opacity: 0;
-			scale: 1;
-			rotate: 0deg;
 		}
 	}
 

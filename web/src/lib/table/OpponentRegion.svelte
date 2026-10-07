@@ -10,14 +10,12 @@
 		position,
 		dealer,
 		turn,
-		sealStamp = null,
 		scoreDelta = null
 	}: {
 		seat: MockSeatState;
 		position: 'across' | 'left' | 'right';
 		dealer: Seat;
 		turn: number;
-		sealStamp?: { glyph: string; key: number } | null;
 		scoreDelta?: { value: number; key: number } | null;
 	} = $props();
 </script>
@@ -35,7 +33,6 @@
 		dealerTitle={m.opponentRegion_dealerBadgeTitle()}
 		score={seat.score}
 		isTurn={seat.seat === turn}
-		{sealStamp}
 		{scoreDelta}
 	>
 		{#snippet badges()}

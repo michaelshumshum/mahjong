@@ -4,6 +4,7 @@
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import SeatPlate from '$lib/table/SeatPlate.svelte';
+	import SealStamp from '$lib/table/SealStamp.svelte';
 	import type { MeldKind, MockMeld } from '$lib/table/mock-game-state';
 	import type { TileCode } from '$lib/table/tile-code';
 	import {
@@ -115,8 +116,8 @@
 		leavingYourTileId = null;
 	}
 
-	// SeatPlate's sealStamp/scoreDelta are transient signals -- previewed here on a real
-	// instance since the frozen mock scenarios never produce the transition that triggers them.
+	// SealStamp and SeatPlate's scoreDelta are transient signals -- previewed here on real
+	// instances since the frozen mock scenarios never produce the transition that triggers them.
 	const SEAL_GLYPH: Record<MeldKind, string> = {
 		chow: '上',
 		pung: '碰',
@@ -170,9 +171,13 @@
 					isDealer={false}
 					dealerTitle=""
 					score={0}
-					sealStamp={demoSealStamp}
 					scoreDelta={demoScoreDelta}
 				/>
+				{#if demoSealStamp}
+					{#key demoSealStamp.key}
+						<SealStamp glyph={demoSealStamp.glyph} />
+					{/key}
+				{/if}
 			</div>
 			<div class="demo-actions">
 				<button type="button" onclick={() => triggerDemoSeal('chow')}
@@ -353,9 +358,11 @@
 		@include buttons.panel-elevated;
 	}
 
-	// SeatPlate's sealStamp/score-delta overlays are `position: absolute; inset: 0` on the plate --
-	// give the preview a sized, positioned box to anchor against, same as a real seat region.
+	// SeatPlate's score-delta overlay is absolutely positioned on the plate -- give the preview a
+	// sized, positioned box to anchor against, same as a real seat region.
 	.demo-seat-plate-preview {
+		gap: var(--space-3);
+		align-items: center;
 		position: relative;
 		display: inline-flex;
 		padding: var(--space-2) var(--space-4);

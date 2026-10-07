@@ -279,8 +279,8 @@ Built today:
 
 | Mode | Desktop and touch |
 | --- | --- |
-| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter`/`Space` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`) — a CSS-only affordance, not committed state. A raised tile's `::after` extends its hit area down by the lift amount, so hovering its bottom edge can't lift it off the pointer and flicker hover/cursor. |
-| `one-tap` | The original behaviour: one click/tap sends `discard` immediately. |
+| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter`/`Space` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`, both modes) — a CSS-only affordance, not committed state. A raised tile's `::after` extends its hit area down by the lift amount, so hovering its bottom edge can't lift it off the pointer and flicker hover/cursor. |
+| `one-tap` | The original behaviour: one click/tap sends `discard` immediately. Same fine-pointer hover preview as `two-step`. |
 
 Both modes are presentation only, never a state mutation (`web/AGENTS.md`): the lift is local UI
 state, and the actual intent still only ever goes `tap → discard{tile_id}`, same as before.
@@ -401,13 +401,13 @@ Durations come from `lib/ui/motion.ts`'s `motionMs(ms)` (JS) or the `_a11y.scss`
 | Own hand reflow | `YourSeatRegion`'s hand tiles are keyed `{#each ownHandTiles as tile (tile.key)}` with `animate:flip` on a wrapper (`.hand-tile-slot` — `animate:` needs the each-block's sole child, so the slot carries it and the interactive/static tile swap happens inside) |
 | Discard settle | `CenterDiscardPool`'s landing tile slides in a short distance from the discarder's own side (`--discard-enter-x/y`, set per `.discard-pool--*`) plus the existing scale pulse, both via `--ease-place`. `translate`/`scale` are independent CSS properties from `transform`, so this composes with the side pools' static rotate `transform` instead of replacing it — a prior version animated `transform` directly and overrode the rotated faces |
 | Meld slide-in | `_tile.scss`'s `meld-enter` mixin (`@include tile.meld-enter` alongside `@include tile.meld`) — plays automatically on DOM insert, same `demo-meld-in` pattern `AnimationDemoPanel` proved out first |
-| Claim seal stamp | `SeatPlate`'s `sealStamp` prop (`{glyph, key}`, keyed so the CSS entrance replays on a repeat): the call glyph (碰/上/槓) scales 1.4→1 with a slight rotate and ink-fades out. `+page.svelte` derives the signal off a seat's `melds.length` growing between renders — presentation only, never game truth, and never set under reduced motion (the information is redundant with the meld tile itself) |
+| Claim seal stamp | `SealStamp` (`lib/table/`), rendered inside `.table-center` and `{#key}`ed so the CSS entrance replays on a repeat: the call glyph (碰/上/槓) as a round badge in the hub cell on the claimer's side — between the hub and that seat's pool, not over the hub (centred over the stacked pools below tablet-up) — scales 1.4→1 with a slight rotate and ink-fades out. `+page.svelte` derives the signal off a seat's `melds.length` growing between renders — presentation only, never game truth, and never set under reduced motion (the information is redundant with the meld tile itself) |
 | Score-delta chips | `SeatPlate`'s `scoreDelta` prop (`{value, key}`), derived off `handResult.payments` once per hand end, floats up and fades near the plate — same transient-signal pattern as the seal stamp |
 | Haptics | `lib/ui/haptics.ts`'s `vibrate(ms)`: `navigator.vibrate`, feature-detected to `(pointer: coarse)` so it's a no-op on desktop. Fired on your turn starting and a claim offer landing, gated on the new `ClientPrefs.haptics` (default on, separate from `motion`) |
 
 Both the seal stamp and score-delta chip have no mock-scenario trigger (the frozen fixtures never
 produce the state transition that fires them) — `AnimationDemoPanel` previews them directly on a
-real `SeatPlate` instance instead, with buttons that call the same prop shape `+page.svelte` does.
+real `SealStamp`/`SeatPlate` instance instead, with buttons that call the same prop shape `+page.svelte` does.
 
 ## 6. Client state
 

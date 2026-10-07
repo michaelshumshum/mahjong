@@ -54,6 +54,7 @@
 		announcementsBetween,
 		type AnnounceSnapshot
 	} from '$lib/ui/announcements';
+	import SealStamp from '$lib/table/SealStamp.svelte';
 	import ConnectionBanner from '$lib/ui/ConnectionBanner.svelte';
 	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
@@ -513,11 +514,12 @@
 		};
 	});
 
-	function sealStampFor(seat: number): { glyph: string; key: number } | null {
-		return sealStamp && sealStamp.seat === seat
-			? { glyph: sealStamp.glyph, key: sealStamp.key }
-			: null;
-	}
+	// table-relative side of the claimer: the badge sits just inside the centre box on that side.
+	let sealStampPosition = $derived.by(() => {
+		if (!sealStamp) return null;
+		const sides = ['self', 'right', 'across', 'left'] as const;
+		return sides[relativeSeat(sealStamp.seat as Seat, gameState.you)];
+	});
 
 	// P3.1(e) score-delta chips: same transient-signal pattern, off `handResult.payments` once
 	// per hand end, cleared after a few seconds -- just a glance near the plate.
@@ -842,7 +844,6 @@
 					position="across"
 					dealer={gameState.dealer as Seat}
 					turn={haloTurn}
-					sealStamp={sealStampFor(seatAt(2).seat)}
 					scoreDelta={scoreDeltaFor(seatAt(2).seat)}
 				/>
 				<OpponentRegion
@@ -850,7 +851,6 @@
 					position="left"
 					dealer={gameState.dealer as Seat}
 					turn={haloTurn}
-					sealStamp={sealStampFor(seatAt(3).seat)}
 					scoreDelta={scoreDeltaFor(seatAt(3).seat)}
 				/>
 				<OpponentRegion
@@ -858,7 +858,6 @@
 					position="right"
 					dealer={gameState.dealer as Seat}
 					turn={haloTurn}
-					sealStamp={sealStampFor(seatAt(1).seat)}
 					scoreDelta={scoreDeltaFor(seatAt(1).seat)}
 				/>
 
@@ -899,6 +898,11 @@
 							: m.tablePage_yourDiscardsAriaLabel()}
 						lastDiscardIndex={lastDiscardIndexFor(seatAt(0).seat)}
 					/>
+					{#if sealStamp && sealStampPosition}
+						{#key sealStamp.key}
+							<SealStamp glyph={sealStamp.glyph} position={sealStampPosition} />
+						{/key}
+					{/if}
 				</div>
 
 				<YourSeatRegion
@@ -912,7 +916,6 @@
 					discardMode={clientPrefs.discardMode}
 					onDiscard={discardTile}
 					{declareOptions}
-					sealStamp={sealStampFor(seatAt(0).seat)}
 					scoreDelta={scoreDeltaFor(seatAt(0).seat)}
 				/>
 			</div>
@@ -1173,6 +1176,10 @@
 			outline-offset: var(--space-2);
 			border-radius: var(--radius-sm);
 		}
+	}
+
+	.table-center {
+		position: relative;
 	}
 
 	// game-end content can be tall (podium + full score sheet + standings): the dialog scrolls
