@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { page } from 'vitest/browser';
 import { render, cleanupAll } from './test-render';
 import CenterDiscardPool from './CenterDiscardPool.svelte';
 import type { MockSeatState } from './mock-game-state';
@@ -121,4 +122,50 @@ describe('CenterDiscardPool', () => {
 		expect(rules.length).toBeGreaterThan(0);
 		for (const rule of rules) expect(rule.cssText).not.toContain('transform');
 	});
+
+	// the settle slides in from the discarder's own side. measured at the animation's first frame,
+	// in screen space, so every pool's own flip/rotation is accounted for (frontend.md §5 Motion).
+	const cases = [
+		['self', 'y', 1],
+		['across', 'y', -1],
+		['left', 'x', -1],
+		['right', 'x', 1]
+	] as const;
+	const viewports = [
+		[1024, 768],
+		[390, 844]
+	] as const;
+	for (const [position, axis, sign] of cases)
+		for (const [width, height] of viewports) {
+			it(`the ${position} pool's landing tile starts offset toward the ${position} seat at ${width}px`, async () => {
+				await page.viewport(width, height);
+				const root = document.documentElement;
+				root.dataset.motion = 'full';
+				// app.scss's tokens aren't loaded in a component spec; the animation needs these two.
+				root.style.setProperty('--dur-3', '320ms');
+				root.style.setProperty('--ease-place', 'linear');
+				const { target } = render(CenterDiscardPool, {
+					seat: mockSeat({ discards: ['1m', '2m'] }),
+					position,
+					ariaLabel: 'Discards',
+					lastDiscardIndex: 1
+				});
+				const face = target.querySelector<HTMLElement>('.discard-tile--last .tile-face')!;
+				const tile = face.parentElement!;
+				const [animation] = face.getAnimations();
+				expect(animation).toBeDefined();
+				animation.pause();
+				animation.currentTime = 0;
+				const f = face.getBoundingClientRect();
+				const t = tile.getBoundingClientRect();
+				const offset =
+					axis === 'y'
+						? f.top + f.height / 2 - (t.top + t.height / 2)
+						: f.left + f.width / 2 - (t.left + t.width / 2);
+				expect(Math.sign(offset)).toBe(sign);
+				delete root.dataset.motion;
+				root.style.removeProperty('--dur-3');
+				root.style.removeProperty('--ease-place');
+			});
+		}
 });
