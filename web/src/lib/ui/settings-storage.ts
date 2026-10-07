@@ -19,6 +19,7 @@ const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 const DISCARD_MODES: readonly DiscardMode[] = ['two-step', 'one-tap'];
 const DEFAULT_DISCARD_MODE: DiscardMode = 'two-step';
 const DEFAULT_HAPTICS = true;
+const DEFAULT_ANNOUNCE_ALL_DISCARDS = false;
 
 function isMotionPref(value: unknown): value is MotionPref {
 	return typeof value === 'string' && (MOTION_PREFS as readonly string[]).includes(value);
@@ -28,8 +29,8 @@ function isDiscardMode(value: unknown): value is DiscardMode {
 	return typeof value === 'string' && (DISCARD_MODES as readonly string[]).includes(value);
 }
 
-// only the fields that have always existed are required -- `discardMode` is newer and is
-// migrated (defaulted) in `loadClientPrefs` below, not discarded along with the whole object.
+// only the fields that have always existed are required -- `discardMode`/`haptics`/
+// `announceAllDiscards` are newer and are migrated (defaulted) in `loadClientPrefs` below.
 export function isClientPrefs(value: unknown): value is ClientPrefs {
 	if (typeof value !== 'object' || value === null) return false;
 	const v = value as Record<string, unknown>;
@@ -87,10 +88,13 @@ export function loadClientPrefs(): ClientPrefs | null {
 	if (raw === null) return null;
 	const rawDiscardMode = (raw as unknown as Record<string, unknown>).discardMode;
 	const rawHaptics = (raw as unknown as Record<string, unknown>).haptics;
+	const rawAnnounce = (raw as unknown as Record<string, unknown>).announceAllDiscards;
 	return {
 		...raw,
 		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_DISCARD_MODE,
-		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_HAPTICS
+		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_HAPTICS,
+		announceAllDiscards:
+			typeof rawAnnounce === 'boolean' ? rawAnnounce : DEFAULT_ANNOUNCE_ALL_DISCARDS
 	};
 }
 

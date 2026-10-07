@@ -8,7 +8,8 @@
 		soundEnabled: true,
 		motion: 'system',
 		discardMode: 'two-step',
-		haptics: true
+		haptics: true,
+		announceAllDiscards: false
 	});
 	let lastAutoArmSummary = $derived(
 		`no_calls=${autoArm.noCalls} auto_pass_chow=${autoArm.autoPassChow}`

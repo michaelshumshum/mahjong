@@ -1,12 +1,28 @@
 <script module lang="ts">
 	const openDialogs: HTMLDialogElement[] = [];
 
-	// fired whenever a modal opens or closes; anything that must stay interactive above a modal
-	// (the toast stack) moves itself into topmostDialog(), since everything outside it is inert.
+	// fired whenever a modal opens or closes.
 	export const TOP_LAYER_EVENT = 'mahjong:top-layer-change';
 
 	export function topmostDialog(): HTMLDialogElement | null {
 		return openDialogs.at(-1) ?? null;
+	}
+
+	// attachment: keeps `el` in the topmost open modal (else its parent), outside it is inert.
+	// `el` must be its parent's only child: svelte unmounts by walking sibling ranges.
+	export function followTopmostDialog(el: HTMLElement): () => void {
+		const home = el.parentElement;
+		if (!home) return () => {};
+		const place = () => {
+			const target = topmostDialog() ?? home;
+			if (el.parentElement !== target) target.append(el);
+		};
+		place();
+		window.addEventListener(TOP_LAYER_EVENT, place);
+		return () => {
+			window.removeEventListener(TOP_LAYER_EVENT, place);
+			el.remove();
+		};
 	}
 </script>
 

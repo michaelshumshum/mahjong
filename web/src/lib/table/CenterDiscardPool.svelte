@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
+	import { tileName } from './tile-name';
 	import type { MockSeatState } from './mock-game-state';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -24,6 +25,7 @@
 			class="discard-tile"
 			class:discard-tile--last={i === lastDiscardIndex}
 			role="listitem"
+			aria-label={m.centerDiscardPool_tileAriaLabel({ name: seat.name, tile: tileName(code) })}
 			title={i === lastDiscardIndex
 				? m.centerDiscardPool_lastDiscardTitle({ name: seat.name })
 				: undefined}

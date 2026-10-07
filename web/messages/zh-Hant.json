@@ -513,5 +513,18 @@
 	"tableToolbar_guideButton": "番數指南",
 	"tablesPage_updatedAt": "更新於 {time}",
 	"tablesPage_emptyTitle": "而家冇枱開緊",
-	"tableCard_compassAriaLabel": "枱邊座位"
+	"tableCard_compassAriaLabel": "枱邊座位",
+	"announcer_you": "你",
+	"announcer_discarded": "{name}打出{tile}",
+	"announcer_kongRob": "{name}用{tile}加槓",
+	"announcer_claimAvailable": "你可以叫呢隻牌",
+	"announcer_called": "{name}{meld}",
+	"announcer_declared": "{name}{meld}",
+	"announcer_yourTurn": "輪到你",
+	"announcer_youWin": "你食糊",
+	"announcer_handWon": "{name}食糊",
+	"announcer_handDraw": "流局",
+	"settings_announcementsLegend": "螢幕閱讀器",
+	"settings_announceAllDiscardsLabel": "讀出每隻打出嘅牌",
+	"centerDiscardPool_tileAriaLabel": "{name}打出{tile}"
 }

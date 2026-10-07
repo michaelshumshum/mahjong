@@ -48,6 +48,12 @@
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
 	import ToastStack from '$lib/ui/ToastStack.svelte';
+	import Announcer from '$lib/ui/Announcer.svelte';
+	import {
+		announceSnapshot,
+		announcementsBetween,
+		type AnnounceSnapshot
+	} from '$lib/ui/announcements';
 	import ConnectionBanner from '$lib/ui/ConnectionBanner.svelte';
 	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
@@ -451,6 +457,19 @@
 		hapticsPrevClaimOffer = offering;
 	});
 
+	// P4.3 live announcements: diffed off the same view model the table renders, so mock and
+	// live share it; a scenario/hand change only re-baselines (announcementsBetween).
+	let announcer: Announcer | undefined = $state();
+	let announcePrev: AnnounceSnapshot | null = null;
+	$effect(() => {
+		const handKey = `${isMock ? scenarioId : 'live'}:${gameState.handNo}`;
+		const yourTurn = !isMock && discardableTileIds.size > 0;
+		const next = announceSnapshot(gameState, handKey, yourTurn, spectating);
+		const lines = announcementsBetween(announcePrev, next, clientPrefs.announceAllDiscards);
+		announcePrev = next;
+		announcer?.announce(lines);
+	});
+
 	// P3.1(d) claim seal stamp: a transient signal off a seat's own meld count growing, never
 	// set under reduced motion. Keyed on `scenarioId`/`handNo` so a scenario/hand change resets.
 	const MELD_SEAL_GLYPH: Record<MeldKind, string> = {
@@ -749,7 +768,8 @@
 			soundEnabled: true,
 			motion: 'system',
 			discardMode: 'two-step',
-			haptics: true
+			haptics: true,
+			announceAllDiscards: false
 		}
 	);
 	// guards the one-shot re-send above per live connection instance, mirroring `readySent`.
@@ -1000,6 +1020,7 @@
 		{/if}
 
 		<ToastStack queue={toastQueue} onDismiss={dismissToast} />
+		<Announcer bind:this={announcer} />
 	</div>
 {:else}
 	<h1 class="sr-only">{m.tablePage_heading()}</h1>

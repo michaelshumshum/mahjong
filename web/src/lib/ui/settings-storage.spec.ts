@@ -73,7 +73,8 @@ describe('settings-storage', () => {
 				soundEnabled: false,
 				motion: 'reduced',
 				discardMode: 'one-tap',
-				haptics: false
+				haptics: false,
+				announceAllDiscards: true
 			};
 			saveClientPrefs(prefs);
 			expect(loadClientPrefs()).toEqual(prefs);
@@ -92,7 +93,8 @@ describe('settings-storage', () => {
 				soundEnabled: true,
 				motion: 'system',
 				discardMode: 'two-step',
-				haptics: true
+				haptics: true,
+				announceAllDiscards: false
 			});
 		});
 
@@ -115,6 +117,25 @@ describe('settings-storage', () => {
 				})
 			);
 			expect(loadClientPrefs()?.haptics).toBe(false);
+		});
+
+		it('migrates a pre-announcement stored value to announcing claim-relevant discards only', () => {
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({
+					soundEnabled: true,
+					motion: 'system',
+					discardMode: 'one-tap',
+					haptics: false
+				})
+			);
+			expect(loadClientPrefs()).toEqual({
+				soundEnabled: true,
+				motion: 'system',
+				discardMode: 'one-tap',
+				haptics: false,
+				announceAllDiscards: false
+			});
 		});
 
 		it('discards an invalid stored discardMode in favour of the default', () => {
@@ -346,7 +367,8 @@ describe('settings-storage', () => {
 					soundEnabled: true,
 					motion: 'full',
 					discardMode: 'two-step',
-					haptics: true
+					haptics: true,
+					announceAllDiscards: false
 				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
@@ -366,7 +388,8 @@ describe('settings-storage', () => {
 					soundEnabled: true,
 					motion: 'full',
 					discardMode: 'two-step',
-					haptics: true
+					haptics: true,
+					announceAllDiscards: false
 				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();

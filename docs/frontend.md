@@ -505,7 +505,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | --- | --- | --- |
 | `mahjong:seat:v2:<tableId>` | this browser's seat at that table (`saveSeatForTable`/`loadSeatForTable`) | saved the moment `state_sync` confirms a seat; fed back into `connect()` on mount. Without it a reload falls into the seat picker and `join` fails with `table_full` |
 | `mahjong:reconnectSecret:v2:<tableId>` | `join`'s `reconnect_secret` (`saveSecretForTable`/`loadSecretForTable`) | presented on every `hello{seat, secret}` ([architecture.md §2.1](architecture.md)); stale `v1` keys are swept on load |
-| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics` | purely local; `discardMode`/`haptics` postdate this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
+| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards` | purely local; `discardMode`/`haptics`/`announceAllDiscards` postdate this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
@@ -999,8 +999,27 @@ fluent Hong Kong mahjong player.
   - State changes always apply instantly; only the motion is dropped.
 - **Discard pools** are real DOM and stay fully present when visually truncated on mobile.
 
-**Designed, not implemented:** per-discard announcements. Intended shape: each discard a focusable
-`role="listitem"` in a per-seat `role="list"` with `aria-label="{seat} discarded {tile}, turn {n}"`,
-plus an `aria-live="polite"` region with one line per discard. At ~80 discards/hand, default
-verbosity would announce claim-relevant discards, claim results and hand end, with a setting for
-"every discard". `CenterDiscardPool.svelte` has none of this yet.
+**Live announcements.** One polite region per table page (`lib/ui/Announcer.svelte`, `role="status"`,
+`aria-atomic`). `+page.svelte` snapshots the same view model the table renders
+(`lib/ui/announcements.ts`'s `announceSnapshot`) after every update and `announcementsBetween(prev,
+next, everyDiscard)` turns the difference into lines:
+
+| Event | Line (en) | When |
+| --- | --- | --- |
+| a discard you can claim | "Bob discarded 3 Bamboo. You can claim it" | claim offer's rising edge (a robbable kong reads "Carol is adding Red Dragon to a kong") |
+| any discard | "Bob discarded 3 Bamboo" / "You discarded …" | only with Settings' "Announce every discard" (`ClientPrefs.announceAllDiscards`, default off — ~80 discards a hand is noise by default) |
+| a call / concealed kong | "Bob called Pung" / "Carol declared Concealed kong" | a seat's meld count grows |
+| your turn | "Your turn" | rising edge of having a legal discard (live only) |
+| hand end | "Bob wins" / "You win" / "Hand ended in a draw" | the hand result appearing |
+
+- A hand or mock-scenario change only re-baselines: a jump between snapshots is not an event.
+- Spectators have no "you"; every seat is named.
+- `announce()` debounces: lines queue and flush 300ms after the last one, at most the latest 4,
+  joined into one update, so a resync burst or a discard+claim pair doesn't interrupt itself. A
+  toggled trailing zero-width space makes an identical repeat ("Your turn" twice) still change the
+  region.
+- The region follows the topmost open modal (`ModalDialog`'s `followTopmostDialog`, same as
+  toasts), or it would be inert — and silent — under the claim and hand-end dialogs.
+- Each discard-pool tile is a `role="listitem"` labelled "Bob discarded 3 Bamboo" inside its seat's
+  labelled `role="list"`. Not focusable: the pools are browsed with the screen reader's own
+  list navigation, and ~80 extra tab stops would bury the hand.

@@ -25,6 +25,8 @@
 		motion: MotionPref;
 		discardMode: DiscardMode;
 		haptics: boolean;
+		// screen-reader verbosity: every discard, not just claim-relevant ones (frontend.md §9).
+		announceAllDiscards: boolean;
 	}
 
 	let {
@@ -108,6 +110,15 @@
 				onChange={() => onPrefsChange({ ...prefs, discardMode: option.value })}
 			/>
 		{/each}
+	</FormGroup>
+
+	<FormGroup legend={m.settings_announcementsLegend()}>
+		<OptionRow
+			type="checkbox"
+			label={m.settings_announceAllDiscardsLabel()}
+			checked={prefs.announceAllDiscards}
+			onChange={(checked) => onPrefsChange({ ...prefs, announceAllDiscards: checked })}
+		/>
 	</FormGroup>
 
 	<LocaleSwitcher />

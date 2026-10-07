@@ -60,6 +60,18 @@ describe('CenterDiscardPool', () => {
 		expect(target.innerHTML).toContain('src="/tiles/Chun.svg"');
 	});
 
+	it('names who discarded each tile', () => {
+		const { target } = render(CenterDiscardPool, {
+			seat: mockSeat({ name: 'Bob', discards: ['3s', 'z5'] }),
+			position: 'right',
+			ariaLabel: "Bob's discards"
+		});
+		const labels = [...target.querySelectorAll('.discard-tile')].map((t) =>
+			t.getAttribute('aria-label')
+		);
+		expect(labels).toEqual(['Bob discarded 3 Bamboo', 'Bob discarded Red Dragon']);
+	});
+
 	it('renders an empty pool with no tiles', () => {
 		const { target } = render(CenterDiscardPool, {
 			seat: mockSeat(),

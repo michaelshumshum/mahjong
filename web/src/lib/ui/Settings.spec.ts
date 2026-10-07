@@ -12,7 +12,8 @@ describe('Settings', () => {
 		soundEnabled: false,
 		motion: 'system',
 		discardMode: 'two-step',
-		haptics: false
+		haptics: false,
+		announceAllDiscards: false
 	};
 
 	it('renders both pre-arm toggles unchecked when both are off', () => {
@@ -37,7 +38,8 @@ describe('Settings', () => {
 			soundEnabled: true,
 			motion: 'system',
 			discardMode: 'two-step',
-			haptics: false
+			haptics: false,
+			announceAllDiscards: false
 		};
 		const { body } = render(Settings, {
 			props: { autoArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -50,7 +52,8 @@ describe('Settings', () => {
 			soundEnabled: false,
 			motion: 'reduced',
 			discardMode: 'two-step',
-			haptics: false
+			haptics: false,
+			announceAllDiscards: false
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -80,7 +83,8 @@ describe('Settings', () => {
 			soundEnabled: false,
 			motion: 'system',
 			discardMode: 'two-step',
-			haptics: true
+			haptics: true,
+			announceAllDiscards: false
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -93,7 +97,8 @@ describe('Settings', () => {
 			soundEnabled: false,
 			motion: 'system',
 			discardMode: 'one-tap',
-			haptics: false
+			haptics: false,
+			announceAllDiscards: false
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -101,5 +106,21 @@ describe('Settings', () => {
 		expect([...body.matchAll(/type="radio"[^>]*name="discardMode"/g)]).toHaveLength(2);
 		expect(body).toMatch(/value="one-tap"[^>]*checked/);
 		expect(body).not.toMatch(/value="two-step"[^>]*checked/);
+	});
+
+	it('offers an "Announce every discard" toggle, off by default', () => {
+		const { body } = render(Settings, {
+			props: { autoArm: offArm, prefs: offPrefs, onAutoArmChange: noop, onPrefsChange: noop }
+		});
+		expect(body).toContain('Announce every discard');
+		const on = render(Settings, {
+			props: {
+				autoArm: offArm,
+				prefs: { ...offPrefs, announceAllDiscards: true },
+				onAutoArmChange: noop,
+				onPrefsChange: noop
+			}
+		});
+		expect([...on.body.matchAll(/type="checkbox"[^>]*checked/g)]).toHaveLength(1);
 	});
 });
