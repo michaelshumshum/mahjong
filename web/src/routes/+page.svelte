@@ -31,45 +31,69 @@
 </script>
 
 <div class="lobby">
-	<h1 class="sr-only">{m.lobby_title()}</h1>
-	<div class="actions">
-		<button
-			type="button"
-			class="primary"
-			data-testid="lobby-create-table"
-			onclick={() => (showCreateDialog = true)}
-		>
-			{m.lobby_createTableButton()}
-		</button>
-		<a class="secondary" data-testid="lobby-join-game-link" href="/tables"
-			>{m.lobby_joinGameLink()}</a
-		>
-		<button
-			type="button"
-			class="secondary"
-			data-testid="lobby-practice-bots"
-			onclick={() => (showPracticeDialog = true)}
-		>
-			{m.lobby_practiceButton()}
-		</button>
-		<div class="row">
+	<div class="lobby-inner">
+		<header class="brand">
+			<span class="seal" aria-hidden="true">{m.lobby_sealMark()}</span>
+			<div class="brand-text">
+				<h1 class="title">{m.lobby_title()}</h1>
+				<p class="tagline">{m.lobby_tagline()}</p>
+			</div>
+		</header>
+
+		<!-- the button is the card's accessible name; its ::after stretches the hit area over
+		the whole card so the description stays outside the name. -->
+		<ul class="actions">
+			<li class="action-card">
+				<span class="action-glyph" aria-hidden="true">{m.lobby_createTableGlyph()}</span>
+				<button
+					type="button"
+					class="action-title"
+					data-testid="lobby-create-table"
+					aria-describedby="lobby-create-desc"
+					onclick={() => (showCreateDialog = true)}>{m.lobby_createTableButton()}</button
+				>
+				<p id="lobby-create-desc" class="action-desc">{m.lobby_createTableDesc()}</p>
+			</li>
+			<li class="action-card">
+				<span class="action-glyph" aria-hidden="true">{m.lobby_practiceGlyph()}</span>
+				<button
+					type="button"
+					class="action-title"
+					data-testid="lobby-practice-bots"
+					aria-describedby="lobby-practice-desc"
+					onclick={() => (showPracticeDialog = true)}>{m.lobby_practiceButton()}</button
+				>
+				<p id="lobby-practice-desc" class="action-desc">{m.lobby_practiceDesc()}</p>
+			</li>
+			<li class="action-card">
+				<span class="action-glyph" aria-hidden="true">{m.lobby_guideGlyph()}</span>
+				<button
+					type="button"
+					class="action-title"
+					data-testid="lobby-guide"
+					aria-describedby="lobby-guide-desc"
+					onclick={() => (showGuide = true)}>{m.lobby_guideButton()}</button
+				>
+				<p id="lobby-guide-desc" class="action-desc">{m.lobby_guideDesc()}</p>
+			</li>
+		</ul>
+
+		<nav class="quiet-links">
+			<span>
+				{m.lobby_joinGamePrompt()}
+				<a class="quiet-link" data-testid="lobby-join-game-link" href="/tables"
+					>{m.lobby_joinGameLink()}</a
+				>
+			</span>
 			<button
 				type="button"
-				class="secondary"
-				data-testid="lobby-guide"
-				onclick={() => (showGuide = true)}
-			>
-				{m.lobby_guideButton()}
-			</button>
-			<button
-				type="button"
-				class="secondary"
+				class="quiet-link"
 				data-testid="lobby-language"
 				onclick={() => setLocale(getLocale() === 'en' ? 'zh-Hant' : 'en')}
 			>
 				{m.lobby_languageButton()}
 			</button>
-		</div>
+		</nav>
 	</div>
 </div>
 
@@ -89,63 +113,203 @@
 {/if}
 
 <style lang="scss">
-	@use '$lib/styles/buttons';
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/layout';
 
 	.lobby {
 		position: relative;
 		z-index: var(--z-hud);
 		display: flex;
-		align-items: flex-end;
+		align-items: center;
 		justify-content: center;
 		min-height: 100dvh;
 		padding: var(--space-8) var(--space-5);
 
 		@include layout.phone-only {
-			align-items: center;
+			padding: var(--space-6) var(--space-4);
 		}
+	}
+
+	.lobby-inner {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-6);
+		width: min(56rem, 100%);
+	}
+
+	.brand {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-5);
+
+		@include layout.phone-only {
+			gap: var(--space-4);
+		}
+	}
+
+	// carved-seal mark: vertical CJK in an ink-red stamp, slightly rotated like a hand press.
+	.seal {
+		flex: none;
+		display: grid;
+		place-items: center;
+		writing-mode: vertical-rl;
+		padding: var(--space-2) var(--space-1);
+		border: 3px double var(--color-text);
+		border-radius: var(--radius-sm);
+		background: var(--color-accent);
+		color: var(--color-text);
+		font-size: calc(var(--font-size-display) * 0.42);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: 0.08em;
+		box-shadow: 0 6px 18px -4px rgb(10 4 2 / 0.7);
+		transform: rotate(-4deg);
+	}
+
+	.title {
+		margin: 0;
+		font-size: var(--font-size-display);
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		line-height: 1;
+		text-shadow: 0 2px 12px rgb(0 0 0 / 0.6);
+	}
+
+	.tagline {
+		margin: var(--space-2) 0 0;
+		max-width: 28rem;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-base);
 	}
 
 	.actions {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-3);
-		width: min(20rem, 100%);
-	}
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: var(--space-4);
+		margin: 0;
+		padding: 0;
+		list-style: none;
 
-	.row {
-		display: flex;
-		gap: var(--space-3);
-
-		> .secondary {
-			flex: 1 1 0;
-			min-width: 0;
-			font-size: var(--font-size-base);
-			padding-inline: var(--space-2);
+		@include layout.phone-only {
+			grid-template-columns: 1fr;
+			gap: var(--space-3);
 		}
 	}
 
-	.primary,
-	.secondary {
+	.action-card {
+		position: relative;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		grid-template-areas:
+			'glyph title'
+			'glyph desc';
+		column-gap: var(--space-3);
+		row-gap: var(--space-1);
+		align-content: start;
+		padding: var(--space-4);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--color-surface-raised) 92%, transparent);
+		box-shadow:
+			inset 0 1px 0 rgb(255 255 255 / 0.06),
+			0 10px 24px -8px rgb(10 4 2 / 0.7);
+		transition:
+			transform var(--dur-1) var(--ease-out),
+			border-color var(--dur-1) var(--ease-out);
+
+		&:hover {
+			border-color: color-mix(in srgb, var(--color-brass) 55%, var(--color-border) 45%);
+		}
+
+		&:has(.action-title:focus-visible) {
+			@include a11y.focus-ring;
+		}
+
+		@include a11y.motion-ok {
+			&:hover {
+				transform: translateY(-2px);
+			}
+		}
+	}
+
+	.action-glyph {
+		grid-area: glyph;
+		display: grid;
+		place-items: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: var(--radius-sm);
+		background: var(--color-tile);
+		color: var(--color-tile-ink);
+		font-size: var(--font-size-lg);
+		font-weight: 700;
+		box-shadow:
+			0 2px 0 var(--color-tile-edge),
+			0 4px 0 var(--color-tile-side);
+	}
+
+	.action-title {
+		grid-area: title;
+		justify-self: start;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--color-text);
 		font: inherit;
 		font-size: var(--font-size-lg);
-		padding: var(--space-3) var(--space-4);
-		min-height: var(--tap-target-min);
+		font-weight: 700;
+		line-height: 1.2;
+		text-align: start;
 		cursor: pointer;
+
+		// stretched hit area: the whole card is one tap target, at least --tap-target-min tall.
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			border-radius: inherit;
+		}
+
+		&:focus-visible {
+			outline: none;
+		}
 	}
 
-	.primary {
-		@include buttons.btn-primary;
+	.action-desc {
+		grid-area: desc;
+		margin: 0;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		line-height: 1.4;
 	}
 
-	.secondary {
-		@include buttons.btn-secondary;
-	}
-
-	a.secondary {
-		display: inline-flex;
+	.quiet-links {
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: center;
-		text-decoration: none;
+		gap: var(--space-2) var(--space-5);
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+	}
+
+	.quiet-link {
+		display: inline-flex;
+		align-items: center;
+		min-height: var(--tap-target-min);
+		padding: 0 var(--space-1);
+		border: none;
+		background: none;
+		color: var(--color-text);
+		font: inherit;
+		text-decoration: underline;
+		text-decoration-color: color-mix(in srgb, var(--color-brass) 60%, transparent);
+		text-underline-offset: 0.2em;
+		cursor: pointer;
+
+		&:hover {
+			color: var(--color-brass);
+		}
 	}
 </style>

@@ -469,5 +469,14 @@
 	"claimDialog_keyHintAriaLabel": "按{n}鍵",
 	"settings_discardModeLegend": "打牌方式",
 	"settings_discardModeTwoStepLabel": "兩步 (先提起，再確認)",
-	"settings_discardModeOneTapLabel": "一按即出"
+	"settings_discardModeOneTapLabel": "一按即出",
+	"lobby_sealMark": "麻雀",
+	"lobby_tagline": "同朋友或者機械人打香港麻雀，開瀏覽器就玩得。",
+	"lobby_createTableDesc": "揀好規則，分享連結俾朋友。",
+	"lobby_practiceDesc": "自己一個對三個機械人，難度由你揀。",
+	"lobby_guideDesc": "所有番種，附牌例。",
+	"lobby_joinGamePrompt": "有枱號？",
+	"lobby_createTableGlyph": "卓",
+	"lobby_practiceGlyph": "機",
+	"lobby_guideGlyph": "番"
 }

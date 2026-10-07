@@ -469,5 +469,14 @@
 	"claimDialog_keyHintAriaLabel": "press {n}",
 	"settings_discardModeLegend": "Discard",
 	"settings_discardModeTwoStepLabel": "Two-step (lift, then confirm)",
-	"settings_discardModeOneTapLabel": "One-tap"
+	"settings_discardModeOneTapLabel": "One-tap",
+	"lobby_sealMark": "麻雀",
+	"lobby_tagline": "Hong Kong mahjong with friends or bots, right in your browser.",
+	"lobby_createTableDesc": "Pick the rules and share a link with friends.",
+	"lobby_practiceDesc": "A solo game against three bots at your chosen level.",
+	"lobby_guideDesc": "Every scoring pattern, with example hands.",
+	"lobby_joinGamePrompt": "Have a code?",
+	"lobby_createTableGlyph": "卓",
+	"lobby_practiceGlyph": "機",
+	"lobby_guideGlyph": "番"
 }

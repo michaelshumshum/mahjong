@@ -65,7 +65,7 @@ Costs:
 **Exception: the background mural.** `lib/ui/TileMuralBackground.svelte` is a real `<canvas>`: a
 continuously vertically-scrolling grid of randomized tile faces (the 34 playable faces plus the
 tile back), under a `backdrop-filter: blur() brightness()` scrim (a sibling element in front of the
-canvas) so foreground content stays legible. Purely decorative (`aria-hidden`,
+canvas, plus a radial darkening toward the centre) so foreground content stays legible. Purely decorative (`aria-hidden`,
 `pointer-events: none`), so it loses nothing the DOM would give. A DOM version would animate ~200
 elements' `transform` every frame; the canvas does one `drawImage` blit of a pre-rendered
 off-screen buffer.
@@ -562,7 +562,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 
 | Route | SSR | Notes |
 | --- | --- | --- |
-| `/` | on | lobby: "Create a table", "Join a game" (→ `/tables`), "Practice vs Bots", "Faan guide", a language toggle, over the mural |
+| `/` | on | lobby (below), over the mural |
 | `/tables` | on | table browser; fetches its listing client-side |
 | `/demo` | on | dev component demos, no backend |
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
@@ -592,9 +592,21 @@ every `RuleSet` field except `multi_win`, grouped scoring/flow/variants/fairness
 calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates to `/table/<table_id>`. The
 waiting room shows the resolved preset name (`PretableScreen.svelte`).
 
+### Lobby
+
+A brand lockup (a 麻雀 seal mark beside a visible `--font-size-display` "Mahjong" `h1` and a
+one-line tagline), then three **equal-weight** action cards — "Create a table", "Practice vs Bots",
+"Faan guide" — each a tile-glyph icon, a title and a one-line description. No hero card: the three
+are peers by design. The card's `<button>` holds only the title (its accessible name, which e2e and
+the screenshot script match exactly); the description sits outside it, wired up via
+`aria-describedby`, and the button's `::after` stretches the hit area over the whole card. Below
+the cards, quiet underlined links: "Have a code? Join a game" (→ `/tables`) and the language
+toggle. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
+middle (a radial gradient) so this copy reads over the tiles.
+
 ### Faan guide and language toggle
 
-Two buttons under "Practice vs Bots". The language button calls `setLocale()` with the other locale
+The language link calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
 stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per faan count (1-8)
 plus Limit, each a list of patterns with a description and a tile example. The dialog is a fixed

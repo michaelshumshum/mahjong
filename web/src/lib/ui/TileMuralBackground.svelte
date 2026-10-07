@@ -243,9 +243,15 @@
 		z-index: var(--z-table);
 		pointer-events: none;
 		// prefixed first: the prod minifier keeps the last of an identical pair, so unprefixed must come last
-		-webkit-backdrop-filter: blur(3px) brightness(0.55);
-		backdrop-filter: blur(3px) brightness(0.55);
-		background: rgb(0 0 0 / 0.25);
+		-webkit-backdrop-filter: blur(3px) brightness(0.5);
+		backdrop-filter: blur(3px) brightness(0.5);
+		// darker in the middle, where lobby/pre-game copy sits over the mural.
+		background: radial-gradient(
+			ellipse 70% 60% at 50% 50%,
+			rgb(0 0 0 / 0.6),
+			rgb(0 0 0 / 0.3) 75%,
+			rgb(0 0 0 / 0.2)
+		);
 		transition: opacity 220ms ease;
 	}
 
