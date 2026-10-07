@@ -233,7 +233,8 @@ test('the motion setting drives html[data-motion] and overrides prefers-reduced-
 	await page.waitForLoadState('networkidle');
 
 	const html = page.locator('html');
-	const ring = page.locator('.seat-region--self .progress').first();
+	// CenterHub (P1.2) now carries the acting seat's timer ring, not the seat header.
+	const ring = page.locator('.hub-marker-ring .progress').first();
 	await expect(html).toHaveAttribute('data-motion', 'system');
 	await expect(ring).toHaveCSS('animation-name', 'none');
 
