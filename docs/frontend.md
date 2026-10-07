@@ -346,8 +346,8 @@ risk: it's an acknowledgment, and the table advances at the same `deadline_ts` r
 
 **`ClaimDialog` layout.** Each option is a big button (meld preview above it, the localized kind
 label inside, a `1`-`N` key-hint badge; no CJK call glyph, no sub-label) — Win gets the same
-accent-glow treatment as a `SeatPlate` turn halo, sized up from its siblings, since it's the one
-choice worth making unmissable. Pass is always its own full-width row below the call options,
+accent-glow treatment as a `SeatPlate` turn halo, since it's the one choice worth making
+unmissable, but every call button (Win included) shares one fixed size. Pass is always its own full-width row below the call options,
 never beside them, and carries an "Esc" hint instead of a number; `1`-`N` index the call options
 only. Initial focus lands
 on Pass (an `$effect` with no reactive reads, so it fires once per mount — the dialog only mounts

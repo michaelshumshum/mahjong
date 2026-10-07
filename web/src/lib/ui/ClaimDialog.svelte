@@ -225,10 +225,10 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		justify-content: center;
 		gap: 2px;
-		min-width: 6rem;
 		min-height: var(--tap-target-min);
-		padding: var(--space-3) var(--space-4);
+		padding: var(--space-2) var(--space-3);
 		font: inherit;
 		cursor: pointer;
 	}
@@ -246,8 +246,12 @@
 	}
 
 	.claim-btn-label {
-		font-size: var(--font-size-lg);
 		font-weight: 700;
+	}
+
+	// every call button shares one fixed size; only pass differs.
+	.claim-calls .claim-btn {
+		width: 5.5rem;
 	}
 
 	.claim-btn--chow,
@@ -260,17 +264,10 @@
 		@include buttons.btn-ghost;
 	}
 
-	// Win is the one option worth making unmissable -- accent background, bigger than its
-	// siblings, with the same glow treatment as SeatPlate's turn halo.
+	// win stands out by colour and the SeatPlate turn-halo glow, not size.
 	.claim-btn--win {
-		min-width: 7rem;
-		padding: var(--space-4) var(--space-5);
 		box-shadow: 0 0 0 4px var(--color-accent-glow);
 		@include buttons.btn-primary;
-	}
-
-	.claim-btn--win .claim-btn-label {
-		font-size: var(--font-size-xl);
 	}
 
 	// phone: a bottom sheet instead of a centred card -- `.claim-overlay` (+page.svelte) still
