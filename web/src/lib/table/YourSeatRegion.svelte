@@ -54,10 +54,6 @@
 		declareOptions: DeclareOption[];
 	} = $props();
 
-	// CenterHub carries the timer ring; this plain-text prompt is for your own seat, where a
-	// ring alone (on a seat you're always looking at) is easy to miss.
-	let isYourTurn = $derived(!spectating && seat.seat === turn && discardableTileIds.size > 0);
-
 	// two-step: the lifted tile is presentation-only state, never game truth. A second tap/Enter
 	// on it (same button, same onclick) discards; another tile moves the lift; outside-click/Esc clears it.
 	let liftedTileId = $state<number | null>(null);
@@ -171,10 +167,6 @@
 	/>
 
 	<div class="your-hand">
-		{#if isYourTurn || (isMock && seat.seat === turn && !spectating)}
-			<p class="turn-prompt">{m.yourSeatRegion_yourTurnPrompt()}</p>
-		{/if}
-
 		<!-- spectators get the opponents' tile size: no seat here is "yours" -->
 		{#if spectating && seat.concealedHand}
 			<div
@@ -272,14 +264,6 @@
 	.seat-region--self {
 		grid-area: self;
 		container-type: inline-size;
-	}
-
-	// echoes SeatPlate's halo colour so the prompt reads as the same signal, not a second one.
-	.turn-prompt {
-		margin: 0;
-		color: var(--color-accent);
-		font-weight: 600;
-		font-size: var(--font-size-sm);
 	}
 
 	.tile-row {

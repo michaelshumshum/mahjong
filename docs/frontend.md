@@ -133,9 +133,9 @@ wind glyph instead of "seat N" — wall count and prevailing wind moved to `Cent
 `::before` so the plate's own box — and the header's layout — never changes size between turns (the
 original whole-region outline is gone from `OpponentRegion`, which previously shifted against the
 felt grain; `.seat-region--turn` stays as a class-only hook so existing specs/e2e still find it,
-carrying no visual rule of its own). Your own seat gets the same plate plus a
-"Your turn — discard a tile" prompt above the hand, since a halo alone on the seat you're always
-looking at is easy to miss. Desktop/tablet (≥768px):
+carrying no visual rule of its own). Your own seat gets the same plate and no extra text prompt:
+the halo, the hub's timer ring and the raised/clickable hand tiles already say it's your turn.
+Desktop/tablet (≥768px):
 
 ```
   header: table/scenario · your wind · chrome toggles
