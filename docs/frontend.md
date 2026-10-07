@@ -336,7 +336,7 @@ are up" is not a stable client state:
 | `claim_resolved` names another seat while this seat's buttons were live | Remove buttons immediately, no fade — the option stopped existing. Toast only for a non-obvious loss (someone else won/konged the tile). |
 | `claim_resolved` with no seat | Remove buttons immediately; play continues. |
 | Local `claim` arrives after the window closed | Server drops it (stale `window_id`) or acks `{ok:false}`. Brief "too slow" toast; nothing else changes. |
-| Dialog's own timer runs out before `claim_resolved` arrives | Auto-select `pass` through the same `onChoose` path as a click (`DialogTimer.svelte`), mirroring the server's own claim-timeout PASS ([protocol.md §4](protocol.md)). |
+| Dialog's own timer runs out before `claim_resolved` arrives | Auto-select `pass` through the same `onChoose` path as a click (`DialogTimer.svelte`), mirroring the server's own claim-timeout PASS ([protocol.md §4](protocol.md)). When the server's timeout wins the race, the late pass is still acked `ok:true`, so no toast. |
 | A pre-armed toggle covers this offer | No buttons render — the server resolves it instantly. |
 
 Accepted tradeoff: a click in the last few ms before the local timer fires can lose to the

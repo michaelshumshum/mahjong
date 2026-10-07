@@ -370,6 +370,11 @@ class Session:
         return True, None
 
     def _apply_claim(self, seat: int, d: proto.ClaimPayload) -> tuple[bool, str | None]:
+        window = self.table.state.claim_window
+        if d.choice == "pass" and (window is None or window.window_id != d.window_id):
+            # client auto-pass races the server's own timeout at the same deadline; outcome is
+            # a pass either way.
+            return True, None
         action = self._build_claim_action(seat, d)
         if action is None:
             return False, "illegal"

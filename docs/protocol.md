@@ -140,7 +140,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand played; `scores` are final absolute totals. Sent only after the final hand's hold resolves |
 | `seat_state` | `{seat, status, name?}` | `status`: `connected\|disconnected\|autoplay\|bot`. Sent for every status change of a bound seat, including the empty→`connected` transition `join` causes. `name` is carried on every broadcast for that seat |
 | `server_shutdown` | `{deadline_ts}` | broadcast once to every seat ever bound when a graceful-shutdown drain starts ([architecture.md §8.1](architecture.md)) |
-| `ack` | `{id, ok, error?, reconnect_secret?}` | **sender-only**, never broadcast — it would leak another player's `id`. Acknowledges receipt/idempotency, not legality: `Table` still silently drops a well-formed but illegal command. `reconnect_secret` only on a successful `join` (§5) |
+| `ack` | `{id, ok, error?, reconnect_secret?}` | **sender-only**, never broadcast — it would leak another player's `id`. Acknowledges receipt/idempotency, not legality: `Table` still silently drops a well-formed but illegal command. `reconnect_secret` only on a successful `join` (§5). A `claim` `pass` naming a closed/superseded window is acked `ok:true` as a no-op (the client's auto-pass races the server's own timeout); any other choice on a stale window gets `ok:false, error:"illegal"` |
 | `error` | `{code, message}` | |
 | `pong` | `{t0, t1}` | |
 

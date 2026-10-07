@@ -340,13 +340,30 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
 
         # a genuinely illegal claim (unknown window) still gets ok=False without ever
         # reaching Table.submit -- and is itself idempotent under the same id contract.
-        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pass"}, id_="bad-1"))
+        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pung"}, id_="bad-1"))
         bad_ack = ws.receive_json()
         assert bad_ack["d"] == {"id": "bad-1", "ok": False, "error": "illegal"}
 
-        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pass"}, id_="bad-1"))
+        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pung"}, id_="bad-1"))
         bad_ack_retry = ws.receive_json()
         assert bad_ack_retry["d"] == {"id": "bad-1", "ok": False, "error": "illegal"}
+
+
+def test_pass_on_a_closed_claim_window_is_acked_ok() -> None:
+    """The client's dialog auto-passes at the same deadline the server times the window out on,
+    so its pass routinely lands after the window closed -- the seat's outcome is a pass either
+    way, so it must not come back as `illegal`."""
+    table_id = f"stale-pass-{uuid.uuid4()}"
+
+    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
+        ws.send_json(_msg("hello", {"client_version": "test"}))
+        ws.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        assert ws.receive_json()["t"] == "seat_state"
+        assert ws.receive_json()["t"] == "state_sync"
+        assert ws.receive_json()["d"]["ok"] is True
+
+        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pass"}, id_="late-pass"))
+        assert ws.receive_json()["d"] == {"id": "late-pass", "ok": True}
 
 
 def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
