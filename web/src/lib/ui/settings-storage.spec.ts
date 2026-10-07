@@ -63,13 +63,33 @@ describe('settings-storage', () => {
 
 	describe('clientPrefs', () => {
 		it('round-trips a saved value', () => {
-			const prefs: ClientPrefs = { soundEnabled: false, motion: 'reduced' };
+			const prefs: ClientPrefs = { soundEnabled: false, motion: 'reduced', discardMode: 'one-tap' };
 			saveClientPrefs(prefs);
 			expect(loadClientPrefs()).toEqual(prefs);
 		});
 
 		it('returns null when nothing has been stored', () => {
 			expect(loadClientPrefs()).toBeNull();
+		});
+
+		it('migrates a pre-discardMode stored value to the two-step default', () => {
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({ soundEnabled: true, motion: 'system' })
+			);
+			expect(loadClientPrefs()).toEqual({
+				soundEnabled: true,
+				motion: 'system',
+				discardMode: 'two-step'
+			});
+		});
+
+		it('discards an invalid stored discardMode in favour of the default', () => {
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({ soundEnabled: true, motion: 'system', discardMode: 'swipe' })
+			);
+			expect(loadClientPrefs()?.discardMode).toBe('two-step');
 		});
 
 		it('falls back to null on malformed JSON rather than throwing', () => {
@@ -255,7 +275,9 @@ describe('settings-storage', () => {
 			};
 			(globalThis as { localStorage?: Storage }).localStorage = throwing;
 
-			expect(() => saveClientPrefs({ soundEnabled: true, motion: 'full' })).not.toThrow();
+			expect(() =>
+				saveClientPrefs({ soundEnabled: true, motion: 'full', discardMode: 'two-step' })
+			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
 			expect(() => saveDisplayName('Alice')).not.toThrow();
 			expect(() => clearSeatForTable('x')).not.toThrow();
@@ -268,7 +290,9 @@ describe('settings-storage', () => {
 		it('save and load never throw when localStorage is undefined entirely', () => {
 			delete (globalThis as { localStorage?: Storage }).localStorage;
 
-			expect(() => saveClientPrefs({ soundEnabled: true, motion: 'full' })).not.toThrow();
+			expect(() =>
+				saveClientPrefs({ soundEnabled: true, motion: 'full', discardMode: 'two-step' })
+			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
 			expect(() => saveDisplayName('Alice')).not.toThrow();
 			expect(() => clearSeatForTable('x')).not.toThrow();

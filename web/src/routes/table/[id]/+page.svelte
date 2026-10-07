@@ -576,7 +576,7 @@
 
 	let autoArm: AutoArm = $state(loadAutoArm() ?? { noCalls: false, autoPassChow: false });
 	let clientPrefs: ClientPrefs = $state(
-		loadClientPrefs() ?? { soundEnabled: true, motion: 'system' }
+		loadClientPrefs() ?? { soundEnabled: true, motion: 'system', discardMode: 'two-step' }
 	);
 	// guards the one-shot re-send above per live connection instance, mirroring `readySent`.
 	let autoArmSent = $state(false);
@@ -707,6 +707,7 @@
 					{isMock}
 					{ownHandTiles}
 					{discardableTileIds}
+					discardMode={clientPrefs.discardMode}
 					onDiscard={discardTile}
 					{declareOptions}
 				/>

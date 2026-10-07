@@ -466,5 +466,8 @@
 	"claimDialog_kongSubLabel": "Claim all four of this tile",
 	"claimDialog_winSubLabel": "Declare your winning hand",
 	"claimDialog_passEscHint": "Esc",
-	"claimDialog_keyHintAriaLabel": "press {n}"
+	"claimDialog_keyHintAriaLabel": "press {n}",
+	"settings_discardModeLegend": "Discard",
+	"settings_discardModeTwoStepLabel": "Two-step (lift, then confirm)",
+	"settings_discardModeOneTapLabel": "One-tap"
 }

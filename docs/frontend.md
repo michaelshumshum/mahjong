@@ -262,18 +262,29 @@ Built today:
 
 | Action    | Desktop and touch                                                                          |
 | --------- | ------------------------------------------------------------------------------------------ |
-| Discard   | one click/tap on a legal hand tile (a `.hand-tile-btn`) sends `discard` immediately         |
+| Discard   | legal hand tile (a `.hand-tile-btn`): one-tap mode discards immediately, two-step lifts then confirms |
 | Claim     | `ClaimDialog`: one big button per offered option plus Pass, with a CSS countdown ring, ≥44px |
 | Declare   | win (hero when self-drawn) / concealed kong / added kong under your hand (`.declare-actions`) |
 | Sort hand | automatic; no manual reorder                                                               |
 
+**Discard mode.** A client pref (`ClientPrefs.discardMode`, `lib/ui/Settings.svelte`), default
+`'two-step'`, persisted the same way as `motion`/`soundEnabled` (§6 Persistence):
+
+| Mode | Desktop and touch |
+| --- | --- |
+| `two-step` | Tap/click a legal tile to lift it (`translateY`, `z-index` raised above overlapping neighbours so the full face stays visible even in phone's negative-margin overlap mode, §3). A second tap, or `Enter` on the same (now-focused) button, discards it — the same `onclick` path, no separate key handling needed. Tapping a different tile just moves the lift; clicking outside the hand or pressing `Escape` clears it with no discard. Hovering a tile previews the lift on fine pointers only (`@media (hover: hover) and (pointer: fine)`) — a CSS-only affordance, not committed state. |
+| `one-tap` | The original behaviour: one click/tap sends `discard` immediately. |
+
+Both modes are presentation only, never a state mutation (`web/AGENTS.md`): the lift is local UI
+state, and the actual intent still only ever goes `tap → discard{tile_id}`, same as before.
+Mock mode renders hand tiles as non-interactive in the first place (no `tile_id` to discard
+against), so neither mode has anything to do there — a deliberate no-op, not an oversight.
+
 **Planned, not built:**
 
-| Action               | Desktop                                                       | Touch                       |
-| -------------------- | ------------------------------------------------------------- | --------------------------- |
-| Select tile          | hover lifts it, click selects                                 | tap lifts                   |
-| Discard              | a setting: two-step (lift, then confirm) or one-tap (today's) | same, plus swipe up         |
-| Inspect discard pool | hover shows who discarded and when                            | long-press                  |
+| Action               | Desktop                            | Touch       |
+| --------------------- | ----------------------------------- | ----------- |
+| Inspect discard pool | hover shows who discarded and when | long-press  |
 
 - **Swipe vs. scroll (planned):** the swipe gesture is scoped to the lifted tile (`touch-action:
   none` on that element while lifted) with distance + direction thresholds, so the rest of the
@@ -289,22 +300,23 @@ Built today:
   reimplementation would duplicate the pure Python engine
   ([ADR 0010](decisions/0010-client-scope-cuts.md)).
 
-### Discard: pending state (planned)
-
-Not built yet: today a discard click sends the intent and the tile simply stays put until the
-echo arrives. The design:
+### Discard: pending state
 
 A mobile round trip to one server is 100–300ms — long enough that a tile with no feedback between
 tap and server echo reads as broken. Still no local mutation of game truth; a **pending**
-presentation state instead:
+presentation state instead, the same in both discard modes:
 
-- Sending `discard {tile_id}` adds a `pending` class to that tile (dimmed, non-interactive, small
-  spinner). It stays in your hand, in place.
-- The matching `discard` echo (or a superseding `turn`/`hand_end`) clears it, and the normal
-  discard animation runs.
+- Sending `discard {tile_id}` sets a local `pendingTileId`, which adds a `hand-tile--pending` class
+  to that tile (dimmed, `disabled`, a small spinner overlay). It stays in your hand, in place.
+- An `$effect` clears it once that `tile_id` is no longer in `ownHandTiles` (the matching `discard`
+  echo landed) or it's no longer this seat's turn (a superseding `turn`/`hand_end`) — never a
+  client-side guess at the outcome, just noticing the tile isn't ours to discard anymore.
 - A discard from the server's own `turn.legal` essentially can't be rejected, so there is no
-  revert path. If no echo arrives within ~3s, the tile shows a stalled indicator, resolved by the
-  normal reconnect/resync path (§6) — never a client-side guess.
+  revert path. If no echo arrives within ~3s (`PENDING_STALL_MS`), the spinner swaps to a steady
+  accent-error ring (stalled), resolved by the normal reconnect/resync path (§6) rather than any
+  client guess. The spinner itself spins unconditionally — a functional in-progress signal, one of
+  the base-motion exceptions §9 lists (alongside seat-slot breathing and the mural fade), not
+  decorative motion gated behind the reduced-motion setting.
 
 ### Claim window
 
@@ -462,7 +474,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | --- | --- | --- |
 | `mahjong:seat:v2:<tableId>` | this browser's seat at that table (`saveSeatForTable`/`loadSeatForTable`) | saved the moment `state_sync` confirms a seat; fed back into `connect()` on mount. Without it a reload falls into the seat picker and `join` fails with `table_full` |
 | `mahjong:reconnectSecret:v2:<tableId>` | `join`'s `reconnect_secret` (`saveSecretForTable`/`loadSecretForTable`) | presented on every `hello{seat, secret}` ([architecture.md §2.1](architecture.md)); stale `v1` keys are swept on load |
-| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion` | purely local |
+| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode` | purely local; `discardMode` postdates this key, so `loadClientPrefs` defaults it when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 

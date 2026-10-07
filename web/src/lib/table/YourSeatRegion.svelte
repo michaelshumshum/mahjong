@@ -5,8 +5,13 @@
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
 	import TileOptionLabel from '$lib/ui/TileOptionLabel.svelte';
+	import type { DiscardMode } from '$lib/ui/Settings.svelte';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
+
+	// how long a sent discard waits for the server echo before a stalled indicator (§5) --
+	// cosmetic, resolved by the normal reconnect/resync path, never a client-side guess.
+	const PENDING_STALL_MS = 3000;
 
 	interface OwnHandTile {
 		key: string;
@@ -33,6 +38,7 @@
 		isMock,
 		ownHandTiles,
 		discardableTileIds,
+		discardMode,
 		onDiscard,
 		declareOptions
 	}: {
@@ -43,6 +49,7 @@
 		isMock: boolean;
 		ownHandTiles: OwnHandTile[];
 		discardableTileIds: Set<number>;
+		discardMode: DiscardMode;
 		onDiscard: (tileId: number) => void;
 		declareOptions: DeclareOption[];
 	} = $props();
@@ -50,7 +57,71 @@
 	// CenterHub carries the timer ring; this plain-text prompt is for your own seat, where a
 	// ring alone (on a seat you're always looking at) is easy to miss.
 	let isYourTurn = $derived(!spectating && seat.seat === turn && discardableTileIds.size > 0);
+
+	// two-step: the lifted tile is presentation-only state, never game truth. A second tap/Enter
+	// on it (same button, same onclick) discards; another tile moves the lift; outside-click/Esc clears it.
+	let liftedTileId = $state<number | null>(null);
+	let handRowEl: HTMLDivElement | null = $state(null);
+
+	// pending: dims the tile with a spinner until the echo removes it from `ownHandTiles` (or the
+	// turn/hand moves on) -- presentation only, never reverted (a legal discard can't be rejected).
+	let pendingTileId = $state<number | null>(null);
+	let pendingStalled = $state(false);
+	let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearPending(): void {
+		pendingTileId = null;
+		pendingStalled = false;
+		if (pendingTimer !== null) {
+			clearTimeout(pendingTimer);
+			pendingTimer = null;
+		}
+	}
+
+	function performDiscard(tileId: number): void {
+		liftedTileId = null;
+		pendingTileId = tileId;
+		pendingStalled = false;
+		if (pendingTimer !== null) clearTimeout(pendingTimer);
+		pendingTimer = setTimeout(() => {
+			pendingStalled = true;
+		}, PENDING_STALL_MS);
+		onDiscard(tileId);
+	}
+
+	function handleTileActivate(tileId: number): void {
+		if (discardMode === 'one-tap' || liftedTileId === tileId) {
+			performDiscard(tileId);
+		} else {
+			liftedTileId = tileId;
+		}
+	}
+
+	// clears a lift once the echo (or a turn/hand change) actually lands -- never a client guess
+	// at the outcome, just noticing the tile is no longer ours to discard.
+	$effect(() => {
+		if (pendingTileId === null) return;
+		const stillPending = seat.seat === turn && ownHandTiles.some((t) => t.tileId === pendingTileId);
+		if (!stillPending) clearPending();
+	});
+
+	$effect(() => {
+		return () => {
+			if (pendingTimer !== null) clearTimeout(pendingTimer);
+		};
+	});
+
+	function handleWindowClick(e: MouseEvent): void {
+		if (liftedTileId === null) return;
+		if (handRowEl && !handRowEl.contains(e.target as Node)) liftedTileId = null;
+	}
+
+	function handleWindowKeydown(e: KeyboardEvent): void {
+		if (e.key === 'Escape' && liftedTileId !== null) liftedTileId = null;
+	}
 </script>
+
+<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
 
 <section
 	class="seat-region seat-region--self"
@@ -124,17 +195,34 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="hand-row" aria-label={m.yourSeatRegion_yourConcealedHandAriaLabel()}>
+			<div
+				class="hand-row"
+				class:hand-row--two-step={discardMode === 'two-step'}
+				aria-label={m.yourSeatRegion_yourConcealedHandAriaLabel()}
+				bind:this={handRowEl}
+			>
 				{#each ownHandTiles as tile (tile.key)}
 					{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
+						{@const lifted = liftedTileId === tile.tileId}
+						{@const pending = pendingTileId === tile.tileId}
 						<button
 							type="button"
 							class="hand-tile hand-tile-btn"
 							class:hand-tile--drawn={tile.drawn}
+							class:hand-tile--lifted={lifted}
+							class:hand-tile--pending={pending}
+							disabled={pending}
 							aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
-							onclick={() => onDiscard(tile.tileId as number)}
+							onclick={() => handleTileActivate(tile.tileId as number)}
 						>
 							<TileFace code={tile.code} />
+							{#if pending}
+								<span
+									class="pending-spinner"
+									class:pending-spinner--stalled={pendingStalled}
+									aria-hidden="true"
+								></span>
+							{/if}
 						</button>
 					{:else}
 						<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
@@ -250,10 +338,63 @@
 
 	// same box as the plain .hand-tile div -- a button reset, not a second style.
 	.hand-tile-btn {
+		position: relative;
 		padding: 0;
 		border: none;
 		background: none;
 		cursor: pointer;
+		transition: transform var(--dur-1) var(--ease-out);
+	}
+
+	// lifted: translateY only (ADR 0002's transform/opacity rule), raised above its negative-
+	// margin-overlapping neighbours so the full face stays visible even in phone overlap mode.
+	.hand-tile-btn.hand-tile--lifted {
+		z-index: 1;
+		transform: translateY(-30%);
+	}
+
+	// desktop/fine-pointer preview only in two-step mode -- one-tap has no lift to preview.
+	@media (hover: hover) and (pointer: fine) {
+		.hand-row--two-step .hand-tile-btn:not(.hand-tile--lifted):hover {
+			z-index: 1;
+			transform: translateY(-12%);
+		}
+	}
+
+	.hand-tile--pending {
+		cursor: default;
+
+		:global(.tile-face) {
+			opacity: 0.45;
+		}
+	}
+
+	.pending-spinner {
+		position: absolute;
+		top: 2px;
+		right: 2px;
+		width: 0.85rem;
+		height: 0.85rem;
+		border: 2px solid var(--color-border);
+		border-top-color: var(--color-text);
+		border-radius: 50%;
+		// a functional in-progress indicator, not decorative -- spins regardless of the reduced-
+		// motion setting (frontend.md §9's exception list: seat-slot breathing, spinners, …).
+		animation: pending-spin 700ms linear infinite;
+	}
+
+	// after PENDING_STALL_MS with no server echo: a steady accent ring instead of a spin, since
+	// the resync path (not a client guess) resolves what actually happened.
+	.pending-spinner--stalled {
+		border-color: var(--color-status-error);
+		border-top-color: var(--color-status-error);
+		animation: none;
+	}
+
+	@keyframes pending-spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.declare-actions {

@@ -8,7 +8,7 @@ import type { AutoArm, ClientPrefs } from './Settings.svelte';
 describe('Settings', () => {
 	const noop = () => {};
 	const offArm: AutoArm = { noCalls: false, autoPassChow: false };
-	const offPrefs: ClientPrefs = { soundEnabled: false, motion: 'system' };
+	const offPrefs: ClientPrefs = { soundEnabled: false, motion: 'system', discardMode: 'two-step' };
 
 	it('renders both pre-arm toggles unchecked when both are off', () => {
 		const { body } = render(Settings, {
@@ -28,7 +28,7 @@ describe('Settings', () => {
 
 	it('reflects both pre-arm toggles and sound on together', () => {
 		const autoArm: AutoArm = { noCalls: true, autoPassChow: true };
-		const prefs: ClientPrefs = { soundEnabled: true, motion: 'system' };
+		const prefs: ClientPrefs = { soundEnabled: true, motion: 'system', discardMode: 'two-step' };
 		const { body } = render(Settings, {
 			props: { autoArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
 		});
@@ -36,7 +36,7 @@ describe('Settings', () => {
 	});
 
 	it('marks the motion radio matching the current pref as checked, others not', () => {
-		const prefs: ClientPrefs = { soundEnabled: false, motion: 'reduced' };
+		const prefs: ClientPrefs = { soundEnabled: false, motion: 'reduced', discardMode: 'two-step' };
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
 		});
@@ -58,5 +58,15 @@ describe('Settings', () => {
 		});
 		expect(body).toContain('Language');
 		expect([...body.matchAll(/type="radio"[^>]*name="locale"/g)]).toHaveLength(2);
+	});
+
+	it('marks the discard-mode radio matching the current pref as checked, others not', () => {
+		const prefs: ClientPrefs = { soundEnabled: false, motion: 'system', discardMode: 'one-tap' };
+		const { body } = render(Settings, {
+			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
+		});
+		expect([...body.matchAll(/type="radio"[^>]*name="discardMode"/g)]).toHaveLength(2);
+		expect(body).toMatch(/value="one-tap"[^>]*checked/);
+		expect(body).not.toMatch(/value="two-step"[^>]*checked/);
 	});
 });

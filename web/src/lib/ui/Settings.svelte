@@ -14,11 +14,16 @@
 
 	export type MotionPref = 'system' | 'reduced' | 'full';
 
+	// two-step: tap/click lifts a tile, a second tap/Enter on it discards -- lets you see the
+	// full tile before committing. one-tap: today's original behaviour.
+	export type DiscardMode = 'two-step' | 'one-tap';
+
 	// client-only prefs, no wire equivalent. `motion` overrides `prefers-reduced-motion` for a
 	// player whose OS setting doesn't match what they want in-game.
 	export interface ClientPrefs {
 		soundEnabled: boolean;
 		motion: MotionPref;
+		discardMode: DiscardMode;
 	}
 
 	let {
@@ -37,6 +42,11 @@
 		{ value: 'system', label: m.settings_motionSystemLabel },
 		{ value: 'reduced', label: m.settings_motionReducedLabel },
 		{ value: 'full', label: m.settings_motionFullLabel }
+	];
+
+	const DISCARD_MODE_OPTIONS: { value: DiscardMode; label: () => string }[] = [
+		{ value: 'two-step', label: m.settings_discardModeTwoStepLabel },
+		{ value: 'one-tap', label: m.settings_discardModeOneTapLabel }
 	];
 </script>
 
@@ -76,6 +86,19 @@
 				label={option.label()}
 				checked={prefs.motion === option.value}
 				onChange={() => onPrefsChange({ ...prefs, motion: option.value })}
+			/>
+		{/each}
+	</FormGroup>
+
+	<FormGroup legend={m.settings_discardModeLegend()}>
+		{#each DISCARD_MODE_OPTIONS as option (option.value)}
+			<OptionRow
+				type="radio"
+				name="discardMode"
+				value={option.value}
+				label={option.label()}
+				checked={prefs.discardMode === option.value}
+				onChange={() => onPrefsChange({ ...prefs, discardMode: option.value })}
 			/>
 		{/each}
 	</FormGroup>

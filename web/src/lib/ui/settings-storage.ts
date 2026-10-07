@@ -1,4 +1,4 @@
-import type { AutoArm, ClientPrefs, MotionPref } from './Settings.svelte';
+import type { AutoArm, ClientPrefs, DiscardMode, MotionPref } from './Settings.svelte';
 
 // Namespaced, versioned keys -- `v1` lets a future shape change fail closed (treated as
 // missing, below) instead of crashing on an old stored shape.
@@ -13,11 +13,19 @@ const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 export const TABLE_CREDS_TTL_MS = 24 * 60 * 60 * 1000;
 
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
+const DISCARD_MODES: readonly DiscardMode[] = ['two-step', 'one-tap'];
+const DEFAULT_DISCARD_MODE: DiscardMode = 'two-step';
 
 function isMotionPref(value: unknown): value is MotionPref {
 	return typeof value === 'string' && (MOTION_PREFS as readonly string[]).includes(value);
 }
 
+function isDiscardMode(value: unknown): value is DiscardMode {
+	return typeof value === 'string' && (DISCARD_MODES as readonly string[]).includes(value);
+}
+
+// only the fields that have always existed are required -- `discardMode` is newer and is
+// migrated (defaulted) in `loadClientPrefs` below, not discarded along with the whole object.
 export function isClientPrefs(value: unknown): value is ClientPrefs {
 	if (typeof value !== 'object' || value === null) return false;
 	const v = value as Record<string, unknown>;
@@ -71,7 +79,13 @@ function load<T>(key: string, isValid: (value: unknown) => value is T): T | null
 }
 
 export function loadClientPrefs(): ClientPrefs | null {
-	return load(CLIENT_PREFS_STORAGE_KEY, isClientPrefs);
+	const raw = load(CLIENT_PREFS_STORAGE_KEY, isClientPrefs);
+	if (raw === null) return null;
+	const rawDiscardMode = (raw as unknown as Record<string, unknown>).discardMode;
+	return {
+		...raw,
+		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_DISCARD_MODE
+	};
 }
 
 export function saveClientPrefs(prefs: ClientPrefs): void {

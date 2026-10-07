@@ -1,4 +1,5 @@
 import { test, expect, chromium } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +16,17 @@ const SERVER_DIR = path.resolve(WEB_DIR, '../server');
 
 let backend: ChildProcess | null = null;
 let frontend: ChildProcess | null = null;
+
+// default discardMode is now 'two-step' (P1.4) -- these flows drive a single click per discard,
+// so every context/page pins one-tap before its first navigation.
+async function forceOneTapDiscard(target: BrowserContext | Page) {
+	await target.addInitScript(() => {
+		localStorage.setItem(
+			'mahjong:clientPrefs:v1',
+			JSON.stringify({ soundEnabled: true, motion: 'system', discardMode: 'one-tap' })
+		);
+	});
+}
 
 async function waitForHealthy(url: string, timeoutMs: number): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
@@ -81,6 +93,7 @@ test('four real seats join, ready, and play real discards/claims through the liv
 		const pages = await Promise.all(
 			Array.from({ length: 4 }, async () => {
 				const ctx = await browser.newContext();
+				await forceOneTapDiscard(ctx);
 				return ctx.newPage();
 			})
 		);
@@ -170,6 +183,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();
+		await forceOneTapDiscard(page);
 		await page.goto(BASE, { waitUntil: 'networkidle' });
 		await page.getByTestId('lobby-practice-bots').click();
 
@@ -228,6 +242,7 @@ test('completing more than one real hand accumulates multi-hand history in the S
 		const pages = await Promise.all(
 			Array.from({ length: 4 }, async () => {
 				const ctx = await browser.newContext();
+				await forceOneTapDiscard(ctx);
 				return ctx.newPage();
 			})
 		);
@@ -320,6 +335,7 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 	const browser = await chromium.launch();
 	try {
 		const page = await browser.newPage();
+		await forceOneTapDiscard(page);
 		await page.goto(BASE, { waitUntil: 'networkidle' });
 		await page.getByTestId('lobby-practice-bots').click();
 		await page.locator('.seat-ring-slot--open').click();

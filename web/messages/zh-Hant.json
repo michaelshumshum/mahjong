@@ -466,5 +466,8 @@
 	"claimDialog_kongSubLabel": "湊成四張一組",
 	"claimDialog_winSubLabel": "宣告食糊",
 	"claimDialog_passEscHint": "Esc",
-	"claimDialog_keyHintAriaLabel": "按{n}鍵"
+	"claimDialog_keyHintAriaLabel": "按{n}鍵",
+	"settings_discardModeLegend": "打牌方式",
+	"settings_discardModeTwoStepLabel": "兩步 (先提起，再確認)",
+	"settings_discardModeOneTapLabel": "一按即出"
 }
