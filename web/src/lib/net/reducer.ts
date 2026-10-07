@@ -240,10 +240,10 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				// mahjong_core.engine's own removal -- not left for the next state_sync to correct.
 				discardPools: replaceAt(state.discardPools, d.seat, pool),
 				lastDiscard: { seat: d.seat, tileId: d.tile_id },
-				// clear stale legal_actions/deadline_ts from the `turn` that granted this move --
-				// left set, a second click would get silently dropped as out-of-turn.
+				// stale own legal_actions would let a second click send an out-of-turn discard.
+				// any seat's discard ends its turn deadline (opponents' rings read it too).
 				legalActions: isOwn ? [] : state.legalActions,
-				deadlineTs: isOwn ? null : state.deadlineTs
+				deadlineTs: null
 			};
 		}
 
@@ -351,7 +351,9 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				// a claimed meld is never a draw -- without this, the last tile left in `ownHand`
 				// after removeMany would show as if freshly drawn.
 				drawnTileId: isOwn ? null : state.drawnTileId,
-				lastDiscard: null
+				lastDiscard: null,
+				// a meld ends whatever turn was running; the next `turn` re-arms it.
+				deadlineTs: null
 			};
 		}
 

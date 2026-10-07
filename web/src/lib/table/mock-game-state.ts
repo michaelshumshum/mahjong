@@ -126,7 +126,7 @@ export interface MockGameState {
 	handResult: MockHandResult | null;
 	// hand-end hold's remaining time; `null` when `handResult` is (no hold to show).
 	handEndHoldMs: number | null;
-	// this seat's own AWAIT_ACTION deadline; `null` whenever it's any other seat's turn.
+	// the acting seat's AWAIT_ACTION deadline (any seat); `null` outside AWAIT_ACTION.
 	turnDurationMs: number | null;
 	you: Seat;
 	/** Set only on the one scenario that's actually reached `game_end` -- lets `GameEndScreen`

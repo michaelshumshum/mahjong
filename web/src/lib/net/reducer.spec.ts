@@ -238,7 +238,7 @@ describe('reduce', () => {
 		expect(next.lastDiscard).toEqual({ seat: 2, tileId: 90 });
 	});
 
-	it("discarding clears this seat's own stale legalActions/deadlineTs, but not another seat's discard", () => {
+	it('discarding clears the turn deadline for any seat, but legalActions only for its own', () => {
 		// regression: stale legalActions kept looking valid after a discard, letting a second
 		// click send a discard the server silently drops as out-of-turn.
 		const own = state({
@@ -274,7 +274,7 @@ describe('reduce', () => {
 			d: { seat: 0, tile_id: 47, tile: '5s', pool_index: 0 }
 		});
 		expect(otherDiscard.legalActions).toEqual([{ kind: 'pass' }]);
-		expect(otherDiscard.deadlineTs).toBe(9000);
+		expect(otherDiscard.deadlineTs).toBeNull();
 	});
 
 	describe('claim window', () => {

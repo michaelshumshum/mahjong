@@ -96,10 +96,10 @@ function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
 	};
 }
 
-/** Anchored deadline, not a countdown carried over the wire -- `state.deadlineTs` is set by
- * `turn` for this seat's AWAIT_ACTION, cleared once this seat acts or the turn moves on. */
+/** Anchored on any seat's `turn` deadline. The phase guard drops a `state_sync`'s own
+ * claim/hand-end deadline, which isn't the acting seat's. */
 function turnDurationMsFromState(state: ClientGameState): number | null {
-	return state.turn === state.seat && state.deadlineTs !== null
+	return state.phase === 'AWAIT_ACTION' && state.deadlineTs !== null
 		? Math.max(0, state.deadlineTs - Date.now())
 		: null;
 }

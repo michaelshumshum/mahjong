@@ -133,7 +133,7 @@ describe('viewFromClientState turnDurationMs', () => {
 		expect(live!.view.turnDurationMs).toBeNull();
 	});
 
-	it("is null for another seat's turn", () => {
+	it("reflects another seat's turn deadline, cleared by that seat's discard", () => {
 		let state = initialClientGameState();
 		state = { ...state, seat: 0 };
 		state = reduce(state, {
@@ -141,11 +141,32 @@ describe('viewFromClientState turnDurationMs', () => {
 			ts: 1,
 			seq: 1,
 			t: 'turn',
-			d: { seat: 2, phase: 'AWAIT_ACTION', deadline_ts: 5000, legal: [] }
+			d: { seat: 2, phase: 'AWAIT_ACTION', deadline_ts: 5000 }
 		} as ServerEvent);
+		expect(viewFromClientState(state)!.view.turnDurationMs).toBe(5000);
 
-		const live = viewFromClientState(state);
-		expect(live!.view.turnDurationMs).toBeNull();
+		state = reduce(state, {
+			v: 1,
+			ts: 1,
+			seq: 2,
+			t: 'discard',
+			d: { seat: 2, tile_id: 4, tile: '1m', pool_index: 0 }
+		} as ServerEvent);
+		expect(viewFromClientState(state)!.view.turnDurationMs).toBeNull();
+	});
+
+	it("is null for a state_sync's claim-window deadline", () => {
+		let state = initialClientGameState();
+		state = { ...state, seat: 0 };
+		state = reduce(state, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'turn',
+			d: { seat: 2, phase: 'AWAIT_ACTION', deadline_ts: 5000 }
+		} as ServerEvent);
+		state = { ...state, phase: 'AWAIT_CLAIMS', deadlineTs: 3000 };
+		expect(viewFromClientState(state)!.view.turnDurationMs).toBeNull();
 	});
 });
 
@@ -174,7 +195,7 @@ describe('viewFromClientState spectator', () => {
 				host_seat: 0,
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
-				deadline_ts: 9999,
+				deadline_ts: null,
 				claim_options: []
 			}
 		} as ServerEvent);

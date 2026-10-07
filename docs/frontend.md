@@ -162,10 +162,12 @@ prevailing wind glyph, "Hand N", the wall-remaining count (`.wall-count strong`,
 `table.e2e.ts`), a min-faan chip (this table's `RuleSet.min_faan`; mocks default to the server's own
 default of 3 since no fixture carries a ruleset), and one small wind marker per seat positioned
 toward that seat (top/left/right/bottom, matching the box above). The acting seat's marker gets the
-same halo treatment as its `SeatPlate` and additionally carries `TimerRing` — but only when this
-client actually knows that seat's deadline, which protocol-wise is only ever true for your own turn
-(`ClientGameState.deadlineTs` is this seat's own `AWAIT_ACTION` deadline, never an opponent's,
-§6); an opponent's turn glows the marker with no ring rather than fabricating a duration. Below
+same halo treatment as its `SeatPlate` and additionally carries `TimerRing`, for every seat's turn:
+`turn` is broadcast with the acting seat's `deadline_ts` to all seats and spectators
+([protocol.md](protocol.md)), and the reducer stores it as `ClientGameState.deadlineTs` (§6). The
+ring shows only while `phase === 'AWAIT_ACTION'` — a `state_sync`'s own `deadline_ts` is this
+seat's claim/hand-end deadline, not the acting seat's — so after a reconnect an opponent's ring
+reappears with their next `turn`. Below
 768px the pools stack instead of forming a box, leaving the markers nowhere to sit without
 overlapping a pool, so the hub collapses to a compact single-row summary (wind/hand/wall/faan only,
 no markers); `TableToolbar`'s own wall/prevailing span is kept as a phone-only fallback copy for
@@ -551,9 +553,10 @@ saying the bot played for you during the `AUTOPLAY` handover.
 
 The mock fixtures hardcode values the real wire doesn't send this way:
 
-- The reducer clears `legalActions` and `deadlineTs` on this seat's own `discard`. Stale entries
-  would render legal-looking discard buttons the server then drops as out-of-turn. Pinned by a
-  `reducer.spec.ts` regression test.
+- The reducer clears `legalActions` on this seat's own `discard`. Stale entries would render
+  legal-looking discard buttons the server then drops as out-of-turn. Pinned by a
+  `reducer.spec.ts` regression test. `deadlineTs` is cleared on any seat's `discard` or `meld`
+  (the turn it timed is over).
 - `prevailing` goes over the wire as the `Wind` enum's member _name_ (`"EAST"`…), not the
   `'E'|'S'|'W'|'N'` code mocks use and `WIND_LABEL` indexes by. `live-view.ts`'s
   `wireWindToCode()` maps it — the one enum-shaped field needing this; `phase`/meld `kind`/claim
