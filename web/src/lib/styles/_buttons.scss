@@ -102,18 +102,6 @@
 	}
 }
 
-// fullscreen dialog backdrop: one declaration instead of each caller hand-copying it.
-@mixin modal-scrim {
-	position: fixed;
-	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: rgb(0 0 0 / 0.5);
-	z-index: var(--z-modal);
-	padding: var(--space-3);
-}
-
 // shadow tinted from --color-bg's warm brown-black, not neutral grey, so chrome reads as
 // sitting on the lacquered table.
 @mixin panel-elevated {

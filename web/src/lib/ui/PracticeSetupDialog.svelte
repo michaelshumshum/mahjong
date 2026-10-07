@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ModalDialog from './ModalDialog.svelte';
 	import {
 		createTable,
 		PRACTICE_DIFFICULTY_TO_TIER,
@@ -56,14 +57,8 @@
 	}
 </script>
 
-<div class="panel-overlay">
-	<div
-		class="practice-dialog"
-		data-testid="practice-setup-dialog"
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="practice-setup-heading"
-	>
+<ModalDialog labelledby="practice-setup-heading" onCancel={() => !submitting && onCancel()}>
+	<div class="practice-dialog" data-testid="practice-setup-dialog">
 		<PanelHeader title={m.practiceSetupDialog_title()} titleId="practice-setup-heading" />
 		<p class="practice-hint">{m.practiceSetupDialog_hint()}</p>
 
@@ -133,14 +128,10 @@
 			</button>
 		</div>
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
-
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
 
 	.practice-dialog {
 		display: flex;

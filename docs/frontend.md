@@ -351,10 +351,11 @@ accent-glow treatment as a `SeatPlate` turn halo, since it's the one choice wort
 unmissable, but every call button (Win included) shares one fixed size. Pass is always its own full-width row below the call options,
 never beside them, and carries an "Esc" hint instead of a number; `1`-`N` index the call options
 only. Initial focus lands
-on Pass (an `$effect` with no reactive reads, so it fires once per mount — the dialog only mounts
-while a claim window is open, i.e. once per window, not on every unrelated state update) so
-keyboard users have a safe default under their fingers immediately; number keys `1`-`N` and `Esc`
-drive the same `onChoose` path as a click. Below 768px the dialog becomes a bottom sheet
+on Pass (`data-autofocus`, focused once by `ModalDialog` on open — the dialog only mounts while a
+claim window is open, i.e. once per window) so keyboard users have a safe default under their
+fingers immediately; number keys `1`-`N` and `Esc` drive the same `onChoose` path as a click. The
+host `ModalDialog` gets no `onCancel`, so the native Escape close request is swallowed rather than
+firing a second pass. Below 768px the dialog becomes a bottom sheet
 (`align-self: flex-end` on the overlay's centering flexbox, full width, top corners only) instead of
 a centred card. **Not built:** a CSS-only (`@property`/`counter()`) seconds-remaining readout on
 the ring — skipped for now; the ring's `aria-label` already states the remaining seconds for
@@ -379,8 +380,11 @@ assistive tech, and a purely visual number is a small enough win to defer rather
 `Toast.svelte` takes a `severity: 'info' | 'warn' | 'error'` (`lib/ui/toasts.ts`'s `ToastEntry`,
 default `'info'`), each with its own accent colour and glyph icon (colourblind-safe, matching the
 dragon-glyph convention) rather than colour alone; `error` renders `role="alert"` instead of
-`role="status"`. `ToastStack` sits at `--z-toast`, above `--z-modal`, so a toast stays legible over
-an open dialog. Current call sites (`routes/table/[id]/+page.svelte`): a rejected `ack` is `warn`,
+`role="status"`. While a modal `<dialog>` is open everything outside it is inert and below the top
+layer, so `ToastStack` moves its stack element into the topmost open dialog (`ModalDialog`'s
+`topmostDialog()`, re-checked on its `TOP_LAYER_EVENT`) and back home when it closes — a toast stays
+visible, clickable and announced over a dialog. A `popover="manual"` stack was tried first: it paints
+above the modal but is inert like the rest of the page (no dismiss click, dropped from the a11y tree). Current call sites (`routes/table/[id]/+page.svelte`): a rejected `ack` is `warn`,
 a server `error` frame is `error`, a waiting-room arrival is the default `info`. `error` frames map
 through `lib/net/server-error-messages.ts`'s `serverErrorToastMessage()` — the known
 `server/app/ws.py` codes (`bad_frame`, `already_joined`, `no_such_seat`, `seat_taken`,
@@ -852,7 +856,7 @@ compiles to plain CSS, so it's an authoring-layer choice only.
 src/lib/styles/
   _tokens.scss      colour (walnut chrome, felt/rim/tile materials, accent, brass, ±deltas),
                     spacing, radii, type scale, motion durations/easings, z-layers
-  _buttons.scss     btn-primary/secondary/ghost, panel-elevated, modal-scrim, input-recessed
+  _buttons.scss     btn-primary/secondary/ghost, panel-elevated, input-recessed
   _forms.scss       panel-header/title/badge, form-group, option row chrome
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
@@ -876,7 +880,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | status | `--color-status-error`, `--color-rank-gold/silver/bronze` | error states; game-end podium |
 | shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
 | motion | `--dur-1` 120ms … `--dur-4` 600ms, `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
-| layers | `--z-table/tiles/hud/overlay/modal/toast` | `--z-toast` sits above `--z-modal` so a toast stays legible over an open dialog |
+| layers | `--z-table/tiles/hud/overlay/modal/toast` | modal dialogs are in the top layer, which no z-index reaches; toasts move into the open dialog instead (§5 Toasts) |
 
 Conventions:
 
@@ -948,6 +952,26 @@ fluent Hong Kong mahjong player.
 - **Colourblind-safe:** dragons are distinguished by glyph, not just red/green.
 - **Focus:** `_a11y.scss`'s global `:focus-visible` ring (2px `--color-brass`, 2px offset) covers
   every control; components don't restyle it.
+- **Modals:** every overlay dialog (claim, hand end, game end, settings/score sheet via
+  `DismissablePanel`, leave, create table, practice setup, guide, animation demo) is a native
+  `<dialog>` opened with `showModal()` through `lib/ui/ModalDialog.svelte`: focus trap, inert
+  background and top layer come from the platform. The `<dialog>` box itself is the full-viewport
+  scrim (`placement`: `center`, `sheet` — bottom sheet below 768px — or `scroll`), so panels keep
+  their own layout. It focuses a `[data-autofocus]` descendant on open and returns focus to the
+  opener on unmount.
+
+  | Dialog | Escape |
+  | --- | --- |
+  | claim | Pass (`ClaimDialog`'s own key handler; the dialog's close request is swallowed) |
+  | hand end | dismiss, same as the close button (an acknowledgment, not a decision) |
+  | game end | nothing — not dismissable |
+  | leave game | Cancel (`alertdialog`, focus starts on Cancel) |
+  | panels, create/practice/guide | close (ignored while a create request is in flight) |
+
+  Escape's `cancel` is always `preventDefault`ed and routed to `onCancel`, so the owning `{#if}`
+  unmounts the dialog — the DOM never closes itself out from under Svelte. Chrome force-closes a
+  dialog whose cancel was already prevented once without user activation in between; the `close`
+  handler treats that as a cancel, or reopens a non-dismissable dialog.
 - **Keyboard:** legal hand tiles are native `<button>`s in normal tab order, `Enter`/`Space`
   discards — the same elements pointer and touch use, so there is one selection model.
   **Planned:** roving `tabindex` over the hand with arrow keys moving focus, and `Enter`/`Space`

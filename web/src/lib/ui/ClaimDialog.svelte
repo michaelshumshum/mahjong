@@ -47,17 +47,11 @@
 		if (passOption) onChoose(passOption);
 	}
 
-	let passButtonEl: HTMLButtonElement | null = $state(null);
-
-	// runs once per mount, i.e. once per window (+page.svelte's `{#if claimOptions}`) -- the only
-	// reactive read is the bound node, set once.
-	$effect(() => {
-		passButtonEl?.focus();
-	});
-
 	// 1-4 pick the Nth call option by position, Esc passes -- the same onChoose path a click takes.
+	// the host ModalDialog has no onCancel, so its own Escape close request is a no-op here.
 	function handleKeydown(e: KeyboardEvent): void {
 		if (e.key === 'Escape') {
+			e.preventDefault();
 			if (passOption) onChoose(passOption);
 			return;
 		}
@@ -70,7 +64,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="claim-dialog" role="dialog" aria-label={m.claimDialog_ariaLabel()}>
+<div class="claim-dialog">
 	<div class="claim-dialog-timer">
 		<DialogTimer {durationMs} size={40} onClose={handleTimeout} />
 	</div>
@@ -112,8 +106,9 @@
 			{/each}
 		</div>
 		{#if passOption}
+			<!-- ModalDialog focuses [data-autofocus] once on open: a safe default under the keyboard. -->
 			<button
-				bind:this={passButtonEl}
+				data-autofocus
 				type="button"
 				class="claim-btn claim-btn--pass"
 				aria-label={claimOptionAriaLabel(passOption)}
@@ -270,8 +265,7 @@
 		@include buttons.btn-primary;
 	}
 
-	// phone: a bottom sheet instead of a centred card -- `.claim-overlay` (+page.svelte) still
-	// centers by default, but align-self here pins this one child to the bottom edge.
+	// phone: a bottom sheet instead of a centred card (the host ModalDialog's `sheet` placement).
 	@include layout.phone-only {
 		.claim-dialog {
 			align-self: flex-end;

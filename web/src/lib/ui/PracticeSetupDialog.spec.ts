@@ -9,8 +9,8 @@ describe('PracticeSetupDialog', () => {
 
 	it('renders as a labelled dialog', () => {
 		const { body } = render(PracticeSetupDialog, { props: { onCreated: noop, onCancel: noop } });
-		expect(body).toContain('role="dialog"');
-		expect(body).toContain('aria-modal="true"');
+		expect(body).toContain('<dialog');
+		expect(body).toContain('aria-labelledby="practice-setup-heading"');
 		expect(body).toContain('Practice vs Bots');
 	});
 

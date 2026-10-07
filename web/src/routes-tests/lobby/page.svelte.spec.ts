@@ -42,7 +42,7 @@ describe('LobbyPage', () => {
 		expect(createButton).not.toBeNull();
 		createButton.click();
 		await Promise.resolve();
-		expect(target.querySelector('[role="dialog"]')).not.toBeNull();
+		expect(target.querySelector('dialog')?.open).toBe(true);
 	});
 
 	it('navigates to /tables when the join link is clicked', () => {

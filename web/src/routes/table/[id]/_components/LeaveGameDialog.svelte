@@ -1,33 +1,32 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
+	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 
 	let { onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void } = $props();
 </script>
 
-<div class="panel-overlay">
-	<div
-		class="confirm-dialog"
-		role="alertdialog"
-		aria-label={m.leaveGameDialog_ariaLabel()}
-		aria-describedby="leave-confirm-desc"
-	>
+<ModalDialog
+	role="alertdialog"
+	label={m.leaveGameDialog_ariaLabel()}
+	describedby="leave-confirm-desc"
+	{onCancel}
+>
+	<div class="confirm-dialog">
 		<h2>{m.leaveGameDialog_title()}</h2>
 		<p id="leave-confirm-desc">{m.leaveGameDialog_description()}</p>
 		<div class="confirm-actions">
-			<button type="button" onclick={onCancel}>{m.leaveGameDialog_cancelButton()}</button>
+			<button type="button" data-autofocus onclick={onCancel}
+				>{m.leaveGameDialog_cancelButton()}</button
+			>
 			<button type="button" class="confirm-leave" onclick={onConfirm}
 				>{m.leaveGameDialog_confirmButton()}</button
 			>
 		</div>
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
-
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
 
 	.confirm-dialog {
 		display: flex;

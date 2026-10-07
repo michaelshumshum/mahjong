@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ModalDialog from './ModalDialog.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 	import { createTable, type CreateTableRequest } from '$lib/net/lobby';
 	import {
@@ -71,14 +72,8 @@
 	}
 </script>
 
-<div class="panel-overlay">
-	<div
-		class="create-dialog"
-		data-testid="create-table-dialog"
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="create-table-heading"
-	>
+<ModalDialog labelledby="create-table-heading" onCancel={() => !submitting && onCancel()}>
+	<div class="create-dialog" data-testid="create-table-dialog">
 		<PanelHeader title={m.createTableDialog_title()} titleId="create-table-heading" />
 
 		<FormGroup legend={m.createTableDialog_rulesLegend()}>
@@ -330,14 +325,10 @@
 			</button>
 		</div>
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
-
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
 
 	.create-dialog {
 		display: flex;

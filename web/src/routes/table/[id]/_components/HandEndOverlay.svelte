@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DialogTimer from '$lib/ui/DialogTimer.svelte';
 	import CloseButton from '$lib/ui/CloseButton.svelte';
+	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import type { MockHandResult, MockMeld } from '$lib/table/mock-game-state';
 	import { m } from '$lib/paraglide/messages.js';
@@ -30,7 +31,13 @@
 	);
 </script>
 
-<div class="faan-overlay" data-testid="faan-overlay">
+<!-- Escape dismisses, same as the close button: the hold is an acknowledgment, not a decision. -->
+<ModalDialog
+	testid="faan-overlay"
+	label={m.handEndOverlay_resultAriaLabel()}
+	placement="sheet"
+	onCancel={onDismiss}
+>
 	<div class="hand-end-panel">
 		<header class="hand-end-header">
 			<span class="result-stamp result-stamp--{stamp.kind}" aria-hidden="true">{stamp.label}</span>
@@ -69,24 +76,12 @@
 			</section>
 		{/if}
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
-
-	// centered, scrim-backed -- a hand result gets full modal weight, not a translucent row.
-	.faan-overlay {
-		@include buttons.modal-scrim;
-		background: rgb(0 0 0 / 0.62);
-		overflow-y: auto;
-
-		@include layout.phone-only {
-			align-items: flex-end;
-			padding: 0;
-		}
-	}
 
 	.hand-end-panel {
 		position: relative;

@@ -1,24 +1,20 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import CloseButton from './CloseButton.svelte';
+	import ModalDialog from './ModalDialog.svelte';
 
-	let { onClose, children }: { onClose: () => void; children: Snippet } = $props();
+	let { onClose, label, children }: { onClose: () => void; label?: string; children: Snippet } =
+		$props();
 </script>
 
-<div class="panel-overlay">
+<ModalDialog onCancel={onClose} {label}>
 	<div class="panel">
 		<CloseButton onclick={onClose} />
 		{@render children()}
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
-	@use '$lib/styles/buttons';
-
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
-
 	// hugs whatever dialog content it wraps so the CloseButton it contains is positioned against
 	// that panel's own corner, not the fullscreen scrim's.
 	.panel {

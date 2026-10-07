@@ -63,6 +63,7 @@
 	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
+	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import TableToolbar from './_components/TableToolbar.svelte';
 	import MockTableToolbar from './_components/MockTableToolbar.svelte';
 	import PretableScreen from './_components/PretableScreen.svelte';
@@ -907,7 +908,7 @@
 		</div>
 
 		{#if claimOptions}
-			<div class="claim-overlay" data-testid="claim-overlay">
+			<ModalDialog testid="claim-overlay" label={m.claimDialog_ariaLabel()} placement="sheet">
 				<ClaimDialog
 					discardTile={gameState.claimWindow?.tile ?? null}
 					discarderName={gameState.claimWindow
@@ -922,7 +923,7 @@
 						{m.tablePage_claimChoiceLabel({ kind: lastClaimChoice.kind })}
 					</p>
 				{/if}
-			</div>
+			</ModalDialog>
 		{/if}
 
 		{#if gameState.handResult && !gameEndReached && !handEndDismissedLocally}
@@ -937,7 +938,7 @@
 		{/if}
 
 		{#if gameEndReached && scoreStandings}
-			<div class="panel-overlay panel-overlay--scrollable" data-testid="game-end-overlay">
+			<ModalDialog testid="game-end-overlay" labelledby="game-end-heading" placement="scroll">
 				<div class="panel panel--scrollable">
 					<GameEndScreen
 						seats={scoreSeats}
@@ -950,11 +951,14 @@
 						{playAgainFailed}
 					/>
 				</div>
-			</div>
+			</ModalDialog>
 		{/if}
 
 		{#if showScoreSheet}
-			<DismissablePanel onClose={() => (showScoreSheet = false)}>
+			<DismissablePanel
+				onClose={() => (showScoreSheet = false)}
+				label={m.tableToolbar_scoreSheetButton()}
+			>
 				<ScoreSheet
 					seats={scoreSeats}
 					totals={scoreTotals}
@@ -965,7 +969,7 @@
 		{/if}
 
 		{#if showSettings}
-			<DismissablePanel onClose={() => (showSettings = false)}>
+			<DismissablePanel onClose={() => (showSettings = false)} label={m.settings_title()}>
 				<Settings
 					{autoArm}
 					prefs={clientPrefs}
@@ -1029,7 +1033,6 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
-	@use '$lib/styles/buttons';
 
 	.table-page {
 		display: flex;
@@ -1151,32 +1154,11 @@
 		}
 	}
 
-	// centered, scrim-backed like `.panel-overlay` below -- a claim decision is as consequential as
-	// a hand result, so it gets the same modal weight, not a translucent row over an interactive table.
-	.claim-overlay,
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
-
-	// game-end content can be tall (podium + full score sheet + standings), so let the overlay
-	// itself scroll rather than clipping inside a fixed-height panel.
-	.panel-overlay--scrollable {
-		align-items: flex-start;
-		overflow-y: auto;
-		background: rgb(0 0 0 / 0.7);
-
-		> .panel {
-			width: 100%;
-		}
-	}
-
-	// hugs whatever dialog content it wraps so CloseButton is positioned against the panel's own
-	// corner, not the fullscreen scrim's.
-	.panel {
-		position: relative;
-	}
-
+	// game-end content can be tall (podium + full score sheet + standings): the dialog scrolls
+	// (placement="scroll") rather than clipping inside a fixed-height panel.
 	.panel--scrollable {
+		position: relative;
+		width: 100%;
 		margin-block: auto;
 	}
 

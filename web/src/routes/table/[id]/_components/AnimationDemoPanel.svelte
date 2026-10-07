@@ -1,6 +1,7 @@
 <script lang="ts">
 	// sandbox proving the positional slot-identity mechanics (tile-slots.ts) and the transform/
 	// opacity-only transition contract work end to end. No JS ticker -- `ontransitionend` commits the change.
+	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import SeatPlate from '$lib/table/SeatPlate.svelte';
 	import type { MeldKind, MockMeld } from '$lib/table/mock-game-state';
@@ -151,7 +152,7 @@
 	}
 </script>
 
-<div class="panel-overlay" data-testid="animation-demo">
+<ModalDialog testid="animation-demo" label={m.animationDemoPanel_heading()} onCancel={onClose}>
 	<div class="animation-demo">
 		<CloseButton onclick={onClose} />
 		<h2>{m.animationDemoPanel_heading()}</h2>
@@ -296,7 +297,7 @@
 			>{m.animationDemoPanel_resetButton()}</button
 		>
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
@@ -305,10 +306,6 @@
 
 	// this sandbox can't share OpponentRegion/YourSeatRegion's scoped selectors directly, but
 	// the shape of each rule is identical, so it goes through the same _tile.scss mixins.
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
-
 	.tile-row {
 		@include tile.tile-row;
 	}

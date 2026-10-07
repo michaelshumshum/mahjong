@@ -372,3 +372,55 @@ test('the toolbar Guide button opens the faan guide in-game', async ({ page }) =
 	await page.getByTestId('guide-dialog').getByTestId('close-button').click();
 	await expect(page.getByTestId('guide-panel')).toHaveCount(0);
 });
+
+test('native modal dialogs: Escape closes a panel and returns focus to its opener', async ({
+	page
+}) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	const opener = page.getByTestId('toggle-settings');
+	await opener.focus();
+	await page.keyboard.press('Enter');
+	const dialog = page.getByRole('dialog', { name: 'Settings' });
+	await expect(dialog).toBeVisible();
+	// showModal(): top layer, rest of the page inert.
+	expect(await page.evaluate(() => document.querySelector('dialog')?.matches(':modal'))).toBe(true);
+
+	await page.keyboard.press('Escape');
+	await expect(dialog).toHaveCount(0);
+	await expect(opener).toBeFocused();
+});
+
+test('claim dialog: focus starts on Pass and Escape passes', async ({ page }) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('button', { name: 'Claim window open (you)' }).click();
+
+	const overlay = page.getByTestId('claim-overlay');
+	await expect(overlay).toBeVisible();
+	await expect(overlay.locator('.claim-btn--pass')).toBeFocused();
+	await page.keyboard.press('Escape');
+	await expect(page.getByTestId('claim-choice')).toHaveText('chose: pass');
+	// the mock keeps the frozen offer up; the dialog itself must not have closed natively.
+	await expect(overlay).toBeVisible();
+});
+
+test('hand-end hold closes on Escape; the game-end summary does not', async ({ page }) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	await page.getByRole('button', { name: 'Hand just ended' }).click();
+	const handEnd = page.getByTestId('faan-overlay');
+	await expect(handEnd).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(handEnd).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Game just ended' }).click();
+	const gameEnd = page.getByTestId('game-end-overlay');
+	await expect(gameEnd).toBeVisible();
+	await page.keyboard.press('Escape');
+	await page.keyboard.press('Escape');
+	await expect(gameEnd).toBeVisible();
+	await expect(gameEnd.getByRole('heading', { name: 'Game over', exact: true })).toBeVisible();
+});

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ModalDialog from './ModalDialog.svelte';
 	import { getLocale } from '$lib/paraglide/runtime.js';
 	import { m } from '$lib/paraglide/messages.js';
 	import TileFace from '$lib/table/TileFace.svelte';
@@ -35,14 +36,8 @@
 	}
 </script>
 
-<div class="panel-overlay">
-	<div
-		class="guide-dialog"
-		data-testid="guide-dialog"
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="guide-heading"
-	>
+<ModalDialog labelledby="guide-heading" onCancel={onClose}>
+	<div class="guide-dialog" data-testid="guide-dialog">
 		<CloseButton onclick={onClose} />
 		<PanelHeader title={m.guide_title()} titleId="guide-heading" />
 
@@ -103,14 +98,10 @@
 			</ul>
 		</div>
 	</div>
-</div>
+</ModalDialog>
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
-
-	.panel-overlay {
-		@include buttons.modal-scrim;
-	}
 
 	.guide-dialog {
 		position: relative;
