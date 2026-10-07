@@ -97,11 +97,21 @@ required=("${required_dedup[@]}")
 
 # build a blob of everything this session has referenced a path/command/prompt in
 refs=""
+# copilot CLI passes sessionId but no transcript_path; fall back to its session events log,
+# which records tools as assistant.message events with lowercase names and `arguments`.
+if [[ -z "$transcript_path" || ! -f "$transcript_path" ]]; then
+  session_id=$(jq -r '.session_id // .sessionId // empty' <<<"$input")
+  candidate="$HOME/.copilot/session-state/$session_id/events.jsonl"
+  [[ -n "$session_id" && -f "$candidate" ]] && transcript_path="$candidate"
+fi
 if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
   refs=$(jq -r '
-    select(.type=="assistant") | .message.content[]? |
-    select(.type=="tool_use" and (.name=="Read" or .name=="Bash" or .name=="ctx_execute_file" or .name=="Agent" or (.name | test("ctx_execute_file$")))) |
-    [.input.file_path, .input.path, .input.command, .input.prompt] | .[] | select(. != null)
+    (select(.type=="assistant") | .message.content[]? |
+      select(.type=="tool_use" and (.name=="Read" or .name=="Bash" or .name=="ctx_execute_file" or .name=="Agent" or (.name | test("ctx_execute_file$")))) |
+      [.input.file_path, .input.path, .input.command, .input.prompt] | .[] | select(. != null)),
+    (select(.type=="assistant.message") | .data.toolRequests[]? |
+      select((.name | IN("read", "view", "bash", "grep", "task", "agent")) or (.name | test("ctx_execute_file$"))) |
+      [.arguments.file_path, .arguments.path, .arguments.command, .arguments.prompt] | .[] | select(. != null))
   ' "$transcript_path" 2>/dev/null || true)
 fi
 
