@@ -14,7 +14,8 @@
 		onLeaveClick,
 		copiedInviteLink,
 		copyInviteLinkFailed,
-		onCopyInviteLink,
+		onInvite,
+		isPractice,
 		effectiveConnection,
 		effectiveSeat,
 		dealer,
@@ -31,7 +32,9 @@
 		onLeaveClick: () => void;
 		copiedInviteLink: boolean;
 		copyInviteLinkFailed: boolean;
-		onCopyInviteLink: () => void;
+		onInvite: () => void;
+		// bots fill every other seat at creation -- nobody to invite.
+		isPractice: boolean;
 		effectiveConnection: ConnectionStatus | undefined;
 		effectiveSeat: Seat | null;
 		dealer: Seat;
@@ -62,20 +65,31 @@
 	);
 </script>
 
-<!-- All three pre-game states share one panel (table code + copy-invite-link) and the seat
+<!-- All three pre-game states share one panel (table code + invite) and the seat
 	ring's arrangement, matching the real table grid's relative layout. -->
 <div class="pretable-panel">
 	<BackButton label={m.pretableScreen_leaveGameButton()} onclick={onLeaveClick} />
-	<div class="pretable-info">
-		<span>{m.pretableScreen_tableLabel()}</span>
-		<span class="pretable-code">{tableId}</span>
-		<button type="button" class="pretable-link-btn" onclick={onCopyInviteLink}>
-			{copiedInviteLink ? m.pretableScreen_copiedLabel() : m.pretableScreen_copyInviteLinkButton()}
-		</button>
+	<div class="pretable-invite">
+		<span class="pretable-code-label">{m.pretableScreen_tableLabel()}</span>
+		<span class="pretable-code" data-testid="pretable-code">{tableId}</span>
 		{#if rulesetKnown}
 			<span class="pretable-rules">
 				{m.pretableScreen_rulesLabel({ preset: presetLabel })}
 			</span>
+		{/if}
+		{#if !isPractice}
+			<button
+				type="button"
+				class="pretable-invite-btn"
+				class:pretable-invite-btn--done={copiedInviteLink}
+				data-testid="pretable-invite"
+				onclick={onInvite}
+			>
+				{copiedInviteLink ? m.pretableScreen_copiedLabel() : m.pretableScreen_inviteButton()}
+			</button>
+			<span class="sr-only" aria-live="polite"
+				>{copiedInviteLink ? m.pretableScreen_copiedLabel() : ''}</span
+			>
 		{/if}
 	</div>
 	{#if copyInviteLinkFailed}
@@ -152,24 +166,40 @@
 		}
 	}
 
-	.pretable-info {
+	.pretable-invite {
 		display: flex;
-		flex-wrap: wrap;
+		flex-direction: column;
 		align-items: center;
-		justify-content: center;
 		gap: var(--space-2);
-		font-size: var(--font-size-sm);
+		width: 100%;
+		padding-bottom: var(--space-4);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.pretable-code-label {
+		font-size: var(--font-size-xs);
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
 		color: var(--color-text-muted);
 	}
 
+	// big enough to read across a room or off a screenshot.
 	.pretable-code {
-		font-family: monospace;
-		font-size: var(--font-size-base);
-		letter-spacing: 0.08em;
-		color: var(--color-text);
-		background: var(--color-surface);
+		padding: var(--space-2) var(--space-4);
 		border-radius: var(--radius-sm);
-		padding: var(--space-1) var(--space-2);
+		background: var(--color-tile);
+		color: var(--color-tile-ink);
+		font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+		font-size: var(--font-size-xl);
+		font-weight: 700;
+		letter-spacing: 0.18em;
+		line-height: 1.1;
+		box-shadow:
+			0 2px 0 var(--color-tile-edge),
+			0 5px 0 var(--color-tile-side),
+			0 8px 14px -4px rgb(10 4 2 / 0.6);
+		user-select: all;
 	}
 
 	.pretable-rules {
@@ -177,13 +207,18 @@
 		color: var(--color-text-muted);
 	}
 
-	.pretable-link-btn {
-		min-height: 36px;
-		padding: var(--space-1) var(--space-3);
+	.pretable-invite-btn {
+		width: min(100%, 16rem);
+		min-height: var(--tap-target-min);
+		margin-top: var(--space-1);
+		padding: var(--space-2) var(--space-5);
 		font: inherit;
-		font-size: var(--font-size-sm);
 		cursor: pointer;
-		@include buttons.btn-ghost;
+		@include buttons.btn-primary;
+	}
+
+	.pretable-invite-btn--done {
+		background: color-mix(in srgb, var(--color-positive) 30%, var(--color-surface-raised));
 	}
 
 	.pretable-error {
@@ -204,12 +239,13 @@
 		color: var(--color-text-muted);
 	}
 
+	// secondary: "Invite friends" is the panel's one primary action.
 	.pretable-cta {
 		min-height: var(--tap-target-min);
 		padding: var(--space-2) var(--space-5);
 		font: inherit;
 		cursor: pointer;
-		@include buttons.btn-primary;
+		@include buttons.btn-secondary;
 	}
 
 	.pretable-name-input {

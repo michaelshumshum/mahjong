@@ -105,8 +105,7 @@
 	"joinByCodePanel_hint": "Any code works — the table is created automatically the moment someone connects to it, so this is a real invite, not a preview.",
 	"pretableScreen_leaveGameButton": "Leave game",
 	"pretableScreen_tableLabel": "Table",
-	"pretableScreen_copyInviteLinkButton": "Copy invite link",
-	"pretableScreen_copiedLabel": "Copied",
+	"pretableScreen_copiedLabel": "Link copied",
 	"pretableScreen_rulesLabel": "Rules: {preset}",
 	"pretableScreen_customRuleset": "Custom",
 	"pretableScreen_copyLinkError": "Couldn't copy automatically — copy the address bar instead.",
@@ -483,5 +482,8 @@
 	"practiceSetupDialog_tierLegendLabel": "Bot levels",
 	"practiceSetupDialog_easyBlurb": "Builds toward any win; never plays safe.",
 	"practiceSetupDialog_normalBlurb": "Aims for valuable hands and avoids feeding you.",
-	"practiceSetupDialog_impossibleBlurb": "Sees every hand. Good luck."
+	"practiceSetupDialog_impossibleBlurb": "Sees every hand. Good luck.",
+	"pretableScreen_inviteButton": "Invite friends",
+	"pretableScreen_inviteShareTitle": "Mahjong table {code}",
+	"pretableScreen_inviteShareText": "Pull up a seat at my mahjong table."
 }

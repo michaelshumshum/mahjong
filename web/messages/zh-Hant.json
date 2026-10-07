@@ -105,8 +105,7 @@
 	"joinByCodePanel_hint": "任何代碼都可使用 — 只要有人連線到該牌桌，系統就會自動建立，所以這是一個真正的邀請連結，並非預覽。",
 	"pretableScreen_leaveGameButton": "離開遊戲",
 	"pretableScreen_tableLabel": "牌桌",
-	"pretableScreen_copyInviteLinkButton": "複製邀請連結",
-	"pretableScreen_copiedLabel": "已複製",
+	"pretableScreen_copiedLabel": "已複製連結",
 	"pretableScreen_rulesLabel": "規則：{preset}",
 	"pretableScreen_customRuleset": "自訂",
 	"pretableScreen_copyLinkError": "無法自動複製 — 請改為複製網址列。",
@@ -483,5 +482,8 @@
 	"practiceSetupDialog_tierLegendLabel": "機械人難度",
 	"practiceSetupDialog_easyBlurb": "只顧食糊，唔識防守。",
 	"practiceSetupDialog_normalBlurb": "會做大牌，亦識避炮。",
-	"practiceSetupDialog_impossibleBlurb": "睇得到所有人嘅牌，祝你好運。"
+	"practiceSetupDialog_impossibleBlurb": "睇得到所有人嘅牌，祝你好運。",
+	"pretableScreen_inviteButton": "邀請朋友",
+	"pretableScreen_inviteShareTitle": "麻雀枱 {code}",
+	"pretableScreen_inviteShareText": "嚟同我打番圈麻雀啦。"
 }

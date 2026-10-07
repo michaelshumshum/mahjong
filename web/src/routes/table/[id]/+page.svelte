@@ -46,6 +46,8 @@
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
 	import { serverErrorToastMessage } from '$lib/net/server-error-messages';
+	import { shareOrCopy } from '$lib/ui/share-invite';
+	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
 	import type { TileCode } from '$lib/table/tile-code';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
@@ -297,17 +299,23 @@
 	// waiting for the table to fill is exactly when you need to hand it to someone.
 	let copiedInviteLink = $state(false);
 	let copyInviteLinkFailed = $state(false);
+	const COPIED_RESET_MS = 2000;
+	let cancelCopiedReset: (() => void) | null = null;
 
-	async function copyInviteLink(): Promise<void> {
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			copiedInviteLink = true;
-			copyInviteLinkFailed = false;
-		} catch {
-			copiedInviteLink = false;
-			copyInviteLinkFailed = true;
-		}
+	async function shareInvite(): Promise<void> {
+		const outcome = await shareOrCopy({
+			url: window.location.href,
+			title: m.pretableScreen_inviteShareTitle({ code: tableId }),
+			text: m.pretableScreen_inviteShareText()
+		});
+		copyInviteLinkFailed = outcome === 'failed';
+		if (outcome !== 'copied') return;
+		copiedInviteLink = true;
+		cancelCopiedReset?.();
+		cancelCopiedReset = scheduleAutoDismiss(COPIED_RESET_MS, () => (copiedInviteLink = false));
 	}
+
+	$effect(() => () => cancelCopiedReset?.());
 
 	function seatAt(position: 0 | 1 | 2 | 3): MockSeatState {
 		return gameState.seats.find((s) => relativeSeat(s.seat, gameState.you) === position)!;
@@ -805,7 +813,8 @@
 			onLeaveClick={handleLeaveClick}
 			{copiedInviteLink}
 			{copyInviteLinkFailed}
-			onCopyInviteLink={copyInviteLink}
+			onInvite={shareInvite}
+			{isPractice}
 			{effectiveConnection}
 			effectiveSeat={effectiveSeat as Seat | null}
 			dealer={gameState.dealer as Seat}

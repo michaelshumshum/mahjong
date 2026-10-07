@@ -667,8 +667,17 @@ promotes the connection off spectator status ([architecture.md §3](architecture
 
 Connecting, seat picker and waiting are recurring moments in a multiplayer game, so they use the
 app's panel/button vocabulary (`panel-elevated`, `_buttons.scss`). All three share one panel —
-table code plus a "copy invite link" button (the table URL _is_ the invite) — and a seat ring: four
-slots arranged across/left/right/self like `layout.seat-region-grid`.
+the table code, large on a tile-coloured chip, plus a primary "Invite friends" button (the table URL
+_is_ the invite) — and a seat ring: four slots arranged across/left/right/self like
+`layout.seat-region-grid`.
+
+- **Invite.** `lib/ui/share-invite.ts`'s `shareOrCopy()` opens the OS share sheet
+  (`navigator.share`, gated on `canShare`) where one exists — i.e. phones — else copies the URL.
+  Dismissing the sheet (`AbortError`) is a no-op, not an error; any other share failure falls
+  through to the clipboard. After a copy the button reads "Link copied" (also announced through a
+  polite live region) and resets after 2s (`scheduleAutoDismiss`). Hidden in practice mode, where
+  bots already hold every other seat. The host's "Start with bots" is secondary-styled so the
+  invite stays the panel's one primary action.
 
 - **Before joining:** each slot is a `<button>` (`seatPicker`/`seatPickerSlot`) reading
   `seatStatus`/`names` — "Open" and clickable, or the occupant's name/"Bot" and disabled.

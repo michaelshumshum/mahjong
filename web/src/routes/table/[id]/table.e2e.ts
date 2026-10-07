@@ -304,3 +304,25 @@ test('animation demo: draw, discard, claim, and concealed kong run the full sequ
 
 	expect(errors).toEqual([]);
 });
+
+test('waiting room invite copies the table link and resets its label after 2s', async ({
+	page,
+	context
+}) => {
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	// desktop chromium has no share sheet; pin that so the clipboard fallback is what runs.
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+	});
+	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
+	await page.goto('/table/abc123?pregame=waiting');
+
+	await expect(page.getByTestId('pretable-code')).toHaveText('abc123');
+	const invite = page.getByTestId('pretable-invite');
+	await invite.click();
+	await expect(invite).toHaveText('Link copied');
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+		'/table/abc123?pregame=waiting'
+	);
+	await expect(invite).toHaveText('Invite friends', { timeout: 4000 });
+});
