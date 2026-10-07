@@ -2,7 +2,8 @@
 	// sandbox proving the positional slot-identity mechanics (tile-slots.ts) and the transform/
 	// opacity-only transition contract work end to end. No JS ticker -- `ontransitionend` commits the change.
 	import TileFace from '$lib/table/TileFace.svelte';
-	import type { MockMeld } from '$lib/table/mock-game-state';
+	import SeatPlate from '$lib/table/SeatPlate.svelte';
+	import type { MeldKind, MockMeld } from '$lib/table/mock-game-state';
 	import type { TileCode } from '$lib/table/tile-code';
 	import {
 		initialSlotState,
@@ -113,6 +114,29 @@
 		leavingYourTileId = null;
 	}
 
+	// SeatPlate's sealStamp/scoreDelta are transient signals -- previewed here on a real
+	// instance since the frozen mock scenarios never produce the transition that triggers them.
+	const SEAL_GLYPH: Record<MeldKind, string> = {
+		chow: '上',
+		pung: '碰',
+		exposed_kong: '槓',
+		concealed_kong: '槓',
+		added_kong: '槓'
+	};
+	let demoSealSeq = 0;
+	let demoSealStamp: { glyph: string; key: number } | null = $state(null);
+	function triggerDemoSeal(kind: MeldKind): void {
+		demoSealSeq += 1;
+		demoSealStamp = { glyph: SEAL_GLYPH[kind], key: demoSealSeq };
+	}
+
+	let demoScoreDeltaSeq = 0;
+	let demoScoreDelta: { value: number; key: number } | null = $state(null);
+	function triggerDemoScoreDelta(value: number): void {
+		demoScoreDeltaSeq += 1;
+		demoScoreDelta = { value, key: demoScoreDeltaSeq };
+	}
+
 	function resetAnimationDemo(): void {
 		demoOpponentSlots = initialSlotState(13);
 		demoOpponentDiscards = [];
@@ -122,6 +146,8 @@
 		demoYourHand = [demoTile('1m'), demoTile('9s'), demoTile('z5'), demoTile('3p'), demoTile('7m')];
 		demoYourDiscards = [];
 		leavingYourTileId = null;
+		demoSealStamp = null;
+		demoScoreDelta = null;
 	}
 </script>
 
@@ -132,6 +158,39 @@
 		<p class="demo-hint">
 			{m.animationDemoPanel_hint()}
 		</p>
+
+		<section aria-label={m.animationDemoPanel_sealStampSectionAriaLabel()}>
+			<h3>{m.animationDemoPanel_sealStampHeading()}</h3>
+			<div class="demo-seat-plate-preview">
+				<SeatPlate
+					name={m.animationDemoPanel_youHeading()}
+					windChar="東"
+					windAriaLabel={m.animationDemoPanel_youHeading()}
+					isDealer={false}
+					dealerTitle=""
+					score={0}
+					sealStamp={demoSealStamp}
+					scoreDelta={demoScoreDelta}
+				/>
+			</div>
+			<div class="demo-actions">
+				<button type="button" onclick={() => triggerDemoSeal('chow')}
+					>{m.animationDemoPanel_sealChowButton()}</button
+				>
+				<button type="button" onclick={() => triggerDemoSeal('pung')}
+					>{m.animationDemoPanel_sealPungButton()}</button
+				>
+				<button type="button" onclick={() => triggerDemoSeal('exposed_kong')}
+					>{m.animationDemoPanel_sealKongButton()}</button
+				>
+				<button type="button" onclick={() => triggerDemoScoreDelta(24)}
+					>{m.animationDemoPanel_scoreDeltaPositiveButton()}</button
+				>
+				<button type="button" onclick={() => triggerDemoScoreDelta(-16)}
+					>{m.animationDemoPanel_scoreDeltaNegativeButton()}</button
+				>
+			</div>
+		</section>
 
 		<section aria-label={m.animationDemoPanel_opponentSeatAriaLabel()}>
 			<h3>{m.animationDemoPanel_opponentHeading()}</h3>
@@ -295,6 +354,16 @@
 		padding: var(--space-4);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
+	}
+
+	// SeatPlate's sealStamp/score-delta overlays are `position: absolute; inset: 0` on the plate --
+	// give the preview a sized, positioned box to anchor against, same as a real seat region.
+	.demo-seat-plate-preview {
+		position: relative;
+		display: inline-flex;
+		padding: var(--space-2) var(--space-4);
+		background: var(--color-surface);
+		border-radius: var(--radius-md);
 	}
 
 	.demo-hint {

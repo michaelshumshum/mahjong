@@ -5,6 +5,7 @@
 	import {
 		MOCK_SCENARIOS,
 		relativeSeat,
+		type MeldKind,
 		type MockSeatState,
 		type Seat
 	} from '$lib/table/mock-game-state';
@@ -27,7 +28,8 @@
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import CoachMarks, { type CoachTarget } from '$lib/ui/CoachMarks.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
-	import { applyMotionPref } from '$lib/ui/motion';
+	import { applyMotionPref, isMotionReduced } from '$lib/ui/motion';
+	import { vibrate } from '$lib/ui/haptics';
 	import {
 		clearSeatForTable,
 		clearSecretForTable,
@@ -432,6 +434,107 @@
 	);
 	let lastClaimChoice: ClaimOption | null = $state(null);
 
+	// P3.3 haptics: a short pulse on your turn starting or a claim offer landing -- mobile
+	// feature-detection lives in haptics.ts; this just decides *when*, on the rising edge.
+	let hapticsPrevTurn = false;
+	$effect(() => {
+		const yourTurn = !isMock && discardableTileIds.size > 0;
+		if (yourTurn && !hapticsPrevTurn && clientPrefs.haptics) vibrate(30);
+		hapticsPrevTurn = yourTurn;
+	});
+
+	let hapticsPrevClaimOffer = false;
+	$effect(() => {
+		const offering = !isMock && !!claimOptions && claimOptions.length > 0;
+		if (offering && !hapticsPrevClaimOffer && clientPrefs.haptics) vibrate(30);
+		hapticsPrevClaimOffer = offering;
+	});
+
+	// P3.1(d) claim seal stamp: a transient signal off a seat's own meld count growing, never
+	// set under reduced motion. Keyed on `scenarioId`/`handNo` so a scenario/hand change resets.
+	const MELD_SEAL_GLYPH: Record<MeldKind, string> = {
+		chow: '上',
+		pung: '碰',
+		exposed_kong: '槓',
+		concealed_kong: '槓',
+		added_kong: '槓'
+	};
+	let sealStamp = $state<{ seat: number; glyph: string; key: number } | null>(null);
+	let sealPrevMeldCounts: number[] = [0, 0, 0, 0];
+	let sealPrevHandKey: string | null = null;
+	let sealStampSeq = 0;
+	let sealStampTimer: ReturnType<typeof setTimeout> | null = null;
+
+	$effect(() => {
+		const seats = gameState.seats;
+		const handKey = `${isMock ? scenarioId : 'live'}:${gameState.handNo}`;
+		if (sealPrevHandKey === handKey && !isMotionReduced()) {
+			for (const s of seats) {
+				const prevCount = sealPrevMeldCounts[s.seat] ?? 0;
+				if (s.melds.length > prevCount) {
+					const newest = s.melds[s.melds.length - 1];
+					sealStampSeq += 1;
+					const seq = sealStampSeq;
+					if (sealStampTimer !== null) clearTimeout(sealStampTimer);
+					sealStamp = { seat: s.seat, glyph: MELD_SEAL_GLYPH[newest.kind], key: seq };
+					sealStampTimer = setTimeout(() => {
+						if (sealStampSeq === seq) sealStamp = null;
+					}, 900);
+				}
+			}
+		}
+		sealPrevMeldCounts = seats.map((s) => s.melds.length);
+		sealPrevHandKey = handKey;
+	});
+
+	$effect(() => {
+		return () => {
+			if (sealStampTimer !== null) clearTimeout(sealStampTimer);
+		};
+	});
+
+	function sealStampFor(seat: number): { glyph: string; key: number } | null {
+		return sealStamp && sealStamp.seat === seat
+			? { glyph: sealStamp.glyph, key: sealStamp.key }
+			: null;
+	}
+
+	// P3.1(e) score-delta chips: same transient-signal pattern, off `handResult.payments` once
+	// per hand end, cleared after a few seconds -- just a glance near the plate.
+	let scoreDeltaSignals = $state<Record<number, { value: number; key: number }>>({});
+	let scoreDeltaPrevHandKey: string | null = null;
+	let scoreDeltaSeq = 0;
+	let scoreDeltaTimer: ReturnType<typeof setTimeout> | null = null;
+
+	$effect(() => {
+		const result = gameState.handResult;
+		const handKey = `${isMock ? scenarioId : 'live'}:${gameState.handNo}`;
+		if (scoreDeltaPrevHandKey === handKey) return;
+		scoreDeltaPrevHandKey = handKey;
+		if (!result || !result.payments || isMotionReduced()) return;
+		scoreDeltaSeq += 1;
+		const seq = scoreDeltaSeq;
+		const next: Record<number, { value: number; key: number }> = {};
+		for (const [seat, value] of Object.entries(result.payments)) {
+			next[Number(seat)] = { value: value as number, key: seq };
+		}
+		scoreDeltaSignals = next;
+		if (scoreDeltaTimer !== null) clearTimeout(scoreDeltaTimer);
+		scoreDeltaTimer = setTimeout(() => {
+			if (scoreDeltaSeq === seq) scoreDeltaSignals = {};
+		}, 2400);
+	});
+
+	$effect(() => {
+		return () => {
+			if (scoreDeltaTimer !== null) clearTimeout(scoreDeltaTimer);
+		};
+	});
+
+	function scoreDeltaFor(seat: number): { value: number; key: number } | null {
+		return scoreDeltaSignals[seat] ?? null;
+	}
+
 	// hand-end hold: dismissing is per-seat, tracked locally and sent once via `hand_end_ack` --
 	// reset per hand, mirroring `readySent`'s one-shot pattern but keyed on `handNo`.
 	let handEndAckSent = $state(false);
@@ -641,7 +744,12 @@
 
 	let autoArm: AutoArm = $state(loadAutoArm() ?? { noCalls: false, autoPassChow: false });
 	let clientPrefs: ClientPrefs = $state(
-		loadClientPrefs() ?? { soundEnabled: true, motion: 'system', discardMode: 'two-step' }
+		loadClientPrefs() ?? {
+			soundEnabled: true,
+			motion: 'system',
+			discardMode: 'two-step',
+			haptics: true
+		}
 	);
 	// guards the one-shot re-send above per live connection instance, mirroring `readySent`.
 	let autoArmSent = $state(false);
@@ -713,18 +821,24 @@
 					position="across"
 					dealer={gameState.dealer as Seat}
 					turn={haloTurn}
+					sealStamp={sealStampFor(seatAt(2).seat)}
+					scoreDelta={scoreDeltaFor(seatAt(2).seat)}
 				/>
 				<OpponentRegion
 					seat={seatAt(3)}
 					position="left"
 					dealer={gameState.dealer as Seat}
 					turn={haloTurn}
+					sealStamp={sealStampFor(seatAt(3).seat)}
+					scoreDelta={scoreDeltaFor(seatAt(3).seat)}
 				/>
 				<OpponentRegion
 					seat={seatAt(1)}
 					position="right"
 					dealer={gameState.dealer as Seat}
 					turn={haloTurn}
+					sealStamp={sealStampFor(seatAt(1).seat)}
+					scoreDelta={scoreDeltaFor(seatAt(1).seat)}
 				/>
 
 				<div class="table-center">
@@ -777,6 +891,8 @@
 					discardMode={clientPrefs.discardMode}
 					onDiscard={discardTile}
 					{declareOptions}
+					sealStamp={sealStampFor(seatAt(0).seat)}
+					scoreDelta={scoreDeltaFor(seatAt(0).seat)}
 				/>
 			</div>
 			{#if showCoachMarks}

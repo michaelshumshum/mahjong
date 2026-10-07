@@ -7,7 +7,8 @@
 	let clientPrefs = $state<ClientPrefs>({
 		soundEnabled: true,
 		motion: 'system',
-		discardMode: 'two-step'
+		discardMode: 'two-step',
+		haptics: true
 	});
 	let lastAutoArmSummary = $derived(
 		`no_calls=${autoArm.noCalls} auto_pass_chow=${autoArm.autoPassChow}`

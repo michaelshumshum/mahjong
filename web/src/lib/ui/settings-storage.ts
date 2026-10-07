@@ -18,6 +18,7 @@ export const TABLE_CREDS_TTL_MS = 24 * 60 * 60 * 1000;
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 const DISCARD_MODES: readonly DiscardMode[] = ['two-step', 'one-tap'];
 const DEFAULT_DISCARD_MODE: DiscardMode = 'two-step';
+const DEFAULT_HAPTICS = true;
 
 function isMotionPref(value: unknown): value is MotionPref {
 	return typeof value === 'string' && (MOTION_PREFS as readonly string[]).includes(value);
@@ -85,9 +86,11 @@ export function loadClientPrefs(): ClientPrefs | null {
 	const raw = load(CLIENT_PREFS_STORAGE_KEY, isClientPrefs);
 	if (raw === null) return null;
 	const rawDiscardMode = (raw as unknown as Record<string, unknown>).discardMode;
+	const rawHaptics = (raw as unknown as Record<string, unknown>).haptics;
 	return {
 		...raw,
-		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_DISCARD_MODE
+		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_DISCARD_MODE,
+		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_HAPTICS
 	};
 }
 

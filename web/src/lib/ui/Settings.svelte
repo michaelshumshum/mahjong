@@ -18,12 +18,13 @@
 	// full tile before committing. one-tap: today's original behaviour.
 	export type DiscardMode = 'two-step' | 'one-tap';
 
-	// client-only prefs, no wire equivalent. `motion` overrides `prefers-reduced-motion` for a
-	// player whose OS setting doesn't match what they want in-game.
+	// client-only prefs, no wire equivalent. `haptics` is separate from `motion`: vibration is
+	// always feature-detected to mobile, this setting only gates whether it fires at all.
 	export interface ClientPrefs {
 		soundEnabled: boolean;
 		motion: MotionPref;
 		discardMode: DiscardMode;
+		haptics: boolean;
 	}
 
 	let {
@@ -74,6 +75,12 @@
 			label={m.settings_soundEffectsLabel()}
 			checked={prefs.soundEnabled}
 			onChange={(checked) => onPrefsChange({ ...prefs, soundEnabled: checked })}
+		/>
+		<OptionRow
+			type="checkbox"
+			label={m.settings_hapticsLabel()}
+			checked={prefs.haptics}
+			onChange={(checked) => onPrefsChange({ ...prefs, haptics: checked })}
 		/>
 	</FormGroup>
 

@@ -69,7 +69,12 @@ describe('settings-storage', () => {
 
 	describe('clientPrefs', () => {
 		it('round-trips a saved value', () => {
-			const prefs: ClientPrefs = { soundEnabled: false, motion: 'reduced', discardMode: 'one-tap' };
+			const prefs: ClientPrefs = {
+				soundEnabled: false,
+				motion: 'reduced',
+				discardMode: 'one-tap',
+				haptics: false
+			};
 			saveClientPrefs(prefs);
 			expect(loadClientPrefs()).toEqual(prefs);
 		});
@@ -86,8 +91,30 @@ describe('settings-storage', () => {
 			expect(loadClientPrefs()).toEqual({
 				soundEnabled: true,
 				motion: 'system',
-				discardMode: 'two-step'
+				discardMode: 'two-step',
+				haptics: true
 			});
+		});
+
+		it('migrates a pre-haptics stored value to the haptics-on default', () => {
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({ soundEnabled: true, motion: 'system', discardMode: 'one-tap' })
+			);
+			expect(loadClientPrefs()?.haptics).toBe(true);
+		});
+
+		it('keeps an explicit stored haptics: false rather than defaulting it', () => {
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({
+					soundEnabled: true,
+					motion: 'system',
+					discardMode: 'one-tap',
+					haptics: false
+				})
+			);
+			expect(loadClientPrefs()?.haptics).toBe(false);
 		});
 
 		it('discards an invalid stored discardMode in favour of the default', () => {
@@ -315,7 +342,12 @@ describe('settings-storage', () => {
 			(globalThis as { localStorage?: Storage }).localStorage = throwing;
 
 			expect(() =>
-				saveClientPrefs({ soundEnabled: true, motion: 'full', discardMode: 'two-step' })
+				saveClientPrefs({
+					soundEnabled: true,
+					motion: 'full',
+					discardMode: 'two-step',
+					haptics: true
+				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
 			expect(() => saveDisplayName('Alice')).not.toThrow();
@@ -330,7 +362,12 @@ describe('settings-storage', () => {
 			delete (globalThis as { localStorage?: Storage }).localStorage;
 
 			expect(() =>
-				saveClientPrefs({ soundEnabled: true, motion: 'full', discardMode: 'two-step' })
+				saveClientPrefs({
+					soundEnabled: true,
+					motion: 'full',
+					discardMode: 'two-step',
+					haptics: true
+				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
 			expect(() => saveDisplayName('Alice')).not.toThrow();
