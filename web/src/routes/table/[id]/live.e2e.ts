@@ -388,7 +388,7 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 
 		await expect(gameEndOverlay).toBeVisible({ timeout: 5_000 });
 		await expect(gameEndOverlay.getByRole('heading', { name: 'Game over' })).toBeVisible();
-		await expect(gameEndOverlay.locator('.standings li')).toHaveCount(4);
+		await expect(gameEndOverlay.getByTestId('game-end-standings').locator('li')).toHaveCount(4);
 
 		// past-round detail: expand hand 1's row and confirm a real winning hand or exhaustive-draw
 		// note renders, not blank/broken output for data long since scrolled out of `state.melds`.
