@@ -497,5 +497,15 @@
 	"gameEndScreen_playAgainButton": "Play again",
 	"gameEndScreen_playAgainPending": "Starting…",
 	"gameEndScreen_playAgainError": "Couldn't start a new table — try again.",
-	"gameEndScreen_scoreSheetSummary": "Hand-by-hand scores"
+	"gameEndScreen_scoreSheetSummary": "Hand-by-hand scores",
+	"coachMarks_regionLabel": "Tips for your first hand",
+	"coachMarks_stepCounter": "Tip {n} of {total}",
+	"coachMarks_discardTwoStep": "Tap a tile in your hand to lift it, then tap it again to discard it.",
+	"coachMarks_discardOneTap": "Tap a tile in your hand to discard it.",
+	"coachMarks_lastDiscard": "The newest discard pulses in the middle of the table. It is the one players can claim.",
+	"coachMarks_claims": "When you can claim a discard, big buttons pop up over the table. Pick one, or pass.",
+	"coachMarks_nextButton": "Next",
+	"coachMarks_doneButton": "Got it",
+	"coachMarks_skipButton": "Skip tips",
+	"tableToolbar_guideButton": "Guide"
 }

@@ -24,6 +24,8 @@
 		type Totals
 	} from '$lib/ui/ScoreSheet.svelte';
 	import GameEndScreen from '$lib/ui/GameEndScreen.svelte';
+	import GuideDialog from '$lib/ui/GuideDialog.svelte';
+	import CoachMarks, { type CoachTarget } from '$lib/ui/CoachMarks.svelte';
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 	import { applyMotionPref } from '$lib/ui/motion';
 	import {
@@ -32,12 +34,14 @@
 		loadAutoArm,
 		loadClientPrefs,
 		loadDisplayName,
+		loadOnboarding,
 		loadPracticeSetup,
 		loadSeatForTable,
 		loadSecretForTable,
 		saveAutoArm,
 		saveClientPrefs,
 		saveDisplayName,
+		saveOnboarding,
 		saveSeatForTable,
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
@@ -608,6 +612,25 @@
 	);
 	let haloTurn = $derived(resultOverlayUp ? -1 : gameState.turn);
 
+	// first-hand coach marks: practice only (no other humans waiting on you), once per browser.
+	let onboarding = $state(loadOnboarding() ?? { coachMarksDone: false });
+	let coachTarget = $state<CoachTarget>(null);
+	let showCoachMarks = $derived(
+		isPractice &&
+			!spectating &&
+			!onboarding.coachMarksDone &&
+			gameState.handNo === 1 &&
+			!claimOptions &&
+			!resultOverlayUp
+	);
+	function finishCoachMarks(): void {
+		onboarding = { coachMarksDone: true };
+		saveOnboarding(onboarding);
+		coachTarget = null;
+	}
+
+	let showGuide = $state(false);
+
 	// persisted to localStorage. `autoArm` is "last known intent," not verified truth -- re-sent
 	// on each fresh connection instead of read back. Display name persists the same way but is sent once on `join`.
 	let displayName = $state(loadDisplayName() ?? '');
@@ -660,6 +683,7 @@
 				onLeaveClick={handleLeaveClick}
 				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
 				onToggleSettings={() => (showSettings = !showSettings)}
+				onOpenGuide={() => (showGuide = true)}
 				onToggleAnimationDemo={() => (showAnimationDemo = !showAnimationDemo)}
 			/>
 		{:else}
@@ -675,10 +699,11 @@
 				onLeaveClick={handleLeaveClick}
 				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
 				onToggleSettings={() => (showSettings = !showSettings)}
+				onOpenGuide={() => (showGuide = true)}
 			/>
 		{/if}
 
-		<div class="table-wrap">
+		<div class="table-wrap" data-coach={showCoachMarks ? coachTarget : undefined}>
 			{#if !isMock}
 				<ConnectionBanner connection={liveStore?.connection} />
 			{/if}
@@ -754,6 +779,15 @@
 					{declareOptions}
 				/>
 			</div>
+			{#if showCoachMarks}
+				<div class="coach-anchor">
+					<CoachMarks
+						discardMode={clientPrefs.discardMode}
+						onStepChange={(target) => (coachTarget = target)}
+						onDone={finishCoachMarks}
+					/>
+				</div>
+			{/if}
 		</div>
 
 		{#if claimOptions}
@@ -837,6 +871,10 @@
 			</DismissablePanel>
 		{/if}
 
+		{#if showGuide}
+			<GuideDialog onClose={() => (showGuide = false)} />
+		{/if}
+
 		{#if showAnimationDemo}
 			<AnimationDemoPanel onClose={() => (showAnimationDemo = false)} />
 		{/if}
@@ -901,6 +939,22 @@
 		position: relative;
 		flex: 1;
 		min-height: 0;
+	}
+
+	// above the felt, below every overlay: a tip never covers a claim or result dialog.
+	.coach-anchor {
+		position: absolute;
+		top: var(--space-3);
+		left: 50%;
+		z-index: var(--z-hud);
+		transform: translateX(-50%);
+	}
+
+	.table-wrap[data-coach='hand'] :global(.seat-region--self),
+	.table-wrap[data-coach='discards'] :global(.table-center) {
+		outline: 2px solid var(--color-brass);
+		outline-offset: 4px;
+		border-radius: var(--radius-md);
 	}
 
 	.table-surface {

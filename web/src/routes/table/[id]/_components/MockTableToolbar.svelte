@@ -11,6 +11,7 @@
 		onLeaveClick,
 		onToggleScoreSheet,
 		onToggleSettings,
+		onOpenGuide,
 		onToggleAnimationDemo
 	}: {
 		scenarioId: string;
@@ -19,6 +20,7 @@
 		onLeaveClick: () => void;
 		onToggleScoreSheet: () => void;
 		onToggleSettings: () => void;
+		onOpenGuide: () => void;
 		onToggleAnimationDemo: () => void;
 	} = $props();
 </script>
@@ -51,6 +53,9 @@
 	</div>
 
 	<div class="chrome-toggles">
+		<button type="button" data-testid="open-guide" onclick={onOpenGuide}
+			>{m.tableToolbar_guideButton()}</button
+		>
 		<button type="button" data-testid="toggle-score-sheet" onclick={onToggleScoreSheet}
 			>{m.mockTableToolbar_scoreSheetButton()}</button
 		>

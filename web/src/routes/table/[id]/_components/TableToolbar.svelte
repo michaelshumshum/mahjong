@@ -16,7 +16,8 @@
 		connection,
 		onLeaveClick,
 		onToggleScoreSheet,
-		onToggleSettings
+		onToggleSettings,
+		onOpenGuide
 	}: {
 		spectating: boolean;
 		tableId: string;
@@ -29,6 +30,7 @@
 		onLeaveClick: () => void;
 		onToggleScoreSheet: () => void;
 		onToggleSettings: () => void;
+		onOpenGuide: () => void;
 	} = $props();
 
 	// your own wind, not "seat N" -- CenterHub (frontend.md §3) now owns the table-wide wall/
@@ -72,6 +74,9 @@
 	</div>
 
 	<div class="chrome-toggles">
+		<button type="button" data-testid="open-guide" onclick={onOpenGuide}
+			>{m.tableToolbar_guideButton()}</button
+		>
 		<button type="button" data-testid="toggle-score-sheet" onclick={onToggleScoreSheet}
 			>{m.tableToolbar_scoreSheetButton()}</button
 		>

@@ -479,6 +479,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode` | purely local; `discardMode` postdates this key, so `loadClientPrefs` defaults it when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
+| `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
 | `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
 
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
@@ -632,6 +633,17 @@ human), each Easy/Normal/Impossible ([bots.md §6](bots.md)), defaulting to the 
 (else Normal), above a short legend
 with a one-line blurb per level. Submitting sends `POST /tables`
 with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/table/<id>?practice=1`.
+
+**First-hand coach marks.** On a practice table's hand 1, until `mahjong:onboarding:v1` says
+they're done, `lib/ui/CoachMarks.svelte` shows one tip at a time in a card pinned to the top of the
+table (above the felt, below every overlay; hidden while a claim or result dialog is up): how to
+discard (worded for the current discard mode), where the newest discard pulses, and that claims pop
+up over the table. The current tip's target — your seat region, or the centre pools — gets a brass
+outline via `.table-wrap[data-coach]`. "Next"/"Got it" and "Skip tips" both end it for good.
+Practice only: in a multiplayer game nobody should be reading tips while three people wait.
+
+**In-game guide.** Both toolbars carry a "Guide" button opening the same `GuideDialog` as the
+lobby, so the faan library is reachable mid-hand.
 
 `?practice=1` is this route's own param; the live-connect effect appends `&practice=true` to the
 WS URL, which binds seats 1-3 at construction (`server/app/ws.py`'s `ws_endpoint`,

@@ -5,6 +5,9 @@ import {
 	CLIENT_PREFS_STORAGE_KEY,
 	DISPLAY_NAME_STORAGE_KEY,
 	PRACTICE_SETUP_STORAGE_KEY,
+	ONBOARDING_STORAGE_KEY,
+	loadOnboarding,
+	saveOnboarding,
 	loadPracticeSetup,
 	savePracticeSetup,
 	TABLE_CREDS_TTL_MS,
@@ -161,6 +164,18 @@ describe('settings-storage', () => {
 			expect(loadPracticeSetup()).toBeNull();
 			localStorage.setItem(PRACTICE_SETUP_STORAGE_KEY, JSON.stringify({ 1: 'easy', 2: 'normal' }));
 			expect(loadPracticeSetup()).toBeNull();
+		});
+	});
+
+	describe('onboarding', () => {
+		it('round-trips a saved value', () => {
+			saveOnboarding({ coachMarksDone: true });
+			expect(loadOnboarding()).toEqual({ coachMarksDone: true });
+		});
+
+		it('falls back to null on a wrong-shaped value', () => {
+			localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ coachMarksDone: 'yes' }));
+			expect(loadOnboarding()).toBeNull();
 		});
 	});
 

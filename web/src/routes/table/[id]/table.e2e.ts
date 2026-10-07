@@ -363,3 +363,12 @@ test('practice game end offers Play again, re-creating a table with the last bot
 	await expect(page).toHaveURL('/table/AGAIN1?practice=1');
 	expect(body).toEqual({ practice: true, bot_tiers: { 1: 'T1', 2: 'ORACLE', 3: 'T2' } });
 });
+
+test('the toolbar Guide button opens the faan guide in-game', async ({ page }) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+	await page.getByTestId('open-guide').click();
+	await expect(page.getByTestId('guide-panel')).toBeVisible();
+	await page.getByTestId('guide-dialog').getByTestId('close-button').click();
+	await expect(page.getByTestId('guide-panel')).toHaveCount(0);
+});

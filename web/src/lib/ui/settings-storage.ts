@@ -7,6 +7,7 @@ export const CLIENT_PREFS_STORAGE_KEY = 'mahjong:clientPrefs:v1';
 export const AUTO_ARM_STORAGE_KEY = 'mahjong:autoArm:v1';
 export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
 export const PRACTICE_SETUP_STORAGE_KEY = 'mahjong:practiceSetup:v1';
+export const ONBOARDING_STORAGE_KEY = 'mahjong:onboarding:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
@@ -138,6 +139,24 @@ export function loadPracticeSetup(): PracticeSetup | null {
 
 export function savePracticeSetup(setup: PracticeSetup): void {
 	writeRaw(PRACTICE_SETUP_STORAGE_KEY, JSON.stringify(setup));
+}
+
+export interface Onboarding {
+	coachMarksDone: boolean;
+}
+
+export function isOnboarding(value: unknown): value is Onboarding {
+	if (typeof value !== 'object' || value === null) return false;
+	return typeof (value as Record<string, unknown>).coachMarksDone === 'boolean';
+}
+
+/** First-hand practice coach marks: shown until finished or skipped once, then never again. */
+export function loadOnboarding(): Onboarding | null {
+	return load(ONBOARDING_STORAGE_KEY, isOnboarding);
+}
+
+export function saveOnboarding(onboarding: Onboarding): void {
+	writeRaw(ONBOARDING_STORAGE_KEY, JSON.stringify(onboarding));
 }
 
 interface StoredSeat {

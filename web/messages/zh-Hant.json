@@ -497,5 +497,15 @@
 	"gameEndScreen_playAgainButton": "再玩一局",
 	"gameEndScreen_playAgainPending": "開緊…",
 	"gameEndScreen_playAgainError": "開唔到新枱，請再試。",
-	"gameEndScreen_scoreSheetSummary": "每局分數"
+	"gameEndScreen_scoreSheetSummary": "每局分數",
+	"coachMarks_regionLabel": "第一局小貼士",
+	"coachMarks_stepCounter": "貼士 {n}/{total}",
+	"coachMarks_discardTwoStep": "撳一下手牌將佢提起，再撳一下就打出。",
+	"coachMarks_discardOneTap": "撳一下手牌就會打出。",
+	"coachMarks_lastDiscard": "最新打出嘅牌會喺枱中間閃一閃，其他人可以叫佢。",
+	"coachMarks_claims": "可以叫牌嘅時候，枱上會彈出大掣，揀一個或者過。",
+	"coachMarks_nextButton": "下一個",
+	"coachMarks_doneButton": "明白",
+	"coachMarks_skipButton": "略過貼士",
+	"tableToolbar_guideButton": "番數指南"
 }
