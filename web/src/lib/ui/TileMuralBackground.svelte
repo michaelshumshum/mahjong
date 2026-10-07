@@ -213,7 +213,9 @@
 		left: 0;
 		z-index: var(--z-table);
 		pointer-events: none;
-		filter: blur(3px) brightness(0.5);
+		// P3.4: calmer atmosphere behind the central content column -- lower saturation/brightness
+		// than P0's first pass, so the tile grid reads as background texture, not content.
+		filter: blur(4px) brightness(0.42) saturate(0.55);
 		transition: opacity 220ms ease;
 	}
 
@@ -237,9 +239,9 @@
 		// darker in the middle, where lobby/pre-game copy sits over the mural.
 		background: radial-gradient(
 			ellipse 70% 60% at 50% 50%,
-			rgb(0 0 0 / 0.6),
-			rgb(0 0 0 / 0.3) 75%,
-			rgb(0 0 0 / 0.2)
+			rgb(0 0 0 / 0.72),
+			rgb(0 0 0 / 0.42) 75%,
+			rgb(0 0 0 / 0.28)
 		);
 		transition: opacity 220ms ease;
 	}
