@@ -485,5 +485,8 @@
 	"practiceSetupDialog_impossibleBlurb": "睇得到所有人嘅牌，祝你好運。",
 	"pretableScreen_inviteButton": "邀請朋友",
 	"pretableScreen_inviteShareTitle": "麻雀枱 {code}",
-	"pretableScreen_inviteShareText": "嚟同我打番圈麻雀啦。"
+	"pretableScreen_inviteShareText": "嚟同我打番圈麻雀啦。",
+	"handEndOverlay_stampWin": "食糊",
+	"handEndOverlay_stampSelfDraw": "自摸",
+	"handEndOverlay_stampDraw": "流局"
 }

@@ -485,5 +485,8 @@
 	"practiceSetupDialog_impossibleBlurb": "Sees every hand. Good luck.",
 	"pretableScreen_inviteButton": "Invite friends",
 	"pretableScreen_inviteShareTitle": "Mahjong table {code}",
-	"pretableScreen_inviteShareText": "Pull up a seat at my mahjong table."
+	"pretableScreen_inviteShareText": "Pull up a seat at my mahjong table.",
+	"handEndOverlay_stampWin": "食糊",
+	"handEndOverlay_stampSelfDraw": "自摸",
+	"handEndOverlay_stampDraw": "流局"
 }

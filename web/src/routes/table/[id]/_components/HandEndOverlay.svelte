@@ -20,16 +20,34 @@
 		winnerMelds: MockMeld[];
 		onDismiss: () => void;
 	} = $props();
+
+	let stamp = $derived(
+		handResult.outcome !== 'win'
+			? { kind: 'draw', label: m.handEndOverlay_stampDraw() }
+			: handResult.winType === 'self_draw'
+				? { kind: 'self-draw', label: m.handEndOverlay_stampSelfDraw() }
+				: { kind: 'win', label: m.handEndOverlay_stampWin() }
+	);
 </script>
 
 <div class="faan-overlay" data-testid="faan-overlay">
-	{#key handNo}
-		<div class="hand-end-timer">
-			<DialogTimer durationMs={handEndHoldMs ?? 0} size={40} onClose={onDismiss} />
-		</div>
-	{/key}
-	<div class="panel">
-		<CloseButton onclick={onDismiss} />
+	<div class="hand-end-panel">
+		<header class="hand-end-header">
+			<span class="result-stamp result-stamp--{stamp.kind}" aria-hidden="true">{stamp.label}</span>
+			<span class="hand-end-handno"
+				>{handResult.outcome === 'win' ? m.handEndOverlay_handHeading({ handNo }) : ''}</span
+			>
+			<!-- no deadline known (a frozen mock, or a resync mid-hold): no ring and no auto-close,
+				rather than a zero-length timer that would close the panel instantly. -->
+			{#if handEndHoldMs !== null}
+				{#key handNo}
+					<span class="hand-end-timer">
+						<DialogTimer durationMs={handEndHoldMs} size={32} onClose={onDismiss} />
+					</span>
+				{/key}
+			{/if}
+			<CloseButton onclick={onDismiss} />
+		</header>
 		{#if handResult.outcome === 'win'}
 			<FaanBreakdown
 				winner={handResult.winner as 0 | 1 | 2 | 3}
@@ -54,40 +72,124 @@
 </div>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	// centered, scrim-backed -- a hand result gets full modal weight, not a translucent row.
 	.faan-overlay {
 		@include buttons.modal-scrim;
+		background: rgb(0 0 0 / 0.62);
+		overflow-y: auto;
+
+		@include layout.phone-only {
+			align-items: flex-end;
+			padding: 0;
+		}
+	}
+
+	.hand-end-panel {
+		position: relative;
+		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
+		width: min(28rem, 100%);
+		max-height: 100%;
+		overflow-y: auto;
+		padding: var(--space-4) var(--space-5) var(--space-5);
+		background: var(--color-surface-raised);
+		@include buttons.panel-elevated;
+
+		@include layout.phone-only {
+			width: 100%;
+			padding: var(--space-4);
+			border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+			padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+		}
+
+		@include a11y.motion-ok {
+			animation: panel-in var(--dur-3) var(--ease-out) both;
+		}
+	}
+
+	@keyframes panel-in {
+		from {
+			opacity: 0;
+			transform: translateY(16px) scale(0.98);
+		}
+	}
+
+	// CloseButton is absolutely positioned in the panel's corner; the right padding keeps the
+	// timer clear of it.
+	.hand-end-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		min-height: var(--tap-target-min);
+		padding-right: calc(var(--tap-target-min) + var(--space-1));
+	}
+
+	.hand-end-handno {
+		flex: 1;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		font-weight: 600;
+		letter-spacing: 0.04em;
+	}
+
+	.hand-end-timer {
+		display: inline-flex;
+	}
+
+	// seal-ink stamp: double-ruled border, slightly off-square like a hand press.
+	.result-stamp {
+		display: inline-grid;
+		place-items: center;
+		padding: var(--space-1) var(--space-3);
+		border: 3px double currentColor;
+		border-radius: var(--radius-sm);
+		color: var(--color-text);
+		background: var(--color-accent);
+		font-size: var(--font-size-lg);
+		font-weight: 800;
+		letter-spacing: 0.12em;
+		line-height: 1.2;
+		transform: rotate(-6deg);
+
+		@include a11y.motion-ok {
+			animation: stamp-in var(--dur-3) var(--ease-place) both;
+		}
+	}
+
+	// the draw is a non-event: a muted ink stamp, never the urgent accent.
+	.result-stamp--draw {
+		color: var(--color-text-muted);
+		background: var(--color-surface);
+	}
+
+	@keyframes stamp-in {
+		from {
+			opacity: 0;
+			transform: rotate(-14deg) scale(1.8);
+		}
+		60% {
+			opacity: 1;
+		}
 	}
 
 	.hand-end-summary {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		// wide enough that a short heading (e.g. "Hand 6") never sits under the CloseButton in
-		// the panel's top-right corner
-		min-width: 14rem;
-		max-width: 24rem;
-		padding: var(--space-4);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
 
 		h2 {
 			margin: 0;
-			font-size: var(--font-size-lg);
+			font-size: var(--font-size-xl);
 		}
 
 		p {
 			margin: 0;
 			color: var(--color-text-muted);
 		}
-	}
-
-	// hugs whatever content it wraps so CloseButton sits against the panel's own corner.
-	.panel {
-		position: relative;
 	}
 </style>

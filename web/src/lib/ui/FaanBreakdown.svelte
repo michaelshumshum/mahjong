@@ -64,6 +64,16 @@
 	);
 	let sortedConcealedHand = $derived(sortTiles(winningHand));
 
+	// reveal order for the staggered entrance: melds left to right, then the concealed hand.
+	let meldOffsets = $derived(
+		sortedMelds.reduce<number[]>(
+			(acc, meld, i) => [...acc, i === 0 ? 0 : acc[i - 1] + sortedMelds[i - 1].tiles.length],
+			[]
+		)
+	);
+	let concealedOffset = $derived(sortedMelds.reduce((n, meld) => n + meld.tiles.length, 0));
+	let tileCount = $derived(concealedOffset + sortedConcealedHand.length);
+
 	// server clamps the total to faan_cap but still reports every pattern at full value --
 	// comparing the raw pattern sum to totalFaan is enough to detect a capped hand.
 	let patternSum = $derived(patterns.reduce((sum, p) => sum + p.faan, 0));
@@ -74,7 +84,12 @@
 	);
 </script>
 
-<section class="faan-breakdown" aria-labelledby="faan-breakdown-heading">
+<section
+	class="faan-breakdown"
+	aria-labelledby="faan-breakdown-heading"
+	style:--tile-count={tileCount}
+	style:--pattern-count={patterns.length}
+>
 	<h2 id="faan-breakdown-heading">{m.faanBreakdown_winsHeading({ name: seatNames[winner] })}</h2>
 
 	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
@@ -84,7 +99,7 @@
 					{#each sortedMelds as meld, mi (mi)}
 						<div class="meld">
 							{#each meld.tiles as code, ti (`${mi}:${ti}:${code}`)}
-								<div class="tile">
+								<div class="tile" style:--i={meldOffsets[mi] + ti}>
 									<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
 								</div>
 							{/each}
@@ -95,7 +110,7 @@
 			{#if sortedConcealedHand.length > 0}
 				<div class="concealed-hand">
 					{#each sortedConcealedHand as code, index (`${index}:${code}`)}
-						<div class="tile"><TileFace {code} /></div>
+						<div class="tile" style:--i={concealedOffset + index}><TileFace {code} /></div>
 					{/each}
 				</div>
 			{/if}
@@ -104,7 +119,7 @@
 
 	<ul class="patterns">
 		{#each patterns as pattern, index (`${index}:${pattern.name}`)}
-			<li class="pattern-row">
+			<li class="pattern-row" style:--i={index}>
 				<span class="pattern-name">{faanPatternLabel(pattern.name)}</span>
 				<span class="pattern-faan">{m.faanBreakdown_faanCountLabel({ faan: pattern.faan })}</span>
 			</li>
@@ -125,6 +140,7 @@
 				class="payment-row"
 				class:payment-row--gain={amount > 0}
 				class:payment-row--loss={amount < 0}
+				class:payment-row--winner={seat === winner}
 			>
 				<span class="payment-seat">{seatNames[seat]}</span>
 				<span class="payment-amount">{amount > 0 ? '+' : ''}{amount}</span>
@@ -134,27 +150,34 @@
 </section>
 
 <style lang="scss">
-	@use '$lib/styles/buttons';
+	@use '$lib/styles/a11y';
 
+	// entrance choreography: tiles fan in one by one, then pattern rows, then total and payments.
+	// delays are custom-property maths so the sequence scales with tile/pattern count.
 	.faan-breakdown {
+		--tile-step: 35ms;
+		--row-step: 90ms;
+		--tiles-done: calc(var(--dur-2) + var(--tile-count, 0) * var(--tile-step));
+		--rows-done: calc(var(--tiles-done) + var(--pattern-count, 0) * var(--row-step));
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
-		max-width: 24rem;
-		padding: var(--space-4);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
 	}
 
 	h2 {
 		margin: 0;
-		font-size: var(--font-size-lg);
+		font-size: var(--font-size-xl);
+		line-height: 1.1;
 	}
 
 	.winning-hand {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
+		padding: var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--color-felt);
+		box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.35);
 	}
 
 	.melds,
@@ -164,13 +187,31 @@
 		gap: var(--space-2);
 	}
 
+	.concealed-hand {
+		gap: 2px;
+	}
+
 	.meld {
 		display: flex;
 		gap: 2px;
 	}
 
 	.tile :global(.tile-face) {
-		height: 48px;
+		height: clamp(40px, 9vw, 52px);
+	}
+
+	.tile {
+		@include a11y.motion-ok {
+			animation: tile-fan-in var(--dur-3) var(--ease-place) both;
+			animation-delay: calc(var(--dur-2) + var(--i) * var(--tile-step));
+		}
+	}
+
+	@keyframes tile-fan-in {
+		from {
+			opacity: 0;
+			transform: translateY(-14px) rotate(-8deg) scale(0.9);
+		}
 	}
 
 	.patterns {
@@ -186,6 +227,20 @@
 		display: flex;
 		justify-content: space-between;
 		gap: var(--space-3);
+		padding-block: 2px;
+		border-bottom: 1px dashed color-mix(in srgb, var(--color-border) 70%, transparent);
+
+		@include a11y.motion-ok {
+			animation: row-in var(--dur-2) var(--ease-out) both;
+			animation-delay: calc(var(--tiles-done) + var(--i) * var(--row-step));
+		}
+	}
+
+	@keyframes row-in {
+		from {
+			opacity: 0;
+			transform: translateX(-10px);
+		}
 	}
 
 	.pattern-faan {
@@ -195,10 +250,13 @@
 
 	.total {
 		margin: 0;
-		padding-block-start: var(--space-2);
-		border-top: 1px solid var(--color-border);
 		font-size: var(--font-size-lg);
 		font-variant-numeric: tabular-nums;
+
+		@include a11y.motion-ok {
+			animation: row-in var(--dur-2) var(--ease-out) both;
+			animation-delay: var(--rows-done);
+		}
 	}
 
 	// no accent here on purpose -- cinnabar is reserved for turn/claim-window/win-marker urgency.
@@ -212,23 +270,56 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--space-2);
+
+		@include a11y.motion-ok {
+			animation: row-in var(--dur-2) var(--ease-out) both;
+			animation-delay: calc(var(--rows-done) + var(--dur-1));
+		}
 	}
 
+	// name plate: player name on a raised chip, the delta as a tinted pill.
 	.payment-row {
 		display: flex;
+		align-items: center;
 		justify-content: space-between;
-		gap: var(--space-3);
+		gap: var(--space-2);
+		min-width: 0;
+		padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.payment-row--winner {
+		border-color: color-mix(in srgb, var(--color-brass) 70%, var(--color-border));
+	}
+
+	.payment-seat {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-weight: 600;
+	}
+
+	.payment-amount {
+		flex: none;
+		padding: 2px var(--space-2);
+		border-radius: 999px;
+		font-weight: 700;
+		background: rgb(255 255 255 / 0.06);
 	}
 
 	.payment-row--gain .payment-amount {
 		color: var(--color-positive);
+		background: color-mix(in srgb, var(--color-positive) 16%, transparent);
 	}
 
 	.payment-row--loss .payment-amount {
 		color: var(--color-negative);
+		background: color-mix(in srgb, var(--color-negative) 14%, transparent);
 	}
 </style>

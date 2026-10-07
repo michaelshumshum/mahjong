@@ -64,6 +64,10 @@ test('switching to the hand-ended scenario shows the faan breakdown', async ({ p
 	const overlay = page.getByTestId('faan-overlay');
 	await expect(overlay).toBeVisible();
 	await expect(overlay.getByRole('heading', { name: /wins$/ })).toBeVisible();
+	// the hold's countdown lives in the panel header, not floating above it.
+	await expect(overlay.locator('.hand-end-header [role="timer"]')).toBeVisible();
+	// the hand is over: no seat may still wear the turn halo behind the overlay.
+	await expect(page.locator('.seat-plate--turn')).toHaveCount(0);
 });
 
 test('switching to the hand-ended-in-a-draw scenario shows the plain draw summary', async ({
@@ -93,6 +97,7 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
 	const overlay = page.getByTestId('game-end-overlay');
 	await expect(overlay).toBeVisible();
+	await expect(page.locator('.seat-plate--turn')).toHaveCount(0);
 	await expect(overlay.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
 
 	// score sheet shows all 4 rounds; final standings cards are omitted in favor of the podium.

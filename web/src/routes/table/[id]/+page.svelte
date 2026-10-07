@@ -574,6 +574,13 @@
 		isMock ? gameState.gameEnd != null : liveStore?.state.gameEnd != null
 	);
 
+	// the hand is over while a result overlay is up, so no seat should still read as acting --
+	// mock fixtures and the live reducer both leave `turn` on the last actor.
+	let resultOverlayUp = $derived(
+		gameEndReached ? !!scoreStandings : !!gameState.handResult && !handEndDismissedLocally
+	);
+	let haloTurn = $derived(resultOverlayUp ? -1 : gameState.turn);
+
 	// persisted to localStorage. `autoArm` is "last known intent," not verified truth -- re-sent
 	// on each fresh connection instead of read back. Display name persists the same way but is sent once on `join`.
 	let displayName = $state(loadDisplayName() ?? '');
@@ -653,19 +660,19 @@
 					seat={seatAt(2)}
 					position="across"
 					dealer={gameState.dealer as Seat}
-					turn={gameState.turn}
+					turn={haloTurn}
 				/>
 				<OpponentRegion
 					seat={seatAt(3)}
 					position="left"
 					dealer={gameState.dealer as Seat}
-					turn={gameState.turn}
+					turn={haloTurn}
 				/>
 				<OpponentRegion
 					seat={seatAt(1)}
 					position="right"
 					dealer={gameState.dealer as Seat}
-					turn={gameState.turn}
+					turn={haloTurn}
 				/>
 
 				<div class="table-center">
@@ -673,7 +680,7 @@
 						prevailing={gameState.prevailing}
 						handNo={gameState.handNo}
 						dealer={gameState.dealer as Seat}
-						turn={gameState.turn as Seat}
+						turn={haloTurn as Seat}
 						you={gameState.you}
 						wallCount={gameState.wallCount}
 						{minFaan}
@@ -711,7 +718,7 @@
 					seat={seatAt(0)}
 					{spectating}
 					dealer={gameState.dealer as Seat}
-					turn={gameState.turn}
+					turn={haloTurn}
 					{isMock}
 					{ownHandTiles}
 					{discardableTileIds}

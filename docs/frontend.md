@@ -733,6 +733,24 @@ a quiet bordered chip, not `--color-accent`, since a bot seat doesn't change mid
 both are transient, in-hand signals, unlike the bot badge's fixed identity. `connected` has no
 visual treatment. Own-seat equivalents and a one-time AUTOPLAY-handover toast are not built yet.
 
+### Hand-end reveal
+
+`HandEndOverlay` is one panel (a bottom sheet below 768px) whose header carries a seal-ink result
+stamp — 食糊 (discard win), 自摸 (self-draw, from `winType`), 流局 (draw, muted ink rather than the
+accent) — the hand number, the hold's `DialogTimer` ring, and the close button. The ring renders
+only when `handEndHoldMs` is known; a zero-length timer would auto-close the panel instantly.
+
+Entrance (`motion-ok` only; reduced motion shows the final state at once): the stamp presses in
+(`--ease-place` overshoot), then `FaanBreakdown`'s winning tiles fan in one by one on a felt
+inset, then pattern rows, then the total and the payments. Delays are custom-property maths
+(`--i` per element, `--tile-count`/`--pattern-count` on the section), so the sequence scales with
+the hand. Payments render as name plates with a `--color-positive`/`--color-negative` tinted ±
+chip, the winner's plate outlined in brass.
+
+**Turn halos hide under a result overlay.** Neither the mock fixtures nor the reducer clear `turn`
+at `hand_end`/`game_end`, so `+page.svelte` passes a `haloTurn` of `-1` to every seat and the hub
+while a hand-end or game-end overlay is up — otherwise the last actor's halo glows behind it.
+
 ### Game-end summary
 
 `ClientGameState.gameEnd` (from `game_end`) shows `GameEndScreen.svelte`, auto-shown and not
