@@ -212,8 +212,24 @@ collapses instead. Your own meld row sits above your name, toward the centre.
 | 44–63px | shrinks to fit |
 | < 44px | stays 44px (touch target) and overlaps via negative `margin-inline-start`, same formula |
 
-No horizontal scroll. Pinned by `table.e2e.ts` at 390×844 and 1024×768 (last tile and drawn tile
-inside the viewport, clear of the right opponent at 1024).
+No horizontal scroll. Pinned by `table.e2e.ts` at 390×844, 390×700, 844×390, 1024×768 and
+1440×900 (last tile and drawn tile inside the viewport, clear of the right opponent at tablet-up),
+plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 and 1440×900.
+
+**Breakpoints** (`_layout.scss`; `tablet-up` and `phone-only` partition every viewport):
+
+| Mixin | Query | Layout |
+| --- | --- | --- |
+| `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips, strip pools, sticky hand bar (below) |
+| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll, the three opponent chips stack in a side column beside the centre (`'across center' 'left center' 'right center' 'self self'`), each a third of the height scrolling its own melds; the centre scrolls inside itself; hand tiles fixed at the 44px touch width |
+| `tablet-up` | `min-width: 768px` and `min-height: 501px` | the box layout above |
+| `desktop-up` | `min-width: 1180px` and `min-height: 501px` | roomier page and surface padding |
+
+A phone held sideways (844×390) is wide enough for `tablet-up` but its vertical side strips (13
+backs ≈ 350px) can't fit, so short viewports count as phone. **Container queries:** `.table-surface`
+is a named inline-size container (`container: table / inline-size`); discard tiles, side-strip
+tiles, the hub circle and the centre box's side tracks size in `cqi` of the table rather than `vw`,
+since the toolbar, page padding and rim make the two differ.
 
 **Side seats.** Left/right hand strips run top-to-bottom via `writing-mode: vertical-lr`/
 `vertical-rl`, not `transform: rotate()` — rotate repaints in place without resizing the box the

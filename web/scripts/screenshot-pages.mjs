@@ -23,6 +23,8 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const DESKTOP = { width: 1400, height: 900 };
 // iPhone 12-14 logical size -- the phone layout (docs/frontend.md §3) below 768px.
 const PHONE = { width: 390, height: 844 };
+// the same phone held sideways -- the compact short-landscape layout (docs/frontend.md §3).
+const PHONE_LANDSCAPE = { width: 844, height: 390 };
 // the hand-end/game-end panels stagger their entrance (tiles, then faan rows, then payments);
 // capture once it has settled, not mid-reveal.
 const HAND_END_REVEAL_MS = 2500;
@@ -141,10 +143,15 @@ const PAGES = [
 	},
 	{ name: 'table-pregame-join', url: '/table/demo123?pregame=join' },
 	{ name: 'table-pregame-waiting', url: '/table/demo123?pregame=waiting' },
-	// phone captures are viewport-only (not fullPage): what fits on one screen is the point,
+	// phone captures (portrait and landscape) are viewport-only (not fullPage): what fits on one screen is the point,
 	// including the sticky hand footer.
 	{ name: 'lobby-phone', url: '/', viewport: PHONE },
 	{ name: 'table-your-turn-phone', url: '/table/demo123?mock=1', viewport: PHONE },
+	{
+		name: 'table-your-turn-phone-landscape',
+		url: '/table/demo123?mock=1',
+		viewport: PHONE_LANDSCAPE
+	},
 	{
 		name: 'table-claim-window-phone',
 		url: '/table/demo123?mock=1',
@@ -244,7 +251,8 @@ async function main() {
 			await page.locator('.connect-gate').waitFor({ state: 'detached' });
 			if (before) await before(page);
 			const dest = path.join(OUT_DIR, `${name}.png`);
-			await page.screenshot({ path: dest, fullPage: viewport !== PHONE });
+			const viewportOnly = viewport === PHONE || viewport === PHONE_LANDSCAPE;
+			await page.screenshot({ path: dest, fullPage: !viewportOnly });
 			console.log('captured', dest);
 		}
 	} finally {

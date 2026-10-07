@@ -173,13 +173,17 @@ test('phone-width viewport applies the sub-768px sticky collapse to the self han
 	await expect(selfRegion).toHaveCSS('position', 'sticky');
 });
 
-// the hand sizes to its container (docs/frontend.md §3). 390 pushed the drawn tile off-screen, 1024
-// under the right strip; 390x700 makes the page outgrow the viewport, so the self row must stick.
-for (const [width, height] of [
+// the hand sizes to its container (docs/frontend.md §3). 390x700 outgrows the viewport, so the self
+// row must stick; 844x390 is a phone held sideways (compact landscape, no page scroll).
+const VIEWPORTS = [
 	[390, 844],
 	[390, 700],
-	[1024, 768]
-] as const) {
+	[844, 390],
+	[1024, 768],
+	[1440, 900]
+] as const;
+
+for (const [width, height] of VIEWPORTS) {
 	test(`the full hand and drawn tile fit inside the viewport at ${width}x${height}`, async ({
 		page
 	}) => {
@@ -201,12 +205,59 @@ for (const [width, height] of [
 			width
 		);
 
-		if (width >= 768) {
+		// tablet-up only: short landscape stacks the opponents in a side column instead.
+		if (width >= 768 && height > 500) {
 			const right = await page.locator('.seat-region--right').boundingBox();
 			expect(last!.x + last!.width).toBeLessThanOrEqual(right!.x);
 		}
 	});
 }
+
+for (const [width, height] of [
+	[390, 844],
+	[844, 390],
+	[1024, 768],
+	[1440, 900]
+] as const) {
+	test(`claim buttons are reachable with no horizontal scroll at ${width}x${height}`, async ({
+		page
+	}) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/table/abc123?mock=claim-window');
+		await page.waitForLoadState('networkidle');
+
+		const overlay = page.getByTestId('claim-overlay');
+		await expect(overlay).toBeVisible();
+		const buttons = overlay.locator('.claim-btn');
+		await expect(buttons).not.toHaveCount(0);
+		for (const button of await buttons.all()) {
+			await button.scrollIntoViewIfNeeded();
+			await expect(button).toBeInViewport({ ratio: 1 });
+		}
+		expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+			width
+		);
+		await overlay.locator('.claim-btn--pung').click();
+		await expect(page.getByTestId('claim-choice')).toHaveText('chose: pung');
+	});
+}
+
+test('short landscape fits hand, centre and opponents without page scroll', async ({ page }) => {
+	await page.setViewportSize({ width: 844, height: 390 });
+	await page.goto('/table/abc123?mock=your-turn');
+	await page.waitForLoadState('networkidle');
+
+	expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(390);
+	for (const selector of [
+		'.seat-region--across',
+		'.seat-region--left',
+		'.seat-region--right',
+		'.table-center',
+		'.seat-region--self'
+	]) {
+		await expect(page.locator(selector)).toBeInViewport({ ratio: 1 });
+	}
+});
 
 test('phone mock toolbar collapses the scenario picker into a disclosure with the same buttons', async ({
 	page

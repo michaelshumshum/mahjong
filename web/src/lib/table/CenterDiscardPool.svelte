@@ -42,7 +42,7 @@
 	// tracks are sized to the tile's own footprint (long edge --discard-h, short edge
 	// --discard-w) so every pool, rotated or not, gets the same 2px gap between tiles.
 	.discard-pool {
-		--discard-h: clamp(30px, 3.2vw, 44px);
+		--discard-h: clamp(30px, 3.2cqi, 44px);
 		--discard-w: calc(var(--discard-h) * 3 / 4);
 		display: grid;
 		grid-template-columns: repeat(6, var(--discard-w));

@@ -2,15 +2,32 @@
 // ASCII diagram).
 
 $breakpoint-tablet: 768px;
+$breakpoint-desktop: 1180px;
+// a phone held sideways: wide enough for tablet-up, too short for its vertical side strips.
+$breakpoint-short: 500px;
 
+// tablet-up and phone-only partition every viewport; a short landscape screen counts as phone
+// (compact chips, strip pools), with phone-landscape layered on top so it fits without scrolling.
 @mixin tablet-up {
-	@media (min-width: $breakpoint-tablet) {
+	@media (min-width: $breakpoint-tablet) and (min-height: $breakpoint-short + 1) {
 		@content;
 	}
 }
 
 @mixin phone-only {
-	@media (max-width: $breakpoint-tablet - 1) {
+	@media (max-width: $breakpoint-tablet - 1), (max-height: $breakpoint-short) {
+		@content;
+	}
+}
+
+@mixin phone-landscape {
+	@media (max-height: $breakpoint-short) and (orientation: landscape) {
+		@content;
+	}
+}
+
+@mixin desktop-up {
+	@media (min-width: $breakpoint-desktop) and (min-height: $breakpoint-short + 1) {
 		@content;
 	}
 }
@@ -47,5 +64,17 @@ $breakpoint-tablet: 768px;
 			'self self self';
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		grid-template-rows: auto 1fr auto;
+	}
+
+	// opponents stack as chips in a side column, so the centre gets the full height above the hand.
+	@include phone-landscape {
+		grid-template-areas:
+			'across center'
+			'left center'
+			'right center'
+			'self self';
+		grid-template-columns: minmax(8rem, 13rem) minmax(0, 1fr);
+		grid-template-rows: repeat(3, minmax(0, 1fr)) auto;
+		gap: var(--space-1) var(--space-2);
 	}
 }

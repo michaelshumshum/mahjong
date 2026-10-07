@@ -90,8 +90,8 @@
 		align-items: center;
 		justify-content: center;
 		gap: 2px;
-		width: clamp(84px, 11vw, 128px);
-		height: clamp(84px, 11vw, 128px);
+		width: clamp(84px, 11cqi, 128px);
+		height: clamp(84px, 11cqi, 128px);
 		margin: var(--space-2) auto;
 		border-radius: 50%;
 		border: 1px solid var(--color-felt-line);

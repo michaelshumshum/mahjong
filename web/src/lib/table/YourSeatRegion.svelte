@@ -522,4 +522,12 @@
 			z-index: var(--z-hud);
 		}
 	}
+
+	// short landscape: the hand can't take a third of a ~390px screen; tiles stop at the 44px
+	// touch-target width instead of growing to 63.
+	@include layout.phone-landscape {
+		.hand-row {
+			--hand-tile-w: 44px;
+		}
+	}
 </style>

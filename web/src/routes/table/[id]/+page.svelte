@@ -1102,6 +1102,9 @@
 
 	.table-surface {
 		@include layout.seat-region-grid;
+		// tiles, pools and the hub size off the table's own width (cqi), not the viewport's:
+		// the toolbar, page padding and rim make the two differ.
+		container: table / inline-size;
 		position: relative;
 		height: 100%;
 		min-height: 420px;
@@ -1154,8 +1157,8 @@
 				'.    across .'
 				'left hub    right'
 				'.    self   .';
-			grid-template-columns: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
-			grid-template-rows: clamp(26px, 4vw, 36px) 1fr clamp(26px, 4vw, 36px);
+			grid-template-columns: clamp(26px, 4cqi, 36px) 1fr clamp(26px, 4cqi, 36px);
+			grid-template-rows: clamp(26px, 4cqi, 36px) 1fr clamp(26px, 4cqi, 36px);
 		}
 	}
 
@@ -1207,6 +1210,46 @@
 		.table-surface {
 			flex: 1 0 auto;
 			height: auto;
+		}
+	}
+
+	@include layout.desktop-up {
+		.table-page {
+			padding: var(--space-4) var(--space-5);
+		}
+
+		.table-surface {
+			padding: var(--space-4);
+		}
+	}
+
+	// a phone held sideways: no page scroll -- the surface takes what the toolbar leaves and the
+	// centre scrolls inside itself (layout.seat-region-grid stacks the opponents beside it).
+	@include layout.phone-landscape {
+		.table-page {
+			height: 100dvh;
+			min-height: 0;
+			overflow: hidden;
+			padding: var(--space-1) var(--space-2);
+			gap: var(--space-1);
+		}
+
+		.table-wrap {
+			flex: 1;
+			min-height: 0;
+		}
+
+		.table-surface {
+			flex: 1 1 auto;
+			height: 100%;
+			min-height: 0;
+			padding: var(--space-1);
+			border-width: 6px;
+		}
+
+		.table-center {
+			min-height: 0;
+			overflow-y: auto;
 		}
 	}
 </style>

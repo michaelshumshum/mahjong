@@ -210,8 +210,8 @@
 	.seat-hand-strip--right .mini-tile {
 		@include layout.tablet-up {
 			position: relative;
-			width: clamp(24px, 4vw, 36px);
-			height: calc(clamp(24px, 4vw, 36px) * 3 / 4);
+			width: clamp(24px, 4cqi, 36px);
+			height: calc(clamp(24px, 4cqi, 36px) * 3 / 4);
 		}
 	}
 
@@ -220,7 +220,7 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			height: clamp(24px, 4vw, 36px);
+			height: clamp(24px, 4cqi, 36px);
 			transform: translate(-50%, -50%) rotate(90deg);
 		}
 	}
@@ -230,7 +230,7 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			height: clamp(24px, 4vw, 36px);
+			height: clamp(24px, 4cqi, 36px);
 			transform: translate(-50%, -50%) rotate(-90deg);
 		}
 	}
@@ -249,6 +249,13 @@
 
 	.backs-count {
 		display: none;
+	}
+
+	// short landscape: each chip gets a third of the side column and scrolls its own melds.
+	@include layout.phone-landscape {
+		.seat-region {
+			overflow-y: auto;
+		}
 	}
 
 	// sub-768px: a compact chip in the top row -- one back plus a ×N count. the other backs stay
