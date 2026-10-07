@@ -587,7 +587,9 @@ before rendering the page. Without it a page looks interactive before the backen
 
 ### Create a table
 
-The lobby's "Create a table" opens `CreateTableDialog.svelte`: preset radios, or "Custom" exposing
+The lobby's "Create a table" opens `CreateTableDialog.svelte`: preset radios (each an `OptionRow`
+with its `RULESET_PRESET_OPTIONS[].description` as a muted second line — `OptionRow`'s optional
+`description` prop), or "Custom" exposing
 every `RuleSet` field except `multi_win`, grouped scoring/flow/variants/fairness/timing. Submitting
 calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates to `/table/<table_id>`. The
 waiting room shows the resolved preset name (`PretableScreen.svelte`).
@@ -621,9 +623,10 @@ shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md))
 ### Practice mode
 
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
-fixed at table construction. Three radio groups, one per bot seat (Right opponent / Across / Left
-opponent, matching `mock-game-state.ts`'s `relativeSeat` offsets; seat 0 is the human), each
-Easy/Normal/Impossible ([bots.md §6](bots.md)), default Normal. Submitting sends `POST /tables`
+fixed at table construction. A seat ring with one tap-to-cycle slot per bot seat (Right opponent /
+Across / Left opponent, matching `mock-game-state.ts`'s `relativeSeat` offsets; seat 0 is the
+human), each Easy/Normal/Impossible ([bots.md §6](bots.md)), default Normal, above a short legend
+with a one-line blurb per level. Submitting sends `POST /tables`
 with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/table/<id>?practice=1`.
 
 `?practice=1` is this route's own param; the live-connect effect appends `&practice=true` to the

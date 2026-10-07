@@ -77,11 +77,11 @@
 	"ruleset_handSetNew6": "New 6",
 	"ruleset_handSetNew18": "New 18",
 	"ruleset_presetHkClassicLabel": "HK Classic",
-	"ruleset_presetHkClassicDescription": "min faan 3, faan cap 10",
+	"ruleset_presetHkClassicDescription": "The standard table: 3 faan to win, capped at 10.",
 	"ruleset_presetHkCasualLabel": "Casual",
-	"ruleset_presetHkCasualDescription": "min faan 1, faan cap 13",
+	"ruleset_presetHkCasualDescription": "Easier wins: 1 faan to win, capped at 13.",
 	"ruleset_presetHkStrictLabel": "Strict",
-	"ruleset_presetHkStrictDescription": "min faan 5, no New 18, half payment",
+	"ruleset_presetHkStrictDescription": "5 faan to win, no New 18 hands, discarder pays half.",
 	"tablesPage_backLabel": "Lobby",
 	"tablesPage_title": "Tables",
 	"tablesPage_refreshButton": "Refresh",
@@ -478,5 +478,10 @@
 	"lobby_joinGamePrompt": "Have a code?",
 	"lobby_createTableGlyph": "卓",
 	"lobby_practiceGlyph": "機",
-	"lobby_guideGlyph": "番"
+	"lobby_guideGlyph": "番",
+	"createTableDialog_customDescription": "Set every rule yourself.",
+	"practiceSetupDialog_tierLegendLabel": "Bot levels",
+	"practiceSetupDialog_easyBlurb": "Builds toward any win; never plays safe.",
+	"practiceSetupDialog_normalBlurb": "Aims for valuable hands and avoids feeding you.",
+	"practiceSetupDialog_impossibleBlurb": "Sees every hand. Good luck."
 }

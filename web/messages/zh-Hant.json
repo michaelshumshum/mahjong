@@ -77,11 +77,11 @@
 	"ruleset_handSetNew6": "新例六式",
 	"ruleset_handSetNew18": "新例十八式",
 	"ruleset_presetHkClassicLabel": "港式經典",
-	"ruleset_presetHkClassicDescription": "最低3番，上限10番",
+	"ruleset_presetHkClassicDescription": "標準玩法：3番起糊，10番封頂。",
 	"ruleset_presetHkCasualLabel": "休閒模式",
-	"ruleset_presetHkCasualDescription": "最低1番，上限13番",
+	"ruleset_presetHkCasualDescription": "易糊啲：1番起糊，13番封頂。",
 	"ruleset_presetHkStrictLabel": "嚴格模式",
-	"ruleset_presetHkStrictDescription": "最低5番，不設新例十八式，出銃者半付",
+	"ruleset_presetHkStrictDescription": "5番起糊，不設新例十八式，出銃者半付。",
 	"tablesPage_backLabel": "大堂",
 	"tablesPage_title": "牌桌",
 	"tablesPage_refreshButton": "重新整理",
@@ -478,5 +478,10 @@
 	"lobby_joinGamePrompt": "有枱號？",
 	"lobby_createTableGlyph": "卓",
 	"lobby_practiceGlyph": "機",
-	"lobby_guideGlyph": "番"
+	"lobby_guideGlyph": "番",
+	"createTableDialog_customDescription": "每條規則自己揀。",
+	"practiceSetupDialog_tierLegendLabel": "機械人難度",
+	"practiceSetupDialog_easyBlurb": "只顧食糊，唔識防守。",
+	"practiceSetupDialog_normalBlurb": "會做大牌，亦識避炮。",
+	"practiceSetupDialog_impossibleBlurb": "睇得到所有人嘅牌，祝你好運。"
 }

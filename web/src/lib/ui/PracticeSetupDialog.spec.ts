@@ -14,6 +14,12 @@ describe('PracticeSetupDialog', () => {
 		expect(body).toContain('Practice vs Bots');
 	});
 
+	it('explains each bot level', () => {
+		const { body } = render(PracticeSetupDialog, { props: { onCreated: noop, onCancel: noop } });
+		expect(body).toContain('never plays safe');
+		expect(body).toContain('Sees every hand');
+	});
+
 	it('lays out the three bot seats in the same ring arrangement as the seat-selection screen', () => {
 		const { body } = render(PracticeSetupDialog, { props: { onCreated: noop, onCancel: noop } });
 		expect(body).toContain('seat-ring-pos--across');

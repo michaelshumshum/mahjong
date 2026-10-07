@@ -22,6 +22,12 @@ describe('CreateTableDialog', () => {
 		expect(body).not.toMatch(/value="custom"[^>]*checked/);
 	});
 
+	it('describes each preset under its label', () => {
+		const { body } = render(CreateTableDialog, { props: { onCreated: noop, onCancel: noop } });
+		expect(body).toContain('3 faan to win, capped at 10');
+		expect(body).toContain('Set every rule yourself.');
+	});
+
 	it('hides the custom rules form until "Custom" is selected', () => {
 		const { body } = render(CreateTableDialog, { props: { onCreated: noop, onCancel: noop } });
 		expect(body).not.toContain('Minimum faan');

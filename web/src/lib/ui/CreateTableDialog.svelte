@@ -88,6 +88,7 @@
 					name="preset"
 					value={option.id}
 					label={option.label()}
+					description={option.description()}
 					checked={presetId === option.id}
 					onChange={() => (presetId = option.id)}
 				/>
@@ -97,6 +98,7 @@
 				name="preset"
 				value={CUSTOM_PRESET_ID}
 				label={m.createTableDialog_customLabel()}
+				description={m.createTableDialog_customDescription()}
 				checked={presetId === CUSTOM_PRESET_ID}
 				onChange={() => (presetId = CUSTOM_PRESET_ID)}
 			/>

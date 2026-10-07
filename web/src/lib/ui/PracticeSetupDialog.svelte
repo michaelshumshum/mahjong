@@ -11,6 +11,15 @@
 	let { onCreated, onCancel }: { onCreated: (tableId: string) => void; onCancel: () => void } =
 		$props();
 
+	const TIER_LEGEND = [
+		{ label: m.practiceDifficultySlot_easyLabel, blurb: m.practiceSetupDialog_easyBlurb },
+		{ label: m.practiceDifficultySlot_normalLabel, blurb: m.practiceSetupDialog_normalBlurb },
+		{
+			label: m.practiceDifficultySlot_impossibleLabel,
+			blurb: m.practiceSetupDialog_impossibleBlurb
+		}
+	];
+
 	const DIFFICULTY_CYCLE: PracticeDifficulty[] = ['easy', 'normal', 'impossible'];
 
 	function nextDifficulty(current: PracticeDifficulty): PracticeDifficulty {
@@ -95,6 +104,15 @@
 				</div>
 			</div>
 		</div>
+
+		<dl class="tier-legend" aria-label={m.practiceSetupDialog_tierLegendLabel()}>
+			{#each TIER_LEGEND as tier (tier.label)}
+				<div class="tier-row">
+					<dt>{tier.label()}</dt>
+					<dd>{tier.blurb()}</dd>
+				</div>
+			{/each}
+		</dl>
 
 		{#if error}
 			<p class="practice-error">{error}</p>
@@ -201,6 +219,33 @@
 	.slot-caption {
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
+	}
+
+	.tier-legend {
+		display: grid;
+		gap: var(--space-1);
+		width: 100%;
+		margin: 0;
+		padding: var(--space-3);
+		border-radius: var(--radius-sm);
+		background: rgb(0 0 0 / 0.18);
+		text-align: start;
+		font-size: var(--font-size-sm);
+	}
+
+	.tier-row {
+		display: grid;
+		grid-template-columns: 6rem 1fr;
+		gap: var(--space-2);
+
+		dt {
+			font-weight: 700;
+		}
+
+		dd {
+			margin: 0;
+			color: var(--color-text-muted);
+		}
 	}
 
 	.practice-error {

@@ -5,6 +5,7 @@
 		value,
 		checked,
 		label,
+		description,
 		onChange
 	}: {
 		type: 'checkbox' | 'radio';
@@ -12,6 +13,7 @@
 		value?: string;
 		checked: boolean;
 		label: string;
+		description?: string;
 		onChange: (next: boolean) => void;
 	} = $props();
 </script>
@@ -44,7 +46,12 @@
 			{/if}
 		</span>
 	{/if}
-	<span class="option-label">{label}</span>
+	<span class="option-text">
+		<span class="option-label">{label}</span>
+		{#if description}
+			<span class="option-desc">{description}</span>
+		{/if}
+	</span>
 </label>
 
 <style lang="scss">
@@ -87,8 +94,21 @@
 		background: var(--color-tile-ink);
 	}
 
+	.option-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
 	.option-label {
 		font-weight: 600;
+	}
+
+	.option-desc {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		line-height: 1.35;
 	}
 
 	.native-input {
