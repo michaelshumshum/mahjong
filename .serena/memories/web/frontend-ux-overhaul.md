@@ -1,8 +1,6 @@
 # Frontend UX overhaul
 
-P0/P1/P2 done. **P3 done (2026-10-07): P3.1(a-e), P3.3, P3.4 shipped.** Next: P4
-(a11y/responsive — native dialog modals, keyboard hand model, live announcements, phone
-opponents, contrast audit, breakpoints).
+**COMPLETE (2026-10-08).** P0–P4 all shipped. Remaining follow-ups listed at the bottom.
 
 (See prior memory versions / `git log` for P0-P2 detail; summarized here only where P3 builds on
 or changes it.)
@@ -22,9 +20,9 @@ Commits: 1096c39 (P3.1 a-c: hand reflow animate:flip, discard settle, meld slide
 - **P3.1(b)** `CenterDiscardPool`'s landing tile: added a `--discard-enter-x/y`-driven `translate`
   (individual CSS property, not `transform`) to the existing scale pulse, `--ease-place`.
   Composes with the side pools' static rotate `transform` instead of overriding it (exactly the
-  P1-era regression the old comment already warned about). Self-pool direction is approximate:
-  the pool's own `scaleY(-1)` at tablet-up means the translate's visual direction is inverted
-  there — cosmetic, not pinned by any test, left as a known minor nit.
+  P1-era regression the old comment already warned about). Self-pool direction: P3 believed
+  it inverted at tablet-up; P4.8 measured it and it is NOT (each tile's own scaleY(-1) cancels the
+  pool flip before the face's translate). Now pinned in screen space by CenterDiscardPool.svelte.spec.ts.
 - **P3.1(c)** `_tile.scss`'s new `meld-enter` mixin (`@include tile.meld-enter` beside
   `@include tile.meld` in both seat regions) promotes `AnimationDemoPanel`'s pre-existing
   `demo-meld-in` keyframe pattern into the real meld rows — plays automatically on DOM insert.
@@ -78,13 +76,52 @@ Commits: 1096c39 (P3.1 a-c: hand reflow animate:flip, discard settle, meld slide
   mode|four real seats'` 2 passed; `pnpm check`/`pnpm lint` clean. 17 screenshots regenerated and
   reviewed.
 
-## Notes for P4
-- Overlays are still divs with `role=dialog`, no focus trap / native `<dialog>`.
-- Hand has no roving tabindex; no live announcements for discards (frontend.md §9 "Designed, not
-  implemented").
-- Phone opponents' strips are cramped; mock toolbar eats ~400px on phone.
-- `--color-text-muted` over the mural not contrast-audited (P3's mural darkening likely helps,
-  not re-measured).
-- P3.1(b)'s self-pool discard-settle direction is visually inverted at tablet-up (see gotcha
-  above) — low priority, cosmetic only, would need a sign-flip on `--discard-enter-y` scoped to
-  `.discard-pool--self` at the tablet-up breakpoint specifically.
+## P4 shipped (2026-10-07/08)
+Commits (subjects): native dialog modals (P4.1), roving-tabindex hand (P4.2), live announcements
+(P4.3), phone opponent chips + viewport-fit=cover (P4.4), contrast audit fixes + accent-on-dark
+follow-up (P4.5), mock scenario disclosure (P4.7), short-landscape/desktop breakpoints + cqi
+(P4.6), discard settle direction pin (P4.8), chip plate wrap fix, screenshots.
+
+- **ModalDialog.svelte** (lib/ui): every overlay is a native `<dialog>` + showModal(). The
+  dialog box itself is the full-viewport scrim (placement center/sheet/scroll). `cancel` is
+  always preventDefault'ed and routed to `onCancel` (owner's `{#if}` unmounts it); no onCancel =
+  not dismissable. Chrome force-closes a dialog after a second prevented cancel without user
+  activation -> `close` handler reopens / treats as cancel. Focuses `[data-autofocus]` on open,
+  restores focus to opener on unmount. ClaimDialog: no onCancel, its own window keydown does
+  Escape=Pass (single path).
+- **Top layer gotcha:** a `popover="manual"` toast stack DOES paint above the modal but is inert
+  (no clicks, dropped from a11y tree -> role=alert not announced). Fix: `followTopmostDialog`
+  attachment moves the element into the topmost open dialog and back. Element must be the ONLY
+  child of a `display: contents` wrapper — svelte removes component DOM by walking sibling ranges,
+  a moved range-end node would make it delete unrelated siblings. Used by ToastStack + Announcer.
+- vitest browser mode supports showModal fine; dialog `close` event is async (await it).
+- **Hand keyboard:** `.hand-row` role=toolbar (role=group + keydown trips svelte a11y warning),
+  roving tabindex, default stop = last discardable (drawn tile), H shortcut with typing guard.
+  `userEvent` from 'vitest/browser' for real Enter/Space -> click.
+- **Announcer:** pure `announcementsBetween(prev,next,everyDiscard)` in announcements.ts (unit
+  tested), handKey re-baselines; 300ms debounce, max 4 lines, zero-width-space toggle for repeats.
+  New pref `announceAllDiscards` (default false) migrated in loadClientPrefs like haptics.
+- **Breakpoints:** phone-only now = `max-width 767 OR max-height 500`; tablet-up = min-width 768
+  AND min-height 501; phone-landscape layered on top; desktop-up 1180. `.table-surface` is
+  `container: table / inline-size`, table sizes in cqi.
+- **app.html had no viewport-fit=cover** -> every env(safe-area-inset-*) was 0 on iOS until P4.4.
+- **Contrast:** `web/scripts/contrast-audit.mjs` parses _tokens.scss, composites layers, exits 1
+  on failure. New token `--color-accent-on-dark` for accent text/icons on dark surfaces.
+- **comment-length hook** checks the working tree, not just staged files — an unrelated unstaged
+  over-long comment blocks a commit. Also: commit hook output hides failures if piped; check
+  `git log -1` after.
+- Partial-file commits without `git add -p`: `git hash-object -w --stdin` +
+  `git update-index --cacheinfo` to stage an intermediate version.
+- GitHub push returned 500 for ~10 min once; fetch worked. Just retry later.
+- Final counts: vitest 418 passed/1 skipped; playwright 59 passed/4 skipped; live (practice
+  mode|four real seats|game_end) 3 passed; check/lint clean. 18 screenshots (+phone-landscape).
+
+## Follow-ups after the overhaul
+- Live TableToolbar was not checked at 844x390 with a real game (mock toolbar was); it is one row
+  but worth a look in the live landscape view.
+- Opponent chips in landscape scroll their melds inside a third of the column; a seat with 3-4
+  melds needs scrolling to see all of them.
+- Game-end phone: score-sheet table clips horizontally inside its card (pre-existing).
+- added_kong isn't announced (meld count doesn't grow, only kind changes).
+- zh-Hant announcer/settings strings are machine-written, not reviewed by a fluent speaker.
+- Sound (deferred), AUTOPLAY-handover banner, resync crossfade still "planned" in frontend.md.
