@@ -344,8 +344,8 @@ auto-pass, since the server treats a seat's first-received choice as final. Pref
 dialog that never closes on its own. `hand_end_ack` gets the same auto-close with none of this
 risk: it's an acknowledgment, and the table advances at the same `deadline_ts` regardless.
 
-**`ClaimDialog` layout.** Each option is a big button (meld preview above it, a CJK call glyph
-碰/上/槓/食糊 inside, the kind label, a `1`-`N` key-hint badge; no sub-label) — Win gets the same
+**`ClaimDialog` layout.** Each option is a big button (meld preview above it, the localized kind
+label inside, a `1`-`N` key-hint badge; no CJK call glyph, no sub-label) — Win gets the same
 accent-glow treatment as a `SeatPlate` turn halo, sized up from its siblings, since it's the one
 choice worth making unmissable. Pass is always its own full-width row below the call options,
 never beside them, and carries an "Esc" hint instead of a number; `1`-`N` index the call options

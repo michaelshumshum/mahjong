@@ -87,7 +87,7 @@ describe('ClaimDialog', () => {
 		expect(body).toContain('claim-btn--pass');
 	});
 
-	it('shows a CJK glyph for pung/chow/kong/win, not for pass, and no sub-label', () => {
+	it('labels buttons with the kind only -- no CJK glyph, no sub-label', () => {
 		const options: ClaimOption[] = [
 			{ kind: 'pung', tiles: ['z5', 'z5'] },
 			{ kind: 'win' },
@@ -96,9 +96,10 @@ describe('ClaimDialog', () => {
 		const { body } = render(ClaimDialog, {
 			props: { discardTile: 'z5', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
 		});
-		expect(body).toMatch(/class="claim-btn-glyph[^"]*"[^>]*>碰</);
-		expect(body).toMatch(/class="claim-btn-glyph[^"]*"[^>]*>食糊</);
-		expect(body).not.toMatch(/claim-btn--pass[\s\S]*?claim-btn-glyph/);
+		expect(body).toMatch(/class="claim-btn-label[^"]*">Pung</);
+		expect(body).toMatch(/class="claim-btn-label[^"]*">Win</);
+		expect(body).not.toContain('claim-btn-glyph');
+		expect(body).not.toContain('食糊');
 		expect(body).not.toContain('claim-btn-sublabel');
 	});
 

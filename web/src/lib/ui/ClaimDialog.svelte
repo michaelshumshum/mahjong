@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
-	import type { ClaimKind, ClaimOption } from './ClaimButtons.svelte';
+	import type { ClaimOption } from './ClaimButtons.svelte';
 	import { claimOptionAriaLabel, claimOptionKey, claimOptionLabel } from './claim-option';
 	import DialogTimer from './DialogTimer.svelte';
 	import { m } from '$lib/paraglide/messages.js';
@@ -36,16 +36,6 @@
 		if (option.kind === 'chow') tiles.sort((a, b) => a.code.localeCompare(b.code));
 		return tiles;
 	}
-
-	// exempt literals (web/AGENTS.md "No literal user-facing strings" §9) -- same Cantonese call
-	// glyphs as the declare-actions buttons, not translated.
-	const CLAIM_GLYPH: Record<ClaimKind, string> = {
-		pass: '',
-		chow: '上',
-		pung: '碰',
-		kong: '槓',
-		win: '食糊'
-	};
 
 	// pass renders on its own row below the rest, so number keys index the non-pass options only.
 	const callOptions = $derived(options.filter((option) => option.kind !== 'pass'));
@@ -116,7 +106,6 @@
 						onclick={() => onChoose(option)}
 					>
 						<span class="claim-btn-key" aria-hidden="true">{index + 1}</span>
-						<span class="claim-btn-glyph" aria-hidden="true">{CLAIM_GLYPH[option.kind]}</span>
 						<span class="claim-btn-label">{claimOptionLabel(option)}</span>
 					</button>
 				</div>
@@ -230,7 +219,7 @@
 		outline-offset: 1px;
 	}
 
-	// each option is a big button, not a plain label -- key badge, CJK glyph, label.
+	// each option is a big button, not a plain label -- key badge and label.
 	.claim-btn {
 		position: relative;
 		display: flex;
@@ -256,12 +245,8 @@
 		opacity: 0.8;
 	}
 
-	.claim-btn-glyph {
-		font-size: var(--font-size-xl);
-		line-height: 1;
-	}
-
 	.claim-btn-label {
+		font-size: var(--font-size-lg);
 		font-weight: 700;
 	}
 
@@ -284,8 +269,8 @@
 		@include buttons.btn-primary;
 	}
 
-	.claim-btn--win .claim-btn-glyph {
-		font-size: calc(var(--font-size-xl) * 1.2);
+	.claim-btn--win .claim-btn-label {
+		font-size: var(--font-size-xl);
 	}
 
 	// phone: a bottom sheet instead of a centred card -- `.claim-overlay` (+page.svelte) still
