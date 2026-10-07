@@ -1,7 +1,7 @@
 # Frontend UX overhaul
 
-P0 done (2026-10-06). P1 done (2026-10-06/07), committed directly to `main` throughout (no
-branch, per that phase's instructions). **Phase complete: all 12 P1 items shipped.**
+P0 done (2026-10-06). P1 done (2026-10-06/07). **P2 done (2026-10-07): all 7 items shipped.**
+All committed directly to `main` (no branch). Next: P3 (gameplay motion), P4 (a11y/responsive).
 
 ## P0 gotchas
 - `_a11y.scss` is MIXINS ONLY; app.scss does `@include a11y.globals`. A component `@use`-ing a
@@ -94,3 +94,50 @@ P1 is done -- no more deferred items from the original plan. Next phase (P2) sco
 yet; candidates surfaced in passing but not acted on: per-discard announcements (frontend.md §9
 "Designed, not implemented"), swipe-to-discard, the CSS-only claim-dialog countdown this session
 skipped, `state_sync`'s lastDiscard gap outside an active claim window (§6 tradeoff).
+
+## P2 shipped (2026-10-07), all 7 items
+63df80a P2.1 lobby (seal + visible display h1, tagline, 3 equal cards, quiet join/language links,
+radial scrim); 1c6bf9f P2.2 OptionRow `description` + preset copy + practice tier legend;
+6652387 P2.3 invite (`lib/ui/share-invite.ts` shareOrCopy, big code chip, 2s reset, hidden in
+practice); cf65477 P2.4 hand-end reveal (stamp, timer in header, staggered tiles/rows, payment
+plates) + `haloTurn` halo fix; 1291d4e P2.5 game-end (rank.ts `placements` competition ranking,
+"Game over", you-placed line, Play again); e129f3b sticky-hand fix; 18f3902 P2.6 coach marks +
+toolbar Guide; a4f314e P2.7 tables compass/empty state/refresh stamp; 1ff8ce0 screenshots.
+
+## P2 gotchas
+- **`.table-surface` must be `overflow: clip`, never `hidden`**: `hidden` makes it a scroll
+  container and the phone self row's `position: sticky` sticks inside the surface, not the
+  viewport -- the hand scrolled off-screen once the page outgrew the screen. Masked until the mock
+  toolbar grew a row; `table.e2e.ts` now pins 390x700.
+- **Pre-commit typechecks the working tree, not the index.** To commit a split hunk while other
+  WIP is unstaged: `git stash push --keep-index --include-untracked`, commit, `stash pop`. Also
+  `rm -rf web/.svelte-kit/.svelte-check` if a stashed new .svelte file leaves stale errors.
+- comment-length counts a run of adjacent `//` lines as one block (max 2) -- appending a line
+  under an existing 2-line comment fails the hook.
+- `toHaveText('Create a table')` on the lobby testid is a full match: the card's `<button>` holds
+  only the title; description sits outside, wired by `aria-describedby`, `::after` stretches the hit
+  area. Same trick if a labelled card ever needs a sub-line.
+- Play again uses `window.location.assign`, not `goto`: SvelteKit reuses the `/table/[id]`
+  component and its local flags (game-started heuristic, dismissals) would leak into the new table.
+- Last practice tiers live in `mahjong:practiceSetup:v1` (also prefills the dialog); coach marks
+  in `mahjong:onboarding:v1`. Coach marks gate on `handNo === 1`, so no mock scenario shows them
+  (all mocks are hand 3+); verified visually with a temporary override, not committed.
+- `HandEndOverlay` renders no `DialogTimer` when `handEndHoldMs` is null -- a 0ms timer would
+  auto-close instantly. Neither mocks nor the reducer clear `turn` at hand/game end; `+page`
+  passes `haloTurn = -1` while a result overlay is up.
+- Mocking `GET /tables` in ad-hoc scripts: response is `{ tables: [...] }`, and a `**/tables`
+  glob also matches the page navigation -- filter on `resourceType() === 'fetch'`.
+- `lib/net/lobby` mocks in `routes-tests` must list every export a child imports
+  (`CreateTableDialog` needs `createTable`), or the suite fails at import time.
+
+## Full-suite status at end of P2
+`npx vitest --run`: 378 passed, 1 skipped. `npx playwright test`: 48 passed, 4 skipped (opt-in
+live suite, still not run here). `pnpm check`/`pnpm lint` clean. 17 screenshots reviewed.
+
+## Notes for P3/P4
+- P3 motion: discard/draw/claim still have no `animate:flip`; staggered reveals use `--i` custom
+  property delays (FaanBreakdown/GameEndScreen) -- reuse that pattern. Mural is still bright on
+  the felt-less pages; scrim tuned only by radial gradient + brightness(0.5).
+- P4: overlays are divs with role=dialog, no focus trap / native `<dialog>`; hand has no roving
+  tabindex; no live announcements for discards; phone opponents' strips are cramped and the mock
+  toolbar eats ~400px on phone; contrast of `--color-text-muted` over the mural not audited.
