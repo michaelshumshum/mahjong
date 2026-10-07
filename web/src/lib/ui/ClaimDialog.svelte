@@ -47,56 +47,33 @@
 		win: '食糊'
 	};
 
-	function claimSubLabel(kind: ClaimKind): string | null {
-		switch (kind) {
-			case 'pung':
-				return m.claimDialog_pungSubLabel();
-			case 'chow':
-				return m.claimDialog_chowSubLabel();
-			case 'kong':
-				return m.claimDialog_kongSubLabel();
-			case 'win':
-				return m.claimDialog_winSubLabel();
-			case 'pass':
-				return null;
-		}
-	}
-
-	function findPassOption(): ClaimOption | undefined {
-		return options.find((option) => option.kind === 'pass');
-	}
+	// pass renders on its own row below the rest, so number keys index the non-pass options only.
+	const callOptions = $derived(options.filter((option) => option.kind !== 'pass'));
+	const passOption = $derived(options.find((option) => option.kind === 'pass'));
 
 	// deadline reached with no explicit choice: resolve the same way the server does on its own
 	// timeout, reusing the exact onChoose path a manual Pass click takes.
 	function handleTimeout(): void {
-		const passOption = findPassOption();
 		if (passOption) onChoose(passOption);
 	}
 
-	let passButtonEl: HTMLButtonElement | null = null;
+	let passButtonEl: HTMLButtonElement | null = $state(null);
 
-	// `bind:this` only takes a plain identifier, not a per-option conditional -- this action
-	// captures the Pass button's node directly from the {#each} without a second branch.
-	function captureIfPass(node: HTMLButtonElement, kind: ClaimKind) {
-		if (kind === 'pass') passButtonEl = node;
-	}
-
-	// no reactive reads inside -- runs once per mount, i.e. once per window (+page.svelte's
-	// `{#if claimOptions}`), not re-stealing focus on every unrelated state update.
+	// runs once per mount, i.e. once per window (+page.svelte's `{#if claimOptions}`) -- the only
+	// reactive read is the bound node, set once.
 	$effect(() => {
 		passButtonEl?.focus();
 	});
 
-	// 1-4 pick the Nth option by position, Esc passes -- the same onChoose path a click takes.
+	// 1-4 pick the Nth call option by position, Esc passes -- the same onChoose path a click takes.
 	function handleKeydown(e: KeyboardEvent): void {
 		if (e.key === 'Escape') {
-			const passOption = findPassOption();
 			if (passOption) onChoose(passOption);
 			return;
 		}
 		const index = Number(e.key) - 1;
-		if (Number.isInteger(index) && index >= 0 && index < options.length) {
-			onChoose(options[index]);
+		if (Number.isInteger(index) && index >= 0 && index < callOptions.length) {
+			onChoose(callOptions[index]);
 		}
 	}
 </script>
@@ -119,39 +96,44 @@
 	</div>
 
 	<div class="claim-options" role="group" aria-label={m.claimDialog_optionsGroupAriaLabel()}>
-		{#each options as option, index (claimOptionKey(option, index))}
-			{@const meld = meldPreview(option)}
-			{@const subLabel = claimSubLabel(option.kind)}
-			<div class="claim-option">
-				{#if meld}
-					<div class="claim-meld" aria-hidden="true">
-						{#each meld as tile, ti (ti)}
-							<div class="claim-meld-tile" class:claim-meld-tile--claimed={tile.claimed}>
-								<TileFace code={tile.code} />
-							</div>
-						{/each}
-					</div>
-				{/if}
-				<button
-					use:captureIfPass={option.kind}
-					type="button"
-					class="claim-btn claim-btn--{option.kind}"
-					aria-label={claimOptionAriaLabel(option)}
-					onclick={() => onChoose(option)}
-				>
-					<span class="claim-btn-key" aria-hidden="true"
-						>{option.kind === 'pass' ? m.claimDialog_passEscHint() : index + 1}</span
+		<div class="claim-calls">
+			{#each callOptions as option, index (claimOptionKey(option, index))}
+				{@const meld = meldPreview(option)}
+				<div class="claim-option">
+					{#if meld}
+						<div class="claim-meld" aria-hidden="true">
+							{#each meld as tile, ti (ti)}
+								<div class="claim-meld-tile" class:claim-meld-tile--claimed={tile.claimed}>
+									<TileFace code={tile.code} />
+								</div>
+							{/each}
+						</div>
+					{/if}
+					<button
+						type="button"
+						class="claim-btn claim-btn--{option.kind}"
+						aria-label={claimOptionAriaLabel(option)}
+						onclick={() => onChoose(option)}
 					>
-					{#if CLAIM_GLYPH[option.kind]}
+						<span class="claim-btn-key" aria-hidden="true">{index + 1}</span>
 						<span class="claim-btn-glyph" aria-hidden="true">{CLAIM_GLYPH[option.kind]}</span>
-					{/if}
-					<span class="claim-btn-label">{claimOptionLabel(option)}</span>
-					{#if subLabel}
-						<span class="claim-btn-sublabel">{subLabel}</span>
-					{/if}
-				</button>
-			</div>
-		{/each}
+						<span class="claim-btn-label">{claimOptionLabel(option)}</span>
+					</button>
+				</div>
+			{/each}
+		</div>
+		{#if passOption}
+			<button
+				bind:this={passButtonEl}
+				type="button"
+				class="claim-btn claim-btn--pass"
+				aria-label={claimOptionAriaLabel(passOption)}
+				onclick={() => onChoose(passOption)}
+			>
+				<span class="claim-btn-key" aria-hidden="true">{m.claimDialog_passEscHint()}</span>
+				<span class="claim-btn-label">{claimOptionLabel(passOption)}</span>
+			</button>
+		{/if}
 	</div>
 </div>
 
@@ -207,6 +189,14 @@
 
 	.claim-options {
 		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--space-3);
+		width: 100%;
+	}
+
+	.claim-calls {
+		display: flex;
 		flex-wrap: wrap;
 		align-items: flex-end;
 		justify-content: center;
@@ -240,7 +230,7 @@
 		outline-offset: 1px;
 	}
 
-	// each option is a big button, not a plain label -- key badge, CJK glyph, label, sub-label.
+	// each option is a big button, not a plain label -- key badge, CJK glyph, label.
 	.claim-btn {
 		position: relative;
 		display: flex;
@@ -273,12 +263,6 @@
 
 	.claim-btn-label {
 		font-weight: 700;
-	}
-
-	.claim-btn-sublabel {
-		font-size: var(--font-size-xs);
-		font-weight: 400;
-		opacity: 0.8;
 	}
 
 	.claim-btn--chow,

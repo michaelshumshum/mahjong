@@ -87,7 +87,7 @@ describe('ClaimDialog', () => {
 		expect(body).toContain('claim-btn--pass');
 	});
 
-	it('shows a CJK glyph and a sub-label for pung/chow/kong/win, not for pass', () => {
+	it('shows a CJK glyph for pung/chow/kong/win, not for pass, and no sub-label', () => {
 		const options: ClaimOption[] = [
 			{ kind: 'pung', tiles: ['z5', 'z5'] },
 			{ kind: 'win' },
@@ -99,7 +99,7 @@ describe('ClaimDialog', () => {
 		expect(body).toMatch(/class="claim-btn-glyph[^"]*"[^>]*>碰</);
 		expect(body).toMatch(/class="claim-btn-glyph[^"]*"[^>]*>食糊</);
 		expect(body).not.toMatch(/claim-btn--pass[\s\S]*?claim-btn-glyph/);
-		expect(body).toContain('claim-btn-sublabel');
+		expect(body).not.toContain('claim-btn-sublabel');
 	});
 
 	it('shows a 1-based key hint on every option and an Esc hint on pass', () => {
@@ -109,5 +109,21 @@ describe('ClaimDialog', () => {
 		});
 		expect(body).toMatch(/class="claim-btn-key[^"]*"[^>]*>1</);
 		expect(body).toMatch(/class="claim-btn-key[^"]*"[^>]*>Esc</);
+	});
+
+	it('renders pass on its own row after the call options, whatever its position in the offer', () => {
+		const options: ClaimOption[] = [
+			{ kind: 'pass' },
+			{ kind: 'pung', tiles: ['z5', 'z5'] },
+			{ kind: 'win' }
+		];
+		const { body } = render(ClaimDialog, {
+			props: { discardTile: 'z5', discarderName: 'Bob', options, durationMs: 5000, onChoose: noop }
+		});
+		const calls = body.slice(body.indexOf('class="claim-calls'), body.indexOf('claim-btn--pass'));
+		expect(calls).toContain('claim-btn--pung');
+		expect(calls).toContain('claim-btn--win');
+		expect(body.indexOf('claim-btn--pass')).toBeGreaterThan(body.lastIndexOf('claim-btn--win'));
+		expect(body).toMatch(/claim-btn--pung[\s\S]*?class="claim-btn-key[^"]*"[^>]*>1</);
 	});
 });

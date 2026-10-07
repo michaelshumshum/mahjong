@@ -345,9 +345,11 @@ dialog that never closes on its own. `hand_end_ack` gets the same auto-close wit
 risk: it's an acknowledgment, and the table advances at the same `deadline_ts` regardless.
 
 **`ClaimDialog` layout.** Each option is a big button (meld preview above it, a CJK call glyph
-碰/上/槓/食糊 inside, a short localized sub-label, a `1`-`N` key-hint badge) — Win gets the same
+碰/上/槓/食糊 inside, the kind label, a `1`-`N` key-hint badge; no sub-label) — Win gets the same
 accent-glow treatment as a `SeatPlate` turn halo, sized up from its siblings, since it's the one
-choice worth making unmissable; Pass carries an "Esc" hint instead of a number. Initial focus lands
+choice worth making unmissable. Pass is always its own full-width row below the call options,
+never beside them, and carries an "Esc" hint instead of a number; `1`-`N` index the call options
+only. Initial focus lands
 on Pass (an `$effect` with no reactive reads, so it fires once per mount — the dialog only mounts
 while a claim window is open, i.e. once per window, not on every unrelated state update) so
 keyboard users have a safe default under their fingers immediately; number keys `1`-`N` and `Esc`
