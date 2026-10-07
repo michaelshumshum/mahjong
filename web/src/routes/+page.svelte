@@ -36,7 +36,6 @@
 			<span class="seal" aria-hidden="true">{m.lobby_sealMark()}</span>
 			<div class="brand-text">
 				<h1 class="title">{m.lobby_title()}</h1>
-				<p class="tagline">{m.lobby_tagline()}</p>
 			</div>
 		</header>
 
@@ -174,13 +173,6 @@
 		letter-spacing: -0.03em;
 		line-height: 1;
 		text-shadow: 0 2px 12px rgb(0 0 0 / 0.6);
-	}
-
-	.tagline {
-		margin: var(--space-2) 0 0;
-		max-width: 28rem;
-		color: var(--color-text-muted);
-		font-size: var(--font-size-base);
 	}
 
 	.actions {

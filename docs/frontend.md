@@ -652,8 +652,8 @@ waiting room shows the resolved preset name (`PretableScreen.svelte`).
 
 ### Lobby
 
-A brand lockup (a 麻雀 seal mark beside a visible `--font-size-display` "Mahjong" `h1` and a
-one-line tagline), then three **equal-weight** action cards — "Create a table", "Practice vs Bots",
+A brand lockup (a 麻雀 seal mark beside a visible `--font-size-display` "Mahjong" `h1`), then
+three **equal-weight** action cards — "Create a table", "Practice vs Bots",
 "Faan guide" — each a tile-glyph icon, a title and a one-line description. No hero card: the three
 are peers by design. The card's `<button>` holds only the title (its accessible name, which e2e and
 the screenshot script match exactly); the description sits outside it, wired up via
