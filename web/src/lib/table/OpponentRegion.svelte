@@ -67,6 +67,10 @@
 				{#each Array.from({ length: seat.concealedCount }) as _, i (i)}
 					<div class="mini-tile back"><TileFace code={null} /></div>
 				{/each}
+				<!-- phone: one back plus this count stands in for the whole strip -->
+				<span class="backs-count" aria-hidden="true"
+					>{m.opponentRegion_backsCount({ count: seat.concealedCount })}</span
+				>
 			</div>
 		{/if}
 
@@ -243,14 +247,41 @@
 		margin-inline-start: var(--space-2);
 	}
 
-	// sub-768px collapse: opponent backs to a thin overlapping strip.
+	.backs-count {
+		display: none;
+	}
+
+	// sub-768px: a compact chip in the top row -- one back plus a ×N count. the other backs stay
+	// in the DOM (positional identity, frontend.md §4), only hidden.
 	@include layout.phone-only {
-		.seat-hand-strip--left,
-		.seat-hand-strip--right,
-		.seat-hand-strip--across {
-			flex-direction: row;
+		.seat-region {
+			gap: var(--space-1);
+			padding: var(--space-1) var(--space-2);
+			border-radius: var(--radius-md);
+			background: rgb(0 0 0 / 0.18);
 		}
 
-		@include tile.backs-row-overlap;
+		.seat-hand-strip {
+			flex-flow: row wrap;
+			align-items: center;
+		}
+
+		.backs-row {
+			flex-wrap: nowrap;
+			align-items: center;
+		}
+
+		.backs-row .mini-tile.back ~ .mini-tile.back {
+			display: none;
+		}
+
+		.backs-count {
+			display: inline-block;
+			margin-inline-start: var(--space-1);
+			color: var(--color-text-muted);
+			font-size: var(--font-size-sm);
+			font-weight: 700;
+			font-variant-numeric: tabular-nums;
+		}
 	}
 </style>

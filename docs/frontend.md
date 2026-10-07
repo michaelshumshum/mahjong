@@ -229,11 +229,17 @@ seated as East") `windWord()` returns `WIND_LABEL`'s English word in `en` and `W
 
 Below 768px (phone portrait):
 
-- Opponent hands collapse to a thin overlapping-backs strip; positional identity (§4) is still
-  tracked.
+- All three opponents become compact chips sharing the top grid row (`left · across · right`,
+  `layout.seat-region-grid`), so the centre and your hand get the full width. Each chip is the
+  `SeatPlate`, then a single jade back with a `×N` count (`.backs-count`, `aria-hidden` — the row's
+  own label already states the count), then melds/flowers. The other backs stay in the DOM, hidden
+  (`display: none`), so positional identity (§4) and the specs counting `.backs-row .mini-tile`
+  are unchanged.
 - Each opponent's discard pool collapses to a horizontally-scrollable strip; full history stays in
   the DOM (§9).
-- Your hand is `position: sticky; bottom: 0` with `env(safe-area-inset-bottom)` padding. It keeps
+- Your hand is a `position: sticky; bottom: 0` bar with `env(safe-area-inset-bottom)` padding.
+  `app.html`'s viewport meta carries `viewport-fit=cover` — without it every `env(safe-area-inset-*)`
+  resolves to 0 on iOS — and `body` pads by the side insets for landscape notches. It keeps
   its own last grid row (`auto 1fr auto`, the surface filling at least the rest of the viewport),
   so it starts at the bottom and nothing above needs padding reserved under it; the page scrolls
   rather than clipping when the table is taller than the screen. `.table-surface` clips its

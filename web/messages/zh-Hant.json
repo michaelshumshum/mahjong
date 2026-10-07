@@ -526,5 +526,6 @@
 	"announcer_handDraw": "流局",
 	"settings_announcementsLegend": "螢幕閱讀器",
 	"settings_announceAllDiscardsLabel": "讀出每隻打出嘅牌",
-	"centerDiscardPool_tileAriaLabel": "{name}打出{tile}"
+	"centerDiscardPool_tileAriaLabel": "{name}打出{tile}",
+	"opponentRegion_backsCount": "×{count}"
 }

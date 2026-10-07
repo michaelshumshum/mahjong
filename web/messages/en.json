@@ -526,5 +526,6 @@
 	"announcer_handDraw": "Hand ended in a draw",
 	"settings_announcementsLegend": "Screen reader",
 	"settings_announceAllDiscardsLabel": "Announce every discard",
-	"centerDiscardPool_tileAriaLabel": "{name} discarded {tile}"
+	"centerDiscardPool_tileAriaLabel": "{name} discarded {tile}",
+	"opponentRegion_backsCount": "×{count}"
 }

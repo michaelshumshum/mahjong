@@ -107,6 +107,23 @@ describe('OpponentRegion', () => {
 		expect(target.querySelectorAll('.backs-row .tile-face--back').length).toBeGreaterThan(0);
 	});
 
+	it('carries a ×N count for the phone chip, and none for revealed hands', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ concealedCount: 13 }),
+			position: 'right',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.backs-row .backs-count')?.textContent).toBe('×13');
+		const open = render(OpponentRegion, {
+			seat: mockSeat({ concealedHand: ['1m'], concealedCount: 1 }),
+			position: 'right',
+			dealer: 0,
+			turn: 0
+		});
+		expect(open.target.querySelector('.backs-count')).toBeNull();
+	});
+
 	it('renders revealed concealed tiles for spectators', () => {
 		const { target } = render(OpponentRegion, {
 			seat: mockSeat({ concealedHand: ['1m', '2m', '3m'], concealedCount: 3 }),

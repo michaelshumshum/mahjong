@@ -27,8 +27,8 @@ $breakpoint-tablet: 768px;
 	}
 }
 
-// §3's desktop grid: across on top, left/right flank a wide centre column, self at bottom.
-// below 768px it collapses to a 3-row stack; per-region content collapse is each region's own concern.
+// §3's grid: across on top, left/right flank the centre, self at bottom. below 768px all three
+// opponents share the top row as compact chips; per-region collapse is each region's concern.
 @mixin seat-region-grid {
 	display: grid;
 	grid-template-areas:
@@ -42,10 +42,10 @@ $breakpoint-tablet: 768px;
 
 	@include phone-only {
 		grid-template-areas:
-			'across across across'
-			'left center right'
+			'left across right'
+			'center center center'
 			'self self self';
-		grid-template-columns: 1fr 1.4fr 1fr;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		grid-template-rows: auto 1fr auto;
 	}
 }
