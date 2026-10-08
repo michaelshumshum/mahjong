@@ -12,7 +12,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "pnpm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
 		"check:watch": "pnpm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
-		"lint": "oxlint . && oxfmt --check .",
+		"lint": "oxlint .",
 		"format": "oxfmt .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",

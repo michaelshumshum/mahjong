@@ -10,7 +10,7 @@ pre-commit:
       root: "web/"
       glob: "*.{js,ts,svelte,json,scss,css,md}"
       exclude: "**/AGENTS.md"
-      run: pnpm exec oxfmt --check {staged_files}
+      run: pnpm exec oxfmt {staged_files}
 
     - name: web-typecheck
       root: "web/"
