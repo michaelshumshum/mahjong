@@ -252,6 +252,7 @@ class DealPayload(BaseModel):
 
     your_hand: list[int]
     counts: dict[int, int]
+    flowers: list[list[str]]
     wall_remaining: int
 
 

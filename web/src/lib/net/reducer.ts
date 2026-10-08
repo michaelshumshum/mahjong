@@ -180,6 +180,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				// dealer alone is dealt 14, the bonus tile appended last and held apart for turn one.
 				drawnTileId: d.your_hand.length > 13 ? d.your_hand[d.your_hand.length - 1] : null,
 				concealedCounts: countsFromWire(d.counts),
+				flowers: d.flowers.map((fl) => fl.slice()),
 				wallRemaining: d.wall_remaining
 			};
 		}

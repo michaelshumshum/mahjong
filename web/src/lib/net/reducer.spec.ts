@@ -194,6 +194,23 @@ describe('reduce', () => {
 		expect(oppDraw.drawnTileId).toBeNull();
 	});
 
+	it("deal sets every seat's opening flowers", () => {
+		const s = state({ seat: 0, flowers: [[], [], [], []] });
+		const next = reduce(s, {
+			v: 1,
+			ts: 1,
+			seq: 1,
+			t: 'deal',
+			d: {
+				your_hand: [1, 2],
+				counts: { 0: 2, 1: 13, 2: 13, 3: 13 },
+				flowers: [['f1'], [], ['f2', 'f5'], []],
+				wall_remaining: 80
+			}
+		});
+		expect(next.flowers).toEqual([['f1'], [], ['f2', 'f5'], []]);
+	});
+
 	it('flower_replace decrements wallRemaining for the drawn flower', () => {
 		const s = state({ seat: 0, wallRemaining: 50, flowers: [[], [], [], []] });
 		const next = reduce(s, {

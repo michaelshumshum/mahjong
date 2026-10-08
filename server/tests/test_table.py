@@ -24,6 +24,7 @@ from bots.random import random_action
 from mahjong_core.actions import Discard
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.state import Phase
+from mahjong_core.tiles import tile_code
 
 _STEP_CAP = 8000  # matches bots/selfplay.py's _STEP_CAP for the same bounded ruleset
 _BOUNDED_RULESET = RuleSet(
@@ -444,3 +445,17 @@ async def test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_or
     view, _mask, _seed, tier, _deadline = args
     assert tier == "T2"
     assert view.hands is None
+
+
+async def test_deal_carries_every_seats_opening_flowers() -> None:
+    table = next(
+        t
+        for t in (Table(f"table-deal-flowers-{s}", _BOUNDED_RULESET, game_seed=s) for s in range(50))
+        if any(seat.flowers for seat in t.state.seats)
+    )
+    table._publish_hand_start_and_deal()
+
+    expected = [[tile_code(f) for f in seat.flowers] for seat in table.state.seats]
+    for seat in range(4):
+        deal = next(e.event for e in table.ring[seat] if e.event["t"] == "deal")
+        assert deal["flowers"] == expected

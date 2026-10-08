@@ -527,6 +527,16 @@
           "title": "Counts",
           "type": "object"
         },
+        "flowers": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Flowers",
+          "type": "array"
+        },
         "wall_remaining": {
           "title": "Wall Remaining",
           "type": "integer"
@@ -535,6 +545,7 @@
       "required": [
         "your_hand",
         "counts",
+        "flowers",
         "wall_remaining"
       ],
       "title": "DealPayload",

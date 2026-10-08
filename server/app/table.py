@@ -1666,6 +1666,7 @@ class Table:
                     "t": "deal",
                     "your_hand": list(state.seats[seat].concealed),
                     "counts": {s: len(state.seats[s].concealed) for s in range(4)},
+                    "flowers": [[tile_code(f) for f in s.flowers] for s in state.seats],
                     "wall_remaining": len(state.wall.tiles),
                 },
             )

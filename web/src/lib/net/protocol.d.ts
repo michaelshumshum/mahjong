@@ -241,6 +241,7 @@ export interface HandStartPayload {
 export interface DealPayload {
 	your_hand: number[];
 	counts: Record<number, number>;
+	flowers: string[][];
 	wall_remaining: number;
 }
 

@@ -126,8 +126,8 @@ Payload shapes match `server/app/protocol.py` (§6).
 | --- | --- | --- |
 | `state_sync` | full redacted snapshot (`app/views.py`'s `SeatView`, wire-serialized) | sent on join, reconnect-with-gap, and after any backpressure collapse (§9). Fields below |
 | `hand_start` | `{hand_no, prevailing, dealer, seats, seed_commit?}` | `seats` is each seat's `seat_status` (`empty` is only reachable on a `require_ready=False` table built directly). `seed_commit`: see Fairness. Synthesized by `app/table.py` at the hand boundary — no backing engine `Event` |
-| `deal` | `{your_hand: [tile_id…], counts: {seat: n}, wall_remaining}` | unicast per seat; synthesized, no backing `Event` |
-| `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event`; mid-hand reveals are emitted |
+| `deal` | `{your_hand: [tile_id…], counts: {seat: n}, flowers: [[code…]×4], wall_remaining}` | unicast per seat; synthesized, no backing `Event`. `flowers` is every seat's flowers revealed by the opening swap (public) |
+| `flower_replace` | `{seat, flower, replacement?}` | `replacement` only for you. **Not emitted for the opening deal's flower swaps** — `new_game()`/`_deal_hand()` build state directly, not through `reduce()`, so there's no `Event`; those arrive in `deal.flowers`. Mid-hand reveals are emitted |
 | `draw` | `{seat, tile_id?}` | `tile_id` **only** for the drawing player |
 | `discard` | `{seat, tile_id, tile, pool_index}` | `pool_index` is computed by `Table` against its own post-event state — `redact_event` alone can't, since a discard claimed in the same `reduce()` call is already gone from the pool |
 | `claim_offer` | `{window_id, options: [{kind, tiles?}...], deadline_ts}` | **unicast**, only to eligible seats. `options` always ends with `{kind:"pass"}`. Sent when the window's deadline is armed, so it always carries a real `deadline_ts` |
