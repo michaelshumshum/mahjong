@@ -932,8 +932,10 @@ R2 progress: **done** — `ml/train_env.py` (§7), `ml/ppo.py` (§9), `ml/curric
 | C1 exit (§10) | update 52,402, 220.4M decisions: rolling win 0.200 (≥ 0.15), sub-min tenpai 0.108 (≤ 0.32), draws 20.2%, deal-in 0.099 over 4,000 hands | met |
 | paired CI > 0 vs `EfficiencyBot` | `ckpt_C1_exit.pt` × 1 vs `EfficiencyBot` × 3, 700 fresh sets (seeds 3,000,000+), `hk_classic`: **+8.74 points/hand [+7.67, +9.80]** (bootstrap [+7.69, +9.81]); win 0.299 / 0.145, deal-in 0.043 / 0.092, avg faan 4.64 / 3.22, sub-min tenpai 0.140 / 0.335 | met |
 
-Training continues at C1's end parameters via `curriculum.hold_final` (§10) until R3's league
-exists. Curriculum timeline, metrics, evaluation over training and observed play:
+The run then held C1's end parameters via `curriculum.hold_final` (§10) to 464.3M decisions
+(update 110,201) and stopped for the R3 league run; final checkpoint
+`runs/ppo_c1/ckpt_hold_final.pt`. Strength vs `FaanBot` plateaued at +8–9 points/hand from 230.9M.
+Curriculum timeline, metrics, evaluation over training and observed play:
 [rl-learnings.md](rl-learnings.md).
 
 Smoke run (15 min from R1 `ckpt_best.pt`, C0 config, i7-1265U, CPU): 271k decisions, 65 updates.
@@ -972,9 +974,24 @@ R3 progress: **built and CPU-smoked; the full run is pending on the GPU box.** `
 snapshots, persona forks, PPO `init_ckpt` loading the whole learner), stage C2 in
 `ml/curriculum.py` (`min_faan` 3 + 20% other presets), `ml/configs/rl_league.yaml`, and the ACH
 switch (`policy_loss: ach`, §9). Measured rollout cost on CPU: 0.59× plain self-play's learner
-decisions/s at the default seating (§11). Exit criteria (paired CI > 0 vs `FaanBot` on ≥ 1,000
-fresh sets, mixed tables, sub-min tenpai) not yet measured. The run starts from a C1 hold
-checkpoint (§11 has the command); the ACH ablation is a second run with `policy_loss: ach`.
+decisions/s at the default seating (§11). The full run started 2026-10-08 on the RTX 2060
+from the hold-end checkpoint (464.3M): ~1.15k learner decisions/s end to end, 0.7× the hold's
+~1.6k/s. The ACH ablation is a second run with `policy_loss: ach`.
+
+Pre-league baseline: the hold checkpoint at 462.0M (chosen in advance) already meets the numeric
+exit criteria on fresh seeds 5,000,000+ ([rl-learnings.md §4](rl-learnings.md)). `eval_policy`
+seats one opponent type ×3, so mixed tables are measured per profile:
+
+| Criterion | Pre-league result (462.0M) | Status |
+| --- | --- | --- |
+| paired CI > 0 vs `FaanBot`, ≥ 1,000 fresh sets | **+9.76 points/hand [+8.72, +10.79]** (bootstrap [+8.75, +10.81]) | met |
+| not worse on mixed tables | 700 sets each: `EfficiencyBot` +11.69, `FaanBotAggressive` +10.57, `FaanBotDefensive` +9.42, `FaanBotFlushChasing` +10.17, every CI > 0 | met per profile; one table of mixed bots not measured |
+| sub-min tenpai not worse | 0.030 vs `FaanBot`'s 0.048; ≤ the opponents' on every table but `FaanBotAggressive` (0.049 / 0.046) | met |
+| stretch ≥ +5 points/game | +9.76 points/hand | met |
+
+Since the baseline already passes, the league's value has to show against it rather than
+against zero: not worse than 462.0M on these tables, and ahead of it head to head (a learned-only
+duplicate match, §12; `eval_policy` can't seat a learned opponent yet).
 
 ## 15. Risks
 
