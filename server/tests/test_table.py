@@ -450,7 +450,9 @@ async def test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_or
 async def test_deal_carries_every_seats_opening_flowers() -> None:
     table = next(
         t
-        for t in (Table(f"table-deal-flowers-{s}", _BOUNDED_RULESET, game_seed=s) for s in range(50))
+        for t in (
+            Table(f"table-deal-flowers-{s}", _BOUNDED_RULESET, game_seed=s) for s in range(50)
+        )
         if any(seat.flowers for seat in t.state.seats)
     )
     table._publish_hand_start_and_deal()
