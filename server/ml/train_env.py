@@ -10,7 +10,11 @@ discard). The policy row is built by `encode_v2.policy_raw`, the parity-tested l
 fields only ever feed the critic and the annealed oracle input.
 
 Roles: `LEARNER` rows are trained on; `FROZEN` rows are surfaced for the caller to act with some
-other policy and are never trained on (the league hook, R3); in-env opponents never surface.
+other policy and are never trained on (the league, `ml.league`); in-env opponents never surface.
+With `EnvConfig.mix` each episode draws its seating and opponent id from a weighted table instead
+(the league's opponent mix); every row of the episode carries that id. With
+`EnvConfig.alt_rulesets` an episode plays another `RULESET_PRESETS` entry with that probability;
+its rows' `ruleset` is then 1 + its index in `PRESET_IDS` (0 = `EnvConfig.ruleset`).
 
 `VecTrainEnv` steps in-process, `SubprocVecTrainEnv` splits the envs over worker processes with
 shared-memory buffers (as `ml.vec_env`). Both give identical arrays for the same seeds and actions.
@@ -32,6 +36,7 @@ from bots.arena import _tenpai_can_reach_min_faan
 from bots.labels import is_tenpai, seat_hand34
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.ml import N_ACTIONS
+from mahjong_core.presets import RULESET_PRESETS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
 from ml.encode_v2 import ORACLE_FIELDS, PAD, POLICY_FIELDS, oracle_raw, policy_raw
@@ -46,12 +51,14 @@ __all__ = [
     "INFO_FIELDS",
     "LEARNER",
     "OPPONENTS",
+    "PRESET_IDS",
     "ROW_BYTES",
     "ROW_FIELDS",
     "EnvConfig",
     "SubprocVecTrainEnv",
     "TrainEnv",
     "VecTrainEnv",
+    "opponent_ids",
     "tsumogiri",
     "unpack_rows",
     "with_min_faan",
@@ -77,6 +84,8 @@ ROW_FIELDS: dict[str, tuple[int, ...]] = {
     "role": (),
     "aux": (),
     "teacher": (),  # §10 contingency teacher action, PAD unless enabled
+    "ruleset": (),
+    "opponent": (2,),  # league opponent id, little-endian; 0 = none
     **AUX_LABEL_FIELDS,
 }
 _OFFSETS: dict[str, tuple[int, int, tuple[int, ...]]] = {}
@@ -90,6 +99,8 @@ ROW_BYTES = _at
 # per finished episode: winner, discarder (-1 if none), then seat bitmasks
 INFO_FIELDS = ("winner", "discarder", "learners", "tenpai_at_draw", "sub_min_tenpai")
 
+PRESET_IDS: tuple[str, ...] = tuple(RULESET_PRESETS)
+
 
 def unpack_rows(rows: np.ndarray, fields: tuple[str, ...] | None = None) -> dict[str, np.ndarray]:
     """`(B, ROW_BYTES)` packed rows -> named `uint8` views, shaped as `ROW_FIELDS`."""
@@ -98,6 +109,12 @@ def unpack_rows(rows: np.ndarray, fields: tuple[str, ...] | None = None) -> dict
         lo, hi, shape = _OFFSETS[name]
         out[name] = rows[:, lo:hi].reshape(len(rows), *shape)
     return out
+
+
+def opponent_ids(u: dict[str, np.ndarray]) -> np.ndarray:
+    """Per row, the episode's league opponent id from unpacked rows."""
+    opp = u["opponent"].astype(np.int64)
+    return opp[:, 0] | opp[:, 1] << 8
 
 
 def tsumogiri(state: GameState, seat: int, mask: np.ndarray) -> int:
@@ -137,7 +154,11 @@ _TEACHERS: dict[str, Callable[[], Callable[[GameState, int, np.ndarray], int]]] 
 @dataclass(frozen=True)
 class EnvConfig:
     """`learners` seats per episode surface as `LEARNER`, `frozen` more as `FROZEN`, the rest
-    play `opponent` in-env. `teacher` is the §10 contingency and stays `None` unless enabled."""
+    play `opponent` in-env. `teacher` is the §10 contingency and stays `None` unless enabled.
+
+    `mix`, if set, replaces `learners`/`frozen` per episode: `(weight, learners, opponent_id)`
+    entries, the remaining seats `FROZEN`. `alt_rulesets`: `(preset, probability)` pairs; the rest
+    of the time an episode plays `ruleset`."""
 
     ruleset: RuleSet = DEFAULT_RULESET
     learners: int = 4
@@ -145,6 +166,8 @@ class EnvConfig:
     opponent: str = "tsumogiri"
     aux_rate: float = 0.0
     teacher: str | None = None
+    mix: tuple[tuple[float, int, int], ...] = ()
+    alt_rulesets: tuple[tuple[str, float], ...] = ()
 
     def __post_init__(self) -> None:
         if not 1 <= self.learners <= 4 or self.learners + self.frozen > 4 or self.frozen < 0:
@@ -153,6 +176,18 @@ class EnvConfig:
             raise ValueError(f"unknown opponent {self.opponent!r}; choices: {sorted(OPPONENTS)}")
         if self.teacher is not None and self.teacher not in _TEACHERS:
             raise ValueError(f"unknown teacher {self.teacher!r}")
+        for weight, learners, opp in self.mix:
+            if weight < 0 or not 1 <= learners <= 4 or not 0 <= opp < 1 << 16:
+                raise ValueError(f"bad mix entry {(weight, learners, opp)}")
+            if (learners < 4) != (opp > 0):
+                raise ValueError(f"mix entry {(weight, learners, opp)}: frozen seats need an id")
+        if self.mix and sum(w for w, _, _ in self.mix) <= 0:
+            raise ValueError("mix weights sum to 0")
+        for name, prob in self.alt_rulesets:
+            if name not in RULESET_PRESETS or prob < 0:
+                raise ValueError(f"bad alt ruleset {(name, prob)}")
+        if sum(p for _, p in self.alt_rulesets) > 1:
+            raise ValueError("alt_rulesets probabilities sum past 1")
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -161,16 +196,39 @@ class EnvConfig:
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> EnvConfig:
-        return EnvConfig(**{**d, "ruleset": RuleSet.from_dict(d["ruleset"])})
+        return EnvConfig(
+            **{
+                **d,
+                "ruleset": RuleSet.from_dict(d["ruleset"]),
+                "mix": tuple(tuple(e) for e in d.get("mix", ())),
+                "alt_rulesets": tuple(tuple(e) for e in d.get("alt_rulesets", ())),
+            }
+        )
 
 
-def _roles(cfg: EnvConfig, seed: int) -> list[int]:
-    """Per seat: `LEARNER`, `FROZEN`, or -1 (in-env opponent)."""
-    seats = random.Random(f"seats:{seed}").sample(range(4), cfg.learners + cfg.frozen)
+def _roles(cfg: EnvConfig, seed: int) -> tuple[list[int], int]:
+    """Per seat `LEARNER`, `FROZEN`, or -1 (in-env opponent); and the episode's opponent id."""
+    learners, frozen, opp = cfg.learners, cfg.frozen, 0
+    if cfg.mix:
+        rng = random.Random(f"mix:{seed}")
+        _, learners, opp = rng.choices(cfg.mix, weights=[w for w, _, _ in cfg.mix])[0]
+        frozen = 4 - learners
+    seats = random.Random(f"seats:{seed}").sample(range(4), learners + frozen)
     roles = [-1] * 4
     for i, s in enumerate(seats):
-        roles[s] = LEARNER if i < cfg.learners else FROZEN
-    return roles
+        roles[s] = LEARNER if i < learners else FROZEN
+    return roles, opp
+
+
+def _episode_ruleset(cfg: EnvConfig, seed: int) -> tuple[RuleSet, int]:
+    if not cfg.alt_rulesets:
+        return cfg.ruleset, 0
+    u = random.Random(f"ruleset:{seed}").random()
+    for name, prob in cfg.alt_rulesets:
+        if u < prob:
+            return RULESET_PRESETS[name], 1 + PRESET_IDS.index(name)
+        u -= prob
+    return cfg.ruleset, 0
 
 
 def _bits(seats: list[int]) -> int:
@@ -190,6 +248,8 @@ class TrainEnv:
         self.seat = -1
         self.mask = np.zeros(N_ACTIONS, dtype=bool)
         self.roles = [-1] * 4
+        self.opponent_id = 0
+        self.ruleset_id = 0
         self._aux_rng = random.Random()
         self._opponent: Opponent | None = None
         self._teacher: Callable[[GameState, int, np.ndarray], int] | None = None
@@ -206,7 +266,8 @@ class TrainEnv:
         if self.pending_cfg is not None:
             self._apply_cfg(self.pending_cfg)
             self.pending_cfg = None
-        self.roles = _roles(self.cfg, seed)
+        self.roles, self.opponent_id = _roles(self.cfg, seed)
+        self.env.ruleset, self.ruleset_id = _episode_ruleset(self.cfg, seed)
         self._aux_rng = random.Random(f"aux:{seed}")
         seat, _, mask = self.env.reset(seed)
         done = self._advance(seat, mask)
@@ -263,6 +324,8 @@ class TrainEnv:
         values["cur_shanten"] = sh + 1
         values["min_faan"] = state.ruleset.min_faan
         values["role"] = role
+        values["ruleset"] = self.ruleset_id
+        values["opponent"] = (self.opponent_id & 0xFF, self.opponent_id >> 8)
         aux = role == LEARNER and self._aux_rng.random() < self.cfg.aux_rate
         values["aux"] = int(aux)
         values["teacher"] = (
