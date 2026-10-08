@@ -985,7 +985,7 @@ English and zh-Hant via Paraglide JS — runes-native and SSR-safe, unlike store
 | --- | --- |
 | Locale strategy | cookie only (`['cookie', 'baseLocale']`), no URL prefix, so invite links (`/table/ABC123`) stay locale-agnostic. `lib/i18n/LocaleSwitcher.svelte` (in `Settings.svelte`) writes the cookie and reloads |
 | Sources | `messages/en.json`, `messages/zh-Hant.json`, edited directly |
-| Generated | `src/lib/paraglide/` — never hand-edited; `pnpm run paraglide:compile` (wired into `build`/`check`) |
+| Generated | `src/lib/paraglide/` — never hand-edited; `pnpm run paraglide:compile` (wired into `build`/`check`). During `pnpm dev` the vite plugin watches `messages/` and recompiles on save, then Vite reloads the page (message modules aren't HMR-acceptable, so it's a full reload, not a patch) |
 | Keys | semantic, namespaced `component_field` (e.g. `lobby_createTableButton`), called as `m.lobby_createTableButton()`; interpolation via `{placeholder}` args |
 | Cantonese terms | 碰/上/槓/食糊 stay as glyphs in both locales, UI and live-region text |
 
