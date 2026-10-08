@@ -394,7 +394,6 @@
 	"practiceSetupDialog_positionLeft": "Left opponent",
 	"practiceSetupDialog_positionRight": "Right opponent",
 	"practiceSetupDialog_selfBadge": "You",
-	"practiceSetupDialog_selfCaption": "Your seat",
 	"practiceSetupDialog_createErrorMessage": "Couldn't start a practice table — try again.",
 	"practiceSetupDialog_cancelButton": "Cancel",
 	"practiceSetupDialog_startButton": "Start",

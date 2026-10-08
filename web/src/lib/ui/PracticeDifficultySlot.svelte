@@ -21,57 +21,43 @@
 	};
 </script>
 
-<div class="slot-column">
-	<button
-		type="button"
-		class="seat-ring-slot"
-		data-testid={testId}
-		aria-label={m.practiceDifficultySlot_ariaLabel({
-			position: positionLabel,
-			difficulty: DIFFICULTY_LABEL[difficulty]()
-		})}
-		onclick={onCycle}
-	>
-		<span>{DIFFICULTY_LABEL[difficulty]()}</span>
-	</button>
-	<span class="slot-caption">{positionLabel}</span>
-</div>
+<button
+	type="button"
+	class="seat-ring-slot"
+	data-testid={testId}
+	aria-label={m.practiceDifficultySlot_ariaLabel({
+		position: positionLabel,
+		difficulty: DIFFICULTY_LABEL[difficulty]()
+	})}
+	onclick={onCycle}
+>
+	<span>{DIFFICULTY_LABEL[difficulty]()}</span>
+</button>
 
 <style lang="scss">
-	.slot-column {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-1);
-	}
-
-	// same round-badge motif as SeatRingSlot/SeatPickerSlot's seat-ring-slot, sized up to fit a
-	// difficulty word instead of a one-line seat status.
+	// pill-button version of the table cards' open-seat treatment (TableCard's dashed pill,
+	// made solid since this one carries a difficulty word and cycles on tap).
 	.seat-ring-slot {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 4.25rem;
-		height: 4.25rem;
-		padding: var(--space-1);
-		border-radius: 50%;
+		padding: var(--space-1) var(--space-3);
 		border: 1px solid var(--color-border);
+		border-radius: 999px;
 		background: none;
 		color: var(--color-text);
 		font: inherit;
 		font-size: var(--font-size-sm);
 		font-weight: 600;
-		text-align: center;
-		line-height: 1.1;
+		white-space: nowrap;
 		cursor: pointer;
 
 		&:hover {
+			border-color: var(--color-accent);
 			background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 		}
-	}
 
-	.slot-caption {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
+		span {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			user-select: none;
+		}
 	}
 </style>

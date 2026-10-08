@@ -34,6 +34,6 @@ describe('PracticeSetupDialog', () => {
 		expect(body).toContain('Across: Normal. Click to change.');
 		expect(body).toContain('Left opponent: Normal. Click to change.');
 		expect(body).toContain('You');
-		expect(body).toContain('Your seat');
+		expect(body).toContain('seat-ring-slot--self');
 	});
 });

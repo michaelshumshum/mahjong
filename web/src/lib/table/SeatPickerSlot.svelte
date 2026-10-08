@@ -20,7 +20,7 @@
 
 <button
 	type="button"
-	class="seat-ring-slot seat-ring-slot--pickable"
+	class="seat-ring-slot"
 	class:seat-ring-slot--self={self}
 	class:seat-ring-slot--open={open}
 	disabled={!open}
@@ -36,53 +36,24 @@
 </button>
 
 <style lang="scss">
-	@use '$lib/styles/a11y';
+	// same treatment as the table cards' compass seats (TableCard): an open seat is a dashed
+	// pill (here accent-tinted since it's the click target), a taken seat is plain bold text.
 	.seat-ring-slot {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 2.75rem;
-		min-height: 2.75rem;
-		padding-inline: var(--space-2);
-		border-radius: 50%;
-		border: 1px dashed var(--color-border);
-		color: var(--color-text-muted);
+		font: inherit;
+		background: none;
+		max-width: 100%;
+		padding: var(--space-1) var(--space-2);
+		border: none;
+		color: var(--color-text);
 		font-size: var(--font-size-sm);
 		font-weight: 600;
 		white-space: nowrap;
-		animation: seat-ring-breathe 2.4s ease-in-out infinite;
-	}
 
-	.seat-ring-slot--self {
-		border: 1px solid var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-		color: var(--color-text);
-		animation: none;
-	}
-
-	@keyframes seat-ring-breathe {
-		0%,
-		100% {
-			opacity: 0.5;
+		span {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			user-select: none;
 		}
-		50% {
-			opacity: 1;
-		}
-	}
-
-	.seat-ring-slot:not(.seat-ring-slot--pickable) {
-		@include a11y.motion-reduced {
-			animation: none;
-			opacity: 0.85;
-		}
-	}
-
-	// a taken seat reads as solid/inert rather than breathing; an open one is a clickable button.
-	.seat-ring-slot--pickable {
-		font: inherit;
-		background: none;
-		animation: none;
-		opacity: 1;
 
 		&:disabled {
 			cursor: default;
@@ -90,9 +61,12 @@
 		}
 	}
 
+	// self carries no emphasis here: all four seats are identical choices until you pick one.
+	// (the --self class stays for SeatPickerSlot.spec and for seat-order parity with SeatRing.)
 	.seat-ring-slot--open {
-		border: 1px solid var(--color-accent);
-		color: var(--color-text);
+		padding: var(--space-1) var(--space-3);
+		border: 1px dashed var(--color-accent);
+		border-radius: 999px;
 		cursor: pointer;
 
 		&:hover {

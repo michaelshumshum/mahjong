@@ -8,6 +8,7 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import PracticeDifficultySlot from './PracticeDifficultySlot.svelte';
+	import CompassFelt from '$lib/table/CompassFelt.svelte';
 	import { loadPracticeSetup, savePracticeSetup } from './settings-storage';
 
 	let { onCreated, onCancel }: { onCreated: (tableId: string) => void; onCancel: () => void } =
@@ -91,13 +92,11 @@
 				/>
 			</div>
 			<div class="seat-ring-pos seat-ring-pos--self">
-				<div class="slot-column">
-					<div class="seat-ring-slot seat-ring-slot--self">
-						<span>{m.practiceSetupDialog_selfBadge()}</span>
-					</div>
-					<span class="slot-caption">{m.practiceSetupDialog_selfCaption()}</span>
+				<div class="seat-ring-slot seat-ring-slot--self">
+					<span>{m.practiceSetupDialog_selfBadge()}</span>
 				</div>
 			</div>
+			<div class="seat-ring-felt"><CompassFelt /></div>
 		</div>
 
 		<dl class="tier-legend" aria-label={m.practiceSetupDialog_tierLegendLabel()}>
@@ -154,62 +153,59 @@
 		color: var(--color-text-muted);
 	}
 
-	// same geometry as SeatRing/SeatPicker's seat-ring (docs/frontend.md's "Pre-game states"),
-	// sized up since each slot here carries a difficulty word + caption, not just seat status.
+	// same compass layout as SeatRing/SeatPicker and the table cards (docs/frontend.md's
+	// "Pre-game states"): top/bottom seats span the full width, side seats flank the mini felt.
 	.seat-ring {
 		display: grid;
 		grid-template-areas:
-			'.      across .'
-			'left   .      right'
-			'.      self   .';
-		grid-template-columns: repeat(3, 5.5rem);
-		grid-template-rows: repeat(3, 4.75rem);
-		gap: var(--space-1);
-		place-items: center;
+			'top   top  top'
+			'left  felt right'
+			'bottom bottom bottom';
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		align-items: center;
+		gap: var(--space-2);
+		width: 100%;
+	}
+
+	.seat-ring-felt {
+		grid-area: felt;
+		width: 4.5rem;
+	}
+
+	.seat-ring-pos {
+		display: flex;
+		justify-content: center;
+		min-width: 0;
 	}
 
 	.seat-ring-pos--across {
-		grid-area: across;
+		grid-area: top;
 	}
 
 	.seat-ring-pos--left {
 		grid-area: left;
+		justify-content: flex-end;
 	}
 
 	.seat-ring-pos--right {
 		grid-area: right;
+		justify-content: flex-start;
 	}
 
 	.seat-ring-pos--self {
-		grid-area: self;
-	}
-
-	.slot-column {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-1);
+		grid-area: bottom;
 	}
 
 	// dealer isn't known until table construction, so this reads "you", not a wind letter --
-	// matching SeatRingSlot's self=true treatment (accent-highlighted, non-interactive).
+	// plain bold text, matching SeatRingSlot's self treatment.
 	.seat-ring-slot--self {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 4.25rem;
-		height: 4.25rem;
-		border-radius: 50%;
-		border: 1px solid var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 16%, transparent);
 		color: var(--color-text);
 		font-size: var(--font-size-sm);
-		font-weight: 600;
-	}
+		font-weight: 700;
 
-	.slot-caption {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
+		span {
+			user-select: none;
+		}
 	}
 
 	.tier-legend {

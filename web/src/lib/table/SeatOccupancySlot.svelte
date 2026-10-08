@@ -17,26 +17,32 @@
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
+	// open seats get the table cards' dashed-pill "Open" treatment; the breathing marks the
+	// ring as live while waiting for players.
 	.seat-ring-slot {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 2.75rem;
-		min-height: 2.75rem;
-		padding-inline: var(--space-2);
-		border-radius: 50%;
+		max-width: 100%;
+		padding: var(--space-1) var(--space-3);
 		border: 1px dashed var(--color-border);
+		border-radius: 999px;
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
-		font-weight: 600;
 		white-space: nowrap;
 		animation: seat-ring-breathe 2.4s ease-in-out infinite;
+		user-select: none;
+
+		span {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			user-select: none;
+		}
 	}
 
-	// occupancy is real -- a filled seat reads solid/inert rather than still breathing "open".
+	// a filled seat is plain bold name text, like the table cards' compass names.
 	.seat-ring-slot--filled {
-		border: 1px solid var(--color-border);
+		padding: var(--space-1) var(--space-2);
+		border: none;
 		color: var(--color-text);
+		font-weight: 600;
 		animation: none;
 	}
 

@@ -146,7 +146,8 @@
 		width: min(90vw, 28rem);
 		max-width: 90vw;
 		padding: var(--space-5);
-		background: var(--color-surface-raised);
+		// same surface as the /tables cards -- this panel is a page, not a modal.
+		background: var(--color-surface);
 		text-align: center;
 		@include buttons.panel-elevated;
 

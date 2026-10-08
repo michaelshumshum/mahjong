@@ -679,9 +679,12 @@ shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md))
 ### Practice mode
 
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
-fixed at table construction. A seat ring with one tap-to-cycle slot per bot seat (Right opponent /
-Across / Left opponent, matching `mock-game-state.ts`'s `relativeSeat` offsets; seat 0 is the
-human), each Easy/Normal/Impossible ([bots.md §6](bots.md)), defaulting to the last practice setup
+fixed at table construction. A seat ring with one tap-to-cycle difficulty pill per bot seat
+(seats 1-3, matching `mock-game-state.ts`'s `relativeSeat` offsets — the position names are
+aria-labels only, no visible captions; seat 0 is the
+human, shown as bold "You" text) around the same `CompassFelt` centerpiece as the pre-game
+rings and `/tables` cards,
+each Easy/Normal/Impossible ([bots.md §6](bots.md)), defaulting to the last practice setup
 (else Normal), above a short legend
 with a one-line blurb per level. Submitting sends `POST /tables`
 with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/table/<id>?practice=1`.
@@ -737,7 +740,15 @@ Connecting, seat picker and waiting are recurring moments in a multiplayer game,
 app's panel/button vocabulary (`panel-elevated`, `_buttons.scss`). All three share one panel —
 the table code, large on a tile-coloured chip, plus a primary "Invite friends" button (the table URL
 _is_ the invite) — and a seat ring: four slots arranged across/left/right/self like
-`layout.seat-region-grid`.
+`layout.seat-region-grid`, around the same mini felt square (`lib/table/CompassFelt.svelte`) the
+`/tables` cards use, laid out on the same compass grid (top/bottom seats span the felt's width,
+side seats hug the felt like the cards' compass names) and styled like the cards' compass seats — an open seat is a dashed pill
+(accent-tinted and clickable in the picker; muted and gently breathing while waiting), a taken
+seat is plain bold name text, and your own seat is your wind glyph in bold text — once seated,
+`CompassFelt`'s `rotate` prop turns the felt so that wind sits at its bottom edge, matching the
+seat you're holding (the cards keep the fixed decorative orientation). The picker, the waiting
+ring and a table card all read as the same table seen from above. The panel itself sits on
+`--color-surface`, the cards' surface.
 
 - **Invite.** `lib/ui/share-invite.ts`'s `shareOrCopy()` opens the OS share sheet
   (`navigator.share`, gated on `canShare`) where one exists — i.e. phones — else copies the URL.

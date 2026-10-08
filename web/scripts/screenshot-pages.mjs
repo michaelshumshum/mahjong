@@ -77,6 +77,16 @@ const PAGES = [
 			await page.getByRole('button', { name: 'Create a table' }).click();
 		}
 	},
+	// the practice difficulty picker (docs/frontend.md's "Practice mode") -- genuinely distinct
+	// from the create dialog above: a seat ring of tap-to-cycle bot levels around the shared
+	// CompassFelt centerpiece, not a ruleset form.
+	{
+		name: 'lobby-practice-dialog',
+		url: '/',
+		async before(page) {
+			await page.getByRole('button', { name: 'Practice vs Bots' }).click();
+		}
+	},
 	{ name: 'tables', url: '/tables' },
 	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Seat } from './mock-game-state';
+	import CompassFelt from './CompassFelt.svelte';
 	import SeatPickerSlot from './SeatPickerSlot.svelte';
 
 	let {
@@ -46,34 +47,50 @@
 			{onJoin}
 		/>
 	</div>
+	<div class="seat-ring-felt"><CompassFelt /></div>
 </div>
 
 <style lang="scss">
+	// same compass layout as the table cards (TableCard): name labels above/below spanning the
+	// full width, side seats in flexible columns flanking the mini felt (CompassFelt).
 	.seat-ring {
 		display: grid;
 		grid-template-areas:
-			'.      across .'
-			'left   .      right'
-			'.      self   .';
-		grid-template-columns: repeat(3, 3.25rem);
-		grid-template-rows: repeat(3, 3.25rem);
-		gap: var(--space-1);
-		place-items: center;
+			'top   top  top'
+			'left  felt right'
+			'bottom bottom bottom';
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		align-items: center;
+		gap: var(--space-2);
+		width: 100%;
+	}
+
+	.seat-ring-felt {
+		grid-area: felt;
+		width: 5.5rem;
+	}
+
+	.seat-ring-pos {
+		display: flex;
+		justify-content: center;
+		min-width: 0;
 	}
 
 	.seat-ring-pos--across {
-		grid-area: across;
+		grid-area: top;
 	}
 
 	.seat-ring-pos--left {
 		grid-area: left;
+		justify-content: flex-end;
 	}
 
 	.seat-ring-pos--right {
 		grid-area: right;
+		justify-content: flex-start;
 	}
 
 	.seat-ring-pos--self {
-		grid-area: self;
+		grid-area: bottom;
 	}
 </style>
