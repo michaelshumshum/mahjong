@@ -454,7 +454,7 @@ uv run python -m ml.aux_eval --ckpt runs/rl_aux/ckpt_best.pt --data data/rl_aux_
   hands).
 - **Shaping:** potential-based only, Φ = −β·shanten with Φ(terminal) = 0; β annealed to 0
   before `min_faan` reaches 3.
-- **ACH** (regret-based PPO variant) as an R3 ablation.
+- **ACH** (regret-based PPO variant) as an R3 ablation: `policy_loss: ach` (below).
 
 **Built (R2).** `algorithm: ppo` in `ml.train` dispatches to `ml.ppo.train_ppo` with its own
 schema (`PPOConfig`); configs are `ml/configs/rl_ppo_*.yaml`.
@@ -472,12 +472,13 @@ schema (`PPOConfig`); configs are `ml/configs/rl_ppo_*.yaml`.
 | blind envs | the first `blind_frac` = 12.5% of envs always run keep 0, k 0: on-policy training data for the blind policy and the blind-win-rate statistic §10 advances on |
 | auxiliary losses | `ml.losses.aux_loss` (default `AuxWeights`) on the `aux_rate` = 10% subsample of learner decisions that carry labels; win / deal-in / payment filled from the hand's outcome; coefficient 1.0 → 0.05 linearly over 50M decisions, never 0 |
 | init | `PolicyNet` from `init_ckpt` (R1 `runs/rl_aux/ckpt_best_engine130.pt`, i.e. `ckpt_best.pt` migrated to engine 1.3.0: trunk + auxiliary heads; policy head untrained); critic trunk from it as above. A PPO `init_ckpt` (it has a `learner` key, e.g. a C1 hold checkpoint) loads the whole learner instead: policy, critic, adapter, PopArt and AdamW moments, with `lr` / `weight_decay` reset to the config's. Counters (decisions, updates) and the schedule start fresh, so the aux-weight anneal restarts: set `aux_coef_start` to the source run's end value. A resumed run builds its `PolicyNet` from its own checkpoint's `model_config` and never reads `init_ckpt` |
+| policy loss | `policy_loss: ppo` (default, the clipped surrogate) or `ach`: ACH's hedge loss (Fu et al. 2022, "Actor-Critic Policy Optimization in a Large-Scale Imperfect-Information Game"), −c·η·y(a)/π_old(a)·A with y the logits centred over legal ids, c = 0 when the ratio is outside [1 − ε, 1 + ε] or y(a) is past ±`ach_logit_threshold` (6) in the advantage's direction; `ach_eta` 1. Entropy, value, aux and the rest of the update are shared. Built and CPU-tested only; untuned, the R3 ablation is a separate run with the switch flipped |
 | engine migration | `ml.migrate_ckpt SRC DST` carries a PPO or R1 checkpoint from engine 1.0.0 to 1.3.0 ([ADR 0020](decisions/0020-hk-scoring-table-alignment.md)). Only the ruleset block at the end of the scalars changed shape (36 → 30 patterns, `NEW_18` off in `hk_classic`), and within `hk_classic` that block is constant apart from `min_faan`. Each layer reading it (policy/critic `trunk.scalar_proj`, `policy_global.0`, `aux_global.0`, critic `value.0`) gets its pattern columns remapped by rule (座位花→正花, 正花→一台花, 混么九→花么九; new rules zero) and the constant difference folded into its bias, so the migrated network's outputs equal the old ones on `hk_classic` at every `min_faan` (test: ≤ 1e-5; R1 `ckpt_best.pt`: ≤ 1e-6). AdamW moments follow their columns. Rewards still change with the engine: this keeps the starting point, not the training |
 | run dir | `meta.json` pins `ENGINE_VERSION` (+ config, resolved device); `ckpt_last.pt` holds models, optimiser, PopArt, schedule state, RNG state, league state (§11, league runs only), all saved on CPU and loaded with `map_location="cpu"`, so a run resumes on either device; resume refuses a different `ENGINE_VERSION`; env seeds restart from `seed·1,000,003 + updates` on resume. SIGINT/SIGTERM save after the current update |
 | `metrics.jsonl` | per update: losses, entropy, approx KL, clip fraction, explained variance, PopArt μ/σ, batch win / deal-in / draw / blind-win / sub-min-tenpai rates, stage parameters, rollout and learner decisions/s, resolved device (+ GPU name) |
 | device | `device: auto` (CUDA if `torch.cuda.is_available()`, else CPU) \| `cpu` \| `cuda`; explicit `cuda` without a GPU raises at startup, never falls back. Learner (policy, critic, adapter, PopArt, AdamW, every update tensor) and the per-step batched rollout forward on it; envs + encoding stay numpy on CPU, one host→device copy per input per step. Optional `amp: true` (CUDA only): fp16 autocast + `GradScaler`, saved in the checkpoint. Logged to stdout, `meta.json` and each metrics record. Detail and the 2060 setup: §13 |
 
-Tests (`tests/test_ml_ppo.py`): GAE against hand-computed λ = 0, ½, 1; shaping telescopes from
+Tests (`tests/test_ml_ppo.py`; ACH in `tests/test_ml_league.py`: matches its formula, illegal ids and clipped samples get zero gradient, a run trains): GAE against hand-computed λ = 0, ½, 1; shaping telescopes from
 every step; PopArt preserves denormalised outputs across updates; masked loss gives illegal ids
 zero probability and zero gradient, entropy over legal ids only; with keep 0 the sampled actions
 and log-probs are unchanged when every oracle field is rewritten; a toy 3-decision
@@ -969,10 +970,11 @@ the i5-10400F's cores.
 R3 progress: **built and CPU-smoked; the full run is pending on the GPU box.** `ml/league.py`
 (pool, PFSP, personas, learned-only Elo), the league in `ml/ppo.py` (`FROZEN` seats acted by
 snapshots, persona forks, PPO `init_ckpt` loading the whole learner), stage C2 in
-`ml/curriculum.py` (`min_faan` 3 + 20% other presets), `ml/configs/rl_league.yaml`. Measured rollout cost on CPU: 0.59× plain self-play's learner
+`ml/curriculum.py` (`min_faan` 3 + 20% other presets), `ml/configs/rl_league.yaml`, and the ACH
+switch (`policy_loss: ach`, §9). Measured rollout cost on CPU: 0.59× plain self-play's learner
 decisions/s at the default seating (§11). Exit criteria (paired CI > 0 vs `FaanBot` on ≥ 1,000
 fresh sets, mixed tables, sub-min tenpai) not yet measured. The run starts from a C1 hold
-checkpoint (§11 has the command).
+checkpoint (§11 has the command); the ACH ablation is a second run with `policy_loss: ach`.
 
 ## 15. Risks
 

@@ -30,6 +30,8 @@ aux_coef_start: 0.05
 aux_coef_end: 0.05
 total_decisions: 2000000000
 save_every: 20
+# ppo | ach (the §9 ablation)
+policy_loss: ppo
 curriculum:
   start: C2
   window: 4000

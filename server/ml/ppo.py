@@ -15,6 +15,7 @@
   sample so the update replays the exact behaviour input. It has no bias, so keep prob 0 adds
   exactly zero and the served `PolicyNet` never needs it;
 - auxiliary losses (`ml.losses.aux_loss`) on the `aux_rate` subsample, weight annealed, never 0;
+- `policy_loss: ach` swaps the clipped surrogate for ACH's hedge loss on centred logits (§9);
 - stage C2 plays the league (`ml.league`, §11): `FROZEN` seats act with a snapshot's policy and
   are never trained on; persona snapshots are forked learners (`train_persona`).
 
@@ -98,6 +99,7 @@ __all__ = [
     "PopArt",
     "Schedule",
     "StageParams",
+    "ach_policy_loss",
     "critic_from_policy",
     "device_info",
     "gae",
@@ -111,6 +113,7 @@ __all__ = [
 
 _KEEP_BITS = N_ORACLE_CHANNELS * 34
 _DRAWS = ORACLE_CHANNELS["next_draws"]
+POLICY_LOSSES = ("ppo", "ach")
 
 
 @dataclass(frozen=True)
@@ -223,6 +226,9 @@ class PPOConfig:
     aux_anneal_decisions: int = 50_000_000
     total_decisions: int = 1_000_000_000
     save_every: int = 20
+    policy_loss: str = "ppo"
+    ach_logit_threshold: float = 6.0
+    ach_eta: float = 1.0
     stage: dict[str, Any] = field(default_factory=dict)
     curriculum: dict[str, Any] | None = None
     league: dict[str, Any] | None = None
@@ -236,6 +242,8 @@ def load_ppo_config(raw: dict[str, Any]) -> PPOConfig:
     if unknown:
         raise ValueError(f"unknown ppo config keys: {sorted(unknown)}")
     cfg = PPOConfig(**raw)
+    if cfg.policy_loss not in POLICY_LOSSES:
+        raise ValueError(f"policy_loss must be one of {POLICY_LOSSES}, got {cfg.policy_loss!r}")
     if cfg.league is not None:
         LeagueConfig.from_dict(cfg.league)
     return cfg
@@ -384,6 +392,41 @@ def ppo_policy_loss(
         "entropy": masked_entropy(logp_all, mask).mean(),
         "approx_kl": (old_logp - logp).mean().detach(),
         "clip_frac": ((ratio - 1).abs() > clip).float().mean().detach(),
+        "logp_all": logp_all,
+    }
+
+
+def ach_policy_loss(
+    logits: torch.Tensor,
+    mask: torch.Tensor,
+    actions: torch.Tensor,
+    old_logp: torch.Tensor,
+    adv: torch.Tensor,
+    clip: float,
+    logit_threshold: float,
+    eta: float,
+) -> dict[str, torch.Tensor]:
+    """ACH (Fu et al. 2022): −c·η·y(a)/π_old(a)·A on the logits centred over legal ids, c = 0
+    once the ratio leaves the clip range or y(a) the threshold in the advantage's direction.
+    Same keys as `ppo_policy_loss`."""
+    logp_all = masked_log_softmax(logits, mask)
+    logp = logp_all.gather(1, actions[:, None]).squeeze(1)
+    ratio = (logp - old_logp).exp()
+    legal = mask.to(logits.dtype)
+    mean = torch.where(mask, logits, 0.0).sum(1) / legal.sum(1)
+    y = logits.gather(1, actions[:, None]).squeeze(1) - mean
+    with torch.no_grad():
+        r, yd = ratio.detach(), y.detach()
+        c = torch.where(
+            adv >= 0,
+            (r < 1 + clip) & (yd < logit_threshold),
+            (r > 1 - clip) & (yd > -logit_threshold),
+        ).to(logits.dtype)
+    return {
+        "pg": -(c * eta * y / old_logp.exp() * adv).mean(),
+        "entropy": masked_entropy(logp_all, mask).mean(),
+        "approx_kl": (old_logp - logp).mean().detach(),
+        "clip_frac": (1 - c).mean(),
         "logp_all": logp_all,
     }
 
@@ -631,9 +674,21 @@ class Learner:
                 if c.amp:
                     out = _float_output(out)
                     v = v.float()
-                pl = ppo_policy_loss(
-                    out.logits, t_masks[mb_t], t_actions[mb_t], t_old[mb_t], t_adv[mb_t], c.clip
-                )
+                if c.policy_loss == "ach":
+                    pl = ach_policy_loss(
+                        out.logits,
+                        t_masks[mb_t],
+                        t_actions[mb_t],
+                        t_old[mb_t],
+                        t_adv[mb_t],
+                        c.clip,
+                        c.ach_logit_threshold,
+                        c.ach_eta,
+                    )
+                else:
+                    pl = ppo_policy_loss(
+                        out.logits, t_masks[mb_t], t_actions[mb_t], t_old[mb_t], t_adv[mb_t], c.clip
+                    )
                 v_loss = 0.5 * F.mse_loss(v, target_n[mb_t])
                 loss = pl["pg"] + c.value_coef * v_loss - c.entropy_coef * pl["entropy"]
                 logs = {

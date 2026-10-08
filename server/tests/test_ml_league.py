@@ -33,8 +33,10 @@ from ml.ppo import (
     Learner,
     PPOConfig,
     StageParams,
+    ach_policy_loss,
     build_schedule,
     main_config,
+    ppo_policy_loss,
     train_ppo,
 )
 from ml.train_env import (
@@ -357,6 +359,32 @@ def test_hold_final_advances_into_c2_once_the_league_exists():
         assert (cur.held_at is not None) == (not league)
 
 
+def test_ach_loss_matches_its_definition_and_clips():
+    torch.manual_seed(0)
+    logits = torch.randn(4, 109, requires_grad=True)
+    mask = torch.zeros(4, 109, dtype=torch.bool)
+    mask[:, :5] = True
+    actions = torch.tensor([0, 1, 2, 3])
+    old = torch.log_softmax(logits.detach()[:, :5], 1).gather(1, actions[:, None]).squeeze(1)
+    adv = torch.tensor([1.0, -1.0, 2.0, 0.5])
+    out = ach_policy_loss(logits, mask, actions, old, adv, 0.2, 6.0, 1.0)
+    y = logits[:, :5] - logits[:, :5].mean(1, keepdim=True)
+    want = -(y.gather(1, actions[:, None]).squeeze(1) / old.exp() * adv).mean()
+    torch.testing.assert_close(out["pg"], want)
+    out["pg"].backward()
+    assert (logits.grad[:, 5:] == 0).all()
+    assert logits.grad[0, 0] < 0 and logits.grad[1, 1] > 0  # descent raises / lowers y(a)
+    ppo = ppo_policy_loss(logits.detach(), mask, actions, old, adv, 0.2)
+    assert out["entropy"].item() == pytest.approx(ppo["entropy"].item())
+    # a logit past the threshold in the advantage's direction gets no gradient
+    big = torch.zeros(1, 109, requires_grad=True)
+    with torch.no_grad():
+        big[0, 0] = 10.0
+    out = ach_policy_loss(big, mask[:1], actions[:1], torch.tensor([-0.01]), adv[:1], 0.2, 6.0, 1.0)
+    out["pg"].backward()
+    assert (big.grad == 0).all() and out["clip_frac"] == 1.0
+
+
 def _tiny(tmp_path: Path, name: str, **kw) -> PPOConfig:
     base = {
         "out": str(tmp_path / name),
@@ -479,6 +507,17 @@ def test_league_stage_without_a_league_block_refuses(tmp_path):
     stage = {"min_faan": 3, "learners": 4, "keep_prob": 0.0, "oracle_k": 0, "league": True}
     with pytest.raises(ValueError, match="league"):
         train_ppo(_tiny(tmp_path, "x", stage=stage), max_updates=1)
+
+
+def test_ach_switch_trains(tmp_path):
+    stage = {"min_faan": 0, "learners": 4, "keep_prob": 0.0, "oracle_k": 0, "beta": 0.5}
+    out = train_ppo(_tiny(tmp_path, "ach", stage=stage, policy_loss="ach"), max_updates=2)
+    lines = _records(out)
+    assert len(lines) == 2 and all(np.isfinite(r["pg"]) for r in lines)
+    with pytest.raises(ValueError, match="policy_loss"):
+        from ml.ppo import load_ppo_config
+
+        load_ppo_config({"policy_loss": "nope"})
 
 
 def test_league_config_file_smoke(tmp_path, c1_ckpt):
