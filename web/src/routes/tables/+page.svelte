@@ -167,8 +167,8 @@
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-		gap: var(--space-4);
+		grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+		gap: var(--space-5);
 	}
 
 	button {

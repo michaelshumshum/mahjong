@@ -44,17 +44,21 @@
 		background: var(--color-surface);
 		padding: var(--space-5);
 		display: flex;
-		flex-direction: column;
-		gap: var(--space-3);
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3) var(--space-4);
 		@include buttons.panel-elevated;
 	}
 
 	.panel h2 {
 		margin: 0;
+		margin-inline-end: auto;
 		font-size: var(--font-size-lg);
 	}
 
 	.hint {
+		flex-basis: 100%;
 		margin: 0;
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);

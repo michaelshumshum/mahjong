@@ -41,8 +41,7 @@
 			</div>
 		</header>
 
-		<!-- the button is the card's accessible name; its ::after stretches the hit area over
-		the whole card so the description stays outside the name. -->
+		<!-- the button's ::after stretches the hit area over the whole card. -->
 		<ul class="actions">
 			<li class="action-card">
 				<span class="action-glyph" aria-hidden="true">{m.lobby_createTableGlyph()}</span>
@@ -50,10 +49,8 @@
 					type="button"
 					class="action-title"
 					data-testid="lobby-create-table"
-					aria-describedby="lobby-create-desc"
 					onclick={() => (showCreateDialog = true)}>{m.lobby_createTableButton()}</button
 				>
-				<p id="lobby-create-desc" class="action-desc">{m.lobby_createTableDesc()}</p>
 			</li>
 			<li class="action-card">
 				<span class="action-glyph" aria-hidden="true">{m.lobby_practiceGlyph()}</span>
@@ -61,10 +58,8 @@
 					type="button"
 					class="action-title"
 					data-testid="lobby-practice-bots"
-					aria-describedby="lobby-practice-desc"
 					onclick={() => (showPracticeDialog = true)}>{m.lobby_practiceButton()}</button
 				>
-				<p id="lobby-practice-desc" class="action-desc">{m.lobby_practiceDesc()}</p>
 			</li>
 			<li class="action-card">
 				<span class="action-glyph" aria-hidden="true">{m.lobby_guideGlyph()}</span>
@@ -72,10 +67,8 @@
 					type="button"
 					class="action-title"
 					data-testid="lobby-guide"
-					aria-describedby="lobby-guide-desc"
 					onclick={() => (showGuide = true)}>{m.lobby_guideButton()}</button
 				>
-				<p id="lobby-guide-desc" class="action-desc">{m.lobby_guideDesc()}</p>
 			</li>
 		</ul>
 
@@ -195,11 +188,8 @@
 		position: relative;
 		display: grid;
 		grid-template-columns: auto 1fr;
-		grid-template-areas:
-			'glyph title'
-			'glyph desc';
+		grid-template-areas: 'glyph title';
 		column-gap: var(--space-3);
-		row-gap: var(--space-1);
 		align-content: start;
 		padding: var(--space-4);
 		border: 1px solid var(--color-border);
@@ -268,14 +258,6 @@
 		&:focus-visible {
 			outline: none;
 		}
-	}
-
-	.action-desc {
-		grid-area: desc;
-		margin: 0;
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
-		line-height: 1.4;
 	}
 
 	.quiet-links {

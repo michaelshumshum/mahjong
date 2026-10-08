@@ -31,7 +31,14 @@
 				{#if seat.status === 'bot'}<span class="bot-badge">{m.tableCard_botBadge()}</span>{/if}
 			</li>
 		{/each}
-		<li class="compass-felt" aria-hidden="true"></li>
+		<!-- wind glyphs are decorative direction markers, one per seat side, rotated to read
+		from that seat's perspective; they don't imply dealt seat winds. -->
+		<li class="compass-felt" aria-hidden="true">
+			<span class="wind wind--0">東</span>
+			<span class="wind wind--1">南</span>
+			<span class="wind wind--2">西</span>
+			<span class="wind wind--3">北</span>
+		</li>
 	</ul>
 	{#if hasJoined}
 		<button
@@ -67,7 +74,8 @@
 	}
 
 	.table-card {
-		padding: var(--space-4);
+		padding: var(--space-5);
+		gap: var(--space-4);
 	}
 
 	.card-header {
@@ -105,9 +113,9 @@
 			'top top top'
 			'left felt right'
 			'bottom bottom bottom';
-		grid-template-columns: minmax(0, 1fr) 2.5rem minmax(0, 1fr);
+		grid-template-columns: minmax(0, 1fr) 5rem minmax(0, 1fr);
 		align-items: center;
-		gap: var(--space-1);
+		gap: var(--space-2);
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -116,10 +124,44 @@
 
 	.compass-felt {
 		grid-area: felt;
+		position: relative;
 		aspect-ratio: 1;
 		border: 2px solid var(--color-rim-hi);
 		border-radius: var(--radius-sm);
 		background: radial-gradient(circle at 50% 40%, var(--color-felt-lit), var(--color-felt-deep));
+		box-shadow: inset 0 0 0 1px var(--color-felt-line);
+	}
+
+	.wind {
+		position: absolute;
+		color: color-mix(in srgb, var(--color-felt-muted) 75%, transparent);
+		font-size: var(--font-size-xs);
+		font-weight: 600;
+		line-height: 1;
+	}
+
+	.wind--0 {
+		bottom: 4px;
+		left: 50%;
+		transform: translateX(-50%);
+	}
+
+	.wind--1 {
+		right: 4px;
+		top: 50%;
+		transform: translateY(-50%) rotate(-90deg);
+	}
+
+	.wind--2 {
+		top: 4px;
+		left: 50%;
+		transform: translateX(-50%) rotate(180deg);
+	}
+
+	.wind--3 {
+		left: 4px;
+		top: 50%;
+		transform: translateY(-50%) rotate(90deg);
 	}
 
 	.compass-seat {

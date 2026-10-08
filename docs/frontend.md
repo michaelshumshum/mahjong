@@ -767,10 +767,12 @@ heuristic.
 
 ### Table browser (`/tables`)
 
-A join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(16rem, 1fr))`)
+A join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(19rem, 1fr))`)
 showing code, an open/in-progress status chip and a mini compass of the four seats around a felt
 square (seat 0 at the bottom, then 1 right / 2 top / 3 left — the same arrangement the table
-itself uses; open seats as dashed "Open" pills, bots badged). The header's Refresh is a real
+itself uses; open seats as dashed "Open" pills, bots badged). The felt carries the four wind
+glyphs (東 bottom / 南 right / 西 top / 北 left, rotated to read from each seat's side) as
+decorative direction markers — they don't imply dealt seat winds. The header's Refresh is a real
 secondary button beside a static "Updated <time>" stamp of the last successful poll (not a ticking
 "n seconds ago" — no JS ticker). With no tables, an empty-state panel offers "Create a table",
 opening the same `CreateTableDialog` as the lobby. Polls `GET /tables` every 5s
