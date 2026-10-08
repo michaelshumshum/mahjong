@@ -1,4 +1,4 @@
-"""Cold-start curriculum (docs/ml.md §10): C0 -> C0b -> C1, then C2 (the R3 league, a stub).
+"""Curriculum (docs/ml.md §10): C0 -> C0b -> C1 (cold start), then C2 (the league, §11).
 
 Each stage fixes the env seating (learning seats, in-env opponent) and linearly anneals, over
 `anneal_decisions` from the stage's start, the oracle the policy sees (next-`k` draws, keep
@@ -6,7 +6,11 @@ probability) and the shaping β; `min_faan` steps up at fractions of the same an
 advances once its anneal is complete and the rolling statistics over the last `window` learner
 hands played since then meet every threshold it sets.
 
-With `hold_final`, exiting the last implemented stage holds it at its end-of-anneal parameters
+C2 runs only when the PPO config has a `league:` block (`Curriculum.league`); without one it is
+the R2 stub: advancing into it completes the run, and `hold_final` holds C1 instead. The last stage
+never advances; it runs until the run's own limits stop it.
+
+With `hold_final`, exiting the last runnable stage holds it at its end-of-anneal parameters
 instead of completing, so training continues until the run's own limits stop it.
 
 The §10 contingency (clone `FaanBot` with a decaying anchor) is built but off by default: unless
@@ -28,7 +32,9 @@ __all__ = ["DEFAULT_STAGES", "Contingency", "Curriculum", "StageSpec"]
 @dataclass(frozen=True)
 class StageSpec:
     """`min_faan` is `[(value, from_fraction), ...]` over the anneal; thresholds left `None` are
-    not checked. `implemented=False` marks a stage this milestone can't run (C2)."""
+    not checked. `alt_rulesets`: `(preset, probability)` episodes off the base ruleset. `league`
+    stages need the league (`Curriculum.league`); `implemented=False` marks a stage that can't
+    run at all."""
 
     name: str
     learners: int = 1
@@ -43,6 +49,8 @@ class StageSpec:
     blind_win_rate: float | None = None
     sub_min_tenpai_max: float | None = None
     min_tenpai_draws: int = 200
+    alt_rulesets: tuple[tuple[str, float], ...] = ()
+    league: bool = False
     implemented: bool = True
 
     @staticmethod
@@ -53,6 +61,8 @@ class StageSpec:
         for key in ("oracle_k", "keep_prob", "beta"):
             if key in d:
                 d[key] = tuple(d[key])
+        if "alt_rulesets" in d:
+            d["alt_rulesets"] = tuple((str(n), float(p)) for n, p in d["alt_rulesets"])
         return StageSpec(**d)
 
 
@@ -77,7 +87,16 @@ DEFAULT_STAGES: tuple[StageSpec, ...] = (
         win_rate=0.15,
         sub_min_tenpai_max=0.32,
     ),
-    StageSpec(name="C2", learners=4, min_faan=((3, 0.0),), implemented=False),
+    StageSpec(
+        name="C2",
+        learners=4,
+        min_faan=((3, 0.0),),
+        oracle_k=(0, 0),
+        keep_prob=(0.0, 0.0),
+        beta=(0.0, 0.0),
+        alt_rulesets=(("hk_casual", 0.1), ("hk_strict", 0.1)),
+        league=True,
+    ),
 )
 
 
@@ -114,13 +133,14 @@ class Curriculum:
     recent: deque[HandStat] = field(default_factory=deque)
     hold_final: bool = False
     held_at: int | None = None
+    league: bool = False
     _held_now: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.recent = deque(self.recent, maxlen=self.window)
 
     @staticmethod
-    def from_config(raw: dict[str, Any]) -> Curriculum:
+    def from_config(raw: dict[str, Any], *, league: bool = False) -> Curriculum:
         raw = dict(raw)
         stages = DEFAULT_STAGES
         if "stages" in raw:
@@ -138,7 +158,7 @@ class Curriculum:
         if raw:
             raise ValueError(f"unknown curriculum keys: {sorted(raw)}")
         index = [s.name for s in stages].index(start)
-        return Curriculum(stages, window, contingency, index, hold_final=hold_final)
+        return Curriculum(stages, window, contingency, index, hold_final=hold_final, league=league)
 
     @property
     def stage(self) -> StageSpec:
@@ -148,10 +168,15 @@ class Curriculum:
         span = self.stage.anneal_decisions
         return 1.0 if span <= 0 else min(1.0, (decisions - self.stage_start) / span)
 
+    def runnable(self, spec: StageSpec) -> bool:
+        return spec.implemented and (self.league or not spec.league)
+
     def params(self, decisions: int) -> StageParams:
         s = self.stage
-        if not s.implemented:
-            raise NotImplementedError(f"stage {s.name} is not part of R2 (league, R3)")
+        if not self.runnable(s):
+            raise NotImplementedError(
+                f"stage {s.name} needs a `league:` block in the PPO config (docs/ml.md §11)"
+            )
         u = self.progress(decisions)
         min_faan = s.min_faan[0][0]
         for value, at in s.min_faan:
@@ -165,6 +190,8 @@ class Curriculum:
             oracle_k=round(_lerp((float(s.oracle_k[0]), float(s.oracle_k[1])), u)),
             keep_prob=_lerp(s.keep_prob, u),
             beta=_lerp(s.beta, u),
+            alt_rulesets=s.alt_rulesets,
+            league=s.league,
         )
 
     def observe(self, stats: list[HandStat]) -> None:
@@ -210,10 +237,12 @@ class Curriculum:
         if self.annealed_at is None and self.progress(decisions) >= 1.0:
             self.annealed_at = decisions
             self.recent.clear()
-        if self.held_at is not None or not self.ready(decisions):
+        if self.held_at is not None or self.index == len(self.stages) - 1:
+            return None
+        if not self.ready(decisions):
             return None
         nxt = self.index + 1
-        if self.hold_final and (nxt == len(self.stages) or not self.stages[nxt].implemented):
+        if self.hold_final and not self.runnable(self.stages[nxt]):
             self.held_at = decisions
             self._held_now = True
             return None
@@ -225,7 +254,7 @@ class Curriculum:
 
     def complete(self) -> bool:
         # a held run resumed without hold_final stops like an unheld one
-        return not self.stage.implemented or (self.held_at is not None and not self.hold_final)
+        return not self.runnable(self.stage) or (self.held_at is not None and not self.hold_final)
 
     def _check_contingency(self, decisions: int) -> None:
         c = self.contingency

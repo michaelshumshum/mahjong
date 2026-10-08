@@ -14,7 +14,9 @@
   through `OracleAdapter`, multiplied by a per-element Bernoulli keep mask that is stored per
   sample so the update replays the exact behaviour input. It has no bias, so keep prob 0 adds
   exactly zero and the served `PolicyNet` never needs it;
-- auxiliary losses (`ml.losses.aux_loss`) on the `aux_rate` subsample, weight annealed, never 0.
+- auxiliary losses (`ml.losses.aux_loss`) on the `aux_rate` subsample, weight annealed, never 0;
+- stage C2 plays the league (`ml.league`, §11): `FROZEN` seats act with a snapshot's policy and
+  are never trained on; persona snapshots are forked learners (`train_persona`).
 
 A run directory holds `meta.json` (pins `ENGINE_VERSION`), `ckpt_last.pt`, `metrics.jsonl`.
 SIGINT/SIGTERM save after the current update and exit 0. Resume refuses a different engine.
@@ -34,8 +36,9 @@ import json
 import math
 import signal
 import time
+import zlib
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -61,6 +64,7 @@ from ml.encode_v2 import (
     encode_policy_batch,
     ruleset_features,
 )
+from ml.league import PAST, League, LeagueConfig, Persona, persona_rewards
 from ml.losses import AuxWeights, aux_loss
 from ml.policy_net import (
     AuxOutput,
@@ -72,14 +76,18 @@ from ml.policy_net import (
     masked_log_softmax,
 )
 from ml.train_env import (
+    FROZEN,
     INFO_FIELDS,
     LEARNER,
+    PRESET_IDS,
     EnvConfig,
     SubprocVecTrainEnv,
     VecTrainEnv,
+    opponent_ids,
     unpack_rows,
     with_min_faan,
 )
+from ml.vec_env import episode_seed
 
 __all__ = [
     "Episode",
@@ -97,6 +105,7 @@ __all__ = [
     "ppo_policy_loss",
     "resolve_device",
     "shaped_rewards",
+    "train_persona",
     "train_ppo",
 ]
 
@@ -115,6 +124,8 @@ class StageParams:
     oracle_k: int = ORACLE_MAX_DRAWS
     keep_prob: float = 1.0
     beta: float = 1.0
+    alt_rulesets: tuple[tuple[str, float], ...] = ()
+    league: bool = False
 
 
 @dataclass(frozen=True)
@@ -214,6 +225,7 @@ class PPOConfig:
     save_every: int = 20
     stage: dict[str, Any] = field(default_factory=dict)
     curriculum: dict[str, Any] | None = None
+    league: dict[str, Any] | None = None
 
     def base_ruleset(self) -> RuleSet:
         return RULESET_PRESETS[self.ruleset]
@@ -223,7 +235,10 @@ def load_ppo_config(raw: dict[str, Any]) -> PPOConfig:
     unknown = set(raw) - {f.name for f in fields(PPOConfig)}
     if unknown:
         raise ValueError(f"unknown ppo config keys: {sorted(unknown)}")
-    return PPOConfig(**raw)
+    cfg = PPOConfig(**raw)
+    if cfg.league is not None:
+        LeagueConfig.from_dict(cfg.league)
+    return cfg
 
 
 def resolve_device(name: str) -> torch.device:
@@ -387,25 +402,32 @@ class Episode:
     rewards: np.ndarray
     info: np.ndarray
     blind: bool
+    opponent: int = 0
 
 
 class Encoder:
     def __init__(self, base: RuleSet) -> None:
         self.base = base
-        self._vecs: dict[int, np.ndarray] = {}
+        self._vecs: dict[tuple[int, int], np.ndarray] = {}
 
-    def _ruleset(self, min_faan: np.ndarray) -> np.ndarray:
+    def _ruleset(self, min_faan: np.ndarray, ruleset: np.ndarray) -> np.ndarray:
+        """Row `ruleset` 0 is `base` at the row's `min_faan`, else that preset as is."""
         out = np.empty((len(min_faan), len(ruleset_features(self.base))), dtype=np.float32)
-        for m in np.unique(min_faan):
-            m = int(m)
-            if m not in self._vecs:
-                rs = RuleSet.from_dict({**self.base.to_dict(), "min_faan": m})
-                self._vecs[m] = ruleset_features(rs).copy()
-            out[min_faan == m] = self._vecs[m]
+        key = ruleset.astype(np.int64) << 8 | min_faan
+        for code in np.unique(key):
+            rid, m = int(code) >> 8, int(code) & 0xFF
+            if (rid, m) not in self._vecs:
+                if rid == 0:
+                    rs = RuleSet.from_dict({**self.base.to_dict(), "min_faan": m})
+                else:
+                    rs = RULESET_PRESETS[PRESET_IDS[rid - 1]]
+                self._vecs[rid, m] = ruleset_features(rs).copy()
+            out[key == code] = self._vecs[rid, m]
         return out
 
     def policy(self, u: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-        return encode_policy_batch({k: u[k] for k in POLICY_FIELDS}, self._ruleset(u["min_faan"]))
+        rulesets = self._ruleset(u["min_faan"], u["ruleset"])
+        return encode_policy_batch({k: u[k] for k in POLICY_FIELDS}, rulesets)
 
     def oracle(self, u: dict[str, np.ndarray], k: np.ndarray | None = None) -> np.ndarray:
         """`k` per row: draw planes `k..` zeroed (all 13 kept when `None`)."""
@@ -483,22 +505,48 @@ class Learner:
         """Sample actions for packed rows. Returns `(actions, logp, packed keep bits)`."""
         u = unpack_rows(rows)
         tiles, scalars = self.encoder.policy(u)
-        b = len(rows)
+        return self.act_encoded(u, tiles, scalars, masks, keep_prob, k, rng)
+
+    @torch.no_grad()
+    def act_encoded(
+        self,
+        u: dict[str, np.ndarray],
+        tiles: np.ndarray,
+        scalars: np.ndarray,
+        masks: np.ndarray,
+        keep_prob: np.ndarray,
+        k: np.ndarray,
+        rng: Any,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        b = len(tiles)
         keep = np.zeros((b, N_ORACLE_CHANNELS, 34), dtype=bool)
         masked = None
         if keep_prob.any():
             p = keep_prob[:, None, None]
             keep = np.where(p >= 1.0, True, rng.random(keep.shape) < p)
             masked = self.encoder.oracle(u, k) * keep
+        actions, logp = self.sample(self.policy, tiles, scalars, masks, rng, self.stem_bias(masked))
+        return actions, logp, np.packbits(keep.reshape(b, -1), axis=1)
+
+    @torch.no_grad()
+    def sample(
+        self,
+        model: PolicyNet,
+        tiles: np.ndarray,
+        scalars: np.ndarray,
+        masks: np.ndarray,
+        rng: Any,
+        stem_bias: torch.Tensor | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Gumbel-max over `model`'s masked log-probs: `(actions, logp)`."""
         with self._autocast():
-            logits = self.policy(
-                self._to(tiles), self._to(scalars), aux=False, stem_bias=self.stem_bias(masked)
+            logits = model(
+                self._to(tiles), self._to(scalars), aux=False, stem_bias=stem_bias
             ).logits
         logp_all = masked_log_softmax(logits.float(), self._to(masks)).cpu().numpy()
         gumbel = -np.log(-np.log(rng.random(logp_all.shape).clip(1e-12, 1.0)))
         actions = np.argmax(logp_all + gumbel, axis=1)
-        logp = logp_all[np.arange(b), actions]
-        return actions, logp, np.packbits(keep.reshape(b, -1), axis=1)
+        return actions, logp_all[np.arange(len(tiles)), actions]
 
     def aux_coef(self, decisions: int) -> float:
         c = self.cfg
@@ -654,15 +702,54 @@ def _float_output(out: PolicyOutput) -> PolicyOutput:
 
 
 class Collector:
-    """Steps the train env with the learner's policy and groups samples into finished hands."""
+    """Steps the train env with the learner's policy and groups samples into finished hands.
+    `FROZEN` rows are acted by the league opponent their episode carries and never kept."""
 
-    def __init__(self, venv: VecTrainEnv | SubprocVecTrainEnv, n_blind: int, rng: Any) -> None:
+    def __init__(
+        self,
+        venv: VecTrainEnv | SubprocVecTrainEnv,
+        n_blind: int,
+        rng: Any,
+        league: League | None = None,
+    ) -> None:
         self.venv = venv
         self.n = venv.num_envs
         self.n_blind = n_blind
         self.rng = rng
+        self.league = league
         self.buf = venv.reset()
         self.pending: list[list[tuple[Any, ...]]] = [[] for _ in range(self.n)]
+
+    def _act(
+        self,
+        learner: Learner,
+        rows: np.ndarray,
+        masks: np.ndarray,
+        keep_prob: np.ndarray,
+        k: np.ndarray,
+        frozen: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Encode once, then one forward for the learner rows and one per frozen opponent."""
+        assert self.league is not None, "FROZEN seats need a league"
+        u = unpack_rows(rows)
+        tiles, scalars = learner.encoder.policy(u)
+        b = len(rows)
+        actions = np.zeros(b, dtype=np.int64)
+        logp = np.zeros(b, dtype=np.float32)
+        keep = np.zeros((b, (_KEEP_BITS + 7) // 8), dtype=np.uint8)
+        mine = np.flatnonzero(~frozen)
+        if len(mine):
+            sub = {name: v[mine] for name, v in u.items()}
+            a, lp, kp = learner.act_encoded(
+                sub, tiles[mine], scalars[mine], masks[mine], keep_prob[mine], k[mine], self.rng
+            )
+            actions[mine], logp[mine], keep[mine] = a, lp, kp
+        opp = opponent_ids(u)
+        for oid in np.unique(opp[frozen]):
+            idx = np.flatnonzero(frozen & (opp == oid))
+            model = self.league.model(int(oid))
+            actions[idx] = learner.sample(model, tiles[idx], scalars[idx], masks[idx], self.rng)[0]
+        return actions, logp, keep
 
     def collect(
         self, learner: Learner, params: StageParams, min_samples: int
@@ -677,8 +764,12 @@ class Collector:
         while ready < min_samples:
             buf = self.buf
             rows, masks, seats = buf.rows.copy(), buf.mask.copy(), buf.seat.copy()
-            actions, logp, keep = learner.act(rows, masks, keep_prob, k, self.rng)
             roles = unpack_rows(rows, ("role",))["role"]
+            frozen = roles == FROZEN
+            if frozen.any():
+                actions, logp, keep = self._act(learner, rows, masks, keep_prob, k, frozen)
+            else:
+                actions, logp, keep = learner.act(rows, masks, keep_prob, k, self.rng)
             for i in range(self.n):
                 if roles[i] == LEARNER:
                     self.pending[i].append(
@@ -710,6 +801,7 @@ class Collector:
             rewards=rewards,
             info=info,
             blind=i < self.n_blind,
+            opponent=int(opponent_ids(unpack_rows(cols[0][0][None], ("opponent",)))[0]),
         )
 
 
@@ -759,31 +851,91 @@ def build_schedule(cfg: PPOConfig) -> Schedule:
     if cfg.curriculum is not None:
         from ml.curriculum import Curriculum
 
-        return Curriculum.from_config(cfg.curriculum)
-    return FixedSchedule(StageParams(**cfg.stage))
+        return Curriculum.from_config(cfg.curriculum, league=cfg.league is not None)
+    stage = dict(cfg.stage)
+    if "alt_rulesets" in stage:
+        stage["alt_rulesets"] = tuple((str(n), float(p)) for n, p in stage["alt_rulesets"])
+    return FixedSchedule(StageParams(**stage))
 
 
-def _env_config(cfg: PPOConfig, params: StageParams, teacher: str | None) -> EnvConfig:
+def _env_config(
+    cfg: PPOConfig,
+    params: StageParams,
+    teacher: str | None,
+    mix: tuple[tuple[float, int, int], ...] = (),
+) -> EnvConfig:
     base = EnvConfig(
         ruleset=cfg.base_ruleset(),
         learners=params.learners,
         opponent=params.opponent,
         aux_rate=cfg.aux_rate,
         teacher=teacher,
+        mix=mix if params.league else (),
+        alt_rulesets=params.alt_rulesets,
     )
     return with_min_faan(base, params.min_faan)
 
 
+def _make_venv(
+    cfg: PPOConfig, base_seed: int, env_cfg: EnvConfig
+) -> VecTrainEnv | SubprocVecTrainEnv:
+    if cfg.workers > 0:
+        return SubprocVecTrainEnv(cfg.envs, base_seed, env_cfg, n_workers=cfg.workers)
+    return VecTrainEnv(cfg.envs, base_seed, env_cfg)
+
+
 def load_policy(cfg: PPOConfig) -> PolicyNet:
-    """From the R1 checkpoint (`init_ckpt`: trunk + aux heads; the policy head is untrained) or
-    freshly initialised."""
+    """From `init_ckpt` — R1 (`model`: trunk + aux heads; the policy head is untrained) or a PPO
+    run (`learner.policy`) — or freshly initialised."""
     if cfg.init_ckpt is None:
         return PolicyNet(PolicyNetConfig(channels=cfg.channels, blocks=cfg.blocks))
     ckpt = torch.load(cfg.init_ckpt, weights_only=False, map_location="cpu")
-    state = ckpt["policy"] if "policy" in ckpt else ckpt["model"]
+    if "learner" in ckpt:
+        state = ckpt["learner"]["policy"]
+    else:
+        state = ckpt["policy"] if "policy" in ckpt else ckpt["model"]
     model = PolicyNet(PolicyNetConfig(**ckpt["model_config"]))
     model.load_state_dict(state)
     return model
+
+
+def _init_learner_state(cfg: PPOConfig) -> dict[str, Any] | None:
+    """A PPO `init_ckpt`'s whole learner (critic, adapter, PopArt, AdamW moments); `None` for R1."""
+    if cfg.init_ckpt is None:
+        return None
+    ckpt = torch.load(cfg.init_ckpt, weights_only=False, map_location="cpu")
+    return ckpt.get("learner")
+
+
+def train_persona(
+    cfg: PPOConfig,
+    learner: Learner,
+    persona: Persona,
+    params: StageParams,
+    decisions: int,
+    updates: int,
+    n_updates: int,
+) -> PolicyNet:
+    """Fork `learner`, train the fork `n_updates` updates of 4-seat self-play on `persona`'s
+    reward, return its policy. Own envs and RNG streams: the main run's are untouched."""
+    fork = Learner(cfg, PolicyNet(learner.policy.config), learner.device)
+    fork.load_state_dict(learner.state_dict())
+    pparams = replace(params, league=False, learners=4)
+    base_seed = episode_seed(cfg.seed * 1_000_003 + updates, -1, zlib.crc32(persona.name.encode()))
+    venv = _make_venv(cfg, base_seed, _env_config(cfg, pparams, None))
+    rng = np.random.default_rng([cfg.seed, updates, *persona.name.encode()])
+    try:
+        collector = Collector(venv, 0, rng)
+        for _ in range(n_updates):
+            episodes, _, _ = collector.collect(fork, pparams, cfg.batch_size)
+            episodes = [
+                replace(e, rewards=persona_rewards(e.rewards, e.info, persona)) for e in episodes
+            ]
+            fork.update(episodes, pparams, decisions, 0.0)
+    finally:
+        if isinstance(venv, SubprocVecTrainEnv):
+            venv.close()
+    return fork.policy
 
 
 def _check_meta(out: Path, cfg: PPOConfig, resume: bool, info: dict[str, str]) -> None:
@@ -837,23 +989,34 @@ def train_ppo(
         return out
 
     params = schedule.params(decisions)
-    env_cfg = _env_config(cfg, params, schedule.teacher())
-    # env seeds move on at each resume: a resumed run is a new, still deterministic, stream
-    base_seed = cfg.seed * 1_000_003 + updates
-    venv: VecTrainEnv | SubprocVecTrainEnv
-    if cfg.workers > 0:
-        venv = SubprocVecTrainEnv(cfg.envs, base_seed, env_cfg, n_workers=cfg.workers)
-    else:
-        venv = VecTrainEnv(cfg.envs, base_seed, env_cfg)
-
     # a resumed run keeps its own shape: init_ckpt may predate a migration (ml.migrate_ckpt)
     policy = (
         load_policy(cfg) if ckpt is None else PolicyNet(PolicyNetConfig(**ckpt["model_config"]))
     )
+    league = None
+    if cfg.league is not None:
+        league = League(LeagueConfig.from_dict(cfg.league), policy.config, device, cfg.seed)
+        if ckpt is not None and "league" in ckpt:
+            league.load_state_dict(ckpt["league"])
+    elif params.league:
+        raise ValueError("stage plays the league but the config has no `league:` block")
+
+    def env_for(p: StageParams) -> EnvConfig:
+        return _env_config(cfg, p, schedule.teacher(), league.mix() if league else ())
+
+    env_cfg = env_for(params)
+    # env seeds move on at each resume: a resumed run is a new, still deterministic, stream
+    base_seed = cfg.seed * 1_000_003 + updates
+    venv = _make_venv(cfg, base_seed, env_cfg)
+
     learner = Learner(cfg, policy, device)
     if ckpt is not None:
         learner.load_state_dict(ckpt["learner"])
-    collector = Collector(venv, round(cfg.envs * cfg.blind_frac), rng)
+    elif (init := _init_learner_state(cfg)) is not None:
+        learner.load_state_dict(init)
+        for group in learner.opt.param_groups:
+            group["lr"], group["weight_decay"] = cfg.lr, cfg.weight_decay
+    collector = Collector(venv, round(cfg.envs * cfg.blind_frac), rng, league)
 
     def save(path: Path = last_path) -> None:
         tmp = path.with_suffix(".tmp")
@@ -868,6 +1031,7 @@ def train_ppo(
                 "config": asdict(cfg),
                 "model_config": learner.policy.config.to_dict(),
                 "algorithm": "ppo",
+                **({"league": league.state_dict()} if league is not None else {}),
             },
             tmp,
         )
@@ -894,23 +1058,35 @@ def train_ppo(
                 and not stop
                 and not schedule.complete()
             ):
+                league_record: dict[str, Any] = {}
+                if league is not None and params.league:
+                    league_record = _league_turn(cfg, league, learner, params, decisions, updates)
+                    if env_for(params) != env_cfg:
+                        env_cfg = env_for(params)
+                        venv.configure(env_cfg)
                 t0 = time.monotonic()
                 episodes, stats, steps = collector.collect(learner, params, cfg.batch_size)
                 t1 = time.monotonic()
                 n = sum(len(e.rows) for e in episodes)
                 record = learner.update(episodes, params, decisions, schedule.clone_coef(decisions))
                 t2 = time.monotonic()
+                if league is not None and params.league:
+                    league_record.update(
+                        league.observe([(e.opponent, e.rewards, int(e.info[2])) for e in episodes])
+                    )
+                    league_record.update(league.metrics())
                 decisions += n
                 updates += 1
                 schedule.observe(stats)
                 advanced = schedule.advance(decisions)
                 # a completed schedule has no params; the loop exits after this record
                 new_params = params if schedule.complete() else schedule.params(decisions)
-                if _env_config(cfg, new_params, schedule.teacher()) != env_cfg:
-                    env_cfg = _env_config(cfg, new_params, schedule.teacher())
+                if env_for(new_params) != env_cfg:
+                    env_cfg = env_for(new_params)
                     venv.configure(env_cfg)
                 record.update({f"batch_{k}": v for k, v in _summarise(stats).items()})
                 record.update(schedule.metrics())
+                record.update(league_record)
                 record.update(
                     {
                         "update": updates,
@@ -949,6 +1125,31 @@ def train_ppo(
             signal.signal(sig, handler)
         if isinstance(venv, SubprocVecTrainEnv):
             venv.close()
+    return out
+
+
+def _league_turn(
+    cfg: PPOConfig,
+    league: League,
+    learner: Learner,
+    params: StageParams,
+    decisions: int,
+    updates: int,
+) -> dict[str, Any]:
+    """Before an update's rollout: snapshot (+ persona forks) when due, rotate the opponents."""
+    out: dict[str, Any] = {}
+    if league.snapshot_due(decisions):
+        t0 = time.monotonic()
+        league.begin_snapshot(decisions, updates)
+        out["league_snapshot"] = league.add(PAST, learner.policy, decisions, updates).id
+        if league.cfg.persona_share > 0:
+            for persona in league.cfg.personas:
+                policy = train_persona(
+                    cfg, learner, persona, params, decisions, updates, league.cfg.persona_updates
+                )
+                league.add(persona.name, policy, decisions, updates)
+        out["league_snapshot_s"] = round(time.monotonic() - t0, 3)
+    league.rotate(updates)
     return out
 
 

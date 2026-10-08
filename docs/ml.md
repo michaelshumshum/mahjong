@@ -181,6 +181,7 @@ canary for this failure mode in heuristic and learned bots alike.
 | auxiliary dataset + training | `ml/generate_aux.py`, `ml/aux_data.py`, `ml/aux_train.py`, `ml/aux_eval.py`, `ml/configs/rl_aux.yaml` | aux-head pretraining and the R1 exit measurements (§8, §14) |
 | training env | `ml/train_env.py`: `EnvConfig`, `VecTrainEnv`, `SubprocVecTrainEnv`, tsumogiri opponents | PPO rollout (§7) |
 | PPO + curriculum | `ml/ppo.py`, `ml/curriculum.py`, `ml/configs/rl_ppo_c0.yaml` | cold start (§9, §10) |
+| league | `ml/league.py`, `ml/configs/rl_league.yaml` | C2 opponent pool, personas, learned-only Elo (§11) |
 | policy evaluation | `ml/eval_policy.py` | R2 gate vs `EfficiencyBot` (§12) |
 
 Nothing here is wired into a bot.
@@ -312,14 +313,16 @@ venv.configure(cfg2)                         # applies at each env's next episod
 
 | Detail | Behaviour |
 | --- | --- |
-| row (`ROW_FIELDS`, `unpack_rows`) | policy raw row (`encode_v2.policy_raw`) + oracle raw row (all 13 next draws; `k` is applied at encode time) + `cur_shanten` (+1) + `min_faan` + `role` + `aux` flag + `teacher` + auxiliary labels |
+| row (`ROW_FIELDS`, `unpack_rows`) | policy raw row (`encode_v2.policy_raw`) + oracle raw row (all 13 next draws; `k` is applied at encode time) + `cur_shanten` (+1) + `min_faan` + `role` + `aux` flag + `teacher` + `ruleset` (0 = `EnvConfig.ruleset`, else 1 + index into `PRESET_IDS`) + `opponent` (league id, 2 bytes, `opponent_ids`) + auxiliary labels |
 | seating | per episode `Random(f"seats:{seed}")` picks `learners` `LEARNER` seats and `frozen` `FROZEN` seats; the rest play `OPPONENTS[opponent]` in-env and never surface |
-| `FROZEN` | surfaced for the caller to act with another policy, never trained on — the league hook (R3) |
+| `mix` (league) | `(weight, learners, opponent_id)` entries; per episode `Random(f"mix:{seed}")` picks one, which sets `learners` and fills every other seat `FROZEN`; every row of the episode carries the id. Empty (the default) leaves seating as above, same RNG draws |
+| `alt_rulesets` | `(preset, probability)` pairs; per episode `Random(f"ruleset:{seed}")` plays that `RULESET_PRESETS` entry as is (its own `min_faan`), else `ruleset`. The learner's `Encoder` builds the ruleset features from the row's `ruleset` + `min_faan` |
+| `FROZEN` | surfaced for the caller to act with another policy, never trained on: `ml.ppo.Collector` acts them with the snapshot their `opponent` id names (§11) |
 | tsumogiri | own turn: discard the last concealed tile (the draw); claims and kong-rob: `PASS`; never wins, claims or declares a kong |
 | auxiliary labels | on `LEARNER` rows with probability `aux_rate` (`Random(f"aux:{seed}")`): opponents' tenpai / waits / legal-win faan and shanten / ukeire after each discard (`ml.generate_aux`'s labellers); win / deal-in / payment and hidden-tile targets are free and filled by the learner for every row |
 | `info` | winner, discarder (-1 if none), then seat bitmasks: learners, tenpai at exhaustive draw, sub-minimum tenpai (`bots.arena._tenpai_can_reach_min_faan`) |
 | `teacher` | `PAD` unless the §10 contingency is enabled (`EnvConfig.teacher="FaanBot"`); `FaanBot` is only constructed when it is |
-| tests | `tests/test_ml_train_env.py`: same seeds → same rows; subprocess = in-process; every surfaced policy row = `policy_raw_from_view(seat_view(...))`; tsumogiri seats never meld or win |
+| tests | `tests/test_ml_train_env.py`: same seeds → same rows; subprocess = in-process; every surfaced policy row = `policy_raw_from_view(seat_view(...))`; tsumogiri seats never meld or win. `tests/test_ml_league.py`: mix seating and ids on every row, alt-ruleset episodes play and tag the preset |
 
 ### Engine speed-ups (in `mahjong_core`, behaviour-neutral)
 
@@ -468,9 +471,9 @@ schema (`PPOConfig`); configs are `ml/configs/rl_ppo_*.yaml`.
 | oracle to the policy | `OracleAdapter`: bias-free 3-wide conv from the 32 oracle channels (draw planes `k..12` zeroed) into the trunk's stem, zero-initialised; input × Bernoulli(keep) mask per element, the mask stored per sample (packed bits) so the update replays it. No bias ⇒ keep 0 adds exactly 0 and export drops the adapter |
 | blind envs | the first `blind_frac` = 12.5% of envs always run keep 0, k 0: on-policy training data for the blind policy and the blind-win-rate statistic §10 advances on |
 | auxiliary losses | `ml.losses.aux_loss` (default `AuxWeights`) on the `aux_rate` = 10% subsample of learner decisions that carry labels; win / deal-in / payment filled from the hand's outcome; coefficient 1.0 → 0.05 linearly over 50M decisions, never 0 |
-| init | `PolicyNet` from `init_ckpt` (R1 `runs/rl_aux/ckpt_best_engine130.pt`, i.e. `ckpt_best.pt` migrated to engine 1.3.0: trunk + auxiliary heads; policy head untrained); critic trunk from it as above. A resumed run builds its `PolicyNet` from its own checkpoint's `model_config` and never reads `init_ckpt` |
+| init | `PolicyNet` from `init_ckpt` (R1 `runs/rl_aux/ckpt_best_engine130.pt`, i.e. `ckpt_best.pt` migrated to engine 1.3.0: trunk + auxiliary heads; policy head untrained); critic trunk from it as above. A PPO `init_ckpt` (it has a `learner` key, e.g. a C1 hold checkpoint) loads the whole learner instead: policy, critic, adapter, PopArt and AdamW moments, with `lr` / `weight_decay` reset to the config's. Counters (decisions, updates) and the schedule start fresh, so the aux-weight anneal restarts: set `aux_coef_start` to the source run's end value. A resumed run builds its `PolicyNet` from its own checkpoint's `model_config` and never reads `init_ckpt` |
 | engine migration | `ml.migrate_ckpt SRC DST` carries a PPO or R1 checkpoint from engine 1.0.0 to 1.3.0 ([ADR 0020](decisions/0020-hk-scoring-table-alignment.md)). Only the ruleset block at the end of the scalars changed shape (36 → 30 patterns, `NEW_18` off in `hk_classic`), and within `hk_classic` that block is constant apart from `min_faan`. Each layer reading it (policy/critic `trunk.scalar_proj`, `policy_global.0`, `aux_global.0`, critic `value.0`) gets its pattern columns remapped by rule (座位花→正花, 正花→一台花, 混么九→花么九; new rules zero) and the constant difference folded into its bias, so the migrated network's outputs equal the old ones on `hk_classic` at every `min_faan` (test: ≤ 1e-5; R1 `ckpt_best.pt`: ≤ 1e-6). AdamW moments follow their columns. Rewards still change with the engine: this keeps the starting point, not the training |
-| run dir | `meta.json` pins `ENGINE_VERSION` (+ config, resolved device); `ckpt_last.pt` holds models, optimiser, PopArt, schedule state, RNG state, all saved on CPU and loaded with `map_location="cpu"`, so a run resumes on either device; resume refuses a different `ENGINE_VERSION`; env seeds restart from `seed·1,000,003 + updates` on resume. SIGINT/SIGTERM save after the current update |
+| run dir | `meta.json` pins `ENGINE_VERSION` (+ config, resolved device); `ckpt_last.pt` holds models, optimiser, PopArt, schedule state, RNG state, league state (§11, league runs only), all saved on CPU and loaded with `map_location="cpu"`, so a run resumes on either device; resume refuses a different `ENGINE_VERSION`; env seeds restart from `seed·1,000,003 + updates` on resume. SIGINT/SIGTERM save after the current update |
 | `metrics.jsonl` | per update: losses, entropy, approx KL, clip fraction, explained variance, PopArt μ/σ, batch win / deal-in / draw / blind-win / sub-min-tenpai rates, stage parameters, rollout and learner decisions/s, resolved device (+ GPU name) |
 | device | `device: auto` (CUDA if `torch.cuda.is_available()`, else CPU) \| `cpu` \| `cuda`; explicit `cuda` without a GPU raises at startup, never falls back. Learner (policy, critic, adapter, PopArt, AdamW, every update tensor) and the per-step batched rollout forward on it; envs + encoding stay numpy on CPU, one host→device copy per input per step. Optional `amp: true` (CUDA only): fp16 autocast + `GradScaler`, saved in the checkpoint. Logged to stdout, `meta.json` and each metrics record. Detail and the 2060 setup: §13 |
 
@@ -515,10 +518,17 @@ seat-hands, cleared at anneal completion and at each advance) meeting every thre
 | C0 | 1 learner + 3 tsumogiri | 0 | 13 | 1 | 1.0 | — | rolling win ≥ 0.40 |
 | C0b | same | 0 | 13 → 0 | 1 | 1.0 → 0.5 | 20M | rolling blind win ≥ 0.25 (blind envs, §9) |
 | C1 | 4 learners (self-play) | 0, 1 from ½, 3 at the end | 0 | 1 → 0 | 0.5 → 0 | 200M | win ≥ 0.15 and sub-min tenpai ≤ 0.32 over ≥ 200 tenpai draws |
-| C2 | stub: `params` raises `NotImplementedError`, `complete()` stops training: the update that advances into it writes its record (`advanced_to: "C2"`), saves `ckpt_last.pt` with the advanced state and exits; resuming that checkpoint returns at once | | | | | | R3 |
+| C2 | league (§11), `ml/configs/rl_league.yaml` | 3; 10% `hk_casual`, 10% `hk_strict` episodes at their own rules | 0 | 0 | 0 | — | never: the last stage runs until the run's limits; the R3 gates are external (§12, §14) |
+
+C2 runs only when the PPO config has a `league:` block (`Curriculum.league`, set by
+`build_schedule`). Without one it stays the R2 stub, so R2 configs behave exactly as before:
+`params` raises `NotImplementedError`, `complete()` stops training (the update that advances into
+it writes `advanced_to: "C2"`, saves `ckpt_last.pt` and exits; resuming returns at once). The 20%
+"other presets" are episode shares (`StageSpec.alt_rulesets` → `EnvConfig.alt_rulesets`, §7).
 
 **`hold_final`** (curriculum key, default `false`). With `true`, meeting the exit criteria of the
-last implemented stage (C1) holds that stage instead of advancing into the stub, so training
+last runnable stage (C1 when there is no `league:` block) holds that stage instead of advancing
+into the stub; with a league block C1's exit advances into C2 as usual, so training
 continues at its end-of-anneal parameters (C1: 4 learners, `min_faan` 3, `k` 0, keep 0, β 0)
 until `total_decisions`, `--max-steps`/`--max-minutes` or a signal stops it. It exists to keep
 training past the C1 exit while the R3 league isn't built.
@@ -565,6 +575,68 @@ constructs or calls `FaanBot` (`tests/test_ml_curriculum.py`).
 Heuristic bots never enter the pool, so evaluation against them stays held out. Track the
 exhaustive-draw rate as the passivity/collusion canary.
 
+**Built (R3): `ml/league.py`**, played by curriculum stage C2 (§10) when the PPO config has a
+`league:` block (`LeagueConfig`; `ml/configs/rl_league.yaml` holds the defaults).
+
+| Piece | Behaviour |
+| --- | --- |
+| shares | per **episode** (table), from `League.mix()` → `EnvConfig.mix` (§7): `self_share` 4 `LEARNER` seats; `past_share` / `persona_share` `seat_learners` (1) learner seats + the rest `FROZEN`, all one snapshot. A share whose pool is empty goes to self-play. With 1 learner seat, learner samples split ~80 / 14 / 6 (a 1-v-3 hand surfaces a quarter of its decisions to the learner) |
+| `FROZEN` seats | acted by the snapshot's own `PolicyNet` (Gumbel-max sampling, no oracle), never kept as samples; `Collector` encodes the step once and runs one forward for the learner rows plus one per distinct opponent present |
+| playable set | `active_past` (3) past + `active_personas` (1) persona draws, with replacement, redrawn every `rotate_every` (16) updates and right after a snapshot: bounds the forwards per step at 5. An evicted snapshot stays playable for 64 updates so hands in flight finish with it |
+| past snapshots | `snapshot_every` (50M) learner decisions, the first when the league starts (so a run entering C2 has an opponent at once); `max_past` (32), oldest evicted |
+| PFSP | weight (1 − x)^`pfsp_power` (2), x = the learner's pairwise win share against the snapshot: per hand, each (learner seat, snapshot seat) pair scores 1 / ½ / 0 by payment, so x = ½ at parity under any seating; ½ prior (one pseudo-game); counts decay × `stat_decay` (0.999) per update (time constant ~1,000 updates ≈ 4M decisions) |
+| personas | at every past snapshot, each persona is a fork of the learner (policy, critic, PopArt, AdamW) trained `persona_updates` (100, ~0.4M decisions) updates of 4-seat self-play on its perturbed reward (`persona_rewards`: the winner's payment × `win`, the discarder's on a discard win × `deal_in`) in its own envs and RNG streams, then frozen. `max_personas` (8), oldest evicted. Cost: 2 × 100 updates per 50M decisions, ~1.6% |
+| Elo | learned-only (§12): each past snapshot is anchored at the learner's rating when taken (the first at 0); the learner's rating is the maximum-likelihood fit (bisection) of its decayed pairwise scores against them, ½ prior per snapshot. Cheap: one 1-D solve per update |
+| state | `League.state_dict()` in `ckpt_last.pt` (`league` key, only in league runs): every snapshot's weights (CPU, ~1.8 MB each at 96 × 6), stats, Elo anchors, next snapshot, the playable set and the league RNG. Non-league checkpoints are unchanged; `--resume` rebuilds the pool on the run's device |
+
+Metrics, every C2 record in `metrics.jsonl`:
+
+| Key | Meaning |
+| --- | --- |
+| `league_past`, `league_personas` | pool sizes |
+| `league_mix_self` / `_past` / `_persona` | share of this batch's finished hands by opponent type |
+| `league_draw_self` / `_past` / `_persona` | exhaustive-draw rate per type; `league_draw_self` is the collusion canary (4 copies of one policy), next to `batch_draw_rate` |
+| `league_vs` | per snapshot (`past<id>` / `<persona><id>`): pairwise win share `x`, learner seat-hand win rate, decayed hands, Elo anchor, decisions when taken |
+| `league_elo`, `league_active` | learner's Elo, the playable ids |
+| `league_snapshot`, `league_snapshot_s` | on a snapshot update: the new past id, seconds spent (persona forks included) |
+
+Tests (`tests/test_ml_league.py`): persona reward scaling; pairwise scores ½ at parity; PFSP
+weights and the sampled frequencies; mix shares with empty pools; rotation cadence; snapshot
+cadence and both caps; snapshots are copies; evicted snapshots stay playable; win share, mix,
+draw and Elo bookkeeping; state round trip (same models, same next draws); `FROZEN` seats act
+with their snapshot and never become samples; C2 runs only with a league and never advances;
+`hold_final` advances into C2 once a league exists; a league run from a PPO `init_ckpt` (first
+snapshot = the checkpoint's policy, critic / PopArt / AdamW carried, `lr` reset) snapshots,
+forks personas and resumes; a league block outside C2 changes nothing; a CPU smoke run of
+`rl_league.yaml` with subprocess envs.
+
+**Rollout cost (measured, CPU).** `Collector.collect`, full-size nets (96 × 6) for the learner
+and 4 playable snapshots, 48 envs × 3 workers, torch 1 thread, `min_faan` 3 + alt presets,
+4 batches of 4,096 after warm-up; 4-vCPU Xeon @ 2.1 GHz (a cloud container, not the 2060 box):
+
+| Seating | Learner decisions/s | Env rows/s | Rows per learner decision | ms/step |
+| --- | --- | --- | --- | --- |
+| C1 self-play (4 learners) | 991 | 945 | 0.95 | 50.8 |
+| league, `seat_learners` 1 (default) | 584 (0.59×) | 881 | 1.51 | 54.5 |
+| league, `seat_learners` 2 | 678 (0.72×) | 831 | 1.23 | 57.8 |
+
+Per surfaced row the league costs ~7% (the extra forwards); the rest of the slowdown is
+structural: a `FROZEN` row is an env step and a forward that yields no sample. On the 2060 box
+(rollout ~2.6–2.7k/s, learner ~2.1–3k/s, §13) the default seating predicts rollout ~1.6k/s and
+end to end ~1.4k → ~1.0–1.1k/s (−25%); `seat_learners: 2` is the lever if that is too slow (it
+mixes some self-play into the snapshot tables). On CUDA the per-opponent forwards are
+launch-bound, so read `rollout_s` against the C1 run's after the first hour. Further lever if
+needed: one batched forward over stacked snapshot weights (`torch.func.functional_call` + `vmap`).
+
+Launch from a C1 hold checkpoint (cwd `server/`; copy it to `runs/ppo_c1/ckpt_last.pt` or edit
+`init_ckpt`):
+
+```
+mkdir -p runs/ppo_league
+OPENBLAS_NUM_THREADS=1 uv run --extra ml python -m ml.train --config ml/configs/rl_league.yaml \
+    [--resume] 2>&1 | tee -a runs/ppo_league/train.log
+```
+
 ## 12. Evaluation
 
 - **Gate:** paired-duplicate CI ([bots §7](bots.md)), candidate × 1 vs `FaanBot` × 3,
@@ -580,7 +652,9 @@ exhaustive-draw rate as the passivity/collusion canary.
 - **Sample size:** SD per duplicate set is ~16–19 points/game (from the existing arena CIs).
   For 80% power: δ = 5 → ~110 sets, δ = 2 → ~700, δ = 1 → ~2,800.
 - **During training:** learned-only duplicate matches against league snapshots (Elo); `FaanBot`
-  gates only at milestones.
+  gates only at milestones. Built as the league's own Elo (§11): fit from the C2 training hands
+  against past snapshots (pairwise by payment), not from separate duplicate matches, so it costs
+  nothing extra but is noisier and on-policy (the learner samples, it doesn't argmax).
 
 **Built (R2): `ml/eval_policy.py`** — the R2 gate harness, candidate × 1 vs a `BOT_REGISTRY` bot
 × 3 (default `EfficiencyBot`). The candidate is not registered in `BOT_REGISTRY` (R4).
@@ -892,6 +966,14 @@ setup for the RTX 2060 desktop. Built and CPU-tested; CUDA tests (`-m cuda`) and
 numbers are pending a run on the 2060. The full run moves there: learner on the GPU, rollout on
 the i5-10400F's cores.
 
+R3 progress: **built and CPU-smoked; the full run is pending on the GPU box.** `ml/league.py`
+(pool, PFSP, personas, learned-only Elo), the league in `ml/ppo.py` (`FROZEN` seats acted by
+snapshots, persona forks, PPO `init_ckpt` loading the whole learner), stage C2 in
+`ml/curriculum.py` (`min_faan` 3 + 20% other presets), `ml/configs/rl_league.yaml`. Measured rollout cost on CPU: 0.59× plain self-play's learner
+decisions/s at the default seating (§11). Exit criteria (paired CI > 0 vs `FaanBot` on ≥ 1,000
+fresh sets, mixed tables, sub-min tenpai) not yet measured. The run starts from a C1 hold
+checkpoint (§11 has the command).
+
 ## 15. Risks
 
 | Risk | Handling |
@@ -899,7 +981,9 @@ the i5-10400F's cores.
 | env slower than the learner end-to-end | R0 measurement; mypyc → Rust ladder (§7) |
 | curriculum stalls | oracle draws, annealed shaping, auxiliary pretraining; §10 contingency |
 | heavy-tailed payouts destabilise the value | PopArt, oracle critic, larger batches |
-| passive/collusive self-play equilibrium | draw-rate canary, league diversity, held-out heuristic eval |
+| passive/collusive self-play equilibrium | draw-rate canary (`league_draw_self` vs `_past` / `_persona`, §11), league diversity, held-out heuristic eval. Self-play draws already rose 20% → 31–40% in the C1 hold while strength vs `FaanBot` rose ([rl-learnings.md §6](rl-learnings.md)): read the canary with held-out eval, not alone |
+| league rollout cost | `FROZEN` rows are env steps and forwards without samples: 0.59× rollout at 1 learner seat per snapshot table (§11); `seat_learners: 2` or a lower snapshot share if end-to-end throughput drops too far |
+| PFSP chasing stale stats | the learner moves while counts age: decay 0.999 per update, ½ prior; an unvisited snapshot drifts back to the prior and gets sampled again |
 | shaping residue (speed bias) | β = 0 well before any gate; sub-min tenpai canary |
 | hidden info leaking into the policy | encoder parity test; `visible_meld_counts34` rule (§5); oracle channels at keep prob 0 before any gate |
 | `ENGINE_VERSION` bump mid-run | pinned in run metadata; a ruleset-encoding-only change (1.0.0 → 1.3.0) is carried by `ml.migrate_ckpt` (§9) into a new run dir |

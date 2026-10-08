@@ -1,0 +1,52 @@
+algorithm: ppo
+out: runs/ppo_league
+# a hold-phase C1 checkpoint: the whole learner (policy, critic, PopArt, AdamW moments) is loaded
+init_ckpt: runs/ppo_c1/ckpt_last.pt
+ruleset: hk_classic
+# not the C1 run's seed: env seeds restart from seed and update 0 in a new run
+seed: 3
+threads: 2
+# auto: cuda when available, else cpu. cuda without a gpu fails at startup
+device: auto
+amp: false
+# the 2060 desktop's best measured split (docs/ml.md §13)
+envs: 160
+workers: 10
+# keep is 0 in C2, so blind envs only tag their hands
+blind_frac: 0.125
+batch_size: 4096
+minibatch: 512
+epochs: 2
+lr: 0.0003
+clip: 0.2
+gae_lambda: 0.95
+entropy_coef: 0.01
+value_coef: 0.5
+grad_clip: 0.5
+popart_beta: 0.1
+aux_rate: 0.1
+# decisions restart at 0 in a new run: hold the aux weight at C1's annealed end value
+aux_coef_start: 0.05
+aux_coef_end: 0.05
+total_decisions: 2000000000
+save_every: 20
+curriculum:
+  start: C2
+  window: 4000
+league:
+  self_share: 0.5
+  past_share: 0.35
+  persona_share: 0.15
+  seat_learners: 1
+  snapshot_every: 50000000
+  max_past: 32
+  max_personas: 8
+  active_past: 3
+  active_personas: 1
+  rotate_every: 16
+  pfsp_power: 2.0
+  stat_decay: 0.999
+  persona_updates: 100
+  personas:
+    - {name: aggressive, win: 1.3}
+    - {name: defensive, deal_in: 1.5}
