@@ -51,7 +51,7 @@ top of `web/scripts/screenshot-pages.mjs`.
 
 Add/remove entries in the `PAGES` array in `web/scripts/screenshot-pages.mjs` — each entry is
 `{ name, url, before?, viewport? }`, where `before(page)` is an optional Playwright action
-(click a scenario button, open a panel) run after navigation and before the screenshot, and
+(open a panel, wait out a reveal; pick a mock scenario via `?mock=<scenarioId>` in the url) run after navigation and before the screenshot, and
 `viewport` is `DESKTOP` (default, 1400×900, full-page capture) or `PHONE` (390×844, viewport-only
 capture — one phone screen, sticky hand footer included). Keep names stable once they're
 referenced from `README.md`; phone variants use a `-phone` suffix.

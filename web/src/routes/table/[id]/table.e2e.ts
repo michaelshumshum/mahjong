@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Covers mock-driven /table scene assembly: scenarios render without layout errors, switching
-// scenarios updates the screen, claim interaction works end to end, sub-768px collapse applies.
+// Covers mock-driven /table scene assembly: scenarios (picked by `?mock=<id>`) render without
+// layout errors, claim interaction works end to end, sub-768px collapse applies.
 
 test('table route renders the default (your-turn) scenario without errors', async ({ page }) => {
 	const errors: string[] = [];
@@ -13,10 +13,8 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 
 	await expect(page.locator('h1')).toHaveText('Table');
 	await expect(page.getByTestId('table-scene')).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Your turn to discard' })).toHaveAttribute(
-		'aria-pressed',
-		'true'
-	);
+	// mock mode wears the real rail -- there is no scenario picker.
+	await expect(page.locator('.table-code')).toHaveText('abc123');
 	// no live claim window or hand result in this scenario
 	await expect(page.getByTestId('claim-overlay')).toHaveCount(0);
 	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
@@ -28,10 +26,8 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 test('switching to the claim-window scenario surfaces claim buttons, and choosing one records the choice', async ({
 	page
 }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=claim-window');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Claim window open (you)' }).click();
 
 	const overlay = page.getByTestId('claim-overlay');
 	await expect(overlay).toBeVisible();
@@ -43,10 +39,8 @@ test('switching to the claim-window scenario surfaces claim buttons, and choosin
 });
 
 test('leaving the claim window untouched auto-passes once its timer runs out', async ({ page }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=claim-window');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Claim window open (you)' }).click();
 	const overlay = page.getByTestId('claim-overlay');
 	await expect(overlay).toBeVisible();
 
@@ -56,10 +50,8 @@ test('leaving the claim window untouched auto-passes once its timer runs out', a
 });
 
 test('switching to the hand-ended scenario shows the faan breakdown', async ({ page }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=hand-ended');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Hand just ended' }).click();
 
 	const overlay = page.getByTestId('faan-overlay');
 	await expect(overlay).toBeVisible();
@@ -73,10 +65,8 @@ test('switching to the hand-ended scenario shows the faan breakdown', async ({ p
 test('switching to the hand-ended-in-a-draw scenario shows the plain draw summary', async ({
 	page
 }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=hand-ended-draw');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
 
 	const overlay = page.getByTestId('faan-overlay');
 	await expect(overlay).toBeVisible();
@@ -87,10 +77,8 @@ test('switching to the hand-ended-in-a-draw scenario shows the plain draw summar
 test('switching to the game-ended scenario auto-shows the game-end summary, not the hand-end hold', async ({
 	page
 }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=game-ended');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Game just ended' }).click();
 
 	// the game-end screen replaces the last hand's own hold overlay outright -- gameJustEnded's
 	// handResult is null, matching the real wire sequence.
@@ -132,28 +120,24 @@ test('switching to the game-ended scenario auto-shows the game-end summary, not 
 test('dismissing the hand-end hold in mock mode closes it locally with no socket round trip', async ({
 	page
 }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=hand-ended');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Hand just ended' }).click();
 	const overlay = page.getByTestId('faan-overlay');
 	await expect(overlay).toBeVisible();
 
 	await overlay.getByTestId('close-button').click();
 	await expect(overlay).toHaveCount(0);
 
-	// switching scenarios resets the local dismiss -- a fresh hand-end always starts open.
-	await page.getByRole('button', { name: 'Hand ended in a draw' }).click();
+	// another scenario's hand-end starts open again.
+	await page.goto('/table/abc123?mock=hand-ended-draw');
 	await expect(page.getByTestId('faan-overlay')).toBeVisible();
 });
 
 test('leaving the hand-end hold untouched auto-closes it once its timer runs out', async ({
 	page
 }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=hand-ended');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Hand just ended' }).click();
 	const overlay = page.getByTestId('faan-overlay');
 	await expect(overlay).toBeVisible();
 
@@ -259,23 +243,6 @@ test('short landscape fits hand, centre and opponents without page scroll', asyn
 	}
 });
 
-test('phone mock toolbar collapses the scenario picker into a disclosure with the same buttons', async ({
-	page
-}) => {
-	await page.setViewportSize({ width: 390, height: 844 });
-	await page.goto('/table/abc123?mock=1');
-	await page.waitForLoadState('networkidle');
-
-	const disclosure = page.getByTestId('scenario-disclosure');
-	await expect(disclosure).not.toHaveAttribute('open');
-	await expect(page.getByRole('button', { name: 'Hand just ended' })).toBeHidden();
-	await disclosure.locator('summary').click();
-	await page.getByRole('button', { name: 'Hand just ended' }).click();
-	await expect(page.getByTestId('faan-overlay')).toBeVisible();
-	await expect(disclosure).not.toHaveAttribute('open');
-	await expect(disclosure.locator('summary')).toContainText('Hand just ended');
-});
-
 test('desktop-width viewport does not apply the sticky self-hand collapse', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 800 });
 	await page.goto('/table/abc123?mock=1');
@@ -342,7 +309,7 @@ test('animation demo: draw, discard, claim, and concealed kong run the full sequ
 	const errors: string[] = [];
 	page.on('pageerror', (err) => errors.push(err.message));
 
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/demo');
 	await page.waitForLoadState('networkidle');
 	await page.getByRole('button', { name: 'Animate a turn' }).click();
 
@@ -423,9 +390,8 @@ test('practice game end offers Play again, re-creating a table with the last bot
 		await route.fulfill({ json: { table_id: 'AGAIN1', ruleset_preset: null, ruleset: {} } });
 	});
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
-	await page.goto('/table/abc123?mock=1&practice=1');
+	await page.goto('/table/abc123?mock=game-ended&practice=1');
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Game just ended' }).click();
 
 	await page.getByTestId('game-end-play-again').click();
 	await expect(page).toHaveURL('/table/AGAIN1?practice=1');
@@ -461,9 +427,8 @@ test('native modal dialogs: Escape closes a panel and returns focus to its opene
 });
 
 test('claim dialog: focus starts on Pass and Escape passes', async ({ page }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=claim-window');
 	await page.waitForLoadState('networkidle');
-	await page.getByRole('button', { name: 'Claim window open (you)' }).click();
 
 	const overlay = page.getByTestId('claim-overlay');
 	await expect(overlay).toBeVisible();
@@ -475,16 +440,14 @@ test('claim dialog: focus starts on Pass and Escape passes', async ({ page }) =>
 });
 
 test('hand-end hold closes on Escape; the game-end summary does not', async ({ page }) => {
-	await page.goto('/table/abc123?mock=1');
+	await page.goto('/table/abc123?mock=hand-ended');
 	await page.waitForLoadState('networkidle');
-
-	await page.getByRole('button', { name: 'Hand just ended' }).click();
 	const handEnd = page.getByTestId('faan-overlay');
 	await expect(handEnd).toBeVisible();
 	await page.keyboard.press('Escape');
 	await expect(handEnd).toHaveCount(0);
 
-	await page.getByRole('button', { name: 'Game just ended' }).click();
+	await page.goto('/table/abc123?mock=game-ended');
 	const gameEnd = page.getByTestId('game-end-overlay');
 	await expect(gameEnd).toBeVisible();
 	await page.keyboard.press('Escape');

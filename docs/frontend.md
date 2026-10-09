@@ -128,8 +128,25 @@ marking on the felt rather than UI chrome.
 
 Seats are rendered relative to **your** seat, at the bottom. Each seat's header is `SeatPlate`
 (`lib/table/SeatPlate.svelte`): name, wind glyph, dealer badge, a slot for extra badges (the bot/
-status chips on an opponent, nothing extra on your own), and the score. The toolbar shows your own
-wind glyph instead of "seat N" — wall count and prevailing wind moved to `CenterHub` (below).
+status chips on an opponent, nothing extra on your own), and the score.
+
+**Header rail.** `TableToolbar` (`routes/table/[id]/_components/`) is the walnut rim's top edge, not
+page chrome: the same `--color-rim` background with top-only `--radius-lg` corners, and
+`.table-surface` drops to a 4px top border and bottom-only corners so the two read as one frame.
+One row at every width, mock and live alike:
+
+| Slot | Content |
+| --- | --- |
+| left | ghost "Leave game" button (chevron + label) |
+| ident | the table code as a small tile-coloured chip (cousin of the waiting room's `.pretable-code`), then one brass tag: "Spectating" or "Practice" |
+| status | the connection pill (§6), right-aligned |
+| right | ghost icon buttons: Guide, Score sheet, Settings (Settings hidden while spectating) |
+
+Below `tablet-up` every button goes icon-only, its label kept as an `sr-only` accessible name, so the
+rail never wraps. It carries nothing seat- or hand-specific: your wind is on your `SeatPlate`,
+wall/prevailing/hand on `CenterHub` (below, including its phone compact row). An earlier free-
+standing toolbar (wood buttons on the page background, a "Table X · 東 · practice vs bots" label,
+a phone-only wall/prevailing copy) wrapped to 3-4 rows on phones and duplicated both.
 
 **Turn indication.** The acting seat's `SeatPlate` gets a red halo (`--color-accent` border plus a
 `--color-accent-glow` box-shadow) and a gentle `motion-ok` pulse, via an absolutely-positioned
@@ -141,7 +158,7 @@ the halo, the hub's timer ring and the raised/clickable hand tiles already say i
 Desktop/tablet (≥768px):
 
 ```
-  header: table/scenario · your wind · chrome toggles
+  header rail: leave · table code · tags · guide/score sheet/settings
 
                     ┌─────────── opponent (across) ───────────┐
                     │       13 backs · melds · flowers        │
@@ -173,8 +190,7 @@ seat's claim/hand-end deadline, not the acting seat's — so after a reconnect a
 reappears with their next `turn`. Below
 768px the pools stack instead of forming a box, leaving the markers nowhere to sit without
 overlapping a pool, so the hub collapses to a compact single-row summary (wind/hand/wall/faan only,
-no markers); `TableToolbar`'s own wall/prevailing span is kept as a phone-only fallback copy for
-the same reason.
+no markers).
 
 **Discard pools: all four in the centre** (`.table-center`), forming a box — across on top,
 left/right along the sides (rotated), self on the bottom — each still keyed to its own seat so
@@ -697,13 +713,13 @@ up over the table. The current tip's target — your seat region, or the centre 
 outline via `.table-wrap[data-coach]`. "Next"/"Got it" and "Skip tips" both end it for good.
 Practice only: in a multiplayer game nobody should be reading tips while three people wait.
 
-**In-game guide.** Both toolbars carry a "Guide" button opening the same `GuideDialog` as the
+**In-game guide.** The header rail carries a "Guide" button opening the same `GuideDialog` as the
 lobby, so the faan library is reachable mid-hand.
 
 `?practice=1` is this route's own param; the live-connect effect appends `&practice=true` to the
 WS URL, which binds seats 1-3 at construction (`server/app/ws.py`'s `ws_endpoint`,
 `Table.__init__(practice=..., seat_bot_tiers=...)`). The human still goes through the seat picker
-(seat 0 is the only open slot). The toolbar label appends "· practice vs bots".
+(seat 0 is the only open slot). The header rail shows a "Practice" tag beside the table code.
 
 ### `/table/[id]` wiring
 
@@ -713,7 +729,7 @@ WS URL, which binds seats 1-3 at construction (`server/app/ws.py`'s `ws_endpoint
 | Query | Renders |
 | --- | --- |
 | (none) | live: a `MahjongSocket` at `${PUBLIC_WS_URL}?table=<id>` driven through `GameStore` |
-| `?mock=<scenarioId>` (or bare `?mock`) | a frozen `MOCK_SCENARIOS` fixture, no backend — used by the screenshot workflow (`.claude/skills/frontend-screenshots/SKILL.md`) and design iteration |
+| `?mock=<scenarioId>` (or bare `?mock`) | a frozen `MOCK_SCENARIOS` fixture, no backend — used by the screenshot workflow (`.claude/skills/frontend-screenshots/SKILL.md`) and design iteration. The url is the only scenario picker: the page wears the real header rail (§3), no dev controls, so a capture shows exactly what players see. `/demo`'s "Table scenarios" section links every scenario and `?pregame=` preview, and hosts `AnimationDemoPanel` ("Animate a turn") |
 | `?pregame=connecting\|join\|waiting` | freezes one pre-game state (below) with no socket — mock scenarios are always fully seated |
 
 **Tab title.** `<svelte:head><title>` reads live turn/claim state: "Your turn · Mahjong" while this
@@ -1010,16 +1026,9 @@ garbage placeholders. Use the variant-array form:
 
 zh-Hant has no grammatical plural; every variant there is the same phrasing.
 
-**Mock toolbar on phones.** Below `phone-only` `MockTableToolbar`'s scenario buttons collapse into a
-`<details>` disclosure whose summary shows the active scenario; picking one closes it. The buttons
-are the same elements, so `getByRole('button', {name})` works once it's open —
-`scripts/screenshot-pages.mjs`'s `pickScenario()` opens it first. Tablet-up holds it open with
-the summary hidden (the old flat row). The wall/prevailing status hides there too (the hub's compact
-row shows it).
-
 **Not translated, deliberately:** fixture/dev-only strings — `mock-game-state.ts`'s
-`MOCK_SCENARIOS` labels and `MockTableToolbar`'s scenario picker (read verbatim by
-`table.e2e.ts`), `AnimationDemoPanel` controls, demo `data-testid` readouts. `lib/table/wind.ts`'s
+`MOCK_SCENARIOS` labels (listed verbatim on `/demo`'s scenario links), the `/demo` pre-game preview
+links, `AnimationDemoPanel` controls, demo `data-testid` readouts. `lib/table/wind.ts`'s
 `WIND_LABEL` is only ever interpolated into already-translated messages.
 
 **Tile names.** `lib/table/tile-name.ts`'s `tileName(code)` maps every `TileCode` to a localized

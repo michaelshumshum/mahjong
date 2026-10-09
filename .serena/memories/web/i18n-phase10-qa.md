@@ -6,7 +6,7 @@ Full plan: `mem:web/core`, `docs/frontend.md` §9.
 - Converted fragile English-text e2e selectors to `data-testid`/stable classes for core flows only
   (lobby create-table/practice-vs-bots, tables list join/watch/rejoin, claim win/pung, hand-end
   close, settings/score-sheet toggles, seat-join in `live.e2e.ts`). New testids added to:
-  `CloseButton.svelte` (`close-button`), `TableToolbar`/`MockTableToolbar` (`toggle-settings`,
+  `CloseButton.svelte` (`close-button`), `TableToolbar` (`toggle-settings`,
   `toggle-score-sheet`), lobby `+page.svelte` (`lobby-create-table`, `lobby-practice-bots`,
   `lobby-join-game-link`), `TableCard.svelte` (`table-card-action`, same id on all 3 branches —
   scope queries to a specific card), `JoinByCodePanel.svelte` (`join-by-code-input`/`-submit`),
@@ -15,7 +15,7 @@ Full plan: `mem:web/core`, `docs/frontend.md` §9.
   `testId`, all 3 call sites in `PracticeSetupDialog` pass `practice-difficulty-{left,right,across}`).
   Claim Win/Pung assertions switched to the pre-existing `.claim-btn--{kind}` classes instead —
   zero component change needed there.
-- Deliberately left alone: `MOCK_SCENARIOS`/`MockTableToolbar` scenario-picker labels and
+- Deliberately left alone: `MOCK_SCENARIOS` labels (now listed on `/demo`; `MockTableToolbar` was removed 2026-10-10) and
   `AnimationDemoPanel` controls (e2e fixture data, not real copy — `web/AGENTS.md`),
   `ApiConnectGate` copy in `page.e2e.ts` (still byte-identical post-migration), form `getByLabel`
   selectors (real semantic interactions, not presence checks), and the "route renders" h1 sanity

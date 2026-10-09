@@ -55,14 +55,6 @@ const LOBBY_TABLES = [
 	}
 ];
 
-// phones collapse the mock scenario buttons into a disclosure (MockTableToolbar); open it first
-// so the same accessible names work at every viewport.
-async function pickScenario(page, name) {
-	const closed = page.locator('[data-testid="scenario-disclosure"]:not([open]) > summary');
-	if (await closed.isVisible()) await closed.click();
-	await page.getByRole('button', { name }).click();
-}
-
 // The "notable pages" list — keep this curated and small (this is what ends up in the
 // README), not exhaustive. Add a page here when it becomes a meaningful, stable part of the
 // app; don't add every mock scenario. `viewport` defaults to DESKTOP.
@@ -88,23 +80,20 @@ const PAGES = [
 		}
 	},
 	{ name: 'tables', url: '/tables' },
-	// `?mock=1` is required now that `/table/[id]` defaults to opening a real WebSocket against
+	// `?mock=<scenarioId>` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
-	// rather than relying on it being the unauthenticated default.
-	{ name: 'table-your-turn', url: '/table/demo123?mock=1' },
+	// rather than relying on it being the unauthenticated default. The url is the only scenario
+	// picker (docs/frontend.md §7).
+	{ name: 'table-your-turn', url: '/table/demo123?mock=your-turn' },
 	{
 		name: 'table-claim-window',
-		url: '/table/demo123?mock=1',
-		async before(page) {
-			await pickScenario(page, 'Claim window open (you)');
-		}
+		url: '/table/demo123?mock=claim-window'
 	},
 	{
 		name: 'table-hand-ended',
-		url: '/table/demo123?mock=1',
+		url: '/table/demo123?mock=hand-ended',
 		async before(page) {
-			await pickScenario(page, 'Hand just ended');
 			await page.waitForTimeout(HAND_END_REVEAL_MS);
 		}
 	},
@@ -113,9 +102,8 @@ const PAGES = [
 	// winner/patterns/payments to show), genuinely distinct enough to warrant its own capture.
 	{
 		name: 'table-hand-ended-draw',
-		url: '/table/demo123?mock=1',
+		url: '/table/demo123?mock=hand-ended-draw',
 		async before(page) {
-			await pickScenario(page, 'Hand ended in a draw');
 			await page.waitForTimeout(150);
 		}
 	},
@@ -125,9 +113,8 @@ const PAGES = [
 	// `&practice=1` so the capture shows the practice-only "Play again" action.
 	{
 		name: 'table-game-ended',
-		url: '/table/demo123?mock=1&practice=1',
+		url: '/table/demo123?mock=game-ended&practice=1',
 		async before(page) {
-			await pickScenario(page, 'Game just ended');
 			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	},
@@ -164,27 +151,22 @@ const PAGES = [
 	},
 	{
 		name: 'table-claim-window-phone',
-		url: '/table/demo123?mock=1',
-		viewport: PHONE,
-		async before(page) {
-			await pickScenario(page, 'Claim window open (you)');
-		}
+		url: '/table/demo123?mock=claim-window',
+		viewport: PHONE
 	},
 	{
 		name: 'table-hand-ended-phone',
-		url: '/table/demo123?mock=1',
+		url: '/table/demo123?mock=hand-ended',
 		viewport: PHONE,
 		async before(page) {
-			await pickScenario(page, 'Hand just ended');
 			await page.waitForTimeout(HAND_END_REVEAL_MS);
 		}
 	},
 	{
 		name: 'table-game-ended-phone',
-		url: '/table/demo123?mock=1&practice=1',
+		url: '/table/demo123?mock=game-ended&practice=1',
 		viewport: PHONE,
 		async before(page) {
-			await pickScenario(page, 'Game just ended');
 			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	}

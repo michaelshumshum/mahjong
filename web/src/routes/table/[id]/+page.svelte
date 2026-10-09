@@ -56,7 +56,6 @@
 	} from '$lib/ui/announcements';
 	import SealStamp from '$lib/table/SealStamp.svelte';
 	import ConnectionBanner from '$lib/ui/ConnectionBanner.svelte';
-	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
 	import { serverErrorToastMessage } from '$lib/net/server-error-messages';
@@ -72,7 +71,6 @@
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import TableToolbar from './_components/TableToolbar.svelte';
-	import MockTableToolbar from './_components/MockTableToolbar.svelte';
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 	import { m } from '$lib/paraglide/messages.js';
@@ -100,12 +98,12 @@
 	// MOCK_SCENARIOS fallback happens to carry.
 	const PREGAME_PREVIEW_SEAT = 1 as Seat;
 
-	// any value other than a known scenario id (including a bare `?mock` flag) falls back to
-	// the first scenario.
-	let initialMockParam = page.url.searchParams.get('mock');
-	let scenarioId = $state(
-		MOCK_SCENARIOS.some((s) => s.id === initialMockParam) ? initialMockParam! : MOCK_SCENARIOS[0].id
-	);
+	// the url is the only scenario picker (/demo links to each); any value other than a known
+	// scenario id (including a bare `?mock` flag) falls back to the first scenario.
+	let scenarioId = $derived.by(() => {
+		const raw = page.url.searchParams.get('mock');
+		return MOCK_SCENARIOS.some((s) => s.id === raw) ? raw! : MOCK_SCENARIOS[0].id;
+	});
 	let mockGameState = $derived(
 		(MOCK_SCENARIOS.find((s) => s.id === scenarioId) ?? MOCK_SCENARIOS[0]).state
 	);
@@ -565,7 +563,7 @@
 		handEndAckSent = false;
 	});
 	// mock mode and spectators have no hand_end_ack round trip to hide the overlay behind --
-	// dismissing just closes it locally, reset when the scenario picker jumps or the next hand starts.
+	// dismissing just closes it locally, reset when the `?mock=` scenario or the hand changes.
 	let handEndDismissedLocally = $state(false);
 	$effect(() => {
 		void scenarioId;
@@ -785,8 +783,6 @@
 		toastQueue = removeToast(toastQueue, id);
 	}
 
-	let showAnimationDemo = $state(false);
-
 	// tab title: your-turn/claim beats the generic table label. Mock scenarios are frozen
 	// snapshots, not live turn state, so they always show the generic table title.
 	let pageTitle = $derived(
@@ -806,33 +802,16 @@
 	<h1 class="sr-only">{m.tablePage_heading()}</h1>
 
 	<div class="table-page">
-		{#if isMock}
-			<MockTableToolbar
-				bind:scenarioId
-				wallCount={gameState.wallCount}
-				prevailing={gameState.prevailing}
-				onLeaveClick={handleLeaveClick}
-				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
-				onToggleSettings={() => (showSettings = !showSettings)}
-				onOpenGuide={() => (showGuide = true)}
-				onToggleAnimationDemo={() => (showAnimationDemo = !showAnimationDemo)}
-			/>
-		{:else}
-			<TableToolbar
-				{spectating}
-				{tableId}
-				{isPractice}
-				seat={liveStore?.state.seat ?? null}
-				dealer={gameState.dealer as Seat}
-				wallCount={gameState.wallCount}
-				prevailing={gameState.prevailing}
-				connection={liveStore?.connection}
-				onLeaveClick={handleLeaveClick}
-				onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
-				onToggleSettings={() => (showSettings = !showSettings)}
-				onOpenGuide={() => (showGuide = true)}
-			/>
-		{/if}
+		<TableToolbar
+			{spectating}
+			{tableId}
+			{isPractice}
+			connection={liveStore?.connection}
+			onLeaveClick={handleLeaveClick}
+			onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
+			onToggleSettings={() => (showSettings = !showSettings)}
+			onOpenGuide={() => (showGuide = true)}
+		/>
 
 		<div class="table-wrap" data-coach={showCoachMarks ? coachTarget : undefined}>
 			{#if !isMock}
@@ -1018,10 +997,6 @@
 			<GuideDialog onClose={() => (showGuide = false)} />
 		{/if}
 
-		{#if showAnimationDemo}
-			<AnimationDemoPanel onClose={() => (showAnimationDemo = false)} />
-		{/if}
-
 		<ToastStack queue={toastQueue} onDismiss={dismissToast} />
 		<Announcer bind:this={announcer} />
 	</div>
@@ -1061,7 +1036,6 @@
 	.table-page {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-3);
 		height: 100dvh;
 		padding: var(--space-3);
 		overflow: hidden;
@@ -1112,13 +1086,15 @@
 		// clip, not hidden: hidden makes this a scroll container, which traps the phone self
 		// row's `position: sticky` inside the surface instead of the viewport.
 		overflow: clip;
-		border-radius: var(--radius-lg);
+		// the top edge is TableToolbar's rail, same walnut, so the two read as one frame.
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 		// local override: --color-text-muted (walnut chrome) fails contrast on felt green;
 		// every descendant using it (seat-wind, seat-score, …) gets the felt-safe value for free.
 		--color-text-muted: var(--color-felt-muted);
 		// walnut rim: a solid border plus an inner highlight ring (the lip catching light) and an
 		// outer shadow (the rim sitting above the room, not flush with it).
 		border: 10px solid var(--color-rim);
+		border-top-width: 4px;
 		box-shadow:
 			inset 0 0 0 2px var(--color-rim-hi),
 			0 10px 28px rgb(0 0 0 / 0.5);
@@ -1231,7 +1207,6 @@
 			min-height: 0;
 			overflow: hidden;
 			padding: var(--space-1) var(--space-2);
-			gap: var(--space-1);
 		}
 
 		.table-wrap {
@@ -1244,7 +1219,7 @@
 			height: 100%;
 			min-height: 0;
 			padding: var(--space-1);
-			border-width: 6px;
+			border-width: 4px 6px 6px;
 		}
 
 		.table-center {

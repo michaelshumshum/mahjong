@@ -206,7 +206,7 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 
 		// three opponent seats, all bot-controlled.
 		await expect(page.locator('.bot-badge')).toHaveCount(3);
-		await expect(page.locator('.table-label')).toContainText('practice vs bots');
+		await expect(page.locator('.table-tag')).toHaveText('Practice');
 
 		// each bot's server-assigned name renders alongside the badge, not in place of it. Each
 		// draws its own random pun name, so this only asserts non-empty and distinct.
