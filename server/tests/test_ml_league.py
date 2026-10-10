@@ -38,6 +38,7 @@ from ml.ppo import (
     build_schedule,
     main_config,
     ppo_policy_loss,
+    reward_divisors,
     train_ppo,
 )
 from ml.train_env import (
@@ -619,3 +620,30 @@ def test_league_config_file_smoke(tmp_path, c1_ckpt):
     lines = _records(out)
     assert len(lines) == 3 and lines[0]["league_snapshot"] == 1
     assert all(np.isfinite(r["pg"]) for r in lines)
+    assert all("pts" in v and "x" in v for r in lines for v in r["league_vs"].values())
+
+    # the live run's case: a checkpoint from before points stats resumes under this config
+    path = out / "ckpt_last.pt"
+    ckpt = torch.load(path, weights_only=False, map_location="cpu")
+    for e in ckpt["league"]["entries"]:
+        del e["points"], e["pairs"]
+    torch.save(ckpt, path)
+    train_ppo(smoke, resume=True, max_updates=1)
+    last = _records(out)[-1]
+    assert last["update"] == 4 and np.isfinite(last["league_elo"])
+    resumed = torch.load(path, weights_only=False, map_location="cpu")
+    assert all("pairs" in e for e in resumed["league"]["entries"])
+
+
+def test_league_config_reward_scale_and_pfsp_metric():
+    cfg = main_config(Path("ml/configs/rl_league.yaml"))
+    div = reward_divisors(cfg)
+    assert cfg.ruleset == "hk_classic" and div[0] == 1.0
+    assert div[1 + PRESET_IDS.index("hk_classic")] == 1.0
+    assert div[1 + PRESET_IDS.index("hk_casual")] == pytest.approx(3.6 / 0.87, abs=0.01)
+    assert div[1 + PRESET_IDS.index("hk_strict")] == pytest.approx(0.98 / 0.87, abs=0.01)
+    league = LeagueConfig.from_dict(cfg.league)
+    assert league.pfsp_metric == "points" and league.points_scale == pytest.approx(0.83)
+    # every config other than the league's leaves rewards unscaled
+    for path in Path("ml/configs").glob("rl_ppo_*.yaml"):
+        assert set(reward_divisors(main_config(path))) == {1.0}

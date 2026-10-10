@@ -32,6 +32,12 @@ total_decisions: 2000000000
 save_every: 20
 # ppo | ach (the §9 ablation)
 policy_loss: ppo
+# divisor on each preset's hand rewards: per-hand payment sd / hk_classic's (0.87), measured on
+# the c2 run's policy (docs/ml.md §11). hk_classic must stay 1
+reward_scale_by_ruleset:
+  hk_classic: 1.0
+  hk_casual: 4.14
+  hk_strict: 1.13
 curriculum:
   start: C2
   window: 4000
@@ -47,6 +53,9 @@ league:
   active_personas: 1
   rotate_every: 16
   pfsp_power: 2.0
+  # pfsp and elo on the mean pair points difference, not the win share x
+  pfsp_metric: points
+  points_scale: 0.83
   stat_decay: 0.999
   persona_updates: 100
   personas:
