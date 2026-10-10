@@ -26,6 +26,13 @@ $breakpoint-short: 500px;
 	}
 }
 
+// phone-only minus phone-landscape: a narrow screen with height to spare.
+@mixin phone-portrait {
+	@media (max-width: $breakpoint-tablet - 1) and (min-height: $breakpoint-short + 1) {
+		@content;
+	}
+}
+
 @mixin desktop-up {
 	@media (min-width: $breakpoint-desktop) and (min-height: $breakpoint-short + 1) {
 		@content;
@@ -57,13 +64,17 @@ $breakpoint-short: 500px;
 	grid-template-rows: auto 1fr auto;
 	gap: var(--space-3);
 
+	// opponents stack as full-width chip rows: a third of a phone made melds 18px wide and wrap.
 	@include phone-only {
 		grid-template-areas:
-			'left across right'
-			'center center center'
-			'self self self';
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		grid-template-rows: auto 1fr auto;
+			'left'
+			'across'
+			'right'
+			'center'
+			'self';
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto auto auto 1fr auto;
+		gap: var(--space-1);
 	}
 
 	// opponents stack as chips in a side column, so the centre gets the full height above the hand.
@@ -73,7 +84,7 @@ $breakpoint-short: 500px;
 			'left center'
 			'right center'
 			'self self';
-		grid-template-columns: minmax(8rem, 13rem) minmax(0, 1fr);
+		grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
 		grid-template-rows: repeat(3, minmax(0, 1fr)) auto;
 		gap: var(--space-1) var(--space-2);
 	}

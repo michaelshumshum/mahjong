@@ -251,33 +251,38 @@
 		display: none;
 	}
 
-	// short landscape: each chip gets a third of the side column and scrolls its own melds.
-	@include layout.phone-landscape {
-		.seat-region {
-			overflow-y: auto;
-		}
-	}
-
-	// sub-768px: a compact chip in the top row -- one back plus a ×N count. the other backs stay
-	// in the DOM (positional identity, frontend.md §4), only hidden.
+	// sub-768px chip row: plate, one back + ×N, melds (second line only if they don't fit).
+	// the other backs stay in the DOM (positional identity, frontend.md §4), only hidden.
 	@include layout.phone-only {
 		.seat-region {
-			gap: var(--space-1);
+			flex-flow: row wrap;
+			align-items: center;
+			gap: var(--space-1) var(--space-2);
 			padding: var(--space-1) var(--space-2);
 			border-radius: var(--radius-md);
 			background: rgb(0 0 0 / 0.18);
 		}
 
 		.seat-hand-strip {
-			flex-flow: row wrap;
-			align-items: center;
+			display: contents;
 		}
 
-		// a third of a phone is too narrow for name + wind + badges + score on one line.
+		// fixed width so the ×N counts line up down the three rows; long names truncate.
 		.seat-region :global(.seat-plate) {
-			flex-wrap: wrap;
-			gap: 0 var(--space-1);
+			flex: 0 0 9rem;
+			gap: var(--space-1);
 			min-width: 0;
+		}
+
+		.seat-region :global(.seat-name) {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.meld-row .mini-tile {
+			height: 30px;
 		}
 
 		.backs-row {
@@ -296,6 +301,18 @@
 			font-size: var(--font-size-sm);
 			font-weight: 700;
 			font-variant-numeric: tabular-nums;
+		}
+	}
+
+	// short landscape: each chip gets a third of the side column; scrolls only if melds overflow it.
+	@include layout.phone-landscape {
+		.seat-region {
+			align-content: center;
+			overflow-y: auto;
+		}
+
+		.meld-row .mini-tile {
+			height: 26px;
 		}
 	}
 </style>

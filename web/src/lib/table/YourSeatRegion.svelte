@@ -405,6 +405,10 @@
 		background: none;
 		cursor: pointer;
 		transition: transform var(--dur-1) var(--ease-out);
+		// rapid taps on ios otherwise select the face glyph or flash the grey tap highlight.
+		-webkit-tap-highlight-color: transparent;
+		-webkit-touch-callout: none;
+		user-select: none;
 
 		// hit area extended down by the lift so the pointer stays over a raised tile; without it,
 		// hovering the bottom edge lifts the tile off the pointer and hover/cursor flicker.
@@ -523,11 +527,56 @@
 		}
 	}
 
-	// short landscape: the hand can't take a third of a ~390px screen; tiles stop at the 44px
-	// touch-target width instead of growing to 63.
-	@include layout.phone-landscape {
+	// portrait phone: 14 tiles in one row overlap to ~half a face, so wrap to two rows of 7 that
+	// never overlap; the centre has height to spare. row-gap clears a lifted second-row tile.
+	@include layout.phone-portrait {
+		.seat-region--self {
+			padding-inline: var(--space-1);
+		}
+
 		.hand-row {
-			--hand-tile-w: 44px;
+			--hand-tile-w: clamp(
+				36px,
+				calc((100cqi - 6 * var(--hand-gap) - var(--hand-drawn-gap) - 1px) / 7),
+				63px
+			);
+			--hand-step: var(--hand-gap);
+			flex-wrap: wrap;
+			row-gap: calc(var(--hand-tile-w) * 0.4);
+			padding-block-start: calc(var(--hand-tile-w) * 0.4);
+		}
+
+		.hand-tile-slot:nth-child(7n + 1):not(.hand-tile-slot--drawn) {
+			margin-inline-start: 0;
+		}
+	}
+
+	// short landscape: melds share the plate's row instead of taking their own, and tiles grow
+	// with width only as far as ~16% of the viewport height allows (44px floor, 56px cap).
+	@include layout.phone-landscape {
+		.seat-region--self {
+			display: grid;
+			grid-template-areas: 'plate melds' 'hand hand';
+			grid-template-columns: auto minmax(0, 1fr);
+			align-items: center;
+			column-gap: var(--space-4);
+		}
+
+		.seat-region--self > :global(.seat-plate) {
+			grid-area: plate;
+		}
+
+		.meld-row {
+			grid-area: melds;
+			min-block-size: 0;
+		}
+
+		.your-hand {
+			grid-area: hand;
+		}
+
+		.hand-row {
+			--hand-tile-w: clamp(44px, min(var(--hand-fit-w), 16dvh * 3 / 4), 56px);
 		}
 	}
 </style>

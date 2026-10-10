@@ -1227,4 +1227,17 @@
 			overflow-y: auto;
 		}
 	}
+
+	// portrait phone: page padding, rim and felt padding cost ~22% of a 390px width; the hand
+	// gets it back (two rows of ~46px tiles instead of ~40px).
+	@include layout.phone-portrait {
+		.table-page {
+			padding: var(--space-1);
+		}
+
+		.table-surface {
+			padding: var(--space-1);
+			border-width: 4px 6px 6px;
+		}
+	}
 </style>

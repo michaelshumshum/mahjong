@@ -197,6 +197,56 @@ for (const [width, height] of VIEWPORTS) {
 	});
 }
 
+test('a portrait phone wraps the hand into two rows of non-overlapping tiles', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/table/abc123?mock=your-turn');
+	await page.waitForLoadState('networkidle');
+
+	const boxes = await page
+		.locator('.seat-region--self .hand-tile-slot')
+		.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
+	expect(boxes).toHaveLength(14);
+	expect(new Set(boxes.map((b) => Math.round(b.top))).size).toBe(2);
+	for (const [i, a] of boxes.entries()) {
+		expect(a.width).toBeGreaterThanOrEqual(36);
+		for (const b of boxes.slice(i + 1)) {
+			const overlap =
+				a.left < b.right - 0.5 &&
+				b.left < a.right - 0.5 &&
+				a.top < b.bottom - 0.5 &&
+				b.top < a.bottom - 0.5;
+			expect(overlap).toBe(false);
+		}
+	}
+});
+
+test('portrait phone opponents are stacked full-width chip rows', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/table/abc123?mock=your-turn');
+	await page.waitForLoadState('networkidle');
+
+	const boxes = [];
+	for (const pos of ['left', 'across', 'right']) {
+		boxes.push((await page.locator(`.seat-region--${pos}`).boundingBox())!);
+	}
+	for (const box of boxes) expect(box.width).toBeGreaterThan(300);
+	expect(boxes[0].y + boxes[0].height).toBeLessThanOrEqual(boxes[1].y);
+	expect(boxes[1].y + boxes[1].height).toBeLessThanOrEqual(boxes[2].y);
+});
+
+test('phone landscape puts your melds on the seat plate row', async ({ page }) => {
+	await page.setViewportSize({ width: 844, height: 390 });
+	await page.goto('/table/abc123?mock=your-turn');
+	await page.waitForLoadState('networkidle');
+
+	const self = page.locator('.seat-region--self');
+	const plate = (await self.locator('.seat-plate').boundingBox())!;
+	const melds = (await self.locator('.meld-row').boundingBox())!;
+	expect(melds.x).toBeGreaterThan(plate.x + plate.width);
+	expect(melds.y).toBeLessThan(plate.y + plate.height);
+	expect(melds.y + melds.height).toBeGreaterThan(plate.y);
+});
+
 for (const [width, height] of [
 	[390, 844],
 	[844, 390],

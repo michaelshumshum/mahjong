@@ -8,6 +8,11 @@
 	box-sizing: border-box;
 }
 
+// no double-tap zoom (quick repeat taps on tiles/buttons zoomed the page); pinch-zoom stays.
+html {
+	touch-action: manipulation;
+}
+
 body {
 	margin: 0;
 	background: var(--color-bg);

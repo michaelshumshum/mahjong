@@ -228,7 +228,18 @@ collapses instead. Your own meld row sits above your name, toward the centre.
 | 44–63px | shrinks to fit |
 | < 44px | stays 44px (touch target) and overlaps via negative `margin-inline-start`, same formula |
 
-No horizontal scroll. Pinned by `table.e2e.ts` at 390×844, 390×700, 844×390, 1024×768 and
+**Portrait phone** (`phone-portrait`: `phone-only` minus `phone-landscape`) wraps the hand into two
+rows of 7 instead (`flex-wrap`, tile width `clamp(36px, fit-7, 63px)`, ~46px at 390px) — one row of
+14 overlapped to ~half a face there, hiding tiles and sending taps to the neighbour, while the
+centre had height to spare. Page padding, rim and felt padding shrink there too (they took ~84px of
+390). `row-gap` and a top pad equal the two-step lift (30% of tile height),
+so a lifted tile never covers the row above or the seat plate.
+
+**Phone landscape** keeps one row, with tiles `clamp(44px, min(fit-14, 16dvh × 3/4), 56px)` —
+height-bound, since the hand can't take more of a ~390px-tall screen. Your melds/flowers sit
+beside your `SeatPlate` (grid `'plate melds' 'hand hand'`) instead of in their own row above it.
+
+No horizontal scroll; two-row, non-overlapping at 390×844. Pinned by `table.e2e.ts` at 390×844, 390×700, 844×390, 1024×768 and
 1440×900 (last tile and drawn tile inside the viewport, clear of the right opponent at tablet-up),
 plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 and 1440×900.
 
@@ -237,7 +248,7 @@ plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 
 | Mixin | Query | Layout |
 | --- | --- | --- |
 | `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips, strip pools, sticky hand bar (below) |
-| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll, the three opponent chips stack in a side column beside the centre (`'across center' 'left center' 'right center' 'self self'`), each a third of the height scrolling its own melds; the centre scrolls inside itself; hand tiles fixed at the 44px touch width |
+| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll, the three opponent chips stack in a side column beside the centre (`'across center' 'left center' 'right center' 'self self'`), each a third of the height (scrolling only if its melds overflow); the centre scrolls inside itself; hand tiles 44–56px (below) |
 | `tablet-up` | `min-width: 768px` and `min-height: 501px` | the box layout above |
 | `desktop-up` | `min-width: 1180px` and `min-height: 501px` | roomier page and surface padding |
 
@@ -261,10 +272,13 @@ seated as East") `windWord()` returns `WIND_LABEL`'s English word in `en` and `W
 
 Below 768px (phone portrait):
 
-- All three opponents become compact chips sharing the top grid row (`left · across · right`,
-  `layout.seat-region-grid`), so the centre and your hand get the full width. Each chip is the
-  `SeatPlate`, then a single jade back with a `×N` count (`.backs-count`, `aria-hidden` — the row's
-  own label already states the count), then melds/flowers. The other backs stay in the DOM, hidden
+- All three opponents become compact chips, one full-width grid row each (`left`, `across`,
+  `right`, then `center`, `self`; `layout.seat-region-grid`) — three chips side by side left each
+  ~99px, with 18px meld tiles wrapping after four. Each chip is one wrapping flex line: the
+  `SeatPlate` (fixed 9rem so the counts align, long names truncate), a single jade back with a `×N`
+  count (`.backs-count`, `aria-hidden` — the row's own label already states the count), then
+  melds/flowers at 30px tall, which drop to a second line only when they don't fit (the strip is
+  `display: contents`). Phone landscape uses the same chip in its side column. The other backs stay in the DOM, hidden
   (`display: none`), so positional identity (§4) and the specs counting `.backs-row .mini-tile`
   are unchanged.
 - Each opponent's discard pool collapses to a horizontally-scrollable strip; full history stays in
@@ -311,6 +325,11 @@ Built today:
 | Claim     | `ClaimDialog`: one big button per offered option plus Pass, with a CSS countdown ring, ≥44px |
 | Declare   | win (hero when self-drawn) / concealed kong / added kong under your hand (`.declare-actions`) |
 | Sort hand | automatic; no manual reorder                                                               |
+
+**Double-tap zoom** is off app-wide: `html { touch-action: manipulation }` (`app.scss`), which
+keeps pinch-zoom. Not a `touchend` `preventDefault` guard — on iOS that also cancels the synthesized
+`click`, eating the second tap of a two-step discard. Hand tile buttons also drop the iOS tap
+highlight, callout and text selection that rapid taps triggered.
 
 **Discard mode.** A client pref (`ClientPrefs.discardMode`, `lib/ui/Settings.svelte`), default
 `'two-step'`, persisted the same way as `motion`/`soundEnabled` (§6 Persistence):
