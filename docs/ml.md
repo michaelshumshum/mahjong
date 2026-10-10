@@ -587,10 +587,14 @@ exhaustive-draw rate as the passivity/collusion canary.
 | `FROZEN` seats | acted by the snapshot's own `PolicyNet` (Gumbel-max sampling, no oracle), never kept as samples; `Collector` encodes the step once and runs one forward for the learner rows plus one per distinct opponent present |
 | playable set | `active_past` (3) past + `active_personas` (1) persona draws, with replacement, redrawn every `rotate_every` (16) updates and right after a snapshot: bounds the forwards per step at 5. An evicted snapshot stays playable for 64 updates so hands in flight finish with it |
 | past snapshots | `snapshot_every` (50M) learner decisions, the first when the league starts (so a run entering C2 has an opponent at once); `max_past` (32), oldest evicted |
-| PFSP | weight (1 − x)^`pfsp_power` (2), x = the learner's pairwise win share against the snapshot: per hand, each (learner seat, snapshot seat) pair scores 1 / ½ / 0 by payment, so x = ½ at parity under any seating; ½ prior (one pseudo-game); counts decay × `stat_decay` (0.999) per update (time constant ~1,000 updates ≈ 4M decisions) |
+| PFSP | weight (1 − p)^`pfsp_power` (2), p = the learner's share against the snapshot under `pfsp_metric`. `win` (the dataclass default): p = x, the pairwise win share: per hand, each (learner seat, snapshot seat) pair scores 1 / ½ / 0 by payment, so x = ½ at parity under any seating; ½ prior (one pseudo-game). `points` (`rl_league.yaml`): p = σ(d / `points_scale`), d = the mean learner-minus-snapshot payment per (learner seat, snapshot seat) pair, 0 prior (one pseudo-pair). Counts decay × `stat_decay` (0.999) per update (time constant ~1,000 updates ≈ 4M decisions) |
+| why points | x counts a 1-faan and a 10-faan win alike. The C2 run drifted to "win less often, win bigger": x sat at ~0.48 against equal-strength snapshots while the points didn't move, so PFSP was effectively uniform and Elo read the style change as a strength loss. d is the quantity the learner is trained on |
+| `points_scale` | 0.83 reward units: the Gaussian-equivalent mapping. With per-seat payment SD σ ≈ 0.87 (`hk_classic`, and every preset once rewards are scaled, §9) and exchangeable zero-sum seats (correlation −⅓), one pair's difference has SD σ·√(8/3) ≈ 1.42; Φ(d / 1.42) is the win share a Gaussian difference with mean d would give, and σ(1.702·z) ≈ Φ(z) gives 1.42 / 1.702 ≈ 0.83. So p and x are on the same scale at parity and Elo stays comparable. Near parity p is still ≈ ½ (a 0.05-unit edge is p ≈ 0.515): sharpness is `pfsp_power`'s job, not the metric's |
+| units | `observe` gets `Learner.train_rewards`: payment / 32 divided by the hand's ruleset factor (§9), so an alt-preset hand weighs what it weighs in training and the `hk_casual` tail can't swamp d. x is invariant to the factor (both seats of a hand share it) |
 | personas | at every past snapshot, each persona is a fork of the learner (policy, critic, PopArt, AdamW) trained `persona_updates` (100, ~0.4M decisions) updates of 4-seat self-play on its perturbed reward (`persona_rewards`: the winner's payment × `win`, the discarder's on a discard win × `deal_in`) in its own envs and RNG streams, then frozen. `max_personas` (8), oldest evicted. Cost: 2 × 100 updates per 50M decisions, ~1.6% |
-| Elo | learned-only (§12): each past snapshot is anchored at the learner's rating when taken (the first at 0); the learner's rating is the maximum-likelihood fit (bisection) of its decayed pairwise scores against them, ½ prior per snapshot. Cheap: one 1-D solve per update |
-| state | `League.state_dict()` in `ckpt_last.pt` (`league` key, only in league runs): every snapshot's weights (CPU, ~1.8 MB each at 96 × 6), stats, Elo anchors, next snapshot, the playable set and the league RNG. Non-league checkpoints are unchanged; `--resume` rebuilds the pool on the run's device |
+| Elo | learned-only (§12): each past snapshot is anchored at the learner's rating when taken (the first at 0); the learner's rating is the maximum-likelihood fit (bisection) of its share p against them, weighted by the decayed count (games for `win`, pairs for `points`) plus the one-pseudo-count prior. Cheap: one 1-D solve per update |
+| state | `League.state_dict()` in `ckpt_last.pt` (`league` key, only in league runs): every snapshot's weights (CPU, ~1.8 MB each at 96 × 6), stats, Elo anchors, next snapshot, the playable set and the league RNG. Non-league checkpoints are unchanged; `--resume` rebuilds the pool on the run's device. The `league:` config block is re-read from the YAML on resume (§9), the state above is not |
+| pre-points state | entries saved before `points`/`pairs` existed load with both at 0, i.e. at the prior (d = 0, p = ½). They aren't seeded from x: x is the frequency signal the points metric replaces. Under `points`, PFSP is uniform and the Elo holds at its saved value until evidence accrues; d reaches ~63% of its steady weight after ~1,000 updates (4M decisions) |
 
 Metrics, every C2 record in `metrics.jsonl`:
 
@@ -599,12 +603,14 @@ Metrics, every C2 record in `metrics.jsonl`:
 | `league_past`, `league_personas` | pool sizes |
 | `league_mix_self` / `_past` / `_persona` | share of this batch's finished hands by opponent type |
 | `league_draw_self` / `_past` / `_persona` | exhaustive-draw rate per type; `league_draw_self` is the collusion canary (4 copies of one policy), next to `batch_draw_rate` |
-| `league_vs` | per snapshot (`past<id>` / `<persona><id>`): pairwise win share `x`, learner seat-hand win rate, decayed hands, Elo anchor, decisions when taken |
+| `league_vs` | per snapshot (`past<id>` / `<persona><id>`): pairwise win share `x`, mean pair points difference `pts` (training reward units), the PFSP/Elo share `p` under `pfsp_metric`, learner seat-hand win rate, decayed hands, Elo anchor, decisions when taken |
+| `league_pts_past`, `league_pts_persona` | pair-weighted mean points difference over that pool (no prior), once it has any |
 | `league_elo`, `league_active` | learner's Elo, the playable ids |
 | `league_snapshot`, `league_snapshot_s` | on a snapshot update: the new past id, seconds spent (persona forks included) |
 
-Tests (`tests/test_ml_league.py`): persona reward scaling; pairwise scores ½ at parity; PFSP
-weights and the sampled frequencies; mix shares with empty pools; rotation cadence; snapshot
+Tests (`tests/test_ml_league.py`): persona reward scaling; pairwise scores ½ at parity; pairwise
+points; PFSP weights and the sampled frequencies; the points metric ranking a "win big, rarely"
+snapshot the opposite way to x; points Elo and metrics; a pre-points state loading at the prior; mix shares with empty pools; rotation cadence; snapshot
 cadence and both caps; snapshots are copies; evicted snapshots stay playable; win share, mix,
 draw and Elo bookkeeping; state round trip (same models, same next draws); `FROZEN` seats act
 with their snapshot and never become samples; C2 runs only with a league and never advances;

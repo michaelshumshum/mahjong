@@ -23,6 +23,7 @@ from ml.league import (
     League,
     LeagueConfig,
     Persona,
+    pairwise_points,
     pairwise_scores,
     persona_rewards,
 )
@@ -112,6 +113,83 @@ def test_pfsp_weights_favour_snapshots_the_learner_struggles_against():
     total = sum(draws.values())
     for e, p in zip(league.entries, w, strict=True):
         assert draws[e.id] / total == pytest.approx(p, abs=0.03)
+
+
+def test_pairwise_points_sum_learner_minus_other_payments():
+    r = np.array([2.0, -2.0, 0.5, -0.5])
+    assert pairwise_points(r, [0], [1, 2, 3]) == pytest.approx(8.0)
+    assert pairwise_points(r, [1, 2], [0, 3]) == pytest.approx(-4.0 - 1.5 + -1.5 + 1.0)
+    # zero-sum and exchangeable: averaged over which seat is the learner, the mean is 0
+    total = sum(pairwise_points(r, [s], [o for o in range(4) if o != s]) for s in range(4))
+    assert total == pytest.approx(0.0)
+
+
+def test_points_metric_weights_by_payment_not_win_frequency():
+    league = _league(pfsp_metric="points", points_scale=0.5, stat_decay=1.0)
+    for i in range(3):
+        league.add(PAST, _policy(i), decisions=i, updates=i)
+    big, even, small = league.entries
+    # vs `big` the learner wins 1 hand in 4 but wins it big; vs `small` it wins often but cheap
+    win_big = np.array([8.0, -8.0, 0.0, 0.0], dtype=np.float32)
+    lose_small = np.array([-1.0, 1.0, 0.0, 0.0], dtype=np.float32)
+    league.observe([(big.id, win_big, 0b0001)] + [(big.id, lose_small, 0b0001)] * 3)
+    league.observe([(small.id, -win_big, 0b0001)] + [(small.id, -lose_small, 0b0001)] * 3)
+    assert big.win_share < 0.5 < small.win_share  # x calls the learner weaker against `big`
+    assert big.points_diff > 0 > small.points_diff  # the points say the opposite
+    assert big.pairs == big.games == 12 and even.pairs == 0
+    assert big.points_diff == pytest.approx(big.points / 13)
+    assert league.share(even) == 0.5
+    assert league.share(big) == pytest.approx(1 / (1 + np.exp(-big.points_diff / 0.5)))
+    w = league.weights(league.entries)
+    raw = np.array([(1 - league.share(e)) ** 2 for e in league.entries])
+    np.testing.assert_allclose(w, raw / raw.sum())
+    assert w[2] > w[1] > w[0]
+    # the win metric on the same counts ranks them the other way
+    league.cfg.pfsp_metric = "win"
+    w_win = league.weights(league.entries)
+    assert w_win[0] > w_win[1] > w_win[2]
+
+
+def test_points_metric_elo_and_metrics():
+    league = _league(pfsp_metric="points", stat_decay=1.0)
+    a = league.add(PAST, _policy(0), 0, 0)
+    p = league.add("aggressive", _policy(1), 0, 0)
+    up = np.array([1.0, -1.0, 0.0, 0.0], dtype=np.float32)
+    league.observe([(a.id, up, 0b0001)] * 20 + [(p.id, -up, 0b0001)] * 5)
+    assert league.elo > a.elo + 50
+    m = league.metrics()
+    vs = m["league_vs"][f"past{a.id}"]
+    assert vs["pts"] == pytest.approx(a.points_diff, abs=1e-4) and vs["p"] > 0.5
+    assert m["league_pts_past"] == pytest.approx(80 / 60, abs=1e-4)  # per pair, no prior
+    assert m["league_pts_persona"] == pytest.approx(-20 / 15, abs=1e-4)
+    json.dumps(m)
+    with pytest.raises(ValueError, match="pfsp_metric"):
+        LeagueConfig(pfsp_metric="elo")
+    with pytest.raises(ValueError, match="points_scale"):
+        LeagueConfig(points_scale=0.0)
+
+
+def test_old_state_without_points_stats_loads_at_the_prior():
+    league = _league(stat_decay=1.0)
+    for i in range(2):
+        league.add(PAST if i == 0 else "defensive", _policy(i), i * 10, i)
+    league.observe([(1, np.array([1.0, -1.0, 0.0, 0.0], dtype=np.float32), 0b0001)] * 4)
+    league.rotate(5)
+    old = league.state_dict()
+    for e in old["entries"]:
+        del e["points"], e["pairs"]  # the pre-points format
+    resumed = _league(pfsp_metric="points", stat_decay=1.0)
+    resumed.load_state_dict(old)
+    a = resumed.entries[0]
+    assert (a.score, a.games, a.hands, a.wins) == (12.0, 12.0, 4.0, 4.0)
+    assert (a.points, a.pairs, a.points_diff) == (0.0, 0.0, 0.0)
+    assert resumed.share(a) == 0.5 and resumed.metrics()["league_vs"]["past1"]["x"] > 0.5
+    np.testing.assert_allclose(resumed.weights(resumed.entries), [0.5, 0.5])
+    assert resumed.fit_elo() == resumed.elo  # no points evidence yet: Elo holds
+    resumed.observe([(1, np.array([1.0, -1.0, 0.0, 0.0], dtype=np.float32), 0b0001)])
+    assert a.pairs == 3 and a.points == pytest.approx(4.0) and resumed.share(a) > 0.5
+    assert resumed.elo > a.elo
+    assert "points" in resumed.state_dict()["entries"][0]
 
 
 def test_mix_shares_and_empty_pools_fall_back_to_self_play():

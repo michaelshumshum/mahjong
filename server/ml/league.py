@@ -15,11 +15,17 @@ learner trained for `persona_updates` updates of 4-seat self-play on a perturbed
 (`persona_rewards`; `ml.ppo.train_persona`), one per persona at every past snapshot, at most
 `max_personas` kept. Heuristic bots never enter the pool.
 
-Opponents are sampled by prioritised fictitious self-play: weight (1 − x)^`pfsp_power`, x the
-learner's pairwise win share against that snapshot's seats — per hand, each (learner seat,
-snapshot seat) pair scores 1 / ½ / 0 as the learner's payment is above / equal to / below the
-snapshot seat's, so x is ½ at parity whatever the seating. Counts decay by `stat_decay` per update
-and start from a ½ prior (one pseudo-game). To keep the rollout forward batched, only `active_past`
+Opponents are sampled by prioritised fictitious self-play: weight (1 − p)^`pfsp_power`, p the
+learner's share against that snapshot under `pfsp_metric`:
+
+- `win`: x, the pairwise win share — per hand, each (learner seat, snapshot seat) pair scores
+  1 / ½ / 0 as the learner's payment is above / equal to / below the snapshot seat's, so x is ½
+  at parity whatever the seating. ½ prior (one pseudo-game).
+- `points`: σ(d / `points_scale`), d the mean payment difference per (learner seat, snapshot seat)
+  pair in training reward units, 0 prior (one pseudo-pair). x counts a 1-point and a 64-point win
+  alike; d doesn't.
+
+Counts decay by `stat_decay` per update. To keep the rollout forward batched, only `active_past`
 past and `active_personas` persona draws (with replacement) are playable at a time, redrawn every
 `rotate_every` updates; a step runs one forward per distinct opponent present.
 
@@ -29,6 +35,7 @@ the learner's rating is the maximum-likelihood fit to its decayed pairwise score
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
@@ -44,12 +51,14 @@ __all__ = [
     "League",
     "LeagueConfig",
     "Persona",
+    "pairwise_points",
     "pairwise_scores",
     "persona_rewards",
 ]
 
 PAST = "past"
 _ELO_SCALE = 400.0
+PFSP_METRICS = ("win", "points")
 # a hand spans at most a handful of updates; an evicted model stays playable this long
 _RETIRE_UPDATES = 64
 
@@ -87,6 +96,11 @@ def pairwise_scores(rewards: np.ndarray, learners: list[int], others: list[int])
     return total
 
 
+def pairwise_points(rewards: np.ndarray, learners: list[int], others: list[int]) -> float:
+    """Sum over (learner seat, other seat) pairs of the learner's payment minus the other's."""
+    return float(sum(float(rewards[a]) - float(rewards[b]) for a in learners for b in others))
+
+
 @dataclass
 class LeagueConfig:
     self_share: float = 0.5
@@ -100,6 +114,9 @@ class LeagueConfig:
     active_personas: int = 1
     rotate_every: int = 16
     pfsp_power: float = 2.0
+    pfsp_metric: str = "win"
+    # logistic scale on the mean pair payment difference (docs/ml.md §11)
+    points_scale: float = 0.83
     stat_decay: float = 0.999
     persona_updates: int = 100
     personas: tuple[Persona, ...] = DEFAULT_PERSONAS
@@ -112,6 +129,10 @@ class LeagueConfig:
             raise ValueError(f"seat_learners must be 1..3, got {self.seat_learners}")
         if min(self.max_past, self.max_personas, self.active_past, self.active_personas) < 1:
             raise ValueError("max_past, max_personas, active_past, active_personas must be >= 1")
+        if self.pfsp_metric not in PFSP_METRICS:
+            raise ValueError(f"pfsp_metric must be one of {PFSP_METRICS}, got {self.pfsp_metric!r}")
+        if not self.points_scale > 0:
+            raise ValueError(f"points_scale must be > 0, got {self.points_scale}")
         names = [p.name for p in self.personas]
         if PAST in names or len(set(names)) != len(names):
             raise ValueError(f"persona names must be unique and not {PAST!r}: {names}")
@@ -129,8 +150,9 @@ class LeagueConfig:
 
 @dataclass
 class Entry:
-    """One frozen snapshot. `score`/`games` are decayed pairwise counts (the PFSP and Elo input),
-    `hands`/`wins` decayed learner seat-hands against it."""
+    """One frozen snapshot. `score`/`games` are decayed pairwise win counts, `points`/`pairs`
+    the decayed pairwise payment-difference sum and its pair count (absent before points stats
+    existed: such entries load at 0, the prior), `hands`/`wins` decayed learner seat-hands."""
 
     id: int
     kind: str
@@ -141,10 +163,16 @@ class Entry:
     games: float = 0.0
     hands: float = 0.0
     wins: float = 0.0
+    points: float = 0.0
+    pairs: float = 0.0
 
     @property
     def win_share(self) -> float:
         return (self.score + 0.5) / (self.games + 1.0)
+
+    @property
+    def points_diff(self) -> float:
+        return self.points / (self.pairs + 1.0)
 
 
 def _expected(diff: np.ndarray) -> np.ndarray:
@@ -212,8 +240,19 @@ class League:
         e = self.entry(oid)
         return e.kind if e is not None else self._retired[oid][0]
 
+    def points_share(self, e: Entry) -> float:
+        return 1.0 / (1.0 + math.exp(-e.points_diff / self.cfg.points_scale))
+
+    def share(self, e: Entry) -> float:
+        """The learner's share against `e` under `pfsp_metric`: the PFSP and Elo input."""
+        return e.win_share if self.cfg.pfsp_metric == "win" else self.points_share(e)
+
+    def _evidence(self, e: Entry) -> float:
+        """Pseudo-count weight of `share(e)` in the Elo fit, prior included."""
+        return (e.games if self.cfg.pfsp_metric == "win" else e.pairs) + 1.0
+
     def weights(self, pool: list[Entry]) -> np.ndarray:
-        w = np.array([(1.0 - e.win_share) ** self.cfg.pfsp_power for e in pool])
+        w = np.array([(1.0 - self.share(e)) ** self.cfg.pfsp_power for e in pool])
         return w / w.sum()
 
     def rotate(self, updates: int) -> bool:
@@ -256,7 +295,9 @@ class League:
         mix (share of hands) and exhaustive-draw rate per type."""
         d = self.cfg.stat_decay
         for e in self.entries:
-            e.score, e.games, e.hands, e.wins = (x * d for x in (e.score, e.games, e.hands, e.wins))
+            e.score, e.games, e.hands, e.wins, e.points, e.pairs = (
+                x * d for x in (e.score, e.games, e.hands, e.wins, e.points, e.pairs)
+            )
         counts = {"self": 0, "past": 0, "persona": 0}
         draws = dict.fromkeys(counts, 0)
         for oid, rewards, bits in hands:
@@ -270,7 +311,9 @@ class League:
             learners = [s for s in range(4) if bits >> s & 1]
             others = [s for s in range(4) if not bits >> s & 1]
             e.score += pairwise_scores(rewards, learners, others)
+            e.points += pairwise_points(rewards, learners, others)
             e.games += len(learners) * len(others)
+            e.pairs += len(learners) * len(others)
             e.hands += len(learners)
             e.wins += sum(bool(rewards[s] > 0) for s in learners)
         self.elo = self.fit_elo()
@@ -283,12 +326,12 @@ class League:
         return out
 
     def fit_elo(self) -> float:
-        pool = [e for e in self.by_kind(True) if e.games > 0]
+        pool = [e for e in self.by_kind(True) if self._evidence(e) > 1.0]
         if not pool:
             return self.elo
         anchors = np.array([e.elo for e in pool])
-        games = np.array([e.games for e in pool]) + 1.0
-        score = np.array([e.score for e in pool]) + 0.5
+        games = np.array([self._evidence(e) for e in pool])
+        score = games * np.array([self.share(e) for e in pool])
         lo, hi = anchors.min() - 4000.0, anchors.max() + 4000.0
         for _ in range(60):
             mid = 0.5 * (lo + hi)
@@ -299,7 +342,7 @@ class League:
         return float(0.5 * (lo + hi))
 
     def metrics(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "league_past": len(self.by_kind(True)),
             "league_personas": len(self.by_kind(False)),
             "league_elo": round(self.elo, 2),
@@ -307,6 +350,8 @@ class League:
             "league_vs": {
                 f"{e.kind}{e.id}": {
                     "x": round(e.win_share, 4),
+                    "pts": round(e.points_diff, 4),
+                    "p": round(self.share(e), 4),
                     "win": round(e.wins / e.hands, 4) if e.hands > 0 else None,
                     "hands": round(e.hands, 1),
                     "elo": round(e.elo, 1),
@@ -315,6 +360,12 @@ class League:
                 for e in self.entries
             },
         }
+        for past, name in ((True, "past"), (False, "persona")):
+            pool = [e for e in self.by_kind(past) if e.pairs > 0]
+            if pool:
+                pairs = sum(e.pairs for e in pool)
+                out[f"league_pts_{name}"] = round(sum(e.points for e in pool) / pairs, 4)
+        return out
 
     def state_dict(self) -> dict[str, Any]:
         return {
