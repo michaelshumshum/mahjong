@@ -16,19 +16,25 @@ torch = pytest.importorskip("torch")
 from torch import nn
 
 from ml.encode_v2 import ORACLE_FIELDS
+from ml.league import Persona, persona_rewards
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.ppo import (
+    Collector,
     Learner,
     OracleAdapter,
     PopArt,
     PPOConfig,
+    StageParams,
+    _env_config,
     critic_from_policy,
     gae,
+    load_ppo_config,
     ppo_policy_loss,
+    reward_divisors,
     shaped_rewards,
     train_ppo,
 )
-from ml.train_env import EnvConfig, VecTrainEnv, unpack_rows, with_min_faan
+from ml.train_env import PRESET_IDS, EnvConfig, VecTrainEnv, unpack_rows, with_min_faan
 
 _TINY = {"channels": 8, "blocks": 1}
 
@@ -309,3 +315,82 @@ def test_train_ppo_is_deterministic(tmp_path):
         return {k: v for k, v in rec.items() if not k.endswith("_s") and "per_s" not in k}
 
     assert run("a") == run("b")
+
+
+def test_reward_divisors_default_to_one_and_pin_the_base_ruleset():
+    assert set(reward_divisors(PPOConfig())) == {1.0}
+    scale = {"hk_casual": 4.0, "hk_strict": 1.25}
+    div = reward_divisors(PPOConfig(reward_scale_by_ruleset=scale))
+    assert div[0] == 1.0  # row ruleset 0 is the base ruleset, hk_classic
+    assert div[1 + PRESET_IDS.index("hk_classic")] == 1.0
+    assert div[1 + PRESET_IDS.index("hk_casual")] == 4.0
+    assert div[1 + PRESET_IDS.index("hk_strict")] == 1.25
+    assert reward_divisors(PPOConfig(reward_scale_by_ruleset={"hk_classic": 1.0}))[0] == 1.0
+    for bad in ({"hk_classic": 2.0}, {"nope": 2.0}, {"hk_casual": 0.0}, {"hk_casual": -1.0}):
+        with pytest.raises(ValueError, match="reward_scale_by_ruleset"):
+            load_ppo_config({"reward_scale_by_ruleset": bad})
+    # the base is whatever `ruleset` names
+    with pytest.raises(ValueError, match="base ruleset"):
+        reward_divisors(PPOConfig(ruleset="hk_casual", reward_scale_by_ruleset={"hk_casual": 4.0}))
+
+
+def _alt_episodes(learner, seed=0):
+    """Real hands, half `hk_casual`, with a synthetic payout so every hand carries a reward."""
+    params = StageParams(
+        min_faan=0,
+        learners=4,
+        keep_prob=0.0,
+        oracle_k=0,
+        beta=0.0,
+        alt_rulesets=(("hk_casual", 0.5),),
+    )
+    venv = VecTrainEnv(4, seed, _env_config(learner.cfg, params, None))
+    episodes, _, _ = Collector(venv, 0, np.random.default_rng(seed)).collect(learner, params, 400)
+    payout = np.array([3.0, -1.0, -1.0, -1.0], dtype=np.float32)
+    return [replace(e, rewards=payout.copy()) for e in episodes], params
+
+
+def test_reward_scaling_divides_alt_preset_hands_and_is_off_by_default(monkeypatch):
+    casual = 1 + PRESET_IDS.index("hk_casual")
+    finals: list[float] = []
+
+    def spy(final, potentials):
+        finals.append(final)
+        return shaped_rewards(final, potentials)
+
+    monkeypatch.setattr("ml.ppo.shaped_rewards", spy)
+
+    def run(scale):
+        torch.manual_seed(0)
+        cfg = PPOConfig(**_TINY, reward_scale_by_ruleset=scale)
+        learner = Learner(cfg, PolicyNet(PolicyNetConfig(**_TINY)))
+        episodes, params = _alt_episodes(learner)
+        finals.clear()
+        learner.update(episodes, params, 0, 0.0)
+        expected = [
+            float(e.rewards[s]) / (4.0 if e.ruleset == casual else 1.0)
+            if scale
+            else float(e.rewards[s])
+            for e in episodes
+            for s in np.unique(e.seats)
+        ]
+        return episodes, list(finals), expected
+
+    episodes, got, expected = run({"hk_casual": 4.0})
+    assert {e.ruleset for e in episodes} == {0, casual}
+    assert all(e.ruleset == unpack_rows(e.rows, ("ruleset",))["ruleset"][0] for e in episodes)
+    assert got == pytest.approx(expected) and 0.75 in got and 3.0 in got
+    _, got, expected = run(None)
+    assert got == expected  # exact: off by default changes no reward
+
+
+def test_persona_perturbation_and_reward_scaling_compose():
+    cfg = PPOConfig(**_TINY, reward_scale_by_ruleset={"hk_casual": 4.0})
+    learner = Learner(cfg, PolicyNet(PolicyNetConfig(**_TINY)))
+    episodes, _ = _alt_episodes(learner)
+    e = next(e for e in episodes if e.ruleset)
+    info = np.array([0, 1, 15, 0, 0])
+    ron = replace(e, rewards=np.array([4.0, -4.0, 0.0, 0.0], dtype=np.float32), info=info)
+    persona = Persona("p", win=1.6, deal_in=2.0)
+    perturbed = replace(ron, rewards=persona_rewards(ron.rewards, ron.info, persona))
+    np.testing.assert_allclose(learner.train_rewards(perturbed), [1.6, -2.0, 0.0, 0.0])

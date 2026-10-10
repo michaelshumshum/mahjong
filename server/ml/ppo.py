@@ -6,7 +6,8 @@
 `batch_size` learner decisions from `ml.train_env`, then `epochs` passes of clipped PPO over them:
 
 - masking only through `legal_mask` (`masked_log_softmax`, `masked_entropy`);
-- reward = own payment / 32 at hand end, unclipped; potential shaping Φ = −β·shanten, Φ(end) = 0;
+- reward = own payment / 32 at hand end, unclipped, divided by the hand's ruleset factor
+  (`reward_scale_by_ruleset`, off by default); potential shaping Φ = −β·shanten, Φ(end) = 0;
 - per-seat GAE with γ = 1 over each seat's decisions in a hand; values are recomputed by the
   critic at update time, so samples from hands that straddled an update are still consistent;
 - asymmetric critic (`OracleCritic`: policy tiles + all oracle channels) with PopArt;
@@ -106,6 +107,7 @@ __all__ = [
     "load_ppo_config",
     "ppo_policy_loss",
     "resolve_device",
+    "reward_divisors",
     "shaped_rewards",
     "train_persona",
     "train_ppo",
@@ -232,6 +234,8 @@ class PPOConfig:
     stage: dict[str, Any] = field(default_factory=dict)
     curriculum: dict[str, Any] | None = None
     league: dict[str, Any] | None = None
+    # preset -> divisor on that preset's hand rewards; the base ruleset's must be 1 (docs/ml.md §9)
+    reward_scale_by_ruleset: dict[str, float] | None = None
 
     def base_ruleset(self) -> RuleSet:
         return RULESET_PRESETS[self.ruleset]
@@ -246,7 +250,22 @@ def load_ppo_config(raw: dict[str, Any]) -> PPOConfig:
         raise ValueError(f"policy_loss must be one of {POLICY_LOSSES}, got {cfg.policy_loss!r}")
     if cfg.league is not None:
         LeagueConfig.from_dict(cfg.league)
+    reward_divisors(cfg)
     return cfg
+
+
+def reward_divisors(cfg: PPOConfig) -> tuple[float, ...]:
+    """Indexed by a row's `ruleset` id (0 = `cfg.ruleset`, 1 + i = `PRESET_IDS[i]`): the divisor
+    on that hand's payment reward. All 1.0 without `reward_scale_by_ruleset`."""
+    scale = dict(cfg.reward_scale_by_ruleset or {})
+    unknown = set(scale) - set(RULESET_PRESETS)
+    if unknown:
+        raise ValueError(f"reward_scale_by_ruleset: unknown presets {sorted(unknown)}")
+    if any(not (math.isfinite(v) and v > 0) for v in scale.values()):
+        raise ValueError(f"reward_scale_by_ruleset factors must be finite and > 0: {scale}")
+    if scale.get(cfg.ruleset, 1.0) != 1.0:
+        raise ValueError(f"reward_scale_by_ruleset: the base ruleset {cfg.ruleset!r} must be 1")
+    return tuple(float(scale.get(name, 1.0)) for name in (cfg.ruleset, *PRESET_IDS))
 
 
 def resolve_device(name: str) -> torch.device:
@@ -446,6 +465,7 @@ class Episode:
     info: np.ndarray
     blind: bool
     opponent: int = 0
+    ruleset: int = 0
 
 
 class Encoder:
@@ -506,6 +526,11 @@ class Learner:
         ]
         self.opt = torch.optim.AdamW(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
         self.encoder = Encoder(cfg.base_ruleset())
+        self.reward_div = reward_divisors(cfg)
+
+    def train_rewards(self, e: Episode) -> np.ndarray:
+        """The hand's `(4,)` rewards in training units: `e.rewards` / its ruleset's divisor."""
+        return e.rewards / self.reward_div[e.ruleset]
 
     def state_dict(self) -> dict[str, Any]:
         """On CPU whatever the device."""
@@ -635,10 +660,12 @@ class Learner:
         for e in episodes:
             m = len(e.rows)
             winner, discarder = int(e.info[0]), int(e.info[1])
+            final = self.train_rewards(e)
             for s in np.unique(e.seats):
                 idx = at + np.flatnonzero(e.seats == s)
-                r = shaped_rewards(float(e.rewards[s]), -params.beta * shanten_now[idx])
+                r = shaped_rewards(float(final[s]), -params.beta * shanten_now[idx])
                 adv[idx], ret[idx] = gae(r, values[idx], c.gae_lambda)
+                # the aux payment head keeps raw points
                 payment[idx] = round(float(e.rewards[s]) * 32)
                 won[idx] = winner == s
                 dealt[idx] = discarder == s and winner != s
@@ -845,6 +872,7 @@ class Collector:
         if not samples:
             return None
         cols = list(zip(*samples, strict=True))
+        first = unpack_rows(cols[0][0][None], ("opponent", "ruleset"))
         return Episode(
             rows=np.stack(cols[0]),
             masks=np.stack(cols[1]),
@@ -856,7 +884,8 @@ class Collector:
             rewards=rewards,
             info=info,
             blind=i < self.n_blind,
-            opponent=int(opponent_ids(unpack_rows(cols[0][0][None], ("opponent",)))[0]),
+            opponent=int(opponent_ids(first)[0]),
+            ruleset=int(first["ruleset"][0]),
         )
 
 
@@ -1127,7 +1156,12 @@ def train_ppo(
                 t2 = time.monotonic()
                 if league is not None and params.league:
                     league_record.update(
-                        league.observe([(e.opponent, e.rewards, int(e.info[2])) for e in episodes])
+                        league.observe(
+                            [
+                                (e.opponent, learner.train_rewards(e), int(e.info[2]))
+                                for e in episodes
+                            ]
+                        )
                     )
                     league_record.update(league.metrics())
                 decisions += n
