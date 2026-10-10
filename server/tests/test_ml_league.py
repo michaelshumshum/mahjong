@@ -644,6 +644,11 @@ def test_league_config_reward_scale_and_pfsp_metric():
     assert div[1 + PRESET_IDS.index("hk_strict")] == pytest.approx(0.98 / 0.87, abs=0.01)
     league = LeagueConfig.from_dict(cfg.league)
     assert league.pfsp_metric == "points" and league.points_scale == pytest.approx(0.83)
+    assert league.persona_updates == 400
+    assert {(p.name, p.win, p.deal_in) for p in league.personas} == {
+        ("aggressive", 1.6, 1.0),
+        ("defensive", 1.0, 2.0),
+    }
     # every config other than the league's leaves rewards unscaled
     for path in Path("ml/configs").glob("rl_ppo_*.yaml"):
         assert set(reward_divisors(main_config(path))) == {1.0}
