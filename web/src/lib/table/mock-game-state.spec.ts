@@ -124,7 +124,8 @@ describe('MOCK_SCENARIOS', () => {
 			'claim-window',
 			'hand-ended',
 			'hand-ended-draw',
-			'game-ended'
+			'game-ended',
+			'late-hand'
 		]);
 	});
 

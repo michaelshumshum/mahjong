@@ -149,6 +149,12 @@ const PAGES = [
 		url: '/table/demo123?mock=1',
 		viewport: PHONE_LANDSCAPE
 	},
+	{ name: 'table-late-hand-phone', url: '/table/demo123?mock=late-hand', viewport: PHONE },
+	{
+		name: 'table-late-hand-phone-landscape',
+		url: '/table/demo123?mock=late-hand',
+		viewport: PHONE_LANDSCAPE
+	},
 	{
 		name: 'table-claim-window-phone',
 		url: '/table/demo123?mock=claim-window',

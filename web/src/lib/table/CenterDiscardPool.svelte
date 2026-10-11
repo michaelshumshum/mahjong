@@ -19,7 +19,12 @@
 	} = $props();
 </script>
 
-<div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
+<div
+	class="discard-pool discard-pool--{position}"
+	role="list"
+	aria-label={ariaLabel}
+	data-seat-name={seat.name}
+>
 	{#each seat.discards as code, i (i)}
 		<div
 			class="discard-tile"
@@ -195,13 +200,42 @@
 		}
 	}
 
+	// phone: pools stack as wrapping rows led by the seat name (position no longer says whose).
+	// the label is visual only -- the list's aria-label already names the seat.
 	@include layout.phone-only {
 		.discard-pool {
-			grid-template-columns: none;
-			grid-auto-flow: column;
-			grid-auto-columns: var(--discard-w);
-			overflow-x: auto;
-			max-width: 100%;
+			position: relative;
+			display: flex;
+			flex-wrap: wrap;
+			align-self: stretch;
+			min-width: 0;
+			min-height: var(--discard-h);
+			padding-inline-start: 3.25rem;
+
+			&::before {
+				content: attr(data-seat-name) / '';
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 3rem;
+				overflow: hidden;
+				color: var(--color-text-muted);
+				font-size: var(--font-size-xs);
+				font-weight: 600;
+				line-height: var(--discard-h);
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+		}
+
+		.discard-tile {
+			width: var(--discard-w);
+		}
+	}
+
+	@include layout.phone-landscape {
+		.discard-pool {
+			--discard-h: 26px;
 		}
 	}
 </style>

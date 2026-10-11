@@ -84,7 +84,8 @@ $breakpoint-short: 500px;
 			'left center'
 			'right center'
 			'self self';
-		grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
+		// wide enough for four melds on one line beside the plate's line at 844px.
+		grid-template-columns: minmax(10rem, min(22rem, 42%)) minmax(0, 1fr);
 		grid-template-rows: repeat(3, minmax(0, 1fr)) auto;
 		gap: var(--space-1) var(--space-2);
 	}

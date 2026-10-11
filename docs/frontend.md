@@ -229,7 +229,8 @@ collapses instead. Your own meld row sits above your name, toward the centre.
 | < 44px | stays 44px (touch target) and overlaps via negative `margin-inline-start`, same formula |
 
 **Portrait phone** (`phone-portrait`: `phone-only` minus `phone-landscape`) wraps the hand into two
-rows of 7 instead (`flex-wrap`, tile width `clamp(36px, fit-7, 63px)`, ~46px at 390px) — one row of
+rows of 8 instead (`flex-wrap`, tile width `clamp(36px, fit-8, 63px)`, ~40px at 390px; a 7-tile hand
+plus the drawn tile stays on one row) — one row of
 14 overlapped to ~half a face there, hiding tiles and sending taps to the neighbour, while the
 centre had height to spare. Page padding, rim and felt padding shrink there too (they took ~84px of
 390). `row-gap` and a top pad equal the two-step lift (30% of tile height),
@@ -247,8 +248,8 @@ plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 
 
 | Mixin | Query | Layout |
 | --- | --- | --- |
-| `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips, strip pools, sticky hand bar (below) |
-| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll, the three opponent chips stack in a side column beside the centre (`'across center' 'left center' 'right center' 'self self'`), each a third of the height (scrolling only if its melds overflow); the centre scrolls inside itself; hand tiles 44–56px (below) |
+| `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips, stacked wrapping pools, sticky hand bar (below) |
+| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll, the three opponent chips stack in a side column beside the centre (`'across center' 'left center' 'right center' 'self self'`), each a third of the height (scrolling only if its melds overflow); column `minmax(10rem, min(22rem, 42%))` so four melds fit one line at 844px; chip tiles `clamp(20px, 5.6dvh, 26px)`, discard tiles 26px; the centre scrolls inside itself; hand tiles 44–56px (below) |
 | `tablet-up` | `min-width: 768px` and `min-height: 501px` | the box layout above |
 | `desktop-up` | `min-width: 1180px` and `min-height: 501px` | roomier page and surface padding |
 
@@ -275,14 +276,20 @@ Below 768px (phone portrait):
 - All three opponents become compact chips, one full-width grid row each (`left`, `across`,
   `right`, then `center`, `self`; `layout.seat-region-grid`) — three chips side by side left each
   ~99px, with 18px meld tiles wrapping after four. Each chip is one wrapping flex line: the
-  `SeatPlate` (fixed 9rem so the counts align, long names truncate), a single jade back with a `×N`
+  `SeatPlate` (fixed 8rem so the counts align, long names truncate), a single jade back with a `×N`
   count (`.backs-count`, `aria-hidden` — the row's own label already states the count), then
-  melds/flowers at 30px tall, which drop to a second line only when they don't fit (the strip is
-  `display: contents`). Phone landscape uses the same chip in its side column. The other backs stay in the DOM, hidden
+  the flower group and each meld at 28px tall. The strip and meld row are `display: contents`, so
+  every meld is its own flex item: flowers join the name line when they fit and a meld wraps
+  whole to the next line, never split across two. The single back matches the meld height so it
+  never sets the name line's height. Phone landscape uses the same chip in its side column. The other backs stay in the DOM, hidden
   (`display: none`), so positional identity (§4) and the specs counting `.backs-row .mini-tile`
   are unchanged.
-- Each opponent's discard pool collapses to a horizontally-scrollable strip; full history stays in
-  the DOM (§9).
+- The four discard pools stack as full-width wrapping rows (no horizontal scroll — a single-row
+  strip ran past the viewport late in a hand), each led by its seat's name via
+  `::before { content: attr(data-seat-name) / '' }`: stacked, position no longer says whose pool it
+  is, and the empty alt text keeps the label out of the list's accessible tree (its `aria-label`
+  already names the seat). Full history stays in the DOM (§9). The `late-hand` mock scenario
+  (full pools, 4 melds + 3 flowers) is the stress fixture for all of this.
 - Your hand is a `position: sticky; bottom: 0` bar with `env(safe-area-inset-bottom)` padding.
   `app.html`'s viewport meta carries `viewport-fit=cover` — without it every `env(safe-area-inset-*)`
   resolves to 0 on iOS — and `body` pads by the side insets for landscape notches. It keeps

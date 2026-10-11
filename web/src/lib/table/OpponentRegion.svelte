@@ -263,13 +263,20 @@
 			background: rgb(0 0 0 / 0.18);
 		}
 
-		.seat-hand-strip {
+		// each meld (and the flower group) is its own flex item: flowers join the name line and a
+		// meld wraps whole, never split across lines.
+		.seat-hand-strip,
+		.meld-row {
 			display: contents;
+		}
+
+		.meld {
+			margin-inline-end: 0;
 		}
 
 		// fixed width so the ×N counts line up down the three rows; long names truncate.
 		.seat-region :global(.seat-plate) {
-			flex: 0 0 9rem;
+			flex: 0 0 8rem;
 			gap: var(--space-1);
 			min-width: 0;
 		}
@@ -281,8 +288,14 @@
 			white-space: nowrap;
 		}
 
-		.meld-row .mini-tile {
-			height: 30px;
+		// the one visible back matches the melds, so it never sets the plate line's height.
+		.seat-region {
+			--chip-tile-h: 28px;
+		}
+
+		.meld-row .mini-tile,
+		.backs-row .mini-tile {
+			height: var(--chip-tile-h);
 		}
 
 		.backs-row {
@@ -307,12 +320,9 @@
 	// short landscape: each chip gets a third of the side column; scrolls only if melds overflow it.
 	@include layout.phone-landscape {
 		.seat-region {
+			--chip-tile-h: clamp(20px, 5.6dvh, 26px);
 			align-content: center;
 			overflow-y: auto;
-		}
-
-		.meld-row .mini-tile {
-			height: 26px;
 		}
 	}
 </style>

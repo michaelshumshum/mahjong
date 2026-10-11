@@ -1187,6 +1187,10 @@
 			flex: 1 0 auto;
 			height: auto;
 		}
+
+		.table-center {
+			gap: var(--space-2);
+		}
 	}
 
 	@include layout.desktop-up {
@@ -1223,6 +1227,7 @@
 		}
 
 		.table-center {
+			gap: var(--space-1);
 			min-height: 0;
 			overflow-y: auto;
 		}

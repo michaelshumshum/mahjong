@@ -74,11 +74,13 @@ Phone (390×844, one screen — the hand stays pinned to the bottom):
 | | | |
 | --- | --- | --- |
 | ![Lobby, phone](docs/screenshots/lobby-phone.png) Lobby | ![Table, your turn, phone](docs/screenshots/table-your-turn-phone.png) Table — your turn | ![Table, claim window, phone](docs/screenshots/table-claim-window-phone.png) Table — claim window |
-| ![Table, hand ended, phone](docs/screenshots/table-hand-ended-phone.png) Table — hand ended | ![Table, game ended, phone](docs/screenshots/table-game-ended-phone.png) Table — game ended | |
+| ![Table, hand ended, phone](docs/screenshots/table-hand-ended-phone.png) Table — hand ended | ![Table, game ended, phone](docs/screenshots/table-game-ended-phone.png) Table — game ended | ![Table, late hand, phone](docs/screenshots/table-late-hand-phone.png) Table — late hand, crowded |
 
 Phone held sideways (844×390 — opponents stacked beside the centre, no page scroll):
 
 ![Table, your turn, phone landscape](docs/screenshots/table-your-turn-phone-landscape.png)
+
+![Table, late hand, phone landscape](docs/screenshots/table-late-hand-phone-landscape.png)
 
 ## Documentation
 

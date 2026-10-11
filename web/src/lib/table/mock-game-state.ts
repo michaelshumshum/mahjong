@@ -427,6 +427,145 @@ export const gameJustEnded: MockGameState = {
 	}
 };
 
+// Scenario 6: late in a hand -- full discard pools, every opponent heavily melded. Stresses the
+// phone layouts (pool wrapping, meld rows), which the early-hand fixtures never fill.
+export const lateHandCrowded: MockGameState = {
+	...yourTurnToDiscard,
+	handNo: 6,
+	wallCount: 9,
+	lastDiscard: { seat: 3, index: 19 },
+	seats: [
+		emptySeat(0, {
+			concealedCount: 7,
+			concealedHand: ['2m', '3m', '4m', '6p', '6p', '7s', '8s'],
+			drawn: '9s',
+			melds: [
+				{ kind: 'pung', tiles: ['z5', 'z5', 'z5'], fromSeat: 2 },
+				{ kind: 'chow', tiles: ['3p', '4p', '5p'], fromSeat: 3 }
+			],
+			flowers: ['f1', 'f5'],
+			discards: [
+				'1s',
+				'9p',
+				'z2',
+				'1m',
+				'z3',
+				'9m',
+				'5s',
+				'2p',
+				'8m',
+				'z4',
+				'1p',
+				'7m',
+				'3s',
+				'z6',
+				'6m',
+				'4s',
+				'9p',
+				'2s',
+				'5m'
+			],
+			score: 40
+		}),
+		emptySeat(1, {
+			concealedCount: 1,
+			melds: [
+				{ kind: 'pung', tiles: ['z1', 'z1', 'z1'], fromSeat: 3 },
+				{ kind: 'chow', tiles: ['6m', '7m', '8m'], fromSeat: 0 },
+				{ kind: 'exposed_kong', tiles: ['4p', '4p', '4p', '4p'], fromSeat: 2 },
+				{ kind: 'concealed_kong', tiles: ['8s', '8s', '8s', '8s'] }
+			],
+			flowers: ['f3', 'f6', 'f8'],
+			discards: [
+				'2p',
+				'3p',
+				'7s',
+				'z4',
+				'1m',
+				'9s',
+				'z2',
+				'5p',
+				'3m',
+				'6s',
+				'1p',
+				'z7',
+				'8p',
+				'2s',
+				'9m',
+				'4m',
+				'z3',
+				'7p',
+				'1s',
+				'6p'
+			],
+			score: -20
+		}),
+		emptySeat(2, {
+			concealedCount: 4,
+			melds: [
+				{ kind: 'chow', tiles: ['1s', '2s', '3s'], fromSeat: 1 },
+				{ kind: 'pung', tiles: ['z6', 'z6', 'z6'], fromSeat: 0 },
+				{ kind: 'pung', tiles: ['9p', '9p', '9p'], fromSeat: 3 }
+			],
+			flowers: ['f2'],
+			discards: [
+				'9m',
+				'1p',
+				'5s',
+				'6s',
+				'z6',
+				'2m',
+				'8s',
+				'z1',
+				'4s',
+				'7m',
+				'3p',
+				'z4',
+				'5m',
+				'2p',
+				'9s',
+				'1m',
+				'6p',
+				'z2',
+				'8m',
+				'3s',
+				'7p'
+			],
+			score: 10
+		}),
+		emptySeat(3, {
+			concealedCount: 7,
+			melds: [
+				{ kind: 'chow', tiles: ['4m', '5m', '6m'], fromSeat: 2 },
+				{ kind: 'exposed_kong', tiles: ['z7', 'z7', 'z7', 'z7'], fromSeat: 1 }
+			],
+			discards: [
+				'8p',
+				'2m',
+				'z3',
+				'7s',
+				'1s',
+				'5p',
+				'9m',
+				'z4',
+				'3m',
+				'6s',
+				'2p',
+				'8m',
+				'z1',
+				'4p',
+				'7m',
+				'1p',
+				'9s',
+				'3p',
+				'z2',
+				'6m'
+			],
+			score: -30
+		})
+	]
+};
+
 export interface MockScenario {
 	id: string;
 	label: string;
@@ -438,5 +577,6 @@ export const MOCK_SCENARIOS: MockScenario[] = [
 	{ id: 'claim-window', label: 'Claim window open (you)', state: claimWindowOpenForYou },
 	{ id: 'hand-ended', label: 'Hand just ended', state: handJustEnded },
 	{ id: 'hand-ended-draw', label: 'Hand ended in a draw', state: handJustEndedDraw },
-	{ id: 'game-ended', label: 'Game just ended', state: gameJustEnded }
+	{ id: 'game-ended', label: 'Game just ended', state: gameJustEnded },
+	{ id: 'late-hand', label: 'Late hand, crowded table', state: lateHandCrowded }
 ];

@@ -234,6 +234,55 @@ test('portrait phone opponents are stacked full-width chip rows', async ({ page 
 	expect(boxes[1].y + boxes[1].height).toBeLessThanOrEqual(boxes[2].y);
 });
 
+// late-hand: ~20 discards per pool and up to 4 melds + 3 flowers per opponent.
+for (const [width, height] of [
+	[390, 844],
+	[360, 740],
+	[844, 390],
+	[667, 375]
+] as const) {
+	test(`a crowded late hand stays inside the viewport width at ${width}x${height}`, async ({
+		page
+	}) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/table/abc123?mock=late-hand');
+		await page.waitForLoadState('networkidle');
+
+		expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+			width
+		);
+		const pools = page.locator('.discard-pool');
+		await expect(pools).toHaveCount(4);
+		for (const pool of await pools.all()) {
+			const box = (await pool.boundingBox())!;
+			const rights = await pool
+				.locator('.discard-tile')
+				.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+			for (const right of rights) expect(right).toBeLessThanOrEqual(box.x + box.width + 0.5);
+		}
+		for (const pos of ['left', 'across', 'right']) {
+			const chip = page.locator(`.seat-region--${pos}`);
+			const box = (await chip.boundingBox())!;
+			const rights = await chip
+				.locator('.meld .mini-tile')
+				.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().right));
+			for (const right of rights) expect(right).toBeLessThanOrEqual(box.x + box.width + 0.5);
+		}
+	});
+}
+
+test('a portrait phone keeps a 7-tile hand plus the drawn tile on one row', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/table/abc123?mock=late-hand');
+	await page.waitForLoadState('networkidle');
+
+	const tops = await page
+		.locator('.seat-region--self .hand-tile-slot')
+		.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+	expect(tops).toHaveLength(8);
+	expect(new Set(tops).size).toBe(1);
+});
+
 test('phone landscape puts your melds on the seat plate row', async ({ page }) => {
 	await page.setViewportSize({ width: 844, height: 390 });
 	await page.goto('/table/abc123?mock=your-turn');
