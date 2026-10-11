@@ -4,8 +4,8 @@
 	import type { MockSeatState } from './mock-game-state';
 	import { m } from '$lib/paraglide/messages.js';
 
-	// all four discard pools live in the centre box (docs/frontend.md §3); `position` picks
-	// the box side and, for left/right, the rotation matching that seat's own hand.
+	// tablet-up: all four pools box the centre hub, `position` picking the side and rotation;
+	// phone: each sits under its own seat (docs/frontend.md §3).
 	let {
 		seat,
 		position,
@@ -19,12 +19,7 @@
 	} = $props();
 </script>
 
-<div
-	class="discard-pool discard-pool--{position}"
-	role="list"
-	aria-label={ariaLabel}
-	data-seat-name={seat.name}
->
+<div class="discard-pool discard-pool--{position}" role="list" aria-label={ariaLabel}>
 	{#each seat.discards as code, i (i)}
 		<div
 			class="discard-tile"
@@ -200,32 +195,42 @@
 		}
 	}
 
-	// phone: pools stack as wrapping rows led by the seat name (position no longer says whose).
-	// the label is visual only -- the list's aria-label already names the seat.
+	// phone: each pool is a wrapping row under its own seat (layout.seat-region-grid's pool-*
+	// areas); an opponent's pool tucks into the gap and reads as the bottom of its chip.
 	@include layout.phone-only {
 		.discard-pool {
-			position: relative;
 			display: flex;
 			flex-wrap: wrap;
-			align-self: stretch;
+			align-content: flex-start;
 			min-width: 0;
-			min-height: var(--discard-h);
-			padding-inline-start: 3.25rem;
+			min-height: calc(var(--discard-h) + var(--space-1));
+			padding: 0 var(--space-2) var(--space-1);
+			border-radius: 0 0 var(--radius-md) var(--radius-md);
+			background: rgb(0 0 0 / 0.18);
+		}
 
-			&::before {
-				content: attr(data-seat-name) / '';
-				position: absolute;
-				top: 0;
-				left: 0;
-				width: 3rem;
-				overflow: hidden;
-				color: var(--color-text-muted);
-				font-size: var(--font-size-xs);
-				font-weight: 600;
-				line-height: var(--discard-h);
-				text-overflow: ellipsis;
-				white-space: nowrap;
-			}
+		.discard-pool--across {
+			grid-area: pool-across;
+		}
+
+		.discard-pool--left {
+			grid-area: pool-left;
+		}
+
+		.discard-pool--right {
+			grid-area: pool-right;
+		}
+
+		.discard-pool--self {
+			grid-area: pool-self;
+			align-self: end;
+			min-height: calc(var(--discard-h) + 2 * var(--space-1));
+			padding-block-start: var(--space-1);
+			border-radius: var(--radius-md);
+		}
+
+		.discard-pool:not(.discard-pool--self) {
+			margin-block-start: calc(-1 * var(--space-1));
 		}
 
 		.discard-tile {
@@ -236,6 +241,12 @@
 	@include layout.phone-landscape {
 		.discard-pool {
 			--discard-h: 26px;
+		}
+
+		// under the hub, not on the hand bar: a crowded side column scrolls the surface, and the
+		// sticky bar would then cover a bottom-aligned pool.
+		.discard-pool--self {
+			align-self: start;
 		}
 	}
 </style>

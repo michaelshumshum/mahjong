@@ -51,8 +51,8 @@ $breakpoint-short: 500px;
 	}
 }
 
-// §3's grid: across on top, left/right flank the centre, self at bottom. below 768px all three
-// opponents share the top row as compact chips; per-region collapse is each region's concern.
+// §3's grid: across on top, left/right flank the centre, self at bottom. below 768px opponents are
+// compact chips over their own pools; per-region collapse is each region's concern.
 @mixin seat-region-grid {
 	display: grid;
 	grid-template-areas:
@@ -64,29 +64,39 @@ $breakpoint-short: 500px;
 	grid-template-rows: auto 1fr auto;
 	gap: var(--space-3);
 
-	// opponents stack as full-width chip rows: a third of a phone made melds 18px wide and wrap.
+	// opponents stack as full-width chip rows, each seat's pool right under its chip; the hub
+	// centres in the spare height, your pool sits on your hand bar (.table-center is contents).
 	@include phone-only {
 		grid-template-areas:
 			'left'
+			'pool-left'
 			'across'
+			'pool-across'
 			'right'
+			'pool-right'
 			'center'
+			'pool-self'
 			'self';
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: auto auto auto 1fr auto;
+		grid-template-rows: repeat(6, auto) 1fr auto auto;
 		gap: var(--space-1);
 	}
 
-	// opponents stack as chips in a side column, so the centre gets the full height above the hand.
+	// chips and their pools stack in a wide left column; the hub and your pool share the right one.
 	@include phone-landscape {
 		grid-template-areas:
 			'across center'
-			'left center'
-			'right center'
+			'pool-across center'
+			'left pool-self'
+			'pool-left pool-self'
+			'right pool-self'
+			'pool-right pool-self'
+			'. pool-self'
 			'self self';
-		// wide enough for four melds on one line beside the plate's line at 844px.
-		grid-template-columns: minmax(10rem, min(22rem, 42%)) minmax(0, 1fr);
-		grid-template-rows: repeat(3, minmax(0, 1fr)) auto;
+		grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+		// min-content floors: the surface scrolls here, and auto rows would otherwise shrink
+		// min-height: 0 regions (the sticky hand bar included) to fit its height.
+		grid-template-rows: repeat(6, minmax(min-content, auto)) 1fr minmax(min-content, auto);
 		gap: var(--space-1) var(--space-2);
 	}
 }

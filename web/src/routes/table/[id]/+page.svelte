@@ -1074,6 +1074,14 @@
 		border-radius: var(--radius-md);
 	}
 
+	// phone: .table-center has no box, so the tip outlines each pool instead.
+	@include layout.phone-only {
+		.table-wrap[data-coach='discards'] :global(.discard-pool) {
+			outline: 2px solid var(--color-brass);
+			outline-offset: 2px;
+		}
+	}
+
 	.table-surface {
 		@include layout.seat-region-grid;
 		// tiles, pools and the hub size off the table's own width (cqi), not the viewport's:
@@ -1120,15 +1128,14 @@
 	}
 
 	// all four discard pools live in the centre, forming a box instead of each sitting at its own
-	// seat's edge. Below tablet-up there's no room for a literal box, so the pools just stack.
+	// seat's edge. below tablet-up the box dissolves: hub and pools become surface grid items.
 	.table-center {
 		grid-area: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
+		display: contents;
 
 		@include layout.tablet-up {
 			display: grid;
+			align-items: center;
 			grid-template-areas:
 				'.    across .'
 				'left hub    right'
@@ -1140,6 +1147,9 @@
 
 	// the compass hub owns the grid's centre cell; the pools form the box around it (frontend.md §2/§3).
 	.table-center :global(.center-hub) {
+		grid-area: center;
+		align-self: center;
+
 		@include layout.tablet-up {
 			grid-area: hub;
 			align-self: center;
@@ -1158,7 +1168,9 @@
 	}
 
 	.table-center {
-		position: relative;
+		@include layout.tablet-up {
+			position: relative;
+		}
 	}
 
 	// game-end content can be tall (podium + full score sheet + standings): the dialog scrolls
@@ -1187,10 +1199,6 @@
 			flex: 1 0 auto;
 			height: auto;
 		}
-
-		.table-center {
-			gap: var(--space-2);
-		}
 	}
 
 	@include layout.desktop-up {
@@ -1203,8 +1211,8 @@
 		}
 	}
 
-	// a phone held sideways: no page scroll -- the surface takes what the toolbar leaves and the
-	// centre scrolls inside itself (layout.seat-region-grid stacks the opponents beside it).
+	// a phone held sideways: no page scroll -- the surface takes what the toolbar leaves and
+	// scrolls inside itself, the hand bar sticky at its bottom (layout.seat-region-grid).
 	@include layout.phone-landscape {
 		.table-page {
 			height: 100dvh;
@@ -1218,18 +1226,19 @@
 			min-height: 0;
 		}
 
+		.table-center :global(.center-hub) {
+			align-self: start;
+		}
+
 		.table-surface {
 			flex: 1 1 auto;
 			height: 100%;
 			min-height: 0;
-			padding: var(--space-1);
+			// no bottom padding: content scrolling under the sticky hand bar would show through it.
+			padding: var(--space-1) var(--space-1) 0;
 			border-width: 4px 6px 6px;
-		}
-
-		.table-center {
-			gap: var(--space-1);
-			min-height: 0;
 			overflow-y: auto;
+			overscroll-behavior: contain;
 		}
 	}
 

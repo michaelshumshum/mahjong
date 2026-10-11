@@ -259,7 +259,8 @@
 			align-items: center;
 			gap: var(--space-1) var(--space-2);
 			padding: var(--space-1) var(--space-2);
-			border-radius: var(--radius-md);
+			// squared bottom: the seat's discard pool continues the chip below it.
+			border-radius: var(--radius-md) var(--radius-md) 0 0;
 			background: rgb(0 0 0 / 0.18);
 		}
 
@@ -317,12 +318,9 @@
 		}
 	}
 
-	// short landscape: each chip gets a third of the side column; scrolls only if melds overflow it.
 	@include layout.phone-landscape {
 		.seat-region {
 			--chip-tile-h: clamp(20px, 5.6dvh, 26px);
-			align-content: center;
-			overflow-y: auto;
 		}
 	}
 </style>

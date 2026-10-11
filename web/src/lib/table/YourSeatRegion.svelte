@@ -524,6 +524,12 @@
 			border-top: 1px solid var(--color-border);
 			padding: var(--space-2) var(--space-2) max(var(--space-2), env(safe-area-inset-bottom));
 			z-index: var(--z-hud);
+			row-gap: 0;
+		}
+
+		// the hand sits flush under the plate; a lifted tile (z-index 1) overlaps the plate.
+		.meld-row {
+			margin-block-end: var(--space-2);
 		}
 	}
 
@@ -543,7 +549,6 @@
 			--hand-step: var(--hand-gap);
 			flex-wrap: wrap;
 			row-gap: calc(var(--hand-tile-w) * 0.4);
-			padding-block-start: calc(var(--hand-tile-w) * 0.4);
 		}
 
 		.hand-tile-slot:nth-child(8n + 1):not(.hand-tile-slot--drawn) {
@@ -558,7 +563,7 @@
 			display: grid;
 			grid-template-areas: 'plate melds' 'hand hand';
 			grid-template-columns: auto minmax(0, 1fr);
-			align-items: center;
+			align-items: end;
 			column-gap: var(--space-4);
 		}
 
@@ -569,6 +574,7 @@
 		.meld-row {
 			grid-area: melds;
 			min-block-size: 0;
+			margin-block-end: 0;
 		}
 
 		.your-hand {

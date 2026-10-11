@@ -188,11 +188,11 @@ same halo treatment as its `SeatPlate` and additionally carries `TimerRing`, for
 ring shows only while `phase === 'AWAIT_ACTION'` — a `state_sync`'s own `deadline_ts` is this
 seat's claim/hand-end deadline, not the acting seat's — so after a reconnect an opponent's ring
 reappears with their next `turn`. Below
-768px the pools stack instead of forming a box, leaving the markers nowhere to sit without
-overlapping a pool, so the hub collapses to a compact single-row summary (wind/hand/wall/faan only,
-no markers).
+768px the pools leave the centre for their own seats (below), leaving the markers nothing to
+point at, so the hub collapses to a compact single-row summary (wind/hand/wall/faan only, no
+markers).
 
-**Discard pools: all four in the centre** (`.table-center`), forming a box — across on top,
+**Discard pools: all four in the centre** (`.table-center`, tablet-up), forming a box — across on top,
 left/right along the sides (rotated), self on the bottom — each still keyed to its own seat so
 "who discarded this" stays legible. This mirrors a real table and keeps your own pool in view;
 pools placed at each seat's edge put yours below your hand, easy to miss.
@@ -233,23 +233,27 @@ rows of 8 instead (`flex-wrap`, tile width `clamp(36px, fit-8, 63px)`, ~40px at 
 plus the drawn tile stays on one row) — one row of
 14 overlapped to ~half a face there, hiding tiles and sending taps to the neighbour, while the
 centre had height to spare. Page padding, rim and felt padding shrink there too (they took ~84px of
-390). `row-gap` and a top pad equal the two-step lift (30% of tile height),
-so a lifted tile never covers the row above or the seat plate.
+390). `row-gap` equals the two-step lift (30% of tile height), so a lifted second-row tile never
+covers the row above. There is no top pad: on every phone layout the hand sits flush under your
+`SeatPlate` (the self region's `row-gap: 0`), and a lifted first-row tile overlaps the plate —
+it's `z-index: 1` above it and stays the tap target, so the lift keeps its desktop 30%.
 
 **Phone landscape** keeps one row, with tiles `clamp(44px, min(fit-14, 16dvh × 3/4), 56px)` —
 height-bound, since the hand can't take more of a ~390px-tall screen. Your melds/flowers sit
-beside your `SeatPlate` (grid `'plate melds' 'hand hand'`) instead of in their own row above it.
+beside your `SeatPlate` (grid `'plate melds' 'hand hand'`, bottom-aligned so the plate meets the
+hand) instead of in their own row above it.
 
 No horizontal scroll; two-row, non-overlapping at 390×844. Pinned by `table.e2e.ts` at 390×844, 390×700, 844×390, 1024×768 and
 1440×900 (last tile and drawn tile inside the viewport, clear of the right opponent at tablet-up),
-plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 and 1440×900.
+plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 and 1440×900, and the
+first hand row flush under the plate at 390×844 and 844×390.
 
 **Breakpoints** (`_layout.scss`; `tablet-up` and `phone-only` partition every viewport):
 
 | Mixin | Query | Layout |
 | --- | --- | --- |
-| `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips, stacked wrapping pools, sticky hand bar (below) |
-| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll, the three opponent chips stack in a side column beside the centre (`'across center' 'left center' 'right center' 'self self'`), each a third of the height (scrolling only if its melds overflow); column `minmax(10rem, min(22rem, 42%))` so four melds fit one line at 844px; chip tiles `clamp(20px, 5.6dvh, 26px)`, discard tiles 26px; the centre scrolls inside itself; hand tiles 44–56px (below) |
+| `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips each over its own wrapping pool, sticky hand bar (below) |
+| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll; each opponent's chip and pool stack in a `3fr` left column, the hub and your pool (under the hub, so the sticky bar never covers it) in a `2fr` right one (`'across center' 'pool-across center' 'left pool-self' … 'self self'`); chip tiles `clamp(20px, 5.6dvh, 26px)`, discard tiles 26px; when a late hand overflows, `.table-surface` itself scrolls (`overflow-y: auto`, no bottom padding) with the hand bar sticky at its bottom — rows are `minmax(min-content, auto)` so the bar isn't squeezed; hand tiles 44–56px (below) |
 | `tablet-up` | `min-width: 768px` and `min-height: 501px` | the box layout above |
 | `desktop-up` | `min-width: 1180px` and `min-height: 501px` | roomier page and surface padding |
 
@@ -273,8 +277,9 @@ seated as East") `windWord()` returns `WIND_LABEL`'s English word in `en` and `W
 
 Below 768px (phone portrait):
 
-- All three opponents become compact chips, one full-width grid row each (`left`, `across`,
-  `right`, then `center`, `self`; `layout.seat-region-grid`) — three chips side by side left each
+- All three opponents become compact chips, one full-width grid row each, each followed by its
+  own discard pool (`left`, `pool-left`, `across`, `pool-across`, `right`, `pool-right`, then
+  `center`, `pool-self`, `self`; `layout.seat-region-grid`) — three chips side by side left each
   ~99px, with 18px meld tiles wrapping after four. Each chip is one wrapping flex line: the
   `SeatPlate` (fixed 8rem so the counts align, long names truncate), a single jade back with a `×N`
   count (`.backs-count`, `aria-hidden` — the row's own label already states the count), then
@@ -284,12 +289,18 @@ Below 768px (phone portrait):
   never sets the name line's height. Phone landscape uses the same chip in its side column. The other backs stay in the DOM, hidden
   (`display: none`), so positional identity (§4) and the specs counting `.backs-row .mini-tile`
   are unchanged.
-- The four discard pools stack as full-width wrapping rows (no horizontal scroll — a single-row
-  strip ran past the viewport late in a hand), each led by its seat's name via
-  `::before { content: attr(data-seat-name) / '' }`: stacked, position no longer says whose pool it
-  is, and the empty alt text keeps the label out of the list's accessible tree (its `aria-label`
-  already names the seat). Full history stays in the DOM (§9). The `late-hand` mock scenario
-  (full pools, 4 melds + 3 flowers) is the stress fixture for all of this.
+- Each discard pool is a full-width wrapping row (no horizontal scroll — a single-row strip ran
+  past the viewport late in a hand) placed under its own seat: `.table-center` is
+  `display: contents`, so the hub and the four pools are `.table-surface` grid items and each pool
+  takes its seat's `pool-*` area. An opponent's pool pulls up by the grid gap and shares the chip's
+  tint with only its bottom corners rounded (the chip's are squared), so chip and pool read as one
+  card; your own pool is a separate tinted card just above the sticky hand bar (portrait) or under
+  the hub (landscape) — inside the bar, under your melds, it would grow the sticky bar by ~2 tile
+  rows late in a hand. Placement says whose pool it is, so there's no seat-name label (an earlier
+  `::before` label cost 3.25rem of every row). Still exactly four pools in the DOM, one list each
+  (`aria-label` names the seat); full history stays in the DOM (§9). The hub centres in whatever
+  height is left over. The `late-hand` mock scenario (full pools, 4 melds + 3 flowers) is the
+  stress fixture for all of this.
 - Your hand is a `position: sticky; bottom: 0` bar with `env(safe-area-inset-bottom)` padding.
   `app.html`'s viewport meta carries `viewport-fit=cover` — without it every `env(safe-area-inset-*)`
   resolves to 0 on iOS — and `body` pads by the side insets for landscape notches. It keeps
@@ -465,7 +476,7 @@ Durations come from `lib/ui/motion.ts`'s `motionMs(ms)` (JS) or the `_a11y.scss`
 | Own hand reflow | `YourSeatRegion`'s hand tiles are keyed `{#each ownHandTiles as tile (tile.key)}` with `animate:flip` on a wrapper (`.hand-tile-slot` — `animate:` needs the each-block's sole child, so the slot carries it and the interactive/static tile swap happens inside) |
 | Discard settle | `CenterDiscardPool`'s landing tile slides in a short distance from the discarder's own side (`--discard-enter-x/y`, set per `.discard-pool--*`) plus the existing scale pulse, both via `--ease-place`. `translate`/`scale` are independent CSS properties from `transform`, so this composes with the side pools' static rotate `transform` instead of replacing it — a prior version animated `transform` directly and overrode the rotated faces. The self pool's `scaleY(-1)` (tablet-up) is cancelled by each tile's own `scaleY(-1)` before the face's `translate` applies, so `--discard-enter-y` needs no sign flip there; every pool's direction is pinned in screen space at tablet and phone widths (`CenterDiscardPool.svelte.spec.ts`) |
 | Meld slide-in | `_tile.scss`'s `meld-enter` mixin (`@include tile.meld-enter` alongside `@include tile.meld`) — plays automatically on DOM insert, same `demo-meld-in` pattern `AnimationDemoPanel` proved out first |
-| Claim seal stamp | `SealStamp` (`lib/table/`), rendered inside `.table-center` and `{#key}`ed so the CSS entrance replays on a repeat: the call glyph (碰/上/槓) as a round badge in the hub cell on the claimer's side — between the hub and that seat's pool, not over the hub (centred over the stacked pools below tablet-up) — scales 1.4→1 with a slight rotate and ink-fades out. `+page.svelte` derives the signal off a seat's `melds.length` growing between renders — presentation only, never game truth, and never set under reduced motion (the information is redundant with the meld tile itself) |
+| Claim seal stamp | `SealStamp` (`lib/table/`), rendered inside `.table-center` and `{#key}`ed so the CSS entrance replays on a repeat: the call glyph (碰/上/槓) as a round badge in the hub cell on the claimer's side — between the hub and that seat's pool, not over the hub (centred on the table surface below tablet-up, where `.table-center` has no box) — scales 1.4→1 with a slight rotate and ink-fades out. `+page.svelte` derives the signal off a seat's `melds.length` growing between renders — presentation only, never game truth, and never set under reduced motion (the information is redundant with the meld tile itself) |
 | Score-delta chips | `SeatPlate`'s `scoreDelta` prop (`{value, key}`), derived off `handResult.payments` once per hand end, floats up and fades near the plate — same transient-signal pattern as the seal stamp |
 | Haptics | `lib/ui/haptics.ts`'s `vibrate(ms)`: `navigator.vibrate`, feature-detected to `(pointer: coarse)` so it's a no-op on desktop. Fired on your turn starting and a claim offer landing, gated on the new `ClientPrefs.haptics` (default on, separate from `motion`) |
 
@@ -735,8 +746,8 @@ with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/
 they're done, `lib/ui/CoachMarks.svelte` shows one tip at a time in a card pinned to the top of the
 table (above the felt, below every overlay; hidden while a claim or result dialog is up): how to
 discard (worded for the current discard mode), where the newest discard pulses, and that claims pop
-up over the table. The current tip's target — your seat region, or the centre pools — gets a brass
-outline via `.table-wrap[data-coach]`. "Next"/"Got it" and "Skip tips" both end it for good.
+up over the table. The current tip's target — your seat region, or the centre pools (each pool
+on phone, where they sit under their seats) — gets a brass outline via `.table-wrap[data-coach]`. "Next"/"Got it" and "Skip tips" both end it for good.
 Practice only: in a multiplayer game nobody should be reading tips while three people wait.
 
 **In-game guide.** The header rail carries a "Guide" button opening the same `GuideDialog` as the

@@ -234,6 +234,66 @@ test('portrait phone opponents are stacked full-width chip rows', async ({ page 
 	expect(boxes[1].y + boxes[1].height).toBeLessThanOrEqual(boxes[2].y);
 });
 
+// phone: each opponent's pool sits under that chip's melds, joined to it, and above the next chip.
+for (const [width, height] of [
+	[390, 844],
+	[844, 390]
+] as const) {
+	test(`each phone discard pool sits under its own seat at ${width}x${height}`, async ({
+		page
+	}) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/table/abc123?mock=late-hand');
+		await page.waitForLoadState('networkidle');
+
+		await expect(page.locator('.discard-pool')).toHaveCount(4);
+		const seats = [];
+		for (const pos of ['left', 'across', 'right']) {
+			const chip = page.locator(`.seat-region--${pos}`);
+			const meldBottoms = await chip
+				.locator('.meld .mini-tile')
+				.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().bottom));
+			seats.push({
+				chip: (await chip.boundingBox())!,
+				meldBottom: Math.max(...meldBottoms),
+				pool: (await page.locator(`.discard-pool--${pos}`).boundingBox())!
+			});
+		}
+		seats.sort((a, b) => a.chip.y - b.chip.y);
+		for (const [i, { chip, meldBottom, pool }] of seats.entries()) {
+			expect(pool.y).toBeGreaterThanOrEqual(meldBottom);
+			expect(Math.abs(pool.y - (chip.y + chip.height))).toBeLessThanOrEqual(1);
+			expect(pool.x).toBeCloseTo(chip.x, 0);
+			const next = seats[i + 1];
+			if (next) expect(pool.y + pool.height).toBeLessThanOrEqual(next.chip.y);
+		}
+
+		const own = (await page.locator('.discard-pool--self').boundingBox())!;
+		const hub = (await page.locator('.center-hub').boundingBox())!;
+		expect(own.y).toBeGreaterThanOrEqual(hub.y + hub.height);
+		if (height > width) {
+			const bar = (await page.locator('.seat-region--self').boundingBox())!;
+			expect(own.y + own.height).toBeLessThanOrEqual(bar.y);
+		}
+
+		const labels = await page
+			.locator('.discard-pool')
+			.evaluateAll((els) => els.map((el) => getComputedStyle(el, '::before').content));
+		expect(labels).toEqual(['none', 'none', 'none', 'none']);
+	});
+
+	test(`the hand sits flush under the seat plate at ${width}x${height}`, async ({ page }) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/table/abc123?mock=your-turn');
+		await page.waitForLoadState('networkidle');
+
+		const plate = (await page.locator('.seat-region--self .seat-plate').boundingBox())!;
+		const tile = (await page.locator('.seat-region--self .hand-tile').first().boundingBox())!;
+		expect(tile.y - (plate.y + plate.height)).toBeGreaterThanOrEqual(-0.5);
+		expect(tile.y - (plate.y + plate.height)).toBeLessThanOrEqual(3);
+	});
+}
+
 // late-hand: ~20 discards per pool and up to 4 melds + 3 flowers per opponent.
 for (const [width, height] of [
 	[390, 844],
@@ -335,7 +395,11 @@ test('short landscape fits hand, centre and opponents without page scroll', asyn
 		'.seat-region--across',
 		'.seat-region--left',
 		'.seat-region--right',
-		'.table-center',
+		'.center-hub',
+		'.discard-pool--across',
+		'.discard-pool--left',
+		'.discard-pool--right',
+		'.discard-pool--self',
 		'.seat-region--self'
 	]) {
 		await expect(page.locator(selector)).toBeInViewport({ ratio: 1 });
