@@ -233,10 +233,12 @@ rows of 8 instead (`flex-wrap`, tile width `clamp(36px, fit-8, 63px)`, ~40px at 
 plus the drawn tile stays on one row) — one row of
 14 overlapped to ~half a face there, hiding tiles and sending taps to the neighbour, while the
 centre had height to spare. Page padding, rim and felt padding shrink there too (they took ~84px of
-390). `row-gap` equals the two-step lift (30% of tile height), so a lifted second-row tile never
-covers the row above. There is no top pad: on every phone layout the hand sits flush under your
-`SeatPlate` (the self region's `row-gap: 0`), and a lifted first-row tile overlaps the plate —
-it's `z-index: 1` above it and stays the tap target, so the lift keeps its desktop 30%.
+390). The rows sit `--hand-gap` (2px) apart, like the columns, and there is no top pad: on every
+phone layout the hand sits flush under your `SeatPlate` (the self region's `row-gap: 0`). So a
+lifted tile (`z-index: 1`, the desktop 30% lift) overlaps the plate or the row above. In portrait
+it only takes taps in its own original slot (`pointer-events: none` on the button, `auto` on its
+`::after` hit area), so a tap on the tile it overlaps reaches that tile instead of discarding the
+lifted one (pinned by `YourSeatRegion.svelte.spec.ts`).
 
 **Phone landscape** keeps one row, with tiles `clamp(44px, min(fit-14, 16dvh × 3/4), 56px)` —
 height-bound, since the hand can't take more of a ~390px-tall screen. Your melds/flowers sit

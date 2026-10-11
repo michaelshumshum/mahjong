@@ -207,6 +207,8 @@ test('a portrait phone wraps the hand into two rows of non-overlapping tiles', a
 		.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
 	expect(boxes).toHaveLength(14);
 	expect(new Set(boxes.map((b) => Math.round(b.top))).size).toBe(2);
+	// rows sit flush (--hand-gap), no lift reservation between them.
+	expect(boxes[8].top - boxes[0].bottom).toBeLessThanOrEqual(3);
 	for (const [i, a] of boxes.entries()) {
 		expect(a.width).toBeGreaterThanOrEqual(36);
 		for (const b of boxes.slice(i + 1)) {

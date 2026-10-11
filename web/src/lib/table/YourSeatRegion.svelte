@@ -534,7 +534,7 @@
 	}
 
 	// portrait phone: 14 tiles in one row overlap to ~half a face, so wrap to rows of 8 that
-	// never overlap; the centre has height to spare. row-gap clears a lifted second-row tile.
+	// never overlap; the centre has height to spare.
 	@include layout.phone-portrait {
 		.seat-region--self {
 			padding-inline: var(--space-1);
@@ -548,11 +548,22 @@
 			);
 			--hand-step: var(--hand-gap);
 			flex-wrap: wrap;
-			row-gap: calc(var(--hand-tile-w) * 0.4);
+			row-gap: var(--hand-gap);
 		}
 
 		.hand-tile-slot:nth-child(8n + 1):not(.hand-tile-slot--drawn) {
 			margin-inline-start: 0;
+		}
+
+		// rows sit 2px apart, so a lifted tile overlaps the row above: only its own slot takes the
+		// tap, or a tap on the tile behind it would discard the lifted one.
+		.hand-tile-btn.hand-tile--lifted {
+			pointer-events: none;
+
+			&::after {
+				top: 30%;
+				pointer-events: auto;
+			}
 		}
 	}
 

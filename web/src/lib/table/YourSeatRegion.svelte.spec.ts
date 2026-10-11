@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import { render, cleanupAll } from './test-render';
 import YourSeatRegion from './YourSeatRegion.svelte';
@@ -224,5 +224,60 @@ describe('YourSeatRegion keyboard hand model', () => {
 		flushSync();
 		await userEvent.keyboard('H');
 		expect(document.activeElement).toBe(target.querySelector('.hand-row'));
+	});
+});
+
+describe('YourSeatRegion portrait phone two-row hand', () => {
+	afterEach(() => {
+		cleanupAll();
+	});
+
+	it('a lifted second-row tile does not take taps meant for the tile above it', async () => {
+		await page.viewport(390, 844);
+		// app.scss's tokens aren't loaded in a component spec; the hand's width calc needs these.
+		for (const [name, value] of [
+			['--space-1', '0.25rem'],
+			['--space-2', '0.5rem'],
+			['--space-4', '1rem']
+		])
+			document.documentElement.style.setProperty(name, value);
+		const codes = [
+			'1m',
+			'2m',
+			'3m',
+			'4m',
+			'5m',
+			'6m',
+			'7m',
+			'8m',
+			'9m',
+			'1p',
+			'2p',
+			'3p',
+			'4p',
+			'5p'
+		] as const;
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, {
+			...baseProps('two-step', onDiscard),
+			ownHandTiles: codes.map((code, i) => ({ key: `c-${i}`, code, tileId: i, drawn: i === 13 })),
+			discardableTileIds: new Set(codes.map((_, i) => i))
+		});
+		const btns = [...target.querySelectorAll<HTMLButtonElement>('.hand-tile-btn')];
+		const above = btns[1].getBoundingClientRect();
+		const below = btns[9].getBoundingClientRect();
+		expect(below.top).toBeGreaterThan(above.top);
+		expect(below.top - above.bottom).toBeLessThanOrEqual(3);
+
+		btns[9].click();
+		flushSync();
+		expect(btns[9].classList.contains('hand-tile--lifted')).toBe(true);
+		expect(btns[9].getBoundingClientRect().top).toBeLessThan(above.bottom);
+
+		const x = above.left + above.width / 2;
+		const hit = (y: number) => document.elementFromPoint(x, y)?.closest('.hand-tile-btn');
+		expect(hit(above.bottom - 2)).toBe(btns[1]);
+		expect(hit(below.top + below.height / 2)).toBe(btns[9]);
+		expect(onDiscard).not.toHaveBeenCalled();
 	});
 });
