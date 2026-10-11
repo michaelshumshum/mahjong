@@ -3,10 +3,13 @@ docs/bots.md §7). `ml`-extra only.
 
     python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 200 --seed 1000000 \
         [--opponent EfficiencyBot] [--min-faan 3] [--parallel 6] [--records eval.jsonl]
+    python -m ml.eval_policy --candidate-bot FaanBot --opponent ORACLE ...   # calibration
 
 A duplicate set is one `HandEnv` episode seed (`hand_start` picks dealer and prevailing wind)
 played four times, the candidate in each seat in turn. The candidate (`PolicyBot`) acts only on
-`seat_view(...)` through `policy_raw_from_view`: no oracle input exists on this path. Each played
+`seat_view(...)` through `policy_raw_from_view`: no oracle input exists on this path. An `ORACLE`
+opponent seat is served through `bots.arena._view_for`, the arena's sanctioned omniscient call
+site (docs/bots.md §9); the candidate seat never is. Each played
 hand is wrapped as a one-hand `bots.arena.GameRecord`, so `bots.arena`'s statistics, paired
 differences (candidate − mean of the others, per set) and normal CI apply unchanged; a seeded
 percentile bootstrap CI is added because payouts are heavy-tailed. Units are points per hand.
@@ -44,6 +47,7 @@ from bots.arena import (
     _paired_differences,
     _roles_for_rotation,
     _tenpai_can_reach_min_faan,
+    _view_for,
 )
 from bots.base import Bot
 from bots.labels import is_tenpai
@@ -84,7 +88,11 @@ class PolicyBot:
 
 
 def _opponent_choices() -> list[str]:
-    """`HandEnv` serves opponents a plain `seat_view`, so an omniscient bot can't sit here."""
+    return sorted(BOT_REGISTRY)
+
+
+def _candidate_bot_choices() -> list[str]:
+    """the candidate seat always gets a plain `seat_view`, so an omniscient bot can't sit there."""
     return sorted(set(BOT_REGISTRY) - OMNISCIENT_BOTS)
 
 
@@ -124,14 +132,27 @@ def _hand(env: HandEnv) -> HandRecord:
     )
 
 
+def _view(state: Any, seat: int, bot: Bot, name: str | None) -> SeatView:
+    if name is None or isinstance(bot, PolicyBot):
+        return seat_view(state, seat)
+    return _view_for(state, seat, name)
+
+
 async def _play(
-    seed: int, ruleset: RuleSet, bots: Sequence[Bot]
+    seed: int,
+    ruleset: RuleSet,
+    bots: Sequence[Bot],
+    names: Sequence[str | None] | None = None,
 ) -> tuple[HandRecord, dict[str, Any]]:
+    """`names` routes each named non-`PolicyBot` seat through `_view_for`; a `None` name, a
+    `PolicyBot` or no `names` at all gets `seat_view`."""
     env = HandEnv(ruleset, encode=False)
     seat, _, mask = env.reset(seed)
     while not env.done:
         assert env.state is not None
-        aid = await bots[seat].act(seat_view(env.state, seat), mask.tolist(), float("inf"))
+        name = names[seat] if names is not None else None
+        view = _view(env.state, seat, bots[seat], name)
+        aid = await bots[seat].act(view, mask.tolist(), float("inf"))
         seat, _, mask, _, _ = env.step(aid)
     return _hand(env), env.record()
 
@@ -139,9 +160,10 @@ async def _play(
 _WORKER: dict[str, Any] = {}
 
 
-def _init_worker(ckpt: str) -> None:
+def _init_worker(ckpt: str | None) -> None:
     torch.set_num_threads(1)
-    _WORKER["model"] = load_candidate(ckpt)
+    if ckpt is not None:
+        _WORKER["model"] = load_candidate(ckpt)
 
 
 def play_set(
@@ -150,16 +172,26 @@ def play_set(
     opponent: str,
     model: PolicyNet | None = None,
     candidate: str = "candidate",
+    candidate_bot: str | None = None,
 ) -> tuple[tuple[GameRecord, ...], list[dict[str, Any]]]:
-    """One duplicate set: four `GameRecord`s (one hand each) and their `HandRecord` columns."""
-    net = model if model is not None else _WORKER["model"]
+    """One duplicate set: four `GameRecord`s (one hand each) and their `HandRecord` columns.
+    `candidate_bot` seats a `BOT_REGISTRY` bot as the candidate instead of the policy."""
+    if candidate_bot in OMNISCIENT_BOTS:
+        raise ValueError(f"candidate bot {candidate_bot!r} would need an omniscient view")
+    net = None if candidate_bot else model if model is not None else _WORKER["model"]
 
     async def run() -> tuple[tuple[GameRecord, ...], list[dict[str, Any]]]:
         games, records = [], []
         for rotation in range(4):
             bots: list[Bot] = [BOT_REGISTRY[opponent](seed * 4 + i) for i in range(4)]
-            bots[rotation] = PolicyBot(net)
-            hand, record = await _play(seed, ruleset, bots)
+            if candidate_bot is None:
+                assert net is not None
+                bots[rotation] = PolicyBot(net)
+            else:
+                bots[rotation] = BOT_REGISTRY[candidate_bot](seed * 4 + rotation)
+            names: list[str | None] = [opponent] * 4
+            names[rotation] = None  # candidate seat: plain `seat_view`, never `_view_for`
+            hand, record = await _play(seed, ruleset, bots, names)
             players = [opponent] * 4
             players[rotation] = candidate
             record["players"] = players
@@ -192,23 +224,33 @@ def evaluate(
     ckpt: str | None = None,
     model: PolicyNet | None = None,
     parallel: int = 1,
+    candidate_bot: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    if opponent not in BOT_REGISTRY or opponent in OMNISCIENT_BOTS:
+    if opponent not in BOT_REGISTRY:
         raise ValueError(f"unknown opponent {opponent!r}; choices: {_opponent_choices()}")
+    if candidate_bot is not None and candidate_bot not in _candidate_bot_choices():
+        raise ValueError(
+            f"unknown candidate bot {candidate_bot!r}; choices: {_candidate_bot_choices()}"
+        )
+    play = functools.partial(
+        play_set, ruleset=ruleset, opponent=opponent, candidate_bot=candidate_bot
+    )
     sets: list[tuple[GameRecord, ...]] = []
     records: list[dict[str, Any]] = []
     if parallel > 1:
-        assert ckpt is not None, "parallel evaluation loads the checkpoint in each worker"
+        assert ckpt is not None or candidate_bot is not None, (
+            "parallel evaluation loads the checkpoint in each worker"
+        )
         with ProcessPoolExecutor(parallel, initializer=_init_worker, initargs=(ckpt,)) as pool:
-            for games, recs in pool.map(
-                functools.partial(play_set, ruleset=ruleset, opponent=opponent), seeds
-            ):
+            for games, recs in pool.map(play, seeds):
                 sets.append(games)
                 records += recs
     else:
-        net = model if model is not None else load_candidate(str(ckpt))
+        net = None
+        if candidate_bot is None:
+            net = model if model is not None else load_candidate(str(ckpt))
         for s in seeds:
-            games, recs = play_set(s, ruleset, opponent, net)
+            games, recs = play(s, model=net)
             sets.append(games)
             records += recs
     stats_a, stats_b = _collect_stats(sets)
@@ -218,6 +260,7 @@ def evaluate(
     report = {
         "sets": len(sets),
         "opponent": opponent,
+        "candidate_bot": candidate_bot,
         "min_faan": ruleset.min_faan,
         "candidate": stats_a.summary(),
         "opponents": stats_b.summary(),
@@ -232,7 +275,11 @@ def evaluate(
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m ml.eval_policy", description=__doc__)
-    parser.add_argument("--ckpt", required=True)
+    who = parser.add_mutually_exclusive_group(required=True)
+    who.add_argument("--ckpt")
+    who.add_argument(
+        "--candidate-bot", choices=_candidate_bot_choices(), help="a heuristic candidate instead"
+    )
     parser.add_argument("--sets", type=int, default=200)
     parser.add_argument("--seed", type=int, default=1_000_000, help="set i uses seed + i")
     parser.add_argument("--opponent", default="EfficiencyBot", choices=_opponent_choices())
@@ -248,7 +295,12 @@ def main(argv: list[str] | None = None) -> None:
         ruleset = dataclasses.replace(ruleset, min_faan=args.min_faan)
     seeds = [args.seed + i for i in range(args.sets)]
     report, records = evaluate(
-        seeds, ruleset, args.opponent, ckpt=args.ckpt, parallel=args.parallel
+        seeds,
+        ruleset,
+        args.opponent,
+        ckpt=args.ckpt,
+        parallel=args.parallel,
+        candidate_bot=args.candidate_bot,
     )
     report["ckpt"] = args.ckpt
     text = json.dumps(report, indent=2)

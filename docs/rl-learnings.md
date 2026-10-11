@@ -46,7 +46,7 @@ next free range for a new one. Below 2,000,000 belongs to `bots.arena`'s heurist
 | 6,000,000+ | 3,000 per direction | league head-to-head series vs the starting policy (§4) |
 | 6,100,000+ – 6,400,000+ | 1,500–2,000 | head-to-head analysis, results not kept in the repo: sampled-mode head-to-head (6.1M, 2,000 sets), hold 462.0M vs 429.2M control (6.2M), `hk_strict` / `hk_casual` head-to-heads (6.3M, 1,500 sets), learner L91.8M vs snapshot `past1` (6.4M) |
 | 7,000,000+, 7,100,000+ | 1,000 / 700; 1,500 head-to-head | R3 gate, L274.3M and 464.3M (§4); later league checkpoints are compared against L274.3M here |
-| 8,000,000+ | — | evals vs `ORACLE` |
+| 8,000,000+ | 1,000 | evals vs `ORACLE`: L274.3M, 464.3M and `FaanBot` ×1 vs `ORACLE` ×3; `ORACLE` / `FaanBot` ×1 vs L274.3M ×3; L274.3M vs `FaanBot` (§4) |
 | 9,000,000+ | — | next free range (the R4 gate re-run) |
 
 The head-to-head harness is `runs/ppo_league_snap/tools/h2h_eval.py` on the training box
@@ -248,6 +248,41 @@ their status are in [ml.md §14](ml.md):
 `hk_strict` tables draw 65–72% of hands: `FaanBot` almost never reaches 5 faan (win 0.009).
 `hk_casual` payouts are heavy-tailed (13-faan cap on the full-spicy table), hence the wide CIs.
 
+**vs `ORACLE`** (2026-10-12, `hk_classic`, 1,000 sets on seeds 8,000,000+, `eval_policy
+--opponent ORACLE`; the 1 × policy-table rows from a scratch harness on the same seeds). Points per
+hand, paired diff = the ×1 side minus the mean of the ×3 side:
+
+| ×1 vs ×3 | Paired diff [95% CI] (bootstrap) | ×1 win / deal-in / avg faan | ×3 win / deal-in / avg faan |
+| --- | --- | --- | --- |
+| L274.3M vs `ORACLE` | **+2.88 [+1.75, +4.01]** ([+1.77, +4.00]) | 0.112 / 0.162 / 5.93 | 0.217 / 0.000 / 3.47 |
+| 464.3M vs `ORACLE` | +3.06 [+1.98, +4.15] | 0.136 / 0.149 / 5.36 | 0.215 / 0.000 / 3.44 |
+| `FaanBot` vs `ORACLE` | −3.69 [−4.08, −3.30] | 0.097 / 0.149 / 3.56 | 0.220 / 0.000 / 3.44 |
+| L274.3M vs `FaanBot` (same seeds) | +11.44 [+10.33, +12.56] | 0.271 / 0.067 / 5.35 | 0.155 / 0.106 / 3.34 |
+| `ORACLE` vs L274.3M | −1.53 [−2.22, −0.84] | 0.266 / 0.000 / 3.30 | 0.168 / 0.128 / — |
+| `FaanBot` vs L274.3M | −9.26 [−10.14, −8.39] | 0.170 / 0.165 / 3.32 | 0.206 / 0.104 / — |
+
+Draws 22–27% on every table; sub-min tenpai 0.021 (L274.3M) / 0.040 (`ORACLE`). The agent
+outscores `ORACLE` from either seating. Paired on identical hands, L274.3M ×1 does +6.56
+[+5.45, +7.70] better than `FaanBot` ×1 against `ORACLE` ×3; the league didn't move this number
+(464.3M +3.06 vs L274.3M +2.88). Where its points go against `ORACLE` ×3, compared with a
+`FaanBot` ×3 table on the same seeds (per agent seat-hand):
+
+| Source | vs `FaanBot` ×3 | vs `ORACLE` ×3 | Δ |
+| --- | --- | --- | --- |
+| own ron wins | +5.29 (0.173 / hand) | 0 (none) | −5.29 |
+| own self-draw wins | +5.48 (0.098) | +6.89 (0.112) | +1.41 |
+| deal-ins | −0.75 (0.067) | −1.62 (0.162) | −0.87 |
+| opponents' self-draws | −1.44 (0.253) | −3.11 (0.490) | −1.67 |
+
+`ORACLE` never deals in (0 of 12,000 seat-hands), so the agent's ron income goes to zero; it
+plays closed (6% of its seat-hands open a meld, 92% of its wins concealed), so its tenpai has no
+meld tell. The agent's 630 discards that dealt in (decision replay with `ml.env.replay_hand`):
+629 had a really safe alternative; 292 / 148 / 190 at 0 / 1 / 2+ shanten after the discard; the
+agent's own danger head rated the tile median P(deal-in) 0.008 (safest alternative 0.001) and
+the real winner's tenpai median 0.16. Of `ORACLE`'s 72,039 decisions that differ from plain
+`FaanBot` on a public view at the same state, 88% are full-information speed (`seen34`), 7%
+tenpai valuation, 5% avoided deal-ins (1,469 of them avoided dealing into the agent), and 86 claims.
+
 For scale: `FaanBot` over `EfficiencyBot` in the heuristic arena is +2.67 points/game [1.92, 3.42]
 over full games ([bots.md §7](bots.md)) — win 0.197 / 0.163, deal-in 0.042 / 0.069, faan 3.30 /
 3.22, sub-min tenpai 0.039 / 0.337, ~31% draws.
@@ -356,7 +391,7 @@ visible melds), claim acceptance rate per offer (claims taken / claims offered),
 
 What to watch next: whether later league checkpoints gain on L274.3M at `hk_classic` (gate them
 against it with the same seeds); sub-min tenpai, which alternates around `FaanBot`'s (0.018–0.067,
-20–25 events per 1,000-set check); the ACH ablation; and the gap to `ORACLE`, never measured.
+20–25 events per 1,000-set check); and the ACH ablation. The agent already outscores `ORACLE` (§4); `ORACLE` is a defence probe, not a ceiling.
 
 ## 7. Earlier runs
 

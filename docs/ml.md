@@ -136,7 +136,7 @@ An earlier plan improved `FaanBot` piece by piece: a supervised opponent-danger 
 
 | Supervised path, built on `FaanBot` | Self-play RL |
 | --- | --- |
-| ceiling is `ORACLE` — `FaanBot` with perfect information, +27.7 points/game over `FaanBot` ([bots §9](bots.md)); learned heads only estimate what `ORACLE` knows exactly | no teacher, so no teacher ceiling |
+| ceiling is `ORACLE` — `FaanBot` with perfect information, +27.7 points/game over `FaanBot` ([bots §9](bots.md)); learned heads only estimate what `ORACLE` knows exactly | no teacher, so no teacher ceiling: the R3 policy beats `ORACLE` ×3 by +2.88 points/hand [+1.75, +4.01] (§12) |
 | claim logic, hand-building and the fold structure stay `FaanBot`'s; a danger model covers defence only, while more than half of `ORACLE`'s edge is offence (win rate 0.318 vs 0.152) | learns the whole policy, claims and push/fold included, against the real objective |
 | there is no HK equivalent of the Tenhou corpus Suphx/Mortal trained on; cloning the only teacher caps at that teacher | self-play needs no corpus |
 
@@ -655,7 +655,7 @@ OPENBLAS_NUM_THREADS=1 uv run --extra ml python -m ml.train --config ml/configs/
 - **Gate:** paired-duplicate CI ([bots §7](bots.md)), candidate × 1 vs `FaanBot` × 3,
   on fresh seeds (tune and gate on different seed sets — picking the best of k configs on the
   gate seeds is a winner's curse), plus a bootstrap CI, since `arena.py`'s CI is a normal
-  approximation over heavy-tailed payouts. Also vs `ORACLE` (gap to ceiling, not a target) and
+  approximation over heavy-tailed payouts. Also vs `ORACLE` (a defence probe, not a ceiling: the agent already outscores it, [rl-learnings.md §4](rl-learnings.md)) and
   mixed tables: `EfficiencyBot` and the `FaanBot` weight profiles (`bots/faanbot.py`
   `WeightProfile`, registered in `BOT_REGISTRY` as `FaanBotAggressive`/`FaanBotDefensive`/
   `FaanBotFlushChasing`).
@@ -680,7 +680,8 @@ uv run python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 700 --see
 | Detail | Behaviour |
 | --- | --- |
 | duplicate set | one `HandEnv` episode seed (dealer / prevailing from `hand_start`), played 4 times with the candidate in each seat; points per hand, not per game, since an RL episode is a hand and only standalone hands export as `HandRecord`s |
-| candidate | `PolicyBot`: `policy_raw_from_view(seat_view(...))` → `PolicyNet` → masked argmax (or seeded sampling); no oracle path exists here |
+| candidate | `PolicyBot`: `policy_raw_from_view(seat_view(...))` → `PolicyNet` → masked argmax (or seeded sampling); no oracle path exists here. `--candidate-bot NAME` seats a heuristic `BOT_REGISTRY` bot instead (calibration); never an `OMNISCIENT_BOTS` one |
+| opponents | any `BOT_REGISTRY` name, `ORACLE` included: opponent seats get their view from `bots.arena._view_for` (the sanctioned omniscient call site, [bots.md §9](bots.md)); the candidate seat, and any `PolicyBot` seat, always gets a plain `seat_view` (`tests/test_ml_eval_policy.py` spies on every view served) |
 | statistics | each played hand is a one-hand `bots.arena.GameRecord`, so `_collect_stats`, `_paired_differences` (candidate − mean of the other three) and the normal CI are `bots.arena`'s; plus a seeded percentile bootstrap CI |
 | metrics | per side: points/hand, win, deal-in, avg winning faan, tenpai-at-draw, `tenpai_rate_on_sub_minimum_hand`; table exhaustive-draw rate |
 | records | every hand as `HandRecord` columns (`--records`, JSON lines; `players` names the candidate's seat), replayable with `ml.env.replay_hand` |
@@ -974,7 +975,7 @@ tables are measured per profile; per-side detail in [rl-learnings.md §4](rl-lea
 The league's measurable gain is across presets (`hk_strict`, `EfficiencyBot` tables), not at
 `hk_classic`, where the starting policy had already plateaued. L274.3M is the R4 candidate; R4
 re-runs this gate on fresh seeds, and later league checkpoints are gated against L274.3M on these
-seeds. Not yet measured: a table of mixed bot types, and the gap to `ORACLE` (§12).
+seeds. Vs `ORACLE` ×3 (seeds 8,000,000+, 1,000 sets): +2.88 [+1.75, +4.01]; `ORACLE` ×1 vs L274.3M ×3: −1.53 [−2.22, −0.84] ([rl-learnings.md §4](rl-learnings.md)). Not yet measured: a table of mixed bot types.
 
 ## 15. Risks
 

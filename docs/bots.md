@@ -368,6 +368,8 @@ clearing tenpai won more but cheaper hands with no points gain.
   `app/table.py`'s `_submit_bot_job`, when the seat's effective tier is `ORACLE`, and the
   offline arena's `bots/arena.py` `_view_for` (§7). `tests/test_oracle_containment.py` AST-scans
   production code for any other call site, and for any `app/` module importing `bots.arena`.
+  `ml/eval_policy.py` (offline, `ml` extra) seats `ORACLE` opponents through `_view_for` too; its
+  candidate seat never goes through it ([ml.md §12](ml.md)).
 - A `SeatView` never carries `game_seed`/`hand_seed`, so it may cross the process-pool boundary.
   No `GameState` crosses; `compute_action` is unchanged.
 - **Disconnect handover always uses `T2`.** `Table._effective_bot_tier(seat)` pins an

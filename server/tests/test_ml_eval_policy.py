@@ -10,11 +10,12 @@ import pytest
 np = pytest.importorskip("numpy")
 torch = pytest.importorskip("torch")
 
+import ml.eval_policy as ev
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import Phase
 from ml.env import replay_hand
-from ml.eval_policy import bootstrap_ci, evaluate, load_candidate
+from ml.eval_policy import PolicyBot, bootstrap_ci, evaluate, load_candidate, play_set
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.ppo import PPOConfig, train_ppo
 
@@ -47,9 +48,62 @@ def test_duplicate_sets_rotate_the_candidate_and_records_replay():
     assert seeds == {5, 6}
 
 
-def test_refuses_an_omniscient_opponent():
-    with pytest.raises(ValueError, match="unknown opponent"):
-        evaluate([5], _RULESET, "ORACLE", model=_model())
+def _spy_views(monkeypatch, cls, seen):
+    original = cls.act
+
+    async def act(self, view, mask, deadline):
+        seen.append((view.seat, view.hands is not None))
+        return await original(self, view, mask, deadline)
+
+    monkeypatch.setattr(cls, "act", act)
+
+
+def test_oracle_opponents_see_every_hand_and_the_candidate_never_does(monkeypatch):
+    from bots.faanbot import FaanBot
+
+    policy_views, oracle_views = [], []
+    _spy_views(monkeypatch, PolicyBot, policy_views)
+    _spy_views(monkeypatch, FaanBot, oracle_views)
+    report, records = evaluate([5], _RULESET, "ORACLE", model=_model())
+    assert report["opponent"] == "ORACLE" and report["candidate"]["hands_played"] == 4
+    assert policy_views and not any(omni for _, omni in policy_views)
+    assert oracle_views and all(omni for _, omni in oracle_views)
+    for rec in records:
+        assert rec["players"].count("ORACLE") == 3
+        assert replay_hand(rec).phase == Phase.HAND_OVER
+
+
+def test_heuristic_candidate_keeps_a_public_view_against_oracle(monkeypatch):
+    from bots.faanbot import FaanBot
+
+    hands: list[list[tuple[int, bool]]] = []
+    original_play = ev._play
+
+    async def play(*args, **kwargs):
+        hands.append([])
+        return await original_play(*args, **kwargs)
+
+    monkeypatch.setattr(ev, "_play", play)
+
+    async def act(self, view, mask, deadline, _original=FaanBot.act):
+        hands[-1].append((view.seat, view.hands is not None))
+        return await _original(self, view, mask, deadline)
+
+    monkeypatch.setattr(FaanBot, "act", act)
+    report, records = evaluate([5], _RULESET, "ORACLE", candidate_bot="FaanBot")
+    assert report["candidate_bot"] == "FaanBot" and report["candidate"]["hands_played"] == 4
+    assert len(hands) == 4
+    for rotation, views in enumerate(hands):
+        assert {seat for seat, omni in views if not omni} == {rotation}
+        assert {seat for seat, omni in views if omni} <= {0, 1, 2, 3} - {rotation}
+        assert records[rotation]["players"].index("candidate") == rotation
+
+
+def test_refuses_an_omniscient_candidate_bot():
+    with pytest.raises(ValueError, match="unknown candidate bot"):
+        evaluate([5], _RULESET, "FaanBot", candidate_bot="ORACLE")
+    with pytest.raises(ValueError, match="omniscient"):
+        play_set(5, _RULESET, "FaanBot", candidate_bot="ORACLE")
 
 
 def test_same_seeds_same_report():
