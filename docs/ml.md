@@ -980,7 +980,7 @@ setup for the RTX 2060 desktop. Built and CPU-tested; CUDA tests (`-m cuda`) and
 numbers are pending a run on the 2060. The full run moves there: learner on the GPU, rollout on
 the i5-10400F's cores.
 
-R3 progress: **built and CPU-smoked; the full run is pending on the GPU box.** `ml/league.py`
+R3 progress: **gate passed** (L274.3M, 2026-10-11); the league keeps running. `ml/league.py`
 (pool, PFSP, personas, learned-only Elo), the league in `ml/ppo.py` (`FROZEN` seats acted by
 snapshots, persona forks, PPO `init_ckpt` loading the whole learner), stage C2 in
 `ml/curriculum.py` (`min_faan` 3 + 20% other presets), `ml/configs/rl_league.yaml`, and the ACH
@@ -988,6 +988,13 @@ switch (`policy_loss: ach`, §9). Measured rollout cost on CPU: 0.59× plain sel
 decisions/s at the default seating (§11). The full run started 2026-10-08 on the RTX 2060
 from the hold-end checkpoint (464.3M): ~1.15k learner decisions/s end to end, 0.7× the hold's
 ~1.6k/s. The ACH ablation is a second run with `policy_loss: ach`.
+
+Run history: through 188M decisions the head-to-head against the starting policy drifted from
+level to −0.83 [−1.27, −0.39] points/hand while `FaanBot` held at +9.3; the cause was `hk_casual`
+dominating the batch's return variance. At 190.0M the run resumed with `reward_scale_by_ruleset`,
+`pfsp_metric: points` and 400-update personas (§9, §11); five checkpoints from 208.7M to 296.6M
+are level with the starting policy at `hk_classic` (mean −0.05). Series and per-segment metrics:
+[rl-learnings.md §3–§4, §6](rl-learnings.md).
 
 Pre-league baseline: the hold checkpoint at 462.0M (chosen in advance) already meets the numeric
 exit criteria on fresh seeds 5,000,000+ ([rl-learnings.md §4](rl-learnings.md)). `eval_policy`
@@ -1000,9 +1007,21 @@ seats one opponent type ×3, so mixed tables are measured per profile:
 | sub-min tenpai not worse | 0.030 vs `FaanBot`'s 0.048; ≤ the opponents' on every table but `FaanBotAggressive` (0.049 / 0.046) | met |
 | stretch ≥ +5 points/game | +9.76 points/hand | met |
 
-Since the baseline already passes, the league's value has to show against it rather than
-against zero: not worse than 462.0M on these tables, and ahead of it head to head (a learned-only
-duplicate match, §12; `eval_policy` can't seat a learned opponent yet).
+Since the baseline already passes, the league is judged against it. Gate on fresh seeds
+7,000,000+, both policies on identical hands (points/hand, bootstrap CI):
+
+| Criterion | Starting policy (464.3M) | L274.3M | Status (L274.3M) |
+| --- | --- | --- | --- |
+| paired CI > 0 vs `FaanBot`, ≥ 1,000 fresh sets | +9.99 [9.02, 10.96] | **+10.94 [9.87, 12.10]** | met |
+| not worse on mixed tables (per profile, 700 sets each) | `EfficiencyBot` +11.32, `FaanBotAggressive` +10.74, `FaanBotDefensive` +9.60, `FaanBotFlushChasing` +10.03 | +14.48, +12.30, +9.88, +10.73; every CI > 0 and ≥ the starting policy's | met per profile |
+| sub-min tenpai not worse | ≤ the opponents' on 2 of 5 tables | ≤ on 4 of 5 (0.048 vs `FaanBotAggressive`'s 0.032; ~20 events per cell) | met but for one table |
+| stretch ≥ +5 points/game | | +10.94 points/hand | met |
+| other presets (not a criterion) | `hk_strict` vs `FaanBot` +17.42, `hk_casual` +14.50 | `hk_strict` +25.04, `hk_casual` +18.98; head-to-head vs the starting policy at `hk_strict` **+2.47 [+1.51, +3.48]**, `hk_casual` +4.04 [−4.44, +13.39], `hk_classic` level | — |
+
+The league's measurable gain is across presets (`hk_strict`, `EfficiencyBot` tables), not at
+`hk_classic`, where the starting policy had already plateaued. L274.3M is the R4 candidate; R4
+re-runs this gate on fresh seeds, and later league checkpoints are gated against L274.3M on these
+seeds. Not yet measured: a table of mixed bot types, and the gap to `ORACLE` (§12).
 
 ## 15. Risks
 
