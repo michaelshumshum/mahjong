@@ -35,6 +35,7 @@ moved on.
 | [0018](0018-milestone-plan.md) | Milestone plan and timeline | Historical |
 | [0019](0019-oracle-improvements-plan.md) | `ORACLE` improvements plan | Accepted |
 | [0020](0020-hk-scoring-table-alignment.md) | Scoring table aligned with standard HK mahjong | Accepted |
+| [0021](0021-rl-training-hardware.md) | RL training hardware: laptop CPU, cloud plan, 2060 desktop | Historical |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).

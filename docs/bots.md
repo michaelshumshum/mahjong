@@ -50,12 +50,13 @@ vary with decision difficulty — no tier returns a confidence signal to scale i
 | `T1` | `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak (§3) | Easy |
 | `T2` | `FaanBot` | T1 + hand-value planning (§4) + discard safety (§5) | Normal; also the default tier and the disconnect-handover tier |
 | `ORACLE` | `FaanBot` | a plain `FaanBot()` fed a full-information view (§9) | Impossible |
-| T4 | learned policy | self-play RL, independent of `FaanBot` | in development ([ml.md](ml.md)) |
+| T4 | learned policy | self-play RL, independent of `FaanBot` | not yet: R3 gate passed, shipping is R4 ([ml.md §14](ml.md)) |
 
 `FaanBot` also ships weight-profile variants (`bots/faanbot.py`'s `WeightProfile`: `AGGRESSIVE`,
 `DEFENSIVE`, `FLUSH_CHASING`), registered in `bots/arena.py`'s `BOT_REGISTRY` as
-`FaanBotAggressive`/`FaanBotDefensive`/`FaanBotFlushChasing` for training variety. They are not
-selectable at a live table ([ADR 0015](decisions/0015-bot-personas.md)).
+`FaanBotAggressive`/`FaanBotDefensive`/`FaanBotFlushChasing` for training variety and the RL
+agent's mixed-table gate ([ml.md §12](ml.md)). They are not selectable at a live table
+([ADR 0015](decisions/0015-bot-personas.md)).
 
 There is no search tier: a determinized-rollout `SearchBot` was built and removed for scoring
 decisively worse than `FaanBot` ([ADR 0012](decisions/0012-searchbot-removed.md)).

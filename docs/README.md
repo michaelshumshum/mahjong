@@ -11,7 +11,7 @@ the [decision log](decisions/README.md).
 | [frontend.md](frontend.md) | rendering, layout, interaction, client state, routes, assets, a11y and i18n |
 | [bots.md](bots.md) | bot interface, tiers, shanten/ukeire, value planning, safety, arena, `ORACLE` |
 | [ml.md](ml.md) | self-play RL agent — in progress, kept as a plan with milestones |
-| [rl-learnings.md](rl-learnings.md) | RL training record: curriculum progress, training metrics, evaluation over training, observed agent behaviour, findings for future runs |
+| [rl-learnings.md](rl-learnings.md) | RL training record for the cold-start (R2) and league (R3) runs: curriculum progress, training metrics, evaluation over training, observed agent behaviour, findings for future runs |
 | [infra.md](infra.md) | repo layout, toolchain, local dev, Docker, database, deployment, CI |
 | [testing.md](testing.md) | test strategy per layer, Vitest and pytest gotchas |
 | [decisions/](decisions/README.md) | ADR log: accepted, deferred, rejected and historical decisions |

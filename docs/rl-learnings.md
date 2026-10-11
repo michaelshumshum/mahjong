@@ -1,8 +1,21 @@
 # RL learnings
 
 What training the self-play agent ([ml.md](ml.md)) has shown so far: curriculum progress, how the
-training metrics move, evaluation against the heuristic bots, and how the agent plays. A living
-record — later runs append rows to the tables and findings to §6.
+training metrics move, evaluation against the heuristic bots and between checkpoints, and how the
+agent plays. A living record — later runs append rows to the tables and findings to §6. Milestone
+results (the R2 and R3 gate criteria) are kept in [ml.md §14](ml.md); this doc has the series and
+per-opponent detail behind them.
+
+| Run | Milestone | Config | Decisions | Checkpoint names |
+| --- | --- | --- | --- | --- |
+| 1 | R2 cold start (C0 → C1 exit at 220.4M), then the C1 hold | `rl_ppo_c0.yaml`, `hold_final: true` | 0 → 464.3M | cumulative decisions: `220.4M` (C1 exit), `462.0M` (last hold eval checkpoint, the pre-league gate candidate), `464.3M` (hold end, `ckpt_hold_final.pt`, the league's starting policy) |
+| 2 | R3 league (C2) | `rl_league.yaml`, `init_ckpt` = 464.3M | counter restarts at 0 | `L` + decisions since the league started: `L274.3M` = 274.3M league decisions on top of 464.3M |
+
+Terms: *sub-min tenpai* is `tenpai_rate_on_sub_minimum_hand`: of a side's hands tenpai at
+exhaustive draw, the share whose waits can't reach `min_faan` ([bots.md §4](bots.md),
+[ml.md §4](ml.md)); *head-to-head* is policy vs policy on duplicate hands (§4); *PFSP* is the
+league's opponent sampling ([ml.md §11](ml.md)). Points are per hand throughout, except the
+heuristic arena's per-game figure in §4.
 
 ## 1. Setup
 
@@ -13,9 +26,31 @@ record — later runs append rows to the tables and findings to §6.
 | update | batch 4,096 learner decisions, 2 epochs × minibatch 512, AdamW 3e-4, clip 0.2, entropy 0.01 ([ml.md §9](ml.md)) | same, `policy_loss: ppo` |
 | model | `PolicyNet` 459k params + `OracleCritic` 427k (96 ch × 6 blocks), initialised from the R1 auxiliary-pretrained checkpoint | same nets, whole learner (critic, PopArt, AdamW) loaded from run 1's hold end (464.3M) |
 | ruleset | `hk_classic` (`min_faan` stepped by the curriculum, [ml.md §10](ml.md)) | C2: `hk_classic` `min_faan` 3, 10% `hk_casual`, 10% `hk_strict` hands |
-| throughput | end to end 1.1–1.7k decisions/s (1.58–1.65k through the hold); rollout 2.6–3.8k/s, learner ~2.9–3.0k/s | ~1.15k learner decisions/s end to end (rollout 2.17 s + update 1.50 s per batch): 0.7× run 1's hold, frozen seats step without producing samples |
+| throughput | end to end 1.1–1.7k decisions/s (1.58–1.65k through the hold); rollout 2.6–3.8k/s, learner ~2.9–3.0k/s | ~1.1k learner decisions/s end to end (segment means 1.05–1.18k, §3; rollout 2.17 s + update 1.50 s per 4,096-decision batch early on): 0.7× run 1's hold, frozen seats step without producing samples |
 
-Metrics before 98.6M decisions are under an earlier scoring table; compare within a segment.
+Metrics before 98.6M decisions are under an earlier scoring table (engine 1.0.0,
+[ADR 0020](decisions/0020-hk-scoring-table-alignment.md)); compare within a segment.
+
+Evaluation seed sets (`eval_policy --seed`, the first duplicate set's `HandEnv` episode seed,
+[ml.md §12](ml.md)). A range used for a gate is never reused for tuning or another gate; pick the
+next free range for a new one. Below 2,000,000 belongs to `bots.arena`'s heuristic-bot tuning and
+`ORACLE` gates (seeds 1+, 1,000,000+, [bots.md §7, §9](bots.md)); `eval_policy`'s default `--seed`
+(1,000,000) falls there, so always pass one.
+
+| Seeds | Sets | Used for |
+| --- | --- | --- |
+| 2,000,000+ | 200 | R2 smoke checkpoint vs `EfficiencyBot` (§7) |
+| 3,000,000+ | 700 | R2 gate (C1 exit) and the 230.9M checks (§4) |
+| 4,100,000+ | 500 → 1,000 | progress series vs `FaanBot`, both runs (§4); fixed, so checkpoints compare on identical hands |
+| 5,000,000+ | 1,000 / 700 | pre-league gate, 462.0M (§4) |
+| 6,000,000+ | 3,000 per direction | league head-to-head series vs the starting policy (§4) |
+| 6,100,000+ – 6,400,000+ | 1,500–2,000 | head-to-head analysis, results not kept in the repo: sampled-mode head-to-head (6.1M, 2,000 sets), hold 462.0M vs 429.2M control (6.2M), `hk_strict` / `hk_casual` head-to-heads (6.3M, 1,500 sets), learner L91.8M vs snapshot `past1` (6.4M) |
+| 7,000,000+, 7,100,000+ | 1,000 / 700; 1,500 head-to-head | R3 gate, L274.3M and 464.3M (§4); later league checkpoints are compared against L274.3M here |
+| 8,000,000+ | — | evals vs `ORACLE` |
+| 9,000,000+ | — | next free range (the R4 gate re-run) |
+
+The head-to-head harness is `runs/ppo_league_snap/tools/h2h_eval.py` on the training box
+(gitignored, not in `ml/`).
 
 ## 2. Curriculum progress
 
@@ -25,14 +60,14 @@ Metrics before 98.6M decisions are under an earlier scoring table; compare withi
 | C0b | 52–4,853 | 0.21M → 20.32M | 20M, complete at 20.22M | rolling blind win 0.405 (threshold 0.25). The 50-update mean of batch blind win was already ≥ 0.25 at 0.43M: the anneal was the binding constraint |
 | C1 | 4,854–52,402 | 20.33M → 220.40M | 200M; `min_faan` 0 → 1 at 120.33M, → 3 at 220.33M (update 52,385) | 17 updates after the anneal: rolling win 0.1995, sub-min tenpai 0.108 (251 tenpai draws), draws 20.2%, deal-in 0.099 over 4,000 hands |
 | C1 held | 52,403–110,201 | 220.40M → 464.27M | — | stopped for the R3 league run (`hold_final`) |
-| C2 (run 2) | 1– | 0 → (296.6M at the R3 gate write-up; counter restarts in a new run) | — | none (league runs to the 2B budget); R3 gate passed at 274.3M ([ml.md §14](ml.md)) |
+| C2 (run 2) | 1– | L0 → L296.6M at the R3 gate write-up, still running | — | none (the league runs to the 2B budget); R3 gate passed at L274.3M ([ml.md §14](ml.md)) |
 
 C1 exit thresholds: win ≥ 0.15, sub-min tenpai ≤ 0.32 ([ml.md §10](ml.md)).
 
 ## 3. Training metrics
 
-Segment means of the per-update `metrics.jsonl` records (batch rates are per learner seat-hand;
-C0/C0b against tsumogiri opponents, C1 self-play over four learner seats).
+Run 1 segment means of the per-update `metrics.jsonl` records (batch rates are per learner
+seat-hand; C0/C0b against tsumogiri opponents, C1 self-play over four learner seats).
 
 | Decisions (M) | Stage, `min_faan` | k / keep / β | Win (blind) | Draw | Deal-in | Entropy | KL | Clip | Expl. var | PopArt σ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -60,7 +95,7 @@ C0/C0b against tsumogiri opponents, C1 self-play over four learner seats).
 | 380–420 | held, 3 | 0 / 0 / 0 | 0.176 | 0.296 | 0.102 | 0.79 | 0.0060 | 0.056 | 0.28 | 0.59 |
 | 420–464.3 | held, 3 | 0 / 0 / 0 | 0.179 | 0.286 | 0.103 | 0.77 | 0.0057 | 0.053 | 0.28 | 0.58 |
 
-Held at `min_faan` 3, rolling window (4,000 hands):
+Run 1, held at `min_faan` 3, rolling window (4,000 hands):
 
 | Decisions (M) | Win | Draw | Deal-in | Sub-min tenpai |
 | --- | --- | --- | --- | --- |
@@ -117,7 +152,7 @@ Candidate × 1 vs bot × 3, paired-duplicate per hand, `hk_classic` (`min_faan` 
 ([ml.md §12](ml.md)). Checkpoints were trained at the `min_faan` shown in §3 but are always
 evaluated at 3.
 
-Progress vs `FaanBot`, fixed seeds 4,100,000+, 500 sets:
+Run 1 progress vs `FaanBot`, fixed seeds 4,100,000+, 500 sets:
 
 | Decisions | Training `min_faan` | Diff [95% bootstrap CI] | Win (agent / bot) | Deal-in | Avg win faan | Sub-min tenpai | Table draws |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -142,13 +177,13 @@ behind it moves: 326.0M wins least (0.260) with the biggest hands (5.01 faan) an
 (0.052); 429.2M wins most (0.309) with the smallest (4.43). Sub-min tenpai keeps falling (0.045 →
 0.018–0.029), level with or below `FaanBot`'s.
 
-Fresh seeds 3,000,000+, 700 sets (the R2 gate seed set):
+Run 1 on fresh seeds 3,000,000+, 700 sets (the R2 gate seed set):
 
 | Checkpoint | Opponent | Diff [95% CI] (bootstrap) | Win | Deal-in | Avg win faan | Sub-min tenpai | Tenpai at draw | Turns to win | Table draws |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **220.4M, C1 exit (R2 gate)** | `EfficiencyBot` | **+8.74 [7.67, 9.80]** ([7.69, 9.81]) | 0.299 / 0.145 | 0.043 / 0.092 | 4.64 / 3.22 | 0.140 / 0.335 | 0.448 / 0.983 | 59.4 / 53.6 | 26.7% |
-| 230.9M, held | `EfficiencyBot` | +12.50 [11.30, 13.71] | 0.331 / 0.141 | 0.032 / 0.108 | 5.04 / 3.21 | 0.095 / 0.352 | 0.336 / 0.984 | 63.1 / 51.6 | 24.5% |
-| 230.9M, held | `FaanBot` | +10.67 [9.32, 12.03] | 0.280 / 0.157 | 0.070 / 0.110 | 5.10 / 3.33 | 0.059 / 0.029 | 0.387 / 0.514 | 60.1 / 57.8 | 25.0% |
+| 230.9M, held | `EfficiencyBot` | +12.50 [11.30, 13.71] ([11.32, 13.73]) | 0.331 / 0.141 | 0.032 / 0.108 | 5.04 / 3.21 | 0.095 / 0.352 | 0.336 / 0.984 | 63.1 / 51.6 | 24.5% |
+| 230.9M, held | `FaanBot` | +10.67 [9.32, 12.03] ([9.34, 12.07]) | 0.280 / 0.157 | 0.070 / 0.110 | 5.10 / 3.33 | 0.059 / 0.029 | 0.387 / 0.514 | 60.1 / 57.8 | 25.0% |
 
 Pre-league R3 gate: the 462.0M hold checkpoint, chosen in advance, on fresh seeds 5,000,000+
 (not used for any other eval). `eval_policy` seats one opponent type ×3, so "mixed tables" is
@@ -164,18 +199,20 @@ measured as each `FaanBot` weight profile and `EfficiencyBot` in turn:
 
 The R3 exit criteria's numbers ([ml.md §14](ml.md)) are already met before the league: CI > 0 vs
 `FaanBot` on ≥ 1,000 fresh sets, positive against every profile, sub-min tenpai at or below each
-opponent's. `FaanBotDefensive` is the closest matchup and the drawiest table (33%).
+opponent's but `FaanBotAggressive`'s (0.049 / 0.046). `FaanBotDefensive` is the closest matchup and
+the drawiest table (33%).
 
-League checkpoints (run 2), vs `FaanBot` on seeds 4,100,000+ (500 sets to L96.3M, 1,000 after;
-the first 500 seeds are shared) and head-to-head against the league's starting policy (464.3M)
-at `hk_classic`: `PolicyBot` vs `PolicyBot` duplicate, 3,000 sets each of league ×1 vs start ×3
-and ×3 vs ×1 on seeds 6,000,000+, combined as the mean of the two diffs:
+Run 2 (league) checkpoints, vs `FaanBot` on seeds 4,100,000+ (500 sets to L96.3M, 1,000 after;
+the first 500 seeds are shared with run 1's series) and head-to-head against the league's starting
+policy (464.3M) at `hk_classic`: `PolicyBot` vs `PolicyBot` duplicate, 3,000 sets each of league
+×1 vs start ×3 and ×3 vs ×1 on seeds 6,000,000+, combined as the mean of the two diffs (bootstrap
+CI):
 
 | Checkpoint | vs `FaanBot` | Sub-min tenpai (agent / bot) | Head-to-head vs start [95% CI] |
 | --- | --- | --- | --- |
 | L23.2M | +8.53 [7.29, 9.82] | 0.026 / 0.027 | — |
 | L48.4M | +8.37 [7.11, 9.69] | 0.027 / 0.032 | — |
-| L72.0M | +9.07 [7.77, 10.42] | 0.038 / 0.027 | −0.42 / +0.38 (×1 / ×3, vs the 462.0M hold checkpoint) |
+| L72.0M | +9.07 [7.77, 10.42] | 0.038 / 0.027 | −0.42 / +0.38 (×1 / ×3 separately, vs 462.0M rather than 464.3M; no CI recorded) |
 | L96.3M | +9.61 [8.33, 10.93] | 0.048 / 0.040 | — |
 | L119.1M | +11.00 [9.90, 12.15] | 0.067 / 0.036 | −0.28 [−0.72, +0.16] |
 | L142.4M | +10.04 [8.98, 11.11] | 0.037 / 0.036 | −0.27 [−0.69, +0.16] |
@@ -192,8 +229,9 @@ Against itself the league policy trades the same way it does against the bots: i
 (0.16–0.19 vs 0.19–0.22 for the starting policy) and deals in more (0.11–0.13 vs 0.09–0.11), and
 makes it up in hand size.
 
-R3 gate (2026-10-11): L274.3M, chosen as the latest checkpoint, and the league's starting policy
-on the same fresh seeds 7,000,000+ (head-to-head 7,100,000+):
+R3 gate (2026-10-11), per-side detail: L274.3M, chosen as the latest checkpoint, and the league's
+starting policy on the same fresh seeds 7,000,000+ (head-to-head 7,100,000+). The criteria and
+their status are in [ml.md §14](ml.md):
 
 | Opponent / test | Sets | Starting policy (464.3M) | **L274.3M** | Win (L274.3M / opp) | Avg win faan | Sub-min tenpai (L274.3M / opp; start / opp) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -292,30 +330,61 @@ visible melds), claim acceptance rate per offer (claims taken / claims offered),
 
 ## 6. Findings for future runs
 
-| Finding | Evidence | Implication |
-| --- | --- | --- |
-| Curriculum anneals, not thresholds, set the pace | C0 exited at 0.21M; C0b's blind-win threshold was met by ~0.43M but the stage ran its full 20M anneal; C1 exited 17 updates after its 200M anneal | candidate to shorten the C0b anneal (and test a shorter C1 anneal) in the next run |
-| Explained variance falls as the oracle and shaping anneal | C1 0.6–0.8 at keep ≥ 0.5, 0.20 at keep / β → 0, ~0.26 held | expected: the shaping term is predictable, unshaped zero-sum payouts are not. Low EV at the end of C1 is not by itself a critic failure; watch it within a held segment |
-| Self-play per-seat win = (1 − draws) / 4 | C1 batch win 0.233 with 7% draws; exit window 0.194 with 22.5% draws | the C1 win threshold is a draw cap (≤ 40%), not a strength measure; strength comes from the held-out eval (§4) |
-| At `min_faan` 0–1 the agents learn speed | C1 self-play draws 2–8%, deal-in ~0.16; eval sub-min tenpai stays 0.15–0.19 through 167M | low `min_faan` stages build hand-making, not value-building; the value play only appears once `min_faan` 3 is trained |
-| Sub-min tenpai only falls once `min_faan` 3 is trained | eval 0.192 (98.6M, `min_faan` 0) → 0.149–0.159 (`min_faan` 1) → 0.104 at exit → 0.045 after 10.5M at `min_faan` 3 | the step to 3 does more in 10M decisions than 100M at 1 did; most training budget belongs at the target ruleset |
-| The C1 exit window mostly measures the transition | the 4,000-hand window fills in ~17 updates after `min_faan` hits 3; exit draws 20%, settled held draws 31–37% (one dip to 52% at 223M) | the exit numbers are a snapshot of a policy trained at `min_faan` 1; don't read them as the converged C1 behaviour |
-| Rising self-play draws were mutual defence, not passivity | held self-play draws 20% → ~31–40% while eval diff vs `FaanBot` rose +6.36 → +8.82, agent deal-in fell 0.071 → 0.064, and eval-table draws stayed 26–27% | read the draw canary together with held-out eval: higher draws among learners with rising strength vs heuristics is learners defending against each other |
-| Entropy rises as the oracle is removed | C1 0.66 → 0.80; held ~0.85; KL 0.007, clip 0.07 throughout | no collapse; the policy stays stochastic at the target ruleset |
-| Checkpoint-to-checkpoint variance ~±1 point | 161.0M +5.26 vs 167.1M +4.29 on the same seeds | gate a checkpoint chosen in advance (or average several), never the best of a sweep on the gate seeds ([ml.md §12](ml.md)) |
-| Self-play against heuristics plateaus fast at the target ruleset | vs `FaanBot` +8.82 at 230.9M, then +7.8 to +9.1 across six checkpoints to 462.0M, all CIs overlapping; the step to `min_faan` 3 took +6.36 → +8.82 in 10.5M decisions | budget ~10–30M decisions at the target ruleset after a curriculum exit, then move on (league); a long pure-self-play hold buys style drift, not measurable strength |
-| Slow self-play trends continue after the eval plateau | over the hold: draws 0.33 → 0.29, win 0.166 → 0.179, entropy 0.85 → 0.77, KL and clip fraction falling, explained variance 0.26 → 0.28 | these trends say the learners are still adapting to each other, not that they're getting stronger against outsiders; held-out eval decides |
-| Checkpoints trade win rate against hand size at equal strength | 326.0M win 0.260 / 5.01 faan / deal-in 0.052; 429.2M win 0.309 / 4.43 faan / deal-in 0.062; both ≈ +8.2–9.1 | behaviour claims need several checkpoints; a single checkpoint's style is a phase of the attack/defence cycle |
-| The style diversifies late | half-flush wins 63% → 46% and concealed wins 16% → 29% from 230.9M to 462.0M at unchanged points per win (§5) | the open-flush route the bots don't read is no longer the agent's only source of value; the league tests whether that holds against opponents that do |
-| The pre-league policy already passes R3's numbers | 462.0M on fresh seeds: +9.76 [8.72, 10.79] vs `FaanBot` (1,000 sets), +9.42 to +11.69 vs every profile and `EfficiencyBot`, sub-min tenpai ≤ each opponent's (§4) | the heuristic gate no longer discriminates between candidates; the league's progress has to be read from learned-only measures (Elo, per-snapshot win rate) and later from exploiter gain, with the heuristic gate as a regression floor |
-| League rollout costs ~0.7× | run 2: ~1.15k vs the hold's ~1.6k learner decisions/s on the same box | frozen seats take env steps and forwards without producing samples; `seat_learners: 2` is the lever if throughput matters more than opponent coverage |
-| A 10% alt-preset share can dominate the return variance | C2, 165M decisions: per-hand payment SD (reward units) 0.87 `hk_classic`, 0.98 `hk_strict`, 3.6 `hk_casual` (max 48), so the `hk_casual` 10% supplied ~65% of the variance; PopArt σ 0.6 → 1.4–2.0 (spikes 4–6), explained variance 0.28 → 0.13–0.17, entropy 0.77 → 0.9; head-to-head vs the league's starting policy −0.3 points/hand [−0.75, +0.10] | normalise each preset's rewards to the main ruleset's scale before mixing presets in one batch (`reward_scale_by_ruleset`, [ml.md §9](ml.md)) |
-| The pairwise win share measures style, not strength | the C2 policy drifted to "win less often, win bigger": x ≈ 0.48 against equal-strength snapshots, PFSP (`pfsp_power` 2) effectively uniform, Elo falling | rank opponents by points difference (`pfsp_metric: points`, [ml.md §11](ml.md)); keep x as a style read-out |
-| Short persona forks are not distinct opponents | `persona_updates` 100 at ×1.3 / ×1.5: KL from the parent 0.06–0.15 nats, top-1 agreement 0.81–0.85, less than checkpoint drift over 2M decisions | 400 updates, ×1.6 / ×2.0; measure persona KL from the parent after each fork before trusting the persona share |
-| Reward scaling fixed the league's regression | at 188.2M the head-to-head vs the starting policy was −0.83 [−1.27, −0.39]; after `reward_scale_by_ruleset` at 190.0M: −0.05 at 208.7M and −0.05 mean over five checkpoints to 296.6M. PopArt σ 1.8 → 0.74, explained variance 0.15 → 0.27, entropy 0.95 → 0.84 within ~1M decisions | mixing presets with different payout scales in one batch is a correctness issue, not a tuning one: scale before mixing, from the first update |
-| The league's gain is robustness across presets, not `hk_classic` strength | 300M league decisions: `hk_classic` head-to-head vs the starting policy level (mean −0.05); L274.3M vs the starting policy on identical seeds: `hk_strict` head-to-head +2.47 [+1.51, +3.48], vs `FaanBot` at `hk_strict` +25.0 vs +17.4, vs `EfficiencyBot` +14.5 vs +11.3; `FaanBot` at `hk_classic` +10.9 vs +10.0 (CIs overlap) | the starting policy had already plateaued at `hk_classic` (§4); the 20% alt-preset hands are what the league added. Judge league checkpoints on all served presets, not the main one alone |
-| Head-to-head between near-equal policies needs ~6,000 sets per checkpoint | combined ×1/×3 head-to-head CI ±0.43 points/hand at 3,000 + 3,000 sets; neighbouring checkpoints move ±0.3 (−0.39 → +0.14 → −0.08) | read the mean over several checkpoints; a single checkpoint can't separate a 0.2-point gain from noise |
+| Area | Finding | Evidence | Implication |
+| --- | --- | --- | --- |
+| Curriculum | Curriculum anneals, not thresholds, set the pace | C0 exited at 0.21M; C0b's blind-win threshold was met by ~0.43M but the stage ran its full 20M anneal; C1 exited 17 updates after its 200M anneal | candidate to shorten the C0b anneal (and test a shorter C1 anneal) in the next run |
+| Curriculum | Explained variance falls as the oracle and shaping anneal | C1 0.6–0.8 at keep ≥ 0.5, 0.20 at keep / β → 0, ~0.26 held | expected: the shaping term is predictable, unshaped zero-sum payouts are not. Low EV at the end of C1 is not by itself a critic failure; watch it within a held segment |
+| Curriculum | Self-play per-seat win = (1 − draws) / 4 | C1 batch win 0.233 with 7% draws; exit window 0.194 with 22.5% draws | the C1 win threshold is a draw cap (≤ 40%), not a strength measure; strength comes from the held-out eval (§4) |
+| Curriculum | At `min_faan` 0–1 the agents learn speed | C1 self-play draws 2–8%, deal-in ~0.16; eval sub-min tenpai stays 0.15–0.19 through 167M | low `min_faan` stages build hand-making, not value-building; the value play only appears once `min_faan` 3 is trained |
+| Curriculum | Sub-min tenpai only falls once `min_faan` 3 is trained | eval 0.192 (98.6M, `min_faan` 0) → 0.149–0.159 (`min_faan` 1) → 0.104 at exit → 0.045 after 10.5M at `min_faan` 3 | the step to 3 does more in 10M decisions than 100M at 1 did; most training budget belongs at the target ruleset |
+| Curriculum | The C1 exit window mostly measures the transition | the 4,000-hand window fills in ~17 updates after `min_faan` hits 3; exit draws 20%, settled held draws 31–37% (one dip to 52% at 223M) | the exit numbers are a snapshot of a policy trained at `min_faan` 1; don't read them as the converged C1 behaviour |
+| Curriculum | Entropy rises as the oracle is removed | C1 0.66 → 0.80; held ~0.85; KL 0.007, clip 0.07 throughout | no collapse; the policy stays stochastic at the target ruleset |
+| C1 hold | Rising self-play draws were mutual defence, not passivity | held self-play draws 20% → ~31–40% while eval diff vs `FaanBot` rose +6.36 → +8.82, agent deal-in fell 0.071 → 0.064, and eval-table draws stayed 26–27% | read the draw canary together with held-out eval: higher draws among learners with rising strength vs heuristics is learners defending against each other |
+| C1 hold | Slow self-play trends continue after the eval plateau | over the hold: draws 0.33 → 0.29, win 0.166 → 0.179, entropy 0.85 → 0.77, KL and clip fraction falling, explained variance 0.26 → 0.28 | these trends say the learners are still adapting to each other, not that they're getting stronger against outsiders; held-out eval decides |
+| C1 hold | Checkpoints trade win rate against hand size at equal strength | 326.0M win 0.260 / 5.01 faan / deal-in 0.052; 429.2M win 0.309 / 4.43 faan / deal-in 0.062; both ≈ +8.2–9.1 | behaviour claims need several checkpoints; a single checkpoint's style is a phase of the attack/defence cycle |
+| C1 hold | The style diversifies late | half-flush wins 63% → 46% and concealed wins 16% → 29% from 230.9M to 462.0M at unchanged points per win (§5) | the open-flush route the bots don't read is no longer the agent's only source of value; the league tests whether that holds against opponents that do |
+| C1 hold | Self-play against heuristics plateaus fast at the target ruleset | vs `FaanBot` +8.82 at 230.9M, then +7.8 to +9.1 across six checkpoints to 462.0M, all CIs overlapping; the step to `min_faan` 3 took +6.36 → +8.82 in 10.5M decisions | budget ~10–30M decisions at the target ruleset after a curriculum exit, then move on (league); a long pure-self-play hold buys style drift, not measurable strength |
+| Evaluation | Checkpoint-to-checkpoint variance ~±1 point | 161.0M +5.26 vs 167.1M +4.29 on the same seeds | gate a checkpoint chosen in advance (or average several), never the best of a sweep on the gate seeds ([ml.md §12](ml.md)) |
+| Evaluation | The pre-league policy already passes R3's numbers | 462.0M on fresh seeds: +9.76 [8.72, 10.79] vs `FaanBot` (1,000 sets), +9.42 to +11.69 vs every profile and `EfficiencyBot`, sub-min tenpai ≤ each opponent's (§4) | the heuristic gate no longer discriminates between candidates; the league's progress has to be read from learned-only measures (Elo, per-snapshot win rate) and later from exploiter gain, with the heuristic gate as a regression floor |
+| Evaluation | Head-to-head between near-equal policies needs ~6,000 sets per checkpoint | combined ×1/×3 head-to-head CI ±0.43 points/hand at 3,000 + 3,000 sets; neighbouring checkpoints move ±0.3 (−0.39 → +0.14 → −0.08) | read the mean over several checkpoints; a single checkpoint can't separate a 0.2-point gain from noise |
+| League | League rollout costs ~0.7× | run 2: ~1.1k vs the hold's ~1.6k learner decisions/s on the same box | frozen seats take env steps and forwards without producing samples; `seat_learners: 2` is the lever if throughput matters more than opponent coverage |
+| League | A 10% alt-preset share can dominate the return variance | C2, 165M decisions: per-hand payment SD (reward units) 0.87 `hk_classic`, 0.98 `hk_strict`, 3.6 `hk_casual` (max 48), so the `hk_casual` 10% supplied ~65% of the variance; PopArt σ 0.6 → 1.4–2.0 (spikes 4–6), explained variance 0.28 → 0.13–0.17, entropy 0.77 → 0.9; head-to-head vs the league's starting policy −0.3 points/hand [−0.75, +0.10] | normalise each preset's rewards to the main ruleset's scale before mixing presets in one batch (`reward_scale_by_ruleset`, [ml.md §9](ml.md)) |
+| League | Reward scaling fixed the league's regression | at 188.2M the head-to-head vs the starting policy was −0.83 [−1.27, −0.39]; after `reward_scale_by_ruleset` at 190.0M: −0.05 at 208.7M and −0.05 mean over five checkpoints to 296.6M. PopArt σ 1.8 → 0.74, explained variance 0.15 → 0.27, entropy 0.95 → 0.84 within ~1M decisions | mixing presets with different payout scales in one batch is a correctness issue, not a tuning one: scale before mixing, from the first update |
+| League | The pairwise win share measures style, not strength | the C2 policy drifted to "win less often, win bigger": x ≈ 0.48 against equal-strength snapshots, PFSP (`pfsp_power` 2) effectively uniform, Elo falling | rank opponents by points difference (`pfsp_metric: points`, [ml.md §11](ml.md)); keep x as a style read-out |
+| League | Short persona forks are not distinct opponents | `persona_updates` 100 at ×1.3 / ×1.5: KL from the parent 0.06–0.15 nats, top-1 agreement 0.81–0.85, less than checkpoint drift over 2M decisions | 400 updates, ×1.6 / ×2.0; measure persona KL from the parent after each fork before trusting the persona share |
+| League | The league's gain is robustness across presets, not `hk_classic` strength | 300M league decisions: `hk_classic` head-to-head vs the starting policy level (mean −0.05); L274.3M vs the starting policy on identical seeds: `hk_strict` head-to-head +2.47 [+1.51, +3.48], vs `FaanBot` at `hk_strict` +25.0 vs +17.4, vs `EfficiencyBot` +14.5 vs +11.3; `FaanBot` at `hk_classic` +10.9 vs +10.0 (CIs overlap) | the starting policy had already plateaued at `hk_classic` (§4); the 20% alt-preset hands are what the league added. Judge league checkpoints on all served presets, not the main one alone |
 
 What to watch next: whether later league checkpoints gain on L274.3M at `hk_classic` (gate them
 against it with the same seeds); sub-min tenpai, which alternates around `FaanBot`'s (0.018–0.067,
 20–25 events per 1,000-set check); the ACH ablation; and the gap to `ORACLE`, never measured.
+
+## 7. Earlier runs
+
+**R1 auxiliary pretraining** ([ml.md §14](ml.md)), run cost:
+
+| Stage | Cost on the i7-1265U |
+| --- | --- |
+| generation, 10 workers | 0.55–0.93 games/s (thermal/power throttling), ~4.8 h |
+| training, 8 / 4 / 2 threads | 0.57 / 0.44 / 0.445 s/step: step time doesn't scale past 2 threads, and 8 threads drained the battery on a 65 W charger; train at 2 |
+
+**R2 smoke run** (15 min from R1 `ckpt_best.pt`, C0 config, i7-1265U, CPU): 271k decisions, 65 updates.
+
+| Updates | Batch win rate vs tsumogiri | Blind-env win rate | Entropy | Critic explained var |
+| --- | --- | --- | --- | --- |
+| 1–10 | 0.031 | 0.019 | 1.87 | 0.72 |
+| 21–30 | 0.183 | 0.235 | 1.58 | 0.97 |
+| 41–50 | 0.452 | 0.468 | 1.20 | 0.92 |
+| 61–65 | 0.529 | 0.531 | 1.05 | 0.88 |
+
+C0's exit (rolling win ≥ 0.40 over 4,000 hands) was met at update 54 (~226k decisions) and the
+run advanced to C0b. Blind and oracle win rates track each other: this early, the policy gains
+little from the oracle (the adapter starts at zero). The run crashed at update 65 on a latent
+`bots.arena._tenpai_can_reach_min_faan` bug (a wait on the seat's own kong type has no physical
+copy left), since fixed with a regression test; resuming from update 60 ran cleanly in C0b.
+
+Its update-60 checkpoint vs `EfficiencyBot` × 3 at `hk_classic` (`min_faan` 3), 200 fresh sets
+(seeds 2,000,000+): **+4.47 points/hand, 95% CI [+2.66, +6.28] (bootstrap [+2.72, +6.25])**;
+candidate win 0.264 / deal-in 0.119 / avg faan 4.57 / sub-min tenpai 0.174 vs `EfficiencyBot`'s
+0.210 / 0.153 / 3.83 / 0.390; exhaustive draws 0.108. A smoke result, not the R2 gate (C1 exit
+first, then a fresh-seed gate); it says more about `EfficiencyBot`'s weakness under `min_faan` 3
+than about the policy, which has never played `min_faan` > 0.
