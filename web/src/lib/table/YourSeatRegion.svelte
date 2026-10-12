@@ -517,6 +517,10 @@
 		);
 		position: relative;
 		display: flex;
+
+		@include layout.tablet-up {
+			justify-content: center;
+		}
 	}
 
 	// the browser must not pan, select or native-drag while a tile is being dragged.

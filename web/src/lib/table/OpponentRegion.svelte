@@ -153,6 +153,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-1);
+
+		@include layout.tablet-up {
+			flex: 1;
+			align-items: center;
+		}
 	}
 
 	.tile-row {
@@ -180,9 +185,18 @@
 		}
 	}
 
+	// your hand turned 180deg: right to left, melds below toward the centre. faces stay upright.
+	.seat-hand-strip--across {
+		@include layout.tablet-up {
+			direction: rtl;
+		}
+	}
+
+	// rtl runs the inline axis bottom to top: the left seat turned 180deg, not mirrored.
 	.seat-hand-strip--right {
 		@include layout.tablet-up {
 			writing-mode: vertical-rl;
+			direction: rtl;
 		}
 	}
 

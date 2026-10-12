@@ -202,8 +202,8 @@ Each pool overflows toward the centre:
 | Pool | Mechanism |
 | --- | --- |
 | left | `grid-auto-flow: column` already advances rightward |
-| across | wraps downward naturally |
-| right | `direction: rtl` so auto-placed columns advance leftward (rotated faces are absolutely positioned, unaffected) |
+| across | your pool turned 180°: `direction: rtl`, so tiles run right-to-left and rows wrap downward; faces stay upright for legibility. The across hand strip gets the same `direction: rtl` (melds below, toward the centre) |
+| right | the left pool turned 180° (`transform: rotate(180deg)` on the pool, faces rotated 90° so they net −90°): tiles run bottom-to-top and columns advance leftward, rotationally matching every other seat rather than mirroring the left one; `justify-self: end` keeps it against the seat |
 | self | flex with `flex-wrap: wrap-reverse`, so overflow lines stack upward |
 
 CSS: `grid-template-areas` for the four seat regions + centre; `transform`/`opacity` only in
@@ -216,6 +216,11 @@ your hand under it) gets the rest of the width.
 `min-block-size` of one mini-tile (`_tile.scss`'s `meld-row-reserved`), so a seat's first meld or
 flower doesn't grow its grid row/column and shift the centre box. Below 768px an empty row
 collapses instead. Your own meld row sits above your name, toward the centre.
+
+**Hands are centred** in their seat region at tablet-up: your `.hand-row` (`justify-content:
+center`), the across strip horizontally and the side strips vertically (`.seat-hand-strip` fills
+its region with `align-items: center`). Your hand recentres by half a tile when the drawn tile
+comes and goes.
 
 **Hand sizing.** The hand sizes to its own seat region, not the viewport:
 `.seat-region--self` is a `container-type: inline-size` container, and `YourSeatRegion`'s
@@ -265,8 +270,9 @@ is a named inline-size container (`container: table / inline-size`); discard til
 tiles, the hub circle and the centre box's side tracks size in `cqi` of the table rather than `vw`,
 since the toolbar, page padding and rim make the two differ.
 
-**Side seats.** Left/right hand strips run top-to-bottom via `writing-mode: vertical-lr`/
-`vertical-rl`, not `transform: rotate()` — rotate repaints in place without resizing the box the
+**Side seats.** Left/right hand strips run vertically via `writing-mode` (`vertical-lr` on the
+left; `vertical-rl` plus `direction: rtl` on the right, so its tiles run bottom-to-top — the left
+seat turned 180°, not mirrored), not `transform: rotate()` — rotate repaints in place without resizing the box the
 grid reserves, so the rotated footprint spills outside its grid area. Tiles inside are rotated 90°
 to face the table: each `.mini-tile` keeps an unrotated box pre-sized to the landscape footprint,
 and only the face inside is absolutely positioned and rotated (paint-only). Left/right discard

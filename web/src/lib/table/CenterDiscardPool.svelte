@@ -90,6 +90,11 @@
 
 	.discard-pool--right .discard-tile--last :global(.tile-face) {
 		--discard-enter-x: 10px;
+
+		// the pool is rotated 180deg at tablet-up, so local -x slides in from screen right
+		@include layout.tablet-up {
+			--discard-enter-x: -10px;
+		}
 	}
 
 	.discard-pool--self .discard-tile--last :global(.tile-face) {
@@ -101,6 +106,9 @@
 			grid-area: across;
 			align-self: start;
 			justify-self: center;
+			// your pool turned 180deg: tiles run right to left, rows still wrap toward the centre.
+			// faces stay upright to stay readable.
+			direction: rtl;
 		}
 	}
 
@@ -110,9 +118,13 @@
 		}
 	}
 
+	// the left pool turned 180deg: rotationally the same order as every other seat (bottom to
+	// top, new columns toward the centre), not mirrored. paint-only, the box stays end-aligned.
 	.discard-pool--right {
 		@include layout.tablet-up {
 			grid-area: right;
+			justify-self: end;
+			transform: rotate(180deg);
 		}
 	}
 
@@ -142,14 +154,6 @@
 		}
 	}
 
-	// grid auto-placement advances toward higher indices, which reads as "away from centre" for
-	// --right; `direction: rtl` flips the wrap direction without touching tile positioning.
-	.discard-pool--right {
-		@include layout.tablet-up {
-			direction: rtl;
-		}
-	}
-
 	// grid's row-major wrap pushes overflow further down the page -- wrong for self (the bottom
 	// edge); scaleY(-1) flips the grid so overflow reads as growing upward, toward centre.
 	.discard-pool--self {
@@ -175,23 +179,15 @@
 		}
 	}
 
-	.discard-pool--left .discard-tile :global(.tile-face) {
-		@include layout.tablet-up {
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			height: var(--discard-h);
-			transform: translate(-50%, -50%) rotate(90deg);
-		}
-	}
-
+	// right's face nets to -90deg through the pool's own 180deg turn.
+	.discard-pool--left .discard-tile :global(.tile-face),
 	.discard-pool--right .discard-tile :global(.tile-face) {
 		@include layout.tablet-up {
 			position: absolute;
 			top: 50%;
 			left: 50%;
 			height: var(--discard-h);
-			transform: translate(-50%, -50%) rotate(-90deg);
+			transform: translate(-50%, -50%) rotate(90deg);
 		}
 	}
 
