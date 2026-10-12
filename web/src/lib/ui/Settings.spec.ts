@@ -13,7 +13,8 @@ describe('Settings', () => {
 		motion: 'system',
 		discardMode: 'two-step',
 		haptics: false,
-		announceAllDiscards: false
+		announceAllDiscards: false,
+		tileSize: 'medium'
 	};
 
 	it('renders both pre-arm toggles unchecked when both are off', () => {
@@ -39,7 +40,8 @@ describe('Settings', () => {
 			motion: 'system',
 			discardMode: 'two-step',
 			haptics: false,
-			announceAllDiscards: false
+			announceAllDiscards: false,
+			tileSize: 'medium'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -53,7 +55,8 @@ describe('Settings', () => {
 			motion: 'reduced',
 			discardMode: 'two-step',
 			haptics: false,
-			announceAllDiscards: false
+			announceAllDiscards: false,
+			tileSize: 'medium'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -106,7 +109,8 @@ describe('Settings', () => {
 			motion: 'system',
 			discardMode: 'two-step',
 			haptics: true,
-			announceAllDiscards: false
+			announceAllDiscards: false,
+			tileSize: 'medium'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -120,7 +124,8 @@ describe('Settings', () => {
 			motion: 'system',
 			discardMode: 'one-tap',
 			haptics: false,
-			announceAllDiscards: false
+			announceAllDiscards: false,
+			tileSize: 'medium'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -128,6 +133,20 @@ describe('Settings', () => {
 		expect([...body.matchAll(/type="radio"[^>]*name="discardMode"/g)]).toHaveLength(2);
 		expect(body).toMatch(/value="one-tap"[^>]*checked/);
 		expect(body).not.toMatch(/value="two-step"[^>]*checked/);
+	});
+
+	it('marks the tile size segment matching the current pref', () => {
+		const { body } = render(Settings, {
+			props: {
+				autoArm: offArm,
+				prefs: { ...offPrefs, tileSize: 'large' },
+				onAutoArmChange: noop,
+				onPrefsChange: noop
+			}
+		});
+		expect([...body.matchAll(/type="radio"[^>]*name="tileSize"/g)]).toHaveLength(3);
+		expect(body).toMatch(/name="tileSize" value="large"[^>]*checked/);
+		expect(body).not.toMatch(/name="tileSize" value="medium"[^>]*checked/);
 	});
 
 	it('offers an "Announce every discard" toggle, off by default', () => {

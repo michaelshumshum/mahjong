@@ -13,6 +13,20 @@ html {
 	touch-action: manipulation;
 }
 
+// tile size setting (lib/ui/tile-size.ts mirrors it onto html[data-tile-size]); every tile
+// clamp on the table multiplies by this.
+html {
+	--tile-scale: 1;
+}
+
+html[data-tile-size='small'] {
+	--tile-scale: 0.85;
+}
+
+html[data-tile-size='large'] {
+	--tile-scale: 1.2;
+}
+
 body {
 	margin: 0;
 	background: var(--color-bg);

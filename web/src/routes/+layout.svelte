@@ -20,12 +20,17 @@
 	import { browser } from '$app/environment';
 	import { cleanupStaleTableCredentials, loadClientPrefs } from '$lib/ui/settings-storage';
 	import { applyMotionPref } from '$lib/ui/motion';
+	import { applyTileSize } from '$lib/ui/tile-size';
 
 	// clear abandoned per-table reconnect credentials so they don't sit in localStorage forever.
 	cleanupStaleTableCredentials();
 
 	// before children mount, so the mural's one-time motion check already sees it.
-	if (browser) applyMotionPref(loadClientPrefs()?.motion ?? 'system');
+	if (browser) {
+		const prefs = loadClientPrefs();
+		applyMotionPref(prefs?.motion ?? 'system');
+		applyTileSize(prefs?.tileSize ?? 'medium');
+	}
 
 	let { children } = $props();
 </script>

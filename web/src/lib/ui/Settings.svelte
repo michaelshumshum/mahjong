@@ -19,6 +19,8 @@
 	// full tile before committing. one-tap: today's original behaviour.
 	export type DiscardMode = 'two-step' | 'one-tap';
 
+	export type TileSize = 'small' | 'medium' | 'large';
+
 	// client-only prefs, no wire equivalent. `haptics` is separate from `motion`: vibration is
 	// always feature-detected to mobile, this setting only gates whether it fires at all.
 	export interface ClientPrefs {
@@ -28,6 +30,7 @@
 		haptics: boolean;
 		// screen-reader verbosity: every discard, not just claim-relevant ones (frontend.md §9).
 		announceAllDiscards: boolean;
+		tileSize: TileSize;
 	}
 
 	type Tab = 'calls' | 'gameplay' | 'display';
@@ -184,6 +187,30 @@
 			aria-labelledby="{uid}-tab-display"
 			hidden={activeTab !== 'display'}
 		>
+			<SegmentedControl
+				legend={m.settings_tileSizeLegend()}
+				name="tileSize"
+				value={prefs.tileSize}
+				options={[
+					{
+						value: 'small',
+						label: m.settings_tileSizeSmallLabel(),
+						description: m.settings_tileSizeSmallDesc()
+					},
+					{
+						value: 'medium',
+						label: m.settings_tileSizeMediumLabel(),
+						description: m.settings_tileSizeMediumDesc()
+					},
+					{
+						value: 'large',
+						label: m.settings_tileSizeLargeLabel(),
+						description: m.settings_tileSizeLargeDesc()
+					}
+				]}
+				onChange={(tileSize) => onPrefsChange({ ...prefs, tileSize })}
+			/>
+
 			<SegmentedControl
 				legend={m.settings_motionLegend()}
 				name="motion"

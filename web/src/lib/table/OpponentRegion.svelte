@@ -320,7 +320,7 @@
 
 	@include layout.phone-landscape {
 		.seat-region {
-			--chip-tile-h: clamp(20px, 5.6dvh, 26px);
+			--chip-tile-h: calc(clamp(20px, 5.6dvh, 26px) * var(--tile-scale, 1));
 		}
 	}
 </style>

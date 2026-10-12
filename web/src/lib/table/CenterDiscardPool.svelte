@@ -42,7 +42,7 @@
 	// tracks are sized to the tile's own footprint (long edge --discard-h, short edge
 	// --discard-w) so every pool, rotated or not, gets the same 2px gap between tiles.
 	.discard-pool {
-		--discard-h: clamp(30px, 3.2cqi, 44px);
+		--discard-h: calc(clamp(30px, 3.2cqi, 44px) * var(--tile-scale, 1));
 		--discard-w: calc(var(--discard-h) * 3 / 4);
 		display: grid;
 		grid-template-columns: repeat(6, var(--discard-w));
@@ -240,7 +240,7 @@
 
 	@include layout.phone-landscape {
 		.discard-pool {
-			--discard-h: 26px;
+			--discard-h: calc(26px * var(--tile-scale, 1));
 		}
 
 		// under the hub, not on the hand bar: a crowded side column scrolls the surface, and the

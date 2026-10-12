@@ -74,7 +74,8 @@ describe('settings-storage', () => {
 				motion: 'reduced',
 				discardMode: 'one-tap',
 				haptics: false,
-				announceAllDiscards: true
+				announceAllDiscards: true,
+				tileSize: 'large'
 			};
 			saveClientPrefs(prefs);
 			expect(loadClientPrefs()).toEqual(prefs);
@@ -94,7 +95,8 @@ describe('settings-storage', () => {
 				motion: 'system',
 				discardMode: 'two-step',
 				haptics: true,
-				announceAllDiscards: false
+				announceAllDiscards: false,
+				tileSize: 'medium'
 			});
 		});
 
@@ -134,8 +136,24 @@ describe('settings-storage', () => {
 				motion: 'system',
 				discardMode: 'one-tap',
 				haptics: false,
-				announceAllDiscards: false
+				announceAllDiscards: false,
+				tileSize: 'medium'
 			});
+		});
+
+		it('migrates a pre-tileSize stored value to medium and rejects an unknown size', () => {
+			const base = { soundEnabled: true, motion: 'system', discardMode: 'one-tap' };
+			localStorage.setItem(CLIENT_PREFS_STORAGE_KEY, JSON.stringify(base));
+			expect(loadClientPrefs()?.tileSize).toBe('medium');
+
+			localStorage.setItem(CLIENT_PREFS_STORAGE_KEY, JSON.stringify({ ...base, tileSize: 'huge' }));
+			expect(loadClientPrefs()?.tileSize).toBe('medium');
+
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({ ...base, tileSize: 'small' })
+			);
+			expect(loadClientPrefs()?.tileSize).toBe('small');
 		});
 
 		it('discards an invalid stored discardMode in favour of the default', () => {
@@ -368,7 +386,8 @@ describe('settings-storage', () => {
 					motion: 'full',
 					discardMode: 'two-step',
 					haptics: true,
-					announceAllDiscards: false
+					announceAllDiscards: false,
+					tileSize: 'medium'
 				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
@@ -389,7 +408,8 @@ describe('settings-storage', () => {
 					motion: 'full',
 					discardMode: 'two-step',
 					haptics: true,
-					announceAllDiscards: false
+					announceAllDiscards: false,
+					tileSize: 'medium'
 				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();

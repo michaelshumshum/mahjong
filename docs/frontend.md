@@ -582,7 +582,7 @@ Rules:
 | --- | --- |
 | Calls | `autoArm`: No calls, Auto-pass chow (switches) |
 | Gameplay | discard mode (segmented), Announce every discard (switch) |
-| Display | motion (segmented), Sound effects and Haptic feedback (switches), language (`LocaleSwitcher`, segmented) |
+| Display | tile size and motion (segmented), Sound effects and Haptic feedback (switches), language (`LocaleSwitcher`, segmented) |
 
 - Every control carries a one-line description; a segmented control (`SegmentedControl.svelte`,
   a native radio group) shows only the selected option's description.
@@ -591,6 +591,13 @@ Rules:
 - **Reset to defaults** restores `DEFAULT_CLIENT_PREFS` and `DEFAULT_AUTO_ARM`
   (`settings-storage.ts`) through the same change callbacks, so live mode re-sends `auto`. Locale
   is untouched. Disabled while everything already matches the defaults.
+- **Tile size** (`ClientPrefs.tileSize`: `small`/`medium`/`large`, default `medium`) is mirrored
+  onto `html[data-tile-size]` by `lib/ui/tile-size.ts`'s `applyTileSize` (root `+layout.svelte` on
+  load, and on every change), which `app.scss` turns into `--tile-scale` (0.85 / 1 / 1.2). Discard
+  pools, meld/flower mini tiles, the across opponent's strip and the phone opponent chips multiply
+  their whole `clamp()` by it. The hand scales only its cap, so it keeps the 44px floor and still
+  fits the row; on a narrow phone it barely changes. The rotated left/right opponent strips are not
+  scaled: they are height-bound, and a larger tile wraps their melds into the backs column.
 - Switches are `<input type="checkbox" role="switch">`; e2e specs select them with
   `getByRole('switch', …)` after opening the right tab (hidden panels drop out of the a11y tree).
 
@@ -603,7 +610,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | --- | --- | --- |
 | `mahjong:seat:v2:<tableId>` | this browser's seat at that table (`saveSeatForTable`/`loadSeatForTable`) | saved the moment `state_sync` confirms a seat; fed back into `connect()` on mount. Without it a reload falls into the seat picker and `join` fails with `table_full` |
 | `mahjong:reconnectSecret:v2:<tableId>` | `join`'s `reconnect_secret` (`saveSecretForTable`/`loadSecretForTable`) | presented on every `hello{seat, secret}` ([architecture.md §2.1](architecture.md)); stale `v1` keys are swept on load |
-| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards` | purely local; `discardMode`/`haptics`/`announceAllDiscards` postdate this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
+| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards`, `tileSize` | purely local; every field after `motion` postdates this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |

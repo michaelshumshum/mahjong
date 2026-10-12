@@ -469,6 +469,31 @@ test('the motion setting drives html[data-motion] and overrides prefers-reduced-
 	await expect(html).toHaveAttribute('data-motion', 'reduced');
 });
 
+test('the tile size setting scales hand and discard tiles and survives a reload', async ({
+	page
+}) => {
+	await page.goto('/table/abc123?mock=1');
+	await page.waitForLoadState('networkidle');
+
+	const html = page.locator('html');
+	const handTile = page.locator('.seat-region--self .hand-tile-slot').first();
+	const discard = page.locator('.discard-tile').first();
+	await expect(html).toHaveAttribute('data-tile-size', 'medium');
+	const before = { hand: (await handTile.boundingBox())!, discard: (await discard.boundingBox())! };
+
+	await page.getByTestId('toggle-settings').click();
+	await page.getByRole('tab', { name: 'Display', exact: true }).click();
+	await page.getByRole('radio', { name: 'Large' }).check();
+	await expect(html).toHaveAttribute('data-tile-size', 'large');
+	const after = { hand: (await handTile.boundingBox())!, discard: (await discard.boundingBox())! };
+	expect(after.hand.width).toBeGreaterThan(before.hand.width);
+	expect(after.discard.height).toBeGreaterThan(before.discard.height);
+
+	await page.reload();
+	await page.waitForLoadState('networkidle');
+	await expect(html).toHaveAttribute('data-tile-size', 'large');
+});
+
 // Covers the scripted draw/discard/claim/kong animation demo -- the pure slot-resolution
 // algorithm is unit-tested in tile-slots.spec.ts; this proves it's wired up end to end.
 test('animation demo: draw, discard, claim, and concealed kong run the full sequence without errors', async ({

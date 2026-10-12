@@ -46,7 +46,7 @@
 	flex-wrap: wrap;
 }
 
-@mixin mini-tile($size: clamp(24px, 4vw, 36px)) {
+@mixin mini-tile($size: calc(clamp(24px, 4vw, 36px) * var(--tile-scale, 1))) {
 	height: $size;
 
 	:global(.tile-face) {
@@ -62,7 +62,7 @@
 
 // reserved even while empty so a first meld/flower doesn't shift the centre discard box.
 // below 768px an empty row collapses instead.
-@mixin meld-row-reserved($size: clamp(24px, 4vw, 36px)) {
+@mixin meld-row-reserved($size: calc(clamp(24px, 4vw, 36px) * var(--tile-scale, 1))) {
 	min-block-size: $size;
 
 	@include layout.phone-only {

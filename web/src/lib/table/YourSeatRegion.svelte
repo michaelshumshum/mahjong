@@ -363,7 +363,8 @@
 		--hand-gap: 2px;
 		--hand-drawn-gap: var(--space-4);
 		--hand-fit-w: calc((100cqi - 13 * var(--hand-gap) - var(--hand-drawn-gap)) / 14);
-		--hand-tile-w: clamp(44px, var(--hand-fit-w), 63px);
+		// the tile size setting moves only the cap, never the 44px floor or the fit.
+		--hand-tile-w: clamp(44px, var(--hand-fit-w), calc(63px * var(--tile-scale, 1)));
 		--hand-step: min(
 			var(--hand-gap),
 			calc((100cqi - var(--hand-drawn-gap) - 14 * var(--hand-tile-w)) / 13)
@@ -544,7 +545,7 @@
 			--hand-tile-w: clamp(
 				36px,
 				calc((100cqi - 7 * var(--hand-gap) - var(--hand-drawn-gap) - 1px) / 8),
-				63px
+				calc(63px * var(--tile-scale, 1))
 			);
 			--hand-step: var(--hand-gap);
 			flex-wrap: wrap;
@@ -593,7 +594,11 @@
 		}
 
 		.hand-row {
-			--hand-tile-w: clamp(44px, min(var(--hand-fit-w), 16dvh * 3 / 4), 56px);
+			--hand-tile-w: clamp(
+				44px,
+				min(var(--hand-fit-w), 16dvh * 3 / 4),
+				calc(56px * var(--tile-scale, 1))
+			);
 		}
 	}
 </style>
