@@ -642,7 +642,9 @@ would need a wire field first.
 server trims/caps/defaults it, so the client doesn't validate. `ClientGameState.names` carries every
 seat's *resolved* name back: set from `state_sync.names`, kept live from `seat_state.name`. Bot
 seats get a random per-table-unique display name (`server/app/table.py`'s `_draw_bot_name`, from
-`_BOT_NAME_POOL`) — cosmetic, not the tier.
+`_BOT_NAME_POOL`) — cosmetic, not the tier. The tier is `state_sync.bot_levels` →
+`ClientGameState.botLevels`, shown by `BotBadge.svelte` ("Bot · Expert"; plain "Bot" for an
+unknown tier) on opponents, and on the bottom seat too while spectating.
 
 ### Last-discard marker
 

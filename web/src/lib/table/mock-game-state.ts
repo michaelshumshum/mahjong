@@ -42,6 +42,7 @@ export interface MockSeatState {
 	// wire seat_status -- optional since no mock fixture sets it (no bot concept in mocks);
 	// live-view.ts populates it from ClientGameState.seatStatus.
 	status?: string;
+	botLevel?: string | null;
 }
 
 export type Seats = [MockSeatState, MockSeatState, MockSeatState, MockSeatState];

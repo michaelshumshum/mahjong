@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
 	import SeatPlate from './SeatPlate.svelte';
+	import BotBadge from './BotBadge.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
@@ -36,9 +37,7 @@
 		{scoreDelta}
 	>
 		{#snippet badges()}
-			{#if seat.status === 'bot'}<span class="bot-badge" title={m.opponentRegion_botBadgeTitle()}
-					>{m.opponentRegion_botBadgeLabel()}</span
-				>{/if}
+			{#if seat.status === 'bot'}<BotBadge level={seat.botLevel} />{/if}
 			{#if seat.status === 'disconnected'}<span
 					class="status-chip status-chip--away"
 					title={m.opponentRegion_awayChipTitle()}>{m.opponentRegion_awayChipLabel()}</span
@@ -121,23 +120,6 @@
 
 	.seat-region--right {
 		grid-area: right;
-	}
-
-	// persistent identity marker, not transient like dealer/turn -- a quiet chip, not --color-accent.
-	.bot-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: 1.25rem;
-		padding: 0 0.4rem;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		background: var(--color-surface-raised);
-		color: var(--color-text-muted);
-		font-size: var(--font-size-xs);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
 	}
 
 	// disconnected/autoplay are transient (unlike the bot badge's fixed identity), so they get a

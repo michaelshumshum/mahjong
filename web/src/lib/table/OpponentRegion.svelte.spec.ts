@@ -63,6 +63,28 @@ describe('OpponentRegion', () => {
 		expect(target.querySelector('.bot-badge')).not.toBeNull();
 	});
 
+	it("names the bot's level in its badge", () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ status: 'bot', botLevel: 'T4' }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		const badge = target.querySelector('.bot-badge');
+		expect(badge?.textContent).toContain('Expert');
+		expect(badge?.getAttribute('data-level')).toBe('T4');
+	});
+
+	it('falls back to a plain bot badge for an unknown level', () => {
+		const { target } = render(OpponentRegion, {
+			seat: mockSeat({ status: 'bot', botLevel: 'T9' }),
+			position: 'across',
+			dealer: 0,
+			turn: 0
+		});
+		expect(target.querySelector('.bot-badge')?.textContent?.trim()).toBe('Bot');
+	});
+
 	it('shows an away chip for a disconnected seat', () => {
 		const { target } = render(OpponentRegion, {
 			seat: mockSeat({ status: 'disconnected' }),

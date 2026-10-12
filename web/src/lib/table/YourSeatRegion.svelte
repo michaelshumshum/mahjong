@@ -3,6 +3,7 @@
 	import { flip } from 'svelte/animate';
 	import TileFace from './TileFace.svelte';
 	import SeatPlate from './SeatPlate.svelte';
+	import BotBadge from './BotBadge.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
@@ -353,7 +354,11 @@
 		score={seat.score}
 		isTurn={seat.seat === turn}
 		{scoreDelta}
-	/>
+	>
+		{#snippet badges()}
+			{#if spectating && seat.status === 'bot'}<BotBadge level={seat.botLevel} />{/if}
+		{/snippet}
+	</SeatPlate>
 
 	<div class="your-hand">
 		<!-- spectators get the opponents' tile size: no seat here is "yours" -->

@@ -168,7 +168,8 @@ export function viewFromClientState(
 				.map(tileIdToCode),
 			flowers: state.flowers[seat] as TileCode[],
 			score: state.scores[seat],
-			status: state.seatStatus[seat]
+			status: state.seatStatus[seat],
+			botLevel: state.botLevels[seat]
 		};
 	}) as unknown as Seats;
 

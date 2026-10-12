@@ -124,6 +124,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				wallRemaining: d.wall_remaining,
 				seatStatus: d.seat_status.slice(),
 				names: d.names.slice(),
+				botLevels: d.bot_levels?.slice() ?? [null, null, null, null],
 				hostSeat: d.host_seat,
 				ruleset: (d.ruleset as RuleSet | undefined) ?? null,
 				rulesetPreset: d.ruleset_preset ?? null,

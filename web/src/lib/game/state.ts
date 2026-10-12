@@ -70,6 +70,8 @@ export interface ClientGameState {
 	seatStatus: string[];
 	/** Each seat's resolved guest display name; `null` for an `empty` seat. */
 	names: (string | null)[];
+	/** Each `bot` seat's tier (`T1`/`T2`/`T4`/`ORACLE`); `null` for every other seat. */
+	botLevels: (string | null)[];
 	/** Whichever seat's `join` was this table's first. Never changes for the life of the table. */
 	hostSeat: number | null;
 	/** This table's ruleset, fixed at construction; `null` until the first `state_sync` lands.
@@ -112,6 +114,7 @@ export function initialClientGameState(): ClientGameState {
 		wallRemaining: 0,
 		seatStatus: ['disconnected', 'disconnected', 'disconnected', 'disconnected'],
 		names: [null, null, null, null],
+		botLevels: [null, null, null, null],
 		hostSeat: null,
 		ruleset: null,
 		rulesetPreset: null,

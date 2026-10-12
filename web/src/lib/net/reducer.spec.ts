@@ -66,6 +66,7 @@ describe('reduce', () => {
 				wall_remaining: 80,
 				seat_status: ['connected', 'connected', 'connected', 'connected'],
 				names: ['Alice', 'Bob', null, 'Dave'],
+				bot_levels: [null, 'T1', null, 'ORACLE'],
 				host_seat: 0,
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
@@ -80,6 +81,7 @@ describe('reduce', () => {
 		expect(next.ownHand).toEqual([10, 11, 12]);
 		expect(next.melds[2]).toEqual([{ kind: 'pung', tiles: [4, 4, 4], count: null, fromSeat: 0 }]);
 		expect(next.names).toEqual(['Alice', 'Bob', null, 'Dave']);
+		expect(next.botLevels).toEqual([null, 'T1', null, 'ORACLE']);
 		expect(next.claimOffer).toEqual({
 			windowId: null,
 			options: [{ kind: 'pung', tiles: [4, 4] }],
