@@ -5,12 +5,14 @@ docs/bots.md §7). `ml`-extra only.
         [--opponent EfficiencyBot] [--min-faan 3] [--parallel 6] [--records eval.jsonl]
     python -m ml.eval_policy --candidate-bot FaanBot --opponent ORACLE ...   # calibration
     python -m ml.eval_policy --candidate-bot LearnedBot --opponent FaanBot ...  # shipped T4
+    python -m ml.eval_policy --candidate-bot ORACLE --opponent LearnedBot ...   # Impossible gate
 
 A duplicate set is one `HandEnv` episode seed (`hand_start` picks dealer and prevailing wind)
 played four times, the candidate in each seat in turn. The candidate (`PolicyBot`) acts only on
-`seat_view(...)` through `policy_raw_from_view`: no oracle input exists on this path. An `ORACLE`
-opponent seat is served through `bots.arena._view_for`, the arena's sanctioned omniscient call
-site (docs/bots.md §9); the candidate seat never is. Each played
+`seat_view(...)` through `policy_raw_from_view`: no oracle input exists on this path. Every
+`BOT_REGISTRY` seat, opponent or `--candidate-bot`, is served through `bots.arena._view_for`, the
+arena's sanctioned omniscient call site (docs/bots.md §9), so an `OMNISCIENT_BOTS` name gets the
+full view and every other seat a plain `seat_view`; a `PolicyBot` seat never does. Each played
 hand is wrapped as a one-hand `bots.arena.GameRecord`, so `bots.arena`'s statistics, paired
 differences (candidate − mean of the others, per set) and normal CI apply unchanged; a seeded
 percentile bootstrap CI is added because payouts are heavy-tailed. Units are points per hand.
@@ -93,8 +95,7 @@ def _opponent_choices() -> list[str]:
 
 
 def _candidate_bot_choices() -> list[str]:
-    """the candidate seat always gets a plain `seat_view`, so an omniscient bot can't sit there."""
-    return sorted(set(BOT_REGISTRY) - OMNISCIENT_BOTS)
+    return sorted(BOT_REGISTRY)
 
 
 def load_candidate(path: str) -> PolicyNet:
@@ -177,8 +178,6 @@ def play_set(
 ) -> tuple[tuple[GameRecord, ...], list[dict[str, Any]]]:
     """One duplicate set: four `GameRecord`s (one hand each) and their `HandRecord` columns.
     `candidate_bot` seats a `BOT_REGISTRY` bot as the candidate instead of the policy."""
-    if candidate_bot in OMNISCIENT_BOTS:
-        raise ValueError(f"candidate bot {candidate_bot!r} would need an omniscient view")
     net = None if candidate_bot else model if model is not None else _WORKER["model"]
 
     async def run() -> tuple[tuple[GameRecord, ...], list[dict[str, Any]]]:
@@ -191,7 +190,7 @@ def play_set(
             else:
                 bots[rotation] = BOT_REGISTRY[candidate_bot](seed * 4 + rotation)
             names: list[str | None] = [opponent] * 4
-            names[rotation] = None  # candidate seat: plain `seat_view`, never `_view_for`
+            names[rotation] = candidate_bot  # None for the policy: plain `seat_view`
             hand, record = await _play(seed, ruleset, bots, names)
             players = [opponent] * 4
             players[rotation] = candidate
@@ -262,6 +261,7 @@ def evaluate(
         "sets": len(sets),
         "opponent": opponent,
         "candidate_bot": candidate_bot,
+        "candidate_omniscient": candidate_bot in OMNISCIENT_BOTS,
         "min_faan": ruleset.min_faan,
         "candidate": stats_a.summary(),
         "opponents": stats_b.summary(),
@@ -281,7 +281,7 @@ def main(argv: list[str] | None = None) -> None:
     who.add_argument(
         "--candidate-bot",
         choices=_candidate_bot_choices(),
-        help="a BOT_REGISTRY candidate instead (a heuristic, or the shipped LearnedBot)",
+        help="a BOT_REGISTRY candidate instead (a heuristic, the shipped LearnedBot, or ORACLE)",
     )
     parser.add_argument("--sets", type=int, default=200)
     parser.add_argument("--seed", type=int, default=1_000_000, help="set i uses seed + i")

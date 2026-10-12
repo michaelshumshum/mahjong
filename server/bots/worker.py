@@ -6,8 +6,8 @@ Returns a bare action id, not a decoded `Action`: a worker process never receive
 
 `compute_action` builds the requested tier's `Bot` and calls `act(view, mask, deadline)` via
 `asyncio.run` -- there's no running event loop in a plain `ProcessPoolExecutor` worker, and every
-tier's `act` here is synchronous work under the hood, `T4`'s numpy forward pass included (no
-inference server: docs/ml.md §6).
+tier's `act` here is synchronous work under the hood, the numpy forward pass of `T4` and `ORACLE`
+included (no inference server: docs/ml.md §6).
 """
 
 from __future__ import annotations
@@ -45,9 +45,11 @@ def _make_bot(tier: str, seed: int) -> Bot:
 
         return LearnedBot()
     if tier == "ORACLE":
-        # plain FaanBot -- no dedicated class needed. its discard-risk scoring is hands-aware
-        # (bots/safety.py's tile_risk), computing exact deal-in danger when .hands is populated (§10).
-        return FaanBot()
+        # the T4 policy plus exact vetoes (docs/bots.md §9); no FaanBot fallback when the weights
+        # don't load -- it raises like T4 does.
+        from bots.oracle_learned import OracleLearnedBot
+
+        return OracleLearnedBot()
     raise ValueError(f"unknown bot tier {tier!r}; choices: {BOT_TIERS}")
 
 

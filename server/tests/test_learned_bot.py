@@ -10,16 +10,17 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import pytest
 
+import bots.learned
 from app.views import _omniscient_seat_view, seat_view
 from bots.arena import BOT_REGISTRY, OMNISCIENT_BOTS
-from bots.learned import DEFAULT_WEIGHTS, LearnedBot, policy_meta
+from bots.learned import DEFAULT_WEIGHTS, LearnedBot, policy_meta, weights_problem
 from bots.worker import BOT_TIERS, compute_action
 from mahjong_core.engine import ENGINE_VERSION
 from ml.env import HandEnv
 from ml.export import EXPORT_VERSION
+from tests.latency import check_latency
 
 _SERVER_ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,6 +52,22 @@ def test_shipped_weights_record_their_source() -> None:
     # the ruleset encoding is engine-versioned (docs/ml.md §9): a bump needs a re-export
     assert meta["engine_version"] == ENGINE_VERSION
     assert DEFAULT_WEIGHTS.stat().st_size < 4_000_000
+
+
+def test_weights_problem_passes_the_shipped_file_and_names_a_broken_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """the api's startup check (app/main.py, docs/bots.md §2): missing, corrupt, truncated, or
+    exported for another engine."""
+    assert weights_problem() is None
+    assert "FileNotFoundError" in str(weights_problem(tmp_path / "missing.npz"))
+    (tmp_path / "corrupt.npz").write_bytes(b"not an npz")
+    assert "ValueError" in str(weights_problem(tmp_path / "corrupt.npz"))
+    blob = DEFAULT_WEIGHTS.read_bytes()
+    (tmp_path / "truncated.npz").write_bytes(blob[: len(blob) // 2])
+    assert "BadZipFile" in str(weights_problem(tmp_path / "truncated.npz"))
+    monkeypatch.setattr(bots.learned, "ENGINE_VERSION", "0.0.0")
+    assert "engine_version" in str(weights_problem())
 
 
 def test_plays_legal_actions_on_the_public_view() -> None:
@@ -109,20 +126,22 @@ def test_serving_never_imports_torch() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.latency
 def test_single_decision_latency() -> None:
-    """docs/ml.md §6: p99 ≤ 5 ms per decision, encode included, as the worker runs it
-    (`seat_view` excluded: the table builds it for every tier). Flaky under parallel CPU load
-    (`-n`); run alone."""
-    bot = LearnedBot()
+    """docs/ml.md §14 R4's "bot load not regressed": a `T4` decision through `compute_action` costs
+    less than a `T2` one at p99 (`seat_view` excluded: the table builds it for every tier). The
+    absolute 5 ms is `make bench-latency` (`tests/latency.py`)."""
     decisions = _decisions(5, seed0=100)[:400]
     views = [(seat_view(s, seat), m) for s, seat, m in decisions]  # type: ignore[arg-type]
     for view, m in views[:20]:
-        asyncio.run(bot.act(view, m, 0.0))
-    runs = []
+        compute_action(view, m, 0, "T4", 0.0)
+        compute_action(view, m, 0, "T2", 0.0)
+    t4, t2 = [], []
     for view, m in views:
         start = time.perf_counter()
-        asyncio.run(bot.act(view, m, 0.0))
-        runs.append(time.perf_counter() - start)
-    p50, p99 = np.percentile(runs, [50, 99])
-    print(f"LearnedBot decision: p50 {p50 * 1e3:.2f} ms, p99 {p99 * 1e3:.2f} ms over {len(runs)}")
-    assert p99 < 0.005
+        compute_action(view, m, 0, "T4", 0.0)
+        mid = time.perf_counter()
+        compute_action(view, m, 0, "T2", 0.0)
+        t4.append(mid - start)
+        t2.append(time.perf_counter() - mid)
+    check_latency("T4 decision", t4, "T2", t2)

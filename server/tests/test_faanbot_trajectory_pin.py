@@ -1,7 +1,8 @@
 """Whole-bot trajectory pin for `FaanBot` on a plain `seat_view` (`view.hands is None`): the
 RL evaluation baseline (docs/ml.md §12) and the probabilistic half of every hands-aware helper
-(docs/bots.md §9). Four `FaanBot`s play seeded hands; every chosen action id is hashed. An
-`ORACLE`-only change must leave every digest unchanged.
+(docs/bots.md §9). Four `FaanBot`s play seeded hands; every chosen action id is hashed. A change
+to the hands-aware branches (`OracleFaanBot`, `OracleLearnedBot`'s vetoes) must leave every
+digest unchanged.
 
 Regenerate only for an intended `FaanBot` behaviour change:
 

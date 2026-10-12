@@ -27,15 +27,16 @@ moved on.
 | [0010](0010-client-scope-cuts.md) | Client features cut from scope | Deferred |
 | [0011](0011-replay-viewer.md) | Replay viewer needs a server re-redaction endpoint | Deferred |
 | [0012](0012-searchbot-removed.md) | T3 `SearchBot` built and removed | Rejected |
-| [0013](0013-oracle-full-information.md) | `ORACLE` as a full-information `FaanBot` | Accepted |
+| [0013](0013-oracle-full-information.md) | `ORACLE` as a full-information `FaanBot` | Historical |
 | [0014](0014-ruleset-aware-bots.md) | Ruleset-aware bots | Accepted |
 | [0015](0015-bot-personas.md) | Bot personas | Deferred |
 | [0016](0016-human-records-as-training-data.md) | Human game records as training data | Deferred |
 | [0017](0017-typescript-7-svelte-check.md) | TypeScript 7 as the primary compiler | Deferred |
 | [0018](0018-milestone-plan.md) | Milestone plan and timeline | Historical |
-| [0019](0019-oracle-improvements-plan.md) | `ORACLE` improvements plan | Accepted |
+| [0019](0019-oracle-improvements-plan.md) | `ORACLE` improvements plan | Historical |
 | [0020](0020-hk-scoring-table-alignment.md) | Scoring table aligned with standard HK mahjong | Accepted |
 | [0021](0021-rl-training-hardware.md) | RL training hardware: laptop CPU, cloud plan, 2060 desktop | Historical |
+| [0022](0022-oracle-learned-tier.md) | `ORACLE` serves `OracleLearned`: the Expert policy plus exact vetoes | Accepted |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).

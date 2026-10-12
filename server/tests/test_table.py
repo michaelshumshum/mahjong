@@ -12,7 +12,9 @@ fast and deterministically.
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
+import logging
 import random
 from concurrent.futures import Executor, Future
 from typing import Any
@@ -324,6 +326,34 @@ class _RecordingExecutor(Executor):
         return future
 
 
+class _FailingExecutor(Executor):
+    """Every job raises, as a worker does when `learned.npz` won't load."""
+
+    def submit(self, fn: Any, /, *args: Any, **kwargs: Any) -> Future[Any]:
+        future: Future[Any] = Future()
+        future.set_exception(FileNotFoundError("learned.npz"))
+        return future
+
+
+async def test_a_failed_bot_job_is_logged_with_tier_table_and_seat(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    table = Table(
+        "table-job-fails",
+        RuleSet(),
+        game_seed=1,
+        bot_tier="T4",
+        bot_pool=_FailingExecutor(),
+        all_bots=True,
+    )
+    with caplog.at_level(logging.ERROR, logger="app.table"):
+        table._poke_bots()
+        await asyncio.gather(*list(table._bot_tasks))
+    assert "table table-job-fails seat 0: T4 bot job failed" in caplog.text
+    assert "FileNotFoundError: learned.npz" in caplog.text
+    assert 0 not in table._pending_bot  # cleared, so the next tick retries
+
+
 async def test_t2_bot_jobs_route_to_the_default_pool_only() -> None:
     default_pool = _RecordingExecutor()
     table = Table(
@@ -387,14 +417,14 @@ def test_seat_bot_tiers_rejects_a_seat_out_of_range() -> None:
 
 
 # --- ORACLE dispatch + disconnect-handover pinning (docs/bots.md §9) -----------------------
-# "ORACLE" is a plain FaanBot() fed an omniscient view -- no dedicated pool, so only the view-building special case and disconnect-handover (never for a human's seat) need pinning here.
+# "ORACLE" is OracleLearnedBot fed an omniscient view -- no dedicated pool, so only the view-building special case and disconnect-handover (never for a human's seat) need pinning here.
 
 
 async def test_oracle_bot_job_view_has_hands_populated_for_a_practice_bot_seat() -> None:
     """A practice-mode `bot` seat (`all_bots=True`, never a real human -- `_bind_bot_seat`) on
     an `ORACLE` table gets the omniscient view built by `_omniscient_seat_view` -- the whole
     point of the tier, and the one case where `_submit_bot_job` is allowed to build one. Routes
-    through the ordinary default pool, same as `T2` -- a `FaanBot`-cost decision needs no
+    through the ordinary default pool, same as `T2` -- a `T4`-cost decision needs no
     isolation from other tables' `T1`/`T2` jobs."""
     default_pool = _RecordingExecutor()
     table = Table(

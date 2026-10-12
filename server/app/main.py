@@ -11,6 +11,7 @@ generated six-character table id.
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from collections.abc import AsyncIterator
@@ -26,6 +27,7 @@ from pydantic import BaseModel
 from app import ws
 from app.db.session import make_engine, make_session_factory
 from app.table import WireSeatStatus
+from bots.learned import weights_problem
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.presets import DEFAULT_PRESET_ID, preset_id_for, resolve_ruleset
 
@@ -37,8 +39,25 @@ _TABLE_CODE_LENGTH = 6
 _TABLE_ID_GENERATION_ATTEMPTS = 10  # astronomically unlikely to ever retry once, let alone exhaust
 
 
+logger = logging.getLogger(__name__)
+
+# the tiers that load bots/weights/learned.npz (docs/bots.md §2)
+_LEARNED_TIERS = frozenset({"T4", "ORACLE"})
+_learned_weights_problem: str | None = None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # degrade rather than refuse to start: a crash-looping api takes every table down, a missing
+    # policy only Expert/Impossible (docs/bots.md §2 "Missing weights")
+    global _learned_weights_problem
+    _learned_weights_problem = weights_problem()
+    if _learned_weights_problem is not None:
+        logger.error(
+            "learned weights unusable, %s disabled: %s",
+            "/".join(sorted(_LEARNED_TIERS)),
+            _learned_weights_problem,
+        )
     database_url = os.environ.get("DATABASE_URL")
     engine = make_engine(database_url) if database_url else None
     session_factory = make_session_factory(engine) if engine is not None else None
@@ -131,15 +150,17 @@ def _resolve_seat_bot_tiers(
     posture as `_resolve_ruleset_query`/`resolve_ruleset` (never hard-reject bad input): a seat
     outside 1..3 (seat 0 is the human seat in practice mode) or a tier outside
     `_PRACTICE_BOT_TIERS` is silently dropped rather than raising -- a malformed entry just falls
-    back to that seat's `DEFAULT_BOT_TIER` instead of failing the whole request. `practice=False`
-    has no bot seats to apply this to, so it resolves to `None` unconditionally.
+    back to that seat's `DEFAULT_BOT_TIER` instead of failing the whole request. So is a
+    `_LEARNED_TIERS` tier while the startup weight check failed (`/healthz` reports it).
+    `practice=False` has no bot seats to apply this to, so it resolves to `None` unconditionally.
     """
     if not practice or not bot_tiers:
         return None
+    unavailable = _LEARNED_TIERS if _learned_weights_problem is not None else frozenset()
     resolved = {
         seat: tier
         for seat, tier in bot_tiers.items()
-        if 1 <= seat <= 3 and tier in _PRACTICE_BOT_TIERS
+        if 1 <= seat <= 3 and tier in _PRACTICE_BOT_TIERS and tier not in unavailable
     }
     return resolved or None
 
@@ -168,6 +189,16 @@ async def healthz() -> JSONResponse:
     # fails once a drain has begun, so a load balancer stops routing new traffic here.
     if ws.registry().draining:
         return JSONResponse({"status": "draining"}, status_code=503)
+    # 200, not 503: the web client's ApiConnectGate blocks every page on a non-2xx. the compose
+    # healthcheck reads "status" instead (docs/infra.md §8)
+    if _learned_weights_problem is not None:
+        return JSONResponse(
+            {
+                "status": "degraded",
+                "disabled_tiers": sorted(_LEARNED_TIERS),
+                "reason": _learned_weights_problem,
+            }
+        )
     return JSONResponse({"status": "ok"})
 
 

@@ -23,9 +23,9 @@ arena.py, bots/selfplay.py, direct tests) gets inert defaults instead.
 `_omniscient_seat_view()` builds a `SeatView` for a real acting seat with `.hands` (every seat's
 concealed tiles) populated -- exactly what `seat_view()`'s `_check_reveal` guard exists to forbid
 for a real `seat`. It backs the `"ORACLE"` bot tier (docs/bots.md §9), an explicitly opt-in,
-non-ladder tier a live table may be configured to run -- driven by a plain `FaanBot()`
-(`bots/worker.py`), whose `bots/safety.py`-derived discard scoring becomes exact rather than
-probabilistic once it sees `.hands` populated. This is safe to hand across
+non-ladder tier a live table may be configured to run -- driven by `OracleLearnedBot`
+(`bots/worker.py`), whose `bots/safety.py` vetoes become exact rather than probabilistic once it
+sees `.hands` populated. This is safe to hand across
 the `ProcessPoolExecutor` boundary (`app/table.py`'s `_submit_bot_job`, the only live caller) because
 `SeatView` never carries `game_seed`/`hand_seed` -- see its field list below, there is no seed
 field -- so `docs/architecture.md §3`'s "`game_seed` never leaves this process" invariant is
@@ -225,7 +225,7 @@ def _omniscient_seat_view(state: GameState, seat: int) -> SeatView:
     Builds `seat`'s ordinary `seat_view(state, seat)` and then replaces `.hands` with every
     seat's concealed tiles -- the one thing `seat_view(..., reveal_hands=True)` refuses to do
     for a real `seat` (`_check_reveal` raises). This function exists specifically to bypass that
-    guard for the `"ORACLE"` tier -- a plain `FaanBot()` handed full information a live table may
+    guard for the `"ORACLE"` tier -- `OracleLearnedBot` handed full information a live table may
     opt into (docs/bots.md §9); `seat_view()`'s own public contract, and `_check_reveal`, are
     left completely untouched by this function's existence.
 

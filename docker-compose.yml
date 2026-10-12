@@ -44,7 +44,8 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      # "degraded" (learned weights unusable, docs/bots.md §2) still serves but marks the container unhealthy
+      test: ["CMD", "python", "-c", "import json,sys,urllib.request;sys.exit(json.load(urllib.request.urlopen('http://localhost:8000/healthz'))['status'] != 'ok')"]
       interval: 10s
       timeout: 3s
       retries: 5

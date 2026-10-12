@@ -15,7 +15,7 @@ from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import Phase
 from ml.env import replay_hand
-from ml.eval_policy import PolicyBot, bootstrap_ci, evaluate, load_candidate, play_set
+from ml.eval_policy import PolicyBot, bootstrap_ci, evaluate, load_candidate
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.ppo import PPOConfig, train_ppo
 
@@ -64,12 +64,12 @@ def test_oracle_opponents_see_every_hand_and_the_candidate_never_does(monkeypatc
     policy_views, oracle_views = [], []
     _spy_views(monkeypatch, PolicyBot, policy_views)
     _spy_views(monkeypatch, FaanBot, oracle_views)
-    report, records = evaluate([5], _RULESET, "ORACLE", model=_model())
-    assert report["opponent"] == "ORACLE" and report["candidate"]["hands_played"] == 4
+    report, records = evaluate([5], _RULESET, "OracleFaanBot", model=_model())
+    assert report["opponent"] == "OracleFaanBot" and report["candidate"]["hands_played"] == 4
     assert policy_views and not any(omni for _, omni in policy_views)
     assert oracle_views and all(omni for _, omni in oracle_views)
     for rec in records:
-        assert rec["players"].count("ORACLE") == 3
+        assert rec["players"].count("OracleFaanBot") == 3
         assert replay_hand(rec).phase == Phase.HAND_OVER
 
 
@@ -90,7 +90,7 @@ def test_heuristic_candidate_keeps_a_public_view_against_oracle(monkeypatch):
         return await _original(self, view, mask, deadline)
 
     monkeypatch.setattr(FaanBot, "act", act)
-    report, records = evaluate([5], _RULESET, "ORACLE", candidate_bot="FaanBot")
+    report, records = evaluate([5], _RULESET, "OracleFaanBot", candidate_bot="FaanBot")
     assert report["candidate_bot"] == "FaanBot" and report["candidate"]["hands_played"] == 4
     assert len(hands) == 4
     for rotation, views in enumerate(hands):
@@ -99,11 +99,22 @@ def test_heuristic_candidate_keeps_a_public_view_against_oracle(monkeypatch):
         assert records[rotation]["players"].index("candidate") == rotation
 
 
-def test_refuses_an_omniscient_candidate_bot():
+def test_omniscient_candidate_sees_every_hand_and_opponents_never_do(monkeypatch):
+    from bots.faanbot import FaanBot
+    from bots.oracle_learned import OracleLearnedBot
+
+    candidate_views, opponent_views = [], []
+    _spy_views(monkeypatch, OracleLearnedBot, candidate_views)
+    _spy_views(monkeypatch, FaanBot, opponent_views)
+    report, _ = evaluate([5], _RULESET, "FaanBot", candidate_bot="OracleLearned")
+    assert report["candidate_omniscient"] and report["candidate"]["hands_played"] == 4
+    assert candidate_views and all(omni for _, omni in candidate_views)
+    assert opponent_views and not any(omni for _, omni in opponent_views)
+
+
+def test_rejects_an_unknown_candidate_bot():
     with pytest.raises(ValueError, match="unknown candidate bot"):
-        evaluate([5], _RULESET, "FaanBot", candidate_bot="ORACLE")
-    with pytest.raises(ValueError, match="omniscient"):
-        play_set(5, _RULESET, "FaanBot", candidate_bot="ORACLE")
+        evaluate([5], _RULESET, "FaanBot", candidate_bot="NoSuchBot")
 
 
 def test_same_seeds_same_report():

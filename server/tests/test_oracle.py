@@ -1,28 +1,18 @@
-"""The `"ORACLE"` bot tier (docs/bots.md §9, `bots/worker.py`'s `_make_bot`).
+"""The `"ORACLE"` bot tier (docs/bots.md §9, `bots/worker.py`'s `_make_bot`) and the hands-aware
+`FaanBot` behind `BOT_REGISTRY["OracleFaanBot"]`, the tier until docs/decisions/0022.
 
-**Design history, briefly:** an earlier version of this tier was `bots/oracle.py`'s `OracleBot`,
-a full-information determinized-wall rollout search reusing `bots/search.py`'s machinery
-(`bots/search.py` no longer exists -- its `SearchBot`/T3 tier was removed for the same structural
-reason, docs/decisions/0012-searchbot-removed.md). Two rounds of arena validation found it was *still* statistically
-worse than plain `FaanBot` despite full information, because full information was only ever used
-to pick which worlds got sampled -- every candidate was still evaluated through the same noisy
-few-sample `FaanBot`-driven rollout that gave `SearchBot` its own ceiling. The actual fix needed
-no search at all: `bots/safety.py`'s
-`tile_risk` is now hands-aware (checks `view.hands` directly, no rollout, no sampling), so a
-*plain* `FaanBot()` handed an omniscient view (`app.views._omniscient_seat_view`) already computes
-exact per-opponent deal-in danger through its existing `_best_discard` scoring, with zero changes
-to `faanbot.py`. `bots/oracle.py` is deleted; `_make_bot("ORACLE", seed)` now just returns
-`FaanBot()`.
+History: ADR 0013 (a rollout `OracleBot` replaced by a plain `FaanBot()` on an omniscient view),
+ADR 0019 (its exact-information rules), ADR 0022 (the tier now serves `OracleLearnedBot`, the `T4`
+policy plus exact vetoes; its own unit tests are `tests/test_oracle_learned.py`).
 
-This file covers: (1) the dispatch wiring (`_make_bot` builds a plain `FaanBot`); (2) a scripted
-behavioral proof that an omniscient view changes `FaanBot`'s real discard choice -- avoiding a
-real deal-in the probabilistic-only view walks straight into, the concrete case
-docs/bots.md §5 item 1 warns about (genbutsu is not a guarantee in HK -- an opponent can
-discard a tile and still legally win on it later); (3) a full self-play smoke test.
+This file covers: (1) the dispatch wiring (`_make_bot("ORACLE")` builds `OracleLearnedBot`); (2)
+scripted behavioral proofs that an omniscient view changes `FaanBot`'s real choices -- avoiding a
+real deal-in the probabilistic-only view walks straight into, the concrete case docs/bots.md §5
+item 1 warns about (genbutsu is not a guarantee in HK -- an opponent can discard a tile and still
+legally win on it later); (3) a full self-play smoke test of the served tier.
 
 Exact per-opponent-danger unit coverage (the win-legality check itself, the min_faan boundary,
-the hands-aware/hands-None regression) lives in `tests/test_safety.py`, not here -- this file is
-about the `"ORACLE"` tier as a whole, not `tile_risk`'s internals.
+the hands-aware/hands-None regression) lives in `tests/test_safety.py`, not here.
 """
 
 from __future__ import annotations
@@ -35,6 +25,7 @@ import pytest
 from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.faanbot import _ADDED_KONG_BASE, _PASS, _PUNG, _THREAT_THRESHOLD, FaanBot
 from bots.features import own_hand34, seen34
+from bots.oracle_learned import OracleLearnedBot
 from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
 from mahjong_core.config import HandSet, RuleSet
@@ -109,16 +100,8 @@ def _discard_mask(types: list[TileType]) -> list[bool]:
     return mask
 
 
-# --- dispatch wiring: "ORACLE" builds a plain FaanBot, nothing else --------------------------
-
-
-def test_make_bot_oracle_tier_builds_a_plain_faanbot() -> None:
-    """No dedicated class, no rollout: `bots/worker.py`'s `_make_bot("ORACLE", seed)` must
-    return an ordinary `FaanBot` instance. `seed` is accepted (matches every other tier's
-    signature) but unused -- `FaanBot` is stateless."""
-    bot = _make_bot("ORACLE", 0)
-    assert isinstance(bot, FaanBot)
-    assert type(bot) is FaanBot  # not a subclass standing in for a since-deleted OracleBot
+def test_make_bot_oracle_tier_builds_oracle_learned() -> None:
+    assert type(_make_bot("ORACLE", 0)) is OracleLearnedBot
 
 
 # --- behavioral proof: an omniscient view changes the real discard choice ---------------------
@@ -795,7 +778,7 @@ async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
 async def _play_oracle_tier_vs_faanbot(seed: int, ruleset: RuleSet) -> GameState:
     """`_make_bot("ORACLE", seed)`'s seat gets a real omniscient view every decision -- unlike
     `bots/selfplay.py`'s `play_game`, which only ever builds ordinary views -- so this exercises
-    the real dispatch shape (`_omniscient_seat_view` + a plain `FaanBot`) rather than a fallback."""
+    the real dispatch shape (`_omniscient_seat_view` + `OracleLearnedBot`)."""
     oracle_seat = 0
     bots = [_make_bot("ORACLE", seed), FaanBot(), FaanBot(), FaanBot()]
     rng = random.Random(seed)

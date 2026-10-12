@@ -34,7 +34,7 @@ Metrics before 98.6M decisions are under an earlier scoring table (engine 1.0.0,
 Evaluation seed sets (`eval_policy --seed`, the first duplicate set's `HandEnv` episode seed,
 [ml.md §12](ml.md)). A range used for a gate is never reused for tuning or another gate; pick the
 next free range for a new one. Below 2,000,000 belongs to `bots.arena`'s heuristic-bot tuning and
-`ORACLE` gates (seeds 1+, 1,000,000+, [bots.md §7, §9](bots.md)); `eval_policy`'s default `--seed`
+the `OracleFaanBot`-era `ORACLE` gates (seeds 1+, 1,000,000+, [bots.md §7, §9](bots.md)); `eval_policy`'s default `--seed`
 (1,000,000) falls there, so always pass one.
 
 | Seeds | Sets | Used for |
@@ -46,9 +46,14 @@ next free range for a new one. Below 2,000,000 belongs to `bots.arena`'s heurist
 | 6,000,000+ | 3,000 per direction | league head-to-head series vs the starting policy (§4) |
 | 6,100,000+ – 6,400,000+ | 1,500–2,000 | head-to-head analysis, results not kept in the repo: sampled-mode head-to-head (6.1M, 2,000 sets), hold 462.0M vs 429.2M control (6.2M), `hk_strict` / `hk_casual` head-to-heads (6.3M, 1,500 sets), learner L91.8M vs snapshot `past1` (6.4M) |
 | 7,000,000+, 7,100,000+ | 1,000 / 700; 1,500 head-to-head | R3 gate, L274.3M and 464.3M (§4); later league checkpoints are compared against L274.3M here |
-| 8,000,000+ | 1,000 | evals vs `ORACLE`: L274.3M, 464.3M and `FaanBot` ×1 vs `ORACLE` ×3; `ORACLE` / `FaanBot` ×1 vs L274.3M ×3; L274.3M vs `FaanBot` (§4) |
+| 8,000,000+ | 1,000 | evals vs `OracleFaanBot` (then named `ORACLE`): L274.3M, 464.3M and `FaanBot` ×1 vs it ×3; it / `FaanBot` ×1 vs L274.3M ×3; L274.3M vs `FaanBot` (§4) |
 | 9,000,000+ | 1,000 / 700 | R4 gate re-run, `LearnedBot` (the shipped numpy path) (§4); 9,500,000+ and 9,900,000+ hold the R4 action-agreement and pool-load samples (`HandEnv` states, not evals) |
-| 10,000,000+ | — | next free range |
+| 10,000,000+ | 1,000 | `OracleLearned` prototype (tuning, not a gate): both seatings vs `LearnedBot` ×3, vs `FaanBot` ×3, `OracleFaanBot` vs `LearnedBot` ×3 ([ADR 0022](decisions/0022-oracle-learned-tier.md)) |
+| 11,000,000+ | 1,000 / 700 | Impossible gate for `learned.npz` L274.3M ([ADR 0022](decisions/0022-oracle-learned-tier.md)): `ORACLE` both seatings vs `LearnedBot` ×3 (1,000), `ORACLE` vs `FaanBot` ×3 (700); plus `OracleFaanBot` vs `LearnedBot` ×3 (1,000) and `LearnedBot` vs `FaanBot` ×3 (700) |
+| 12,000,000+ | — | next free range |
+
+New weights take two fresh ranges, one for the Expert gate and one for the Impossible gate
+([bots.md §2](bots.md) "Shipping new weights", steps 4–5).
 
 The head-to-head harness is `runs/ppo_league_snap/tools/h2h_eval.py` on the training box
 (gitignored, not in `ml/`).
@@ -268,7 +273,9 @@ average winning faan within 0.1 of R3's per-side detail above. The `FaanBot` run
 `ml/export.py` (equal within float error); the other four ran with it.
 
 **vs `ORACLE`** (2026-10-12, `hk_classic`, 1,000 sets on seeds 8,000,000+, `eval_policy
---opponent ORACLE`; the 1 × policy-table rows from a scratch harness on the same seeds). Points per
+--opponent ORACLE`; the 1 × policy-table rows from a scratch harness on the same seeds). `ORACLE`
+here is the hands-aware `FaanBot`, the tier before [ADR 0022](decisions/0022-oracle-learned-tier.md)
+(now `--opponent OracleFaanBot`). Points per
 hand, paired diff = the ×1 side minus the mean of the ×3 side:
 
 | ×1 vs ×3 | Paired diff [95% CI] (bootstrap) | ×1 win / deal-in / avg faan | ×3 win / deal-in / avg faan |

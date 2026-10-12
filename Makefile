@@ -4,7 +4,7 @@ COMPOSE := docker compose
 DC_PROD := docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart logs build ps sh-api sh-web test test-server test-server-slow test-web \
+.PHONY: help up down restart logs build ps sh-api sh-web test test-server test-server-slow bench-latency test-web \
         selfplay arena train proto proto-check migrate revision fmt lint typecheck clean prod-build prod-up prod-migrate
 
 help: ## Show this help
@@ -45,6 +45,9 @@ test-server: ## pytest (fast tests only; use `make test-server-slow` for the slo
 
 test-server-slow: ## pytest slow suite: soaks, real-bot e2e, hypothesis runs -- everything CI's server-slow job covers
 	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m slow -n auto --games=$${N:-10000}
+
+bench-latency: ## latency tests serially against the absolute budget (docs/testing.md §1); run on the target CPU
+	$(COMPOSE) run --rm --no-deps -e LATENCY_BUDGET_MS=$${BUDGET:-5} api uv run pytest -q -s -m latency -p no:xdist
 
 # CI=true: vitest browser mode and playwright both default to *headed* off-CI, and the
 # container has no X server. Set here, not in the compose service, so `make up`'s dev server

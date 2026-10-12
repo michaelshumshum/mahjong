@@ -1,6 +1,7 @@
 # 0019. `ORACLE` improvements plan
 
-- **Status:** Accepted — §5.0–§5.3 built (§12); §7 not built; §8 out of scope
+- **Status:** Historical — §5.0–§5.3 built (§12); §7 not built; §8 out of scope. The tier moved to
+  `OracleLearned` in [ADR 0022](0022-oracle-learned-tier.md); this bot is now `OracleFaanBot`
 - **Date:** 2026-10-04
 
 ## 1. Context

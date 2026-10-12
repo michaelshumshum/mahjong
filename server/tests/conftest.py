@@ -35,6 +35,9 @@ os.environ.setdefault("BOT_THINK_MAX_SECONDS", "0")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 # no always-on bot table: every `TestClient(app)` would otherwise start a real all-bot game
 os.environ.setdefault("SHOWCASE_TABLE_ID", "")
+# one BLAS thread per process like a bot pool worker; set here since numpy loads before
+# bots/learned.py in an xdist worker, whose BLAS would otherwise spawn a thread per core
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

@@ -45,6 +45,7 @@ markers = [
     "slow: long-running self-play / arena runs",
     "fast: fast tests (everything except slow)",
     "cuda: needs a CUDA GPU; skipped without one",
+    "latency: timing checks, a ratio gate plus LATENCY_BUDGET_MS (tests/latency.py)",
 ]
 
 [tool.coverage.run]

@@ -17,6 +17,7 @@ from mahjong_core.state import GameState
 from ml.encode_v2 import POLICY_CHANNELS, encode_policy
 from ml.env import HandEnv
 from ml.policy_net import PolicyNet, PolicyNetConfig, masked_log_softmax
+from tests.latency import check_latency
 
 
 def _random_model(config: PolicyNetConfig) -> PolicyNet:
@@ -115,21 +116,32 @@ def test_export_ppo_checkpoint_records_provenance(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.latency
 def test_single_sample_latency_with_encoding(tmp_path: Path) -> None:
-    """Flaky under parallel CPU load (`-n`); run alone. p99 over 300 decisions."""
+    """Full-size serving (encode + forward) costs less than a `FaanBot` decision at p99 on the
+    same states. The absolute 5 ms is `make bench-latency` (`tests/latency.py`)."""
+    import asyncio
+
+    from app.views import seat_view
+    from bots.faanbot import FaanBot
+
     config = PolicyNetConfig()
     export.export_policy_state(
         _random_model(config).state_dict(), config.to_dict(), tmp_path / "p.npz"
     )
     net = export.NumpyPolicyNet.load(tmp_path / "p.npz")
     states = _states(4)[:300]
-    for state, seat, _ in states[:20]:
+    bot = FaanBot()
+    for state, seat, mask in states[:20]:
         net.state_logits(state, seat)
-    runs = []
+        asyncio.run(bot.act(seat_view(state, seat), mask.tolist(), 0.0))
+    serve, faan = [], []
     for state, seat, mask in states:
+        view, m = seat_view(state, seat), mask.tolist()
         start = time.perf_counter()
         export.masked_log_softmax(net.state_logits(state, seat), mask)
-        runs.append(time.perf_counter() - start)
-    p50, p99 = np.percentile(runs, [50, 99])
-    print(f"policy serve: p50 {p50 * 1e3:.2f} ms, p99 {p99 * 1e3:.2f} ms over {len(runs)}")
-    assert p99 < 0.005
+        mid = time.perf_counter()
+        asyncio.run(bot.act(view, m, 0.0))
+        serve.append(mid - start)
+        faan.append(time.perf_counter() - mid)
+    check_latency("policy serve", serve, "FaanBot", faan)

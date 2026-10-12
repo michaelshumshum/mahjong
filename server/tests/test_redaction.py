@@ -651,7 +651,7 @@ def test_state_sync_wire_never_populates_hands_for_a_real_seat_regardless_of_bot
     """Regression, `ORACLE`-tier-specific: `app/views.py`'s `_omniscient_seat_view` is a
     deliberate, narrowly-scoped exception to "a real seat's `.hands` is never populated" -- it
     exists purely to feed `app/table.py`'s `_submit_bot_job` (which drives the `"ORACLE"` tier's
-    plain `FaanBot()` with an omniscient view), and must never leak into what a real WS client
+    `OracleLearnedBot` with an omniscient view), and must never leak into what a real WS client
     actually receives. `state_sync_wire` is exactly that path (`app/ws.py` calls it on
     join/reconnect/backpressure-collapse) -- confirm it's completely unaffected by which
     `bot_tier` a table happens to be configured with, `ORACLE` included: a real seat's own

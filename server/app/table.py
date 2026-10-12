@@ -456,9 +456,8 @@ class Table:
     resolved tier (`_effective_bot_tier`) immediately at construction, before seat 0's human ever
     joins -- see `_bind_bot_seat`.
     `"ORACLE"` builds its view via `_omniscient_seat_view` (`app/views.py`) instead of the
-    ordinary `seat_view`, but the bot doing the deciding is a plain `FaanBot()`
-    (`bots/worker.py`'s `_make_bot`) -- the same single-digit-millisecond cost as `T2` -- so it
-    shares the same pool every tier now uses (`_shared_bot_pool`'s docstring has the historical
+    ordinary `seat_view`, but the bot doing the deciding (`bots/worker.py`'s `_make_bot`) costs
+    single-digit milliseconds like every other tier, so it shares the same pool every tier uses (`_shared_bot_pool`'s docstring has the historical
     note on why a second, `T3`-only pool briefly existed and was removed).
     """
 
@@ -552,8 +551,8 @@ class Table:
         self._pending_bot: dict[int, BotJobTag] = {}
         self._bot_tasks: set[asyncio.Task[None]] = set()
         self._bot_pool: Executor = bot_pool if bot_pool is not None else _shared_bot_pool()
-        # "ORACLE" needs no dedicated pool: bots/worker.py's _make_bot builds a plain FaanBot()
-        # for it (same cost as T2), so every tier shares this one pool.
+        # "ORACLE" needs no dedicated pool: its bot costs single-digit ms like T2/T4, so every
+        # tier shares this one pool.
 
         # require_ready=True (real tables) gates every command on all four seats joining+ready
         # first (_authorize below); require_ready=False (default) is actionable off new_game().
@@ -1326,8 +1325,8 @@ class Table:
         `ORACLE` jobs build their view with `_omniscient_seat_view` (`app/views.py`) instead of
         the normal `seat_view(state, seat)` -- **this is the only call site for that function in
         the entire codebase**; see its docstring, and `tests/test_oracle_containment.py`, which
-        pins that structurally. The bot itself is a plain `FaanBot()` (`bots/worker.py`'s
-        `_make_bot`), so `ORACLE` jobs share `self._bot_pool` like every other tier.
+        pins that structurally. The bot itself is built by `bots/worker.py`'s `_make_bot`, and
+        `ORACLE` jobs share `self._bot_pool` like every other tier.
         """
         loop = asyncio.get_running_loop()
         tier = self._effective_bot_tier(seat)
@@ -1355,19 +1354,20 @@ class Table:
         future = loop.run_in_executor(
             self._bot_pool, compute_action, view, mask, seed, tier, deadline
         )
-        task = asyncio.ensure_future(self._await_bot_job(seat, tag, future, seed))
+        task = asyncio.ensure_future(self._await_bot_job(seat, tag, future, seed, tier))
         self._bot_tasks.add(task)
         task.add_done_callback(self._bot_tasks.discard)
 
     async def _await_bot_job(
-        self, seat: int, tag: BotJobTag, future: asyncio.Future[int], seed: int
+        self, seat: int, tag: BotJobTag, future: asyncio.Future[int], seed: int, tier: str
     ) -> None:
         """Await one submitted job under a hard deadline, then re-enter it through `self.inbox`
         as a `BotResult` -- never applied directly from here, so it still goes through the same
         staleness check and single-writer discipline every other inbox item does.
 
-        On timeout or a worker crash: applies no synthesized default action, just clears the
-        pending tag so the next `_poke_bots()` tick retries from scratch. What actually stops a
+        On timeout or a worker crash: logs it with the tier, table and seat, applies no
+        synthesized default action, and clears the pending tag so the next `_poke_bots()` tick
+        retries from scratch. What actually stops a
         stalled turn decision from wedging the table is the independent, seat-level
         `ruleset.turn_seconds` deadline, which races the wall clock regardless of whether any
         particular bot job is in flight.
@@ -1379,7 +1379,7 @@ class Table:
         pending tag goes stale while asleep, the result lands anyway but `_handle_bot_result`
         drops it like any other stale answer.
         """
-        with contextlib.suppress(Exception):
+        try:
             aid = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
             think_seconds = random.Random(seed ^ 0x5A5A5A5A).uniform(
                 _BOT_THINK_MIN_SECONDS, _BOT_THINK_MAX_SECONDS
@@ -1387,6 +1387,16 @@ class Table:
             await asyncio.sleep(think_seconds)
             self.inbox.put_nowait(BotResult(seat=seat, tag=tag, aid=aid))
             return
+        except TimeoutError:
+            logger.warning(
+                "table %s seat %d: %s bot job timed out after %.0fs",
+                self.table_id,
+                seat,
+                tier,
+                _BOT_JOB_TIMEOUT_SECONDS,
+            )
+        except Exception:
+            logger.exception("table %s seat %d: %s bot job failed", self.table_id, seat, tier)
         if self._pending_bot.get(seat) == tag:
             del self._pending_bot[seat]
 

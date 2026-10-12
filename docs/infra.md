@@ -68,14 +68,16 @@ mahjong/
 
 | Tool | Version | Pinned in |
 | --- | --- | --- |
-| Python | 3.13 | `mise.toml`, `server/Dockerfile` (`python:3.13-slim`), `pyproject.toml` (`requires-python >=3.13`, floor only) |
+| Python | 3.13 | `mise.toml`, `server/.python-version` (what `uv` and so CI resolve), `server/Dockerfile` (`python:3.13-slim`), `pyproject.toml` (`requires-python >=3.13`, floor only) |
 | Node | 24 | `mise.toml`, `web/Dockerfile` (`node:24-*`) |
 | pnpm | 12.4.2 | `mise.toml`, root `package.json` `packageManager` (corepack, used inside images) |
 | uv | 0.12 | `mise.toml` |
 | Postgres | 17 | `docker-compose.yml` (`postgres:17-alpine`) |
 
 Keep these in sync when bumping. CI does not read `mise.toml`: `web.yml`/`proto-check.yml` use
-`node-version: lts/*` and no workflow pins Python, so CI runs whatever the actions resolve (§9).
+`node-version: lts/*`. Python is pinned for CI only through `server/.python-version`: with the
+floor alone, `uv` picked the newest CPython (3.15), for which torch has no wheels, and
+`server-ml.yml`'s `uv sync --extra ml` failed (§9).
 
 ### Two ways to run
 
@@ -121,6 +123,7 @@ Native equivalents of the Docker targets:
 | --- | --- |
 | `make test-server` | `cd server && uv run pytest -q -m fast -n auto` |
 | `make test-server-slow` | `cd server && uv run pytest -q -m slow -n auto --games=10000` |
+| `make bench-latency` | `cd server && LATENCY_BUDGET_MS=5 uv run pytest -q -s -m latency -p no:xdist` |
 | `make test-web` | `pnpm --dir web test` |
 | `make migrate` | `cd server && uv run alembic upgrade head` (with `DATABASE_URL`) |
 | `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts` |
@@ -278,7 +281,7 @@ Client IPs seen by the app are the tunnel host's, not the player's (`CF-Connecti
 | Area | Current state |
 | --- | --- |
 | Logging | stdout, `LOG_LEVEL` via env, captured by Docker. Not structured, no shipping |
-| Health | process-level `/healthz` (the `api` healthcheck; `503` while draining). No per-table liveness |
+| Health | process-level `/healthz` (the `api` healthcheck): `503` while draining; `200` with `"status": "degraded"` when the learned weights failed the startup check ([bots.md §2](bots.md)), which the Compose healthcheck treats as unhealthy (it requires `"ok"`). No per-table liveness |
 | Metrics | none |
 | Error tracking | none — an uncaught exception in a table's task goes only to the log |
 | Tracing | not needed at one process |
@@ -298,7 +301,7 @@ before real users:
 
 | File | Jobs | Runs |
 | --- | --- | --- |
-| `server.yml` | `server`, `server-slow` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs |
+| `server.yml` | `server`, `server-slow` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs, and the latency tests, which gate on ratios and write absolute p50/p99 to the job summary ([testing.md §1](testing.md)) |
 | `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` |
 | `proto-check.yml` | `proto-check` | regenerates protocol types natively (§2's `make proto` equivalent), then `git diff --exit-code` |
 
@@ -348,7 +351,8 @@ kept diverging. A missing coverage report keeps that badge's previous SVG rather
 run.
 
 **Gates** (all hard): `ruff check`, `ruff format --check`, fast pytest, slow pytest
-(`--games=1000`), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,
+(`--games=1000`; latency as ratios, the absolute 5 ms budget is `make bench-latency` on the target
+CPU, [testing.md §1](testing.md)), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,
 `proto-check`.
 
 **Local vs. CI.** `make test*` runs the fast suite only; the slow suite (`@pytest.mark.slow`) costs

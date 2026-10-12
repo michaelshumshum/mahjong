@@ -15,7 +15,7 @@ pure efficiency (docs/bots.md §4).
 `--parallel` runs duplicate sets across a `ProcessPoolExecutor`; each worker plays its own
 4-rotation set start to finish, so nothing needs pickling beyond `(seed, ruleset, bot, bot)`.
 
-`ORACLE` seats are fed `_omniscient_seat_view` via `_view_for`, the one sanctioned call site
+`OMNISCIENT_BOTS` seats are fed `_omniscient_seat_view` via `_view_for`, the one sanctioned call site
 outside `app/table.py` (docs/bots.md §9). Offline only: `app/` never imports this module
 (`tests/test_oracle_containment.py`).
 """
@@ -92,6 +92,13 @@ def _learned_bot_factory(seed: int) -> Bot:
     return LearnedBot()
 
 
+def _oracle_learned_factory(seed: int) -> Bot:
+    del seed  # greedy; seed unused
+    from bots.oracle_learned import OracleLearnedBot
+
+    return OracleLearnedBot()
+
+
 BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "RandomBot": _random_bot_factory,
     "EfficiencyBot": _efficiency_bot_factory,
@@ -99,11 +106,15 @@ BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "FaanBotAggressive": _weight_profile_factory(AGGRESSIVE),
     "FaanBotDefensive": _weight_profile_factory(DEFENSIVE),
     "FaanBotFlushChasing": _weight_profile_factory(FLUSH_CHASING),
-    "ORACLE": _faan_bot_factory,
     "LearnedBot": _learned_bot_factory,
+    "ORACLE": _oracle_learned_factory,
+    "OracleLearned": _oracle_learned_factory,
+    "OracleFaanBot": _faan_bot_factory,
 }
+"""`ORACLE` is the served Impossible tier (`bots/worker.py`'s `_make_bot`), so it tracks whatever
+`OracleLearned` is; `OracleFaanBot` is the tier before docs/decisions/0022, comparison only."""
 
-OMNISCIENT_BOTS: frozenset[str] = frozenset({"ORACLE"})
+OMNISCIENT_BOTS: frozenset[str] = frozenset({"ORACLE", "OracleLearned", "OracleFaanBot"})
 """`BOT_REGISTRY` names played on an omniscient view; any other harness must refuse them."""
 
 _STEP_CAP = 8000

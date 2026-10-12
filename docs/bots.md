@@ -44,29 +44,56 @@ vary with decision difficulty — no tier returns a confidence signal to scale i
 
 ## 2. Tiers
 
-| Tier | Class | What it is | Offered as |
+| Difficulty | Tier | Class (`bots/`) | Decides with | Weights | View |
+| --- | --- | --- | --- | --- | --- |
+| — (never offered) | `T0` | `RandomBot` (`random.py`) | uniform over legal actions; fuzzing and engine tests | — | `seat_view` |
+| Easy | `T1` | `EfficiencyBot` (`efficiency.py`) | shanten-minimising discard, ukeire tiebreak (§3) | — | `seat_view` |
+| Normal | `T2` | `FaanBot` (`faanbot.py`) | `T1` + hand-value planning (§4) + discard safety (§5) | hand-tuned (`_weights_for_turn`) | `seat_view` |
+| Expert | `T4` | `LearnedBot` (`learned.py`) | the self-play RL policy, greedy ([ml.md](ml.md)) | `weights/learned.npz` | `seat_view`; raises on `.hands` |
+| Impossible | `ORACLE` | `OracleLearnedBot` (`oracle_learned.py`) | Expert's policy + exact-information vetoes (§9) | the same `weights/learned.npz` | omniscient (`.hands` populated, §9) |
+
+`T2` is also the default tier (an unpicked seat, the showcase table) and the disconnect-handover
+tier. `T3` is not reused: it was the removed `SearchBot` (below). Each tier's arena/eval name is
+its class name in `bots/arena.py`'s `BOT_REGISTRY`, except `ORACLE`:
+
+| `BOT_REGISTRY` name | Bot | Omniscient | Live tier |
 | --- | --- | --- | --- |
-| `T0` | `RandomBot` | uniform over legal actions | never — fuzzing and engine tests only |
-| `T1` | `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak (§3) | Easy |
-| `T2` | `FaanBot` | T1 + hand-value planning (§4) + discard safety (§5) | Normal; also the default tier and the disconnect-handover tier |
-| `T4` | `LearnedBot` | the self-play RL policy, greedy, on the public view only ([ml.md](ml.md)) | Expert |
-| `ORACLE` | `FaanBot` | a plain `FaanBot()` fed a full-information view (§9) | Impossible |
+| `ORACLE`, `OracleLearned` | `OracleLearnedBot` | yes | `ORACLE` |
+| `OracleFaanBot` | `FaanBot` on an omniscient view: the `ORACLE` tier until [ADR 0022](decisions/0022-oracle-learned-tier.md), comparison only | yes | none |
+| `FaanBotAggressive` / `Defensive` / `FlushChasing` | `FaanBot` weight profiles (below) | no | none |
 
-`T3` is not reused: it was the removed `SearchBot` (below).
+**Expert and Impossible share one policy.** `OracleLearnedBot` runs `LearnedBot.logits` on the view
+with `.hands` stripped, then vetoes certain deal-ins and robbed kongs and always takes a win (§9).
+Both load `learned.npz`, so new weights change both tiers and both gates re-run (runbook below).
 
-**`T4` `LearnedBot`** (`bots/learned.py`, `BOT_REGISTRY["LearnedBot"]`). One decision is
-`ml.encode_v2.policy_raw_from_view(view)` → `encode_policy_batch` → `ml.export.NumpyPolicyNet`
-→ argmax over the legal ids — the same path `ml.eval_policy` gated, with numpy in place of torch.
-It raises on a view with `.hands` populated, so it can't be seated on the `ORACLE` path. The
-worker imports it lazily and `load_policy` caches the weights once per process.
+**`T4` decision path.** `ml.encode_v2.policy_raw_from_view(view)` → `encode_policy_batch` →
+`ml.export.NumpyPolicyNet` → argmax over the legal ids: the path `ml.eval_policy` gated, with numpy
+in place of torch. The worker imports it lazily; `load_policy` caches the weights once per process.
+
+**`learned.npz`:**
 
 | Detail | Value |
 | --- | --- |
-| weights | `server/bots/weights/learned.npz`, 1.7 MB float32, trunk + policy head (427k params) |
+| file | `server/bots/weights/learned.npz`, 1.7 MB float32, trunk + policy head (427k params) |
 | source | `runs/ppo_league_snap/ckpt_L274.3M.pt` (league run, 274,239,759 league decisions, update 65,560, on top of the 464.3M starting policy), sha256 `3e2b6726…c53bc`; engine 1.3.0 |
-| export | `python -m ml.export --ckpt <ckpt> --out bots/weights/learned.npz`, `ml.export.EXPORT_VERSION` 2; provenance is in the file's `__meta__` (`bots.learned.policy_meta()`) |
-| strength | R3 gate re-run through this path: [ml.md §14](ml.md) R4 |
-| latency | p99 ≤ 5 ms per decision incl. encode ([ml.md §14](ml.md) R4) |
+| provenance | the file's `__meta__` (`bots.learned.policy_meta()`), pinned by `tests/test_learned_bot.py::test_shipped_weights_record_their_source` |
+| strength | Expert: [ml.md §14](ml.md) R4; Impossible: §9 |
+| latency budget | p99 ≤ 5 ms per decision incl. encode, on the target CPU (`make bench-latency`, [testing.md §1](testing.md)) |
+
+**Shipping new weights** (runbook). Seeds come from the next free range in
+[rl-learnings.md §1](rl-learnings.md); record what you used there.
+
+| # | Step | Command / check | Pass |
+| --- | --- | --- | --- |
+| 1 | export | `uv run python -m ml.export --ckpt <ckpt> --out bots/weights/learned.npz` (`ml` extra; `EXPORT_VERSION` 2) | file < 4 MB |
+| 2 | provenance | update `test_shipped_weights_record_their_source` to the new `source`/`decisions` | `engine_version == ENGINE_VERSION` |
+| 3 | parity | `uv run pytest tests/test_ml_learned_parity.py` (`ml` extra): torch `PolicyNet` vs `LearnedBot` on the file | same logits and actions |
+| 4 | Expert gate | `python -m ml.eval_policy --candidate-bot LearnedBot --opponent FaanBot --sets 1000 --seed <S>`; 700 sets each vs `EfficiencyBot`, `FaanBotAggressive`, `FaanBotDefensive`, `FaanBotFlushChasing` ([ml.md §14](ml.md) R4) | every CI > 0 |
+| 5 | Impossible gate | `--candidate-bot ORACLE --opponent LearnedBot --sets 1000`, `--candidate-bot LearnedBot --opponent ORACLE --sets 1000`, `--candidate-bot ORACLE --opponent FaanBot --sets 700`, all `--seed <S'>` ([ADR 0022](decisions/0022-oracle-learned-tier.md)) | `ORACLE` ahead from both seatings and vs `FaanBot` (every CI excludes 0 in its favour) |
+| 6 | latency | `make bench-latency` on the target CPU; CI gates the ratios ([testing.md §1](testing.md)) | p99 < 5 ms |
+| 7 | record | numbers in ml.md §14 / §9 here; seed ranges in rl-learnings.md §1 | — |
+
+All `eval_policy` runs: `--ruleset hk_classic --parallel N`, from `server/` with the `ml` extra.
 
 **Why the weights are committed.** 1.7 MB is small next to what git already holds
 (`docs/screenshots/` is ~8.7 MB); each new policy adds one more 1.7 MB blob. In git, the weights
@@ -76,6 +103,17 @@ download step or volume that could be missing at startup. A new policy is a new 
 file. `tests/test_learned_bot.py` pins the recorded source and `engine_version ==
 ENGINE_VERSION`, so an engine bump that changes the encoding fails until the policy is
 re-exported (or migrated, [ml.md §9](ml.md)).
+
+**Missing weights.** `T4` and `ORACLE` both load this file. If it's missing, unreadable, or exported
+for another `ENGINE_VERSION`:
+
+| Where | What happens |
+| --- | --- |
+| api startup (`app/main.py` `lifespan` → `bots.learned.weights_problem`) | logs an ERROR and keeps serving with `T4`/`ORACLE` disabled; it doesn't refuse to start, since a crash-looping api takes every table down and this costs only two difficulties |
+| `POST /tables` | a practice seat asking for `T4`/`ORACLE` falls back to `T2` (`_resolve_seat_bot_tiers`) |
+| `GET /healthz` | `200 {"status": "degraded", "disabled_tiers": [...], "reason": ...}`: 2xx because the web client's `ApiConnectGate` blocks every page otherwise; the Compose healthcheck requires `"ok"`, so the container reads `unhealthy` ([infra.md §8](infra.md)) |
+| a bot job that raises anyway | `Table._await_bot_job` logs it (tier, table, seat) for every tier, then retries; the turn timer's safe default still applies |
+| constructing `LearnedBot`/`OracleLearnedBot` | raises (`FileNotFoundError`, `ValueError`, `BadZipFile`); no fallback to another bot |
 
 `FaanBot` also ships weight-profile variants (`bots/faanbot.py`'s `WeightProfile`: `AGGRESSIVE`,
 `DEFENSIVE`, `FLUSH_CHASING`), registered in `bots/arena.py`'s `BOT_REGISTRY` as
@@ -177,7 +215,7 @@ score(discard) = w_speed  * ukeire_after
   threatening` — a far-from-tenpai hand against a threatening opponent discards safe tiles
   instead of chasing.
 - **Claim guard** (`_should_claim`): never claim a meld that drops the hand's reachable value below
-  `view.ruleset.min_faan`. `ORACLE` can still claim past it into an exactly-valued tenpai (§9).
+  `view.ruleset.min_faan`. `OracleFaanBot` can still claim past it into an exactly-valued tenpai (§9).
 
 `tenpai_rate_on_sub_minimum_hand` is the canary metric for this section (§7). A regression means a
 candidate has drifted back toward pure-efficiency play.
@@ -216,23 +254,23 @@ because signals 1–2 are structurally weaker — but needs a labelled corpus fi
 ## 6. Difficulty levels
 
 Practice mode's per-seat picker (`web/src/lib/ui/PracticeSetupDialog.svelte`,
-[frontend.md §7](frontend.md) "Practice mode", `POST /tables`'s `bot_tiers` —
-[protocol.md §10](protocol.md)):
+[frontend.md §7](frontend.md) "Practice mode") sends `POST /tables`'s `bot_tiers`
+([protocol.md §10](protocol.md)): Easy `T1`, Normal `T2`, Expert `T4`, Impossible `ORACLE` (class,
+weights and view per tier: §2). `T0` is never offered; an unpicked seat, the showcase table and
+disconnect handover use `T2`. While the learned weights fail the api's startup check, Expert and
+Impossible fall back to `T2` (§2 "Missing weights").
 
-| Level | Bot | Tier |
+The ladder is ordered by strength, `hk_classic` points/hand (paired, 95% CI):
+
+| Comparison | Result | Source |
 | --- | --- | --- |
-| Easy | `EfficiencyBot` — shanten/ukeire only, no value targeting, no safety model (§3) | `T1` |
-| Normal | `FaanBot` — value targeting, safety model, fold logic (§4/§5) | `T2` |
-| Expert | `LearnedBot` — the self-play RL policy (§2) | `T4` |
-| Impossible | `FaanBot` with a full-information view (§9) | `ORACLE` |
+| Normal vs Easy | `T2` ×1 vs `T1` ×3: +2.67 points/game [+1.92, +3.42] | §7 |
+| Expert vs Normal | `T4` ×1 vs `T2` ×3: +10.75 [+9.64, +11.86] | [ml.md §14](ml.md) R4 |
+| Impossible vs Expert | `ORACLE` ×1 vs `T4` ×3: +3.60 [+3.15, +4.06]; `T4` ×1 vs `ORACLE` ×3: −4.51 [−5.15, −3.88] | §9 |
 
-`T0` is never offered. The default tier (`DEFAULT_BOT_TIER`, an unpicked seat, the showcase table)
-and disconnect handover stay `T2`.
-
-The ladder is named by kind, not strictly ordered by strength: Expert outscores Impossible
-head to head (`T4` × 1 vs `ORACLE` × 3 +2.88 points/hand, `ORACLE` × 1 vs `T4` × 3 −1.53,
-[rl-learnings.md §4](rl-learnings.md)). Impossible is "sees every hand" — it never deals in — not
-"strongest".
+Impossible beats Expert because it *is* Expert plus exact information. Before
+[ADR 0022](decisions/0022-oracle-learned-tier.md) Impossible was the hands-aware `FaanBot`
+(`OracleFaanBot`) and lost to Expert.
 
 ## 7. Evaluation harness
 
@@ -242,10 +280,12 @@ python -m bots.arena --a FaanBot --b EfficiencyBot --games 20000 --seed 1 --para
 
 (`make arena A=… B=… N=…` runs it in the `tools` Compose profile.)
 
-`--a ORACLE` plays the `ORACLE` tier: `BOT_REGISTRY["ORACLE"]` is the same `FaanBot` factory as
-`FaanBot`, and `bots/arena.py`'s `_view_for` feeds every name in `OMNISCIENT_BOTS` an
-`_omniscient_seat_view` (§9). Harnesses that only build plain `seat_view`s (`ml/eval_policy.py`,
-`ml/generate_dataset.py`) refuse those names.
+`--a ORACLE` plays the served `ORACLE` tier (`OracleLearnedBot`, also registered as
+`OracleLearned`); `OracleFaanBot` is the hands-aware `FaanBot` that was the tier before
+[ADR 0022](decisions/0022-oracle-learned-tier.md). `bots/arena.py`'s `_view_for` feeds every name
+in `OMNISCIENT_BOTS` an `_omniscient_seat_view` (§9). `ml/eval_policy.py` serves its
+`BOT_REGISTRY` seats through `_view_for` too; `ml/generate_dataset.py`, which only builds plain
+`seat_view`s, refuses those names.
 
 Reports per bot: average points/hand, win rate, deal-in rate, average winning faan, tenpai-at-draw
 rate, average turns to win, and `tenpai_rate_on_sub_minimum_hand` (§4).
@@ -318,14 +358,84 @@ none: bots rank discards by faan within a hand.
 
 ## 9. `ORACLE` tier
 
-A plain `FaanBot()` (`bots/worker.py`'s `_make_bot`) driven by a `SeatView` with `.hands` (every
-seat's concealed tiles) populated. No dedicated class, no search, no rollout
-([ADR 0013](decisions/0013-oracle-full-information.md), improvements in
-[ADR 0019](decisions/0019-oracle-improvements-plan.md)). Six helpers branch on `view.hands`, and
-each is byte-identical to its probabilistic form when `view.hands is None`; `FaanBot` itself reads
-it only to gate the `ORACLE`-only rules below (certain deal-ins, exact tenpai valuation, claims). `tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain
-`seat_view` (4 × `FaanBot`, every preset, hashed action ids), so any `ORACLE`-only change that
-leaks into `FaanBot` fails it:
+Impossible. `bots/oracle_learned.py`'s `OracleLearnedBot` (`bots/worker.py`'s
+`_make_bot("ORACLE")`; `BOT_REGISTRY["ORACLE"]` and `["OracleLearned"]`), driven by a `SeatView`
+with `.hands` (every seat's concealed tiles) populated:
+
+| Bot | `ORACLE` tier | Registry name | Record |
+| --- | --- | --- | --- |
+| rollout `OracleBot` | first, deleted | — | [ADR 0013](decisions/0013-oracle-full-information.md) |
+| `FaanBot` on an omniscient view | until 2026-10-12 | `OracleFaanBot` (comparison only) | [ADR 0013](decisions/0013-oracle-full-information.md), [ADR 0019](decisions/0019-oracle-improvements-plan.md); helpers below |
+| `OracleLearnedBot` | current | `ORACLE`, `OracleLearned` | [ADR 0022](decisions/0022-oracle-learned-tier.md) |
+
+1. **Policy.** `T4`'s `LearnedBot.logits` on `replace(view, hands=None)`: the network input is
+   bit-equal to a plain `seat_view`'s (`tests/test_oracle_learned.py` pins it), so the policy
+   never sees `.hands` and `LearnedBot`'s own omniscient-view refusal still holds.
+2. **Vetoes**, over the legal ids in logit order, using the exact `.hands` helpers below:
+   - a legal win is always taken;
+   - a discard with `tile_risk > 0` (a certain deal-in) is skipped while a zero-risk discard
+     exists; when every discard deals in, the cheapest (lowest `tile_risk`, then logit) is played;
+   - a self-kong `kong_rob_risk` proves would be robbed is skipped;
+   - claims and passes are the policy's own.
+3. **Weights.** `bots/weights/learned.npz`, the file `T4` ships, so Impossible follows whatever
+   policy Expert ships: new weights re-run its gate (§2 runbook, step 5). Missing or broken
+   weights: §2 "Missing weights".
+4. **Cost.** One numpy forward pass plus `tile_risk` per legal discard, about `T4`'s own cost:
+   p99 2.1 ms on the laptop (i7-1265U); 6.9–7.7 ms on the slower cloud box the gate ran on
+   (Xeon @ 2.1 GHz), where `T4` itself measured 6.1–8.5 ms. `OracleFaanBot` was 11.6 ms on the
+   laptop. `tests/test_oracle_learned.py::test_served_tier_decision_latency` (slow suite) holds
+   `ORACLE`'s p99 within 2× `T4`'s on the same decisions ([testing.md §1](testing.md)).
+
+**Measured** (`ml.eval_policy`, `hk_classic`, seeds 11,000,000+, points/hand, paired
+difference [95% CI]):
+
+| ×1 vs ×3 | Sets | Paired diff |
+| --- | --- | --- |
+| `ORACLE` vs `LearnedBot` | 1,000 | **+3.60 [+3.15, +4.06]** |
+| `LearnedBot` vs `ORACLE` | 1,000 | **−4.51 [−5.15, −3.88]** |
+| `ORACLE` vs `FaanBot` | 700 | +12.54 [+11.21, +13.87] (`LearnedBot`: +11.62) |
+| `OracleFaanBot` (old tier) vs `LearnedBot` | 1,000 | −0.78 [−1.46, −0.10] |
+
+Paired on identical hands, `ORACLE` ×1 does +4.38 [+3.58, +5.19] better than `OracleFaanBot` ×1
+against `LearnedBot` ×3, and +0.92 [+0.56, +1.28] better than `LearnedBot` ×1 against `FaanBot` ×3.
+`ORACLE` deals in on 0.3% of hands (only when every discard deals in) against `LearnedBot`'s 13–17%.
+Per-run detail: [ADR 0022](decisions/0022-oracle-learned-tier.md).
+
+**Containment** ([architecture.md §5](architecture.md)):
+
+- `app/views.py`'s `_omniscient_seat_view(state, seat)` is the only builder of a real seat's
+  omniscient view; `seat_view()`'s `_check_reveal` still forbids it. Exactly two callers:
+  `app/table.py`'s `_submit_bot_job`, when the seat's effective tier is `ORACLE`, and the
+  offline arena's `bots/arena.py` `_view_for` (§7). `tests/test_oracle_containment.py` AST-scans
+  production code for any other call site, and for any `app/` module importing `bots.arena`.
+  `ml/eval_policy.py` (offline, `ml` extra) serves every `BOT_REGISTRY` seat, candidate or
+  opponent, through `_view_for` too; a `PolicyBot` (checkpoint) seat never goes through it
+  ([ml.md §12](ml.md)).
+- `T4` (`LearnedBot`) is not omniscient: not in `OMNISCIENT_BOTS`, served a plain `seat_view` by
+  the table and every harness, and it raises if handed a view with `.hands`; `OracleLearnedBot`
+  strips `.hands` before calling it. Its serving path
+  imports no torch and no oracle encoder (`tests/test_learned_bot.py`, in a fresh interpreter).
+- A `SeatView` never carries `game_seed`/`hand_seed`, so it may cross the process-pool boundary.
+  No `GameState` crosses; `compute_action` is unchanged.
+- **Disconnect handover always uses `T2`.** `Table._effective_bot_tier(seat)` pins an
+  `autoplay`-status seat (a human's, gone) to `_DISCONNECT_HANDOVER_BOT_TIER = "T2"`; only
+  `bot`-status seats (practice / all-bot tables, never human) use the configured tier. The risk is
+  the omniscient *view*, not the bot class.
+  `tests/test_table.py::test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_oracle`
+  pins it; `tests/test_redaction.py` pins that `Table.state_sync_wire` never carries `.hands` for a
+  real seat.
+- `ORACLE` jobs use the shared pool; a decision costs single-digit milliseconds like `T2`/`T4`.
+
+### Exact-information helpers and `OracleFaanBot`
+
+`BOT_REGISTRY["OracleFaanBot"]` is a plain `FaanBot()` on an omniscient view — the tier before
+ADR 0022, kept offline and arena-only for comparison; it is not a tier. Six helpers branch on
+`view.hands`, and each is byte-identical to its probabilistic form when `view.hands is None`;
+`OracleLearnedBot` uses `tile_risk` and `kong_rob_risk`, `FaanBot` all six plus the
+`view.hands`-gated rules below (certain deal-ins, exact tenpai valuation, claims).
+`tests/test_faanbot_trajectory_pin.py` pins whole-bot behaviour on a plain `seat_view` (4 ×
+`FaanBot`, every preset, hashed action ids), so any hands-aware change that leaks into `FaanBot`
+fails it:
 
 | Helper (`bots/`) | `view.hands is None` | `view.hands` populated |
 | --- | --- | --- |
@@ -372,9 +482,9 @@ takes `_WIN`, so it is a certain deal-in. `_best_discard` therefore drops every 
 mode alike. Same "never do what provably backfires" precedent as kong-rob avoidance. When every
 legal discard deals in, the usual `w_safety * risk` trade-off ranks them. Before this, a certain
 deal-in was priced like a soft risk (0.15–0.9 × its faan against `_SHANTEN_UNIT = 5` per shanten
-step), and 66 of 67 `ORACLE` deal-ins in 200 sets were avoidable.
+step), and 66 of 67 `OracleFaanBot` deal-ins in 200 sets were avoidable.
 
-**Exact tenpai valuation.** For a candidate discard that leaves `ORACLE` tenpai, `_best_discard`
+**Exact tenpai valuation.** For a candidate discard that leaves `OracleFaanBot` tenpai, `_best_discard`
 replaces both structural proxies with `exact_wait_value` over the real waits
 (`labels.winning_tile_types`): the speed term's tile count becomes the acceptance (live wall
 copies, plus `ron_credit` copies in opponents' hands), and `estimate_best_faan` becomes the
@@ -386,41 +496,19 @@ real discard rates were 26% / 7.6% (ADR 0019 §3). Non-tenpai candidates keep th
 decision costs about the same as before (~12 ms on the arena machine).
 
 **Claims into a clearing tenpai.** When `_act_on_claim`'s default would pass and the hand is
-≥ 1-shanten, `ORACLE` tries each offered pung/chow (`view.claim_options`): for every post-claim
+≥ 1-shanten, `OracleFaanBot` tries each offered pung/chow (`view.claim_options`): for every post-claim
 discard with `tile_risk == 0` that reaches tenpai, `exact_wait_value` (with the new meld) gives
 acceptance and value. It claims the option with the largest acceptance × value among those with
 acceptance ≥ 1 copy and value ≥ `min_faan + 1` (`_CLAIM_VALUE_MARGIN`); otherwise it passes. The
 margin matters: an exposed meld loses 門前清 and the self-draw bonus, and claiming into any
 clearing tenpai won more but cheaper hands with no points gain.
 
-**Containment** ([architecture.md §5](architecture.md)):
-
-- `app/views.py`'s `_omniscient_seat_view(state, seat)` is the only builder of a real seat's
-  omniscient view; `seat_view()`'s `_check_reveal` still forbids it. Exactly two callers:
-  `app/table.py`'s `_submit_bot_job`, when the seat's effective tier is `ORACLE`, and the
-  offline arena's `bots/arena.py` `_view_for` (§7). `tests/test_oracle_containment.py` AST-scans
-  production code for any other call site, and for any `app/` module importing `bots.arena`.
-  `ml/eval_policy.py` (offline, `ml` extra) seats `ORACLE` opponents through `_view_for` too; its
-  candidate seat never goes through it ([ml.md §12](ml.md)).
-- `T4` (`LearnedBot`) is not omniscient: not in `OMNISCIENT_BOTS`, served a plain `seat_view` by
-  the table and every harness, and it raises if handed a view with `.hands`. Its serving path
-  imports no torch and no oracle encoder (`tests/test_learned_bot.py`, in a fresh interpreter).
-- A `SeatView` never carries `game_seed`/`hand_seed`, so it may cross the process-pool boundary.
-  No `GameState` crosses; `compute_action` is unchanged.
-- **Disconnect handover always uses `T2`.** `Table._effective_bot_tier(seat)` pins an
-  `autoplay`-status seat (a human's, gone) to `_DISCONNECT_HANDOVER_BOT_TIER = "T2"`; only
-  `bot`-status seats (practice / all-bot tables, never human) use the configured tier. The risk is
-  the omniscient *view*, not the bot class.
-  `tests/test_table.py::test_disconnect_handover_always_uses_t2_even_when_table_bot_tier_is_oracle`
-  pins it; `tests/test_redaction.py` pins that `Table.state_sync_wire` never carries `.hands` for a
-  real seat.
-- `ORACLE` jobs use the shared pool; a decision costs the same single-digit milliseconds as `T2`.
-
-**Measured** (`python -m bots.arena --a ORACLE --b FaanBot --games 200 --seed 1000000`, 200
-duplicate sets): paired difference **+35.153 points/game, 95% CI [32.255, 38.052]**; win rate
-0.364 vs 0.143; deal-in rate 0.000 vs 0.178; avg winning faan 4.29. Against the previous `ORACLE`
-on the same seeds: Δ **+2.293 points/game [+1.142, +3.445]**, Δ win rate +2.53pp [+1.87, +3.19]
-([ADR 0019](decisions/0019-oracle-improvements-plan.md) has each change's gate run).
+**Measured, `OracleFaanBot`** (then `ORACLE`; `python -m bots.arena --a OracleFaanBot --b FaanBot
+--games 200 --seed 1000000`, 200 duplicate sets): paired difference **+35.153 points/game, 95% CI
+[32.255, 38.052]**; win rate 0.364 vs 0.143; deal-in rate 0.000 vs 0.178; avg winning faan 4.29.
+Against the version before on the same seeds: Δ **+2.293 points/game [+1.142, +3.445]**, Δ win rate
++2.53pp [+1.87, +3.19] ([ADR 0019](decisions/0019-oracle-improvements-plan.md) has each change's
+gate run).
 
 ## 10. Known issues
 

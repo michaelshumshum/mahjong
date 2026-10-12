@@ -136,8 +136,8 @@ An earlier plan improved `FaanBot` piece by piece: a supervised opponent-danger 
 
 | Supervised path, built on `FaanBot` | Self-play RL |
 | --- | --- |
-| ceiling is `ORACLE` — `FaanBot` with perfect information, +27.7 points/game over `FaanBot` ([bots §9](bots.md)); learned heads only estimate what `ORACLE` knows exactly | no teacher, so no teacher ceiling: the R3 policy beats `ORACLE` ×3 by +2.88 points/hand [+1.75, +4.01] (§12) |
-| claim logic, hand-building and the fold structure stay `FaanBot`'s; a danger model covers defence only, while more than half of `ORACLE`'s edge is offence (win rate 0.318 vs 0.152) | learns the whole policy, claims and push/fold included, against the real objective |
+| ceiling is `FaanBot` with perfect information (then the `ORACLE` tier, now `OracleFaanBot`), +27.7 points/game over `FaanBot` ([bots §9](bots.md)); learned heads only estimate what it knows exactly | no teacher, so no teacher ceiling: the R3 policy beats `ORACLE` ×3 by +2.88 points/hand [+1.75, +4.01] (§12) |
+| claim logic, hand-building and the fold structure stay `FaanBot`'s; a danger model covers defence only, while more than half of that oracle's edge is offence (win rate 0.318 vs 0.152) | learns the whole policy, claims and push/fold included, against the real objective |
 | there is no HK equivalent of the Tenhou corpus Suphx/Mortal trained on; cloning the only teacher caps at that teacher | self-play needs no corpus |
 
 The old "RL is out" estimate priced single-sample inference per decision, not the engine:
@@ -239,11 +239,11 @@ yet scored.
 | Requirement | Detail |
 | --- | --- |
 | Independent of `FaanBot` | not a teacher, reward baseline, feature source, or training opponent |
-| `FaanBot` / `ORACLE` | held-out evaluation opponents only; `FaanBot` actions allowed only as the §10 contingency bootstrap |
+| `FaanBot` / `OracleFaanBot` | held-out evaluation opponents only; `FaanBot` actions allowed only as the §10 contingency bootstrap |
 | Objective | hand point delta — never shanten (§4) |
 | `mahjong_core` | stays pure, stdlib-only, the reference implementation; speed-ups ship with equivalence tests and no `ENGINE_VERSION` bump |
 | Determinism | a trajectory is a function of `(checkpoint, ruleset, env_seed, policy_seed)`; every eval hand exports a replayable `HandRecord`. GPU training itself is not bit-reproducible. |
-| Serving | numpy forward, p99 ≤ 5 ms single-sample CPU incl. encoding; fits the existing worker-pool job model, so no batched inference-serving process; torch stays in the `ml` stage, numpy joins base deps |
+| Serving | numpy forward, p99 ≤ 5 ms single-sample CPU incl. encoding, on the target CPU (`make bench-latency`; CI gates ratios, [testing.md §1](testing.md)); fits the existing worker-pool job model, so no batched inference-serving process; torch stays in the `ml` stage, numpy joins base deps |
 | Layout | all training code in `server/ml/`; configs in `server/ml/configs/rl_*.yaml` |
 
 ## 7. Environment — `ml/env.py`
@@ -656,7 +656,7 @@ OPENBLAS_NUM_THREADS=1 uv run --extra ml python -m ml.train --config ml/configs/
 - **Gate:** paired-duplicate CI ([bots §7](bots.md)), candidate × 1 vs `FaanBot` × 3,
   on fresh seeds (tune and gate on different seed sets — picking the best of k configs on the
   gate seeds is a winner's curse), plus a bootstrap CI, since `arena.py`'s CI is a normal
-  approximation over heavy-tailed payouts. Also vs `ORACLE` (a defence probe, not a ceiling: the agent already outscores it, [rl-learnings.md §4](rl-learnings.md)) and
+  approximation over heavy-tailed payouts. Also vs `OracleFaanBot` (the `ORACLE` tier until [ADR 0022](decisions/0022-oracle-learned-tier.md); a defence probe, not a ceiling: the agent already outscores it, [rl-learnings.md §4](rl-learnings.md)) and
   mixed tables: `EfficiencyBot` and the `FaanBot` weight profiles (`bots/faanbot.py`
   `WeightProfile`, registered in `BOT_REGISTRY` as `FaanBotAggressive`/`FaanBotDefensive`/
   `FaanBotFlushChasing`).
@@ -682,8 +682,8 @@ uv run python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 700 --see
 | Detail | Behaviour |
 | --- | --- |
 | duplicate set | one `HandEnv` episode seed (dealer / prevailing from `hand_start`), played 4 times with the candidate in each seat; points per hand, not per game, since an RL episode is a hand and only standalone hands export as `HandRecord`s |
-| candidate | `PolicyBot`: `policy_raw_from_view(seat_view(...))` → `PolicyNet` → masked argmax (or seeded sampling); no oracle path exists here. `--candidate-bot NAME` seats a `BOT_REGISTRY` bot instead (a heuristic for calibration, or the shipped `LearnedBot`); never an `OMNISCIENT_BOTS` one |
-| opponents | any `BOT_REGISTRY` name, `ORACLE` included: opponent seats get their view from `bots.arena._view_for` (the sanctioned omniscient call site, [bots.md §9](bots.md)); the candidate seat, and any `PolicyBot` seat, always gets a plain `seat_view` (`tests/test_ml_eval_policy.py` spies on every view served) |
+| candidate | `PolicyBot`: `policy_raw_from_view(seat_view(...))` → `PolicyNet` → masked argmax (or seeded sampling); no oracle path exists here. `--candidate-bot NAME` seats a `BOT_REGISTRY` bot instead (a heuristic for calibration, the shipped `LearnedBot`, or an `OMNISCIENT_BOTS` one such as `ORACLE`, served through `_view_for` like an opponent; the report's `candidate_omniscient` says which) |
+| opponents | any `BOT_REGISTRY` name, `ORACLE` included: every `BOT_REGISTRY` seat gets its view from `bots.arena._view_for` (the sanctioned omniscient call site, [bots.md §9](bots.md)), so only `OMNISCIENT_BOTS` names see `.hands`; a `PolicyBot` seat always gets a plain `seat_view` (`tests/test_ml_eval_policy.py` spies on every view served) |
 | statistics | each played hand is a one-hand `bots.arena.GameRecord`, so `_collect_stats`, `_paired_differences` (candidate − mean of the other three) and the normal CI are `bots.arena`'s; plus a seeded percentile bootstrap CI |
 | metrics | per side: points/hand, win, deal-in, avg winning faan, tenpai-at-draw, `tenpai_rate_on_sub_minimum_hand`; table exhaustive-draw rate |
 | records | every hand as `HandRecord` columns (`--records`, JSON lines; `players` names the candidate's seat), replayable with `ml.env.replay_hand` |
@@ -977,7 +977,7 @@ tables are measured per profile; per-side detail in [rl-learnings.md §4](rl-lea
 The league's measurable gain is across presets (`hk_strict`, `EfficiencyBot` tables), not at
 `hk_classic`, where the starting policy had already plateaued. L274.3M is the R4 candidate; R4
 re-runs this gate on fresh seeds, and later league checkpoints are gated against L274.3M on these
-seeds. Vs `ORACLE` ×3 (seeds 8,000,000+, 1,000 sets): +2.88 [+1.75, +4.01]; `ORACLE` ×1 vs L274.3M ×3: −1.53 [−2.22, −0.84] ([rl-learnings.md §4](rl-learnings.md)). Not yet measured: a table of mixed bot types.
+seeds. Vs `OracleFaanBot` ×3 (the `ORACLE` tier then; seeds 8,000,000+, 1,000 sets): +2.88 [+1.75, +4.01]; `OracleFaanBot` ×1 vs L274.3M ×3: −1.53 [−2.22, −0.84] ([rl-learnings.md §4](rl-learnings.md)). Not yet measured: a table of mixed bot types.
 
 R4 progress: **done** (2026-10-12) — L274.3M ships as `T4`, practice mode's "Expert":
 `bots/learned.py` `LearnedBot` (`BOT_REGISTRY["LearnedBot"]`, worker tier `T4`), `"T4"` in
@@ -989,7 +989,7 @@ concern is about a slow tier, and `T4` is cheaper than `T2`. Exit criteria:
 | Criterion | Result | Status |
 | --- | --- | --- |
 | R3 gate re-run on fresh seeds | production path (`eval_policy --candidate-bot LearnedBot`, numpy forward), seeds 9,000,000+, `hk_classic`: vs `FaanBot` ×3 **+10.75 [9.64, 11.86]** on 1,000 sets (R3, `PolicyBot` on 7,000,000+: +10.94); 700 sets each vs `EfficiencyBot` +15.19, `FaanBotAggressive` +11.62, `FaanBotDefensive` +10.85, `FaanBotFlushChasing` +11.72 (R3: +14.48, +12.30, +9.88, +10.73). Every CI > 0 and contains the R3 estimate; per-side detail in [rl-learnings.md §4](rl-learnings.md) | met |
-| p99 ≤ 5 ms on the server CPU | this laptop (i7-1265U), `tests/test_learned_bot.py::test_single_decision_latency` alone (`act` incl. encode, `seat_view` excluded): p50 1.8 ms, p99 2.0–3.4 ms over three runs. In a saturated 6-worker pool: p99 5.3 ms. The prod box (i5-10400F) is unmeasured | met on the laptop; prod unmeasured |
+| p99 ≤ 5 ms on the server CPU | laptop (i7-1265U), `act` incl. encode, `seat_view` excluded, run alone: p50 1.8 ms, p99 2.0–3.4 ms over three runs; p99 5.3 ms in a saturated 6-worker pool. The prod box (i5-10400F) is unmeasured: `make bench-latency` there is the check | met on the laptop; prod unmeasured |
 | bot load not regressed | `compute_action` in a `ProcessPoolExecutor`, 1,625 decisions: one worker, `T4` mean 1.8 ms / p99 3.8 ms vs `T2` 3.6 / 11.3 ms; six workers saturated, 1,539 vs 949 decisions/s. A worker pays once on its first `T4` job: ~35 ms (numpy import + weight load) and +21 MB RSS (49 vs 28 MB) | met: cheaper per decision than `T2` |
 
 The numpy path is the gated torch path: on 2,479 decisions from 30 hands, `LearnedBot` picked the
@@ -997,6 +997,11 @@ same action as `PolicyBot` on the checkpoint every time (max logit difference 6.
 `tests/test_ml_learned_parity.py` pins logits and actions on the shipped file. Sub-min tenpai is
 ≤ the opponents' on 2 of 5 re-run tables (R3: 4 of 5); the three over are 0.033 vs 0.032, 0.042
 vs 0.036 and 0.046 vs 0.033, at ~20 events per cell.
+
+Since [ADR 0022](decisions/0022-oracle-learned-tier.md) the `ORACLE` tier ("Impossible") is this
+policy plus exact-information vetoes and loads the same `learned.npz`, so new weights change both
+tiers. Shipping them is [bots.md §2](bots.md)'s runbook: export, provenance, parity, this R4 gate
+(Expert), the ADR 0022 gate (Impossible), `make bench-latency`.
 
 ## 15. Risks
 

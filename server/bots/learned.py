@@ -15,16 +15,18 @@ import os
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 import functools
+import zipfile
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from app.views import SeatView
+from mahjong_core.engine import ENGINE_VERSION
 from ml.encode_v2 import encode_policy_batch, policy_raw_from_view, ruleset_features
 from ml.export import NumpyPolicyNet, load_meta
 
-__all__ = ["DEFAULT_WEIGHTS", "LearnedBot", "load_policy", "policy_meta"]
+__all__ = ["DEFAULT_WEIGHTS", "LearnedBot", "load_policy", "policy_meta", "weights_problem"]
 
 DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "weights" / "learned.npz"
 
@@ -38,6 +40,21 @@ def load_policy(path: Path = DEFAULT_WEIGHTS) -> NumpyPolicyNet:
 @functools.cache
 def policy_meta(path: Path = DEFAULT_WEIGHTS) -> dict[str, Any] | None:
     return load_meta(path)
+
+
+def weights_problem(path: Path = DEFAULT_WEIGHTS) -> str | None:
+    """`None` when `path` loads and was exported for this `ENGINE_VERSION` (docs/bots.md §2), else
+    why not. The API's startup check (`app/main.py`'s `lifespan`), not the per-decision path."""
+    try:
+        meta = policy_meta(path)
+        load_policy(path)
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
+        return f"{path.name}: {type(exc).__name__}: {exc}"
+    if meta is None:
+        return f"{path.name}: no __meta__ provenance"
+    if meta.get("engine_version") != ENGINE_VERSION:
+        return f"{path.name}: engine_version {meta.get('engine_version')} != {ENGINE_VERSION}"
+    return None
 
 
 class LearnedBot:

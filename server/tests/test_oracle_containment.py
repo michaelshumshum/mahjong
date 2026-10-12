@@ -10,8 +10,8 @@ WS/protocol-facing path, nowhere else. `tests/` is excluded deliberately: `tests
 omniscient views directly (via `app.views._omniscient_seat_view`) for white-box `"ORACLE"`-tier
 tests -- that's expected, sanctioned test-only usage, not the dispatch path this test guards.
 This guarantee is unaffected by which bot actually consumes the omniscient view -- it held for
-the original rollout-based `OracleBot` and holds identically now that the tier is a plain
-`FaanBot()` fed an omniscient view (docs/bots.md §9).
+the rollout-based `OracleBot`, the plain `FaanBot()` after it, and holds identically for
+`OracleLearnedBot` (docs/bots.md §9).
 """
 
 from __future__ import annotations

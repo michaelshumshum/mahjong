@@ -30,6 +30,7 @@ Full file map: `docs/infra.md §1`.
 ```
 make test-server       pytest fast suite (parallelized across all cores)
 make test-server-slow  pytest slow suite — soaks, real-bot e2e, hypothesis runs; CI runs this too
+make bench-latency     latency tests serially against the 5 ms budget; run on the target CPU
 make selfplay          engine soak — N complete games, random bots
 make arena             bot evaluation
 make migrate           alembic upgrade head

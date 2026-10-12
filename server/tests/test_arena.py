@@ -28,6 +28,7 @@ from bots.arena import (
     main,
 )
 from bots.faanbot import FaanBot
+from bots.oracle_learned import OracleLearnedBot
 from mahjong_core.engine import new_game
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import HandOutcome, SeatState, WinType
@@ -38,12 +39,14 @@ def test_make_bot_rejects_unknown_name() -> None:
         _make_bot("NotABot", seed=0)
 
 
-def test_oracle_is_a_plain_faanbot_on_an_omniscient_view() -> None:
+def test_oracle_is_the_served_tier_on_an_omniscient_view() -> None:
     state = new_game(_ARENA_RULESET, 0)
-    assert type(_make_bot("ORACLE", seed=0)) is FaanBot
-    oracle_view = _view_for(state, 1, "ORACLE")
-    assert oracle_view.hands is not None
-    assert oracle_view.hands[2] == state.seats[2].concealed
+    assert type(_make_bot("ORACLE", seed=0)) is OracleLearnedBot
+    assert type(_make_bot("OracleFaanBot", seed=0)) is FaanBot
+    for name in ("ORACLE", "OracleLearned", "OracleFaanBot"):
+        oracle_view = _view_for(state, 1, name)
+        assert oracle_view.hands is not None
+        assert oracle_view.hands[2] == state.seats[2].concealed
     assert _view_for(state, 1, "FaanBot").hands is None
 
 

@@ -32,6 +32,40 @@ rarely that repeat-on-draw can chain 150+ hands before a round rotates, turning 
 slow-converging config into flakiness. With repeats off, a game is exactly 4/8/16 hands for
 `EAST_ONLY`/`EAST_SOUTH`/`FULL`. The repeat paths have dedicated unit coverage in `test_engine.py`.
 
+**Latency tests** (`@pytest.mark.slow` + `@pytest.mark.latency`, checked by `tests/latency.py`'s
+`check_latency`). Each times its decision back to back with a reference on the same input, so both
+see the same CPU load:
+
+| Test | Measured | Reference | Gate (CI) |
+| --- | --- | --- | --- |
+| `test_learned_bot.py::test_single_decision_latency` | `T4` via `compute_action` | `T2` | p99 < reference p99 |
+| `test_oracle_learned.py::test_served_tier_decision_latency` | `ORACLE` via `compute_action` | `T4` | p99 < 2 × reference p99 |
+| `test_ml_policy_export.py::test_single_sample_latency_with_encoding` | numpy policy serve, full size | `FaanBot` decision | p99 < reference p99 |
+| `test_ml_export.py::test_three_opponents_score_faster_than_a_faanbot_decision` | `DangerNet` ×3 opponents | `FaanBot` decision | median < reference median |
+
+Where each budget is enforced:
+
+| Check | Where | Gating |
+| --- | --- | --- |
+| ratio above | every slow-suite run, CI included (`-n auto`) | yes |
+| absolute p50/p99 | printed; appended to `$GITHUB_STEP_SUMMARY` in CI | no: contended runner numbers, a trend only |
+| [ml.md §6](ml.md)'s 5 ms p99 | `make bench-latency` (`LATENCY_BUDGET_MS=5`, serial, `-m latency`) on the CPU that matters: the laptop or prod host. Part of the weights re-gate runbook ([bots.md §2](bots.md)) | yes, when run |
+
+Why this split: an absolute 5 ms on a shared runner under `-n auto` measured the runner, not the
+code (53 ms p99 on `main`); a slower dev box misses it even serially (`T4` p99 6–8 ms on a 2.1 GHz
+Xeon). Rejected:
+
+| Option | Why not |
+| --- | --- |
+| CPU-normalised budget (calibrate on a reference workload) | the scaling factor depends on the workload mix (numpy vs pure Python) and adds its own noise; the paired ratio already is a same-runner calibration, against the code it competes with |
+| separate non-gating benchmark job | another `uv sync` on the same shared runner for numbers the summary already records |
+| dedicated runner | standing infra for one check; nothing else needs it |
+| `pytest-benchmark` | a new dependency that still times absolute numbers on the shared runner |
+| absolute check only in `make test-server-slow` | that target runs `-n auto`, the same contention as CI |
+
+`tests/conftest.py` pins `OPENBLAS_NUM_THREADS=1`, as a bot pool worker runs; without it every
+xdist worker's numpy spawned a thread per core and the tests timed the oversubscription.
+
 **Determinism.** A failing game reproduces from `(ruleset, seed, actions)`.
 
 ## 2. Web (Vitest)
