@@ -118,8 +118,8 @@ const PAGES = [
 			await page.waitForTimeout(GAME_END_REVEAL_MS);
 		}
 	},
-	// Settings panel: a distinct chrome surface (pre-arm toggles, sound, motion) now styled to
-	// match the score sheet's panel/cards look.
+	// Settings panel: a distinct chrome surface (tabbed: calls, gameplay, display), opened on
+	// its first tab.
 	{
 		name: 'table-settings',
 		url: '/table/demo123?mock=1',

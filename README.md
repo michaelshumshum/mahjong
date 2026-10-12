@@ -65,7 +65,7 @@ frontend change (see `.claude/skills/frontend-screenshots/SKILL.md`).
 | ![Lobby, practice dialog](docs/screenshots/lobby-practice-dialog.png) Lobby — practice setup: tap-to-cycle bot difficulty per seat | ![Tables](docs/screenshots/tables.png) Tables (`/tables`) — join by code, or sit down / watch from cards with a seat compass |
 | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open |
 | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended: result stamp, winning hand, faan rows, payments | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw |
-| ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended: placement, final standings with ties, play again | ![Table, settings](docs/screenshots/table-settings.png) Table — settings panel |
+| ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended: placement, final standings with ties, play again | ![Table, settings](docs/screenshots/table-settings.png) Table — settings: calls, gameplay and display tabs |
 | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
 | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | |
 
