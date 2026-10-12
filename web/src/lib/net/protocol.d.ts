@@ -229,6 +229,7 @@ export interface StateSyncPayload {
 	hand_history?: HandHistoryEntryPayload[];
 	ruleset_preset?: string | null;
 	ruleset?: Record<string, unknown>;
+	bot_levels?: (string | null)[];
 }
 
 export interface HandStartPayload {

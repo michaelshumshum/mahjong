@@ -945,6 +945,7 @@ class Table:
         # RULESET_PRESETS key it matches, or null for a custom ruleset.
         wire["ruleset_preset"] = preset_id_for(self.state.ruleset)
         wire["ruleset"] = self.state.ruleset.to_dict()
+        wire["bot_levels"] = list(self.bot_levels_tuple())
         return wire
 
     def seat_status_tuple(
@@ -963,6 +964,17 @@ class Table:
         return cast(
             "tuple[str | None, str | None, str | None, str | None]",
             tuple(b.name if b is not None else None for b in self.seat_bindings),
+        )
+
+    def bot_levels_tuple(self) -> tuple[str | None, str | None, str | None, str | None]:
+        """Each `bot`-status seat's tier; `None` for every other seat, `autoplay` included --
+        a human's handover tier isn't the seat's level."""
+        return cast(
+            "tuple[str | None, str | None, str | None, str | None]",
+            tuple(
+                self._effective_bot_tier(seat) if b is not None and b.status == "bot" else None
+                for seat, b in enumerate(self.seat_bindings)
+            ),
         )
 
     async def run(self) -> None:

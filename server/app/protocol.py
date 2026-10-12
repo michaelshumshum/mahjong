@@ -235,6 +235,8 @@ class StateSyncPayload(BaseModel):
     # ruleset; ruleset is always the full resolved values either way.
     ruleset_preset: str | None = None
     ruleset: dict[str, Any] = {}
+    # per-seat bot tier (`bots.worker.BOT_TIERS`), `null` for a non-`bot` seat
+    bot_levels: list[str | None] = []
 
 
 class HandStartPayload(BaseModel):

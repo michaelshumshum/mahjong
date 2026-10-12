@@ -151,6 +151,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `seat_status` | `connected\|disconnected\|autoplay\|bot\|empty` per seat. `empty` = nobody has joined that seat yet |
 | `names` | each seat's resolved display name; `null` for an `empty` seat, a real string for any bound seat, human or bot |
 | `host_seat` | the first seat to `join`, or `null` |
+| `bot_levels` | each `bot` seat's tier (`T1`\|`T2`\|`T4`\|`ORACLE`, [bots.md §6](bots.md)), `null` for every other seat, `autoplay` included. Fixed for the table's life (bot seats are bound at construction). Defaults to `[]` |
 | `hands` | every seat's concealed tiles for an open-hands spectator, `null` otherwise |
 | `hand_history` | every completed hand, oldest first: `hand_end`'s fields plus `dealer`/`prevailing`/`winner_melds`. Lets a client with no earlier live stream (mid-game spectator, resync) render past hands. `winner_melds` gets the same concealed-kong redaction a live `meld` would. Defaults to `[]` |
 | `ruleset` / `ruleset_preset` | the table's fixed `RuleSet.to_dict()` and matching preset id (or `null`) |

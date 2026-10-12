@@ -206,7 +206,9 @@ the resolved value to late joiners, reconnects and spectators.
 
 **Showcase table.** `TableRegistry.start_showcase` (`app/registry.py`, started from `lifespan` for
 `SHOWCASE_TABLE_ID`, default `BOTS`, empty disables) keeps one all-bot, open-hands table running.
-`Table(all_bots=True)` binds all four seats and deals when `run()` starts; its hand-end hold runs
+Each game draws every seat's tier uniformly from the practice-mode ladder (`bot_tiers`; `main.py`'s
+`_available_bot_tiers`, which drops Expert/Impossible while the learned weights fail the startup
+check), seeded off that game's seed. `Table(all_bots=True)` binds all four seats and deals when `run()` starts; its hand-end hold runs
 the full `hand_end_seconds` (no human to ack; it's the spectators' time to read the result). After
 `GAME_OVER` the finished table stays up for 30s, then a fresh game replaces it under the same id
 and the old table's spectator sockets are closed so their reconnect lands on the new one. Not

@@ -89,6 +89,35 @@ async def test_showcase_plays_itself_and_shows_spectators_every_hand() -> None:
     await _shutdown(registry)
 
 
+async def test_showcase_draws_each_seats_level_per_game() -> None:
+    registry = TableRegistry()
+    registry.start_showcase("BOTS", _FAST, restart_delay=0, bot_tiers=("T1", "T2"))
+    levels: set[tuple[str | None, ...]] = set()
+    for _ in range(8):
+        table = _showcase(registry)
+        spectator = _Capture()
+        table.register_spectator("spec-1", spectator.send, spectator.close)
+        sync_levels = spectator.frames[0]["bot_levels"]
+        assert sync_levels == [table._effective_bot_tier(seat) for seat in range(4)]
+        assert set(sync_levels) <= {"T1", "T2"}
+        levels.add(tuple(sync_levels))
+        _end_game(table)
+        await _until(lambda t=table: registry.get("BOTS") is not t)
+    assert len(levels) > 1
+
+    await _shutdown(registry)
+
+
+def test_bot_levels_only_name_bot_seats() -> None:
+    table = Table(
+        "t-practice", DEFAULT_RULESET, 1, practice=True, seat_bot_tiers={1: "T1", 3: "ORACLE"}
+    )
+    player = _Capture()
+    table.join("s-alice", player.send, seat=0, name="Alice")
+    sync = next(f for f in player.frames if f["t"] == "state_sync")
+    assert sync["bot_levels"] == [None, "T1", "T2", "ORACLE"]
+
+
 async def test_showcase_restarts_under_same_id_and_closes_old_spectators() -> None:
     registry = TableRegistry()
     registry.start_showcase("BOTS", _FAST, restart_delay=0)
@@ -180,6 +209,7 @@ def test_lifespan_starts_showcase_from_env(monkeypatch: pytest.MonkeyPatch) -> N
         sync = ws.receive_json()
         assert sync["t"] == "state_sync"
         assert sync["d"]["seat_status"] == ["bot", "bot", "bot", "bot"]
+        assert set(sync["d"]["bot_levels"]) <= {"T1", "T2", "T4", "ORACLE"}
         assert [len(hand) for hand in sync["d"]["hands"]] == sync["d"]["concealed_counts"]
 
         tables = client.get("/tables").json()["tables"]

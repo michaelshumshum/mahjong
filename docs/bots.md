@@ -52,8 +52,8 @@ vary with decision difficulty — no tier returns a confidence signal to scale i
 | Expert | `T4` | `LearnedBot` (`learned.py`) | the self-play RL policy, greedy ([ml.md](ml.md)) | `weights/learned.npz` | `seat_view`; raises on `.hands` |
 | Impossible | `ORACLE` | `OracleLearnedBot` (`oracle_learned.py`) | Expert's policy + exact-information vetoes (§9) | the same `weights/learned.npz` | omniscient (`.hands` populated, §9) |
 
-`T2` is also the default tier (an unpicked seat, the showcase table) and the disconnect-handover
-tier. `T3` is not reused: it was the removed `SearchBot` (below). Each tier's arena/eval name is
+`T2` is also the default tier (an unpicked seat) and the disconnect-handover tier; the showcase
+table draws each seat's tier at random per game (§6). `T3` is not reused: it was the removed `SearchBot` (below). Each tier's arena/eval name is
 its class name in `bots/arena.py`'s `BOT_REGISTRY`, except `ORACLE`:
 
 | `BOT_REGISTRY` name | Bot | Omniscient | Live tier |
@@ -256,8 +256,10 @@ because signals 1–2 are structurally weaker — but needs a labelled corpus fi
 Practice mode's per-seat picker (`web/src/lib/ui/PracticeSetupDialog.svelte`,
 [frontend.md §7](frontend.md) "Practice mode") sends `POST /tables`'s `bot_tiers`
 ([protocol.md §10](protocol.md)): Easy `T1`, Normal `T2`, Expert `T4`, Impossible `ORACLE` (class,
-weights and view per tier: §2). `T0` is never offered; an unpicked seat, the showcase table and
-disconnect handover use `T2`. While the learned weights fail the api's startup check, Expert and
+weights and view per tier: §2). `T0` is never offered; an unpicked seat and disconnect handover
+use `T2`. The showcase table draws each seat uniformly from the same four, per game
+([architecture.md §3](architecture.md)). `state_sync.bot_levels` reports every bot seat's tier, and
+the client's bot badge shows it ([frontend.md §6](frontend.md)). While the learned weights fail the api's startup check, Expert and
 Impossible fall back to `T2` (§2 "Missing weights").
 
 The ladder is ordered by strength, `hk_classic` points/hand (paired, 95% CI):

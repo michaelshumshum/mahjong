@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry = ws.reset_registry(session_factory=session_factory)
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
     if showcase_id:
-        registry.start_showcase(showcase_id, DEFAULT_RULESET)
+        registry.start_showcase(showcase_id, DEFAULT_RULESET, bot_tiers=_available_bot_tiers())
     try:
         yield
     finally:
@@ -143,6 +143,12 @@ def _generate_table_id() -> str:
 _PRACTICE_BOT_TIERS = ("T1", "T2", "T4", "ORACLE")
 
 
+def _available_bot_tiers() -> tuple[str, ...]:
+    """`_PRACTICE_BOT_TIERS` minus `_LEARNED_TIERS` while the startup weight check failed."""
+    unavailable = _LEARNED_TIERS if _learned_weights_problem is not None else frozenset()
+    return tuple(t for t in _PRACTICE_BOT_TIERS if t not in unavailable)
+
+
 def _resolve_seat_bot_tiers(
     practice: bool, bot_tiers: dict[int, str] | None
 ) -> dict[int, str] | None:
@@ -156,11 +162,9 @@ def _resolve_seat_bot_tiers(
     """
     if not practice or not bot_tiers:
         return None
-    unavailable = _LEARNED_TIERS if _learned_weights_problem is not None else frozenset()
+    available = _available_bot_tiers()
     resolved = {
-        seat: tier
-        for seat, tier in bot_tiers.items()
-        if 1 <= seat <= 3 and tier in _PRACTICE_BOT_TIERS and tier not in unavailable
+        seat: tier for seat, tier in bot_tiers.items() if 1 <= seat <= 3 and tier in available
     }
     return resolved or None
 

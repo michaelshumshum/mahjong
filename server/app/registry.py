@@ -13,7 +13,8 @@ eviction decision from; full table eviction is a tracked gap, not an oversight.
 (`reset_registry`) so this and `draining` never leak across server lifetimes.
 
 Showcase table. `start_showcase` keeps one all-bot table (`Table(all_bots=True)`, open hands
-for spectators) running under a fixed id forever: when a game ends it holds the finished table
+for spectators) running under a fixed id forever, each game drawing every seat's tier at random
+from `bot_tiers`: when a game ends it holds the finished table
 for `restart_delay` seconds, then swaps in a fresh game under the same id and closes the old
 table's spectator sockets so their reconnect lands on the new one. Never persisted and not
 waited on by the shutdown drain -- bot-only, nothing to protect.
@@ -23,8 +24,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import Literal
@@ -129,29 +131,31 @@ class TableRegistry:
         ruleset: RuleSet,
         *,
         restart_delay: float = SHOWCASE_RESTART_SECONDS,
-        bot_tier: str = DEFAULT_BOT_TIER,
+        bot_tiers: Sequence[str] = (DEFAULT_BOT_TIER,),
     ) -> None:
         """Start the always-on all-bot table under `table_id`. The first game is created before
         this returns, so no connection can race it into a plain table."""
         if self._showcase_task is not None:
             raise RuntimeError("showcase already started")
         self._showcase_id = table_id
-        first = self._start_showcase_game(table_id, ruleset, bot_tier)
+        first = self._start_showcase_game(table_id, ruleset, bot_tiers)
         self._showcase_task = asyncio.create_task(
-            self._run_showcase(first, table_id, ruleset, restart_delay, bot_tier)
+            self._run_showcase(first, table_id, ruleset, restart_delay, bot_tiers)
         )
 
     def _start_showcase_game(
-        self, table_id: str, ruleset: RuleSet, bot_tier: str
+        self, table_id: str, ruleset: RuleSet, bot_tiers: Sequence[str]
     ) -> asyncio.Task[None]:
         previous = self._tables.get(table_id)
+        game_seed = time.time_ns()
+        tier_rng = random.Random(game_seed)
         table = Table(
             table_id,
             ruleset,
-            game_seed=time.time_ns(),
+            game_seed=game_seed,
             require_ready=True,
             bot_pool=self._bot_pool,
-            bot_tier=bot_tier,
+            seat_bot_tiers={seat: tier_rng.choice(bot_tiers) for seat in range(4)},
             all_bots=True,
             settings=TableSettings(spectators_see_hands=True),
         )
@@ -168,7 +172,7 @@ class TableRegistry:
         table_id: str,
         ruleset: RuleSet,
         restart_delay: float,
-        bot_tier: str,
+        bot_tiers: Sequence[str],
     ) -> None:
         while True:
             try:
@@ -176,7 +180,7 @@ class TableRegistry:
             except Exception:
                 logger.exception("showcase table %s crashed, restarting", table_id)
             await asyncio.sleep(restart_delay)
-            task = self._start_showcase_game(table_id, ruleset, bot_tier)
+            task = self._start_showcase_game(table_id, ruleset, bot_tiers)
 
     def is_running(self, table_id: str) -> bool:
         """Whether `table_id`'s background task is still alive -- `False` for an unknown id or a
