@@ -982,6 +982,12 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
   (clipPath/filter/gradient) that collide when tiles are inlined more than once. `<img>` isolates
   each instance, at the cost of `currentColor` styling.
 - **No build step, no atlas, no DPR split** — SVG is resolution-independent.
+- **UI icons:** [`@lucide/svelte`](https://lucide.dev), imported per icon
+  (`@lucide/svelte/icons/<name>`), never hand-written inline `<svg>`. One 24px grid and stroke
+  style keeps chrome icons consistent, and per-icon imports tree-shake to only the icons used.
+  Size and weight are props (`size`, `strokeWidth`); colour is `currentColor`, and an icon is
+  `aria-hidden` unless given an `aria-*`/`title` prop, so the button's label stays the accessible
+  name. Not icons: `TimerRing` (a countdown ring) and the favicon.
 - **Sound (planned, deferred):** draw click, discard clack, shuffle — short, preloaded, muted
   until opt-in. Settings' "Sound effects" toggle is persisted but nothing plays yet. No recorded
   call-outs ([ADR 0010](decisions/0010-client-scope-cuts.md)).

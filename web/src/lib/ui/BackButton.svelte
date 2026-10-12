@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+
 	// shared top-left "go back"/"leave" affordance so icon, label placement, and position stay
 	// identical across every route that uses it.
 	let {
@@ -12,27 +14,14 @@
 	} = $props();
 </script>
 
-{#snippet icon()}
-	<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-		<path
-			d="M15 6 L9 12 L15 18"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		/>
-	</svg>
-{/snippet}
-
 {#if href}
 	<a class="back-button" {href}>
-		{@render icon()}
+		<ChevronLeft size={18} />
 		<span>{label}</span>
 	</a>
 {:else}
 	<button type="button" class="back-button" {onclick}>
-		{@render icon()}
+		<ChevronLeft size={18} />
 		<span>{label}</span>
 	</button>
 {/if}
@@ -53,9 +42,7 @@
 		cursor: pointer;
 		@include buttons.btn-secondary;
 
-		svg {
-			width: 18px;
-			height: 18px;
+		:global(svg) {
 			flex-shrink: 0;
 		}
 	}

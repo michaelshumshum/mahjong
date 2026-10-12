@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
 	import type { ConnectionStatus } from '$lib/game/state';
+	import BookOpen from '@lucide/svelte/icons/book-open';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import Settings from '@lucide/svelte/icons/settings';
+	import Table from '@lucide/svelte/icons/table';
 
 	let {
 		spectating,
@@ -21,15 +25,16 @@
 		onToggleSettings: () => void;
 		onOpenGuide: () => void;
 	} = $props();
+
+	// lighter than lucide's default 2 to sit with the rail's small label text.
+	const ICON = { size: 18, strokeWidth: 1.8 };
 </script>
 
 <!-- the rim's top edge (frontend.md §3): wind, wall and prevailing live on the SeatPlate and
      CenterHub, never here. -->
 <header class="table-toolbar">
 	<button type="button" class="rail-btn" onclick={onLeaveClick}>
-		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-			<path d="M15 6 9 12l6 6" />
-		</svg>
+		<ChevronLeft {...ICON} />
 		<span class="rail-label">{m.tableToolbar_leaveGameLabel()}</span>
 	</button>
 
@@ -56,11 +61,7 @@
 
 	<div class="chrome-toggles">
 		<button type="button" class="rail-btn" data-testid="open-guide" onclick={onOpenGuide}>
-			<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-				<path
-					d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 1 1.5 1.5z"
-				/>
-			</svg>
+			<BookOpen {...ICON} />
 			<span class="rail-label">{m.tableToolbar_guideButton()}</span>
 		</button>
 		<button
@@ -69,10 +70,7 @@
 			data-testid="toggle-score-sheet"
 			onclick={onToggleScoreSheet}
 		>
-			<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-				<rect x="4" y="4" width="16" height="16" rx="2" />
-				<path d="M4 9.5h16M4 14.5h16M10 4v16" />
-			</svg>
+			<Table {...ICON} />
 			<span class="rail-label">{m.tableToolbar_scoreSheetButton()}</span>
 		</button>
 		{#if !spectating}
@@ -82,12 +80,7 @@
 				data-testid="toggle-settings"
 				onclick={onToggleSettings}
 			>
-				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-					<path
-						d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
-					/>
-					<circle cx="12" cy="12" r="3" />
-				</svg>
+				<Settings {...ICON} />
 				<span class="rail-label">{m.tableToolbar_settingsButton()}</span>
 			</button>
 		{/if}
@@ -129,15 +122,8 @@
 		@include buttons.btn-ghost;
 		text-shadow: none;
 
-		svg {
-			width: 18px;
-			height: 18px;
+		:global(svg) {
 			flex-shrink: 0;
-			fill: none;
-			stroke: currentColor;
-			stroke-width: 1.8;
-			stroke-linecap: round;
-			stroke-linejoin: round;
 		}
 
 		&:focus-visible {

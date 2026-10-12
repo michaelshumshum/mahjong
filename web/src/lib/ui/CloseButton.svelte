@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
+	import X from '@lucide/svelte/icons/x';
 
 	let { onclick }: { onclick: () => void } = $props();
 </script>
@@ -11,14 +12,7 @@
 	aria-label={m.closeButton_ariaLabel()}
 	{onclick}
 >
-	<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-		<path
-			d="M6 6 L18 18 M18 6 L6 18"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-		/>
-	</svg>
+	<X size={20} />
 </button>
 
 <style lang="scss">
@@ -36,10 +30,5 @@
 		padding: 0;
 		cursor: pointer;
 		@include buttons.btn-ghost;
-	}
-
-	svg {
-		width: 20px;
-		height: 20px;
 	}
 </style>

@@ -7,6 +7,7 @@
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { hasJoinedTable } from '$lib/ui/settings-storage';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import JoinByCodePanel from './_components/JoinByCodePanel.svelte';
 	import TableCard from './_components/TableCard.svelte';
 
@@ -74,16 +75,7 @@
 				disabled={refreshing}
 				onclick={refreshTables}
 			>
-				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-					<path
-						d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					/>
-				</svg>
+				<RotateCw size="1.1em" />
 				{m.tablesPage_refreshButton()}
 			</button>
 		</div>
@@ -198,11 +190,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);
-
-		svg {
-			width: 1.1em;
-			height: 1.1em;
-		}
 	}
 
 	.empty {
