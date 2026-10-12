@@ -17,13 +17,14 @@
 	const TIER_LEGEND = [
 		{ label: m.practiceDifficultySlot_easyLabel, blurb: m.practiceSetupDialog_easyBlurb },
 		{ label: m.practiceDifficultySlot_normalLabel, blurb: m.practiceSetupDialog_normalBlurb },
+		{ label: m.practiceDifficultySlot_expertLabel, blurb: m.practiceSetupDialog_expertBlurb },
 		{
 			label: m.practiceDifficultySlot_impossibleLabel,
 			blurb: m.practiceSetupDialog_impossibleBlurb
 		}
 	];
 
-	const DIFFICULTY_CYCLE: PracticeDifficulty[] = ['easy', 'normal', 'impossible'];
+	const DIFFICULTY_CYCLE: PracticeDifficulty[] = ['easy', 'normal', 'expert', 'impossible'];
 
 	function nextDifficulty(current: PracticeDifficulty): PracticeDifficulty {
 		return DIFFICULTY_CYCLE[(DIFFICULTY_CYCLE.indexOf(current) + 1) % DIFFICULTY_CYCLE.length];

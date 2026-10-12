@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -581,6 +581,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
+    { name = "numpy" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
@@ -590,7 +591,6 @@ dependencies = [
 
 [package.optional-dependencies]
 ml = [
-    { name = "numpy" },
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "torch" },
@@ -615,7 +615,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.14" },
     { name = "asyncpg", specifier = ">=0.30" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "numpy", marker = "extra == 'ml'", specifier = ">=2.1" },
+    { name = "numpy", specifier = ">=2.1" },
     { name = "pyarrow", marker = "extra == 'ml'", specifier = ">=18.0" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },

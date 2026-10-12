@@ -6,8 +6,8 @@ Returns a bare action id, not a decoded `Action`: a worker process never receive
 
 `compute_action` builds the requested tier's `Bot` and calls `act(view, mask, deadline)` via
 `asyncio.run` -- there's no running event loop in a plain `ProcessPoolExecutor` worker, and every
-tier's `act` here is synchronous heuristic work under the hood; `async` exists on the `Bot`
-protocol only so a future learned-policy tier can await a real model call.
+tier's `act` here is synchronous work under the hood, `T4`'s numpy forward pass included (no
+inference server: docs/ml.md §6).
 """
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ from bots.random import RandomBot
 
 __all__ = ["BOT_TIERS", "DEFAULT_BOT_TIER", "compute_action"]
 
-# "ORACLE", not "T4": not one more rung on the T0-T2 ladder (T3/SearchBot, Expert, was removed --
-# docs/decisions/0012-searchbot-removed.md) but a full-information bot a table opts into explicitly.
-BOT_TIERS: Final = ("T0", "T1", "T2", "ORACLE")
+# "T4" is the learned policy; "T3" stays retired with SearchBot (docs/decisions/0012). "ORACLE"
+# is not a rung on the ladder but a full-information bot a table opts into explicitly.
+BOT_TIERS: Final = ("T0", "T1", "T2", "T4", "ORACLE")
 DEFAULT_BOT_TIER: Final = "T2"
 """A bot-filled table runs `FaanBot`, not a weaker tier -- an all-T1 table produces endless
 exhaustive draws under `min_faan=3` (docs/bots.md §4)."""
@@ -39,6 +39,11 @@ def _make_bot(tier: str, seed: int) -> Bot:
         return EfficiencyBot()
     if tier == "T2":
         return FaanBot()
+    if tier == "T4":
+        # lazy: numpy + the weights load only in a worker that serves a T4 seat, once per process
+        from bots.learned import LearnedBot
+
+        return LearnedBot()
     if tier == "ORACLE":
         # plain FaanBot -- no dedicated class needed. its discard-risk scoring is hands-aware
         # (bots/safety.py's tile_risk), computing exact deal-in danger when .hands is populated (§10).

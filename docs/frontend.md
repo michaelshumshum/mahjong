@@ -739,7 +739,7 @@ fixed at table construction. A seat ring with one tap-to-cycle difficulty pill p
 aria-labels only, no visible captions; seat 0 is the
 human, shown as bold "You" text) around the same `CompassFelt` centerpiece as the pre-game
 rings and `/tables` cards,
-each Easy/Normal/Impossible ([bots.md §6](bots.md)), defaulting to the last practice setup
+each Easy/Normal/Expert/Impossible ([bots.md §6](bots.md)), defaulting to the last practice setup
 (else Normal), above a short legend
 with a one-line blurb per level. Submitting sends `POST /tables`
 with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/table/<id>?practice=1`.

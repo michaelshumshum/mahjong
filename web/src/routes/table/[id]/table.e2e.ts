@@ -546,7 +546,7 @@ test('practice game end offers Play again, re-creating a table with the last bot
 	await page.addInitScript(() => {
 		localStorage.setItem(
 			'mahjong:practiceSetup:v1',
-			JSON.stringify({ 1: 'easy', 2: 'impossible', 3: 'normal' })
+			JSON.stringify({ 1: 'easy', 2: 'impossible', 3: 'expert' })
 		);
 	});
 	let body: unknown = null;
@@ -560,7 +560,7 @@ test('practice game end offers Play again, re-creating a table with the last bot
 
 	await page.getByTestId('game-end-play-again').click();
 	await expect(page).toHaveURL('/table/AGAIN1?practice=1');
-	expect(body).toEqual({ practice: true, bot_tiers: { 1: 'T1', 2: 'ORACLE', 3: 'T2' } });
+	expect(body).toEqual({ practice: true, bot_tiers: { 1: 'T1', 2: 'ORACLE', 3: 'T4' } });
 });
 
 test('the toolbar Guide button opens the faan guide in-game', async ({ page }) => {

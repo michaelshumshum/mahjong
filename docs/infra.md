@@ -43,6 +43,7 @@ mahjong/
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay
+│   │   └── weights/learned.npz # T4's exported policy, committed (bots.md §2)
 │   ├── ml/                     # RL + supervised training (ml.md)
 │   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6
 │   └── tests/                  # pytest; pins/ holds pinned fixtures
@@ -151,8 +152,9 @@ SIGKILL) cuts the drain short there.
 
 Only `ml` and `tools` profiles exist.
 
-The base `server` image has no torch or numpy; the `ml` extra adds both. The API never imports
-either. `trainer` runs `python -m ml.train --config ml/configs/danger.yaml` by default
+The base `server` image has numpy but no torch; the `ml` extra adds torch. The API process never
+imports either; numpy loads only in a bot-pool worker serving a `T4` seat (`bots/learned.py`,
+[bots.md §2](bots.md)), and the `.npz` weights ship inside the image via `COPY . .`. `trainer` runs `python -m ml.train --config ml/configs/danger.yaml` by default
 ([ml.md](ml.md)); RL configs (`ml/configs/rl_*.yaml`) run in the same service. GPU passthrough is
 commented out in `trainer`; GPU training runs natively ([ml.md §13](ml.md)).
 

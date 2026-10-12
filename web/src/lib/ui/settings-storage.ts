@@ -127,7 +127,12 @@ export function saveDisplayName(name: string): void {
 /** Bot difficulty per relative seat (1 right, 2 across, 3 left) of the last practice table. */
 export type PracticeSetup = Record<1 | 2 | 3, PracticeDifficulty>;
 
-const PRACTICE_DIFFICULTIES: readonly PracticeDifficulty[] = ['easy', 'normal', 'impossible'];
+const PRACTICE_DIFFICULTIES: readonly PracticeDifficulty[] = [
+	'easy',
+	'normal',
+	'expert',
+	'impossible'
+];
 
 export function isPracticeSetup(value: unknown): value is PracticeSetup {
 	if (typeof value !== 'object' || value === null) return false;

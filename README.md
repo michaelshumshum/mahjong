@@ -17,7 +17,7 @@ table link.
 ## Features
 
 - **Full HK ruleset** — faan table, claim priority, payouts, configurable `RuleSet` presets ([rules](docs/rules.md))
-- **Bots from Easy to Impossible** — heuristic tiers and a full-information `ORACLE`; a self-play RL agent is in development ([bots](docs/bots.md), [ml](docs/ml.md))
+- **Bots from Easy to Impossible** — heuristic tiers, a self-play RL agent ("Expert") and a full-information `ORACLE` ([bots](docs/bots.md), [ml](docs/ml.md))
 - **Structural anti-cheat** — per-seat redaction; clients never see what they shouldn't ([architecture §5, §9](docs/architecture.md))
 - **Deterministic** — any hand reproduces from `(ruleset, seed, actions)` ([architecture §3](docs/architecture.md))
 

@@ -87,6 +87,15 @@ def test_practice_bot_tiers_picks_a_difficulty_per_seat() -> None:
     assert table._effective_bot_tier(3) == "ORACLE"
 
 
+def test_practice_bot_tiers_accepts_expert() -> None:
+    with TestClient(app) as client:
+        response = client.post("/tables", json={"practice": True, "bot_tiers": {"2": "T4"}})
+        table = get_table(response.json()["table_id"])
+    assert table is not None
+    assert table._effective_bot_tier(2) == "T4"
+    assert table._effective_bot_tier(1) == "T2"
+
+
 def test_practice_bot_tiers_ignores_an_unrecognized_tier_and_an_out_of_range_seat() -> None:
     """Same lenient-fallback posture as `ruleset`/`rules` -- a malformed entry is dropped, not a
     400, and that seat just falls back to `DEFAULT_BOT_TIER` ("T2")."""

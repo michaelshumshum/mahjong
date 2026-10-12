@@ -47,7 +47,8 @@ next free range for a new one. Below 2,000,000 belongs to `bots.arena`'s heurist
 | 6,100,000+ – 6,400,000+ | 1,500–2,000 | head-to-head analysis, results not kept in the repo: sampled-mode head-to-head (6.1M, 2,000 sets), hold 462.0M vs 429.2M control (6.2M), `hk_strict` / `hk_casual` head-to-heads (6.3M, 1,500 sets), learner L91.8M vs snapshot `past1` (6.4M) |
 | 7,000,000+, 7,100,000+ | 1,000 / 700; 1,500 head-to-head | R3 gate, L274.3M and 464.3M (§4); later league checkpoints are compared against L274.3M here |
 | 8,000,000+ | 1,000 | evals vs `ORACLE`: L274.3M, 464.3M and `FaanBot` ×1 vs `ORACLE` ×3; `ORACLE` / `FaanBot` ×1 vs L274.3M ×3; L274.3M vs `FaanBot` (§4) |
-| 9,000,000+ | — | next free range (the R4 gate re-run) |
+| 9,000,000+ | 1,000 / 700 | R4 gate re-run, `LearnedBot` (the shipped numpy path) (§4); 9,500,000+ and 9,900,000+ hold the R4 action-agreement and pool-load samples (`HandEnv` states, not evals) |
+| 10,000,000+ | — | next free range |
 
 The head-to-head harness is `runs/ppo_league_snap/tools/h2h_eval.py` on the training box
 (gitignored, not in `ml/`).
@@ -247,6 +248,24 @@ their status are in [ml.md §14](ml.md):
 
 `hk_strict` tables draw 65–72% of hands: `FaanBot` almost never reaches 5 faan (win 0.009).
 `hk_casual` payouts are heavy-tailed (13-faan cap on the full-spicy table), hence the wide CIs.
+
+**R4 gate re-run** (2026-10-12, [ml.md §14](ml.md) R4): the same L274.3M weights through the
+shipped path — `BOT_REGISTRY["LearnedBot"]`, numpy forward from `bots/weights/learned.npz` —
+via `eval_policy --candidate-bot LearnedBot --parallel 6`, `hk_classic`, fresh seeds 9,000,000+
+(every opponent on the same seeds, as R3). Points per hand; the R3 column is `PolicyBot` (torch)
+on 7,000,000+:
+
+| Opponent ×3 | Sets | R3 (7,000,000+) | **R4 re-run [95% CI]** (bootstrap) | Win (agent / opp) | Deal-in | Avg win faan | Sub-min tenpai | Table draws |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `FaanBot` | 1,000 | +10.94 | **+10.75 [9.64, 11.86]** ([9.67, 11.89]) | 0.267 / 0.160 | 0.076 / 0.105 | 5.26 / 3.37 | 0.033 / 0.032 | 25.4% |
+| `EfficiencyBot` | 700 | +14.48 | **+15.19 [13.74, 16.64]** ([13.73, 16.62]) | 0.329 / 0.143 | 0.027 / 0.112 | 5.44 / 3.26 | 0.095 / 0.349 | 24.1% |
+| `FaanBotAggressive` | 700 | +12.30 | **+11.62 [10.34, 12.90]** ([10.35, 12.96]) | 0.284 / 0.168 | 0.074 / 0.119 | 5.28 / 3.37 | 0.042 / 0.036 | 21.1% |
+| `FaanBotDefensive` | 700 | +9.88 | **+10.85 [9.52, 12.19]** ([9.52, 12.26]) | 0.251 / 0.146 | 0.067 / 0.092 | 5.28 / 3.35 | 0.036 / 0.039 | 31.2% |
+| `FaanBotFlushChasing` | 700 | +10.73 | **+11.72 [10.43, 13.01]** ([10.42, 13.03]) | 0.285 / 0.154 | 0.072 / 0.109 | 5.22 / 3.37 | 0.046 / 0.033 | 25.3% |
+
+Every R3 estimate falls inside the re-run's CI; the agent's win rate is within 0.02 and its
+average winning faan within 0.1 of R3's per-side detail above. The `FaanBot` run predates the overflow-free sigmoid in
+`ml/export.py` (equal within float error); the other four ran with it.
 
 **vs `ORACLE`** (2026-10-12, `hk_classic`, 1,000 sets on seeds 8,000,000+, `eval_policy
 --opponent ORACLE`; the 1 × policy-table rows from a scratch harness on the same seeds). Points per

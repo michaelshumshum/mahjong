@@ -131,19 +131,23 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 	await page.getByTestId('lobby-practice-bots').click();
 
 	const dialog = page.getByTestId('practice-setup-dialog');
-	// each seat's difficulty cycles easy -> normal -> impossible -> easy on click, starting from
-	// the default (Normal).
+	// each seat's difficulty cycles easy -> normal -> expert -> impossible -> easy on click,
+	// starting from the default (Normal).
 	const rightSlot = dialog.getByTestId('practice-difficulty-right');
+	const acrossSlot = dialog.getByTestId('practice-difficulty-across');
 	const leftSlot = dialog.getByTestId('practice-difficulty-left');
 	await rightSlot.click();
 	await rightSlot.click();
+	await rightSlot.click();
+	await acrossSlot.click();
+	await leftSlot.click();
 	await leftSlot.click();
 	await dialog.getByTestId('practice-start-submit').click();
 
 	await expect(page).toHaveURL('/table/DIFF456?practice=1');
 	expect(sentBody).toMatchObject({
 		practice: true,
-		bot_tiers: { 1: 'T1', 2: 'T2', 3: 'ORACLE' }
+		bot_tiers: { 1: 'T1', 2: 'T4', 3: 'ORACLE' }
 	});
 });
 

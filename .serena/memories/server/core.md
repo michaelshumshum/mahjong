@@ -5,7 +5,7 @@ Full rules: `server/AGENTS.md`, `docs/architecture.md`.
 ## Layout
 - `mahjong_core/` — pure rules engine: `reduce(state, action) -> (state, events)`. No asyncio, I/O, clock, or unseeded randomness; stdlib-only. Modules: tiles, wall, melds, claims, actions, state, engine, shanten, scoring/, config, ml (feature encoding).
 - `app/` — FastAPI (`main.py`), per-table actor (`table.py`), registry, ws, `views.py` (redaction), `protocol.py` (source of generated TS types), outbox, idempotency, db/.
-- `bots/` — random, efficiency, faanbot, safety, valuation, features, arena, selfplay, worker.
+- `bots/` — random, efficiency, faanbot, safety, valuation, features, arena, selfplay, worker, learned (T4 RL policy, numpy; import boundary + weights re-export: `mem:server/rl-learned-bot`).
 - `tools/gen_protocol.py` — `make proto` generator.
 - `tests/` — flat `test_*.py`; markers `fast`/`slow`.
 

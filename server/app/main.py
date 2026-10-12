@@ -94,7 +94,7 @@ class CreateTableRequest(BaseModel):
     # `RuleSet.from_dict`-shaped; only read when `ruleset == "custom"`.
     rules: dict[str, Any] | None = None
     practice: bool = False
-    # practice mode's per-seat difficulty picker: {1: "T1", 2: "T2", 3: "ORACLE"}-shaped, seat 0
+    # practice mode's per-seat difficulty picker: {1: "T1", 2: "T4", 3: "ORACLE"}-shaped, seat 0
     # excluded (the human seat) -- only meaningful when practice=True, see _resolve_seat_bot_tiers.
     bot_tiers: dict[int, str] | None = None
 
@@ -119,9 +119,9 @@ def _generate_table_id() -> str:
     raise RuntimeError("could not generate a unique table id")
 
 
-# practice-mode difficulty picker (docs/bots.md §6): Easy/Normal/Impossible = T1/T2/ORACLE.
-# T0/RandomBot is deliberately excluded -- never shipped as a difficulty (§2).
-_PRACTICE_BOT_TIERS = ("T1", "T2", "ORACLE")
+# practice-mode difficulty picker (docs/bots.md §6): Easy/Normal/Expert/Impossible =
+# T1/T2/T4/ORACLE. T0/RandomBot is deliberately excluded -- never shipped as a difficulty (§2).
+_PRACTICE_BOT_TIERS = ("T1", "T2", "T4", "ORACLE")
 
 
 def _resolve_seat_bot_tiers(

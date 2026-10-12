@@ -85,6 +85,13 @@ def _weight_profile_factory(profile: WeightProfile) -> Callable[[int], Bot]:
     return factory
 
 
+def _learned_bot_factory(seed: int) -> Bot:
+    del seed  # greedy; seed unused
+    from bots.learned import LearnedBot
+
+    return LearnedBot()
+
+
 BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "RandomBot": _random_bot_factory,
     "EfficiencyBot": _efficiency_bot_factory,
@@ -93,6 +100,7 @@ BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "FaanBotDefensive": _weight_profile_factory(DEFENSIVE),
     "FaanBotFlushChasing": _weight_profile_factory(FLUSH_CHASING),
     "ORACLE": _faan_bot_factory,
+    "LearnedBot": _learned_bot_factory,
 }
 
 OMNISCIENT_BOTS: frozenset[str] = frozenset({"ORACLE"})

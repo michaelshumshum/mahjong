@@ -7,6 +7,8 @@ import random
 import pytest
 
 np = pytest.importorskip("numpy")
+# numpy is a base dep; ml.train_env reaches pyarrow (ml extra) via ml.generate_dataset
+pytest.importorskip("pyarrow")
 
 from app.views import seat_view
 from bots.labels import seat_hand34

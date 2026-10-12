@@ -410,7 +410,7 @@ GET /tables
 ```
 POST /tables
 {"ruleset"?: "hk_classic", "rules"?: {…RuleSet.to_dict() shape…}, "practice"?: false,
- "bot_tiers"?: {"1": "T1"|"T2"|"ORACLE", "2": …, "3": …}}
+ "bot_tiers"?: {"1": "T1"|"T2"|"T4"|"ORACLE", "2": …, "3": …}}
 ->
 {"table_id": "ABC123", "ruleset_preset": "hk_classic" | null, "ruleset": {…RuleSet.to_dict()…}}
 ```
@@ -421,8 +421,9 @@ POST /tables
 - `ruleset`/`rules`/`practice` have the same semantics as the WS query params (§2) — both call
   `mahjong_core.presets.resolve_ruleset` and fall back to `hk_classic` on bad input.
 - `bot_tiers` is practice mode's per-seat difficulty ([bots.md §6](bots.md)): seat keys `1`-`3`
-  only (seat `0` is the human), values `T1`/`T2`/`ORACLE` (`_PRACTICE_BOT_TIERS`; `T0` is never
-  selectable). An out-of-range seat or unknown tier is dropped and that seat falls back to
+  only (seat `0` is the human), values `T1`/`T2`/`T4`/`ORACLE` (`_PRACTICE_BOT_TIERS`; `T0` is
+  never selectable). A plain string field, not in `shared/protocol.schema.json`: adding a tier
+  needs no `make proto`. An out-of-range seat or unknown tier is dropped and that seat falls back to
   `DEFAULT_BOT_TIER` (`T2`). Ignored when `practice` is false.
 - A table created via `POST /tables` and one auto-created by a direct WS connect behave
   identically; whichever happens first for an id sticks.

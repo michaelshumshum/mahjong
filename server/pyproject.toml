@@ -11,14 +11,15 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "pyjwt>=2.10",
+    "numpy>=2.1",                     # LearnedBot's forward pass (T4); no torch at runtime
 ]
-# mahjong_core is stdlib-only — no numpy, no torch in base deps. See server/AGENTS.md.
+# mahjong_core is stdlib-only. numpy only in bots/learned.py and the torch-free ml/ modules it
+# imports; never torch. See server/AGENTS.md.
 
 [project.optional-dependencies]
 # ml image target only
 ml = [
     "torch>=2.6",                     # first release with official cp313 wheels
-    "numpy>=2.1",
     "pyarrow>=18.0",
     "pyyaml>=6.0",
 ]

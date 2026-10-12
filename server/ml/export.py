@@ -2,6 +2,7 @@
 
     python -m ml.export --ckpt runs/danger/ckpt_best.pt --out runs/danger/danger.npz
     python -m ml.export --ckpt runs/rl_aux/ckpt_best.pt --out runs/rl_aux/policy.npz
+    python -m ml.export --ckpt runs/ppo_league_snap/ckpt_L274.3M.pt --out bots/weights/learned.npz
 
 The checkpoint's weights go to a plain `.npz` and `NumpyDangerNet` / `NumpyPolicyNet` re-implement
 the forward pass in numpy, so serving needs numpy only, not torch or an ONNX runtime. Parity tests
@@ -11,6 +12,7 @@ pin both to torch. Loading needs numpy alone; exporting needs the checkpoint's t
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -22,11 +24,14 @@ if TYPE_CHECKING:
     from mahjong_core.state import GameState
 
 __all__ = [
+    "EXPORT_VERSION",
     "NumpyDangerNet",
     "NumpyPolicyNet",
+    "checkpoint_meta",
     "export_checkpoint",
     "export_policy_state",
     "export_state",
+    "load_meta",
     "main",
     "masked_log_softmax",
     "numpy_trunk",
@@ -42,40 +47,79 @@ _MASK[..., _POSITIONS] = 1.0
 _POLICY_PREFIXES = ("trunk.", "policy_tile.", "policy_global.")
 
 
-def export_state(state_dict: dict[str, Any], model_config: dict[str, int], path: Path) -> None:
+EXPORT_VERSION = 2
+"""Bumped when the `.npz` layout or the numpy forward changes. 2: `__meta__` provenance, PPO /
+league checkpoints (`learner.policy`)."""
+
+_RESERVED = ("__config__", "__meta__")
+
+
+def export_state(
+    state_dict: dict[str, Any],
+    model_config: dict[str, int],
+    path: Path,
+    meta: dict[str, Any] | None = None,
+) -> None:
     arrays = {k: v.detach().cpu().numpy().astype(np.float32) for k, v in state_dict.items()}
-    np.savez(path, __config__=np.array(json.dumps(model_config)), **arrays)
+    extra = {} if meta is None else {"__meta__": np.array(json.dumps(meta, sort_keys=True))}
+    np.savez(path, __config__=np.array(json.dumps(model_config)), **extra, **arrays)
 
 
 def export_policy_state(
-    state_dict: dict[str, Any], model_config: dict[str, int], path: Path
+    state_dict: dict[str, Any],
+    model_config: dict[str, int],
+    path: Path,
+    meta: dict[str, Any] | None = None,
 ) -> None:
     """`PolicyNet`'s served path only: trunk + policy head, no auxiliary heads."""
     served = {k: v for k, v in state_dict.items() if k.startswith(_POLICY_PREFIXES)}
-    export_state(served, model_config, path)
+    export_state(served, model_config, path, meta)
+
+
+def checkpoint_meta(ckpt_path: Path, ckpt: dict[str, Any]) -> dict[str, Any]:
+    """Provenance written into the `.npz`: source file and hash, training counters, versions."""
+    return {
+        "source": ckpt_path.name,
+        "source_sha256": hashlib.sha256(ckpt_path.read_bytes()).hexdigest(),
+        "algorithm": ckpt.get("algorithm"),
+        "decisions": ckpt.get("decisions"),
+        "updates": ckpt.get("updates"),
+        "engine_version": ckpt.get("engine_version"),
+        "export_version": EXPORT_VERSION,
+    }
 
 
 def export_checkpoint(ckpt_path: Path, path: Path) -> None:
-    """A `DangerNet` checkpoint, or a `PolicyNet` one (`algorithm: rl_aux`) via
-    `export_policy_state`."""
+    """A `DangerNet` checkpoint, or a `PolicyNet` one via `export_policy_state`: R1 `rl_aux`
+    (`model`) or `ml.ppo` / league (`learner.policy`)."""
     import torch
 
     ckpt = torch.load(ckpt_path, weights_only=False, map_location="cpu")
-    if ckpt.get("algorithm") == "rl_aux":
-        export_policy_state(ckpt["model"], ckpt["model_config"], path)
+    meta = checkpoint_meta(ckpt_path, ckpt)
+    if "learner" in ckpt:
+        export_policy_state(ckpt["learner"]["policy"], ckpt["model_config"], path, meta)
+    elif ckpt.get("algorithm") == "rl_aux":
+        export_policy_state(ckpt["model"], ckpt["model_config"], path, meta)
     else:
-        export_state(ckpt["model"], ckpt["model_config"], path)
+        export_state(ckpt["model"], ckpt["model_config"], path, meta)
 
 
 def _load_npz(path: Path) -> tuple[dict[str, np.ndarray], dict[str, int]]:
     with np.load(path, allow_pickle=False) as z:
-        arrays = {k: z[k] for k in z.files if k != "__config__"}
+        arrays = {k: z[k] for k in z.files if k not in _RESERVED}
         config = json.loads(str(z["__config__"]))
     return arrays, config
 
 
+def load_meta(path: Path) -> dict[str, Any] | None:
+    """The `.npz`'s `__meta__` provenance; `None` for an export-version-1 file."""
+    with np.load(path, allow_pickle=False) as z:
+        return json.loads(str(z["__meta__"])) if "__meta__" in z.files else None
+
+
 def _sigmoid(x: np.ndarray) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-x))
+    # tanh form: 1 / (1 + exp(-x)) overflows (and warns) for very negative x
+    return 0.5 * (1.0 + np.tanh(0.5 * x))
 
 
 def _group_norm(x: np.ndarray, weight: np.ndarray, bias: np.ndarray) -> np.ndarray:

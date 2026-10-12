@@ -81,6 +81,39 @@ def test_export_checkpoint_strips_aux_heads(tmp_path: Path) -> None:
     assert all(k.startswith(("trunk.", "policy_")) for k in net.w)
 
 
+def test_sigmoid_does_not_overflow() -> None:
+    """the SE gate saw logits far below -88, where float32 exp(-x) overflows and warns."""
+    with np.errstate(over="raise"):
+        out = export._sigmoid(np.array([-1000.0, 0.0, 1000.0], dtype=np.float32))
+    assert np.allclose(out, [0.0, 0.5, 1.0])
+
+
+def test_export_ppo_checkpoint_records_provenance(tmp_path: Path) -> None:
+    """`ml.ppo` / league checkpoints keep the policy under `learner.policy`."""
+    config = PolicyNetConfig(channels=16, blocks=1)
+    model = _random_model(config)
+    ckpt = {
+        "learner": {"policy": model.state_dict(), "critic": {}},
+        "model_config": config.to_dict(),
+        "algorithm": "ppo",
+        "decisions": 1234,
+        "updates": 5,
+        "engine_version": "1.3.0",
+    }
+    torch.save(ckpt, tmp_path / "ckpt_L1.2K.pt")
+    export.export_checkpoint(tmp_path / "ckpt_L1.2K.pt", tmp_path / "p.npz")
+    net = export.NumpyPolicyNet.load(tmp_path / "p.npz")
+    assert all(k.startswith(("trunk.", "policy_")) for k in net.w)
+    meta = export.load_meta(tmp_path / "p.npz")
+    assert meta is not None
+    assert meta["source"] == "ckpt_L1.2K.pt"
+    assert meta["decisions"] == 1234
+    assert meta["export_version"] == export.EXPORT_VERSION
+    assert len(meta["source_sha256"]) == 64
+    export.export_policy_state(model.state_dict(), config.to_dict(), tmp_path / "bare.npz")
+    assert export.load_meta(tmp_path / "bare.npz") is None
+
+
 @pytest.mark.slow
 def test_single_sample_latency_with_encoding(tmp_path: Path) -> None:
     """Flaky under parallel CPU load (`-n`); run alone. p99 over 300 decisions."""

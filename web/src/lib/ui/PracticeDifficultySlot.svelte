@@ -17,6 +17,7 @@
 	const DIFFICULTY_LABEL: Record<PracticeDifficulty, () => string> = {
 		easy: m.practiceDifficultySlot_easyLabel,
 		normal: m.practiceDifficultySlot_normalLabel,
+		expert: m.practiceDifficultySlot_expertLabel,
 		impossible: m.practiceDifficultySlot_impossibleLabel
 	};
 </script>

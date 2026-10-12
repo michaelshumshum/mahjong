@@ -3,8 +3,8 @@
 In progress — this doc keeps a plan/status structure (§14 milestones, §15 risks) until the agent
 ships.
 
-The learned bot is a self-play RL policy with no dependence on `FaanBot`. It is planned as the T4
-"Expert" tier ([bots.md §2/§6](bots.md)). Two
+The learned bot is a self-play RL policy with no dependence on `FaanBot`. It ships as the `T4`
+"Expert" tier (`bots/learned.py`, [bots.md §2/§6](bots.md), §14 R4). Two
 engine-side pieces came first because retrofitting them later means touching the engine, the
 bots, the protocol and every stored record at once: the **action encoding** (§1) and
 **persisted `GameRecord`s** (§2).
@@ -171,7 +171,7 @@ canary for this failure mode in heuristic and learned bots alike.
 | dataset | `ml/generate_dataset.py`, `ml/pack.py`, `ml/splits.py`, `ml/dataset.py` | optional auxiliary pretraining (§10) |
 | `DangerNet` + training | `ml/danger_model.py`, `ml/losses.py`, `ml/train.py`, `ml/configs/danger.yaml` | trunk template and R1 reference (§8, §14) |
 | offline eval | `ml/evaluate.py`, `ml/metrics.py` | AUC / log-loss / Brier with game-level bootstrap CIs, reliability table |
-| numpy export | `ml/export.py`: `NumpyDangerNet`, `NumpyPolicyNet` (trunk + policy head only), `numpy_trunk`, `masked_log_softmax` | torch-free serving, pinned to torch by parity tests |
+| numpy export | `ml/export.py`: `NumpyDangerNet`, `NumpyPolicyNet` (trunk + policy head only), `numpy_trunk`, `masked_log_softmax`; `export_checkpoint` reads R1, `ml.ppo` and league checkpoints and writes provenance into the `.npz` (`__meta__`: source file + sha256, decisions, updates, `engine_version`, `EXPORT_VERSION`; `load_meta`) | torch-free serving, pinned to torch by parity tests |
 | single-hand env | `ml/env.py`: `HandEnv`, `encode_obs`, `replay_hand` | the rollout env (§7) |
 | vector env | `ml/vec_env.py`: `VecHandEnv` (in-process), `SubprocVecHandEnv` (shared memory) | batched rollout (§7) |
 | rollout benchmark | `ml/bench_env.py` | R0 throughput measurement (§13) |
@@ -184,7 +184,8 @@ canary for this failure mode in heuristic and learned bots alike.
 | league | `ml/league.py`, `ml/configs/rl_league.yaml` | C2 opponent pool, personas, learned-only Elo (§11) |
 | policy evaluation | `ml/eval_policy.py` | R2 and R3 gates: candidate × 1 vs a `BOT_REGISTRY` bot × 3 (§12) |
 
-Nothing here is wired into a bot.
+`bots/learned.py` (`T4`, [bots.md §2](bots.md)) serves `encode_v2`'s `policy_raw_from_view` and
+`NumpyPolicyNet`; nothing else here is wired into a bot.
 
 ```
 uv run python -m ml.generate_dataset --out data/danger_v3 --games N --parallel 10 \
@@ -670,7 +671,8 @@ OPENBLAS_NUM_THREADS=1 uv run --extra ml python -m ml.train --config ml/configs/
   nothing extra but is noisier and on-policy (the learner samples, it doesn't argmax).
 
 **Built (R2): `ml/eval_policy.py`** — the R2 gate harness, candidate × 1 vs a `BOT_REGISTRY` bot
-× 3 (default `EfficiencyBot`). The candidate is not registered in `BOT_REGISTRY` (R4).
+× 3 (default `EfficiencyBot`). The shipped bot is `BOT_REGISTRY["LearnedBot"]`, so
+`--candidate-bot LearnedBot` gates the production path (§14 R4).
 
 ```
 uv run python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 700 --seed 1000000 \
@@ -680,7 +682,7 @@ uv run python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 700 --see
 | Detail | Behaviour |
 | --- | --- |
 | duplicate set | one `HandEnv` episode seed (dealer / prevailing from `hand_start`), played 4 times with the candidate in each seat; points per hand, not per game, since an RL episode is a hand and only standalone hands export as `HandRecord`s |
-| candidate | `PolicyBot`: `policy_raw_from_view(seat_view(...))` → `PolicyNet` → masked argmax (or seeded sampling); no oracle path exists here. `--candidate-bot NAME` seats a heuristic `BOT_REGISTRY` bot instead (calibration); never an `OMNISCIENT_BOTS` one |
+| candidate | `PolicyBot`: `policy_raw_from_view(seat_view(...))` → `PolicyNet` → masked argmax (or seeded sampling); no oracle path exists here. `--candidate-bot NAME` seats a `BOT_REGISTRY` bot instead (a heuristic for calibration, or the shipped `LearnedBot`); never an `OMNISCIENT_BOTS` one |
 | opponents | any `BOT_REGISTRY` name, `ORACLE` included: opponent seats get their view from `bots.arena._view_for` (the sanctioned omniscient call site, [bots.md §9](bots.md)); the candidate seat, and any `PolicyBot` seat, always gets a plain `seat_view` (`tests/test_ml_eval_policy.py` spies on every view served) |
 | statistics | each played hand is a one-hand `bots.arena.GameRecord`, so `_collect_stats`, `_paired_differences` (candidate − mean of the other three) and the normal CI are `bots.arena`'s; plus a seeded percentile bootstrap CI |
 | metrics | per side: points/hand, win, deal-in, avg winning faan, tenpai-at-draw, `tenpai_rate_on_sub_minimum_hand`; table exhaustive-draw rate |
@@ -976,6 +978,25 @@ The league's measurable gain is across presets (`hk_strict`, `EfficiencyBot` tab
 `hk_classic`, where the starting policy had already plateaued. L274.3M is the R4 candidate; R4
 re-runs this gate on fresh seeds, and later league checkpoints are gated against L274.3M on these
 seeds. Vs `ORACLE` ×3 (seeds 8,000,000+, 1,000 sets): +2.88 [+1.75, +4.01]; `ORACLE` ×1 vs L274.3M ×3: −1.53 [−2.22, −0.84] ([rl-learnings.md §4](rl-learnings.md)). Not yet measured: a table of mixed bot types.
+
+R4 progress: **done** (2026-10-12) — L274.3M ships as `T4`, practice mode's "Expert":
+`bots/learned.py` `LearnedBot` (`BOT_REGISTRY["LearnedBot"]`, worker tier `T4`), `"T4"` in
+`POST /tables`' `bot_tiers` and the web picker, numpy in the base dependencies, weights committed
+as `server/bots/weights/learned.npz` (1.7 MB; provenance, export command and why it is committed:
+[bots.md §2](bots.md)). It shares `_shared_bot_pool()` with every tier: ADR 0012's head-of-line
+concern is about a slow tier, and `T4` is cheaper than `T2`. Exit criteria:
+
+| Criterion | Result | Status |
+| --- | --- | --- |
+| R3 gate re-run on fresh seeds | production path (`eval_policy --candidate-bot LearnedBot`, numpy forward), seeds 9,000,000+, `hk_classic`: vs `FaanBot` ×3 **+10.75 [9.64, 11.86]** on 1,000 sets (R3, `PolicyBot` on 7,000,000+: +10.94); 700 sets each vs `EfficiencyBot` +15.19, `FaanBotAggressive` +11.62, `FaanBotDefensive` +10.85, `FaanBotFlushChasing` +11.72 (R3: +14.48, +12.30, +9.88, +10.73). Every CI > 0 and contains the R3 estimate; per-side detail in [rl-learnings.md §4](rl-learnings.md) | met |
+| p99 ≤ 5 ms on the server CPU | this laptop (i7-1265U), `tests/test_learned_bot.py::test_single_decision_latency` alone (`act` incl. encode, `seat_view` excluded): p50 1.8 ms, p99 2.0–3.4 ms over three runs. In a saturated 6-worker pool: p99 5.3 ms. The prod box (i5-10400F) is unmeasured | met on the laptop; prod unmeasured |
+| bot load not regressed | `compute_action` in a `ProcessPoolExecutor`, 1,625 decisions: one worker, `T4` mean 1.8 ms / p99 3.8 ms vs `T2` 3.6 / 11.3 ms; six workers saturated, 1,539 vs 949 decisions/s. A worker pays once on its first `T4` job: ~35 ms (numpy import + weight load) and +21 MB RSS (49 vs 28 MB) | met: cheaper per decision than `T2` |
+
+The numpy path is the gated torch path: on 2,479 decisions from 30 hands, `LearnedBot` picked the
+same action as `PolicyBot` on the checkpoint every time (max logit difference 6.5e-5);
+`tests/test_ml_learned_parity.py` pins logits and actions on the shipped file. Sub-min tenpai is
+≤ the opponents' on 2 of 5 re-run tables (R3: 4 of 5); the three over are 0.033 vs 0.032, 0.042
+vs 0.036 and 0.046 vs 0.033, at ~20 events per cell.
 
 ## 15. Risks
 

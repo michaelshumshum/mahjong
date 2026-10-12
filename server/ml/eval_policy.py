@@ -4,6 +4,7 @@ docs/bots.md §7). `ml`-extra only.
     python -m ml.eval_policy --ckpt runs/ppo_c0/ckpt_last.pt --sets 200 --seed 1000000 \
         [--opponent EfficiencyBot] [--min-faan 3] [--parallel 6] [--records eval.jsonl]
     python -m ml.eval_policy --candidate-bot FaanBot --opponent ORACLE ...   # calibration
+    python -m ml.eval_policy --candidate-bot LearnedBot --opponent FaanBot ...  # shipped T4
 
 A duplicate set is one `HandEnv` episode seed (`hand_start` picks dealer and prevailing wind)
 played four times, the candidate in each seat in turn. The candidate (`PolicyBot`) acts only on
@@ -278,7 +279,9 @@ def main(argv: list[str] | None = None) -> None:
     who = parser.add_mutually_exclusive_group(required=True)
     who.add_argument("--ckpt")
     who.add_argument(
-        "--candidate-bot", choices=_candidate_bot_choices(), help="a heuristic candidate instead"
+        "--candidate-bot",
+        choices=_candidate_bot_choices(),
+        help="a BOT_REGISTRY candidate instead (a heuristic, or the shipped LearnedBot)",
     )
     parser.add_argument("--sets", type=int, default=200)
     parser.add_argument("--seed", type=int, default=1_000_000, help="set i uses seed + i")

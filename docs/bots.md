@@ -49,8 +49,33 @@ vary with decision difficulty — no tier returns a confidence signal to scale i
 | `T0` | `RandomBot` | uniform over legal actions | never — fuzzing and engine tests only |
 | `T1` | `EfficiencyBot` | shanten-minimising discard, ukeire tiebreak (§3) | Easy |
 | `T2` | `FaanBot` | T1 + hand-value planning (§4) + discard safety (§5) | Normal; also the default tier and the disconnect-handover tier |
+| `T4` | `LearnedBot` | the self-play RL policy, greedy, on the public view only ([ml.md](ml.md)) | Expert |
 | `ORACLE` | `FaanBot` | a plain `FaanBot()` fed a full-information view (§9) | Impossible |
-| T4 | learned policy | self-play RL, independent of `FaanBot` | not yet: R3 gate passed, shipping is R4 ([ml.md §14](ml.md)) |
+
+`T3` is not reused: it was the removed `SearchBot` (below).
+
+**`T4` `LearnedBot`** (`bots/learned.py`, `BOT_REGISTRY["LearnedBot"]`). One decision is
+`ml.encode_v2.policy_raw_from_view(view)` → `encode_policy_batch` → `ml.export.NumpyPolicyNet`
+→ argmax over the legal ids — the same path `ml.eval_policy` gated, with numpy in place of torch.
+It raises on a view with `.hands` populated, so it can't be seated on the `ORACLE` path. The
+worker imports it lazily and `load_policy` caches the weights once per process.
+
+| Detail | Value |
+| --- | --- |
+| weights | `server/bots/weights/learned.npz`, 1.7 MB float32, trunk + policy head (427k params) |
+| source | `runs/ppo_league_snap/ckpt_L274.3M.pt` (league run, 274,239,759 league decisions, update 65,560, on top of the 464.3M starting policy), sha256 `3e2b6726…c53bc`; engine 1.3.0 |
+| export | `python -m ml.export --ckpt <ckpt> --out bots/weights/learned.npz`, `ml.export.EXPORT_VERSION` 2; provenance is in the file's `__meta__` (`bots.learned.policy_meta()`) |
+| strength | R3 gate re-run through this path: [ml.md §14](ml.md) R4 |
+| latency | p99 ≤ 5 ms per decision incl. encode ([ml.md §14](ml.md) R4) |
+
+**Why the weights are committed.** 1.7 MB is small next to what git already holds
+(`docs/screenshots/` is ~8.7 MB); each new policy adds one more 1.7 MB blob. In git, the weights
+version with the code that encodes their input (the encoder layout, the ruleset encoding pinned
+by `ENGINE_VERSION`), and the prod image gets them through its existing `COPY . .` with no
+download step or volume that could be missing at startup. A new policy is a new commit of the
+file. `tests/test_learned_bot.py` pins the recorded source and `engine_version ==
+ENGINE_VERSION`, so an engine bump that changes the encoding fails until the policy is
+re-exported (or migrated, [ml.md §9](ml.md)).
 
 `FaanBot` also ships weight-profile variants (`bots/faanbot.py`'s `WeightProfile`: `AGGRESSIVE`,
 `DEFENSIVE`, `FLUSH_CHASING`), registered in `bots/arena.py`'s `BOT_REGISTRY` as
@@ -198,9 +223,16 @@ Practice mode's per-seat picker (`web/src/lib/ui/PracticeSetupDialog.svelte`,
 | --- | --- | --- |
 | Easy | `EfficiencyBot` — shanten/ukeire only, no value targeting, no safety model (§3) | `T1` |
 | Normal | `FaanBot` — value targeting, safety model, fold logic (§4/§5) | `T2` |
+| Expert | `LearnedBot` — the self-play RL policy (§2) | `T4` |
 | Impossible | `FaanBot` with a full-information view (§9) | `ORACLE` |
 
-`T0` is never offered.
+`T0` is never offered. The default tier (`DEFAULT_BOT_TIER`, an unpicked seat, the showcase table)
+and disconnect handover stay `T2`.
+
+The ladder is named by kind, not strictly ordered by strength: Expert outscores Impossible
+head to head (`T4` × 1 vs `ORACLE` × 3 +2.88 points/hand, `ORACLE` × 1 vs `T4` × 3 −1.53,
+[rl-learnings.md §4](rl-learnings.md)). Impossible is "sees every hand" — it never deals in — not
+"strongest".
 
 ## 7. Evaluation harness
 
@@ -370,6 +402,9 @@ clearing tenpai won more but cheaper hands with no points gain.
   production code for any other call site, and for any `app/` module importing `bots.arena`.
   `ml/eval_policy.py` (offline, `ml` extra) seats `ORACLE` opponents through `_view_for` too; its
   candidate seat never goes through it ([ml.md §12](ml.md)).
+- `T4` (`LearnedBot`) is not omniscient: not in `OMNISCIENT_BOTS`, served a plain `seat_view` by
+  the table and every harness, and it raises if handed a view with `.hands`. Its serving path
+  imports no torch and no oracle encoder (`tests/test_learned_bot.py`, in a fresh interpreter).
 - A `SeatView` never carries `game_seed`/`hand_seed`, so it may cross the process-pool boundary.
   No `GameState` crosses; `compute_action` is unchanged.
 - **Disconnect handover always uses `T2`.** `Table._effective_bot_tier(seat)` pins an
