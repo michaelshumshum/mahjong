@@ -152,25 +152,26 @@ _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 
 _MAX_NAME_LENGTH = 24  # guest display name cap (docs/protocol.md §2 `join.name`)
 
-# every bot seat gets a random Cantonese-pun display name instead of a generic "Bot"
+# every bot seat gets a random HK mahjong-parlour nickname instead of a generic "Bot"
 # placeholder -- cosmetic only, `self._bot_tier` still governs actual strength.
 _BOT_NAME_POOL = (
-    "自摸俠",
-    "三索雀王",
-    "摸魚大師",
     "東成西就",
-    "詐糊皇",
-    "放銃西施",
-    "打雀高手",
-    "東南西北通",
-    "一筒天下",
     "八萬富翁",
     "大三元帥",
-    "九萬鵬程",
-    "六六筒順",
-    "十三么后",
-    "大四喜嫂",
-    "過水英雄",
+    "詐糊皇",
+    "雞糊佬",
+    "十三姨",
+    "阿清",
+    "阿蓮",
+    "阿發",
+    "碰哥",
+    "槓叔",
+    "平叔",
+    "自摸嬸",
+    "白板",
+    "三缺一",
+    "雀聖",
+    "搭腳仔",
 )
 
 
@@ -634,7 +635,7 @@ class Table:
     def _draw_bot_name(self) -> str:
         """A random display name for a newly bound bot seat, unique among every bot this table
         has ever bound. Falls back to allowing a repeat only once the pool itself is exhausted
-        -- unreachable with 4 seats against a 16-name pool, kept only so this can never raise."""
+        -- unreachable with 4 seats against a 17-name pool, kept only so this can never raise."""
         available = [n for n in _BOT_NAME_POOL if n not in self._bot_names_used]
         name = self._bot_name_rng.choice(available or list(_BOT_NAME_POOL))
         self._bot_names_used.add(name)
