@@ -50,7 +50,8 @@ the `OracleFaanBot`-era `ORACLE` gates (seeds 1+, 1,000,000+, [bots.md §7, §9]
 | 9,000,000+ | 1,000 / 700 | R4 gate re-run, `LearnedBot` (the shipped numpy path) (§4); 9,500,000+ and 9,900,000+ hold the R4 action-agreement and pool-load samples (`HandEnv` states, not evals) |
 | 10,000,000+ | 1,000 | `OracleLearned` prototype (tuning, not a gate): both seatings vs `LearnedBot` ×3, vs `FaanBot` ×3, `OracleFaanBot` vs `LearnedBot` ×3 ([ADR 0022](decisions/0022-oracle-learned-tier.md)) |
 | 11,000,000+ | 1,000 / 700 | Impossible gate for `learned.npz` L274.3M ([ADR 0022](decisions/0022-oracle-learned-tier.md)): `ORACLE` both seatings vs `LearnedBot` ×3 (1,000), `ORACLE` vs `FaanBot` ×3 (700); plus `OracleFaanBot` vs `LearnedBot` ×3 (1,000) and `LearnedBot` vs `FaanBot` ×3 (700) |
-| 12,000,000+ | — | next free range |
+| 12,000,000+ | 1,000 / 700 | behaviour analysis (§5), not a gate: L274.3M, 464.3M, L358.5M and `FaanBot` (as candidate) each vs `FaanBot` ×3 (1,000); L274.3M vs `EfficiencyBot` ×3, `EfficiencyBot` vs `FaanBot` ×3, L274.3M vs `LearnedBot` ×3 (700). The candidate seat sees identical tiles in every file |
+| 13,000,000+ | — | next free range |
 
 New weights take two fresh ranges, one for the Expert gate and one for the Impossible gate
 ([bots.md §2](bots.md) "Shipping new weights", steps 4–5).
@@ -418,9 +419,117 @@ mostly through one route (open half flush); by the hold's end it also builds clo
 reader of discards and melds has less to go on. The agent's deal-in rate per seat-hand is
 unchanged (0.070), and the bots still feed it 2.5× what it feeds them (683 vs 278).
 
-Not yet measured, worth doing next: push/fold timing (discard danger vs own shanten and opponents'
-visible melds), claim acceptance rate per offer (claims taken / claims offered), win-decline
-(`PASS` on a legal win) frequency, and the same breakdown against `ORACLE` and mixed tables.
+**Decision level** (2026-10-12, seeds 12,000,000+, §1). Every candidate decision with more than
+one legal action replayed with `ml.env.replay_hand`'s recipe: the policy's probabilities from the
+plain `seat_view`, shanten after each legal discard, and each discard's exact deal-in (omniscient,
+analysis only). Columns are the candidate seat on identical tiles: L274.3M (the shipped Expert
+weights, torch path) and `FaanBot`, each ×1 vs `FaanBot` ×3, 4,000 seat-hands and ~67k discards
+each; `EfficiencyBot` ×1 vs `FaanBot` ×3, 2,800. Scripts and rows:
+`server/runs/behaviour/` (gitignored). Measured facts first; the reading of them is in italics.
+
+**Direction is set by discard 3–6 and is public by discard 6.** It throws middle tiles and keeps
+honours; the bots do the reverse:
+
+| Own discards 1–3 | L274.3M | `FaanBot` | `EfficiencyBot` |
+| --- | --- | --- | --- |
+| dragons | 1.3% | 17.8% | 21.4% |
+| seat / prevailing wind | 1.5% | 17.2% | 18.0% |
+| other winds | 3.0% | 20.3% | 22.0% |
+| terminals | 17% | 23% | 25% |
+| 2–8 | 77% | 22% | 14% |
+| holding a lone value honour (discards 1–6): discards one that turn | 5.1% | 52% | 62% |
+| shanten-raising discards, discards 1–3 / 4–6 / 7–9 | 29% / 25% / 16% | 27% / 35% / 35% | 0 |
+
+The honours come out late instead (14% of its discards from the 13th on are dragons, `FaanBot` 9%).
+Hands with ≤ 2 tiles outside one suit (+ honours) at its 4th / 7th / 10th / 13th discard: 12% /
+39% / 61% / 69%; `FaanBot` ≤ 1.3% throughout. 74% of its wins are half or full flushes (`FaanBot`
+1.4%). Over its 816 flush wins, the suit it had discarded least over its first 3 discards was the winning
+suit (and unique) in 77%, over its first 6 in 96% — a reader of its pool alone knows the suit.
+
+**Claims follow the direction.** Taken / offered, offers without a win option:
+
+| Offer | L274.3M | `FaanBot` | `EfficiencyBot` |
+| --- | --- | --- | --- |
+| pung, all | 70% (5,607) | 5.6% (6,868) | 49% (3,484) |
+| pung of a dragon / seat-prevailing wind / other wind | 89% / 86% / 78% | 10% / 9% / 7% | 53% / 60% / 58% |
+| pung of a 2–8 tile | 59% | 3.5% | 40% |
+| pung, tile in / outside its main suit | 70% / 32% | 4.0% / 4.5% | 48% / 43% |
+| pung that doesn't lower shanten | 37% (1,132) | 0 | 0 |
+| chow, all | 26% (6,979) | 0.5% | 27% |
+| chow, tile in / outside its main suit | 33% / 0.8% | 0.7% / 0.4% | 24% / 29% |
+| chow, own discards 1–6 / 13+ | 16% / 28% | 0.8% / 0.2% | 59% / 5.5% |
+| exposed kong offer: kong / pung / pass | 0 / 18% / 80% (405) | 0 / 0.4% / 99.6% | 0 / 4% / 96% |
+
+The policy is near-deterministic on claims (mean probability of its chosen claim action 0.95; on
+own-turn decisions 0.66, below 0.6 in 47% of them).
+
+**Declines cheap rons to build, never declines a self-draw.** `PASS` (or a pung / chow) on a legal
+win:
+
+| Legal win | 464.3M | L274.3M | L358.5M | `FaanBot` | `EfficiencyBot` |
+| --- | --- | --- | --- | --- | --- |
+| ron, 3 faan | 20% (255) | 11% (162) | 3.0% (167) | 0 (241) | 0 (115) |
+| ron, 4 faan | 2.9% (207) | 9.4% (180) | 3.5% (202) | 0 | 0 |
+| ron, 5–6 faan | 0.4% (233) | 12% (263) | 2.5% (238) | 0 | 0 |
+| ron, 7+ faan | 0 (137) | 4.0% (198) | 2.7% (149) | 0 | 0 |
+| ron, all | 7.1% | 9.3% | 2.9% | 0 | 0 |
+| self-draw, any faan | 0 (420) | 0 (374) | 0 (385) | 0 (354) | 0 (344) |
+
+L274.3M's 75 declines: median wall 48 (accepted wins: 24), mean declined value 4.7 faan; 51 of the
+75 hands it went on to win, at a mean 5.5 faan, and the hand ended at +26.9 points per decline
+against +23.5 had it taken the ron (selection-biased: the comparison holds the declined win's value
+fixed). On the `EfficiencyBot` table it declines 2.3%, on its own table 8.1%. *The decline rule is
+not stable across checkpoints (464.3M declined 3-faan rons, L274.3M 5–6 faan, L358.5M almost none):
+an early-wall "this hand can still grow" bet that the league keeps re-learning, not a fixed trait.*
+
+**Keeps tenpai unless the wait is dead.** With a tenpai discard available (10,452 decisions) it
+keeps tenpai 95% (`FaanBot` 97%, `EfficiencyBot` 100%); 97% when some wait clears `min_faan`, 80%
+when every wait is dead or sub-minimum (`FaanBot` 96%, `EfficiencyBot` 100%). Choosing among
+several tenpai discards it takes the highest-value wait 96% of the time, the widest 88%
+(`FaanBot` 91% / 87%).
+
+**Push/fold.** Fold = a shanten-raising discard; per discard, L274.3M / `FaanBot`:
+
+| Max opponent exposed melds | own tenpai after | 1-shanten | 2+-shanten |
+| --- | --- | --- | --- |
+| 0 | fold 5.0% / 3.5% | 11% / 23% | 21% / 29% |
+| 2 | 7.3% / 2.3% | 11% / 15% | 21% / 31% |
+| 3+ | 8.5% / 2.3%, deal-in 2.7% / 1.2% | 19% / 8.5% | 25% / 18% |
+
+With an opponent really tenpai and a live tile in hand, it discards a live tile 12.5% of the time
+when tenpai itself (`FaanBot` 9.2%), 7.7% at 1-shanten (5.9%), 8.7% at 2+ (5.8%); deal-in per
+discard is level with `FaanBot`'s (1.1–1.7%). Genbutsu against the most-melded opponent (≥ 2
+melds): 33–36% of its discards vs 20–23% of its legal tiles (`FaanBot` 30–36% vs 18–27%). In the
+last 5 wall tiles it folds 18% of discards (`FaanBot` 2.9%) at the same deal-in per discard (1.3% /
+1.9%). *Unlike `FaanBot`, its folding rises with the table's meld count, not just with turn; at
+2+-shanten it folds less than `FaanBot` because it is still building (its shanten-raising
+discards early are flush-building, not defence).*
+
+**No suit reading.** Against an opponent whose ≥ 2 exposed suited melds are all one suit, its
+discards are in that suit 27% of the time vs 25% of its legal tiles (262 decisions; `FaanBot` 20%
+vs 32%). On its own table (12,364 decisions) 42% vs 31%, and those in-suit discards deal in 1.8%
+vs 1.1% for its other discards.
+
+**Kongs: about one opportunity in two.** Concealed kong: declared on 65% of (hand, tile)
+opportunities, 56% at the first chance; added kong 72% / 60%; neither rate moves with being
+tenpai, wall, or an opponent being tenpai. Neither heuristic bot ever declares one (483 / 46
+concealed / added kong decisions for `FaanBot`). Exposed kong offers are passed (above).
+
+**Seat and flowers.** Dealer +10.4 points/hand vs +8.3 non-dealer (win 31% / 26%), `FaanBot`
++0.25 / −0.08. With no flowers it wins 31% (1–3 flowers 26–28%), as does `FaanBot` (25% vs
+12–17%): 無花 is a free faan toward `min_faan`. 門風 / 圈風 appear in 13% / 12% of its wins.
+
+**Over training** (464.3M → L274.3M → L358.5M, same 4,000 seat-hands): points/hand +7.8 / +8.9 /
++7.9; average win faan 4.95 / 5.40 / 5.12; flush wins 63% / 74% / 73%; all-pungs wins 17% / 20% /
+13%; hands one-suited by the 10th discard 53% / 61% / 63%; lone value honour thrown early 11% / 5.1%
+/ 5.2%; chow acceptance 16% / 26% / 18%; pung of an off-suit tile 28% / 32% / 19%; exposed-kong
+offers ponged 40% / 18% / 67%; tenpai at exhaustive draw 34% / 47% / 37%. *The league kept the
+direction (earlier and more committed flush building, honours held longer) and swings the claim and
+decline thresholds checkpoint to checkpoint.*
+
+Not yet measured, worth doing next: the same decision-level breakdown against `ORACLE` and mixed
+tables; a controlled suit-reading probe (the same state with an opponent's melds moved to another
+suit).
 
 ## 6. Findings for future runs
 
