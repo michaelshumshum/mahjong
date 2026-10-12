@@ -162,7 +162,6 @@
 	"opponentRegion_dealerBadgeTitle": "莊家",
 	"botBadge_title": "電腦操控座位",
 	"botBadge_label": "機械人",
-	"botBadge_levelLabel": "機械人 · {level}",
 	"botBadge_levelTitle": "電腦操控座位（{level}）",
 	"opponentRegion_awayChipTitle": "已斷線 -- 可能會轉為自動遊玩",
 	"opponentRegion_awayChipLabel": "離線",

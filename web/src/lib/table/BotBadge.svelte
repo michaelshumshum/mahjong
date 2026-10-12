@@ -3,8 +3,8 @@
 
 	let { level = null }: { level?: string | null } = $props();
 
-	// wire tier -> practice picker's difficulty word ($lib/net/lobby's PRACTICE_DIFFICULTY_TO_TIER,
-	// not imported: lobby.ts pulls in $env/dynamic/public). an unknown tier falls back to plain "Bot".
+	// level word alone (the chip reads as a bot); mirrors lobby.ts's PRACTICE_DIFFICULTY_TO_TIER,
+	// not imported since lobby.ts pulls in $env/dynamic/public. unknown tier -> plain "Bot".
 	const LEVEL_LABEL: Record<string, () => string> = {
 		T1: m.practiceDifficultySlot_easyLabel,
 		T2: m.practiceDifficultySlot_normalLabel,
@@ -19,7 +19,7 @@
 	class="bot-badge"
 	data-level={level ?? undefined}
 	title={levelLabel ? m.botBadge_levelTitle({ level: levelLabel }) : m.botBadge_title()}
-	>{levelLabel ? m.botBadge_levelLabel({ level: levelLabel }) : m.botBadge_label()}</span
+	>{levelLabel ?? m.botBadge_label()}</span
 >
 
 <style lang="scss">

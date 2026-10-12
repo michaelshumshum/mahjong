@@ -162,7 +162,6 @@
 	"opponentRegion_dealerBadgeTitle": "Dealer",
 	"botBadge_title": "Bot-controlled seat",
 	"botBadge_label": "Bot",
-	"botBadge_levelLabel": "Bot · {level}",
 	"botBadge_levelTitle": "Bot-controlled seat ({level})",
 	"opponentRegion_awayChipTitle": "Disconnected -- autoplay may take over",
 	"opponentRegion_awayChipLabel": "Away",
