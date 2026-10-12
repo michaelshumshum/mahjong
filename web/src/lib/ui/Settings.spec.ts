@@ -67,7 +67,29 @@ describe('Settings', () => {
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs: offPrefs, onAutoArmChange: noop, onPrefsChange: noop }
 		});
-		expect(body.toLowerCase()).not.toContain('win');
+		const labels = [...body.matchAll(/class="switch-label[^"]*">([^<]*)</g)].map((m) => m[1]);
+		expect(labels.length).toBeGreaterThan(0);
+		expect(labels.some((label) => label.toLowerCase().includes('win'))).toBe(false);
+	});
+
+	it('renders three tabs with only the first panel visible', () => {
+		const { body } = render(Settings, {
+			props: { autoArm: offArm, prefs: offPrefs, onAutoArmChange: noop, onPrefsChange: noop }
+		});
+		expect([...body.matchAll(/role="tab"/g)]).toHaveLength(3);
+		expect([...body.matchAll(/role="tabpanel"[^>]*hidden/g)]).toHaveLength(2);
+		expect(body).toMatch(
+			/role="tab"[^>]*aria-selected="true"[^>]*data-testid="settings-tab-calls"/
+		);
+	});
+
+	it('describes the selected discard mode and the pre-arm toggles', () => {
+		const { body } = render(Settings, {
+			props: { autoArm: offArm, prefs: offPrefs, onAutoArmChange: noop, onPrefsChange: noop }
+		});
+		expect(body).toContain('Tap a tile to lift it, tap it again to discard.');
+		expect(body).not.toContain('Tap a tile to discard it straight away.');
+		expect(body).toContain('Pass every pung, kong and chow offer automatically.');
 	});
 
 	it('renders the language switcher as its own section', () => {

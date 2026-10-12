@@ -12,6 +12,7 @@ test('switching locale via the UI writes the cookie and re-renders zh-Hant, surv
 }) => {
 	await page.goto('/demo');
 	await page.waitForLoadState('networkidle');
+	await page.getByRole('tab', { name: 'Display', exact: true }).click();
 
 	// each locale option renders its own label in its own language regardless of current locale,
 	// so these two names are stable across both directions of the switch.
@@ -19,11 +20,13 @@ test('switching locale via the UI writes the cookie and re-renders zh-Hant, surv
 	const zhHantOption = page.getByRole('radio', { name: '繁體中文' });
 	await expect(englishOption).toBeChecked();
 
-	await zhHantOption.check();
+	// click, not check: the reload lands back on the first settings tab, hiding the radio.
+	await zhHantOption.click();
 	await page.waitForLoadState('networkidle'); // setLocale's default reload: true
 
 	const cookies = await context.cookies();
 	expect(cookies.find((c) => c.name === 'PARAGLIDE_LOCALE')?.value).toBe('zh-Hant');
+	await page.getByTestId('settings-tab-display').click();
 	await expect(page.getByRole('radio', { name: '繁體中文' })).toBeChecked();
 
 	// the lobby's real (non-demo, ApiConnectGate-gated) copy actually renders in zh-Hant: the

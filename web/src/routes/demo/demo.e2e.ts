@@ -29,12 +29,13 @@ test('settings demo: toggling pre-arm and motion prefs fires onChange with the n
 		'no_calls=false auto_pass_chow=false'
 	);
 
-	await page.getByLabel('No calls this hand').check();
+	await page.getByRole('switch', { name: 'No calls' }).check();
 	await expect(page.getByTestId('auto-arm-summary')).toHaveText(
 		'no_calls=true auto_pass_chow=false'
 	);
 
-	await page.getByLabel('Reduce motion').check();
+	await page.getByRole('tab', { name: 'Display', exact: true }).click();
+	await page.getByRole('radio', { name: 'Reduce motion' }).check();
 	await expect(page.getByTestId('prefs-summary')).toHaveText('soundEnabled=true motion=reduced');
 });
 

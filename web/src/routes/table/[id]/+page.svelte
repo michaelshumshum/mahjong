@@ -35,6 +35,8 @@
 		clearSecretForTable,
 		loadAutoArm,
 		loadClientPrefs,
+		DEFAULT_AUTO_ARM,
+		DEFAULT_CLIENT_PREFS,
 		loadDisplayName,
 		loadOnboarding,
 		loadPracticeSetup,
@@ -762,16 +764,8 @@
 		saveDisplayName(value);
 	}
 
-	let autoArm: AutoArm = $state(loadAutoArm() ?? { noCalls: false, autoPassChow: false });
-	let clientPrefs: ClientPrefs = $state(
-		loadClientPrefs() ?? {
-			soundEnabled: true,
-			motion: 'system',
-			discardMode: 'two-step',
-			haptics: true,
-			announceAllDiscards: false
-		}
-	);
+	let autoArm: AutoArm = $state(loadAutoArm() ?? { ...DEFAULT_AUTO_ARM });
+	let clientPrefs: ClientPrefs = $state(loadClientPrefs() ?? { ...DEFAULT_CLIENT_PREFS });
 	// guards the one-shot re-send above per live connection instance, mirroring `readySent`.
 	let autoArmSent = $state(false);
 
@@ -989,6 +983,7 @@
 						saveClientPrefs(next);
 						applyMotionPref(next.motion);
 					}}
+					onReset={() => pushToast(m.settings_resetDone())}
 				/>
 			</DismissablePanel>
 		{/if}

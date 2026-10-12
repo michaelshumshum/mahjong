@@ -573,6 +573,27 @@ Rules:
 - **Connect URL:** adds `&spectate=true` whenever there is no persisted seat to resume, so the page
   gets real seat occupancy before joining (§7 "Join flow").
 
+### Settings dialog
+
+`lib/ui/Settings.svelte`, opened from the table header (`DismissablePanel`). Three tabs
+(`role="tablist"`, roving focus, `←`/`→` wrap, `Home`/`End`):
+
+| Tab | Controls |
+| --- | --- |
+| Calls | `autoArm`: No calls, Auto-pass chow (switches) |
+| Gameplay | discard mode (segmented), Announce every discard (switch) |
+| Display | motion (segmented), Sound effects and Haptic feedback (switches), language (`LocaleSwitcher`, segmented) |
+
+- Every control carries a one-line description; a segmented control (`SegmentedControl.svelte`,
+  a native radio group) shows only the selected option's description.
+- Inactive panels stay mounted with `hidden`, and the dialog has a fixed height
+  (`min(36rem, 100dvh - 2rem)`) whose body scrolls, so switching tabs never resizes it.
+- **Reset to defaults** restores `DEFAULT_CLIENT_PREFS` and `DEFAULT_AUTO_ARM`
+  (`settings-storage.ts`) through the same change callbacks, so live mode re-sends `auto`. Locale
+  is untouched. Disabled while everything already matches the defaults.
+- Switches are `<input type="checkbox" role="switch">`; e2e specs select them with
+  `getByRole('switch', …)` after opening the right tab (hidden panels drop out of the a11y tree).
+
 ### Persistence
 
 All `localStorage` access (`lib/ui/settings-storage.ts`) is wrapped in `try/catch` and falls back
@@ -1121,7 +1142,7 @@ fluent Hong Kong mahjong player.
 
   Spectators have no hand row, so none of this applies there.
 - **Names:** tiles are announced by localized name, never code (§9 i18n "Tile names").
-- **Reduced motion:** Settings' Motion radio (`system`/`reduced`/`full`, persisted in
+- **Reduced motion:** Settings' Motion control (`system`/`reduced`/`full`, persisted in
   `clientPrefs`) is mirrored onto `html[data-motion]` by `lib/ui/motion.ts`'s `applyMotionPref`
   — from the root `+layout.svelte` on load, and on every Settings change. `reduced`/`full`
   override the OS; `system` defers to `prefers-reduced-motion`.

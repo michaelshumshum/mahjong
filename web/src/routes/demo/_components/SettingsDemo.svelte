@@ -1,16 +1,11 @@
 <script lang="ts">
 	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
 	import { m } from '$lib/paraglide/messages.js';
+	import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from '$lib/ui/settings-storage';
 
 	// mock `auto` pre-arm state plus client-only prefs, no real message sent or persisted yet.
-	let autoArm = $state<AutoArm>({ noCalls: false, autoPassChow: false });
-	let clientPrefs = $state<ClientPrefs>({
-		soundEnabled: true,
-		motion: 'system',
-		discardMode: 'two-step',
-		haptics: true,
-		announceAllDiscards: false
-	});
+	let autoArm = $state<AutoArm>({ ...DEFAULT_AUTO_ARM });
+	let clientPrefs = $state<ClientPrefs>({ ...DEFAULT_CLIENT_PREFS });
 	let lastAutoArmSummary = $derived(
 		`no_calls=${autoArm.noCalls} auto_pass_chow=${autoArm.autoPassChow}`
 	);

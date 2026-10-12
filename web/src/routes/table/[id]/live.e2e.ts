@@ -353,8 +353,8 @@ test('a real game reaching game_end auto-shows the game-end summary, and a past 
 		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
 
 		await page.getByTestId('toggle-settings').click();
-		await page.getByLabel('No calls this hand').check();
-		await page.getByLabel('Auto-pass chow').check();
+		await page.getByRole('switch', { name: 'No calls' }).check();
+		await page.getByRole('switch', { name: 'Auto-pass chow' }).check();
 		await page.getByTestId('close-button').click();
 
 		const gameEndOverlay = page.getByTestId('game-end-overlay');

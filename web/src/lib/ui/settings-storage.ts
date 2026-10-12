@@ -17,9 +17,16 @@ export const TABLE_CREDS_TTL_MS = 24 * 60 * 60 * 1000;
 
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 const DISCARD_MODES: readonly DiscardMode[] = ['two-step', 'one-tap'];
-const DEFAULT_DISCARD_MODE: DiscardMode = 'two-step';
-const DEFAULT_HAPTICS = true;
-const DEFAULT_ANNOUNCE_ALL_DISCARDS = false;
+
+export const DEFAULT_CLIENT_PREFS: Readonly<ClientPrefs> = {
+	soundEnabled: true,
+	motion: 'system',
+	discardMode: 'two-step',
+	haptics: true,
+	announceAllDiscards: false
+};
+
+export const DEFAULT_AUTO_ARM: Readonly<AutoArm> = { noCalls: false, autoPassChow: false };
 
 function isMotionPref(value: unknown): value is MotionPref {
 	return typeof value === 'string' && (MOTION_PREFS as readonly string[]).includes(value);
@@ -91,10 +98,10 @@ export function loadClientPrefs(): ClientPrefs | null {
 	const rawAnnounce = (raw as unknown as Record<string, unknown>).announceAllDiscards;
 	return {
 		...raw,
-		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_DISCARD_MODE,
-		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_HAPTICS,
+		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_CLIENT_PREFS.discardMode,
+		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_CLIENT_PREFS.haptics,
 		announceAllDiscards:
-			typeof rawAnnounce === 'boolean' ? rawAnnounce : DEFAULT_ANNOUNCE_ALL_DISCARDS
+			typeof rawAnnounce === 'boolean' ? rawAnnounce : DEFAULT_CLIENT_PREFS.announceAllDiscards
 	};
 }
 

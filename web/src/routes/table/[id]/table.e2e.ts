@@ -424,7 +424,8 @@ test('reloading the page preserves clientPrefs toggled in Settings', async ({ pa
 	await page.waitForLoadState('networkidle');
 
 	await page.getByTestId('toggle-settings').click();
-	const soundToggle = page.getByRole('checkbox', { name: 'Sound effects' });
+	await page.getByRole('tab', { name: 'Display', exact: true }).click();
+	const soundToggle = page.getByRole('switch', { name: 'Sound effects' });
 	const reducedMotion = page.getByRole('radio', { name: 'Reduce motion' });
 	await expect(soundToggle).toBeChecked(); // default is on
 	await soundToggle.uncheck();
@@ -433,8 +434,9 @@ test('reloading the page preserves clientPrefs toggled in Settings', async ({ pa
 	await page.reload();
 	await page.waitForLoadState('networkidle');
 	await page.getByTestId('toggle-settings').click();
+	await page.getByRole('tab', { name: 'Display', exact: true }).click();
 
-	await expect(page.getByRole('checkbox', { name: 'Sound effects' })).not.toBeChecked();
+	await expect(page.getByRole('switch', { name: 'Sound effects' })).not.toBeChecked();
 	await expect(page.getByRole('radio', { name: 'Reduce motion' })).toBeChecked();
 });
 
@@ -452,6 +454,7 @@ test('the motion setting drives html[data-motion] and overrides prefers-reduced-
 	await expect(ring).toHaveCSS('animation-name', 'none');
 
 	await page.getByTestId('toggle-settings').click();
+	await page.getByRole('tab', { name: 'Display', exact: true }).click();
 	await page.getByRole('radio', { name: 'Full motion' }).check();
 	await expect(html).toHaveAttribute('data-motion', 'full');
 	await expect(ring).not.toHaveCSS('animation-name', 'none');
