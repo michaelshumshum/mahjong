@@ -1,4 +1,11 @@
-import type { AutoArm, ClientPrefs, DiscardMode, MotionPref, TileSize } from './Settings.svelte';
+import type {
+	AutoArm,
+	ClientPrefs,
+	DiscardMode,
+	HandOrder,
+	MotionPref,
+	TileSize
+} from './Settings.svelte';
 import type { PracticeDifficulty } from '$lib/net/lobby';
 
 // Namespaced, versioned keys -- `v1` lets a future shape change fail closed (treated as
@@ -18,6 +25,7 @@ export const TABLE_CREDS_TTL_MS = 24 * 60 * 60 * 1000;
 const MOTION_PREFS: readonly MotionPref[] = ['system', 'reduced', 'full'];
 const DISCARD_MODES: readonly DiscardMode[] = ['two-step', 'one-tap'];
 const TILE_SIZES: readonly TileSize[] = ['small', 'medium', 'large'];
+const HAND_ORDERS: readonly HandOrder[] = ['auto', 'manual'];
 
 export const DEFAULT_CLIENT_PREFS: Readonly<ClientPrefs> = {
 	soundEnabled: true,
@@ -25,7 +33,8 @@ export const DEFAULT_CLIENT_PREFS: Readonly<ClientPrefs> = {
 	discardMode: 'two-step',
 	haptics: true,
 	announceAllDiscards: false,
-	tileSize: 'medium'
+	tileSize: 'medium',
+	handOrder: 'auto'
 };
 
 export const DEFAULT_AUTO_ARM: Readonly<AutoArm> = { noCalls: false, autoPassChow: false };
@@ -40,6 +49,10 @@ function isDiscardMode(value: unknown): value is DiscardMode {
 
 function isTileSize(value: unknown): value is TileSize {
 	return typeof value === 'string' && (TILE_SIZES as readonly string[]).includes(value);
+}
+
+function isHandOrder(value: unknown): value is HandOrder {
+	return typeof value === 'string' && (HAND_ORDERS as readonly string[]).includes(value);
 }
 
 // only the fields that have always existed are required -- every later field is migrated
@@ -103,13 +116,15 @@ export function loadClientPrefs(): ClientPrefs | null {
 	const rawHaptics = (raw as unknown as Record<string, unknown>).haptics;
 	const rawAnnounce = (raw as unknown as Record<string, unknown>).announceAllDiscards;
 	const rawTileSize = (raw as unknown as Record<string, unknown>).tileSize;
+	const rawHandOrder = (raw as unknown as Record<string, unknown>).handOrder;
 	return {
 		...raw,
 		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_CLIENT_PREFS.discardMode,
 		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_CLIENT_PREFS.haptics,
 		announceAllDiscards:
 			typeof rawAnnounce === 'boolean' ? rawAnnounce : DEFAULT_CLIENT_PREFS.announceAllDiscards,
-		tileSize: isTileSize(rawTileSize) ? rawTileSize : DEFAULT_CLIENT_PREFS.tileSize
+		tileSize: isTileSize(rawTileSize) ? rawTileSize : DEFAULT_CLIENT_PREFS.tileSize,
+		handOrder: isHandOrder(rawHandOrder) ? rawHandOrder : DEFAULT_CLIENT_PREFS.handOrder
 	};
 }
 

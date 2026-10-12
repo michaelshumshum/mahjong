@@ -21,6 +21,9 @@
 
 	export type TileSize = 'small' | 'medium' | 'large';
 
+	// manual: tiles stay where the player drags them; new tiles join at the right.
+	export type HandOrder = 'auto' | 'manual';
+
 	// client-only prefs, no wire equivalent. `haptics` is separate from `motion`: vibration is
 	// always feature-detected to mobile, this setting only gates whether it fires at all.
 	export interface ClientPrefs {
@@ -31,6 +34,7 @@
 		// screen-reader verbosity: every discard, not just claim-relevant ones (frontend.md §9).
 		announceAllDiscards: boolean;
 		tileSize: TileSize;
+		handOrder: HandOrder;
 	}
 
 	type Tab = 'calls' | 'gameplay' | 'display';
@@ -165,6 +169,25 @@
 					}
 				]}
 				onChange={(discardMode) => onPrefsChange({ ...prefs, discardMode })}
+			/>
+
+			<SegmentedControl
+				legend={m.settings_handOrderLegend()}
+				name="handOrder"
+				value={prefs.handOrder}
+				options={[
+					{
+						value: 'auto',
+						label: m.settings_handOrderAutoLabel(),
+						description: m.settings_handOrderAutoDesc()
+					},
+					{
+						value: 'manual',
+						label: m.settings_handOrderManualLabel(),
+						description: m.settings_handOrderManualDesc()
+					}
+				]}
+				onChange={(handOrder) => onPrefsChange({ ...prefs, handOrder })}
 			/>
 
 			<fieldset class="group">

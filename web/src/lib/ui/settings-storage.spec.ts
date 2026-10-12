@@ -75,7 +75,8 @@ describe('settings-storage', () => {
 				discardMode: 'one-tap',
 				haptics: false,
 				announceAllDiscards: true,
-				tileSize: 'large'
+				tileSize: 'large',
+				handOrder: 'manual'
 			};
 			saveClientPrefs(prefs);
 			expect(loadClientPrefs()).toEqual(prefs);
@@ -96,7 +97,8 @@ describe('settings-storage', () => {
 				discardMode: 'two-step',
 				haptics: true,
 				announceAllDiscards: false,
-				tileSize: 'medium'
+				tileSize: 'medium',
+				handOrder: 'auto'
 			});
 		});
 
@@ -137,7 +139,8 @@ describe('settings-storage', () => {
 				discardMode: 'one-tap',
 				haptics: false,
 				announceAllDiscards: false,
-				tileSize: 'medium'
+				tileSize: 'medium',
+				handOrder: 'auto'
 			});
 		});
 
@@ -154,6 +157,18 @@ describe('settings-storage', () => {
 				JSON.stringify({ ...base, tileSize: 'small' })
 			);
 			expect(loadClientPrefs()?.tileSize).toBe('small');
+		});
+
+		it('migrates a pre-handOrder stored value to auto-sort and rejects an unknown order', () => {
+			const base = { soundEnabled: true, motion: 'system' };
+			localStorage.setItem(CLIENT_PREFS_STORAGE_KEY, JSON.stringify(base));
+			expect(loadClientPrefs()?.handOrder).toBe('auto');
+
+			localStorage.setItem(
+				CLIENT_PREFS_STORAGE_KEY,
+				JSON.stringify({ ...base, handOrder: 'by-suit' })
+			);
+			expect(loadClientPrefs()?.handOrder).toBe('auto');
 		});
 
 		it('discards an invalid stored discardMode in favour of the default', () => {
@@ -387,7 +402,8 @@ describe('settings-storage', () => {
 					discardMode: 'two-step',
 					haptics: true,
 					announceAllDiscards: false,
-					tileSize: 'medium'
+					tileSize: 'medium',
+					handOrder: 'auto'
 				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();
@@ -409,7 +425,8 @@ describe('settings-storage', () => {
 					discardMode: 'two-step',
 					haptics: true,
 					announceAllDiscards: false,
-					tileSize: 'medium'
+					tileSize: 'medium',
+					handOrder: 'auto'
 				})
 			).not.toThrow();
 			expect(() => saveAutoArm({ noCalls: true, autoPassChow: true })).not.toThrow();

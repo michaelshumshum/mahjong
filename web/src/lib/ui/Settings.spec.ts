@@ -14,7 +14,8 @@ describe('Settings', () => {
 		discardMode: 'two-step',
 		haptics: false,
 		announceAllDiscards: false,
-		tileSize: 'medium'
+		tileSize: 'medium',
+		handOrder: 'auto'
 	};
 
 	it('renders both pre-arm toggles unchecked when both are off', () => {
@@ -41,7 +42,8 @@ describe('Settings', () => {
 			discardMode: 'two-step',
 			haptics: false,
 			announceAllDiscards: false,
-			tileSize: 'medium'
+			tileSize: 'medium',
+			handOrder: 'auto'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -56,7 +58,8 @@ describe('Settings', () => {
 			discardMode: 'two-step',
 			haptics: false,
 			announceAllDiscards: false,
-			tileSize: 'medium'
+			tileSize: 'medium',
+			handOrder: 'auto'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -110,7 +113,8 @@ describe('Settings', () => {
 			discardMode: 'two-step',
 			haptics: true,
 			announceAllDiscards: false,
-			tileSize: 'medium'
+			tileSize: 'medium',
+			handOrder: 'auto'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }
@@ -125,7 +129,8 @@ describe('Settings', () => {
 			discardMode: 'one-tap',
 			haptics: false,
 			announceAllDiscards: false,
-			tileSize: 'medium'
+			tileSize: 'medium',
+			handOrder: 'auto'
 		};
 		const { body } = render(Settings, {
 			props: { autoArm: offArm, prefs, onAutoArmChange: noop, onPrefsChange: noop }

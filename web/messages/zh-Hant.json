@@ -540,5 +540,10 @@
 	"settings_tileSizeLargeLabel": "大",
 	"settings_tileSizeSmallDesc": "枱面多啲位。手牌唔會細過容易撳嘅大細。",
 	"settings_tileSizeMediumDesc": "標準大細。",
-	"settings_tileSizeLargeDesc": "畫面夠位就用大啲嘅牌。手牌一定放得落畫面闊度。"
+	"settings_tileSizeLargeDesc": "畫面夠位就用大啲嘅牌。手牌一定放得落畫面闊度。",
+	"settings_handOrderLegend": "手牌排列",
+	"settings_handOrderAutoLabel": "自動排序",
+	"settings_handOrderManualLabel": "手動",
+	"settings_handOrderAutoDesc": "手牌一律按花色同數字排好。",
+	"settings_handOrderManualDesc": "拖動牌嚟排列，或者喺選中嘅牌撳 Shift + ←/→。新牌會加喺右邊。"
 }

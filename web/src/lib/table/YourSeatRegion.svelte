@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import TileFace from './TileFace.svelte';
 	import SeatPlate from './SeatPlate.svelte';
@@ -10,6 +11,9 @@
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { motionMs } from '$lib/ui/motion';
 	import { m } from '$lib/paraglide/messages.js';
+
+	// a press that travels this far drags the tile (manual hand order) instead of tapping it.
+	const DRAG_THRESHOLD_PX = 8;
 
 	// how long a sent discard waits for the server echo before a stalled indicator (§5) --
 	// cosmetic, resolved by the normal reconnect/resync path, never a client-side guess.
@@ -42,6 +46,8 @@
 		discardableTileIds,
 		discardMode,
 		onDiscard,
+		arrangeable = false,
+		onReorder = () => {},
 		declareOptions,
 		scoreDelta = null
 	}: {
@@ -54,6 +60,8 @@
 		discardableTileIds: Set<number>;
 		discardMode: DiscardMode;
 		onDiscard: (tileId: number) => void;
+		arrangeable?: boolean;
+		onReorder?: (tileId: number, toIndex: number) => void;
 		declareOptions: DeclareOption[];
 		scoreDelta?: { value: number; key: number } | null;
 	} = $props();
@@ -141,6 +149,15 @@
 
 	function handleHandKeydown(e: KeyboardEvent): void {
 		if (rovingTileId === null) return;
+		if (arrangeable && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+			const from = arrangedIds.indexOf(rovingTileId);
+			if (from === -1) return;
+			e.preventDefault();
+			const tileId = rovingTileId;
+			onReorder(tileId, from + (e.key === 'ArrowLeft' ? -1 : 1));
+			tick().then(() => focusTile(tileId));
+			return;
+		}
 		const last = discardableOrder.length - 1;
 		const index = discardableOrder.indexOf(rovingTileId);
 		let next: number;
@@ -151,6 +168,116 @@
 		else return;
 		e.preventDefault();
 		focusTile(discardableOrder[next]);
+	}
+
+	// manual hand order: concealed tiles only -- the drawn tile stays held apart until discarded.
+	const arrangedIds = $derived(
+		ownHandTiles.filter((t) => !t.drawn && t.tileId !== null).map((t) => t.tileId as number)
+	);
+
+	interface Drag {
+		tileId: number;
+		pointerId: number;
+		startX: number;
+		startY: number;
+		// pointer position inside the dragged slot's layout box, fixed at activation.
+		grabX: number;
+		grabY: number;
+		active: boolean;
+	}
+	let drag = $state<Drag | null>(null);
+	let dragOffset = $state({ x: 0, y: 0 });
+	let lastPointer = { x: 0, y: 0 };
+	// set when a drag ends, so the click the browser fires on release discards/lifts nothing.
+	let swallowClick = false;
+
+	function slotOf(tileId: number): HTMLElement | null {
+		return handRowEl?.querySelector<HTMLElement>(`[data-slot-tile-id="${tileId}"]`) ?? null;
+	}
+
+	// layout boxes (offsetLeft/Top against the positioned row), never getBoundingClientRect: a
+	// neighbour mid-flip reports its transformed box and the target index would oscillate.
+	function pointerInRow(clientX: number, clientY: number): { x: number; y: number } {
+		const row = handRowEl!.getBoundingClientRect();
+		return { x: clientX - row.left, y: clientY - row.top };
+	}
+
+	function updateDragOffset(): void {
+		const slot = drag && slotOf(drag.tileId);
+		if (!drag || !slot) return;
+		const p = pointerInRow(lastPointer.x, lastPointer.y);
+		dragOffset = { x: p.x - drag.grabX - slot.offsetLeft, y: p.y - drag.grabY - slot.offsetTop };
+	}
+
+	function nearestSlotIndex(x: number, y: number): number {
+		let best = 0;
+		let bestDist = Infinity;
+		arrangedIds.forEach((id, i) => {
+			const slot = slotOf(id);
+			if (!slot) return;
+			const cx = slot.offsetLeft + slot.offsetWidth / 2;
+			const cy = slot.offsetTop + slot.offsetHeight / 2;
+			const dist = Math.hypot(x - cx, (y - cy) * 2);
+			if (dist < bestDist) {
+				best = i;
+				bestDist = dist;
+			}
+		});
+		return best;
+	}
+
+	function handleRowPointerDown(e: PointerEvent): void {
+		swallowClick = false;
+		if (!arrangeable || !e.isPrimary || e.button !== 0) return;
+		const slot = (e.target as Element).closest<HTMLElement>('[data-slot-tile-id]');
+		const tileId = Number(slot?.dataset.slotTileId);
+		if (!slot || !arrangedIds.includes(tileId)) return;
+		drag = {
+			tileId,
+			pointerId: e.pointerId,
+			startX: e.clientX,
+			startY: e.clientY,
+			grabX: 0,
+			grabY: 0,
+			active: false
+		};
+	}
+
+	function handleWindowPointerMove(e: PointerEvent): void {
+		if (!drag || e.pointerId !== drag.pointerId || !handRowEl) return;
+		lastPointer = { x: e.clientX, y: e.clientY };
+		if (!drag.active) {
+			if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD_PX) return;
+			const slot = slotOf(drag.tileId);
+			if (!slot) return;
+			const start = pointerInRow(drag.startX, drag.startY);
+			drag.grabX = start.x - slot.offsetLeft;
+			drag.grabY = start.y - slot.offsetTop;
+			drag.active = true;
+			liftedTileId = null;
+		}
+		e.preventDefault();
+		const p = pointerInRow(e.clientX, e.clientY);
+		const target = nearestSlotIndex(p.x - drag.grabX + slotOf(drag.tileId)!.offsetWidth / 2, p.y);
+		if (target !== arrangedIds.indexOf(drag.tileId)) {
+			onReorder(drag.tileId, target);
+			tick().then(updateDragOffset);
+		}
+		updateDragOffset();
+	}
+
+	function handleWindowPointerUp(e: PointerEvent): void {
+		if (!drag || e.pointerId !== drag.pointerId) return;
+		if (drag.active) swallowClick = e.type === 'pointerup';
+		drag = null;
+		dragOffset = { x: 0, y: 0 };
+	}
+
+	function handleRowClickCapture(e: MouseEvent): void {
+		if (!swallowClick) return;
+		swallowClick = false;
+		e.stopPropagation();
+		e.preventDefault();
 	}
 
 	function isTypingTarget(target: EventTarget | null): boolean {
@@ -172,7 +299,13 @@
 	}
 </script>
 
-<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
+<svelte:window
+	onclick={handleWindowClick}
+	onkeydown={handleWindowKeydown}
+	onpointermove={handleWindowPointerMove}
+	onpointerup={handleWindowPointerUp}
+	onpointercancel={handleWindowPointerUp}
+/>
 
 <section
 	class="seat-region seat-region--self"
@@ -245,18 +378,26 @@
 		{:else}
 			<div
 				class="hand-row"
+				class:hand-row--arrangeable={arrangeable}
 				role="toolbar"
 				tabindex="-1"
 				aria-label={m.yourSeatRegion_yourConcealedHandAriaLabel()}
-				aria-keyshortcuts="h"
+				aria-keyshortcuts={arrangeable ? 'h Shift+ArrowLeft Shift+ArrowRight' : 'h'}
 				bind:this={handRowEl}
 				onkeydown={handleHandKeydown}
+				onclickcapture={handleRowClickCapture}
+				onpointerdown={handleRowPointerDown}
+				ondragstart={(e) => e.preventDefault()}
 			>
 				{#each ownHandTiles as tile (tile.key)}
+					{@const dragging = drag?.active === true && drag.tileId === tile.tileId}
 					<div
 						class="hand-tile-slot"
 						class:hand-tile-slot--drawn={tile.drawn}
-						animate:flip={{ duration: motionMs(220) }}
+						class:hand-tile-slot--dragging={dragging}
+						data-slot-tile-id={tile.tileId}
+						style:translate={dragging ? `${dragOffset.x}px ${dragOffset.y}px` : null}
+						animate:flip={{ duration: dragging ? 0 : motionMs(220) }}
 					>
 						{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
 							{@const lifted = liftedTileId === tile.tileId}
@@ -369,7 +510,25 @@
 			var(--hand-gap),
 			calc((100cqi - var(--hand-drawn-gap) - 14 * var(--hand-tile-w)) / 13)
 		);
+		position: relative;
 		display: flex;
+	}
+
+	// the browser must not pan, select or native-drag while a tile is being dragged.
+	.hand-row--arrangeable {
+		user-select: none;
+
+		.hand-tile-slot:not(.hand-tile-slot--drawn) {
+			touch-action: none;
+			cursor: grab;
+		}
+	}
+
+	.hand-tile-slot--dragging {
+		position: relative;
+		z-index: 3;
+		cursor: grabbing;
+		filter: drop-shadow(0 8px 10px rgb(0 0 0 / 0.45));
 	}
 
 	// the flip-animated flex item -- the inner button/div just fills it. animate: needs the

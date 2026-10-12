@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import TileFace from '$lib/table/TileFace.svelte';
@@ -10,6 +11,7 @@
 		type Seat
 	} from '$lib/table/mock-game-state';
 	import { tileIdToCode } from '$lib/table/tile-code';
+	import { moveTile, reconcileHandOrder } from '$lib/table/hand-order';
 	import { meldToView, viewFromClientState, wireWindToCode } from '$lib/table/live-view';
 	import { MahjongSocket, defaultWsUrl } from '$lib/net/socket';
 	import { GameStore } from '$lib/game/store.svelte';
@@ -357,18 +359,52 @@
 		drawn: boolean;
 	}
 
+	// manual hand order (ClientPrefs.handOrder): local presentation only, reconciled against the
+	// live hand on every change so held tiles keep their place and new ones join at the right.
+	let manualOrder = $state<number[]>([]);
+	let arrangedConcealedIds = $derived.by((): number[] => {
+		const concealedIds = live?.ownHand.concealedIds ?? [];
+		return clientPrefs.handOrder === 'manual'
+			? reconcileHandOrder(manualOrder, concealedIds)
+			: concealedIds;
+	});
+	$effect(() => {
+		const next = clientPrefs.handOrder === 'manual' ? arrangedConcealedIds : [];
+		untrack(() => {
+			if (next.length !== manualOrder.length || next.some((id, i) => manualOrder[i] !== id))
+				manualOrder = next;
+		});
+	});
+
+	function reorderHand(tileId: number, toIndex: number): void {
+		manualOrder = moveTile(arrangedConcealedIds, tileId, toIndex);
+	}
+
+	// keyed by tile_id when live, so a reorder (or the drawn tile joining the hand) animates the
+	// same element; mock fixtures have no ids, so they key by position.
 	let ownHandTiles = $derived.by((): OwnHandTile[] => {
 		const seat0 = seatAt(0);
-		const concealedIds = live?.ownHand.concealedIds ?? [];
 		const drawnId = live?.ownHand.drawnId ?? null;
-		const tiles: OwnHandTile[] = (seat0.concealedHand ?? []).map((code, i) => ({
-			key: `c-${i}`,
-			code,
-			tileId: concealedIds[i] ?? null,
-			drawn: false
-		}));
+		const tiles: OwnHandTile[] = live
+			? arrangedConcealedIds.map((id) => ({
+					key: `t-${id}`,
+					code: tileIdToCode(id),
+					tileId: id,
+					drawn: false
+				}))
+			: (seat0.concealedHand ?? []).map((code, i) => ({
+					key: `c-${i}`,
+					code,
+					tileId: null,
+					drawn: false
+				}));
 		if (seat0.drawn) {
-			tiles.push({ key: 'drawn', code: seat0.drawn, tileId: drawnId, drawn: true });
+			tiles.push({
+				key: drawnId !== null ? `t-${drawnId}` : 'drawn',
+				code: seat0.drawn,
+				tileId: drawnId,
+				drawn: true
+			});
 		}
 		return tiles;
 	});
@@ -889,6 +925,8 @@
 					{discardableTileIds}
 					discardMode={clientPrefs.discardMode}
 					onDiscard={discardTile}
+					arrangeable={!isMock && clientPrefs.handOrder === 'manual'}
+					onReorder={reorderHand}
 					{declareOptions}
 					scoreDelta={scoreDeltaFor(seatAt(0).seat)}
 				/>

@@ -281,3 +281,90 @@ describe('YourSeatRegion portrait phone two-row hand', () => {
 		expect(onDiscard).not.toHaveBeenCalled();
 	});
 });
+
+describe('YourSeatRegion manual hand order', () => {
+	afterEach(cleanupAll);
+
+	function arrangeProps(arrangeable: boolean, onReorder = vi.fn(), onDiscard = vi.fn()) {
+		return {
+			...baseProps('one-tap', onDiscard),
+			ownHandTiles: [
+				{ key: 't-10', code: '1m' as const, tileId: 10, drawn: false },
+				{ key: 't-11', code: '2m' as const, tileId: 11, drawn: false },
+				{ key: 't-12', code: '3m' as const, tileId: 12, drawn: true }
+			],
+			discardableTileIds: new Set([10, 11, 12]),
+			arrangeable,
+			onReorder
+		};
+	}
+
+	function pointer(type: string, target: EventTarget, x: number, y: number): void {
+		target.dispatchEvent(
+			new PointerEvent(type, {
+				bubbles: true,
+				pointerId: 1,
+				isPrimary: true,
+				button: 0,
+				clientX: x,
+				clientY: y
+			})
+		);
+	}
+
+	function dragFirstOntoSecond(target: HTMLElement): void {
+		const [first, second] = target.querySelectorAll<HTMLButtonElement>('.hand-tile-btn');
+		const from = first.getBoundingClientRect();
+		const to = second.getBoundingClientRect();
+		const y = from.top + from.height / 2;
+		pointer('pointerdown', first, from.left + from.width / 2, y);
+		pointer('pointermove', document, from.left + from.width / 2 + 10, y);
+		pointer('pointermove', document, to.left + to.width / 2 + 4, y);
+		pointer('pointerup', document, to.left + to.width / 2 + 4, y);
+		first.click();
+		flushSync();
+	}
+
+	it('dragging a tile past a neighbour reorders it and swallows the release click', () => {
+		const onReorder = vi.fn();
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, arrangeProps(true, onReorder, onDiscard));
+		flushSync();
+		dragFirstOntoSecond(target);
+		expect(onReorder).toHaveBeenCalledWith(10, 1);
+		expect(onDiscard).not.toHaveBeenCalled();
+	});
+
+	it('a short press stays a tap', () => {
+		const onReorder = vi.fn();
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, arrangeProps(true, onReorder, onDiscard));
+		flushSync();
+		const first = target.querySelector<HTMLButtonElement>('.hand-tile-btn')!;
+		const box = first.getBoundingClientRect();
+		pointer('pointerdown', first, box.left + 5, box.top + 5);
+		pointer('pointermove', document, box.left + 8, box.top + 6);
+		pointer('pointerup', document, box.left + 8, box.top + 6);
+		first.click();
+		flushSync();
+		expect(onReorder).not.toHaveBeenCalled();
+		expect(onDiscard).toHaveBeenCalledWith(10);
+	});
+
+	it('never drags when auto-sorted', () => {
+		const onReorder = vi.fn();
+		const { target } = render(YourSeatRegion, arrangeProps(false, onReorder));
+		flushSync();
+		dragFirstOntoSecond(target);
+		expect(onReorder).not.toHaveBeenCalled();
+	});
+
+	it('Shift+Arrow moves the focused tile one place', async () => {
+		const onReorder = vi.fn();
+		const { target } = render(YourSeatRegion, arrangeProps(true, onReorder));
+		flushSync();
+		target.querySelector<HTMLButtonElement>('.hand-tile-btn')!.focus();
+		await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}');
+		expect(onReorder).toHaveBeenCalledWith(10, 1);
+	});
+});

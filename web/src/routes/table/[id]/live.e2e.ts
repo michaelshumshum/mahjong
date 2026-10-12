@@ -242,6 +242,69 @@ test('practice mode is reachable from the lobby and reaches real gameplay with b
 	}
 });
 
+test('manual hand order: a dragged tile keeps its place across real turns', async () => {
+	test.setTimeout(90_000);
+	const browser = await chromium.launch();
+	try {
+		const page = await browser.newPage();
+		await page.addInitScript(() => {
+			localStorage.setItem(
+				'mahjong:clientPrefs:v1',
+				JSON.stringify({
+					soundEnabled: true,
+					motion: 'reduced',
+					discardMode: 'one-tap',
+					handOrder: 'manual'
+				})
+			);
+		});
+		await page.goto(BASE, { waitUntil: 'networkidle' });
+		await page.getByTestId('lobby-practice-bots').click();
+		await page.getByRole('dialog').getByRole('button', { name: 'Start' }).click();
+		await page.locator('.seat-ring-slot--open').click();
+		await page.getByTestId('table-scene').waitFor({ state: 'visible', timeout: 15_000 });
+
+		const concealed = page.locator('.hand-row .hand-tile-slot:not(.hand-tile-slot--drawn)');
+		const order = async () =>
+			(await concealed.evaluateAll((els) => els.map((el) => el.dataset.slotTileId))).map(Number);
+		const myTurn = async () => {
+			for (let i = 0; i < 60; i++) {
+				const pass = page.locator('.claim-btn--pass');
+				if (await pass.count()) await pass.click();
+				if (await page.locator('.hand-tile-btn.hand-tile--drawn').count()) return;
+				await page.waitForTimeout(250);
+			}
+			throw new Error('never got a turn with a drawn tile');
+		};
+
+		await myTurn();
+		const before = await order();
+		const first = concealed.first().locator('.hand-tile');
+		const last = concealed.last().locator('.hand-tile');
+		const from = (await first.boundingBox())!;
+		const to = (await last.boundingBox())!;
+		await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(from.x + from.width, from.y + from.height / 2, { steps: 4 });
+		await page.mouse.move(to.x + to.width / 2 + 4, to.y + to.height / 2, { steps: 12 });
+		await page.mouse.up();
+		const dragged = [...before.slice(1), before[0]];
+		await expect.poll(order).toEqual(dragged);
+		// the release did not discard anything.
+		await expect(page.locator('.hand-tile-btn.hand-tile--drawn')).toHaveCount(1);
+
+		// tsumogiri, then on the next turn the arrangement survives (minus anything melded).
+		await page.locator('.hand-tile-btn.hand-tile--drawn').click();
+		await page.waitForTimeout(500);
+		await myTurn();
+		const after = await order();
+		const kept = after.filter((id) => dragged.includes(id));
+		expect(kept).toEqual(dragged.filter((id) => after.includes(id)));
+	} finally {
+		await browser.close();
+	}
+});
+
 test('completing more than one real hand accumulates multi-hand history in the ScoreSheet', async () => {
 	// HK ruleset has no dead wall (`wall_reserve = 0`) -- absent an earlier win, a hand runs until
 	// the wall's dry (~80 discards); two hands is hundreds of round trips, hence the generous budget.

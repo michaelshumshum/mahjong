@@ -344,7 +344,7 @@ Built today:
 | Discard   | legal hand tile (a `.hand-tile-btn`): one-tap mode discards immediately, two-step lifts then confirms |
 | Claim     | `ClaimDialog`: one big button per offered option plus Pass, with a CSS countdown ring, ≥44px |
 | Declare   | win (hero when self-drawn) / concealed kong / added kong under your hand (`.declare-actions`) |
-| Sort hand | automatic; no manual reorder                                                               |
+| Sort hand | automatic by default; manual arrangement is a setting (below)                                |
 
 **Double-tap zoom** is off app-wide: `html { touch-action: manipulation }` (`app.scss`), which
 keeps pinch-zoom. Not a `touchend` `preventDefault` guard — on iOS that also cancels the synthesized
@@ -363,6 +363,19 @@ Both modes are presentation only, never a state mutation (`web/AGENTS.md`): the 
 state, and the actual intent still only ever goes `tap → discard{tile_id}`, same as before.
 Mock mode renders hand tiles as non-interactive in the first place (no `tile_id` to discard
 against), so neither mode has anything to do there — a deliberate no-op, not an oversight.
+
+**Hand order.** `ClientPrefs.handOrder`, default `'auto'` (sorted by tile type, `live-view.ts`).
+`'manual'` keeps the player's arrangement, live mode only (mock tiles have no `tile_id`):
+
+| Piece | Behaviour |
+| --- | --- |
+| state | `+page.svelte`'s `manualOrder` (in memory, not persisted): `reconcileHandOrder` (`lib/table/hand-order.ts`) keeps held tiles in place, drops gone ones and appends new ones at the right; an effect writes it back, so tiles kept from later draws stack in arrival order. Switching back to auto clears it |
+| keys | live hand tiles key by `t-<tile_id>` (drawn tile included) in both modes, so a reorder, or the drawn tile joining the hand, is the same element under `animate:flip` |
+| drag | `pointerdown` on the hand row (delegated), activates after 8px. The tile follows the pointer (`translate`, no flip while dragged) and the target is the nearest slot to the tile's centre, measured from layout boxes (`offsetLeft`/`offsetTop`), not `getBoundingClientRect`: mid-flip neighbours report transformed boxes and the target would oscillate. The click fired on release is swallowed in the capture phase, so a drag never lifts or discards. Slots get `touch-action: none` |
+| keyboard | `Shift`+`←`/`→` moves the focused tile one place (focusable only when discardable, i.e. your turn) |
+| drawn tile | never draggable; it stays apart until discarded or kept, then joins at the right |
+
+Presentation only: the wire only ever sees `discard{tile_id}`.
 
 **Planned, not built:**
 
@@ -581,7 +594,7 @@ Rules:
 | Tab | Controls |
 | --- | --- |
 | Calls | `autoArm`: No calls, Auto-pass chow (switches) |
-| Gameplay | discard mode (segmented), Announce every discard (switch) |
+| Gameplay | discard mode and hand order (segmented), Announce every discard (switch) |
 | Display | tile size and motion (segmented), Sound effects and Haptic feedback (switches), language (`LocaleSwitcher`, segmented) |
 
 - Every control carries a one-line description; a segmented control (`SegmentedControl.svelte`,
@@ -610,7 +623,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | --- | --- | --- |
 | `mahjong:seat:v2:<tableId>` | this browser's seat at that table (`saveSeatForTable`/`loadSeatForTable`) | saved the moment `state_sync` confirms a seat; fed back into `connect()` on mount. Without it a reload falls into the seat picker and `join` fails with `table_full` |
 | `mahjong:reconnectSecret:v2:<tableId>` | `join`'s `reconnect_secret` (`saveSecretForTable`/`loadSecretForTable`) | presented on every `hello{seat, secret}` ([architecture.md §2.1](architecture.md)); stale `v1` keys are swept on load |
-| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards`, `tileSize` | purely local; every field after `motion` postdates this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
+| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards`, `tileSize`, `handOrder` | purely local; every field after `motion` postdates this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
@@ -1145,6 +1158,7 @@ fluent Hong Kong mahjong player.
   | `←`/`→`, `Home`/`End` | move focus between discardable tiles (clamped, no wrap) |
   | `Enter`/`Space` | the button's own click: two-step lifts then discards, one-tap discards (§5) |
   | `Escape` | clears a lift |
+  | `Shift`+`←`/`→` | moves the focused tile one place, manual hand order only (§5 "Hand order") |
   | `H` | jumps focus to the hand from anywhere (`aria-keyshortcuts`), ignored while typing in an input/select/contenteditable or with a modifier; with nothing discardable the row itself takes focus (`tabindex="-1"`) |
 
   Spectators have no hand row, so none of this applies there.

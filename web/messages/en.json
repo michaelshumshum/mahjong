@@ -537,5 +537,10 @@
 	"settings_tileSizeLargeLabel": "Large",
 	"settings_tileSizeSmallDesc": "More room on the table. Your hand never shrinks below a comfortable tap size.",
 	"settings_tileSizeMediumDesc": "The standard size.",
-	"settings_tileSizeLargeDesc": "Bigger tiles where the screen has room. Your hand always fits the width."
+	"settings_tileSizeLargeDesc": "Bigger tiles where the screen has room. Your hand always fits the width.",
+	"settings_handOrderLegend": "Hand order",
+	"settings_handOrderAutoLabel": "Auto-sort",
+	"settings_handOrderManualLabel": "Manual",
+	"settings_handOrderAutoDesc": "Your hand is always sorted by suit and number.",
+	"settings_handOrderManualDesc": "Drag tiles to arrange them, or use Shift + ←/→ on a focused tile. New tiles join at the right."
 }
