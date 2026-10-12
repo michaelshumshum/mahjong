@@ -66,7 +66,7 @@ The head-to-head harness is `runs/ppo_league_snap/tools/h2h_eval.py` on the trai
 | C0b | 52–4,853 | 0.21M → 20.32M | 20M, complete at 20.22M | rolling blind win 0.405 (threshold 0.25). The 50-update mean of batch blind win was already ≥ 0.25 at 0.43M: the anneal was the binding constraint |
 | C1 | 4,854–52,402 | 20.33M → 220.40M | 200M; `min_faan` 0 → 1 at 120.33M, → 3 at 220.33M (update 52,385) | 17 updates after the anneal: rolling win 0.1995, sub-min tenpai 0.108 (251 tenpai draws), draws 20.2%, deal-in 0.099 over 4,000 hands |
 | C1 held | 52,403–110,201 | 220.40M → 464.27M | — | stopped for the R3 league run (`hold_final`) |
-| C2 (run 2) | 1– | L0 → L296.6M at the R3 gate write-up, still running | — | none (the league runs to the 2B budget); R3 gate passed at L274.3M ([ml.md §14](ml.md)) |
+| C2 (run 2) | 1– | L0 → L358.5M (2026-10-12), still running | — | none (the league runs to the 2B budget); R3 gate passed at L274.3M ([ml.md §14](ml.md)) |
 
 C1 exit thresholds: win ≥ 0.15, sub-min tenpai ≤ 0.32 ([ml.md §10](ml.md)).
 
@@ -143,9 +143,11 @@ PFSP/Elo, 400-update personas; [ml.md §11](ml.md), §6 below):
 | **190–210** (redesign) | 0.168 | 0.328 | 0.327 | 0.100 | 0.047 | 0.85 | 0.004 | 0.27 | 0.74 | 1,066 |
 | 210–250 | 0.168 | 0.329 | 0.329 | 0.099 | 0.049 | 0.84 | 0.004 | 0.27 | 0.74 | 1,059 |
 | 250–296.7 | 0.169 | 0.323 | 0.322 | 0.101 | 0.049 | 0.84 | 0.004 | 0.27 | 0.77 | 1,051 |
+| 296.7–330 | 0.173 | 0.310 | 0.308 | 0.102 | 0.048 | 0.82 | 0.004 | 0.27 | 0.74 | 1,028 |
+| 330–358.5 | 0.167 | 0.331 | 0.333 | 0.097 | 0.045 | 0.82 | 0.004 | 0.27 | 0.74 | 1,043 |
 
 Each 50M snapshot adds a past snapshot and two persona forks (≤ 32 past, ≤ 8 personas kept); a
-fork pauses training ~565 s at 100 persona updates, ~2,170 s at 400. The step at 190M is the
+fork pauses training ~565 s at 100 persona updates, 2,170–2,255 s at 400 (measured at the 200M–350M forks). The step at 190M is the
 reward scaling: PopArt σ, explained variance and entropy returned to the hold's levels within
 ~1M decisions and stayed there.
 
@@ -230,10 +232,18 @@ CI):
 | L251.7M | +9.66 [8.68, 10.66] | 0.032 / 0.039 | −0.39 [−0.79, +0.02] |
 | L274.3M | +10.66 [9.62, 11.73] | 0.043 / 0.035 | +0.14 [−0.29, +0.58] |
 | L296.6M | +9.54 [8.57, 10.57] | 0.018 / 0.036 | −0.08 [−0.50, +0.34] |
+| L316.3M | +10.59 [9.55, 11.69] | 0.035 / 0.038 | +0.47 [+0.03, +0.91] |
+| L338.5M | +9.70 [8.72, 10.72] | 0.016 / 0.032 | −0.11 [−0.54, +0.31] |
+| L358.5M | +10.40 [9.32, 11.50] | 0.040 / 0.040 | +0.26 [−0.15, +0.67] |
 
-Against itself the league policy trades the same way it does against the bots: it wins less often
-(0.16–0.19 vs 0.19–0.22 for the starting policy) and deals in more (0.11–0.13 vs 0.09–0.11), and
-makes it up in hand size.
+Since the redesign the head-to-head averages +0.05 over eight checkpoints (−0.39 to +0.47).
+L316.3M's +0.47 was the only CI above zero and the next checkpoint fell back to −0.11, so it
+reads as the top of the noise band, not a step. Against itself the league policy trades the same
+way it does against the bots: it wins less often (0.16–0.19 vs 0.19–0.22 for the starting
+policy) and, through L338.5M, deals in more (0.11–0.13 vs 0.09–0.11), making it up in hand size.
+At L358.5M the deal-in gap closed (0.104 / 0.105 at ×1 vs ×3, 0.102 / 0.102 at ×3 vs ×1) with
+average winning faan still ~5.2 vs `FaanBot` ×3, and its deal-in vs `FaanBot` (0.057) was the
+lowest of either run.
 
 R3 gate (2026-10-11), per-side detail: L274.3M, chosen as the latest checkpoint, and the league's
 starting policy on the same fresh seeds 7,000,000+ (head-to-head 7,100,000+). The criteria and
@@ -308,6 +318,29 @@ agent's own danger head rated the tile median P(deal-in) 0.008 (safest alternati
 the real winner's tenpai median 0.16. Of `ORACLE`'s 72,039 decisions that differ from plain
 `FaanBot` on a public view at the same state, 88% are full-information speed (`seen34`), 7%
 tenpai valuation, 5% avoided deal-ins (1,469 of them avoided dealing into the agent), and 86 claims.
+
+**Impossible tier: `OracleLearned`** ([ADR 0022](decisions/0022-oracle-learned-tier.md)). The
+`ORACLE` tier now plays `LearnedBot`'s policy (L274.3M, `learned.npz`) with exact-information
+vetoes: it never discards into a known deal-in when a safe alternative exists; the network input
+is a plain `seat_view`. `hk_classic`, points per hand, paired diff [95% CI]:
+
+| ×1 vs ×3 | Prototype (10,000,000+, 1,000 sets) | **Gate (11,000,000+)** |
+| --- | --- | --- |
+| `OracleLearned` vs `LearnedBot` | +3.33 [+2.89, +3.76] | **+3.60 [+3.15, +4.06]** |
+| `LearnedBot` vs `OracleLearned` | −4.20 [−4.77, −3.62] | **−4.51 [−5.15, −3.88]** |
+| `OracleLearned` vs `FaanBot` | +13.14 [+12.04, +14.24] | +12.54 [+11.21, +13.87] (700 sets) |
+| `OracleFaanBot` vs `LearnedBot` | −1.90 [−2.59, −1.21] | −0.78 [−1.46, −0.10] |
+| `LearnedBot` vs `FaanBot` | +12.29 [+11.16, +13.41] | +11.62 [+10.27, +12.98] (700 sets) |
+
+Prototype variants on the same seeds: a shanten-floor "push" override, level with `LearnedBot`
+(+0.18 [−0.68, +1.05]; average winning faan fell to 4.24, dropped); the frozen oracle adapter
+(`learner.adapter`, unchanged since `keep_prob` reached 0 at the C1 end) alone +1.82 [+0.75,
++2.90], with the vetoes +4.41 [+3.40, +5.43], +1.09 [+0.03, +2.14] over the vetoes alone (not
+shipped). Paired on identical hands `OracleLearned` scores +5.23 [+4.42, +6.03] more than
+`OracleFaanBot` against `LearnedBot` ×3 (gate seeds: +4.38 [+3.58, +5.19]); against `FaanBot`
+×3 the vetoes add +0.85 to +0.92 to the plain policy. `OracleLearned` deals in at 0.0015 per
+seat-hand and wins at 5.2 faan; `OracleFaanBot` at 0 and 3.3. Laptop p99 per decision: 2.13 ms
+(`OracleFaanBot` 11.57 ms, `LearnedBot` 1.67 ms).
 
 For scale: `FaanBot` over `EfficiencyBot` in the heuristic arena is +2.67 points/game [1.92, 3.42]
 over full games ([bots.md §7](bots.md)) — win 0.197 / 0.163, deal-in 0.042 / 0.069, faan 3.30 /
@@ -413,11 +446,17 @@ visible melds), claim acceptance rate per offer (claims taken / claims offered),
 | League | Reward scaling fixed the league's regression | at 188.2M the head-to-head vs the starting policy was −0.83 [−1.27, −0.39]; after `reward_scale_by_ruleset` at 190.0M: −0.05 at 208.7M and −0.05 mean over five checkpoints to 296.6M. PopArt σ 1.8 → 0.74, explained variance 0.15 → 0.27, entropy 0.95 → 0.84 within ~1M decisions | mixing presets with different payout scales in one batch is a correctness issue, not a tuning one: scale before mixing, from the first update |
 | League | The pairwise win share measures style, not strength | the C2 policy drifted to "win less often, win bigger": x ≈ 0.48 against equal-strength snapshots, PFSP (`pfsp_power` 2) effectively uniform, Elo falling | rank opponents by points difference (`pfsp_metric: points`, [ml.md §11](ml.md)); keep x as a style read-out |
 | League | Short persona forks are not distinct opponents | `persona_updates` 100 at ×1.3 / ×1.5: KL from the parent 0.06–0.15 nats, top-1 agreement 0.81–0.85, less than checkpoint drift over 2M decisions | 400 updates, ×1.6 / ×2.0; measure persona KL from the parent after each fork before trusting the persona share |
+| League | A single head-to-head checkpoint can cross zero by chance | L316.3M +0.47 [+0.03, +0.91], then L338.5M −0.11 and L358.5M +0.26; eight post-redesign checkpoints average +0.05 | require two consecutive checkpoints with CI > 0 (or a mean over several) before calling a gain |
+| League | The league eventually matched the starting policy's defence while keeping the bigger hands | head-to-head deal-in 0.11–0.13 vs 0.09–0.11 from L72 to L338.5M; 0.102–0.104 vs 0.102–0.105 at L358.5M, average winning faan ~5.2 vs ~4.9 | the cost of the bigger-hand style shrank over ~170M post-redesign decisions without moving the points total; watch whether it turns into a points gain |
 | League | The league's gain is robustness across presets, not `hk_classic` strength | 300M league decisions: `hk_classic` head-to-head vs the starting policy level (mean −0.05); L274.3M vs the starting policy on identical seeds: `hk_strict` head-to-head +2.47 [+1.51, +3.48], vs `FaanBot` at `hk_strict` +25.0 vs +17.4, vs `EfficiencyBot` +14.5 vs +11.3; `FaanBot` at `hk_classic` +10.9 vs +10.0 (CIs overlap) | the starting policy had already plateaued at `hk_classic` (§4); the 20% alt-preset hands are what the league added. Judge league checkpoints on all served presets, not the main one alone |
 
-What to watch next: whether later league checkpoints gain on L274.3M at `hk_classic` (gate them
-against it with the same seeds); sub-min tenpai, which alternates around `FaanBot`'s (0.018–0.067,
-20–25 events per 1,000-set check); and the ACH ablation. The agent already outscores `ORACLE` (§4); `ORACLE` is a defence probe, not a ceiling.
+| Bots | `ORACLE`'s weakness was hand value, not information | `OracleFaanBot` never deals in yet loses to `LearnedBot` (−1.90) and wins at 3.3 faan; the same exact vetoes on `LearnedBot`'s policy beat it by +5.23 and beat `LearnedBot` from both seatings (§4) | to make an omniscient tier strong, give it a strong blind policy and spend the information on vetoes; a dedicated oracle RL run (25–50 GPU-hours) wasn't needed to clear "Impossible > Expert" |
+| Bots | The shipped numpy path reproduces the torch gate | R4 re-run through `LearnedBot` on fresh seeds: every R3 estimate inside the CI; 2,479 of 2,479 decisions identical to `PolicyBot` (max logit difference 6.5e-5) | re-gate through the shipped path whenever weights change ([bots.md §2](bots.md) runbook), not only through the checkpoint |
+
+What to watch next: whether the league's post-redesign head-to-head turns into a sustained gain on
+L274.3M (two consecutive checkpoints with CI > 0); sub-min tenpai, which alternates around
+`FaanBot`'s (0.016–0.067, 20–25 events per 1,000-set check); new weights for Expert, which also
+change Impossible and need both gates ([bots.md §2](bots.md)); and the ACH ablation.
 
 ## 7. Earlier runs
 

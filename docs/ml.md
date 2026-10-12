@@ -955,8 +955,9 @@ hold-end checkpoint (464.3M): ~1.1k learner decisions/s end to end, 0.7× the ho
 Run history: through 188M decisions the head-to-head against the starting policy drifted from
 level to −0.83 [−1.27, −0.39] points/hand while `FaanBot` held at +9.3; the cause was `hk_casual`
 dominating the batch's return variance. At 190.0M the run resumed with `reward_scale_by_ruleset`,
-`pfsp_metric: points` and 400-update personas (§9, §11); five checkpoints from 208.7M to 296.6M
-are level with the starting policy at `hk_classic` (mean −0.05). Series and per-segment metrics:
+`pfsp_metric: points` and 400-update personas (§9, §11); eight checkpoints from 208.7M to 358.5M
+are level with the starting policy at `hk_classic` (mean +0.05; one, L316.3M, crossed zero and
+the next fell back). Series and per-segment metrics:
 [rl-learnings.md §3–§4, §6](rl-learnings.md).
 
 Pre-league baseline: the hold checkpoint at 462.0M (chosen in advance) already met every numeric
