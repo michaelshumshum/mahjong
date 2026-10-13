@@ -41,7 +41,9 @@ vi.mock('$lib/net/lobby', () => ({
 	seatedCount: (table: TableSummary) => table.seats.filter((s) => s.status !== 'empty').length
 }));
 vi.mock('$lib/ui/settings-storage', () => ({
-	hasJoinedTable: vi.fn(() => false)
+	hasJoinedTable: vi.fn(() => false),
+	loadCreateTableSetup: vi.fn(() => null),
+	saveCreateTableSetup: vi.fn()
 }));
 
 describe('TablesPage', () => {

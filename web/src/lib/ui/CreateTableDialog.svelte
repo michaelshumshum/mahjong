@@ -1,69 +1,120 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 	import ModalDialog from './ModalDialog.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 	import { createTable, type CreateTableRequest } from '$lib/net/lobby';
 	import {
 		CUSTOM_PRESET_ID,
 		DEFAULT_PRESET_ID,
-		DEFAULT_RULESET,
-		HAND_SET_OPTIONS,
 		RULESET_PRESET_OPTIONS,
-		VALID_FAAN_CAP,
-		VALID_MIN_FAAN,
-		type HandSet,
+		RULESET_PRESET_RULES,
+		countRuleChanges,
+		invalidRuleFields,
+		withInertDefaults,
 		type RuleSet
 	} from '$lib/net/ruleset';
 	import PanelHeader from './PanelHeader.svelte';
 	import FormGroup from './FormGroup.svelte';
 	import OptionRow from './OptionRow.svelte';
+	import SegmentedControl from './SegmentedControl.svelte';
+	import RulesEditor, { type OverrideRow, type RulesTab } from './RulesEditor.svelte';
+	import { loadCreateTableSetup, saveCreateTableSetup } from './settings-storage';
 
 	let { onCreated, onCancel }: { onCreated: (tableId: string) => void; onCancel: () => void } =
 		$props();
 
-	let presetId = $state(DEFAULT_PRESET_ID);
-	// prefilled from the same defaults `hk_classic` resolves to server-side -- editing from a
-	// sensible starting point, not a blank/zeroed form.
-	let custom = $state<RuleSet>({ ...DEFAULT_RULESET, faan_overrides: {} });
-	let overrideRows = $state<{ key: string; value: number }[]>([]);
+	interface Draft {
+		base: string;
+		rules: RuleSet;
+		overrides: OverrideRow[];
+	}
+
+	function draftFrom(base: string, source: RuleSet): Draft {
+		const { faan_overrides, ...rest } = source;
+		return {
+			base,
+			rules: { ...rest, hand_sets: [...rest.hand_sets], faan_overrides: {} },
+			overrides: Object.entries(faan_overrides).map(([pattern, value]) => ({ pattern, value }))
+		};
+	}
+
+	const saved = loadCreateTableSetup();
+	let presetId = $state(saved?.presetId ?? DEFAULT_PRESET_ID);
+	let draft = $state<Draft>(
+		saved
+			? draftFrom(saved.customBase, saved.custom)
+			: draftFrom(DEFAULT_PRESET_ID, RULESET_PRESET_RULES[DEFAULT_PRESET_ID])
+	);
+	let view = $state<'presets' | 'custom'>('presets');
+	let activeTab = $state<RulesTab>('scoring');
+	// the draft a "Start from"/Reset just replaced, offered back until the next edit
+	let replaced = $state<{ draft: Draft; preset: string } | null>(null);
 	let submitting = $state(false);
+	let scrollEl: HTMLElement | undefined = $state();
 	let error = $state<string | null>(null);
 
-	function toggleHandSet(value: HandSet, checked: boolean): void {
-		custom.hand_sets = checked
-			? [...custom.hand_sets, value]
-			: custom.hand_sets.filter((v) => v !== value);
+	const customRules = $derived<RuleSet>({
+		...draft.rules,
+		faan_overrides: Object.fromEntries(draft.overrides.map((r) => [r.pattern, r.value as number]))
+	});
+	const baseRules = $derived(RULESET_PRESET_RULES[draft.base]);
+	const changes = $derived(countRuleChanges(customRules, baseRules));
+	const invalid = $derived(invalidRuleFields(customRules));
+	const isCustom = $derived(presetId === CUSTOM_PRESET_ID);
+	const presetLabel = (id: string) =>
+		RULESET_PRESET_OPTIONS.find((o) => o.id === id)?.label() ?? id;
+
+	const undoable = $derived(changes === 0 ? replaced : null);
+
+	function openCustom(): void {
+		presetId = CUSTOM_PRESET_ID;
+		view = 'custom';
+		error = null;
 	}
 
-	function addOverrideRow(): void {
-		overrideRows = [...overrideRows, { key: '', value: 0 }];
+	function loadPreset(id: string): void {
+		const previous = $state.snapshot(draft) as Draft;
+		const discarded = changes > 0 || previous.base !== id;
+		draft = draftFrom(id, RULESET_PRESET_RULES[id]);
+		replaced = discarded ? { draft: previous, preset: id } : null;
 	}
 
-	function removeOverrideRow(index: number): void {
-		overrideRows = overrideRows.filter((_, i) => i !== index);
+	function undoReplace(): void {
+		if (!replaced) return;
+		draft = replaced.draft;
+		replaced = null;
+	}
+
+	function firstInvalidTab(): RulesTab {
+		if (invalid.some((f) => f === 'hand_sets' || f.startsWith('faan_overrides'))) return 'hands';
+		if (invalid.includes('wall_reserve')) return 'play';
+		return 'table';
 	}
 
 	async function handleSubmit(): Promise<void> {
+		if (isCustom && invalid.length > 0) {
+			view = 'custom';
+			activeTab = firstInvalidTab();
+			error = m.createTableDialog_fixErrors();
+			await tick();
+			const target = scrollEl?.querySelector<HTMLElement>(
+				'[role="tabpanel"]:not([hidden]) :is([aria-invalid="true"], [role="alert"])'
+			);
+			target?.scrollIntoView({ block: 'center' });
+			if (target?.matches('input')) target.focus();
+			return;
+		}
 		submitting = true;
 		error = null;
-		const body: CreateTableRequest =
-			presetId === CUSTOM_PRESET_ID
-				? {
-						ruleset: CUSTOM_PRESET_ID,
-						rules: {
-							...custom,
-							// never user-editable -- see ruleset.ts's RuleSet doc on why exposing this
-							// would silently discard the whole custom ruleset the instant it's toggled on
-							multi_win: false,
-							faan_overrides: Object.fromEntries(
-								overrideRows
-									.filter((row) => row.key.trim() !== '')
-									.map((row) => [row.key.trim(), row.value])
-							)
-						}
-					}
-				: { ruleset: presetId };
+		const custom = withInertDefaults($state.snapshot(customRules) as RuleSet);
+		const body: CreateTableRequest = isCustom
+			? { ruleset: CUSTOM_PRESET_ID, rules: custom }
+			: { ruleset: presetId };
 		try {
 			const response = await createTable(body);
+			saveCreateTableSetup({ presetId, customBase: draft.base, custom });
 			onCreated(response.table_id);
 		} catch {
 			error = m.createTableDialog_createError();
@@ -73,241 +124,107 @@
 </script>
 
 <ModalDialog labelledby="create-table-heading" onCancel={() => !submitting && onCancel()}>
-	<div class="create-dialog" data-testid="create-table-dialog">
-		<PanelHeader title={m.createTableDialog_title()} titleId="create-table-heading" />
+	<div
+		class="create-dialog"
+		class:create-dialog--custom={view === 'custom'}
+		data-testid="create-table-dialog"
+	>
+		{#if view === 'presets'}
+			<PanelHeader title={m.createTableDialog_title()} titleId="create-table-heading" />
 
-		<FormGroup legend={m.createTableDialog_rulesLegend()}>
-			{#each RULESET_PRESET_OPTIONS as option (option.id)}
-				<OptionRow
-					type="radio"
-					name="preset"
-					value={option.id}
-					label={option.label()}
-					description={option.description()}
-					checked={presetId === option.id}
-					onChange={() => (presetId = option.id)}
+			<div class="body">
+				<FormGroup legend={m.createTableDialog_rulesLegend()}>
+					{#each RULESET_PRESET_OPTIONS as option (option.id)}
+						<OptionRow
+							type="radio"
+							name="preset"
+							value={option.id}
+							label={option.label()}
+							description={option.description()}
+							checked={presetId === option.id}
+							onChange={() => (presetId = option.id)}
+						/>
+					{/each}
+					<OptionRow
+						type="radio"
+						name="preset"
+						value={CUSTOM_PRESET_ID}
+						label={m.createTableDialog_customLabel()}
+						description={changes > 0
+							? m.createTableDialog_customSummary({
+									preset: presetLabel(draft.base),
+									count: changes
+								})
+							: m.createTableDialog_customDescription()}
+						checked={isCustom}
+						onChange={openCustom}
+					/>
+				</FormGroup>
+				{#if isCustom}
+					<button
+						type="button"
+						class="edit-custom"
+						data-testid="create-table-edit-custom"
+						onclick={openCustom}
+						><SlidersHorizontal size={16} />{m.createTableDialog_editCustomButton()}</button
+					>
+				{/if}
+			</div>
+		{:else}
+			<header class="custom-header">
+				<button
+					type="button"
+					class="back"
+					aria-label={m.createTableDialog_backToPresets()}
+					data-testid="create-table-back"
+					onclick={() => {
+						view = 'presets';
+						error = null;
+					}}><ChevronLeft size={22} /></button
+				>
+				<PanelHeader title={m.createTableDialog_customTitle()} titleId="create-table-heading" />
+			</header>
+
+			<div class="scroll" bind:this={scrollEl}>
+				<SegmentedControl
+					legend={m.createTableDialog_startFromLegend()}
+					name="custom_base"
+					value={draft.base}
+					options={RULESET_PRESET_OPTIONS.map((o) => ({ value: o.id, label: o.label() }))}
+					onChange={loadPreset}
 				/>
-			{/each}
-			<OptionRow
-				type="radio"
-				name="preset"
-				value={CUSTOM_PRESET_ID}
-				label={m.createTableDialog_customLabel()}
-				description={m.createTableDialog_customDescription()}
-				checked={presetId === CUSTOM_PRESET_ID}
-				onChange={() => (presetId = CUSTOM_PRESET_ID)}
-			/>
-		</FormGroup>
 
-		{#if presetId === CUSTOM_PRESET_ID}
-			<div class="custom-form">
-				<FormGroup legend={m.createTableDialog_scoringLegend()}>
-					<label class="field">
-						{m.createTableDialog_minFaanLabel()}
-						<select bind:value={custom.min_faan}>
-							{#each VALID_MIN_FAAN as value (value)}
-								<option {value}>{value}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="field">
-						{m.createTableDialog_faanCapLabel()}
-						<select bind:value={custom.faan_cap}>
-							{#each VALID_FAAN_CAP as value (value)}
-								<option {value}>{value}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="field">
-						{m.createTableDialog_scoreTableLabel()}
-						<select bind:value={custom.score_table}>
-							<option value="half_spicy">{m.createTableDialog_scoreTableHalfSpicy()}</option>
-							<option value="full_spicy">{m.createTableDialog_scoreTableFullSpicy()}</option>
-						</select>
-					</label>
-					<div class="field">
-						{m.createTableDialog_handSetsLabel()}
-						<div class="checkbox-row">
-							{#each HAND_SET_OPTIONS as option (option.value)}
-								<OptionRow
-									type="checkbox"
-									label={option.label()}
-									checked={custom.hand_sets.includes(option.value)}
-									onChange={(checked) => toggleHandSet(option.value, checked)}
-								/>
-							{/each}
-						</div>
-					</div>
-					<label class="field">
-						{m.createTableDialog_discardPaymentLabel()}
-						<select bind:value={custom.discard_payment}>
-							<option value="all">{m.createTableDialog_discardPaymentAll()}</option>
-							<option value="half">{m.createTableDialog_discardPaymentHalf()}</option>
-						</select>
-					</label>
-					<label class="field">
-						{m.createTableDialog_selfDrawMultiplierLabel()}
-						<input type="number" step="0.1" min="1" bind:value={custom.self_draw_multiplier} />
-					</label>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_flowersScoreLabel()}
-						checked={custom.flowers_score}
-						onChange={(checked) => (custom.flowers_score = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_sevenFlowersInstantWinLabel()}
-						checked={custom.seven_flowers_instant_win}
-						onChange={(checked) => (custom.seven_flowers_instant_win = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_eightFlowersInstantWinLabel()}
-						checked={custom.eight_flowers_instant_win}
-						onChange={(checked) => (custom.eight_flowers_instant_win = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_thirteenOrphansWaitBonusLabel()}
-						checked={custom.thirteen_orphans_wait_bonus}
-						onChange={(checked) => (custom.thirteen_orphans_wait_bonus = checked)}
-					/>
-
-					<div class="field">
-						{m.createTableDialog_faanOverridesLabel()}
-						{#each overrideRows as row, i (i)}
-							<div class="override-row">
-								<input
-									type="text"
-									placeholder={m.createTableDialog_overridePatternPlaceholder()}
-									aria-label={m.createTableDialog_overridePatternAriaLabel()}
-									bind:value={row.key}
-								/>
-								<input
-									type="number"
-									aria-label={m.createTableDialog_overrideFaanValueAriaLabel()}
-									bind:value={row.value}
-								/>
-								<button type="button" onclick={() => removeOverrideRow(i)}
-									>{m.createTableDialog_removeOverrideButton()}</button
-								>
-							</div>
-						{/each}
-						<button type="button" class="add-override" onclick={addOverrideRow}
-							>{m.createTableDialog_addOverrideButton()}</button
+				<div class="summary" aria-live="polite">
+					{#if undoable}
+						<span>{m.createTableDialog_loadedPreset({ preset: presetLabel(undoable.preset) })}</span
 						>
-					</div>
-				</FormGroup>
+						<button type="button" class="link" onclick={undoReplace}
+							>{m.createTableDialog_undoButton()}</button
+						>
+					{:else if changes > 0}
+						<span
+							>{m.createTableDialog_changesFrom({
+								preset: presetLabel(draft.base),
+								count: changes
+							})}</span
+						>
+						<button
+							type="button"
+							class="link"
+							data-testid="create-table-reset"
+							onclick={() => loadPreset(draft.base)}>{m.createTableDialog_resetButton()}</button
+						>
+					{:else}
+						<span>{m.createTableDialog_sameAsPreset({ preset: presetLabel(draft.base) })}</span>
+					{/if}
+				</div>
 
-				<FormGroup legend={m.createTableDialog_flowLegend()}>
-					<label class="field">
-						{m.createTableDialog_gameLengthLabel()}
-						<select bind:value={custom.game_length}>
-							<option value="EAST_ONLY">{m.createTableDialog_gameLengthEastOnly()}</option>
-							<option value="EAST_SOUTH">{m.createTableDialog_gameLengthEastSouth()}</option>
-							<option value="FULL">{m.createTableDialog_gameLengthFull()}</option>
-						</select>
-					</label>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_dealerRepeatOnWinLabel()}
-						checked={custom.dealer_repeat_on_win}
-						onChange={(checked) => (custom.dealer_repeat_on_win = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_dealerRepeatOnDrawLabel()}
-						checked={custom.dealer_repeat_on_draw}
-						onChange={(checked) => (custom.dealer_repeat_on_draw = checked)}
-					/>
-					<label class="field">
-						{m.createTableDialog_wallReserveLabel()}
-						<input type="number" min="0" step="1" bind:value={custom.wall_reserve} />
-					</label>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_fourKongAbortLabel()}
-						checked={custom.four_kong_abort}
-						onChange={(checked) => (custom.four_kong_abort = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_nineTerminalsAbortLabel()}
-						checked={custom.nine_terminals_abort}
-						onChange={(checked) => (custom.nine_terminals_abort = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_tenpaiPaymentsLabel()}
-						checked={custom.tenpai_payments}
-						onChange={(checked) => (custom.tenpai_payments = checked)}
-					/>
-				</FormGroup>
-
-				<FormGroup legend={m.createTableDialog_variantsLegend()}>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_flowersEnabledLabel()}
-						checked={custom.flowers_enabled}
-						onChange={(checked) => (custom.flowers_enabled = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_kongRobEnabledLabel()}
-						checked={custom.kong_rob_enabled}
-						onChange={(checked) => (custom.kong_rob_enabled = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_concealedKongRobbableLabel()}
-						checked={custom.concealed_kong_robbable}
-						onChange={(checked) => (custom.concealed_kong_robbable = checked)}
-					/>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_paoRulesLabel()}
-						checked={custom.pao_rules}
-						onChange={(checked) => (custom.pao_rules = checked)}
-					/>
-				</FormGroup>
-
-				<FormGroup legend={m.createTableDialog_fairnessLegend()}>
-					<OptionRow
-						type="checkbox"
-						label={m.createTableDialog_provableFairnessLabel()}
-						checked={custom.provable_fairness}
-						onChange={(checked) => (custom.provable_fairness = checked)}
-					/>
-				</FormGroup>
-
-				<FormGroup legend={m.createTableDialog_timingLegend()}>
-					<label class="field">
-						{m.createTableDialog_turnSecondsLabel()}
-						<input type="number" min="1" step="1" bind:value={custom.turn_seconds} />
-					</label>
-					<label class="field">
-						{m.createTableDialog_claimSecondsLabel()}
-						<input type="number" min="1" step="1" bind:value={custom.claim_seconds} />
-					</label>
-					<label class="field">
-						{m.createTableDialog_handEndSecondsLabel()}
-						<input type="number" min="0" step="1" bind:value={custom.hand_end_seconds} />
-					</label>
-					<label class="field">
-						{m.createTableDialog_turnTimeoutStrikesLabel()}
-						<input type="number" min="1" step="1" bind:value={custom.turn_timeout_strikes} />
-					</label>
-					<label class="field">
-						{m.createTableDialog_disconnectGraceSecondsLabel()}
-						<input type="number" min="0" step="1" bind:value={custom.disconnect_grace_seconds} />
-					</label>
-				</FormGroup>
+				<RulesEditor bind:rules={draft.rules} bind:overrides={draft.overrides} bind:activeTab />
 			</div>
 		{/if}
 
 		{#if error}
-			<p class="create-error">{error}</p>
+			<p class="create-error" role="alert">{error}</p>
 		{/if}
 
 		<div class="create-actions">
@@ -329,74 +246,102 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.create-dialog {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-5);
-		width: 100%;
-		max-width: 32rem;
-		max-height: 90vh;
-		overflow-y: auto;
+		gap: var(--space-4);
+		width: min(90vw, 32rem);
+		max-height: calc(100dvh - var(--space-6));
 		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
+
+		@include layout.phone-landscape {
+			gap: var(--space-2);
+			padding: var(--space-3) var(--space-4) var(--space-2);
+		}
 	}
 
-	.custom-form {
+	// fixed height so switching rule tabs never resizes the dialog
+	.create-dialog--custom {
+		height: min(44rem, calc(100dvh - var(--space-6)));
+	}
+
+	.body {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-5);
-		padding-top: var(--space-2);
-		border-top: 1px solid var(--color-border);
+		gap: var(--space-3);
+		min-height: 0;
+		overflow-y: auto;
 	}
 
-	.field {
+	.custom-header {
 		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		font-size: var(--font-size-sm);
-	}
-
-	.field select,
-	.field input[type='number'],
-	.field input[type='text'] {
-		font: inherit;
-		min-height: 36px;
-		padding: var(--space-1) var(--space-2);
-		color: var(--color-text);
-		@include buttons.input-recessed;
-	}
-
-	.checkbox-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-2);
-	}
-
-	.override-row {
-		display: flex;
-		gap: var(--space-2);
 		align-items: center;
-
-		input[type='text'] {
-			flex: 2;
-		}
-
-		input[type='number'] {
-			flex: 1;
-			min-width: 4rem;
-		}
+		gap: var(--space-1);
+		margin-inline-start: calc(-1 * var(--space-2));
 	}
 
-	.add-override {
-		align-self: flex-start;
-		font: inherit;
-		font-size: var(--font-size-sm);
-		min-height: 36px;
-		padding: var(--space-1) var(--space-3);
+	.back {
+		display: grid;
+		place-items: center;
+		flex: none;
+		width: 40px;
+		height: 40px;
+		padding: 0;
 		cursor: pointer;
 		@include buttons.btn-ghost;
+	}
+
+	// start-from, summary and rule tabs scroll as one; the tab bar sticks (RulesEditor)
+	.scroll {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		margin-inline: calc(-1 * var(--space-2));
+		padding-inline: var(--space-2);
+	}
+
+	.edit-custom {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		min-height: 36px;
+		padding: var(--space-1) var(--space-2);
+		font: inherit;
+		font-size: var(--font-size-sm);
+		font-weight: 600;
+		cursor: pointer;
+		align-self: flex-start;
+		@include buttons.btn-ghost;
+	}
+
+	.summary {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: var(--space-2);
+		min-height: 1.5rem;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+	}
+
+	.link {
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--color-brass);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
 	}
 
 	.create-error {
@@ -409,6 +354,8 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: var(--space-3);
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--color-border);
 
 		button {
 			min-height: var(--tap-target-min);

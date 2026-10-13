@@ -69,6 +69,23 @@ const PAGES = [
 			await page.getByRole('button', { name: 'Create a table' }).click();
 		}
 	},
+	// the custom ruleset editor behind the create dialog's "Custom" option (docs/frontend.md's
+	// "Create a table"): tabbed rules seeded from a preset, with a change summary.
+	{
+		name: 'lobby-create-custom',
+		url: '/',
+		async before(page) {
+			await page.getByRole('button', { name: 'Create a table' }).click();
+			const dialog = page.getByTestId('create-table-dialog');
+			await dialog.locator('input[type="radio"][value="custom"]').click();
+			await dialog
+				.getByRole('group', { name: 'Minimum faan' })
+				.getByRole('radio', { name: '1', exact: true })
+				.click({ force: true });
+			// let the segment's highlight transition finish
+			await page.waitForTimeout(300);
+		}
+	},
 	// the practice difficulty picker (docs/frontend.md's "Practice mode") -- genuinely distinct
 	// from the create dialog above: a seat ring of tap-to-cycle bot levels around the shared
 	// CompassFelt centerpiece, not a ruleset form.

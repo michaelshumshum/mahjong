@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // every route is gated behind ApiConnectGate's /healthz poll -- this suite has no real backend
 // (webServer is `pnpm dev` alone), so every test must mock it or the gate polls to its 10s timeout.
@@ -75,32 +75,116 @@ test('lobby create table opens a rules dialog, then navigates to the created tab
 	await expect(page).toHaveURL('/table/ABC123');
 });
 
-test('lobby create table with custom rules sends the edited RuleSet, never multi_win', async ({
-	page
-}) => {
-	let sentBody: Record<string, unknown> | null = null;
+async function captureCreateBody(page: Page): Promise<{ body: Record<string, unknown> | null }> {
+	const sent: { body: Record<string, unknown> | null } = { body: null };
 	await page.route('**/tables', (route) => {
 		if (route.request().method() !== 'POST') return route.fallback();
-		sentBody = route.request().postDataJSON();
+		sent.body = route.request().postDataJSON();
 		return route.fulfill({
-			json: { table_id: 'CUSTOM1', ruleset_preset: null, ruleset: sentBody?.rules ?? {} }
+			json: { table_id: 'CUSTOM1', ruleset_preset: null, ruleset: sent.body?.rules ?? {} }
 		});
 	});
+	return sent;
+}
+
+async function openCustomRules(page: Page): Promise<Locator> {
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
 	await page.getByTestId('lobby-create-table').click();
-
 	const dialog = page.getByTestId('create-table-dialog');
-	await dialog.locator('input[type="radio"][value="custom"]').check();
-	await dialog.getByLabel('Minimum faan').selectOption('0');
+	// click, not check(): choosing Custom swaps the view, unmounting the radio
+	await dialog.locator('input[type="radio"][value="custom"]').click();
+	await expect(dialog.getByRole('heading', { name: 'Custom rules' })).toBeVisible();
+	return dialog;
+}
+
+test('lobby create table with custom rules sends the edited RuleSet, inert fields at defaults', async ({
+	page
+}) => {
+	const sent = await captureCreateBody(page);
+	const dialog = await openCustomRules(page);
+
+	await dialog
+		.getByRole('group', { name: 'Minimum faan' })
+		.getByRole('radio', { name: '0', exact: true })
+		.click({ force: true });
+	await dialog.getByTestId('rules-tab-hands').click();
+	await dialog.getByRole('button', { name: 'Add override' }).click();
+	await dialog.getByTestId('override-pattern').selectOption('自摸');
+	await dialog.getByTestId('override-value').fill('2');
+	await dialog.getByTestId('rules-tab-table').click();
+	await dialog.getByRole('switch', { name: /Provable fairness/ }).click({ force: true });
+	await expect(dialog.getByText('3 changes from HK Classic')).toBeVisible();
 	await dialog.getByTestId('create-table-submit').click();
 
 	await expect(page).toHaveURL('/table/CUSTOM1');
-	expect(sentBody).toMatchObject({ ruleset: 'custom' });
-	expect((sentBody as unknown as { rules: Record<string, unknown> }).rules).toMatchObject({
+	expect(sent.body).toMatchObject({ ruleset: 'custom' });
+	expect((sent.body as { rules: Record<string, unknown> }).rules).toMatchObject({
 		min_faan: 0,
-		multi_win: false
+		faan_overrides: { 自摸: 2 },
+		provable_fairness: true,
+		multi_win: false,
+		pao_rules: false,
+		tenpai_payments: false,
+		self_draw_multiplier: 1.5
 	});
+});
+
+test('custom rules start from the chosen preset, and reset can be undone', async ({ page }) => {
+	const dialog = await openCustomRules(page);
+	const startFrom = dialog.getByRole('group', { name: 'Start from' });
+	const faanCap = dialog.getByRole('group', { name: 'Faan cap' });
+
+	await startFrom.getByRole('radio', { name: 'Casual' }).click({ force: true });
+	await expect(faanCap.getByRole('radio', { name: '13' })).toBeChecked();
+	await faanCap.getByRole('radio', { name: '8' }).click({ force: true });
+	await expect(dialog.getByText('1 change from Casual')).toBeVisible();
+
+	await dialog.getByTestId('create-table-reset').click();
+	await expect(faanCap.getByRole('radio', { name: '13' })).toBeChecked();
+	await dialog.getByRole('button', { name: 'Undo' }).click();
+	await expect(faanCap.getByRole('radio', { name: '8' })).toBeChecked();
+});
+
+test('an invalid custom rule blocks create and jumps to its tab', async ({ page }) => {
+	const sent = await captureCreateBody(page);
+	const dialog = await openCustomRules(page);
+
+	await dialog.getByTestId('rules-tab-table').click();
+	await dialog.getByTestId('rule-turn_seconds').fill('');
+	await dialog.getByTestId('rules-tab-scoring').click();
+	await dialog.getByTestId('create-table-submit').click();
+
+	await expect(dialog.getByText('Some rules need fixing')).toBeVisible();
+	await expect(dialog.getByTestId('rule-turn_seconds')).toBeFocused();
+	expect(sent.body).toBeNull();
+
+	await dialog.getByRole('button', { name: 'Increase Turn' }).click();
+	await dialog.getByTestId('create-table-submit').click();
+	await expect(page).toHaveURL('/table/CUSTOM1');
+	expect((sent.body as { rules: Record<string, unknown> }).rules).toMatchObject({
+		turn_seconds: 2
+	});
+});
+
+test('the create dialog reopens on the last custom setup', async ({ page }) => {
+	await captureCreateBody(page);
+	const dialog = await openCustomRules(page);
+	await dialog
+		.getByRole('group', { name: 'Start from' })
+		.getByRole('radio', { name: 'Strict' })
+		.click({ force: true });
+	await dialog.getByTestId('rules-tab-play').click();
+	await dialog.getByRole('switch', { name: /Dealer repeats on draw/ }).click({ force: true });
+	await dialog.getByTestId('create-table-submit').click();
+	await expect(page).toHaveURL('/table/CUSTOM1');
+
+	await page.goto('/');
+	await page.waitForLoadState('networkidle');
+	await page.getByTestId('lobby-create-table').click();
+	const reopened = page.getByTestId('create-table-dialog');
+	await expect(reopened.locator('input[type="radio"][value="custom"]')).toBeChecked();
+	await expect(reopened.getByText('Based on Strict · 1 change')).toBeVisible();
 });
 
 test('lobby practice vs bots opens a difficulty dialog, then navigates to the practice table', async ({

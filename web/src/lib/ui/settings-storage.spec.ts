@@ -6,6 +6,9 @@ import {
 	DISPLAY_NAME_STORAGE_KEY,
 	PRACTICE_SETUP_STORAGE_KEY,
 	ONBOARDING_STORAGE_KEY,
+	CREATE_TABLE_SETUP_STORAGE_KEY,
+	loadCreateTableSetup,
+	saveCreateTableSetup,
 	loadOnboarding,
 	saveOnboarding,
 	loadPracticeSetup,
@@ -26,6 +29,7 @@ import {
 	saveSeatForTable,
 	saveSecretForTable
 } from './settings-storage';
+import { DEFAULT_RULESET, RULESET_PRESET_RULES } from '$lib/net/ruleset';
 
 // In-memory fake -- this file runs under the 'server' vitest project (plain node, no jsdom),
 // so `localStorage` doesn't exist as a global until a test installs one.
@@ -245,6 +249,46 @@ describe('settings-storage', () => {
 			expect(loadPracticeSetup()).toBeNull();
 			localStorage.setItem(PRACTICE_SETUP_STORAGE_KEY, JSON.stringify({ 1: 'easy', 2: 'normal' }));
 			expect(loadPracticeSetup()).toBeNull();
+		});
+	});
+
+	describe('createTableSetup', () => {
+		it('round-trips a saved value', () => {
+			const custom = { ...RULESET_PRESET_RULES.hk_strict, faan_overrides: { 平糊: 2 } };
+			saveCreateTableSetup({ presetId: 'custom', customBase: 'hk_strict', custom });
+			expect(loadCreateTableSetup()).toEqual({
+				presetId: 'custom',
+				customBase: 'hk_strict',
+				custom
+			});
+		});
+
+		it('returns null when nothing has been stored', () => {
+			expect(loadCreateTableSetup()).toBeNull();
+		});
+
+		it('rejects an unknown preset id', () => {
+			localStorage.setItem(
+				CREATE_TABLE_SETUP_STORAGE_KEY,
+				JSON.stringify({ presetId: 'hk_retired', customBase: 'hk_classic', custom: {} })
+			);
+			expect(loadCreateTableSetup()).toBeNull();
+		});
+
+		it('repairs a stale custom ruleset instead of dropping the setup', () => {
+			localStorage.setItem(
+				CREATE_TABLE_SETUP_STORAGE_KEY,
+				JSON.stringify({
+					presetId: 'hk_casual',
+					customBase: 'hk_classic',
+					custom: { min_faan: 1, turn_seconds: 'slow' }
+				})
+			);
+			expect(loadCreateTableSetup()?.custom).toEqual({
+				...DEFAULT_RULESET,
+				faan_overrides: {},
+				min_faan: 1
+			});
 		});
 	});
 

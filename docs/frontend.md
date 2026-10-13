@@ -611,7 +611,8 @@ Rules:
 ### Settings dialog
 
 `lib/ui/Settings.svelte`, opened from the table header (`DismissablePanel`). Three tabs
-(`role="tablist"`, roving focus, `←`/`→` wrap, `Home`/`End`):
+(`TabBar.svelte`, shared with the custom rules editor: `role="tablist"`, roving focus, `←`/`→`
+wrap, `Home`/`End`):
 
 | Tab | Controls |
 | --- | --- |
@@ -763,12 +764,50 @@ before rendering the page. Without it a page looks interactive before the backen
 
 ### Create a table
 
-The lobby's "Create a table" opens `CreateTableDialog.svelte`: preset radios (each an `OptionRow`
-with its `RULESET_PRESET_OPTIONS[].description` as a muted second line — `OptionRow`'s optional
-`description` prop), or "Custom" exposing
-every `RuleSet` field except `multi_win`, grouped scoring/flow/variants/fairness/timing. Submitting
-calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates to `/table/<table_id>`. The
-waiting room shows the resolved preset name (`PretableScreen.svelte`).
+The lobby's "Create a table" opens `CreateTableDialog.svelte`, two views in one dialog:
+
+- **Presets** — one radio per `RULESET_PRESET_OPTIONS` entry (an `OptionRow` with its
+  `description` as a muted second line), plus "Custom". Picking a named preset and pressing Create
+  posts `{ruleset: <id>}`. Picking Custom opens the editor; back in this view the Custom row reads
+  "Based on <preset> · N changes" with an "Edit custom rules" button.
+- **Custom rules** (`RulesEditor.svelte`) — a back button, then one scroll region holding "Start
+  from" (a segmented control over the presets), a change summary, and four tabs (`TabBar.svelte`,
+  sticky inside the scroll region):
+
+| Tab | Controls |
+| --- | --- |
+| Scoring | minimum faan, faan cap, score table, discard payment (segmented, each option described) |
+| Hands | hand sets, flowers (switches), faan overrides |
+| Play | game length (segmented); dealer repeats, kong robbing (switches); wall reserve (stepper) |
+| Table | turn, claim window, hand result, timeouts allowed, reconnect grace (steppers); provable fairness (switch) |
+
+- **Seeded from a preset.** `RULESET_PRESET_RULES` (`lib/net/ruleset.ts`) mirrors server
+  `RULESET_PRESETS` field-for-field — update both together. "Start from" and "Reset" replace the
+  draft with that preset; the replaced draft is offered back via "Undo" until the next edit.
+  `countRuleChanges` drives the "N changes from <preset>" summary.
+- **Dependent switches** disable rather than hide: seat flowers and the 7/8-flower instant wins
+  need flowers enabled; concealed-kong robbing needs kong robbing.
+- **Faan overrides** pick a pattern from a `<select>` (`OVERRIDABLE_PATTERNS` in `faan-guide.ts`,
+  localized labels, grouped by default faan, limited to the enabled hand sets and to patterns not
+  already overridden) — the wire key is `patterns.py`'s Chinese name, never typed by hand. Values
+  are integers `0..13`; 0 turns the pattern off.
+- **Validation is client-side**, because `resolve_ruleset` silently falls back to `hk_classic` on
+  an invalid custom body ([rules.md §10](rules.md)). `invalidRuleFields` checks integer steppers
+  against `NUMERIC_RULE_MIN`, at least one hand set, and override range. Create with errors stays
+  open, switches to the first tab with an error (each such tab carries a red dot plus
+  screen-reader text), and focuses the offending field.
+- **Inert fields** (`INERT_RULE_FIELDS`: every `RuleSet` field with no server reader, rules.md §10,
+  including `multi_win`) are never shown and always posted at their defaults (`withInertDefaults`)
+  — a toggle must not promise a rule the engine ignores.
+- **Remembered.** A successful create stores `{presetId, customBase, custom}` under
+  `mahjong:createTableSetup:v1`; the next open restores the selection and the custom draft.
+  `loadCreateTableSetup` drops an unknown preset id and repairs a stale ruleset field-by-field
+  (`sanitizeRuleSet`) instead of discarding it.
+- The custom view has a fixed height (`min(44rem, 100dvh - 2rem)`) so switching tabs never resizes
+  it; Cancel/Create stay pinned below the scroll region.
+
+Submitting calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates to
+`/table/<table_id>`. The waiting room shows the resolved preset name (`PretableScreen.svelte`).
 
 ### Lobby
 

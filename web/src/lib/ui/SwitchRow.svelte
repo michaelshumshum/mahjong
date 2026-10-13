@@ -3,18 +3,20 @@
 		label,
 		description,
 		checked,
+		disabled = false,
 		onChange
 	}: {
 		label: string;
 		description?: string;
 		checked: boolean;
+		disabled?: boolean;
 		onChange: (next: boolean) => void;
 	} = $props();
 
 	const uid = $props.id();
 </script>
 
-<label class="switch-row">
+<label class="switch-row" class:switch-row--disabled={disabled}>
 	<span class="switch-text">
 		<span class="switch-label">{label}</span>
 		{#if description}
@@ -26,6 +28,7 @@
 		role="switch"
 		class="native-input"
 		{checked}
+		{disabled}
 		aria-describedby={description ? `${uid}-desc` : undefined}
 		onchange={(e) => onChange(e.currentTarget.checked)}
 	/>
@@ -52,6 +55,11 @@
 			outline: 2px solid var(--color-brass);
 			outline-offset: 2px;
 		}
+	}
+
+	.switch-row--disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
 	}
 
 	.switch-row + :global(.switch-row) {

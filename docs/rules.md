@@ -373,8 +373,9 @@ class RuleSet:
 ```
 
 `ScoreTable`/`HandSet`/`DiscardPayment`/`GameLength` are `StrEnum`s (`mahjong_core/config.py`).
-`four_kong_abort`, `nine_terminals_abort`, `thirteen_orphans_wait_bonus`, `multi_win` and
-`pao_rules` have no reader — setting them has no effect.
+`self_draw_multiplier` (§8 hardcodes 1.5), `four_kong_abort`, `nine_terminals_abort`,
+`thirteen_orphans_wait_bonus`, `tenpai_payments`, `multi_win` and `pao_rules` have no reader —
+setting them has no effect. The create-table editor hides them (`INERT_RULE_FIELDS`, frontend.md §7).
 
 **Presets** (`mahjong_core.presets.RULESET_PRESETS`): `hk_classic` (the defaults above),
 `hk_casual` (`min_faan=1`, `faan_cap=13`, `NEW_18` on), `hk_strict` (`min_faan=5`). `custom` takes a full

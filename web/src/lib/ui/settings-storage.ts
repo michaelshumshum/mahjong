@@ -7,6 +7,12 @@ import type {
 	TileSize
 } from './Settings.svelte';
 import type { PracticeDifficulty } from '$lib/net/lobby';
+import {
+	CUSTOM_PRESET_ID,
+	RULESET_PRESET_RULES,
+	sanitizeRuleSet,
+	type RuleSet
+} from '$lib/net/ruleset';
 
 // Namespaced, versioned keys -- `v1` lets a future shape change fail closed (treated as
 // missing, below) instead of crashing on an old stored shape.
@@ -15,6 +21,7 @@ export const AUTO_ARM_STORAGE_KEY = 'mahjong:autoArm:v1';
 export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
 export const PRACTICE_SETUP_STORAGE_KEY = 'mahjong:practiceSetup:v1';
 export const ONBOARDING_STORAGE_KEY = 'mahjong:onboarding:v1';
+export const CREATE_TABLE_SETUP_STORAGE_KEY = 'mahjong:createTableSetup:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
@@ -330,4 +337,32 @@ export function cleanupStaleTableCredentials(maxAgeMs: number = TABLE_CREDS_TTL_
 	} catch {
 		// storage unavailable/blocked -- ignore
 	}
+}
+
+/** Last create-table choice: the preset picked, plus the custom ruleset and the preset it was
+ * started from, kept even when a named preset won so switching back to Custom restores it. */
+export interface CreateTableSetup {
+	presetId: string;
+	customBase: string;
+	custom: RuleSet;
+}
+
+export function loadCreateTableSetup(): CreateTableSetup | null {
+	const raw = readRaw(CREATE_TABLE_SETUP_STORAGE_KEY);
+	if (raw === null) return null;
+	try {
+		const v: unknown = JSON.parse(raw);
+		if (typeof v !== 'object' || v === null) return null;
+		const { presetId, customBase, custom } = v as Record<string, unknown>;
+		const known = (id: unknown): id is string =>
+			typeof id === 'string' && id in RULESET_PRESET_RULES;
+		if (!(known(presetId) || presetId === CUSTOM_PRESET_ID) || !known(customBase)) return null;
+		return { presetId, customBase, custom: sanitizeRuleSet(custom) };
+	} catch {
+		return null;
+	}
+}
+
+export function saveCreateTableSetup(setup: CreateTableSetup): void {
+	writeRaw(CREATE_TABLE_SETUP_STORAGE_KEY, JSON.stringify(setup));
 }

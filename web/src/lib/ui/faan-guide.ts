@@ -1,5 +1,5 @@
 import { m } from '$lib/paraglide/messages.js';
-import type { HandSet } from '$lib/net/ruleset';
+import { RULESET_PRESET_RULES, type HandSet } from '$lib/net/ruleset';
 import type { TileCode } from '$lib/table/tile-code';
 
 export interface GuideEntry {
@@ -158,12 +158,13 @@ export function handSetOf(pattern: string): HandSet {
 	return NEW_6.includes(pattern) ? 'NEW_6' : NEW_18.includes(pattern) ? 'NEW_18' : 'CLASSIC';
 }
 
-// mirrors server RULESET_PRESETS' hand_sets/min_faan; update both together
-export const GUIDE_PRESET_RULES: Record<string, { handSets: HandSet[]; minFaan: number }> = {
-	hk_classic: { handSets: ['CLASSIC', 'NEW_6'], minFaan: 3 },
-	hk_casual: { handSets: ['CLASSIC', 'NEW_6', 'NEW_18'], minFaan: 1 },
-	hk_strict: { handSets: ['CLASSIC', 'NEW_6'], minFaan: 5 }
-};
+export const GUIDE_PRESET_RULES: Record<string, { handSets: HandSet[]; minFaan: number }> =
+	Object.fromEntries(
+		Object.entries(RULESET_PRESET_RULES).map(([id, rules]) => [
+			id,
+			{ handSets: rules.hand_sets, minFaan: rules.min_faan }
+		])
+	);
 
 export function inPreset(pattern: string, presetId: string | null): boolean {
 	if (presetId === null) return true;
@@ -176,3 +177,20 @@ export function inPreset(pattern: string, presetId: string | null): boolean {
 export function guideEntries(tab: GuideTab, presetId: string | null = null): GuideEntry[] {
 	return (GUIDE[String(tab)] ?? []).filter((e) => inPreset(e.pattern, presetId));
 }
+
+export interface OverridablePattern {
+	pattern: string;
+	handSet: HandSet;
+	// GUIDE tab it sits under: its default faan, or 'limit'
+	tier: GuideTab;
+}
+
+// every scored pattern a custom ruleset's faan_overrides can key, in guide order. 雞糊 is listed
+// under 1 in the guide but scores 0 by default (scoring/faan.py's CHICKEN_HAND_FAAN).
+export const OVERRIDABLE_PATTERNS: OverridablePattern[] = GUIDE_TABS.flatMap((tab) =>
+	(GUIDE[String(tab)] ?? []).map((e) => ({
+		pattern: e.pattern,
+		handSet: handSetOf(e.pattern),
+		tier: e.pattern === '雞糊' ? 0 : tab
+	}))
+);
