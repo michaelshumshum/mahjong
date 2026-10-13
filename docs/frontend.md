@@ -224,7 +224,8 @@ collapses instead. Your own meld row sits above your name, toward the centre.
 
 **Hands are centred** in their seat region at tablet-up: your `.hand-row` (`justify-content:
 center`; a spectator's bottom-seat `.backs-row` likewise), the across strip horizontally and the side strips vertically (`.seat-hand-strip` fills
-its region with `align-items: center`). Your hand recentres by half a tile when the drawn tile
+its region with `align-items: center`). Melds and flowers don't centre: an opponent's `.meld-row`
+is `align-self: start`, the seat's own left once the strip is rotated. Your hand recentres by half a tile when the drawn tile
 comes and goes.
 
 **Hand sizing.** The hand sizes to its own seat region, not the viewport:

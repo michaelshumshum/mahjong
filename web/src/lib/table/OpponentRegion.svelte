@@ -173,8 +173,13 @@
 		@include tile.meld-enter;
 	}
 
+	// the hand centres, melds stay at the seat's own left (inline start, which the strip rotates).
 	.meld-row {
 		@include tile.meld-row-reserved;
+
+		@include layout.tablet-up {
+			align-self: start;
+		}
 	}
 
 	// writing-mode reflows the flex axes so width/height already reflect the vertical footprint --

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { page } from 'vitest/browser';
 import { render, cleanupAll } from './test-render';
 import OpponentRegion from './OpponentRegion.svelte';
 import type { MockSeatState } from './mock-game-state';
@@ -189,4 +190,32 @@ describe('OpponentRegion', () => {
 		expect(row!.classList.contains('meld-row--empty')).toBe(true);
 		expect(parseFloat(getComputedStyle(row!).minBlockSize)).toBeGreaterThan(0);
 	});
+
+	// the seat's own left: across faces down the screen, left faces right, right faces left.
+	for (const [position, edge] of [
+		['across', 'right'],
+		['left', 'top'],
+		['right', 'bottom']
+	] as const) {
+		it(`aligns the ${position} seat's melds to its own left at tablet-up`, async () => {
+			await page.viewport(1024, 768);
+			const { target } = render(OpponentRegion, {
+				seat: mockSeat({
+					concealedCount: 4,
+					flowers: ['f1'],
+					melds: [{ kind: 'pung', tiles: ['1m', '1m', '1m'] }]
+				}),
+				position,
+				dealer: 0,
+				turn: 0
+			});
+			// the table grid sizes the region in the app; give the side strips room to run.
+			target.querySelector<HTMLElement>('.seat-region')!.style.height = '600px';
+			const strip = target.querySelector('.seat-hand-strip')!.getBoundingClientRect();
+			const row = target.querySelector('.meld-row')!.getBoundingClientRect();
+			expect(Math.abs(row[edge] - strip[edge])).toBeLessThanOrEqual(1);
+			const backs = target.querySelector('.backs-row')!.getBoundingClientRect();
+			expect(Math.abs(backs[edge] - strip[edge])).toBeGreaterThan(10);
+		});
+	}
 });
