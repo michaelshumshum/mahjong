@@ -3,6 +3,7 @@
 	import PanelHeader from './PanelHeader.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
 	import SwitchRow from './SwitchRow.svelte';
+	import TabBar from './TabBar.svelte';
 	import LocaleSwitcher from '$lib/i18n/LocaleSwitcher.svelte';
 	import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from './settings-storage';
 
@@ -61,19 +62,6 @@
 	];
 	let activeTab = $state<Tab>('calls');
 
-	function handleTabKeydown(e: KeyboardEvent): void {
-		const index = TABS.findIndex((t) => t.id === activeTab);
-		let next: number;
-		if (e.key === 'ArrowRight') next = (index + 1) % TABS.length;
-		else if (e.key === 'ArrowLeft') next = (index - 1 + TABS.length) % TABS.length;
-		else if (e.key === 'Home') next = 0;
-		else if (e.key === 'End') next = TABS.length - 1;
-		else return;
-		e.preventDefault();
-		activeTab = TABS[next].id;
-		document.getElementById(`${uid}-tab-${activeTab}`)?.focus();
-	}
-
 	const isDefault = $derived(
 		(Object.keys(DEFAULT_CLIENT_PREFS) as (keyof ClientPrefs)[]).every(
 			(k) => prefs[k] === DEFAULT_CLIENT_PREFS[k]
@@ -92,29 +80,14 @@
 <section class="settings" aria-labelledby="{uid}-heading">
 	<PanelHeader title={m.settings_title()} titleId="{uid}-heading" />
 
-	<div
-		class="tabs"
-		role="tablist"
-		aria-label={m.settings_tabsAriaLabel()}
-		onkeydown={handleTabKeydown}
-		tabindex="-1"
-	>
-		{#each TABS as tab (tab.id)}
-			<button
-				type="button"
-				role="tab"
-				class="tab"
-				id="{uid}-tab-{tab.id}"
-				aria-selected={activeTab === tab.id}
-				aria-controls="{uid}-panel-{tab.id}"
-				tabindex={activeTab === tab.id ? 0 : -1}
-				data-testid="settings-tab-{tab.id}"
-				onclick={() => (activeTab = tab.id)}
-			>
-				{tab.label()}
-			</button>
-		{/each}
-	</div>
+	<TabBar
+		tabs={TABS.map((t) => ({ id: t.id, label: t.label() }))}
+		active={activeTab}
+		idPrefix={uid}
+		label={m.settings_tabsAriaLabel()}
+		testidPrefix="settings-tab"
+		onChange={(tab) => (activeTab = tab)}
+	/>
 
 	<!-- every panel stays rendered (hidden, not unmounted) so tab switches never jump the height -->
 	<div class="panels">
@@ -297,7 +270,6 @@
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/forms';
 	@use '$lib/styles/layout';
-	@use '$lib/styles/a11y';
 
 	// fixed height (capped by the viewport) so switching tabs never resizes the dialog.
 	.settings {
@@ -329,42 +301,6 @@
 	// leaves room for DismissablePanel's absolutely positioned close button.
 	.settings > :global(.panel-header) {
 		padding-inline-end: var(--space-6);
-	}
-
-	.tabs {
-		display: flex;
-		gap: var(--space-1);
-		border-bottom: 1px solid var(--color-border);
-	}
-
-	.tab {
-		flex: 1 1 0;
-		min-height: 44px;
-		padding: var(--space-2) var(--space-2);
-		margin-bottom: -1px;
-		border: none;
-		border-bottom: 2px solid transparent;
-		background: none;
-		color: var(--color-text-muted);
-		font: inherit;
-		font-size: var(--font-size-sm);
-		font-weight: 700;
-		cursor: pointer;
-
-		@include a11y.motion-ok {
-			transition:
-				color 130ms ease,
-				border-color 130ms ease;
-		}
-
-		&:hover {
-			color: var(--color-text);
-		}
-
-		&[aria-selected='true'] {
-			border-bottom-color: var(--color-brass);
-			color: var(--color-text);
-		}
 	}
 
 	.panels {
