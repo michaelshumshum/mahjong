@@ -20,6 +20,14 @@ export interface MeldState {
 	fromSeat: number | null;
 }
 
+/** A provable-fairness reveal. `commit` is the `hand_start.seed_commit` this session saw live;
+ * `null` for a hand only known from `state_sync.hand_history`. */
+export interface FairnessState {
+	handSeed: string;
+	nonce: string;
+	commit: string | null;
+}
+
 export interface HandEndState {
 	handNo: number;
 	outcome: string;
@@ -32,6 +40,8 @@ export interface HandEndState {
 	payments: Record<number, number> | null;
 	revealed: boolean;
 	winningHand: number[] | null;
+	/** `provable_fairness` tables only. */
+	fairness?: FairnessState | null;
 }
 
 export interface GameEndState {
@@ -78,6 +88,8 @@ export interface ClientGameState {
 	 * `rulesetPreset` is the matching `RULESET_PRESETS` key, `null` for a custom ruleset. */
 	ruleset: RuleSet | null;
 	rulesetPreset: string | null;
+	/** Current hand's `seed_commit` on a `provable_fairness` table, else `null`. */
+	seedCommit: string | null;
 	scores: number[];
 	legalActions: Record<string, unknown>[];
 	deadlineTs: number | null;
@@ -118,6 +130,7 @@ export function initialClientGameState(): ClientGameState {
 		hostSeat: null,
 		ruleset: null,
 		rulesetPreset: null,
+		seedCommit: null,
 		scores: [0, 0, 0, 0],
 		legalActions: [],
 		deadlineTs: null,

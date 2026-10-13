@@ -546,5 +546,16 @@
 	"settings_handOrderAutoLabel": "自動排序",
 	"settings_handOrderManualLabel": "手動",
 	"settings_handOrderAutoDesc": "手牌一律按花色同數字排好。",
-	"settings_handOrderManualDesc": "拖動牌嚟排列，或者喺選中嘅牌撳 Shift + ←/→。新牌會加喺右邊。"
+	"settings_handOrderManualDesc": "拖動牌嚟排列，或者喺選中嘅牌撳 Shift + ←/→。新牌會加喺右邊。",
+	"fairness_checking": "驗證緊發牌…",
+	"fairness_verified": "發牌已驗證",
+	"fairness_verifiedDesc": "公開嘅種子同發牌前公佈嘅承諾吻合。",
+	"fairness_mismatch": "發牌同承諾唔吻合",
+	"fairness_mismatchDesc": "公開嘅種子唔係伺服器喺發牌前承諾嗰個。",
+	"fairness_unverifiable": "已公開種子",
+	"fairness_unverifiableDesc": "呢部裝置冇收到發牌前嘅承諾，所以喺度驗證唔到。",
+	"fairness_details": "種子詳情",
+	"fairness_commitLabel": "承諾",
+	"fairness_handSeedLabel": "本局種子",
+	"fairness_nonceLabel": "隨機數"
 }

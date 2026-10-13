@@ -132,7 +132,8 @@ function handResultToView(state: ClientGameState): MockHandResult | null {
 			? Object.entries(d.faanBreakdown).map(([name, faan]): FaanPatternMock => ({ name, faan }))
 			: undefined,
 		totalFaan: d.faan ?? undefined,
-		payments: (d.payments ?? undefined) as MockHandResult['payments']
+		payments: (d.payments ?? undefined) as MockHandResult['payments'],
+		fairness: d.fairness ?? undefined
 	};
 }
 

@@ -68,7 +68,10 @@ function mapHandHistoryEntry(h: HandHistoryEntryPayload): HandHistoryEntry {
 		winningHand: h.winning_hand,
 		dealer: h.dealer,
 		prevailing: h.prevailing,
-		winnerMelds: h.winner_melds ? h.winner_melds.map(mapMeldDict) : null
+		winnerMelds: h.winner_melds ? h.winner_melds.map(mapMeldDict) : null,
+		...(h.fairness && {
+			fairness: { handSeed: h.fairness.hand_seed, nonce: h.fairness.nonce, commit: null }
+		})
 	};
 }
 
@@ -128,6 +131,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				hostSeat: d.host_seat,
 				ruleset: (d.ruleset as RuleSet | undefined) ?? null,
 				rulesetPreset: d.ruleset_preset ?? null,
+				seedCommit: d.seed_commit ?? null,
 				scores: d.scores.slice(),
 				legalActions: d.legal_actions,
 				deadlineTs: d.deadline_ts,
@@ -156,6 +160,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				prevailing: d.prevailing,
 				dealer: d.dealer,
 				seatStatus: d.seats.slice(),
+				seedCommit: d.seed_commit ?? null,
 				ownHand: [],
 				drawnTileId: null,
 				concealedCounts: [0, 0, 0, 0],
@@ -410,7 +415,14 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				prevailing: state.prevailing,
 				// snapshotted now -- the next hand_start clears state.melds, so this is the only
 				// point the winner's melds are still available to capture.
-				winnerMelds: d.winner !== null ? state.melds[d.winner].slice() : null
+				winnerMelds: d.winner !== null ? state.melds[d.winner].slice() : null,
+				...(d.fairness && {
+					fairness: {
+						handSeed: d.fairness.hand_seed,
+						nonce: d.fairness.nonce,
+						commit: state.seedCommit
+					}
+				})
 			};
 			// defense in depth against the same hand_no landing twice (socket.ts already drops
 			// replays by seq before this).

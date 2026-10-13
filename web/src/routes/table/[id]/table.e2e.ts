@@ -74,6 +74,15 @@ test('switching to the hand-ended-in-a-draw scenario shows the plain draw summar
 	await expect(page.getByTestId('hand-end-draw').getByText('Draw')).toBeVisible();
 });
 
+test('a provable-fairness hand end checks the reveal against its commit', async ({ page }) => {
+	await page.goto('/table/abc123?mock=hand-ended-draw');
+	await page.waitForLoadState('networkidle');
+
+	const badge = page.getByTestId('fairness-badge');
+	await expect(badge).toHaveAttribute('data-check', 'verified');
+	await expect(badge.getByText('Fair deal verified')).toBeVisible();
+});
+
 test('switching to the game-ended scenario auto-shows the game-end summary, not the hand-end hold', async ({
 	page
 }) => {

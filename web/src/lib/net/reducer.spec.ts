@@ -1032,4 +1032,101 @@ describe('reduce open-hands spectator', () => {
 		);
 		expect(next.hands).toBeNull();
 	});
+
+	describe('reduce: provable fairness', () => {
+		const handEnd = (fairness?: { hand_seed: string; nonce: string }): ServerEvent => ({
+			v: 1,
+			ts: 1,
+			seq: 2,
+			t: 'hand_end',
+			d: {
+				hand_no: 1,
+				outcome: 'exhaustive_draw',
+				winner: null,
+				win_type: null,
+				discarder: null,
+				faan: null,
+				faan_breakdown: null,
+				points: null,
+				payments: null,
+				revealed: false,
+				winning_hand: null,
+				deadline_ts: 9000,
+				...(fairness ? { fairness } : {})
+			}
+		});
+
+		it("keeps hand_start's seed_commit and pairs it with hand_end's reveal", () => {
+			const started = reduce(state(), {
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'hand_start',
+				d: { hand_no: 1, prevailing: 'EAST', dealer: 0, seats: [], seed_commit: 'abc' }
+			});
+			expect(started.seedCommit).toBe('abc');
+
+			const ended = reduce(started, handEnd({ hand_seed: '01', nonce: '02' }));
+			expect(ended.lastHandEnd?.fairness).toEqual({ handSeed: '01', nonce: '02', commit: 'abc' });
+			expect(ended.handHistory[0].fairness).toEqual(ended.lastHandEnd?.fairness);
+		});
+
+		it('leaves fairness null on a table without it', () => {
+			const ended = reduce(state(), handEnd());
+			expect(ended.seedCommit).toBeNull();
+			expect(ended.lastHandEnd).not.toHaveProperty('fairness');
+		});
+
+		it('backfills a history reveal with no commit to check against', () => {
+			const synced = reduce(state(), {
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'state_sync',
+				d: {
+					seat: 0,
+					hand_no: 2,
+					prevailing: 'EAST',
+					dealer: 1,
+					turn: 1,
+					phase: 'AWAIT_ACTION',
+					own_hand: [],
+					concealed_counts: [13, 13, 13, 13],
+					melds: [[], [], [], []],
+					discard_pools: [[], [], [], []],
+					flowers: [[], [], [], []],
+					wall_remaining: 80,
+					seat_status: ['connected', 'connected', 'connected', 'connected'],
+					names: [null, null, null, null],
+					host_seat: 0,
+					scores: [0, 0, 0, 0],
+					legal_actions: [],
+					claim_options: [],
+					deadline_ts: null,
+					seed_commit: 'def',
+					hand_history: [
+						{
+							hand_no: 1,
+							outcome: 'exhaustive_draw',
+							winner: null,
+							win_type: null,
+							discarder: null,
+							faan: null,
+							faan_breakdown: null,
+							points: null,
+							payments: null,
+							revealed: false,
+							winning_hand: null,
+							dealer: 0,
+							prevailing: 'EAST',
+							winner_melds: null,
+							fairness: { hand_seed: '0a', nonce: '0b' }
+						}
+					]
+				}
+			});
+			expect(synced.seedCommit).toBe('def');
+			expect(synced.handHistory[0].fairness).toEqual({ handSeed: '0a', nonce: '0b', commit: null });
+		});
+	});
 });

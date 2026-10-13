@@ -955,6 +955,12 @@ inset, then pattern rows, then the total and the payments. Delays are custom-pro
 the hand. Payments render as name plates with a `--color-positive`/`--color-negative` tinted ±
 chip, the winner's plate outlined in brass.
 
+**Fairness check.** On a `provable_fairness` table, `FairnessBadge` closes the panel: it hashes
+`hand_end.fairness` against the `seed_commit` the reducer kept from that hand's `hand_start`
+(`lib/net/fairness.ts`, WebCrypto) and shows verified / mismatch / unverifiable (no live commit,
+or no `crypto.subtle` on an insecure origin), with the hex values in a `<details>` for
+`tools/verify_fairness.py` ([protocol.md §3](protocol.md) "Fairness").
+
 **Turn halos hide under a result overlay.** Neither the mock fixtures nor the reducer clear `turn`
 at `hand_end`/`game_end`, so `+page.svelte` passes a `haloTurn` of `-1` to every seat and the hub
 while a hand-end or game-end overlay is up — otherwise the last actor's halo glows behind it.

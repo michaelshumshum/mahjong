@@ -2,6 +2,7 @@
 // pre-redacted for a single seat's view. Opponent hands are plain counts; TileCodes only where the wire would reveal them.
 
 import type { TileCode } from './tile-code';
+import type { FairnessState } from '$lib/game/state';
 
 export type Seat = 0 | 1 | 2 | 3;
 export type Wind = 'E' | 'S' | 'W' | 'N';
@@ -83,6 +84,7 @@ export interface MockHandResult {
 	patterns?: FaanPatternMock[];
 	totalFaan?: number;
 	payments?: Partial<Record<Seat, number>>;
+	fairness?: FairnessState;
 }
 
 // mirrors ScoreSheet.svelte's `RoundResult`, kept as a separate parallel type since this module
@@ -324,7 +326,15 @@ export const handJustEndedDraw: MockGameState = {
 		emptySeat(2, { concealedCount: 13, discards: ['9m', '1p', '5s'], score: 10 }),
 		emptySeat(3, { concealedCount: 13, discards: ['8p', '2m'], score: -30 })
 	],
-	handResult: { outcome: 'exhaustive_draw' },
+	handResult: {
+		outcome: 'exhaustive_draw',
+		// a real commit/reveal pair (SHA256(hand_seed || nonce)), so the badge reads as verified
+		fairness: {
+			handSeed: '3f9c2a7e41b06d58c3e1f2a49b7d0c6e8a5f13d24b9e70c6a1d8f3b25e4c7a09',
+			nonce: '8d2e4f61a09b3c7e5d1f2a6b4c8e0d93',
+			commit: 'bcdf31dea46c9d02561f12ccce044a365acae2a95d539b69726cb4bd8547f8dc'
+		}
+	},
 	handEndHoldMs: 8000,
 	turnDurationMs: null
 };

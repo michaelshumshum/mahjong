@@ -543,5 +543,16 @@
 	"settings_handOrderAutoLabel": "Auto-sort",
 	"settings_handOrderManualLabel": "Manual",
 	"settings_handOrderAutoDesc": "Your hand is always sorted by suit and number.",
-	"settings_handOrderManualDesc": "Drag tiles to arrange them, or use Shift + ←/→ on a focused tile. New tiles join at the right."
+	"settings_handOrderManualDesc": "Drag tiles to arrange them, or use Shift + ←/→ on a focused tile. New tiles join at the right.",
+	"fairness_checking": "Checking the deal…",
+	"fairness_verified": "Fair deal verified",
+	"fairness_verifiedDesc": "The revealed seed matches the commitment published before the deal.",
+	"fairness_mismatch": "Deal doesn't match its commitment",
+	"fairness_mismatchDesc": "The revealed seed isn't what the server committed to before the deal.",
+	"fairness_unverifiable": "Seed revealed",
+	"fairness_unverifiableDesc": "This device didn't see the commitment before the deal, so it can't check it here.",
+	"fairness_details": "Seed details",
+	"fairness_commitLabel": "Commitment",
+	"fairness_handSeedLabel": "Hand seed",
+	"fairness_nonceLabel": "Nonce"
 }

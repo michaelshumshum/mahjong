@@ -3,6 +3,7 @@
 	import CloseButton from '$lib/ui/CloseButton.svelte';
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
+	import FairnessBadge from '$lib/ui/FairnessBadge.svelte';
 	import type { MockHandResult, MockMeld } from '$lib/table/mock-game-state';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -74,6 +75,9 @@
 				<h2>{m.handEndOverlay_handHeading({ handNo })}</h2>
 				<p>{m.handEndOverlay_drawLabel()}</p>
 			</section>
+		{/if}
+		{#if handResult.fairness}
+			<FairnessBadge fairness={handResult.fairness} />
 		{/if}
 	</div>
 </ModalDialog>
