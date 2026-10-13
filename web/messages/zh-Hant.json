@@ -67,7 +67,7 @@
 	"ruleset_presetHkCasualLabel": "休閒模式",
 	"ruleset_presetHkCasualDescription": "易糊啲：1番起糊，13番封頂。",
 	"ruleset_presetHkStrictLabel": "嚴格模式",
-	"ruleset_presetHkStrictDescription": "5番起糊，不設新例十八式，出銃者半付。",
+	"ruleset_presetHkStrictDescription": "5番起糊；出銃者付一半，其餘兩家各付四分之一。",
 	"tablesPage_backLabel": "大堂",
 	"tablesPage_title": "牌枱",
 	"tablesPage_refreshButton": "重新載入",

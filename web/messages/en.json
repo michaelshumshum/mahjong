@@ -67,7 +67,7 @@
 	"ruleset_presetHkCasualLabel": "Casual",
 	"ruleset_presetHkCasualDescription": "Easier wins: 1 faan to win, capped at 13.",
 	"ruleset_presetHkStrictLabel": "Strict",
-	"ruleset_presetHkStrictDescription": "5 faan to win, no New 18 hands, discarder pays half.",
+	"ruleset_presetHkStrictDescription": "5 faan to win; the discarder pays half, the other two a quarter each.",
 	"tablesPage_backLabel": "Lobby",
 	"tablesPage_title": "Tables",
 	"tablesPage_refreshButton": "Refresh",

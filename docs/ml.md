@@ -200,7 +200,7 @@ uv run python -m ml.export --ckpt runs/danger/ckpt_best.pt --out danger.npz
 across, previous), reading only entitled `SeatView` fields — never `view.hands`, the `ORACLE`
 tier's omniscient extra ([bots §9](bots.md)). `encode_ruleset` is
 `[min_faan, wall_reserve, hand_sets bitmask, effective faan per PATTERNS entry]`: the correct
-discard for the same hand depends on the ruleset (Seven Pairs under `hk_classic` vs `hk_strict`),
+discard for the same hand depends on the ruleset (Seven Pairs under `hk_casual` vs `hk_classic`/`hk_strict`),
 so a network without it overfits one ruleset or gets contradictory labels across several.
 Timing/connection fields are not encoded.
 

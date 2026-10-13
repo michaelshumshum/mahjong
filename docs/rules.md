@@ -378,7 +378,7 @@ class RuleSet:
 setting them has no effect. The create-table editor hides them (`INERT_RULE_FIELDS`, frontend.md §7).
 
 **Presets** (`mahjong_core.presets.RULESET_PRESETS`): `hk_classic` (the defaults above),
-`hk_casual` (`min_faan=1`, `faan_cap=13`, `NEW_18` on), `hk_strict` (`min_faan=5`). `custom` takes a full
+`hk_casual` (`min_faan=1`, `faan_cap=13`, `score_table=FULL_SPICY`, `NEW_18` on), `hk_strict` (`min_faan=5`, `discard_payment=HALF`). `custom` takes a full
 `RuleSet.from_dict` body. `resolve_ruleset` never hard-rejects: an unknown preset or invalid custom
 body falls back to `hk_classic`.
 
