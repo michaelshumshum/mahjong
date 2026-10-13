@@ -350,6 +350,12 @@ Committing them to `main` instead put a bot commit on top of nearly every push, 
 kept diverging. A missing coverage report keeps that badge's previous SVG rather than failing the
 run.
 
+The `badges` repository ruleset blocks creating, updating and deleting the branch. A personal
+repo's ruleset can't list the Actions token as a bypass actor, so the job pushes over SSH with a
+write-enabled deploy key (`badges`, private half in the `BADGES_DEPLOY_KEY` secret), and the
+ruleset's bypass list holds **Deploy keys**. A missing secret fails the job rather than leaving the
+badges silently stale.
+
 **Gates** (all hard): `ruff check`, `ruff format --check`, fast pytest, slow pytest
 (`--games=1000`; latency as ratios, the absolute 5 ms budget is `make bench-latency` on the target
 CPU, [testing.md §1](testing.md)), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,

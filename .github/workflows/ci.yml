@@ -68,9 +68,19 @@ jobs:
           cp -r badges-out badges-prev
           python3 .github/scripts/coverage_badge.py server "server coverage" coverage-server/coverage.json badges-out/coverage-server.svg
           python3 .github/scripts/coverage_badge.py web "web coverage" coverage-web/coverage-summary.json badges-out/coverage-web.svg
+      # the `badges` ruleset blocks updates; only its deploy-key bypass can push (docs/infra.md §9).
       - name: force-push badges branch if changed
+        env:
+          BADGES_DEPLOY_KEY: ${{ secrets.BADGES_DEPLOY_KEY }}
         run: |
           diff -r badges-prev badges-out >/dev/null && exit 0
+          if [ -z "$BADGES_DEPLOY_KEY" ]; then
+            echo "::error::BADGES_DEPLOY_KEY secret is not set (docs/infra.md §9)"
+            exit 1
+          fi
+          key="$RUNNER_TEMP/badges_key"
+          install -m 600 /dev/null "$key"
+          printf '%s\n' "$BADGES_DEPLOY_KEY" > "$key"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -q --orphan badges-tmp
@@ -78,4 +88,5 @@ jobs:
           cp badges-out/*.svg .
           git add coverage-*.svg
           git commit -qm "chore(ci): update coverage badges"
-          git push --force origin HEAD:badges
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            git push --force "git@github.com:${{ github.repository }}.git" HEAD:badges
