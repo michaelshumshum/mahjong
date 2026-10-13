@@ -135,7 +135,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `meld` | `{seat, meld_kind, tiles, from_seat?}` | `concealed_kong` has a redacted per-seat form: `{seat, meld_kind:"concealed_kong", tiles?, count?}` (Redaction, below) |
 | `kong_replace` | `{seat, tile_id?}` | `tile_id` only for the drawing player |
 | `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat, one entry per legal `Action` (`mahjong_core.actions.action_to_dict`). `deadline_ts` is an enforced `TimerHeap` entry ([architecture.md §8](architecture.md) "Turn timeout") |
-| `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?, deadline_ts}` | `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed`. `faan_breakdown` keys are the Chinese pattern names (`mahjong_core.scoring.patterns.PATTERNS`). `deadline_ts` is the hand-end hold's deadline, identical on every seat's stream |
+| `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?, deadline_ts, fairness?}` | `fairness`: see Fairness. `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed`. `faan_breakdown` keys are the Chinese pattern names (`mahjong_core.scoring.patterns.PATTERNS`). `deadline_ts` is the hand-end hold's deadline, identical on every seat's stream |
 | `score` | `{totals: {seat: n}}` | broadcast alongside `hand_end`; absolute post-payment totals, not a delta |
 | `game_end` | `{hand_no, scores}` | `hand_no` is the last hand played; `scores` are final absolute totals. Sent only after the final hand's hold resolves |
 | `seat_state` | `{seat, status, name?}` | `status`: `connected\|disconnected\|autoplay\|bot`. Sent for every status change of a bound seat, including the empty→`connected` transition `join` causes. `name` is carried on every broadcast for that seat |
@@ -155,6 +155,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `hands` | every seat's concealed tiles for an open-hands spectator, `null` otherwise |
 | `hand_history` | every completed hand, oldest first: `hand_end`'s fields plus `dealer`/`prevailing`/`winner_melds`. Lets a client with no earlier live stream (mid-game spectator, resync) render past hands. `winner_melds` gets the same concealed-kong redaction a live `meld` would. Defaults to `[]` |
 | `ruleset` / `ruleset_preset` | the table's fixed `RuleSet.to_dict()` and matching preset id (or `null`) |
+| `seed_commit` | the current hand's commit, `provable_fairness` tables only (see Fairness) |
 
 ### Fairness (optional, ruleset flag)
 
@@ -169,8 +170,19 @@ hand_seed = SHA256(game_seed || hand_no)
   is dealt.
 - `hand_end.fairness = {hand_seed, nonce}` — reveals only that hand's subseed, **never**
   `game_seed`. A player can recompute that one wall and check it against the commit.
-- Both fields exist only when `ruleset.provable_fairness` is set; the keys are omitted otherwise,
+- `state_sync.seed_commit` repeats the current hand's commit for a client that missed
+  `hand_start`; `state_sync.hand_history[i].fairness` repeats each past hand's reveal.
+- All of these exist only when `ruleset.provable_fairness` is set; the keys are omitted otherwise,
   not sent as nulls.
+- Hex-encoded. `nonce` is 16 random bytes per hand, minted in `app/fairness.py` (never in the
+  pure engine). `game_seed` is 63 random bits (`new_game_seed`; signed `BIGINT` columns), not a
+  clock reading: a revealed `hand_seed` is a SHA-256 preimage target, and a guessable seed would let
+  a player grind it and predict every later wall.
+- **Checking a hand.** The client recomputes `SHA256(hand_seed || nonce)` against the commit it saw
+  and shows the result on the hand-end panel (`FairnessBadge.svelte`; a hand known only from
+  `hand_history` has no live commit to check against). To check the wall itself, run
+  `uv run python tools/verify_fairness.py --commit … --hand-seed … --nonce …` from `server/`: it
+  verifies the commit and prints the wall `hand_seed` shuffles to, front to back.
 - **Limit:** this proves the server didn't change the wall *after* committing. It does not stop a
   malicious server from choosing `(seed, nonce)` adversarially *before* the commit
   ([architecture.md §9](architecture.md), [ADR 0005](decisions/0005-client-entropy-fairness.md)).

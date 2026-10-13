@@ -230,6 +230,7 @@ export interface StateSyncPayload {
 	ruleset_preset?: string | null;
 	ruleset?: Record<string, unknown>;
 	bot_levels?: (string | null)[];
+	seed_commit?: string | null;
 }
 
 export interface HandStartPayload {
@@ -237,6 +238,7 @@ export interface HandStartPayload {
 	prevailing: string;
 	dealer: number;
 	seats: string[];
+	seed_commit?: string | null;
 }
 
 export interface DealPayload {
@@ -310,6 +312,7 @@ export interface HandEndPayload {
 	revealed: boolean;
 	winning_hand: number[] | null;
 	deadline_ts: number;
+	fairness?: FairnessPayload | null;
 }
 
 export interface ScorePayload {
@@ -353,6 +356,12 @@ export interface HandHistoryEntryPayload {
 	dealer: number;
 	prevailing: string;
 	winner_melds: Record<string, unknown>[] | null;
+	fairness?: FairnessPayload | null;
+}
+
+export interface FairnessPayload {
+	hand_seed: string;
+	nonce: string;
 }
 
 /** Client -> server intents (docs/protocol.md §2). */

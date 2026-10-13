@@ -33,6 +33,7 @@ from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.fairness import new_game_seed
 from app.table import Table, TableSettings, WireSeatStatus
 from bots.worker import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
@@ -107,7 +108,7 @@ class TableRegistry:
         table = Table(
             table_id,
             ruleset,
-            game_seed=seed if seed is not None else time.time_ns(),
+            game_seed=seed if seed is not None else new_game_seed(),
             require_ready=require_ready,
             bot_pool=self._bot_pool,
             session_factory=self._session_factory,
@@ -147,7 +148,7 @@ class TableRegistry:
         self, table_id: str, ruleset: RuleSet, bot_tiers: Sequence[str]
     ) -> asyncio.Task[None]:
         previous = self._tables.get(table_id)
-        game_seed = time.time_ns()
+        game_seed = new_game_seed()
         tier_rng = random.Random(game_seed)
         table = Table(
             table_id,

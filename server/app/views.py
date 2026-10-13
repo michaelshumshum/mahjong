@@ -524,6 +524,8 @@ class HandHistoryRecord:
     dealer: int
     prevailing: str
     winner_melds: tuple[Meld, ...] | None
+    # provable_fairness only: that hand's `{hand_seed, nonce}` reveal
+    fairness: Mapping[str, str] | None = None
 
 
 def hand_history_wire(
@@ -555,6 +557,7 @@ def hand_history_wire(
                 else None
             ),
         }
+        | ({"fairness": dict(r.fairness)} if r.fairness is not None else {})
         for r in records
     ]
 

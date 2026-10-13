@@ -173,6 +173,15 @@ class Auto(Envelope):
     d: AutoPayload
 
 
+class FairnessPayload(BaseModel):
+    """One hand's reveal: hex `hand_seed` and `nonce`; never `game_seed`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hand_seed: str
+    nonce: str
+
+
 class HandHistoryEntryPayload(BaseModel):
     """One completed hand, carried on `state_sync.hand_history`. Same fields as `HandEndPayload`
     minus `deadline_ts`, plus `dealer`/`prevailing`/`winner_melds` -- a live client derives
@@ -195,6 +204,7 @@ class HandHistoryEntryPayload(BaseModel):
     dealer: int
     prevailing: str
     winner_melds: list[dict[str, Any]] | None
+    fairness: FairnessPayload | None = None
 
 
 class StateSyncPayload(BaseModel):
@@ -237,6 +247,8 @@ class StateSyncPayload(BaseModel):
     ruleset: dict[str, Any] = {}
     # per-seat bot tier (`bots.worker.BOT_TIERS`), `null` for a non-`bot` seat
     bot_levels: list[str | None] = []
+    # provable_fairness only, omitted otherwise: the current hand's hand_start.seed_commit
+    seed_commit: str | None = None
 
 
 class HandStartPayload(BaseModel):
@@ -247,6 +259,8 @@ class HandStartPayload(BaseModel):
     dealer: int
     # per-seat status, seat_view's shape: connected/disconnected/autoplay/bot/empty
     seats: list[str]
+    # provable_fairness only, omitted otherwise: SHA256(hand_seed || nonce), hex
+    seed_commit: str | None = None
 
 
 class DealPayload(BaseModel):
@@ -341,6 +355,8 @@ class HandEndPayload(BaseModel):
     winning_hand: list[int] | None
     # hand-end hold: every seat gets this same deadline, held until all four ack or it elapses.
     deadline_ts: int
+    # provable_fairness only, omitted otherwise
+    fairness: FairnessPayload | None = None
 
 
 class ScorePayload(BaseModel):

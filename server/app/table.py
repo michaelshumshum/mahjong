@@ -85,6 +85,7 @@ from typing import Any, Final, Literal, cast
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.records import save_game_record
+from app.fairness import fairness_reveal, new_nonce, seed_commit
 from app.idempotency import IdempotencyCache
 from app.views import (
     HandHistoryRecord,
@@ -546,6 +547,8 @@ class Table:
         # every completed hand, oldest first -- populated by _record_hand_history on each HandEnded.
         # lets a client with only a fresh state_sync still show the full scoresheet.
         self._hand_history: list[HandHistoryRecord] = []
+        # (hand_no, nonce) behind the current hand's seed_commit; provable_fairness tables only.
+        self._fairness_nonce: tuple[int, bytes] | None = None
 
         # seat -> BotJobTag in flight for it (absent = none outstanding). _bot_tasks holds strong
         # refs to the asyncio.Tasks awaiting each ProcessPoolExecutor future so they aren't GC'd mid-flight.
@@ -947,6 +950,9 @@ class Table:
         wire["ruleset_preset"] = preset_id_for(self.state.ruleset)
         wire["ruleset"] = self.state.ruleset.to_dict()
         wire["bot_levels"] = list(self.bot_levels_tuple())
+        commit = self._seed_commit()
+        if commit is not None:
+            wire["seed_commit"] = commit
         return wire
 
     def seat_status_tuple(
@@ -1673,15 +1679,17 @@ class Table:
         """Synthesize `hand_start` (broadcast) and `deal` (per-seat) -- these have no backing
         `Event`. Called once the table actually starts and once per later hand."""
         state = self.state
-        self._broadcast_wire(
-            {
-                "t": "hand_start",
-                "hand_no": state.hand_no,
-                "prevailing": state.prevailing.name,
-                "dealer": state.dealer,
-                "seats": list(self.seat_status_tuple()),
-            }
-        )
+        hand_start: dict[str, Any] = {
+            "t": "hand_start",
+            "hand_no": state.hand_no,
+            "prevailing": state.prevailing.name,
+            "dealer": state.dealer,
+            "seats": list(self.seat_status_tuple()),
+        }
+        commit = self._seed_commit()
+        if commit is not None:
+            hand_start["seed_commit"] = commit
+        self._broadcast_wire(hand_start)
         for seat in range(4):
             self.publish_to_seat(
                 seat,
@@ -1738,6 +1746,25 @@ class Table:
             wire["pool_index"] = len(pool) - 1
         if isinstance(event, HandEnded):
             wire["deadline_ts"] = self._hand_end_deadline_ms
+            reveal = self._fairness_reveal()
+            if reveal is not None:
+                wire["fairness"] = reveal
+
+    def _seed_commit(self) -> str | None:
+        """The current hand's `seed_commit`, or `None` off `provable_fairness`. The nonce is
+        minted on first use per hand, so `hand_start` and a later `state_sync` agree."""
+        if not self.state.ruleset.provable_fairness:
+            return None
+        if self._fairness_nonce is None or self._fairness_nonce[0] != self.state.hand_no:
+            self._fairness_nonce = (self.state.hand_no, new_nonce())
+        return seed_commit(self.state.hand_seed, self._fairness_nonce[1])
+
+    def _fairness_reveal(self) -> dict[str, str] | None:
+        """`hand_end.fairness` for the hand `self.state` is on; never `game_seed`."""
+        if self._seed_commit() is None:
+            return None
+        assert self._fairness_nonce is not None
+        return fairness_reveal(self.state.hand_seed, self._fairness_nonce[1])
 
     def _publish(self, events: list[Event]) -> None:
         """`redact_event()` per recipient seat, published via `publish_to_seat`, plus one more
@@ -1785,6 +1812,7 @@ class Table:
                 dealer=self.state.dealer,
                 prevailing=self.state.prevailing.name,
                 winner_melds=self.state.seats[winner].melds if winner is not None else None,
+                fairness=self._fairness_reveal(),
             )
         )
 

@@ -943,6 +943,26 @@
       "title": "ErrorPayload",
       "type": "object"
     },
+    "FairnessPayload": {
+      "additionalProperties": false,
+      "description": "One hand's reveal: hex `hand_seed` and `nonce`; never `game_seed`.",
+      "properties": {
+        "hand_seed": {
+          "title": "Hand Seed",
+          "type": "string"
+        },
+        "nonce": {
+          "title": "Nonce",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hand_seed",
+        "nonce"
+      ],
+      "title": "FairnessPayload",
+      "type": "object"
+    },
     "FlowerReplace": {
       "additionalProperties": false,
       "properties": {
@@ -1335,6 +1355,17 @@
         "deadline_ts": {
           "title": "Deadline Ts",
           "type": "integer"
+        },
+        "fairness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FairnessPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1489,6 +1520,17 @@
             }
           ],
           "title": "Winner Melds"
+        },
+        "fairness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FairnessPayload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1585,6 +1627,18 @@
           },
           "title": "Seats",
           "type": "array"
+        },
+        "seed_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed Commit"
         }
       },
       "required": [
@@ -2739,6 +2793,18 @@
           },
           "title": "Bot Levels",
           "type": "array"
+        },
+        "seed_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed Commit"
         }
       },
       "required": [
