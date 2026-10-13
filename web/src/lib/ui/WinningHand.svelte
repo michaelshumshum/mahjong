@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
+	import { meldTileFace } from '../table/meld-face';
 	import type { TileCode } from '../table/tile-code';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -61,7 +62,7 @@
 						<div class="meld">
 							{#each meld.tiles as code, ti (`${mi}:${ti}:${code}`)}
 								<div class="tile">
-									<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+									<TileFace code={meldTileFace(meld.kind, code, ti, meld.tiles.length)} />
 								</div>
 							{/each}
 						</div>

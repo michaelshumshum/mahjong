@@ -46,8 +46,7 @@ function updateHand(
 function mapMeldDict(m: Record<string, unknown>): MeldState {
 	return {
 		kind: (m.kind ?? m.meld_kind) as string,
-		tiles: (m.tiles as number[] | null | undefined) ?? null,
-		count: (m.count as number | null | undefined) ?? null,
+		tiles: m.tiles as number[],
 		fromSeat: (m.from_seat as number | null | undefined) ?? null
 	};
 }
@@ -275,23 +274,20 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 			const newMeld: MeldState = {
 				kind: d.meld_kind,
 				tiles: d.tiles,
-				count: d.count ?? null,
 				fromSeat: d.from_seat ?? null
 			};
 
 			if (d.meld_kind === 'added_kong') {
 				// upgrades the existing pung in place rather than appending a stale duplicate entry.
-				const claimTiles = d.tiles ?? [];
+				const claimTiles = d.tiles;
 				const seatMelds = state.melds[d.seat];
 				const pungIdx = seatMelds.findIndex(
 					(existing) =>
-						existing.kind === 'pung' &&
-						existing.tiles !== null &&
-						existing.tiles.every((t) => claimTiles.includes(t))
+						existing.kind === 'pung' && existing.tiles.every((t) => claimTiles.includes(t))
 				);
 				const nextSeatMelds =
 					pungIdx === -1 ? [...seatMelds, newMeld] : replaceAt(seatMelds, pungIdx, newMeld);
-				const oldPungTiles = pungIdx === -1 ? [] : (seatMelds[pungIdx].tiles ?? []);
+				const oldPungTiles = pungIdx === -1 ? [] : seatMelds[pungIdx].tiles;
 				const addedTile = claimTiles.find((t) => !oldPungTiles.includes(t));
 				return {
 					...state,
@@ -324,8 +320,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 						d.seat,
 						Math.max(0, state.concealedCounts[d.seat] - 4)
 					),
-					ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
-					hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles ?? [])),
+					ownHand: isOwn ? removeMany(state.ownHand, d.tiles) : state.ownHand,
+					hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles)),
 					drawnTileId: isOwn ? null : state.drawnTileId,
 					lastDiscard: null
 				};
@@ -333,8 +329,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 
 			// chow/pung/exposed_kong: `from_seat` set means exactly one tile of `tiles` came from
 			// that seat's discard, the rest from this seat's own concealed hand.
-			const claimedCount = d.from_seat != null && d.tiles ? 1 : 0;
-			const fromHandCount = (d.tiles?.length ?? 0) - claimedCount;
+			const claimedCount = d.from_seat != null ? 1 : 0;
+			const fromHandCount = d.tiles.length - claimedCount;
 			return {
 				...state,
 				melds,
@@ -343,8 +339,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 					d.seat,
 					Math.max(0, state.concealedCounts[d.seat] - fromHandCount)
 				),
-				ownHand: isOwn && d.tiles ? removeMany(state.ownHand, d.tiles) : state.ownHand,
-				hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles ?? [])),
+				ownHand: isOwn ? removeMany(state.ownHand, d.tiles) : state.ownHand,
+				hands: updateHand(state.hands, d.seat, (h) => removeMany(h, d.tiles)),
 				// mahjong_core.engine pops the claimed tile off the discarder's pool immediately (always
 				// the last entry) -- mirrored here so pool_index doesn't misalign before the next state_sync.
 				discardPools:

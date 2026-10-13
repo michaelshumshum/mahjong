@@ -37,6 +37,7 @@ moved on.
 | [0020](0020-hk-scoring-table-alignment.md) | Scoring table aligned with standard HK mahjong | Accepted |
 | [0021](0021-rl-training-hardware.md) | RL training hardware: laptop CPU, cloud plan, 2060 desktop | Historical |
 | [0022](0022-oracle-learned-tier.md) | `ORACLE` serves `OracleLearned`: the Expert policy plus exact vetoes | Accepted |
+| [0023](0023-concealed-kong-public.md) | Concealed kongs are public (HK display: end tiles face-down) | Accepted |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).

@@ -60,13 +60,12 @@ from mahjong_core.engine import (
     KongReplacementDrawn,
     MeldFormed,
 )
-from mahjong_core.melds import Meld, MeldKind
+from mahjong_core.melds import Meld
 from mahjong_core.state import ClaimOffer, GameState, HandOutcome, Phase, Wind
 from mahjong_core.tiles import Flower, TileId, tile_code
 
 __all__ = [
     "ClaimResolvedWire",
-    "ConcealedKongWire",
     "DiscardWire",
     "DrawWire",
     "Entitlement",
@@ -238,7 +237,7 @@ def _omniscient_seat_view(state: GameState, seat: int) -> SeatView:
     return replace(view, hands=tuple(s.concealed for s in state.seats))
 
 
-# one dataclass per distinct wire shape -- concealed_kong gets two (owner vs. everyone else).
+# one dataclass per distinct wire shape.
 # not modeled (needs Table's own per-event state): discard.pool_index, flower_replace's tile, envelope fields.
 
 
@@ -265,26 +264,13 @@ class DiscardWire:
 
 @dataclass(frozen=True)
 class MeldWire:
-    """Every meld kind except concealed_kong -- fully public, full tiles to everyone."""
+    """Every meld kind, concealed_kong included -- fully public, full tiles to everyone."""
 
     t: Literal["meld"] = field(metadata=_entitled(Entitlement.PUBLIC))
     seat: int = field(metadata=_entitled(Entitlement.PUBLIC))
     meld_kind: str = field(metadata=_entitled(Entitlement.PUBLIC))
     tiles: tuple[int, ...] = field(metadata=_entitled(Entitlement.PUBLIC))
     from_seat: int | None = field(default=None, metadata=_entitled(Entitlement.PUBLIC))
-
-
-@dataclass(frozen=True)
-class ConcealedKongWire:
-    """暗槓's redacted-per-seat wire form: declaring seat sees `tiles`, everyone else sees
-    `count`, for the rest of the hand -- a showdown reveal comes only through
-    `HandEndWire.winning_hand`."""
-
-    t: Literal["meld"] = field(metadata=_entitled(Entitlement.PUBLIC))
-    seat: int = field(metadata=_entitled(Entitlement.PUBLIC))
-    meld_kind: Literal["concealed_kong"] = field(metadata=_entitled(Entitlement.PUBLIC))
-    tiles: tuple[int, ...] | None = field(metadata=_entitled(Entitlement.OWN_SEAT))
-    count: int | None = field(metadata=_entitled(Entitlement.PUBLIC))
 
 
 @dataclass(frozen=True)
@@ -335,7 +321,6 @@ WireEvent = (
     | FlowerReplaceWire
     | DiscardWire
     | MeldWire
-    | ConcealedKongWire
     | ClaimResolvedWire
     | KongReplaceWire
     | HandEndWire
@@ -365,15 +350,6 @@ def _build_event_wire(
 
     if isinstance(event, MeldFormed):
         meld = event.meld
-        if meld.kind == MeldKind.CONCEALED_KONG:
-            owns = _sees_concealed(seat, event.seat, reveal_hands)
-            return ConcealedKongWire(
-                t="meld",
-                seat=event.seat,
-                meld_kind="concealed_kong",
-                tiles=tuple(meld.tiles) if owns else None,
-                count=None if owns else len(meld.tiles),
-            )
         return MeldWire(
             t="meld",
             seat=event.seat,
@@ -438,31 +414,15 @@ def _wire_value(value: Any) -> Any:
     return value
 
 
-def _meld_wire(
-    meld: Meld, *, owner: int, viewer: int | None, reveal_hands: bool = False
-) -> dict[str, Any]:
-    """Same redaction as `ConcealedKongWire`: tiles only to the declaring seat, count to
-    everyone else -- needed because `SeatView.melds`'s `PUBLIC` annotation is right in aggregate
-    but wrong for concealed-kong tile identity specifically."""
-    if meld.kind == MeldKind.CONCEALED_KONG:
-        owns = _sees_concealed(viewer, owner, reveal_hands)
-        return {
-            "kind": meld.kind.value,
-            "tiles": list(meld.tiles) if owns else None,
-            "count": None if owns else len(meld.tiles),
-            "from_seat": meld.from_seat,
-        }
+def _meld_wire(meld: Meld) -> dict[str, Any]:
     return {"kind": meld.kind.value, "tiles": list(meld.tiles), "from_seat": meld.from_seat}
 
 
-def _claim_offer_wire(offer: ClaimOffer, viewer: int | None) -> dict[str, Any]:
-    """`offer.melds` can never actually hold a concealed kong -- claim offers only ever carry
-    chow/pung/exposed-kong, and concealed kong is self-declared only. Still routes through
-    `_meld_wire` defensively, in case that ever changes."""
+def _claim_offer_wire(offer: ClaimOffer) -> dict[str, Any]:
     return {
         "seat": offer.seat,
         "can_win": offer.can_win,
-        "melds": [_meld_wire(m, owner=offer.seat, viewer=viewer) for m in offer.melds],
+        "melds": [_meld_wire(m) for m in offer.melds],
     }
 
 
@@ -480,15 +440,7 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "phase": view.phase.value,
         "own_hand": list(view.own_hand),
         "concealed_counts": list(view.concealed_counts),
-        "melds": [
-            [
-                _meld_wire(
-                    m, owner=owner_seat, viewer=view.seat, reveal_hands=view.hands is not None
-                )
-                for m in seat_melds
-            ]
-            for owner_seat, seat_melds in enumerate(view.melds)
-        ],
+        "melds": [[_meld_wire(m) for m in seat_melds] for seat_melds in view.melds],
         "discard_pools": [list(pool) for pool in view.discard_pools],
         "flowers": [[tile_code(f) for f in fl] for fl in view.flowers],
         "wall_remaining": view.wall_remaining,
@@ -496,7 +448,7 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "names": list(view.names),
         "scores": list(view.scores),
         "legal_actions": [action_to_dict(a) for a in view.legal_actions],
-        "claim_options": [_claim_offer_wire(o, view.seat) for o in view.claim_options],
+        "claim_options": [_claim_offer_wire(o) for o in view.claim_options],
         "deadline_ts": view.deadline_ts,
         "host_seat": view.host_seat,
         "hands": [list(h) for h in view.hands] if view.hands is not None else None,
@@ -506,9 +458,7 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
 @dataclass(frozen=True)
 class HandHistoryRecord:
     """One completed hand, captured once `HandEnded` fires (`_record_hand_history`) -- backs
-    `state_sync.hand_history`. Every field but `winner_melds` is already public; `winner_melds`
-    stays raw `Meld`s, redacted per viewer at `state_sync` time (`hand_history_wire`) so a
-    non-owner still never learns a past hand's concealed-kong tiles."""
+    `state_sync.hand_history`. Every field is public, concealed kongs included."""
 
     hand_no: int
     outcome: str
@@ -528,11 +478,8 @@ class HandHistoryRecord:
     fairness: Mapping[str, str] | None = None
 
 
-def hand_history_wire(
-    records: Sequence[HandHistoryRecord], *, viewer: int | None, reveal_hands: bool = False
-) -> list[dict[str, Any]]:
-    """`state_sync.hand_history` -- one dict per completed hand, oldest first. `winner_melds`
-    gets the same per-viewer concealed-kong redaction a live `meld` event would."""
+def hand_history_wire(records: Sequence[HandHistoryRecord]) -> list[dict[str, Any]]:
+    """`state_sync.hand_history` -- one dict per completed hand, oldest first."""
     return [
         {
             "hand_no": r.hand_no,
@@ -549,10 +496,7 @@ def hand_history_wire(
             "dealer": r.dealer,
             "prevailing": r.prevailing,
             "winner_melds": (
-                [
-                    _meld_wire(m, owner=r.winner, viewer=viewer, reveal_hands=reveal_hands)
-                    for m in r.winner_melds
-                ]
+                [_meld_wire(m) for m in r.winner_melds]
                 if r.winner_melds is not None and r.winner is not None
                 else None
             ),

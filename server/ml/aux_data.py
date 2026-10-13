@@ -79,18 +79,16 @@ def pack_aux(src: Path, dst: Path, *, salt: str = DEFAULT_SALT) -> dict[str, obj
 
 
 def hidden_counts(raw: dict[str, np.ndarray]) -> np.ndarray:
-    """`(B, 4, 34)` true location of every unseen copy: next/across/previous opponent
-    (concealed tiles + concealed kongs), live wall."""
-    opp = raw["opp_concealed"].astype(np.int64) + 4 * raw["opp_concealed_kongs"].astype(np.int64)
+    """`(B, 4, 34)` true location of every unseen copy: next/across/previous opponent's
+    concealed tiles, live wall. Concealed kongs are public, so not unseen."""
+    opp = raw["opp_concealed"].astype(np.int64)
     return np.concatenate([opp, raw["wall_counts"].astype(np.int64)[:, None]], axis=1)
 
 
 def hidden_slots(raw: dict[str, np.ndarray], total_hidden: np.ndarray) -> np.ndarray:
-    """`(B, 4)` hidden non-flower tile slots per location, from public counts only: concealed
-    tiles + 4 per concealed kong per opponent, the rest in the wall."""
-    cc = raw["concealed_counts"][:, 1:].astype(np.int64)
-    kongs = raw["concealed_kongs"][:, 1:].astype(np.int64)
-    opp = cc + 4 * kongs
+    """`(B, 4)` hidden non-flower tile slots per location, from public counts only: each
+    opponent's concealed tiles, the rest in the wall."""
+    opp = raw["concealed_counts"][:, 1:].astype(np.int64)
     wall = total_hidden - opp.sum(axis=1)
     return np.concatenate([opp, wall[:, None]], axis=1)
 

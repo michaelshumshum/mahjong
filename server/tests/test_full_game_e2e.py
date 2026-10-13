@@ -132,12 +132,8 @@ def _check_redaction(frame: dict[str, Any], seat: int) -> None:
             assert d.get("tile_id") is None, f"{t} leaked a foreign tile_id to seat {seat}: {d}"
         else:
             assert d.get("tile_id") is not None
-    elif t == "meld" and d.get("meld_kind") == "concealed_kong":
-        if d.get("seat") != seat:
-            assert d.get("tiles") is None, f"concealed_kong leaked tiles to seat {seat}: {d}"
-            assert d.get("count") is not None
-        else:
-            assert d.get("tiles") is not None
+    elif t == "meld":
+        assert d.get("tiles"), f"meld without tiles to seat {seat}: {d}"
     elif t == "hand_end":
         if d.get("outcome") == "win":
             assert d.get("revealed") is True

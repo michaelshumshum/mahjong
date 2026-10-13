@@ -3,11 +3,9 @@ every heuristic bot tier. Lives in `bots/`, not `mahjong_core/`, since it reads 
 `ClaimOffer` -- `app/`-layer types `mahjong_core` must never depend on.
 
 `own_hand34`/`seen34` only read tiles this seat is entitled to: own concealed hand, every seat's
-non-concealed melds, public discard pools. Another seat's concealed kong is deliberately excluded
--- a human wouldn't see its tile type either, and `mahjong_core` never redacts, so this module is
-where that boundary is drawn. `seen34` is the one exception: when `view.hands` is populated (the
-`"ORACLE"` tier's omniscient view, docs/bots.md §9) it also counts every opponent's real
-concealed tiles, including concealed kongs -- see its own docstring.
+melds (concealed kongs included -- they're played face-up), public discard pools. `seen34` is the
+one exception: when `view.hands` is populated (the `"ORACLE"` tier's omniscient view,
+docs/bots.md §9) it also counts every opponent's real concealed tiles -- see its own docstring.
 """
 
 from __future__ import annotations
@@ -57,13 +55,6 @@ def seen34(view: SeatView) -> list[int]:
     genuinely known rather than merely inferred -- otherwise `ukeire`'s live-tile count
     (`4 - seen34[t]`) would treat tiles actually sitting in an opponent's hand as still drawable
     from the wall. `view.hands is None` (every other tier) is untouched, byte-for-byte.
-
-    A concealed kong is the one case that flips direction under `view.hands`: its 4 tiles are
-    removed from `SeatState.concealed` the moment it's declared
-    (`mahjong_core.engine._apply_self_kong`), so they are *not* already counted via
-    `view.hands[opponent]` -- unlike the probabilistic branch, which must skip it because a real
-    human genuinely can't see it, the omniscient view knows exactly what it is and must add it
-    from `view.melds` instead, or those tiles would silently vanish from the count entirely.
     """
     if view.seat is None:
         raise ValueError("seen34 needs a seated view, not a spectator's")
@@ -72,8 +63,6 @@ def seen34(view: SeatView) -> list[int]:
         if s == view.seat:
             continue
         for meld in seat_melds:
-            if meld.concealed and view.hands is None:
-                continue  # another seat's concealed kong -- not visible probabilistically
             _add_meld(counts, meld)
     if view.hands is not None:
         for s, hand in enumerate(view.hands):

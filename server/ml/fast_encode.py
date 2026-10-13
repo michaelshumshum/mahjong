@@ -3,8 +3,8 @@ preallocated buffer (docs/ml.md §7). Skips `seat_view`'s legal-action scan and 
 numpy round trips. `tests/test_ml_fast_encode.py` pins it bit-equal to the reference path: that
 parity test is the leak guard, since this module reads `GameState` directly.
 
-Reads, per seat, exactly what `SeatView` exposes: own concealed tiles, every seat's melds minus
-other seats' concealed kongs (`ml.raw.visible_meld_counts34`'s rule), discards, concealed counts.
+Reads, per seat, exactly what `SeatView` exposes: own concealed tiles, every seat's melds
+(`ml.raw.visible_meld_counts34`), discards, concealed counts.
 """
 
 from __future__ import annotations
@@ -62,8 +62,6 @@ def encode_state(state: GameState, seat: int, out: np.ndarray | None = None) -> 
         meld_base = (1 + rel) * N_TILE_TYPES
         own_melds = abs_seat == seat
         for meld in s.melds:
-            if meld.concealed and not own_melds:
-                continue
             tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
             for t in tiles:
                 idx.append(meld_base + t // _COPIES)

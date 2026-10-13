@@ -337,7 +337,7 @@ Below 768px (phone portrait):
 
 The hand model keys elements by `tile_id`, so a tile drawn, held and discarded is one continuous
 element — but the protocol only gives `tile_id` to the seat that owns the tile. Opponents arrive as
-counts (`deal.counts`, `draw {seat}`, `{count: 13}`, `concealed_kong → {count: 4}`).
+counts (`deal.counts`, `draw {seat}`, `{count: 13}`).
 
 The client assigns a **positional** identity instead — stable per seat, opaque until revealed:
 
@@ -348,12 +348,15 @@ The client assigns a **positional** identity instead — stable per seat, opaque
   chosen by a fixed rule: `seat:drawn` if it exists (covers tsumogiri), else the rightmost
   concealed slot (`seat:12`), with later slots shifting down. That element morphs face-up in place,
   then animates to the pool keyed by `tile_id`. From reveal onward its key is the real `tile_id`.
-- `concealed_kong {seat, count: 4}`: remove 4 concealed slots (same rule: `seat:drawn` + the 3
-  rightmost), replace with 4 backs in the meld area. `hand_end` reveals identity later.
-- An open meld (`meld {seat, kind, tiles, from_seat}`) carries real ids directly.
+- `meld {seat, kind, tiles, from_seat}` carries real ids for every kind. A concealed kong removes 4
+  concealed slots (same rule: `seat:drawn` + the 3 rightmost); the other kinds remove
+  `tiles.length` minus the claimed tile.
+- A concealed kong (暗槓) is drawn HK-style, both end tiles as backs and the middle two face-up
+  (`lib/table/meld-face.ts`'s `meldTileFace`, used by every meld renderer — table and win
+  screens alike; [ADR 0023](decisions/0023-concealed-kong-public.md)).
 
 Client-only bookkeeping — it doesn't touch the protocol or leak information. Opponent slot count
-always matches the server's redacted `count`.
+always matches the server's `count`.
 
 ## 5. Interaction
 
@@ -535,7 +538,7 @@ interface ClientGameState {
   phase: string;
   ownHand: number[]; // real tile_ids — this seat's own concealed hand only
   concealedCounts: number[]; // length-4, count-only for every seat incl. this one
-  melds: MeldState[][]; // length-4; concealed_kong is {tiles:null,count} until reveal
+  melds: MeldState[][]; // length-4; real tile_ids for every kind
   discardPools: number[][]; // length-4, append-only, indexed by pool_index
   lastDiscard: { seat: number; tileId: number } | null; // most recent unclaimed discard
   flowers: string[][];

@@ -23,7 +23,7 @@ export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'ad
 
 export interface MockMeld {
 	kind: MeldKind;
-	// real tile identities always, even for concealed_kong -- TileFace renders it as backs.
+	// real tile identities always; a concealed_kong shows its end tiles as backs (meld-face.ts).
 	tiles: TileCode[];
 	fromSeat?: Seat; // undefined for concealed_kong/added_kong, mirrors Meld.from_seat = None
 }

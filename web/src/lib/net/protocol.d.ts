@@ -282,8 +282,7 @@ export interface ClaimResolvedPayload {
 export interface MeldPayload {
 	seat: number;
 	meld_kind: string;
-	tiles: number[] | null;
-	count?: number | null;
+	tiles: number[];
 	from_seat?: number | null;
 }
 

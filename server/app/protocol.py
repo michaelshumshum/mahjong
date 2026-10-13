@@ -318,8 +318,7 @@ class MeldPayload(BaseModel):
 
     seat: int
     meld_kind: str
-    tiles: list[int] | None
-    count: int | None = None  # concealed_kong, non-owner stream only
+    tiles: list[int]
     from_seat: int | None = None
 
 

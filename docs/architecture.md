@@ -427,13 +427,12 @@ Invariants this enforces:
 - Another player's concealed hand → `{"count": 13}`. Never a tile list.
 - The wall → `{"remaining": 42}`. Never contents, never `game_seed`. Only that hand's `hand_seed`
   is revealed, and only at that hand's end (§3, §9).
-- A concealed kong (暗槓) → `{"kind": "concealed_kong", "count": 4}` to others; the tile identity
-  is revealed only at hand end.
-- Flowers, melds, discard pool, scores: fully public.
+- Flowers, melds (concealed kongs included, [ADR 0023](decisions/0023-concealed-kong-public.md)),
+  discard pool, scores: fully public.
 - A spectator sees the union of what all four players show publicly, **not** their private hands —
   unless the table sets `spectators_see_hands` (§3). Then `seat_view(state, None,
   reveal_hands=True)` adds `hands`, and `redact_event(..., reveal_hands=True)` hands the spectator
-  every `OWN_SEAT` field (draw/kong-replace tile ids, concealed-kong tiles). The walker checks this
+  every `OWN_SEAT` field (draw/kong-replace tile ids). The walker checks this
   under its own `OPEN_HANDS` entitlement. There is no delay: open-hands tables are for watching
   bots, where a spectator relaying hands to a player isn't a concern.
 

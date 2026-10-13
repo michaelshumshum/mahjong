@@ -113,7 +113,7 @@ Phases: `AWAIT_DRAW`, `AWAIT_ACTION`, `AWAIT_CLAIMS`, `AWAIT_KONG_ROB`, `SCORING
 | Pung 刻子 | 碰 | discard, any player | three identical |
 | Exposed kong 明槓 | 槓 | discard, any player | four identical; draw replacement from back of wall |
 | Added kong 加槓 | 加槓 | own draw added to an exposed pung | **opens a robbing-the-kong window** |
-| Concealed kong 暗槓 | 暗槓 | four drawn by self | laid face down; identity hidden until hand end; cannot be undone; draw replacement |
+| Concealed kong 暗槓 | 暗槓 | four drawn by self | laid with both end tiles face down and the middle two face up, so its identity is public ([ADR 0023](decisions/0023-concealed-kong-public.md)); still a concealed set for scoring (§7); cannot be undone; draw replacement |
 
 Kong replacements come from the **live wall** (§9) — HK play has no separate dead wall, so each
 kong brings the exhaustive draw one tile closer.

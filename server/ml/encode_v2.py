@@ -179,8 +179,6 @@ def policy_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
         for meld in s.melds:
             if meld.concealed:
                 n_kongs += 1
-                if rel:
-                    continue
             for t in meld.tiles[:3] if meld.is_kong else meld.tiles:
                 row[t // _COPIES] += 1
         melds.append(row)

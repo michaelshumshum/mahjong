@@ -15,8 +15,7 @@ export interface ClaimWindowState {
 
 export interface MeldState {
 	kind: string;
-	tiles: number[] | null; // null only for another seat's still-concealed concealed_kong
-	count: number | null;
+	tiles: number[];
 	fromSeat: number | null;
 }
 

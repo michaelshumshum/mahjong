@@ -51,7 +51,9 @@ the `OracleFaanBot`-era `ORACLE` gates (seeds 1+, 1,000,000+, [bots.md §7, §9]
 | 10,000,000+ | 1,000 | `OracleLearned` prototype (tuning, not a gate): both seatings vs `LearnedBot` ×3, vs `FaanBot` ×3, `OracleFaanBot` vs `LearnedBot` ×3 ([ADR 0022](decisions/0022-oracle-learned-tier.md)) |
 | 11,000,000+ | 1,000 / 700 | Impossible gate for `learned.npz` L274.3M ([ADR 0022](decisions/0022-oracle-learned-tier.md)): `ORACLE` both seatings vs `LearnedBot` ×3 (1,000), `ORACLE` vs `FaanBot` ×3 (700); plus `OracleFaanBot` vs `LearnedBot` ×3 (1,000) and `LearnedBot` vs `FaanBot` ×3 (700) |
 | 12,000,000+ | 1,000 / 700 | behaviour analysis (§5), not a gate: L274.3M, 464.3M, L358.5M and `FaanBot` (as candidate) each vs `FaanBot` ×3 (1,000); L274.3M vs `EfficiencyBot` ×3, `EfficiencyBot` vs `FaanBot` ×3, L274.3M vs `LearnedBot` ×3 (700). The candidate seat sees identical tiles in every file |
-| 13,000,000+ | — | next free range |
+| 13,000,000+ | 1,000 / 700 | Expert gate re-run after concealed kongs became public, same `learned.npz` ([ADR 0023](decisions/0023-concealed-kong-public.md)) |
+| 14,000,000+ | 1,000 / 700 | Impossible gate re-run, same change ([ADR 0023](decisions/0023-concealed-kong-public.md)) |
+| 15,000,000+ | — | next free range |
 
 New weights take two fresh ranges, one for the Expert gate and one for the Impossible gate
 ([bots.md §2](bots.md) "Shipping new weights", steps 4–5).

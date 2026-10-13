@@ -133,12 +133,12 @@ describe('FaanBreakdown', () => {
 		expect(body).toMatch(/class="concealed-hand\b/);
 	});
 
-	it('renders a concealed_kong meld as backs, matching the in-play convention', () => {
+	it('renders a concealed_kong meld with its end tiles as backs, matching the in-play convention', () => {
 		const melds: WinningMeld[] = [{ kind: 'concealed_kong', tiles: ['z1', 'z1', 'z1', 'z1'] }];
 		const { body } = render(FaanBreakdown, {
 			props: { winner: 2, seatNames, winningHand: [], melds, patterns, totalFaan: 5, payments }
 		});
 		expect(body).toContain('concealed tile');
-		expect(body).not.toContain('data-tile="z1"');
+		expect(body.match(/data-tile="z1"/g)).toHaveLength(2);
 	});
 });

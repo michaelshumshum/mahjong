@@ -46,7 +46,7 @@ def _concealed_kong(t: TileType) -> Meld:
     return Meld(kind=MeldKind.CONCEALED_KONG, tiles=tile_ids_for_type(t))
 
 
-def test_another_seats_concealed_kong_is_hidden_but_own_and_exposed_are_kept() -> None:
+def test_every_seats_concealed_kong_is_counted_like_any_meld() -> None:
     exposed = Meld(
         kind=MeldKind.EXPOSED_KONG, tiles=tile_ids_for_type(TileType.WIND_EAST), from_seat=0
     )
@@ -54,9 +54,9 @@ def test_another_seats_concealed_kong_is_hidden_but_own_and_exposed_are_kept() -
     view = _view(0, ((kong,), (kong, exposed), (), ()))
 
     assert visible_meld_counts34(view, 0)[int(TileType.DRAGON_RED)] == 3
-    hidden = visible_meld_counts34(view, 1)
-    assert hidden[int(TileType.DRAGON_RED)] == 0
-    assert hidden[int(TileType.WIND_EAST)] == 3
+    other = visible_meld_counts34(view, 1)
+    assert other[int(TileType.DRAGON_RED)] == 3
+    assert other[int(TileType.WIND_EAST)] == 3
 
 
 def test_concealed_kong_counts_are_public_per_absolute_seat() -> None:
@@ -97,6 +97,6 @@ def test_raw_row_keeps_discard_order_flower_counts_and_relative_seat_order() -> 
     ]
     assert row["flowers"] == [0, 2, 0, 1]
     assert row["concealed_kongs"] == [1, 1, 0, 0]
-    assert row["meld_counts"][1] == [0] * 34  # seat 2's concealed kong stays hidden
+    assert row["meld_counts"][1][int(TileType.DRAGON_RED)] == 3  # seat 2's concealed kong
     assert row["meld_counts"][0][int(TileType.DRAGON_RED)] == 3
     assert row["dealer_idx"] == 3  # dealer is absolute seat 0

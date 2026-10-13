@@ -173,8 +173,9 @@ describe('OpponentRegion', () => {
 			turn: 0
 		});
 		expect(target.querySelectorAll('.meld-row .mini-tile')).toHaveLength(8);
-		// concealed kong renders as backs
-		expect(target.querySelectorAll('.meld-row .tile-face--back')).toHaveLength(4);
+		// concealed kong: end tiles as backs, middle two face-up
+		expect(target.querySelectorAll('.meld-row .tile-face--back')).toHaveLength(2);
+		expect(target.querySelectorAll('.meld-row [data-tile="z7"]')).toHaveLength(2);
 	});
 
 	// first meld/flower must not grow the region and shift the centre discard box.

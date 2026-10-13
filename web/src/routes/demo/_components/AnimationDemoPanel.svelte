@@ -3,6 +3,7 @@
 	// opacity-only transition contract work end to end. No JS ticker -- `ontransitionend` commits the change.
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import TileFace from '$lib/table/TileFace.svelte';
+	import { meldTileFace } from '$lib/table/meld-face';
 	import SeatPlate from '$lib/table/SeatPlate.svelte';
 	import SealStamp from '$lib/table/SealStamp.svelte';
 	import type { MeldKind, MockMeld } from '$lib/table/mock-game-state';
@@ -222,7 +223,7 @@
 						<div class="meld demo-meld-entering">
 							{#each meld.tiles as code, ti (ti)}
 								<div class="mini-tile">
-									<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+									<TileFace code={meldTileFace(meld.kind, code, ti, meld.tiles.length)} />
 								</div>
 							{/each}
 						</div>

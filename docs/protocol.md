@@ -106,8 +106,8 @@ then every broadcast event and the public half of `turn`. A `join`/`hello{seat}`
 connection promotes it to a seat. A spectator session is never reconnectable (§5).
 
 On a table with `spectators_see_hands` ([architecture.md §3](architecture.md)), spectators get the
-open-hands view: `state_sync.hands` is every seat's concealed tiles, `draw`/`kong_replace` carry
-`tile_id`, and concealed-kong `meld`s carry `tiles`. Spectators get no `deal`, so each new hand is
+open-hands view: `state_sync.hands` is every seat's concealed tiles and `draw`/`kong_replace` carry
+`tile_id`. Spectators get no `deal`, so each new hand is
 followed by a fresh `state_sync` to every spectator. Seats' own streams are unchanged (`hands` is
 always `null` for a seat).
 
@@ -132,7 +132,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `discard` | `{seat, tile_id, tile, pool_index}` | `pool_index` is computed by `Table` against its own post-event state — `redact_event` alone can't, since a discard claimed in the same `reduce()` call is already gone from the pool |
 | `claim_offer` | `{window_id, options: [{kind, tiles?}...], deadline_ts}` | **unicast**, only to eligible seats. `options` always ends with `{kind:"pass"}`. Sent when the window's deadline is armed, so it always carries a real `deadline_ts` |
 | `claim_resolved` | `{window_id, claim_kind, seat?, action_kind?}` | `claim_kind` is the window kind (`discard`\|`kong_rob`); `action_kind` is the winner's action (`claim_chow`\|`claim_pung`\|`claim_kong`\|`claim_win`\|`pass`). `seat`/`action_kind` are `null` when nobody's claim beat a Pass |
-| `meld` | `{seat, meld_kind, tiles, from_seat?}` | `concealed_kong` has a redacted per-seat form: `{seat, meld_kind:"concealed_kong", tiles?, count?}` (Redaction, below) |
+| `meld` | `{seat, meld_kind, tiles, from_seat?}` | every kind, `concealed_kong` included, carries real `tiles` to everyone (Redaction, below) |
 | `kong_replace` | `{seat, tile_id?}` | `tile_id` only for the drawing player |
 | `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat, one entry per legal `Action` (`mahjong_core.actions.action_to_dict`). `deadline_ts` is an enforced `TimerHeap` entry ([architecture.md §8](architecture.md) "Turn timeout") |
 | `hand_end` | `{hand_no, outcome, winner?, win_type?, discarder?, faan?, faan_breakdown?, points?, payments?, revealed, winning_hand?, deadline_ts, fairness?}` | `fairness`: see Fairness. `outcome` is `win`\|`exhaustive_draw`. `winning_hand`/faan/points/payments are `null` until `revealed`. `faan_breakdown` keys are the Chinese pattern names (`mahjong_core.scoring.patterns.PATTERNS`). `deadline_ts` is the hand-end hold's deadline, identical on every seat's stream |
@@ -153,7 +153,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `host_seat` | the first seat to `join`, or `null` |
 | `bot_levels` | each `bot` seat's tier (`T1`\|`T2`\|`T4`\|`ORACLE`, [bots.md §6](bots.md)), `null` for every other seat, `autoplay` included. Fixed for the table's life (bot seats are bound at construction). Defaults to `[]` |
 | `hands` | every seat's concealed tiles for an open-hands spectator, `null` otherwise |
-| `hand_history` | every completed hand, oldest first: `hand_end`'s fields plus `dealer`/`prevailing`/`winner_melds`. Lets a client with no earlier live stream (mid-game spectator, resync) render past hands. `winner_melds` gets the same concealed-kong redaction a live `meld` would. Defaults to `[]` |
+| `hand_history` | every completed hand, oldest first: `hand_end`'s fields plus `dealer`/`prevailing`/`winner_melds`. Lets a client with no earlier live stream (mid-game spectator, resync) render past hands. Defaults to `[]` |
 | `ruleset` / `ruleset_preset` | the table's fixed `RuleSet.to_dict()` and matching preset id (or `null`) |
 | `seed_commit` | the current hand's commit, `provable_fairness` tables only (see Fairness) |
 
@@ -202,18 +202,9 @@ rendered through `redact_event` per recipient — never one frame broadcast with
 ignore fields. An ineligible seat's stream simply has no `claim_offer` entry at all, not a redacted
 stub — safe under per-seat `seq` (§1, §7).
 
-**Concealed kong (暗槓)** is the one meld not fully public until hand end, so `meld` has two
-per-seat wire forms:
-
-```jsonc
-// to the declaring seat:
-{"t":"meld","d":{"seat":2,"kind":"concealed_kong","tiles":[9,10,11,12]}}
-
-// to every other seat and spectators, for the rest of the hand:
-{"t":"meld","d":{"seat":2,"kind":"concealed_kong","count":4}}
-```
-
-All other kinds (`chow`, `pung`, `added_kong`) are fully public.
+Every `meld` is fully public, **concealed kong (暗槓)** included: HK play shows it, end tiles
+face-down and the middle two face-up ([ADR 0023](decisions/0023-concealed-kong-public.md)). Showing the end tiles as backs is the client's
+job (`web/src/lib/table/meld-face.ts`); the wire carries all four ids.
 
 ## 4. Timers
 

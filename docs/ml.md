@@ -222,9 +222,10 @@ yet scored.
 
 **Dataset rules that must survive into RL tooling:**
 
-- `SeatView.melds` is unredacted in-process (only the wire path redacts). Read melds through
-  `raw.visible_meld_counts34`, which hides other seats' concealed-kong tile types; v2 data leaked
-  them and is not trained on.
+- Read melds through `raw.visible_meld_counts34`. Every seat's concealed kongs count there
+  ([ADR 0023](decisions/0023-concealed-kong-public.md)); data generated before 2026-10-14 (v3,
+  `rl_aux`, and every rollout the shipped policy trained on) hid other seats' concealed-kong tile
+  types. v2 data leaked them by accident and is not trained on.
 - Seat ↔ bot assignment is shuffled per game (`_shuffled_roster`, its own seeded RNG). A fixed
   assignment let the model read bot identity off dealer/seat-wind context.
 - Rows store raw counts (0–4); encoding is a training-time choice, so changing it never means
@@ -389,12 +390,12 @@ flower counts /8, concealed-kong counts /4, own seat flowers /2, own flower set 
 /4, then `encode_ruleset` scaled as `encode_batch` scales it (39 + 41).
 
 Oracle input — `(32, 34)`, `encode_oracle_batch(rows, k)`: opponents' concealed tiles (3 × 4
-thermometer), opponents' concealed-kong types (3), live-wall composition (thermometer, flowers
+thermometer), opponents' concealed-kong types (3; public since [ADR 0023](decisions/0023-concealed-kong-public.md), kept so the critic's input shape is unchanged), live-wall composition (thermometer, flowers
 excluded), next `ORACLE_MAX_DRAWS = 13` front-of-wall draws as one-hot planes (a flower is an
 empty plane); planes `k..12` are zeroed, so annealing `k` (§10) keeps the shape.
 
 `tests/test_ml_encode_v2.py`: fast row = reference row on every seat of every state of 40 random
-hands (claim-preferring and kong-preferring, so claim windows and hidden concealed kongs occur);
+hands (claim-preferring and kong-preferring, so claim windows and concealed kongs occur);
 re-dealing opponents' concealed tiles and the wall's tile order leaves the policy tensors
 unchanged while the oracle tensor moves; oracle rows account for every hidden tile.
 
@@ -418,7 +419,7 @@ head its logit is taken from.
 | --- | --- | --- |
 | per-opponent tenpai / legal wait / structural wait / faan class | `(3,)`, `(3, 34)`, `(3, 34)`, `(3, 34, 10)` | `bots/labels.py` |
 | own P(win), P(deal-in), E[payment / 32 \| win] | 3 scalars | hand outcome (`hand_result.payments`) |
-| hidden tiles: where each unseen copy is (3 opponents' concealed + concealed kongs, live wall) | `(4, 34)` location logits | `GameState` |
+| hidden tiles: where each unseen copy is (3 opponents' concealed tiles, live wall; concealed kongs are public) | `(4, 34)` location logits | `GameState` |
 | shanten / ukeire after each discard | `(34,)`, `(34,)` | `mahjong_core.shanten`, early curriculum only |
 
 `DangerNet` (§5) is the reference: the trunk's danger head should reach its AUC.

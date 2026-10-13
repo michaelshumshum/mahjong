@@ -37,7 +37,7 @@ export function popSlotForDiscard(state: SlotState): { left: Slot; remaining: Sl
 	};
 }
 
-/** concealed_kong {seat, count: 4}: same pop-from-the-end rule, extended to 4 (§4). */
+/** concealed_kong {seat, tiles}: same pop-from-the-end rule, extended to 4 (§4). */
 export function popSlotsForConcealedKong(state: SlotState): {
 	kong: readonly Slot[];
 	remaining: SlotState;

@@ -75,13 +75,12 @@ def _concealed_kong(tile_type: TileType) -> Meld:
 
 def test_seen34_hands_none_matches_the_original_probabilistic_behavior() -> None:
     """`view.hands is None` (every tier except `"ORACLE"`) must still: count own hand, count
-    every seat's exposed melds, skip a concealed kong entirely (still genuinely invisible to a
-    normal bot), and count every discard pool -- exactly the original behavior, computed by hand
-    here rather than re-deriving it from `seen34` itself."""
+    every seat's melds (a concealed kong too -- it's played face-up), and count every discard
+    pool, computed by hand here rather than re-deriving it from `seen34` itself."""
     own_types = (TileType.MAN_1, TileType.MAN_2, TileType.MAN_3)
     exposed_pung = _pung(TileType.PIN_5)
-    hidden_kong = _concealed_kong(TileType.SOU_9)
-    melds = ((), (exposed_pung,), (hidden_kong,), ())
+    concealed_kong = _concealed_kong(TileType.SOU_9)
+    melds = ((), (exposed_pung,), (concealed_kong,), ())
     discard_pools = ((), _pool((TileType.WIND_EAST,)), (), _pool((TileType.DRAGON_WHITE,) * 2))
     view = _view(own_types=own_types, melds=melds, discard_pools=discard_pools)
     assert view.hands is None
@@ -92,11 +91,10 @@ def test_seen34_hands_none_matches_the_original_probabilistic_behavior() -> None
     for t in own_types:
         expected[int(t)] += 1
     expected[int(TileType.PIN_5)] += 3  # exposed pung: visible
-    # hidden_kong (SOU_9) deliberately NOT added -- concealed, genuinely invisible
+    expected[int(TileType.SOU_9)] += 3  # concealed kong: face-up, a kong counts 3
     expected[int(TileType.WIND_EAST)] += 1
     expected[int(TileType.DRAGON_WHITE)] += 2
     assert counts == expected
-    assert counts[int(TileType.SOU_9)] == 0
 
 
 # --- view.hands populated: undercounted tiles now correctly seen ------------------------------
@@ -156,19 +154,9 @@ def test_seen34_hands_aware_counts_an_opponents_real_concealed_tiles() -> None:
     )
 
 
-def test_seen34_hands_aware_counts_an_opponents_concealed_kong() -> None:
-    """Regression for the concealed-kong subtlety this task had to resolve correctly, mirroring
-    `tests/test_safety.py::test_tile_risk_hands_aware_handles_a_concealed_kong_of_the_candidate_type`'s
-    convention. Opponent 1 has declared a concealed kong of SOU_9. `mahjong_core.engine.
-    _apply_self_kong` removes all 4 of a concealed kong's tiles from `SeatState.concealed` the
-    moment it's declared, so `view.hands[1]` (built directly from `state.seats[1].concealed` by
-    `_omniscient_seat_view`) does NOT contain them -- unlike an ordinary exposed meld, whose
-    claimed tiles are equally absent from `concealed` but whose identity was already counted via
-    the `view.melds` loop regardless of `view.hands`. If hands-aware `seen34` still skipped a
-    concealed meld (mirroring the probabilistic branch's genuine blind spot), those 4 tiles would
-    silently vanish from the count entirely -- neither the melds loop (skipped) nor the hands
-    loop (already excluded by the engine) would add them. `seen34` must add them from `view.melds`
-    once `view.hands` is populated, since the omniscient view genuinely knows what they are."""
+def test_seen34_counts_an_opponents_concealed_kong_with_or_without_hands() -> None:
+    """`_apply_self_kong` removes a concealed kong's tiles from `SeatState.concealed`, so
+    `view.hands` never holds them; `seen34` counts them from `view.melds` in both branches."""
     own_types = (
         TileType.MAN_1,
         TileType.MAN_2,
@@ -204,10 +192,7 @@ def test_seen34_hands_aware_counts_an_opponents_concealed_kong() -> None:
     hands_view = _view(own_types=own_types, melds=melds, hands=((), opp1_remaining, (), ()))
 
     sou9 = int(TileType.SOU_9)
-    assert seen34(probabilistic_view)[sou9] == 0, (
-        "sanity: the probabilistic branch must genuinely skip this concealed kong -- a normal "
-        "bot really can't see it"
-    )
+    assert seen34(probabilistic_view)[sou9] == 3
     # a kong contributes 3 to a 34-count array, matching `_add_meld`'s existing convention for
     # every other meld this module counts (docs/bots.md §3).
     assert seen34(hands_view)[sou9] == 3

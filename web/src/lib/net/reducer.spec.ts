@@ -79,7 +79,7 @@ describe('reduce', () => {
 
 		expect(next.seat).toBe(2);
 		expect(next.ownHand).toEqual([10, 11, 12]);
-		expect(next.melds[2]).toEqual([{ kind: 'pung', tiles: [4, 4, 4], count: null, fromSeat: 0 }]);
+		expect(next.melds[2]).toEqual([{ kind: 'pung', tiles: [4, 4, 4], fromSeat: 0 }]);
 		expect(next.names).toEqual(['Alice', 'Bob', null, 'Dave']);
 		expect(next.botLevels).toEqual([null, 'T1', null, 'ORACLE']);
 		expect(next.claimOffer).toEqual({
@@ -370,7 +370,7 @@ describe('reduce', () => {
 			expect(melded.ownHand).toEqual([2, 3]);
 			expect(melded.concealedCounts[0]).toBe(2);
 			expect(melded.melds[0]).toEqual([
-				{ kind: 'concealed_kong', tiles: [1, 1, 1, 1], count: null, fromSeat: null }
+				{ kind: 'concealed_kong', tiles: [1, 1, 1, 1], fromSeat: null }
 			]);
 
 			const replaced = reduce(melded, {
@@ -387,19 +387,20 @@ describe('reduce', () => {
 			expect(replaced.drawnTileId).toBe(55);
 		});
 
-		it('a non-owner concealed_kong only carries a count, never redacts to real tiles', () => {
-			const s = state({ seat: 0, concealedCounts: [13, 6, 13, 13] });
+		it("another seat's concealed_kong carries its real tiles and leaves this hand alone", () => {
+			const s = state({ seat: 0, ownHand: [2, 3], concealedCounts: [2, 6, 13, 13] });
 			const next = reduce(s, {
 				v: 1,
 				ts: 1,
 				seq: 1,
 				t: 'meld',
-				d: { seat: 1, meld_kind: 'concealed_kong', tiles: null, count: 4 }
+				d: { seat: 1, meld_kind: 'concealed_kong', tiles: [8, 9, 10, 11] }
 			});
 			expect(next.melds[1]).toEqual([
-				{ kind: 'concealed_kong', tiles: null, count: 4, fromSeat: null }
+				{ kind: 'concealed_kong', tiles: [8, 9, 10, 11], fromSeat: null }
 			]);
 			expect(next.concealedCounts[1]).toBe(2);
+			expect(next.ownHand).toEqual([2, 3]);
 		});
 
 		it('added_kong replaces the existing pung meld in place rather than duplicating it', () => {
@@ -407,7 +408,7 @@ describe('reduce', () => {
 				seat: 0,
 				ownHand: [9, 1, 2],
 				concealedCounts: [3, 13, 13, 13],
-				melds: [[{ kind: 'pung', tiles: [4, 4, 4], count: null, fromSeat: 2 }], [], [], []]
+				melds: [[{ kind: 'pung', tiles: [4, 4, 4], fromSeat: 2 }], [], [], []]
 			});
 			const next = reduce(s, {
 				v: 1,
@@ -418,7 +419,7 @@ describe('reduce', () => {
 			});
 
 			expect(next.melds[0]).toEqual([
-				{ kind: 'added_kong', tiles: [4, 4, 4, 9], count: null, fromSeat: null }
+				{ kind: 'added_kong', tiles: [4, 4, 4, 9], fromSeat: null }
 			]);
 			expect(next.ownHand).toEqual([1, 2]);
 			expect(next.concealedCounts[0]).toBe(2);
@@ -572,7 +573,7 @@ describe('reduce', () => {
 	});
 
 	it("hand_end snapshots the winner's melds off state.melds at the moment it fires", () => {
-		const winnerMelds = [{ kind: 'pung', tiles: [4, 5, 6], count: null, fromSeat: 1 }];
+		const winnerMelds = [{ kind: 'pung', tiles: [4, 5, 6], fromSeat: 1 }];
 		const s = state({ melds: [winnerMelds, [], [], []] });
 		const next = reduce(s, {
 			v: 1,
@@ -602,7 +603,7 @@ describe('reduce', () => {
 
 	it('winnerMelds is null for an exhaustive draw (no winner to snapshot)', () => {
 		const s = state({
-			melds: [[{ kind: 'chow', tiles: [0, 1, 2], count: null, fromSeat: 1 }], [], [], []]
+			melds: [[{ kind: 'chow', tiles: [0, 1, 2], fromSeat: 1 }], [], [], []]
 		});
 		const next = reduce(s, {
 			v: 1,
@@ -629,7 +630,7 @@ describe('reduce', () => {
 	});
 
 	it("winnerMelds survives the next hand_start clearing state.melds, since it's a copy taken at hand_end", () => {
-		const winnerMelds = [{ kind: 'exposed_kong', tiles: [4, 5, 6, 7], count: null, fromSeat: 2 }];
+		const winnerMelds = [{ kind: 'exposed_kong', tiles: [4, 5, 6, 7], fromSeat: 2 }];
 		let s = state({ melds: [winnerMelds, [], [], []] });
 		s = reduce(s, {
 			v: 1,
@@ -841,7 +842,7 @@ describe('reduce', () => {
 		);
 
 		expect(next.handHistory[0].winnerMelds).toEqual([
-			{ kind: 'pung', tiles: [1, 2, 3], count: null, fromSeat: 1 }
+			{ kind: 'pung', tiles: [1, 2, 3], fromSeat: 1 }
 		]);
 	});
 

@@ -7,9 +7,9 @@
   `ml.evaluate`) and tenpai AUC, on own-turn rows; with `--danger-ckpt`, `DangerNet` is scored on
   the same rows (`ml.aux_data.danger_raw`) and the paired AUC difference gets a CI.
 - **Hidden tiles.** Mean negative log-likelihood, per unseen copy, of its true location (each
-  opponent's concealed tiles + concealed kongs, or the live wall) against **uniform over unseen**:
-  every unseen copy equally likely to sit in any hidden slot, so P(location) = that location's
-  hidden-slot count / all hidden slots (public: concealed counts, concealed-kong counts, wall).
+  opponent's concealed tiles, or the live wall) against **uniform over unseen**: every unseen
+  copy equally likely to sit in any hidden slot, so P(location) = that location's hidden-slot
+  count / all hidden slots (public: concealed counts, wall).
 - Own win / deal-in AUC; shanten and ukeire MAE on own discard turns.
 - `--v3-data`: the same danger AUCs on the v3 danger dataset's split (`DangerNet`'s own
   benchmark, §5), its rows re-expressed as encoder v2 rows by `v3_policy_raw`.

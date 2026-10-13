@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import TileFace from './TileFace.svelte';
+	import { meldTileFace } from './meld-face';
 	import SeatPlate from './SeatPlate.svelte';
 	import BotBadge from './BotBadge.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
@@ -338,7 +339,7 @@
 			<div class="meld">
 				{#each meld.tiles as code, ti (ti)}
 					<div class="mini-tile">
-						<TileFace code={meld.kind === 'concealed_kong' ? null : code} />
+						<TileFace code={meldTileFace(meld.kind, code, ti, meld.tiles.length)} />
 					</div>
 				{/each}
 			</div>

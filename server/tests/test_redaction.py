@@ -23,7 +23,6 @@ import pytest
 from app.table import Table
 from app.views import (
     ClaimResolvedWire,
-    ConcealedKongWire,
     DiscardWire,
     DrawWire,
     Entitlement,
@@ -318,16 +317,12 @@ def _offer_tile_ids(offer: ClaimOffer) -> set[TileId]:
 
 
 def _public_tile_ids(state: GameState) -> set[TileId]:
-    """Every tile id already public knowledge right now: melds (all kinds -- even a concealed
-    kong's `tiles` field is a real leak if it shows up outside `own_hand`/an entitled wire, but
-    the *seat* who declared it already legitimately knows its own concealed_kong tiles, which
-    is exactly `own_hand`, not this set) and every seat's discard pool, plus the live claim
-    window's tile if one is open."""
+    """Every tile id already public knowledge right now: melds (all kinds, concealed kongs
+    included) and every seat's discard pool, plus the live claim window's tile if one is open."""
     ids: set[TileId] = set()
     for seat_state in state.seats:
         for meld in seat_state.melds:
-            if meld.kind != MeldKind.CONCEALED_KONG:
-                ids.update(meld.tiles)
+            ids.update(meld.tiles)
         ids.update(seat_state.discards)
     if state.claim_window is not None:
         ids.add(state.claim_window.tile)
@@ -356,30 +351,14 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
         leaked = _offer_tile_ids(offer) - allowed
         assert not leaked, f"claim_options leaked {leaked} to seat {seat}: {offer!r}"
 
-    # `melds` has hand-rolled serialization (`_meld_wire`), not the schema walker above -- its
-    # aggregate PUBLIC annotation is wrong specifically for a concealed kong's tiles (architecture.md §5).
+    # `melds` has hand-rolled serialization (`_meld_wire`), not the schema walker above.
     wire = seat_view_wire(view)
     for owner_seat, seat_melds in enumerate(view.melds):
         wire_melds = wire["melds"][owner_seat]
         for meld, wire_meld in zip(seat_melds, wire_melds, strict=True):
-            if meld.kind != MeldKind.CONCEALED_KONG:
-                assert wire_meld["tiles"] == list(meld.tiles), (
-                    f"public meld tiles altered for seat {seat}: {wire_meld!r}"
-                )
-                continue
-            if seat == owner_seat:
-                # ground truth: the declaring seat must get its real tiles, not just "not
-                # obviously leaked" -- else a bug nulling tiles for everyone passes vacuously.
-                assert wire_meld["tiles"] == list(meld.tiles), (
-                    "concealed_kong tiles hidden from the declaring seat itself"
-                )
-                assert wire_meld["count"] is None
-            else:
-                assert wire_meld["tiles"] is None, (
-                    f"concealed_kong tiles leaked to seat {seat} (owner={owner_seat}): "
-                    f"{wire_meld!r}"
-                )
-                assert wire_meld["count"] == len(meld.tiles)
+            assert wire_meld["tiles"] == list(meld.tiles), (
+                f"public meld tiles altered for seat {seat}: {wire_meld!r}"
+            )
 
 
 def _assert_event_redaction(state: GameState, event: Event) -> None:
@@ -405,23 +384,11 @@ def _assert_event_redaction(state: GameState, event: Event) -> None:
         assert isinstance(owner_wire, KongReplaceWire)
         assert owner_wire.tile_id == event.tile_id
 
-    if isinstance(event, MeldFormed) and event.meld.kind == MeldKind.CONCEALED_KONG:
-        owner_wire = _build_event_wire(state, event.seat, event)
-        assert isinstance(owner_wire, ConcealedKongWire)
-        assert owner_wire.tiles == tuple(event.meld.tiles)
-        assert owner_wire.count is None
-
-        other_seat = (event.seat + 1) % 4
-        other_wire = _build_event_wire(state, other_seat, event)
-        assert isinstance(other_wire, ConcealedKongWire)
-        assert other_wire.tiles is None
-        assert other_wire.count == len(event.meld.tiles)
-
-    if isinstance(event, MeldFormed) and event.meld.kind != MeldKind.CONCEALED_KONG:
+    if isinstance(event, MeldFormed):
         for viewer in (0, 1, 2, 3, None):
             wire = _build_event_wire(state, viewer, event)
             assert isinstance(wire, MeldWire)
-            assert wire.tiles == tuple(event.meld.tiles)  # fully public, every kind but the above
+            assert wire.tiles == tuple(event.meld.tiles)  # fully public, concealed kong included
 
     if isinstance(event, HandEnded) and event.outcome == HandOutcome.WIN:
         assert event.winner is not None
@@ -499,8 +466,7 @@ def test_hand_end_reveals_full_winning_hand_for_claimed_win() -> None:
 
 
 def _concealed_kong_history_record() -> HandHistoryRecord:
-    """A completed hand won with a concealed kong in the winner's melds -- `hand_history_wire`'s
-    one genuinely per-viewer-redacted field (`HandHistoryRecord`'s own docstring)."""
+    """A completed hand won with a concealed kong in the winner's melds."""
     kong = Meld(MeldKind.CONCEALED_KONG, (TileId(0), TileId(1), TileId(2), TileId(3)))
     return HandHistoryRecord(
         hand_no=1,
@@ -520,25 +486,12 @@ def _concealed_kong_history_record() -> HandHistoryRecord:
     )
 
 
-def test_hand_history_wire_hides_winner_concealed_kong_from_non_owners() -> None:
-    """A hand ending doesn't retroactively make its winner's concealed-kong tile identity
-    public -- a non-owning viewer still only ever gets `count`, matching what a live `meld`
-    event would have shown them for the same meld while the hand was in progress."""
+def test_hand_history_wire_shows_winner_concealed_kong_tiles() -> None:
     record = _concealed_kong_history_record()
-
-    owner_view = hand_history_wire([record], viewer=0)[0]
-    assert owner_view["winner_melds"][0]["tiles"] == [0, 1, 2, 3]
-    assert owner_view["winner_melds"][0]["count"] is None
-
-    other_seat_view = hand_history_wire([record], viewer=1)[0]
-    assert other_seat_view["winner_melds"][0]["tiles"] is None
-    assert other_seat_view["winner_melds"][0]["count"] == 4
-
-    plain_spectator_view = hand_history_wire([record], viewer=None)[0]
-    assert plain_spectator_view["winner_melds"][0]["tiles"] is None
-
-    open_hands_spectator_view = hand_history_wire([record], viewer=None, reveal_hands=True)[0]
-    assert open_hands_spectator_view["winner_melds"][0]["tiles"] == [0, 1, 2, 3]
+    wire = hand_history_wire([record])[0]
+    assert wire["winner_melds"] == [
+        {"kind": "concealed_kong", "tiles": [0, 1, 2, 3], "from_seat": None}
+    ]
 
 
 def test_hand_history_wire_omits_winner_melds_for_exhaustive_draw() -> None:
@@ -551,7 +504,7 @@ def test_hand_history_wire_omits_winner_melds_for_exhaustive_draw() -> None:
         winning_hand=None,
         winner_melds=None,
     )
-    wire = hand_history_wire([record], viewer=None)[0]
+    wire = hand_history_wire([record])[0]
     assert wire["winner_melds"] is None
     assert wire["winner"] is None
 
@@ -609,10 +562,9 @@ def test_open_hands_spectator_event_redaction(
         if isinstance(event, KongReplacementDrawn):
             assert isinstance(wire, KongReplaceWire)
             assert wire.tile_id == event.tile_id
-        if isinstance(event, MeldFormed) and event.meld.kind == MeldKind.CONCEALED_KONG:
-            assert isinstance(wire, ConcealedKongWire)
+        if isinstance(event, MeldFormed):
+            assert isinstance(wire, MeldWire)
             assert wire.tiles == tuple(event.meld.tiles)
-            assert wire.count is None
 
 
 def test_open_hands_spectator_seat_view(event_samples: list[tuple[GameState, Event]]) -> None:

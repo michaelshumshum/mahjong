@@ -1985,30 +1985,11 @@
           "type": "string"
         },
         "tiles": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Tiles"
-        },
-        "count": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Count"
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tiles",
+          "type": "array"
         },
         "from_seat": {
           "anyOf": [

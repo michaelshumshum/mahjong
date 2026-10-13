@@ -224,8 +224,9 @@ def _write_manifest(
             "assignment -- metadata only, never a model input. Every row is captured at the "
             "acting seat's own AWAIT_ACTION turn (turn-holder is always relative seat 0, phase "
             "is constant) -- both dropped from the row schema rather than stored redundantly. "
-            "v3 adds discard_seq (per-seat discard order), concealed_kongs and flowers, and "
-            "hides other seats' concealed-kong tile types in meld_counts."
+            "v3 adds discard_seq (per-seat discard order), concealed_kongs and flowers. "
+            "meld_counts includes other seats' concealed kongs (played face-up); data "
+            "generated before 2026-10-14 hid them."
         ),
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))

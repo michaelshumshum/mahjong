@@ -940,11 +940,7 @@ class Table:
         )
         wire = seat_view_wire(view)
         wire["t"] = "state_sync"
-        wire["hand_history"] = hand_history_wire(
-            self._hand_history,
-            viewer=seat,
-            reveal_hands=seat is None and self.settings.spectators_see_hands,
-        )
+        wire["hand_history"] = hand_history_wire(self._hand_history)
         # fixed at construction, never changes after new_game(). ruleset_preset is the
         # RULESET_PRESETS key it matches, or null for a custom ruleset.
         wire["ruleset_preset"] = preset_id_for(self.state.ruleset)

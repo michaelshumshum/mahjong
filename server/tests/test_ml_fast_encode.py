@@ -62,7 +62,7 @@ def test_parity_across_full_random_games():
 
 
 def test_parity_with_concealed_kongs():
-    """Kong-preferring random play, so other seats' concealed kongs (the redacted case) occur."""
+    """Kong-preferring random play, so other seats' concealed kongs occur."""
     hidden = 0
     for seed in range(60):
         env = HandEnv(encode=False)

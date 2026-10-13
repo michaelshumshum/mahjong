@@ -443,7 +443,7 @@ fails it:
 | --- | --- | --- |
 | `safety.tile_risk` | Σ `deal_in_probability × expected_cost` (§5) | exact: per opponent, `_exact_deal_in_faan` checks whether this tile completes their real hand and returns its real faan |
 | `safety.opponent_threat_level` | meld/tempo proxy | real shanten from `_opponent_real_shanten`, mapped onto the proxy's scale |
-| `features.seen34` | own hand + visible melds + discards | also every opponent's real concealed tiles and concealed kongs |
+| `features.seen34` | own hand + every seat's melds (concealed kongs included) + discards | also every opponent's real concealed tiles |
 | `safety.kong_rob_risk` | not called | exact rob check before declaring a self-kong |
 | `valuation.exact_wait_value` | not called | a tenpai candidate's `(acceptance, value)` from the real scorer: live wall copies in the self-draw context plus `ron_credit` copies in the discard context, each wait counted only where it clears `min_faan` |
 | `safety.ron_credit` | not called | expected ron copies per tenpai wait: 0.5 per copy an opponent holds but doesn't need (removing it doesn't raise their shanten), 0 per needed copy |
@@ -468,8 +468,8 @@ already prices each tile's real faan, including sub-minimum hands.
 
 **`seen34` and concealed kongs.** `mahjong_core.engine._apply_self_kong` removes a concealed kong's
 tiles from `SeatState.concealed`, and `_omniscient_seat_view` builds `.hands` from `concealed`, so
-those tiles are in neither `.hands` nor (if skipped) the meld loop. Under `view.hands`, concealed
-melds are counted like any other (`_add_meld`, 3 per kong).
+`.hands` never holds them; both branches count them from the meld loop like any other meld
+(`_add_meld`, 3 per kong) — they're public ([ADR 0023](decisions/0023-concealed-kong-public.md)).
 
 **Kong-rob avoidance.** `FaanBot._act_on_turn`'s kong loop skips any kong that
 `kong_rob_risk(view, t, concealed=...)` proves would be robbed (`if view.hands is not None and

@@ -59,14 +59,9 @@ function splitOwnHand(state: ClientGameState): LiveOwnHand {
 }
 
 export function meldToView(m: MeldState): MockMeld {
-	const tiles = m.tiles
-		? m.tiles.map(tileIdToCode)
-		: // another seat's still-concealed concealed_kong: codes are never read since +page.svelte
-			// forces TileFace code={null} for any concealed_kong meld regardless.
-			(Array(m.count ?? 0).fill('1m') as TileCode[]);
 	return {
 		kind: m.kind as MeldKind,
-		tiles,
+		tiles: m.tiles.map(tileIdToCode),
 		fromSeat: (m.fromSeat ?? undefined) as Seat | undefined
 	};
 }
