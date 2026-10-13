@@ -11,7 +11,7 @@ export interface GuideEntry {
 
 export type GuideTab = number | 'limit';
 
-export const GUIDE_TABS: GuideTab[] = [1, 2, 3, 4, 5, 6, 7, 8, 'limit'];
+export const GUIDE_TABS: GuideTab[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 'limit'];
 
 const TILE_RE = /[1-9][mps]|[zf][1-9]/g;
 
@@ -20,6 +20,8 @@ export function parseGroup(group: string): TileCode[] {
 }
 
 export const GUIDE: Record<string, GuideEntry[]> = {
+	// 雞糊 scores 0 (scoring/faan.py's CHICKEN_HAND_FAAN); only winnable at min_faan 0
+	'0': [{ pattern: '雞糊', description: m.guide_descChickenHand, example: [] }],
 	'1': [
 		{
 			pattern: '平糊',
@@ -45,7 +47,6 @@ export const GUIDE: Record<string, GuideEntry[]> = {
 		{ pattern: '無花', description: m.guide_descNoFlowers, example: [] },
 		{ pattern: '自摸', description: m.guide_descSelfDraw, example: [] },
 		{ pattern: '門前清', description: m.guide_descFullyConcealed, example: [] },
-		{ pattern: '雞糊', description: m.guide_descChickenHand, example: [] },
 		{ pattern: '海底撈月', description: m.guide_descWinOnLastWallTile, example: [] },
 		{ pattern: '槓上開花', description: m.guide_descWinOnKongReplacement, example: [] },
 		{ pattern: '搶槓', description: m.guide_descRobbingTheKong, example: [] }
@@ -185,12 +186,11 @@ export interface OverridablePattern {
 	tier: GuideTab;
 }
 
-// every scored pattern a custom ruleset's faan_overrides can key, in guide order. 雞糊 is listed
-// under 1 in the guide but scores 0 by default (scoring/faan.py's CHICKEN_HAND_FAAN).
+// every scored pattern a custom ruleset's faan_overrides can key, in guide order.
 export const OVERRIDABLE_PATTERNS: OverridablePattern[] = GUIDE_TABS.flatMap((tab) =>
 	(GUIDE[String(tab)] ?? []).map((e) => ({
 		pattern: e.pattern,
 		handSet: handSetOf(e.pattern),
-		tier: e.pattern === '雞糊' ? 0 : tab
+		tier: tab
 	}))
 );

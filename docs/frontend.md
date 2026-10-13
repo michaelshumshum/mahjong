@@ -825,7 +825,7 @@ middle (a radial gradient) so this copy reads over the tiles.
 
 The language link calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
-stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per faan count (1-8)
+stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per faan count (0-8)
 plus Limit, each a list of patterns with a description and a tile example. The dialog is a fixed
 `90dvh` tall and the tab panel scrolls, so switching to a shorter tab doesn't resize it. The data lives in
 `lib/ui/faan-guide.ts` (`GUIDE`, keyed by faan value; examples are strings of concatenated tile
@@ -833,7 +833,8 @@ codes, one group each); a spec pins it to `FAAN_PATTERN_LABEL` so a new pattern 
 Situational patterns (self-draw, last tile, ...) show the description only. A ruleset select (All or
 one of the `RULESET_PRESET_OPTIONS`) hides patterns whose hand set the preset disables and tabs left
 empty; `GUIDE_PRESET_RULES` mirrors the server presets' `hand_sets`/`min_faan`, and 雞糊 only
-shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md)).
+shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md)); it sits on its
+own 0 tab, the faan it actually scores.
 
 ### Practice mode
 

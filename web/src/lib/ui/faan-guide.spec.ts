@@ -43,6 +43,11 @@ describe('faan guide', () => {
 		expect(names('hk_strict')).toContain('花么九');
 	});
 
+	it('lists chicken hand under 0 faan, what it scores', () => {
+		expect(guideEntries(0).map((e) => e.pattern)).toEqual(['雞糊']);
+		expect(guideEntries(1).map((e) => e.pattern)).not.toContain('雞糊');
+	});
+
 	it('hides chicken hand under presets that need min faan above 0', () => {
 		for (const id of ['hk_classic', 'hk_casual', 'hk_strict'])
 			expect(names(id)).not.toContain('雞糊');
