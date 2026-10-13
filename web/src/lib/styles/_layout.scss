@@ -82,21 +82,22 @@ $breakpoint-short: 500px;
 		gap: var(--space-1);
 	}
 
-	// chips and their pools stack in a wide left column; the hub and your pool share the right one.
+	// the table as a box: across over the full width, left and right side by side, your pool
+	// just above your hand. the hub sits in the header rail here (frontend.md §3).
 	@include phone-landscape {
 		grid-template-areas:
-			'across center'
-			'pool-across center'
-			'left pool-self'
-			'pool-left pool-self'
-			'right pool-self'
-			'pool-right pool-self'
-			'. pool-self'
+			'across across'
+			'pool-across pool-across'
+			'left right'
+			'pool-left pool-right'
+			'pool-self pool-self'
 			'self self';
-		grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-		// min-content floors: the surface scrolls here, and auto rows would otherwise shrink
-		// min-height: 0 regions (the sticky hand bar included) to fit its height.
-		grid-template-rows: repeat(6, minmax(min-content, auto)) 1fr minmax(min-content, auto);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		// min-content floors: the surface scrolls, and auto rows would shrink the sticky hand bar.
+		// your pool's row takes the slack (bottom-aligned, so it sits on your hand).
+		grid-template-rows:
+			repeat(4, minmax(min-content, auto)) minmax(min-content, 1fr)
+			minmax(min-content, auto);
 		gap: var(--space-1) var(--space-2);
 	}
 }

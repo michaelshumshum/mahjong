@@ -239,10 +239,9 @@
 			--discard-h: calc(26px * var(--tile-scale, 1));
 		}
 
-		// under the hub, not on the hand bar: a crowded side column scrolls the surface, and the
-		// sticky bar would then cover a bottom-aligned pool.
 		.discard-pool--self {
-			align-self: start;
+			min-height: calc(var(--discard-h) + 4px);
+			padding-block: 2px;
 		}
 	}
 </style>

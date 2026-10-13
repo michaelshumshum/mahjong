@@ -736,29 +736,59 @@
 		}
 	}
 
-	// short landscape: melds share the plate's row instead of taking their own, and tiles grow
-	// with width only as far as ~16% of the viewport height allows (44px floor, 56px cap).
+	// short landscape: melds and declare buttons share the plate's row (beside the hand once it's
+	// ≤ 11 slots); tiles are height-bound to ~16dvh (44px floor, 56px cap). frontend.md §3.
 	@include layout.phone-landscape {
 		.seat-region--self {
 			display: grid;
-			grid-template-areas: 'plate melds' 'hand hand';
-			grid-template-columns: auto minmax(0, 1fr);
+			grid-template-areas: 'plate melds actions' 'hand hand hand';
+			grid-template-columns: auto minmax(0, 1fr) auto;
 			align-items: end;
 			column-gap: var(--space-4);
+			padding-block-start: var(--space-1);
+			padding-block-end: max(var(--space-1), env(safe-area-inset-bottom));
+		}
+
+		.seat-region--self:not(:has(.hand-tile-slot:nth-child(12))):has(.hand-tile-slot) {
+			grid-template-areas: 'plate plate actions' 'hand melds melds';
+			grid-template-columns: auto minmax(0, 1fr) auto;
 		}
 
 		.seat-region--self > :global(.seat-plate) {
 			grid-area: plate;
+			justify-self: start;
 		}
 
 		.meld-row {
 			grid-area: melds;
+			flex-wrap: wrap;
+			row-gap: 2px;
 			min-block-size: 0;
 			margin-block-end: 0;
 		}
 
+		.meld-row .mini-tile {
+			height: calc(26px * var(--tile-scale, 1));
+		}
+
 		.your-hand {
+			display: contents;
+		}
+
+		.hand-row,
+		.backs-row {
 			grid-area: hand;
+		}
+
+		.declare-actions {
+			grid-area: actions;
+			flex-wrap: nowrap;
+			margin-block-end: var(--space-1);
+		}
+
+		.declare-btn--hero {
+			padding: var(--space-2) var(--space-4);
+			font-size: var(--font-size-base);
 		}
 
 		.hand-row {

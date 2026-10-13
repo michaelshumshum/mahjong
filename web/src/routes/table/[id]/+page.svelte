@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import TileFace from '$lib/table/TileFace.svelte';
@@ -79,6 +80,7 @@
 	import PretableScreen from './_components/PretableScreen.svelte';
 	import LeaveGameDialog from './_components/LeaveGameDialog.svelte';
 	import { m } from '$lib/paraglide/messages.js';
+	import { PHONE_LANDSCAPE_QUERY } from '$lib/ui/breakpoints';
 
 	// `?mock=<scenarioId>` renders a frozen MOCK_SCENARIOS fixture with no backend (screenshot
 	// workflow); omitted, `[id]` opens a real MahjongSocket -> GameStore through the same view model.
@@ -88,6 +90,8 @@
 	// `?practice=1` (unrelated in spelling to the wire's own `&practice=true`) opens the live
 	// socket in practice mode: seats 1-3 are already bot-bound at table creation.
 	let isPractice = $derived(page.url.searchParams.has('practice'));
+	// phone landscape: the hub moves into the header rail, freeing a felt row (frontend.md §3).
+	const phoneLandscape = new MediaQuery(PHONE_LANDSCAPE_QUERY);
 
 	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket --
 	// a MOCK_SCENARIOS fixture (always fully-seated) has no room for these, so it's a mode of its own.
@@ -832,8 +836,22 @@
 {#if tableReady}
 	<h1 class="sr-only">{m.tablePage_heading()}</h1>
 
+	{#snippet hub()}
+		<CenterHub
+			prevailing={gameState.prevailing}
+			handNo={gameState.handNo}
+			dealer={gameState.dealer as Seat}
+			turn={haloTurn as Seat}
+			you={gameState.you}
+			wallCount={gameState.wallCount}
+			{minFaan}
+			turnDurationMs={gameState.turnDurationMs}
+		/>
+	{/snippet}
+
 	<div class="table-page">
 		<TableToolbar
+			hub={phoneLandscape.current ? hub : undefined}
 			{spectating}
 			{tableId}
 			{isPractice}
@@ -872,16 +890,9 @@
 				/>
 
 				<div class="table-center">
-					<CenterHub
-						prevailing={gameState.prevailing}
-						handNo={gameState.handNo}
-						dealer={gameState.dealer as Seat}
-						turn={haloTurn as Seat}
-						you={gameState.you}
-						wallCount={gameState.wallCount}
-						{minFaan}
-						turnDurationMs={gameState.turnDurationMs}
-					/>
+					{#if !phoneLandscape.current}
+						{@render hub()}
+					{/if}
 					<CenterDiscardPool
 						seat={seatAt(2)}
 						position="across"
@@ -1253,16 +1264,12 @@
 			height: 100dvh;
 			min-height: 0;
 			overflow: hidden;
-			padding: var(--space-1) var(--space-2);
+			padding: 0 var(--space-2) var(--space-1);
 		}
 
 		.table-wrap {
 			flex: 1;
 			min-height: 0;
-		}
-
-		.table-center :global(.center-hub) {
-			align-self: start;
 		}
 
 		.table-surface {

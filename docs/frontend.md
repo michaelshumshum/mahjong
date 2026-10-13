@@ -144,7 +144,12 @@ One row at every width, mock and live alike:
 
 Below `tablet-up` every button goes icon-only, its label kept as an `sr-only` accessible name, so the
 rail never wraps. It carries nothing seat- or hand-specific: your wind is on your `SeatPlate`,
-wall/prevailing/hand on `CenterHub` (below, including its phone compact row). An earlier free-
+wall/prevailing/hand on `CenterHub` (below, including its phone compact row). On phone landscape the
+page hands `CenterHub` itself to the rail (a `hub` snippet prop, centred in the status slot as a
+bare summary line): the rail's middle is otherwise empty, and the hub's own felt row cost ~40px of
+a ~330px-tall surface. `+page.svelte` picks the one place to render it with a `MediaQuery` on
+`lib/ui/breakpoints.ts`'s `PHONE_LANDSCAPE_QUERY` (kept equal to `_layout.scss`'s
+`phone-landscape`), so there is only ever one `.center-hub` in the DOM. An earlier free-
 standing toolbar (wood buttons on the page background, a "Table X · 東 · practice vs bots" label,
 a phone-only wall/prevailing copy) wrapped to 3-4 rows on phones and duplicated both.
 
@@ -190,7 +195,7 @@ seat's claim/hand-end deadline, not the acting seat's — so after a reconnect a
 reappears with their next `turn`. Below
 768px the pools leave the centre for their own seats (below), leaving the markers nothing to
 point at, so the hub collapses to a compact single-row summary (wind/hand/wall/faan only, no
-markers).
+markers) — in its own felt row in portrait, in the header rail on phone landscape (above).
 
 **Discard pools: all four in the centre** (`.table-center`, tablet-up), forming a box — across on top,
 left/right along the sides (rotated), self on the bottom — each still keyed to its own seat so
@@ -246,21 +251,29 @@ it only takes taps in its own original slot (`pointer-events: none` on the butto
 lifted one (pinned by `YourSeatRegion.svelte.spec.ts`).
 
 **Phone landscape** keeps one row, with tiles `clamp(44px, min(fit-14, 16dvh × 3/4), 56px)` —
-height-bound, since the hand can't take more of a ~390px-tall screen. Your melds/flowers sit
-beside your `SeatPlate` (grid `'plate melds' 'hand hand'`, bottom-aligned so the plate meets the
-hand) instead of in their own row above it.
+height-bound, since the hand can't take more of a ~390px-tall screen. The bar is one grid:
+
+| Hand | Grid | Why |
+| --- | --- | --- |
+| ≥ 12 slots (no meld yet) | `'plate melds actions' 'hand hand hand'` | flowers and declare buttons share the plate's line instead of each taking a row |
+| ≤ 11 slots | `'plate plate actions' 'hand melds melds'` | each meld frees three hand tiles' width (~140px) for a ~65px meld, so the melds fit beside the hand and the plate line shrinks to the plate |
+
+`.your-hand` is `display: contents` there so the hand row and `.declare-actions` are grid items; your
+meld tiles drop to 26px (× tile scale), and the bar's vertical padding to `--space-1`.
 
 No horizontal scroll; two-row, non-overlapping at 390×844. Pinned by `table.e2e.ts` at 390×844, 390×700, 844×390, 1024×768 and
 1440×900 (last tile and drawn tile inside the viewport, clear of the right opponent at tablet-up),
 plus claim buttons fully in view and clickable at 390×844, 844×390, 1024×768 and 1440×900, and the
-first hand row flush under the plate at 390×844 and 844×390.
+first hand row flush under the plate at 390×844 and 844×390. Phone landscape also pins the box
+placement (left/right side by side, the hub in the rail, your pool on your hand), the `late-hand`
+fit at 844×390/740×360/667×375, and melds beside a short hand.
 
 **Breakpoints** (`_layout.scss`; `tablet-up` and `phone-only` partition every viewport):
 
 | Mixin | Query | Layout |
 | --- | --- | --- |
 | `phone-only` | `max-width: 767px`, or `max-height: 500px` | opponent chips each over its own wrapping pool, sticky hand bar (below) |
-| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll; each opponent's chip and pool stack in a `3fr` left column, the hub and your pool (under the hub, so the sticky bar never covers it) in a `2fr` right one (`'across center' 'pool-across center' 'left pool-self' … 'self self'`); chip tiles `clamp(20px, 5.6dvh, 26px)`, discard tiles 26px; when a late hand overflows, `.table-surface` itself scrolls (`overflow-y: auto`, no bottom padding) with the hand bar sticky at its bottom — rows are `minmax(min-content, auto)` so the bar isn't squeezed; hand tiles 44–56px (below) |
+| `phone-landscape` | `max-height: 500px` and landscape | on top of `phone-only`: no page scroll; the table as a box — across chip and pool full width, left and right side by side under it, your pool on your hand (`'across across' 'pool-across pool-across' 'left right' 'pool-left pool-right' 'pool-self pool-self' 'self self'`; your pool's row is the `1fr` one, bottom-aligned), the hub in the header rail; chip tiles `clamp(20px, 5.6dvh, 26px)`, discard tiles 26px; the `late-hand` fixture fits without scrolling at 844×390, 740×360 and 667×375 (an earlier 3fr/2fr two-column stack overflowed 667×375 by ~120px and hid a whole opponent under the hand bar, with the right column half empty); if a hand still overflows, `.table-surface` itself scrolls (`overflow-y: auto`, no bottom padding) with the hand bar sticky at its bottom — rows are `minmax(min-content, …)` so the bar isn't squeezed; hand tiles 44–56px (above) |
 | `tablet-up` | `min-width: 768px` and `min-height: 501px` | the box layout above |
 | `desktop-up` | `min-width: 1180px` and `min-height: 501px` | roomier page and surface padding |
 
@@ -294,7 +307,7 @@ Below 768px (phone portrait):
   the flower group and each meld at 28px tall. The strip and meld row are `display: contents`, so
   every meld is its own flex item: flowers join the name line when they fit and a meld wraps
   whole to the next line, never split across two. The single back matches the meld height so it
-  never sets the name line's height. Phone landscape uses the same chip in its side column. The other backs stay in the DOM, hidden
+  never sets the name line's height. Phone landscape uses the same chip, full width (across) or half width (left/right). The other backs stay in the DOM, hidden
   (`display: none`), so positional identity (§4) and the specs counting `.backs-row .mini-tile`
   are unchanged.
 - Each discard pool is a full-width wrapping row (no horizontal scroll — a single-row strip ran

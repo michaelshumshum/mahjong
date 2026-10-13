@@ -261,13 +261,17 @@ for (const [width, height] of [
 				pool: (await page.locator(`.discard-pool--${pos}`).boundingBox())!
 			});
 		}
-		seats.sort((a, b) => a.chip.y - b.chip.y);
-		for (const [i, { chip, meldBottom, pool }] of seats.entries()) {
+		for (const { chip, meldBottom, pool } of seats) {
 			expect(pool.y).toBeGreaterThanOrEqual(meldBottom);
 			expect(Math.abs(pool.y - (chip.y + chip.height))).toBeLessThanOrEqual(1);
 			expect(pool.x).toBeCloseTo(chip.x, 0);
-			const next = seats[i + 1];
-			if (next) expect(pool.y + pool.height).toBeLessThanOrEqual(next.chip.y);
+			// clear of any chip below it in the same column (landscape seats left and right apart).
+			for (const other of seats) {
+				const sameColumn =
+					other.chip.x < pool.x + pool.width && pool.x < other.chip.x + other.chip.width;
+				if (sameColumn && other.chip.y > chip.y)
+					expect(pool.y + pool.height).toBeLessThanOrEqual(other.chip.y);
+			}
 		}
 
 		const own = (await page.locator('.discard-pool--self').boundingBox())!;
@@ -386,6 +390,63 @@ for (const [width, height] of [
 		await expect(page.getByTestId('claim-choice')).toHaveText('chose: pung');
 	});
 }
+
+test('phone landscape seats the table as a box with the hub in the header rail', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 844, height: 390 });
+	await page.goto('/table/abc123?mock=your-turn');
+	await page.waitForLoadState('networkidle');
+
+	await expect(page.locator('.center-hub')).toHaveCount(1);
+	await expect(page.locator('.table-toolbar .center-hub')).toBeVisible();
+	const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
+	const across = await box('.seat-region--across');
+	const left = await box('.seat-region--left');
+	const right = await box('.seat-region--right');
+	const ownPool = await box('.discard-pool--self');
+	const hand = await box('.seat-region--self');
+	expect(left.y).toBeGreaterThan(across.y);
+	expect(right.y).toBeCloseTo(left.y, 0);
+	expect(right.x).toBeGreaterThan(left.x + left.width);
+	expect(ownPool.y + ownPool.height).toBeLessThanOrEqual(hand.y + 0.5);
+	expect(hand.y - (ownPool.y + ownPool.height)).toBeLessThanOrEqual(8);
+});
+
+// late-hand is the stress fixture: every seat and pool must be visible without scrolling.
+for (const [width, height] of [
+	[844, 390],
+	[740, 360],
+	[667, 375]
+] as const) {
+	test(`a crowded late hand fits a ${width}x${height} landscape phone without scrolling`, async ({
+		page
+	}) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/table/abc123?mock=late-hand');
+		await page.waitForLoadState('networkidle');
+
+		const surface = page.locator('.table-surface');
+		const [scrollH, clientH] = await surface.evaluate((el) => [el.scrollHeight, el.clientHeight]);
+		expect(scrollH).toBeLessThanOrEqual(clientH);
+		for (const pos of ['across', 'left', 'right', 'self'])
+			await expect(page.locator(`.discard-pool--${pos}`)).toBeInViewport({ ratio: 1 });
+	});
+}
+
+test('phone landscape moves your melds beside a hand that has lost tiles to them', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 844, height: 390 });
+	await page.goto('/table/abc123?mock=late-hand');
+	await page.waitForLoadState('networkidle');
+
+	const self = page.locator('.seat-region--self');
+	const hand = (await self.locator('.hand-row').boundingBox())!;
+	const melds = (await self.locator('.meld-row').boundingBox())!;
+	expect(melds.x).toBeGreaterThanOrEqual(hand.x + hand.width);
+	expect(melds.y).toBeGreaterThan(hand.y);
+});
 
 test('short landscape fits hand, centre and opponents without page scroll', async ({ page }) => {
 	await page.setViewportSize({ width: 844, height: 390 });

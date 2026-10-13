@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
+	import type { Snippet } from 'svelte';
 	import type { ConnectionStatus } from '$lib/game/state';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
@@ -14,7 +15,8 @@
 		onLeaveClick,
 		onToggleScoreSheet,
 		onToggleSettings,
-		onOpenGuide
+		onOpenGuide,
+		hub
 	}: {
 		spectating: boolean;
 		tableId: string;
@@ -24,14 +26,15 @@
 		onToggleScoreSheet: () => void;
 		onToggleSettings: () => void;
 		onOpenGuide: () => void;
+		hub?: Snippet;
 	} = $props();
 
 	// lighter than lucide's default 2 to sit with the rail's small label text.
 	const ICON = { size: 18, strokeWidth: 1.8 };
 </script>
 
-<!-- the rim's top edge (frontend.md §3): wind, wall and prevailing live on the SeatPlate and
-     CenterHub, never here. -->
+<!-- the rim's top edge (frontend.md §3). wind, wall and prevailing live on the SeatPlate and
+     CenterHub; the page hands the hub in only on phone landscape. -->
 <header class="table-toolbar">
 	<button type="button" class="rail-btn" onclick={onLeaveClick}>
 		<ChevronLeft {...ICON} />
@@ -50,6 +53,9 @@
 	</div>
 
 	<div class="table-status" aria-label={m.tableToolbar_tableStatusAriaLabel()}>
+		{#if hub}
+			<div class="rail-hub">{@render hub()}</div>
+		{/if}
 		{#if connection === 'resyncing' || connection === 'closed' || connection === 'connecting'}
 			<span class="connection-pill" data-testid="connection-pill">
 				{connection === 'resyncing'
@@ -172,6 +178,23 @@
 		min-width: 0;
 	}
 
+	// the hub as a bare summary line, centred in the free space before the pill.
+	.rail-hub {
+		display: flex;
+		min-width: 0;
+		margin-inline: auto;
+		overflow: hidden;
+
+		:global(.center-hub) {
+			width: auto;
+			margin: 0;
+			padding: 0;
+			border: 0;
+			background: none;
+			white-space: nowrap;
+		}
+	}
+
 	.connection-pill {
 		padding: 0 var(--space-2);
 		border-radius: var(--radius-sm);
@@ -209,6 +232,12 @@
 
 		.rail-label {
 			@include a11y.sr-only;
+		}
+	}
+
+	@include layout.phone-landscape {
+		.table-toolbar {
+			padding-top: 0;
 		}
 	}
 </style>
