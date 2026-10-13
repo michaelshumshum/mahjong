@@ -466,7 +466,10 @@ fingers immediately; number keys `1`-`N` and `Esc` drive the same `onChoose` pat
 host `ModalDialog` gets no `onCancel`, so the native Escape close request is swallowed rather than
 firing a second pass. Below 768px the dialog becomes a bottom sheet
 (`align-self: flex-end` on the overlay's centering flexbox, full width, top corners only) instead of
-a centred card. **Not built:** a CSS-only (`@property`/`counter()`) seconds-remaining readout on
+a centred card. On phone landscape it is instead a ~110px top sheet, one row (timer and header,
+the call options, then Pass filling the rest) with bottom corners only, over a lighter scrim: the
+bottom sheet covered the whole table there, your hand included, while you decided on a call.
+**Not built:** a CSS-only (`@property`/`counter()`) seconds-remaining readout on
 the ring — skipped for now; the ring's `aria-label` already states the remaining seconds for
 assistive tech, and a purely visual number is a small enough win to defer rather than risk the
 `@property`-registration edge cases cross-browser.
@@ -938,7 +941,9 @@ visual treatment. Own-seat equivalents and a one-time AUTOPLAY-handover toast ar
 
 ### Hand-end reveal
 
-`HandEndOverlay` is one panel (a bottom sheet below 768px) whose header carries a seal-ink result
+`HandEndOverlay` is one panel (a bottom sheet below 768px; a wide centred card on phone landscape,
+where `FaanBreakdown` goes two-column — the hand left, patterns/total/payments right — so the
+payments are in view at 740×360) whose header carries a seal-ink result
 stamp — 食糊 (discard win), 自摸 (self-draw, from `winType`), 流局 (draw, muted ink rather than the
 accent) — the hand number, the hold's `DialogTimer` ring, and the close button. The ring renders
 only when `handEndHoldMs` is known; a zero-length timer would auto-close the panel instantly.
@@ -963,7 +968,9 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
 
 - One panel: a "Game over" heading, a "You placed Nth" line (omitted for spectators), all four
   final standings as ranked rows, the actions, then the full `ScoreSheet` (score table, running
-  totals) under a "Hand-by-hand scores" label.
+  totals) under a "Hand-by-hand scores" label. On phone landscape it is a viewport-high two-column
+  grid — heading, standings and actions left, the score sheet scrolling on its own right — so Play
+  again is in view without scrolling the dialog (stacked, it opened scrolled part-way down).
 - **Ties** use competition ranking (`rank.ts`'s `placements`: totals 50/10/−30/−30 place
   1st/2nd/3rd/3rd, never 3rd/4th): tied rows share a place and a "Tied" tag, and the line reads
   "You tied for 3rd". `ScoreSheet`'s own standings list uses the same places.
@@ -1159,7 +1166,8 @@ fluent Hong Kong mahjong player.
   `DismissablePanel`, leave, create table, practice setup, guide, animation demo) is a native
   `<dialog>` opened with `showModal()` through `lib/ui/ModalDialog.svelte`: focus trap, inert
   background and top layer come from the platform. The `<dialog>` box itself is the full-viewport
-  scrim (`placement`: `center`, `sheet` — bottom sheet below 768px — or `scroll`), so panels keep
+  scrim (`placement`: `center`, `sheet` — bottom sheet below 768px, a lighter scrim on phone
+  landscape — or `scroll`), so panels keep
   their own layout. It focuses a `[data-autofocus]` descendant on open and returns focus to the
   opener on unmount.
 

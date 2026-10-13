@@ -448,6 +448,31 @@ test('phone landscape moves your melds beside a hand that has lost tiles to them
 	expect(melds.y).toBeGreaterThan(hand.y);
 });
 
+test('phone landscape claim sheet leaves your hand visible', async ({ page }) => {
+	await page.setViewportSize({ width: 844, height: 390 });
+	await page.goto('/table/abc123?mock=claim-window');
+	await page.waitForLoadState('networkidle');
+
+	const sheet = (await page.locator('.claim-dialog').boundingBox())!;
+	const tile = (await page.locator('.seat-region--self .hand-tile').first().boundingBox())!;
+	expect(sheet.y).toBeLessThanOrEqual(1);
+	expect(sheet.y + sheet.height).toBeLessThanOrEqual(tile.y);
+});
+
+test('phone landscape hand-end shows the payments and game-end the actions without scrolling', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 740, height: 360 });
+	await page.goto('/table/abc123?mock=hand-ended');
+	await page.waitForLoadState('networkidle');
+	await expect(page.locator('.payment-row').last()).toBeInViewport({ ratio: 1 });
+
+	await page.goto('/table/abc123?mock=game-ended&practice=1');
+	await page.waitForLoadState('networkidle');
+	await expect(page.getByTestId('game-end-play-again')).toBeInViewport({ ratio: 1 });
+	await expect(page.getByTestId('game-end-standings')).toBeInViewport({ ratio: 1 });
+});
+
 test('short landscape fits hand, centre and opponents without page scroll', async ({ page }) => {
 	await page.setViewportSize({ width: 844, height: 390 });
 	await page.goto('/table/abc123?mock=your-turn');

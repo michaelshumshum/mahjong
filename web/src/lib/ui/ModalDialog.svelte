@@ -144,6 +144,13 @@
 		}
 	}
 
+	// phone landscape: lighter, so your hand stays readable under a sheet that leaves it visible.
+	.modal--sheet {
+		@include layout.phone-landscape {
+			background: rgb(0 0 0 / 0.35);
+		}
+	}
+
 	.modal--scroll {
 		background: rgb(0 0 0 / 0.7);
 

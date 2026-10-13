@@ -307,4 +307,74 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 	}
+
+	// phone landscape: result and actions on the left, the score sheet scrolling on its own on the
+	// right, so Play again is in view without scrolling the dialog.
+	@include layout.phone-landscape {
+		.game-end {
+			display: grid;
+			grid-template-areas:
+				'header sheet'
+				'standings sheet'
+				'actions sheet'
+				'error sheet';
+			grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+			grid-template-rows: auto auto auto 1fr;
+			align-items: start;
+			gap: var(--space-3) var(--space-5);
+			width: 100%;
+			max-width: none;
+			height: calc(100dvh - 2 * var(--space-3));
+			padding: var(--space-3) var(--space-4);
+		}
+
+		.game-end-header {
+			grid-area: header;
+
+			h2 {
+				font-size: var(--font-size-xl);
+			}
+		}
+
+		.you-placed {
+			font-size: var(--font-size-base);
+		}
+
+		.final-standings {
+			grid-area: standings;
+			gap: var(--space-1);
+		}
+
+		.final-row,
+		.final-row--first {
+			padding-block: var(--space-1);
+		}
+
+		.final-name,
+		.final-total,
+		.final-row:not(.final-row--first) .final-total {
+			font-size: var(--font-size-base);
+		}
+
+		.game-end-actions {
+			grid-area: actions;
+			flex-wrap: nowrap;
+		}
+
+		.action {
+			flex-basis: 0;
+			padding-inline: var(--space-3);
+		}
+
+		.play-again-error {
+			grid-area: error;
+		}
+
+		.score-sheet-wrap {
+			grid-area: sheet;
+			align-self: stretch;
+			min-height: 0;
+			overflow-y: auto;
+		}
+	}
 </style>

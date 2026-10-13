@@ -102,6 +102,21 @@
 			padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
 		}
 
+		// phone landscape: a wide centred card -- FaanBreakdown goes two-column to fit the height.
+		@include layout.phone-landscape {
+			align-self: center;
+			width: min(52rem, 100%);
+			gap: var(--space-2);
+			padding: var(--space-2) var(--space-4) var(--space-3);
+			border-radius: var(--radius-lg);
+		}
+
+		&:has(.hand-end-summary) {
+			@include layout.phone-landscape {
+				width: min(28rem, 100%);
+			}
+		}
+
 		@include a11y.motion-ok {
 			animation: panel-in var(--dur-3) var(--ease-out) both;
 		}

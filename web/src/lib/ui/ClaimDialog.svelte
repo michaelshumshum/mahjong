@@ -275,4 +275,42 @@
 			padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
 		}
 	}
+
+	// phone landscape: one row from the top edge -- timer and header, the calls, then pass -- so
+	// the sheet covers the across seat, not your hand.
+	@include layout.phone-landscape {
+		.claim-dialog {
+			display: grid;
+			grid-template-columns: auto auto minmax(0, 1fr);
+			align-items: center;
+			align-self: flex-start;
+			gap: var(--space-2) var(--space-4);
+			padding: max(var(--space-2), env(safe-area-inset-top)) var(--space-4) var(--space-3);
+			border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+			text-align: start;
+		}
+
+		.claim-dialog-header {
+			min-width: 0;
+		}
+
+		.claim-options {
+			flex-direction: row;
+			align-items: flex-end;
+		}
+
+		.claim-calls {
+			flex-wrap: nowrap;
+			gap: var(--space-3);
+		}
+
+		.claim-meld-tile {
+			height: 36px;
+		}
+
+		.claim-btn--pass {
+			flex: 1;
+			min-width: 6rem;
+		}
+	}
 </style>

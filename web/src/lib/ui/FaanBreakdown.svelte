@@ -151,6 +151,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
+	@use '$lib/styles/layout';
 
 	// entrance choreography: tiles fan in one by one, then pattern rows, then total and payments.
 	// delays are custom-property maths so the sequence scales with tile/pattern count.
@@ -321,5 +322,49 @@
 	.payment-row--loss .payment-amount {
 		color: var(--color-negative);
 		background: color-mix(in srgb, var(--color-negative) 14%, transparent);
+	}
+
+	// phone landscape: the hand on the left, the scoring on the right, so payments sit above the
+	// fold instead of under a full-width hand.
+	@include layout.phone-landscape {
+		.faan-breakdown {
+			display: grid;
+			grid-template-areas:
+				'title title'
+				'hand patterns'
+				'hand total'
+				'hand payments';
+			grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+			align-content: start;
+			align-items: start;
+			gap: var(--space-2) var(--space-4);
+		}
+
+		h2 {
+			grid-area: title;
+			font-size: var(--font-size-lg);
+		}
+
+		.winning-hand {
+			grid-area: hand;
+			padding: var(--space-2);
+		}
+
+		.patterns {
+			grid-area: patterns;
+		}
+
+		.total {
+			grid-area: total;
+			font-size: var(--font-size-base);
+		}
+
+		.payments {
+			grid-area: payments;
+		}
+
+		.tile :global(.tile-face) {
+			height: clamp(32px, 10dvh, 40px);
+		}
 	}
 </style>
