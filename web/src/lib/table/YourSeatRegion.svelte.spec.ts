@@ -282,6 +282,32 @@ describe('YourSeatRegion portrait phone two-row hand', () => {
 	});
 });
 
+describe('YourSeatRegion spectator hand', () => {
+	afterEach(() => {
+		cleanupAll();
+	});
+
+	for (const faceUp of [true, false]) {
+		it(`centres the bottom seat's ${faceUp ? 'face-up' : 'face-down'} hand at tablet-up`, async () => {
+			await page.viewport(1024, 768);
+			const { target } = render(YourSeatRegion, {
+				...baseProps('two-step'),
+				seat: mockSeat({ concealedHand: faceUp ? ['1m', '2m'] : undefined }),
+				spectating: true,
+				ownHandTiles: [],
+				discardableTileIds: new Set<number>()
+			});
+			const row = target.querySelector<HTMLElement>('.backs-row')!;
+			const tiles = row.querySelectorAll('.mini-tile');
+			const r = row.getBoundingClientRect();
+			const left = tiles[0].getBoundingClientRect().left - r.left;
+			const right = r.right - tiles[tiles.length - 1].getBoundingClientRect().right;
+			expect(left).toBeGreaterThan(10);
+			expect(Math.abs(left - right)).toBeLessThanOrEqual(1);
+		});
+	}
+});
+
 describe('YourSeatRegion manual hand order', () => {
 	afterEach(cleanupAll);
 

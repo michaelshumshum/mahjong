@@ -223,7 +223,7 @@ flower doesn't grow its grid row/column and shift the centre box. Below 768px an
 collapses instead. Your own meld row sits above your name, toward the centre.
 
 **Hands are centred** in their seat region at tablet-up: your `.hand-row` (`justify-content:
-center`), the across strip horizontally and the side strips vertically (`.seat-hand-strip` fills
+center`; a spectator's bottom-seat `.backs-row` likewise), the across strip horizontally and the side strips vertically (`.seat-hand-strip` fills
 its region with `align-items: center`). Your hand recentres by half a tile when the drawn tile
 comes and goes.
 

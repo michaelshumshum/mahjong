@@ -503,6 +503,13 @@
 		gap: var(--space-2);
 	}
 
+	// spectator's bottom seat: centred like .hand-row.
+	.backs-row {
+		@include layout.tablet-up {
+			justify-content: center;
+		}
+	}
+
 	// 13 tiles + the drawn one fit the container: shrink to fit down to the 44px touch target
 	// (docs/frontend.md §3), then overlap via negative margins instead of shrinking further.
 	.hand-row {
