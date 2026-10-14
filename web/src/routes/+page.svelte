@@ -312,7 +312,7 @@
 
 	.source-link {
 		position: absolute;
-		right: var(--space-4);
+		right: var(--space-8);
 		bottom: var(--space-3);
 		display: inline-flex;
 		align-items: center;
