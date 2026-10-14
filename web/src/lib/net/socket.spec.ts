@@ -372,6 +372,29 @@ describe('MahjongSocket', () => {
 			expect(FakeWebSocket.instances).toHaveLength(1);
 			expect(socket.status).toBe('closed');
 		});
+
+		it('a table_closed error closes the socket and stops reconnecting', async () => {
+			const socket = new MahjongSocket('ws://test/ws');
+			const seen: string[] = [];
+			socket.onEvent((e) => seen.push((e as ServerEventLike).t));
+			socket.connect();
+			await vi.advanceTimersByTimeAsync(0);
+
+			const ws = FakeWebSocket.instances[0];
+			ws.simulateMessage({
+				v: 1,
+				ts: 1,
+				seq: 1,
+				t: 'error',
+				d: { code: 'table_closed', message: 'table closed: every player left' }
+			});
+			await vi.advanceTimersByTimeAsync(10000);
+
+			expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+			expect(seen).toEqual(['error']); // still delivered, so the page can toast it
+			expect(FakeWebSocket.instances).toHaveLength(1);
+			expect(socket.status).toBe('closed');
+		});
 	});
 });
 

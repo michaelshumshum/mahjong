@@ -233,6 +233,7 @@
 	"serverError_seatTaken": "該座位已被佔用。",
 	"serverError_badSecret": "無法重新連接至你的座位 -- 可能已被接管。",
 	"serverError_notJoined": "請先加入座位。",
+	"serverError_tableClosed": "此牌枱已關閉 -- 所有玩家已離開。",
 	"connectionBanner_title": "重新連線中…",
 	"connectionBanner_body": "牌局將從中斷之處繼續。",
 	"tableToolbar_connectionResyncingLabel": "同步中…",

@@ -315,6 +315,12 @@ export class MahjongSocket {
 		}
 		if (!isServerEvent(parsed)) return;
 		this.#ingest(parsed);
+		// the table ended as abandoned; a reconnect would only be refused again (architecture.md
+		// §8.2). closed after ingest so the page still gets the frame to toast
+		if (parsed.t === 'error' && parsed.d.code === 'table_closed') {
+			this.#closedByUser = true;
+			this.#ws?.close();
+		}
 	}
 
 	/** Per-seat seq gap detection. `state_sync` always applies regardless of seq continuity (it

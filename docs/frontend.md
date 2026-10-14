@@ -504,8 +504,8 @@ above the modal but is inert like the rest of the page (no dismiss click, droppe
 a server `error` frame is `error`, a waiting-room arrival is the default `info`. `error` frames map
 through `lib/net/server-error-messages.ts`'s `serverErrorToastMessage()` — the known
 `server/app/ws.py` codes (`bad_frame`, `already_joined`, `no_such_seat`, `seat_taken`,
-`bad_secret`, `not_joined`) get a human Paraglide message; an unrecognized code falls back to the
-raw wire message via `tablePage_serverErrorToast`.
+`bad_secret`, `not_joined`, `table_closed`) get a human Paraglide message; an unrecognized code
+falls back to the raw wire message via `tablePage_serverErrorToast`.
 
 ### Motion (P3)
 
@@ -608,6 +608,9 @@ Rules:
   ([protocol.md §5](protocol.md)'s branch is keyed only on `last_seq`, so asking mid-connection is
   the same request). `status` is `'resyncing'` meanwhile.
 - **Reconnect:** unexpected closes reconnect with backoff (`min(250ms * 2^attempt, 10s) ± 20%`).
+  An `error{code:"table_closed"}` frame (an abandoned table, [architecture.md §8.2](architecture.md))
+  closes the socket and turns reconnecting off, as `disconnect()` does; the frame still reaches
+  the page for its toast.
   `connect(resume?)` accepts `{lastSeq, seat}` to seed a fresh instance.
 - **Connect URL:** adds `&spectate=true` whenever there is no persisted seat to resume, so the page
   gets real seat occupancy before joining (§7 "Join flow").

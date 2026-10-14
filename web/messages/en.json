@@ -233,6 +233,7 @@
 	"serverError_seatTaken": "That seat is already taken.",
 	"serverError_badSecret": "Couldn't reconnect to your seat -- it may have been taken over.",
 	"serverError_notJoined": "Join a seat first.",
+	"serverError_tableClosed": "This table has closed -- every player left.",
 	"connectionBanner_title": "Reconnecting…",
 	"connectionBanner_body": "The table will pick up right where it left off.",
 	"tableToolbar_connectionResyncingLabel": "Resyncing…",

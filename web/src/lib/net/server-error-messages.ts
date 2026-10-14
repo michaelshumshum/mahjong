@@ -8,7 +8,8 @@ const SERVER_ERROR_MESSAGE: Record<string, () => string> = {
 	no_such_seat: m.serverError_noSuchSeat,
 	seat_taken: m.serverError_seatTaken,
 	bad_secret: m.serverError_badSecret,
-	not_joined: m.serverError_notJoined
+	not_joined: m.serverError_notJoined,
+	table_closed: m.serverError_tableClosed
 };
 
 export function serverErrorToastMessage(code: string, rawMessage: string): string {
