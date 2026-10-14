@@ -418,9 +418,7 @@ describe('reduce', () => {
 				d: { seat: 0, meld_kind: 'added_kong', tiles: [4, 4, 4, 9], from_seat: null }
 			});
 
-			expect(next.melds[0]).toEqual([
-				{ kind: 'added_kong', tiles: [4, 4, 4, 9], fromSeat: null }
-			]);
+			expect(next.melds[0]).toEqual([{ kind: 'added_kong', tiles: [4, 4, 4, 9], fromSeat: null }]);
 			expect(next.ownHand).toEqual([1, 2]);
 			expect(next.concealedCounts[0]).toBe(2);
 		});
