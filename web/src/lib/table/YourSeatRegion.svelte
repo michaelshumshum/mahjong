@@ -5,6 +5,7 @@
 	import { meldTileFace } from './meld-face';
 	import SeatPlate from './SeatPlate.svelte';
 	import BotBadge from './BotBadge.svelte';
+	import SeatStatusChip from './SeatStatusChip.svelte';
 	import type { MockSeatState, Seat } from './mock-game-state';
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
@@ -358,6 +359,7 @@
 	>
 		{#snippet badges()}
 			{#if spectating && seat.status === 'bot'}<BotBadge level={seat.botLevel} />{/if}
+			{#if spectating}<SeatStatusChip status={seat.status} />{/if}
 		{/snippet}
 	</SeatPlate>
 

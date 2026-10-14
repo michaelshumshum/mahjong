@@ -979,7 +979,7 @@ seat switches to autoplay until you reconnect"); otherwise it navigates straight
 set by mocks) drives a `.bot-badge` chip ("Bot") next to the dealer badge when `status === 'bot'` —
 a quiet bordered chip, not `--color-accent`, since a bot seat doesn't change mid-hand.
 `disconnected`/`autoplay` get their own `.status-chip--away`/`.status-chip--autoplay` chips
-(`OpponentRegion.svelte`), tinted (`--color-status-error`/`--color-accent`) rather than neutral —
+(`SeatStatusChip.svelte`, on opponents and on the bottom seat while spectating), tinted (`--color-status-error`/`--color-accent`) rather than neutral —
 both are transient, in-hand signals, unlike the bot badge's fixed identity. `connected` has no
 visual treatment. Own-seat equivalents and a one-time AUTOPLAY-handover toast are not built yet.
 

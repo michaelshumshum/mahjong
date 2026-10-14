@@ -306,6 +306,30 @@ describe('YourSeatRegion spectator hand', () => {
 			expect(Math.abs(left - right)).toBeLessThanOrEqual(1);
 		});
 	}
+
+	for (const [status, chip] of [
+		['autoplay', '.status-chip--autoplay'],
+		['disconnected', '.status-chip--away']
+	] as const) {
+		it(`shows the ${status} chip on the bottom seat`, () => {
+			const { target } = render(YourSeatRegion, {
+				...baseProps('two-step'),
+				seat: mockSeat({ status }),
+				spectating: true,
+				ownHandTiles: [],
+				discardableTileIds: new Set<number>()
+			});
+			expect(target.querySelector(chip)).not.toBeNull();
+		});
+	}
+
+	it('shows no status chip on your own seat', () => {
+		const { target } = render(YourSeatRegion, {
+			...baseProps('two-step'),
+			seat: mockSeat({ status: 'autoplay' })
+		});
+		expect(target.querySelector('.status-chip')).toBeNull();
+	});
 });
 
 describe('YourSeatRegion manual hand order', () => {
