@@ -85,7 +85,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan)
+def _openapi_url(api_docs: str | None) -> str | None:
+    # None also unmounts /docs and /redoc, which both read the schema from it
+    return None if api_docs == "0" else "/openapi.json"
+
+
+# API_DOCS=0 (prod overlay) hides the schema and docs UIs
+app = FastAPI(lifespan=lifespan, openapi_url=_openapi_url(os.environ.get("API_DOCS")))
 app.include_router(ws.router)
 # comma-separated CORS_ORIGINS; unset -> no cross-origin reads.
 app.add_middleware(

@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app import main, ws
@@ -11,6 +12,14 @@ def test_healthz() -> None:
     with TestClient(app) as client:
         response = client.get("/healthz")
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize(("api_docs", "expected"), [(None, 200), ("1", 200), ("0", 404)])
+def test_api_docs_toggle(api_docs: str | None, expected: int) -> None:
+    docs_app = FastAPI(openapi_url=main._openapi_url(api_docs))
+    client = TestClient(docs_app)
+    for path in ("/openapi.json", "/docs", "/redoc"):
+        assert client.get(path).status_code == expected
 
 
 def test_unusable_weights_degrade_instead_of_refusing_to_start(

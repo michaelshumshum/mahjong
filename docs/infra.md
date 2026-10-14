@@ -115,6 +115,7 @@ pnpm --dir web dev
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
 | `LOG_LEVEL` | `info` | |
+| `API_DOCS` | on; `0` disables | `/docs`, `/redoc`, `/openapi.json`; the prod overlay sets `0` |
 | `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7) |
 | `JWT_SECRET` | — | passed by both Compose files but read by nothing — vestigial from the cut auth design ([ADR 0001](decisions/0001-guest-only-identity.md)) |
 
@@ -249,6 +250,7 @@ reload.
   across `-f` files, so a bare `ports: []` for `postgres` would leave the dev file's `5432:5432`
   mapping in place.
 - `JWT_SECRET` is required by the overlay but unused (§2).
+- `API_DOCS=0`: no `/docs`, `/redoc` or `/openapi.json` on the public API host (§2).
 - The overlay publishes `api` and `web` on `127.0.0.1` only, so a host-side proxy or tunnel
   connector is the sole way in.
 - `make prod-migrate` applies migrations inside the prod `api` container (`make migrate` targets the

@@ -12,6 +12,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
+      API_DOCS: "0"
     # !override: base file publishes 0.0.0.0; only the host-side tunnel connector should reach it
     ports: !override ["127.0.0.1:${API_PORT:-8000}:8000"]
     stop_grace_period: 100s   # > SHUTDOWN_GRACE_SECONDS (90)
