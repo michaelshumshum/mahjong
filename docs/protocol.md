@@ -141,7 +141,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `seat_state` | `{seat, status, name?}` | `status`: `connected\|disconnected\|autoplay\|bot`. Sent for every status change of a bound seat, including the empty→`connected` transition `join` causes. `name` is carried on every broadcast for that seat |
 | `server_shutdown` | `{deadline_ts}` | broadcast once to every seat ever bound when a graceful-shutdown drain starts ([architecture.md §8.1](architecture.md)) |
 | `ack` | `{id, ok, error?, reconnect_secret?}` | **sender-only**, never broadcast — it would leak another player's `id`. Acknowledges receipt/idempotency, not legality: `Table` still silently drops a well-formed but illegal command. `reconnect_secret` only on a successful `join` (§5). A `claim` `pass` naming a closed/superseded window is acked `ok:true` as a no-op (the client's auto-pass races the server's own timeout); any other choice on a stale window gets `ok:false, error:"illegal"` |
-| `error` | `{code, message}` | |
+| `error` | `{code, message}` | `code: "table_closed"` is also sent to every seat and spectator when an abandoned table ends ([architecture.md §8.2](architecture.md)); spectator sockets are then closed |
 | `pong` | `{t0, t1}` | |
 
 **`state_sync` fields** beyond `SeatView`'s ([architecture.md §5](architecture.md)):
@@ -251,6 +251,7 @@ above.
 | `seat` never joined | `error{code:"no_such_seat"}` |
 | bound seat, missing or wrong `secret` | `error{code:"bad_secret"}`; the current holder keeps the seat |
 | bound seat, correct `secret` | rebind, then resume |
+| table ended as abandoned ([architecture.md §8.2](architecture.md)) | `error{code:"table_closed"}`, then the server closes the socket — sent on connect, before any `hello`. The client stops reconnecting on this code |
 
 **Spectators are never reconnectable.** There is no `hello{seat}` equivalent for "the same
 spectator again" — no seat, no `SeatBinding`, and a spectator's `session_id` isn't something a
@@ -404,7 +405,7 @@ GET /tables
 
 | Rule | Why |
 | --- | --- |
-| Only still-running tables (`TableRegistry.is_running`) | finished `Table`s are never evicted from the registry |
+| Only still-running tables (`TableRegistry.is_running`) | finished `Table`s are never evicted from the registry; abandoned ones are, but their id is kept so it's never reused ([architecture.md §8.2](architecture.md)) |
 | Only tables with at least one non-bot seat bound | every `/table/<id>` visit creates a table, and a practice table is bot-only until its owner joins |
 | …except the showcase table (`BOTS`), always listed | it's bot-only by design ([architecture.md §3](architecture.md)) |
 | `open` = not started and some seat `empty`; otherwise `in_progress` | an `in_progress` table can only be spectated |

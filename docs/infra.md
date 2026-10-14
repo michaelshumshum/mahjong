@@ -112,6 +112,7 @@ pnpm --dir web dev
 | `CORS_ORIGINS` | unset → **no cross-origin requests**, so the web dev server can't reach the API | comma-separated; Compose sets `http://localhost:${WEB_PORT}` |
 | `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:8000` / `ws://localhost:8000/ws` (`lib/net/lobby.ts`, `lib/net/socket.ts`) | web, read at runtime via `$env/dynamic/public` |
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
+| `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
 | `LOG_LEVEL` | `info` | |
 | `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7) |

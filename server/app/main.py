@@ -32,6 +32,8 @@ from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.presets import DEFAULT_PRESET_ID, preset_id_for, resolve_ruleset
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # tunable via env
+# must stay well above RuleSet.disconnect_grace_seconds (20s) so a refresh never ends a game
+_DEFAULT_ABANDONED_TABLE_GRACE_SECONDS = 120.0
 _DEFAULT_SHOWCASE_TABLE_ID = "BOTS"
 # matches web/src/lib/table/table-code.ts's TABLE_CODE_ALPHABET -- no 0/O/1/I look-alikes.
 _TABLE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -61,7 +63,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     database_url = os.environ.get("DATABASE_URL")
     engine = make_engine(database_url) if database_url else None
     session_factory = make_session_factory(engine) if engine is not None else None
-    registry = ws.reset_registry(session_factory=session_factory)
+    abandon_grace = float(
+        os.environ.get("ABANDONED_TABLE_GRACE_SECONDS", _DEFAULT_ABANDONED_TABLE_GRACE_SECONDS)
+    )
+    registry = ws.reset_registry(
+        session_factory=session_factory, abandon_grace_seconds=abandon_grace
+    )
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
     if showcase_id:
         registry.start_showcase(showcase_id, DEFAULT_RULESET, bot_tiers=_available_bot_tiers())
@@ -133,7 +140,7 @@ def _generate_table_id() -> str:
     registry = ws.registry()
     for _ in range(_TABLE_ID_GENERATION_ATTEMPTS):
         candidate = "".join(secrets.choice(_TABLE_CODE_ALPHABET) for _ in range(_TABLE_CODE_LENGTH))
-        if registry.get(candidate) is None:
+        if registry.get(candidate) is None and not registry.is_closed(candidate):
             return candidate
     raise RuntimeError("could not generate a unique table id")
 

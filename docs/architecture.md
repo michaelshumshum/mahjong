@@ -460,7 +460,8 @@ dict lookup, violating `server/AGENTS.md`'s "`async def` only where there is rea
 `TableRegistry` (`server/app/registry.py`) is an in-process `dict[str, Table]` plus the bookkeeping
 to run each table's `asyncio.Task`. `Table.run()` returns on `GAME_OVER` and `TableRegistry` drops
 its task entry; the `Table` object itself stays, so reconnecting after the game ends still works
-(`Table.reconnect`/`resume`). Finished tables are never evicted — there is no TTL policy.
+(`Table.reconnect`/`resume`). Finished tables are never evicted — there is no TTL policy. An
+abandoned table is the exception: evicted and its id tombstoned (§8.2).
 
 `Table` records a real game's full action log (`self.actions`, every `Action` that ran through
 `reduce()` — never a `start_next_hand()` transition, which replay reconstructs off
@@ -488,7 +489,8 @@ non-determinism (bot decisions, timer expiries) that exact replay would need to 
 | --- | --- |
 | Player disconnects | Seat marked `DISCONNECTED` when the WS connection closes (no heartbeat — [protocol.md §8](protocol.md)). Table continues. After `ruleset.disconnect_grace_seconds` (default 20s) the seat flips to `AUTOPLAY` and a bot takes over, via the same `TimerHeap` claim windows use. **Mid-claim-window:** a live, unresolved claim offer held by this seat is forfeited immediately (`Pass`, the claim-timeout path) ([ADR 0004](decisions/0004-claim-forfeit-on-disconnect.md)). **Pre-start** (table still filling): same `DISCONNECTED` + grace, but on expiry the seat frees back to empty instead of `AUTOPLAY` — there's no hand for a bot to play, and an untouched `AUTOPLAY` seat would keep `GET /tables` listing the table as taken. |
 | Player reconnects | `hello{last_seq, seat, secret}`. Server replays from that seat's ring buffer or sends a fresh `state_sync` (§3). Bot relinquishes the seat. No claim offer is ever waiting — disconnect already forfeited it. |
-| Player never returns | Bot plays out the game. Result recorded against the human. |
+| Player never returns | Bot plays out the game while at least one other human seat is `connected`. Result recorded against the human. |
+| Every human gone | Started table, every human-bound seat `disconnected`/`autoplay`: ended after `ABANDONED_TABLE_GRACE_SECONDS` (default 120s), not persisted (§8.2). |
 | Turn timeout | `ruleset.turn_seconds` (default 15s), armed on every `AWAIT_ACTION` (`_arm_turn_timer`). **After a draw:** tsumogiri. **After a claimed pung or chow:** discard the concealed tile with the lowest `tile_id` (kong always draws a replacement first). The drawn-vs-claimed distinction reads that tick's real `Drawn`/`KongReplacementDrawn` events, not hand size. The synthesized discard comes from `legal_actions`, so it is always legal. `SeatBinding.turn_timeout_strikes` counts timeouts, never resets; at `ruleset.turn_timeout_strikes` (3) the seat flips to `AUTOPLAY` for the rest of the game. |
 | Bot raises / hangs | Runs in a worker pool with a hard deadline (§3). A *claim* offer resolves via its own `TimerHeap` entry (default `Pass`) whether or not the bot answers. A bot's *turn* gets the same `turn_seconds` fallback a human does — it races the wall clock, not the worker job. |
 | Planned shutdown / deploy | §8.1. |
@@ -521,6 +523,37 @@ the attempt finished, so the wait always exits.
 
 Compose's default `stop_grace_period` (10s) is shorter than the drain; see
 [infra.md §3](infra.md).
+
+### 8.2 Abandoned tables
+
+A table nobody is watching still costs a bot job per decision for the rest of the game, and
+creating tables is free and unthrottled, so a table with no human left is ended rather than played
+out ([ADR 0024](decisions/0024-end-abandoned-tables.md)).
+
+| Condition | Rule |
+| --- | --- |
+| Abandoned | `Table.started`, at least one human-bound seat, none `connected` (`_is_abandoned`). `bot` seats and spectators never count — a spectator keeping a table alive would be trivially exploitable. Pre-start tables keep the §8 seat-freeing path |
+| Grace | `ABANDONED_TABLE_GRACE_SECONDS` (default 120s, `app/main.py`'s `lifespan` → `TableRegistry` → `Table.abandon_grace_seconds`). Must stay well above `disconnect_grace_seconds` (20s): a refresh or network blip never ends a game |
+| Arm / disarm | one `TimerHeap` entry (`_abandon_timer_id`), armed at the tail of the `process_one()` tick that first sees the table abandoned, so it runs on the table's own loop like every other timer (§3 "Timer race"). `reconnect()` disarms it directly; expiry re-checks `_is_abandoned()` anyway, since a reclaim lands off-loop |
+| Exempt | the showcase table: all-bot, no human-bound seat, and `start_showcase` passes no grace |
+
+On expiry (`_handle_abandon_timeout`), all inside the table's own task:
+
+1. `Table.closed` is set; `_poke_bots` and `_handle_bot_result` refuse from then on, `_pending_bot`
+   is cleared and every in-flight `_await_bot_job` task cancelled, so a late worker answer is
+   dropped harmlessly.
+2. `error{code:"table_closed"}` goes to every seat stream and spectator; spectator sockets are
+   closed. The long-lived inbox getter is cancelled — nothing will read the inbox again.
+3. One `WARNING` log line: table id, `hand_no`, reason.
+4. `run()` returns. The game never reached `GAME_OVER`, so nothing is persisted — same as a
+   crash-abandoned table.
+5. `TableRegistry._run` evicts the `Table` from `_tables` and keeps the id in `_closed`. Eviction
+   is safe because the id is tombstoned: without it, a late `/ws?table=<id>` would
+   `get_or_create` a fresh, empty table under a dead game's id. Instead `ws_endpoint` answers any
+   connection to a closed id with `error{code:"table_closed"}` and closes it, and `POST /tables`
+   never mints a closed id. A connection that grabbed the `Table` in the instant before it ended
+   gets the same error from `Session.handle`. The tombstone is a bare string per ended table,
+   never pruned.
 
 ## 9. Anti-cheat
 

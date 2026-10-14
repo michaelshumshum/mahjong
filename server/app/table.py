@@ -22,6 +22,11 @@ state_version)`; the result re-enters through `self.inbox` as a `BotResult` carr
 action id, decoded back into a real `Action` here (a worker process never receives `GameState`),
 and dropped if the tag no longer matches `_pending_bot[seat]` by the time it lands.
 
+Abandonment (architecture.md §8.2). Once a started table has no human seat `connected`,
+`_update_abandon_timer` arms `abandon_grace_seconds` on the same heap; on expiry
+`_handle_abandon_timeout` sets `closed`, drops every bot job, sends `table_closed` and `run()`
+returns without persisting. `TableRegistry` then evicts it.
+
 Bot-filled seats from table creation (practice mode). `practice=True` binds seats 1-3 to
 their resolved tier immediately, before seat 0's human ever `join`s -- a `bot` status, distinct
 from `autoplay`, driven through the identical `_poke_bots` machinery. `seat_bot_tiers` picks a
@@ -115,6 +120,7 @@ from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
 __all__ = [
+    "TABLE_CLOSED_ERROR",
     "BotJobTag",
     "BotResult",
     "Command",
@@ -145,6 +151,9 @@ _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (architecture.md §8 "Bot raise
 # disconnect-handover always drives the autoplay bot at T2/FaanBot, never self._bot_tier -- must
 # never land on ORACLE, which would leak every seat's concealed tiles. See _effective_bot_tier.
 _DISCONNECT_HANDOVER_BOT_TIER: Final = "T2"
+# error payload for every socket on (or later connecting to) an abandoned table; the client stops
+# reconnecting on this code
+TABLE_CLOSED_ERROR: Final = {"code": "table_closed", "message": "table closed: every player left"}
 
 # humanising think delay, applied after the worker replies so it never touches the real
 # turn/claim deadline math -- a real tier answers in single-digit ms otherwise. Env-overridable.
@@ -477,6 +486,7 @@ class Table:
         practice: bool = False,
         all_bots: bool = False,
         settings: TableSettings | None = None,
+        abandon_grace_seconds: float | None = None,
     ) -> None:
         if bot_tier not in BOT_TIERS:
             raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
@@ -531,6 +541,10 @@ class Table:
         self._claim_deadline_ms: dict[tuple[int, int], int] = {}
         self._disconnect_timer_seat: dict[int, int] = {}
         self._active_disconnect_timer: dict[int, int] = {}
+        # None never ends the table early (showcase, bare test tables)
+        self.abandon_grace_seconds = abandon_grace_seconds
+        self._abandon_timer_id: int | None = None
+        self.closed = False  # ended early as abandoned; run() has returned, never persisted
         # per-seat AWAIT_ACTION turn deadlines -- same lazy-deletion staleness discipline as claims.
         self._turn_timer_seat: dict[int, int] = {}
         self._active_turn_timer: dict[int, int] = {}
@@ -748,6 +762,7 @@ class Table:
         binding.status = "connected"
         self._pending_bot.pop(seat, None)
         self._active_disconnect_timer.pop(seat, None)
+        self._abandon_timer_id = None
         return was_status != "connected"
 
     def mark_disconnected(self, seat: int, session_id: str) -> None:
@@ -990,7 +1005,7 @@ class Table:
         self._poke_bots()
         while True:
             await self.process_one()
-            if self.state.phase == Phase.GAME_OVER:
+            if self.closed or self.state.phase == Phase.GAME_OVER:
                 return
 
     async def process_one(self) -> None:
@@ -1031,10 +1046,15 @@ class Table:
         else:
             for timer_id in event:
                 self._dispatch_expired_timer(timer_id)
+        if self.closed:
+            if self._shutdown_boundary is not None:
+                self._shutdown_boundary.set()
+            return
         self._arm_claim_timer()
         if not isinstance(event, _WakeUp) and self.state is not pre_state:
             self._publish_turn_if_active()
         self._poke_bots()
+        self._update_abandon_timer()
         if self.state.phase == Phase.GAME_OVER and not self._persisted:
             self._persisted = True
             try:
@@ -1122,7 +1142,7 @@ class Table:
         from this same state. `_authorize` still runs anyway as defense-in-depth, not because
         it's expected to ever actually reject something here.
         """
-        if self._pending_bot.get(result.seat) != result.tag:
+        if self.closed or self._pending_bot.get(result.seat) != result.tag:
             return
         del self._pending_bot[result.seat]
         binding = self.seat_bindings[result.seat]
@@ -1147,6 +1167,8 @@ class Table:
             self._handle_turn_timeout(timer_id)
         elif timer_id == self._active_hand_end_timer_id:
             self._handle_hand_end_timeout(timer_id)
+        elif timer_id == self._abandon_timer_id:
+            self._handle_abandon_timeout()
         else:
             self._handle_disconnect_timeout(timer_id)
 
@@ -1259,6 +1281,54 @@ class Table:
         self._active_disconnect_timer[seat] = timer_id
         self._wake()
 
+    def _is_abandoned(self) -> bool:
+        """Started, with at least one human-bound seat and none of them `connected`. `bot` seats
+        and spectators never count -- a spectator keeping a table alive would be trivially
+        exploitable."""
+        if not self.started or self.abandon_grace_seconds is None:
+            return False
+        humans = [b for b in self.seat_bindings if b is not None and b.status != "bot"]
+        return bool(humans) and all(b.status != "connected" for b in humans)
+
+    def _update_abandon_timer(self) -> None:
+        """Arm `abandon_grace_seconds` from the tick the last human went away; disarm (lazily,
+        like every other timer here) once one is back. `reconnect()` also disarms directly, so
+        a second departure always gets a fresh full grace."""
+        if not self._is_abandoned():
+            self._abandon_timer_id = None
+            return
+        if self._abandon_timer_id is not None:
+            return
+        assert self.abandon_grace_seconds is not None
+        loop = asyncio.get_running_loop()
+        timer_id = next(self._timer_seq)
+        self.deadlines.add(loop.time() + self.abandon_grace_seconds, timer_id)
+        self._abandon_timer_id = timer_id
+
+    def _handle_abandon_timeout(self) -> None:
+        """The abandonment deadline popped. Re-checks rather than trusting the arm: a reconnect
+        off-loop may have landed since. Ends the table: no further bot jobs, every in-flight one
+        dropped, every remaining socket told why (spectators also closed), never persisted."""
+        self._abandon_timer_id = None
+        if not self._is_abandoned():
+            return
+        self.closed = True
+        self._pending_bot.clear()
+        for task in list(self._bot_tasks):
+            task.cancel()
+        self._broadcast_wire({"t": "error", **TABLE_CLOSED_ERROR})
+        self.close_spectators()
+        if self._getter is not None:
+            # the never-cancel rule guards against losing an item; nothing is read after this
+            self._getter.cancel()
+            self._getter = None
+        logger.warning(
+            "table %s: ended at hand %d, reason: abandoned (no human connected for %.0fs)",
+            self.table_id,
+            self.state.hand_no,
+            self.abandon_grace_seconds,
+        )
+
     def _arm_turn_timer(self, seat: int) -> int:
         """Give `seat` a fresh `TimerHeap` entry, `ruleset.turn_seconds` from right now. Only
         ever called synchronously from within `process_one()`/`mark_ready()`, both on this
@@ -1285,6 +1355,8 @@ class Table:
         gets, since which tier (and therefore which `SeatView` constructor) applies to a given
         seat needs `_effective_bot_tier`'s "is this a real human's autoplay seat" check.
         """
+        if self.closed:
+            return
         window = self.state.claim_window
         for seat in range(4):
             binding = self.seat_bindings[seat]

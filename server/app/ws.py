@@ -32,6 +32,7 @@ from app import protocol as proto
 from app.outbox import BoundedOutbox
 from app.registry import TableRegistry
 from app.table import (
+    TABLE_CLOSED_ERROR,
     NotHostError,
     SeatAuthError,
     SeatNotBoundError,
@@ -94,12 +95,17 @@ def reset_registry(
     *,
     bot_pool: Executor | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
+    abandon_grace_seconds: float | None = None,
 ) -> TableRegistry:
     """Install a fresh `TableRegistry` as this module's singleton -- called on every ASGI
     startup (including a `TestClient(app)` context) so a previous lifetime's tables/draining
     flag never leak into this one."""
     global _registry
-    _registry = TableRegistry(bot_pool=bot_pool, session_factory=session_factory)
+    _registry = TableRegistry(
+        bot_pool=bot_pool,
+        session_factory=session_factory,
+        abandon_grace_seconds=abandon_grace_seconds,
+    )
     return _registry
 
 
@@ -229,6 +235,11 @@ class Session:
         the gameplay intents the idempotency contract covers. `hello` with no `seat` is a no-op
         preceding `join`; `hello` with a `seat` is the reconnect handshake -- see
         `_handle_hello`."""
+        if self.table.closed:
+            # connected in the instant before the table ended (docs/architecture.md §8.2)
+            self._send_local("error", dict(TABLE_CLOSED_ERROR))
+            self.outbox.close()
+            return
         if isinstance(message, proto.Hello):
             await self._handle_hello(message)
             return
@@ -461,6 +472,12 @@ async def ws_endpoint(
         return
     # no auth -- accept every other connection unconditionally.
     await websocket.accept()
+    if _registry.is_closed(table):
+        # an abandoned table's id is never recycled (docs/architecture.md §8.2)
+        frame = {"v": 1, "t": "error", "seq": 1, "ts": _now_ms(), "d": dict(TABLE_CLOSED_ERROR)}
+        await websocket.send_text(json.dumps(frame))
+        await websocket.close()
+        return
     table_obj = _get_or_create_table(table, seed, practice, ruleset, rules)
     session = Session(websocket, table_obj)
     if spectate:

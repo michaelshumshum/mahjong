@@ -8,6 +8,11 @@ promptly. The `Table` object itself is not evicted from `_tables` -- reconnectin
 ends is still a supported path, and there's no session-expiry/TTL policy to drive a real
 eviction decision from; full table eviction is a tracked gap, not an oversight.
 
+Abandoned tables (docs/architecture.md §8.2) are the exception: `abandon_grace_seconds` is
+threaded into every non-showcase `Table`, and one that ends early (`Table.closed`) is evicted
+from `_tables` and its id kept in `_closed`, so a late connect to it is refused (`is_closed`)
+instead of recreating a fresh table under a dead id.
+
 `session_factory`, if given, is threaded into every `Table` so it can persist a `GameRecord` on
 `Phase.GAME_OVER`. `app/ws.py`'s module-level registry gets a fresh one per ASGI startup
 (`reset_registry`) so this and `draining` never leak across server lifetimes.
@@ -74,11 +79,15 @@ class TableRegistry:
         *,
         bot_pool: Executor | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
+        abandon_grace_seconds: float | None = None,
     ) -> None:
         self._bot_pool = bot_pool
+        self._abandon_grace_seconds = abandon_grace_seconds
         self._session_factory = session_factory
         self._tables: dict[str, Table] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        # ids of evicted abandoned tables; a bare id each, never pruned
+        self._closed: set[str] = set()
         # read by ws.py's connection accept and main.py's /healthz once a drain starts
         self.draining = False
         self._showcase_id: str | None = None
@@ -115,6 +124,7 @@ class TableRegistry:
             practice=practice,
             bot_tier=bot_tier,
             seat_bot_tiers=seat_bot_tiers,
+            abandon_grace_seconds=self._abandon_grace_seconds,
         )
         self._tables[table_id] = table
         self._tasks[table_id] = asyncio.create_task(self._run(table_id, table))
@@ -125,6 +135,9 @@ class TableRegistry:
             await table.run()
         finally:
             self._tasks.pop(table_id, None)
+            if table.closed and self._tables.get(table_id) is table:
+                del self._tables[table_id]
+                self._closed.add(table_id)
 
     def start_showcase(
         self,
@@ -182,6 +195,10 @@ class TableRegistry:
                 logger.exception("showcase table %s crashed, restarting", table_id)
             await asyncio.sleep(restart_delay)
             task = self._start_showcase_game(table_id, ruleset, bot_tiers)
+
+    def is_closed(self, table_id: str) -> bool:
+        """Whether `table_id` named a table ended early as abandoned."""
+        return table_id in self._closed
 
     def is_running(self, table_id: str) -> bool:
         """Whether `table_id`'s background task is still alive -- `False` for an unknown id or a
