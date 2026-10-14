@@ -831,7 +831,8 @@ are peers by design. The card's `<button>` holds only the title (its accessible 
 the screenshot script match exactly); the description sits outside it, wired up via
 `aria-describedby`, and the button's `::after` stretches the hit area over the whole card. Below
 the cards, quiet underlined links: "Have a code? Join a game" (→ `/tables`) and the language
-toggle. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
+toggle. A muted "Source code" link (GitHub mark + label, new tab) sits in the page's
+bottom-right corner. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
 middle (a radial gradient) so this copy reads over the tiles.
 
 ### Faan guide and language toggle

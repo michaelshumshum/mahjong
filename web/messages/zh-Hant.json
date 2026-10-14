@@ -403,6 +403,7 @@
 	],
 	"apiConnectGate_retryButton": "重試",
 	"lobby_languageButton": "English",
+	"lobby_sourceLink": "原始碼",
 	"lobby_guideButton": "番數指南",
 	"guide_title": "番數指南",
 	"guide_tabsLabel": "番數",
