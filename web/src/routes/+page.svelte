@@ -30,6 +30,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>{m.lobby_title()}</title>
+</svelte:head>
+
 <div class="lobby">
 	<div class="lobby-inner">
 		<header class="brand">

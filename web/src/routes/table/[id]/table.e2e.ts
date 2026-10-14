@@ -23,6 +23,21 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 	await expect(page).toHaveTitle('Table abc123 · Mahjong');
 });
 
+test('leaving the table via client-side navigation drops the table title', async ({ page }) => {
+	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
+	await page.goto('/table/abc123?mock=1');
+	await expect(page).toHaveTitle('Table abc123 · Mahjong');
+	// svelte never restores document.title on unmount, so the next page has to set its own.
+	await page.evaluate(() => {
+		const a = document.createElement('a');
+		a.href = '/';
+		document.body.append(a);
+		a.click();
+	});
+	await expect(page).toHaveURL('/');
+	await expect(page).toHaveTitle('Mahjong');
+});
+
 test('switching to the claim-window scenario surfaces claim buttons, and choosing one records the choice', async ({
 	page
 }) => {

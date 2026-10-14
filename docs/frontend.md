@@ -749,9 +749,18 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
 | `/profile` | on | placeholder heading only |
+| `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
 The web image builds with adapter-node (`pnpm build`, `node build`), so SSR is on unless a route
 opts out.
+
+**Page titles.** Every route (and `+error.svelte`) sets its own `<svelte:head><title>`, as
+"`<page>` · Mahjong" (`*_pageTitle` keys, so it's localized). The lobby uses the bare app name
+(`lobby_title`). `app.html` has no `<title>`. A static one there would be emitted before
+`%sveltekit.head%`, and browsers honour the first `<title>`, so it would shadow the page's title in
+SSR HTML. Svelte never restores `document.title` when a component unmounts, so a page without its
+own title would keep the previous page's, e.g. a stale "Your turn · Mahjong" after leaving a table.
+`ApiConnectGate` shows the app name while it holds the page back.
 
 ### API health gate (`ApiConnectGate`)
 

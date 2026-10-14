@@ -48,6 +48,13 @@
 	});
 </script>
 
+<!-- the gated page's own title takes over once it mounts. -->
+<svelte:head>
+	{#if !skip && status !== 'ready'}
+		<title>{m.lobby_title()}</title>
+	{/if}
+</svelte:head>
+
 {#if skip || status === 'ready'}
 	{@render children()}
 {:else}

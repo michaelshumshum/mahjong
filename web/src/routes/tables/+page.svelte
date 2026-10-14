@@ -58,6 +58,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>{m.tablesPage_pageTitle()}</title>
+</svelte:head>
+
 <div class="tables-page">
 	<header class="page-header">
 		<BackButton label={m.tablesPage_backLabel()} href="/" />

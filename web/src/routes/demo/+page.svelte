@@ -16,6 +16,10 @@
 	let showAnimationDemo = $state(false);
 </script>
 
+<svelte:head>
+	<title>{m.demoPage_pageTitle()}</title>
+</svelte:head>
+
 <div class="demo-header">
 	<BackButton label={m.demoPage_backLabel()} href="/" />
 </div>

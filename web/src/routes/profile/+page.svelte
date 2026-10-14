@@ -1,5 +1,13 @@
-<a class="back-link" href="/">← Lobby</a>
-<h1>Profile</h1>
+<script lang="ts">
+	import { m } from '$lib/paraglide/messages.js';
+</script>
+
+<svelte:head>
+	<title>{m.profilePage_pageTitle()}</title>
+</svelte:head>
+
+<a class="back-link" href="/">← {m.profilePage_backLabel()}</a>
+<h1>{m.profilePage_heading()}</h1>
 
 <style lang="scss">
 	.back-link {
