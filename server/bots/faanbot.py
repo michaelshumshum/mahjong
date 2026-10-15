@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.views import SeatView
-from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
+from bots.features import claimed_tile_type, is_closed, is_terminal_or_honor, own_hand34, seen34
 from bots.labels import winning_tile_types
 from bots.safety import kong_rob_risk, opponent_threat_level, ron_credit, tile_risk
 from bots.valuation import (
@@ -131,16 +131,6 @@ def _best_after_discard(
     return best_shanten, best_hand
 
 
-def _claimed_type(view: SeatView) -> int | None:
-    """Same derivation as `bots/efficiency.py`'s identical helper; duplicated for independence."""
-    if view.phase != Phase.AWAIT_CLAIMS:
-        return None
-    pool = view.discard_pools[view.turn]
-    if not pool:
-        return None
-    return int(tile_id_type(pool[-1]))
-
-
 def _without_one(tiles: tuple[TileId, ...], tile_type: int) -> tuple[TileId, ...]:
     for i, t in enumerate(tiles):
         if int(tile_id_type(t)) == tile_type:
@@ -206,7 +196,7 @@ class FaanBot:
         best_shanten = before_shanten
 
         min_faan = view.ruleset.min_faan
-        claimed_type = _claimed_type(view)
+        claimed_type = claimed_tile_type(view)
         if claimed_type is not None:
             if mask[PUNG_ID]:
                 candidate = list(hand)

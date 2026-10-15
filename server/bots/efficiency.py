@@ -11,7 +11,7 @@ not run position), so this evaluates once and returns whichever id the mask offe
 from __future__ import annotations
 
 from app.views import SeatView
-from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
+from bots.features import claimed_tile_type, is_closed, is_terminal_or_honor, own_hand34, seen34
 from mahjong_core.config import HandSet
 from mahjong_core.ml import (
     ADDED_KONG_BASE,
@@ -24,7 +24,7 @@ from mahjong_core.ml import (
 )
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
+from mahjong_core.tiles import N_TILE_TYPES
 
 __all__ = ["EfficiencyBot"]
 
@@ -45,19 +45,6 @@ def _best_after_discard(hand34: list[int], *, closed: bool, hand_sets: frozenset
     return best
 
 
-def _claimed_type(view: SeatView) -> int | None:
-    """Tile type up for claim, without `state.claim_window.tile` (a bot never sees `GameState`):
-    `view.turn` still names the discarder during `AWAIT_CLAIMS`, so their last discard is the
-    claimed tile. `None` outside a discard claim window (kong-rob is win-only) or on a
-    defensively-empty pool."""
-    if view.phase != Phase.AWAIT_CLAIMS:
-        return None
-    pool = view.discard_pools[view.turn]
-    if not pool:
-        return None
-    return int(tile_id_type(pool[-1]))
-
-
 class EfficiencyBot:
     """T1: see module docstring. Never returns an id `mask` doesn't mark legal."""
 
@@ -76,7 +63,7 @@ class EfficiencyBot:
         best_aid = PASS_ID
         best_shanten = shanten(hand, closed=closed, hand_sets=hand_sets)
 
-        claimed_type = _claimed_type(view)
+        claimed_type = claimed_tile_type(view)
         if claimed_type is not None:
             if mask[PUNG_ID]:
                 candidate = list(hand)

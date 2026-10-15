@@ -12,17 +12,38 @@ from __future__ import annotations
 
 from app.views import SeatView
 from mahjong_core.melds import Meld
+from mahjong_core.state import Phase
 from mahjong_core.tiles import N_SUITED_TYPES, RANKS_PER_SUIT, new_count_array, tile_id_type
 
-__all__ = ["is_closed", "is_terminal_or_honor", "own_hand34", "seen34"]
+__all__ = [
+    "add_meld",
+    "claimed_tile_type",
+    "is_closed",
+    "is_terminal_or_honor",
+    "own_hand34",
+    "seen34",
+]
 
 
-def _add_meld(counts: list[int], meld: Meld) -> None:
+def add_meld(counts: list[int], meld: Meld) -> None:
     """Adds one meld to a 34-count array; a kong contributes 3, per mahjong_core.shanten's
     contract."""
     tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
     for t in tiles:
         counts[int(tile_id_type(t))] += 1
+
+
+def claimed_tile_type(view: SeatView) -> int | None:
+    """Tile type up for claim, without `state.claim_window.tile` (a bot never sees `GameState`):
+    `view.turn` still names the discarder during `AWAIT_CLAIMS`, so their last discard is the
+    claimed tile. `None` outside a discard claim window (kong-rob is win-only) or on a
+    defensively-empty pool."""
+    if view.phase != Phase.AWAIT_CLAIMS:
+        return None
+    pool = view.discard_pools[view.turn]
+    if not pool:
+        return None
+    return int(tile_id_type(pool[-1]))
 
 
 def own_hand34(view: SeatView) -> list[int]:
@@ -34,7 +55,7 @@ def own_hand34(view: SeatView) -> list[int]:
     for t in view.own_hand:
         counts[int(tile_id_type(t))] += 1
     for meld in view.melds[view.seat]:
-        _add_meld(counts, meld)
+        add_meld(counts, meld)
     return counts
 
 
@@ -63,7 +84,7 @@ def seen34(view: SeatView) -> list[int]:
         if s == view.seat:
             continue
         for meld in seat_melds:
-            _add_meld(counts, meld)
+            add_meld(counts, meld)
     if view.hands is not None:
         for s, hand in enumerate(view.hands):
             if s == view.seat:
