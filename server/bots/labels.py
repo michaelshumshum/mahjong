@@ -19,7 +19,14 @@ from mahjong_core.melds import Meld
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, SeatState
-from mahjong_core.tiles import TileId, TileType, new_count_array, tile_id_type, tile_ids_for_type
+from mahjong_core.tiles import (
+    N_TILE_TYPES,
+    TileId,
+    TileType,
+    new_count_array,
+    tile_id_type,
+    tile_ids_for_type,
+)
 
 __all__ = [
     "OpponentDangerLabel",
@@ -41,7 +48,7 @@ def seat_hand34(seat_state: SeatState) -> list[int]:
     for t in seat_state.concealed:
         counts[int(tile_id_type(t))] += 1
     meld_counts = meld_counts34(seat_state.melds)
-    for i in range(34):
+    for i in range(N_TILE_TYPES):
         counts[i] += meld_counts[i]
     return counts
 
@@ -74,7 +81,7 @@ def winning_tile_types(
     (docs/bots.md §8 -- a hand that's only tenpai via a shape `hand_sets` excludes, e.g. Seven
     Pairs under `hk_strict`, must not be reported as a real wait)."""
     out = []
-    for t in range(34):
+    for t in range(N_TILE_TYPES):
         if hand34[t] >= 4:
             continue
         candidate = list(hand34)
@@ -152,7 +159,7 @@ def danger_labels_for_opponents(state: GameState, seat: int) -> dict[int, Oppone
         if opponent == seat:
             continue
         if not is_tenpai(state, opponent):
-            labels[opponent] = OpponentDangerLabel(False, (), (0.0,) * 34)
+            labels[opponent] = OpponentDangerLabel(False, (), (0.0,) * N_TILE_TYPES)
             continue
         opponent_state = state.seats[opponent]
         hand34 = seat_hand34(opponent_state)
@@ -162,7 +169,7 @@ def danger_labels_for_opponents(state: GameState, seat: int) -> dict[int, Oppone
         )
         faan = tuple(
             expected_faan_if_won(state, opponent, t, discarder=seat) if t in winners else 0.0
-            for t in range(34)
+            for t in range(N_TILE_TYPES)
         )
         labels[opponent] = OpponentDangerLabel(True, winners, faan)
     return labels

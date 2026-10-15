@@ -31,6 +31,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.ppo import (
     Collector,
@@ -167,7 +168,7 @@ def bench_learner(
 
 def bench_transfer(cfg: PPOConfig, device: torch.device, reps: int = 200) -> dict[str, float]:
     """Host->device copy of one rollout step's inputs, pageable vs pinned."""
-    tiles = np.random.default_rng(0).random((cfg.envs, 70 + 32, 34), dtype=np.float32)
+    tiles = np.random.default_rng(0).random((cfg.envs, 70 + 32, N_TILE_TYPES), dtype=np.float32)
     out = {}
     for name, src in (
         ("pageable_ms", torch.from_numpy(tiles)),

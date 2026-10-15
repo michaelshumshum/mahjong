@@ -53,6 +53,7 @@ from torch import nn
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.presets import RULESET_PRESETS
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.aux_data import aux_targets
 from ml.danger_model import _padded_positions
 from ml.encode import PAD, PADDED_WIDTH
@@ -113,7 +114,7 @@ __all__ = [
     "train_ppo",
 ]
 
-_KEEP_BITS = N_ORACLE_CHANNELS * 34
+_KEEP_BITS = N_ORACLE_CHANNELS * N_TILE_TYPES
 _DRAWS = ORACLE_CHANNELS["next_draws"]
 POLICY_LOSSES = ("ppo", "ach")
 
@@ -587,7 +588,7 @@ class Learner:
         rng: Any,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         b = len(tiles)
-        keep = np.zeros((b, N_ORACLE_CHANNELS, 34), dtype=bool)
+        keep = np.zeros((b, N_ORACLE_CHANNELS, N_TILE_TYPES), dtype=bool)
         masked = None
         if keep_prob.any():
             p = keep_prob[:, None, None]
@@ -635,7 +636,7 @@ class Learner:
         u = unpack_rows(rows)
         tiles, scalars = self.encoder.policy(u)
         oracle_full = self.encoder.oracle(u)
-        pol_oracle = self.encoder.oracle(u, k) * keep.reshape(n, N_ORACLE_CHANNELS, 34)
+        pol_oracle = self.encoder.oracle(u, k) * keep.reshape(n, N_ORACLE_CHANNELS, N_TILE_TYPES)
         has_oracle = pol_oracle.reshape(n, -1).any(axis=1)
 
         t_tiles, t_scalars, t_oracle = self._to(tiles), self._to(scalars), self._to(oracle_full)

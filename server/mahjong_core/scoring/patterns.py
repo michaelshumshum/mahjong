@@ -51,7 +51,9 @@ from mahjong_core.melds import KONG_KINDS, Meld, MeldKind
 from mahjong_core.state import Wind
 from mahjong_core.tiles import (
     DRAGON_TYPES,
+    N_SUITED_TYPES,
     ORPHAN_TYPES,
+    RANKS_PER_SUIT,
     WIND_TYPES,
     Flower,
     TileId,
@@ -162,8 +164,8 @@ def _suits_used(groups: tuple[Meld, ...], pair: Meld) -> tuple[set[int], bool]:
     honors = False
     for meld in (*groups, pair):
         v = int(meld.tile_type)
-        if v < 27:
-            suits.add(v // 9)
+        if v < N_SUITED_TYPES:
+            suits.add(v // RANKS_PER_SUIT)
         else:
             honors = True
     return suits, honors
@@ -181,8 +183,8 @@ def _suit_profile(hand: tuple[Meld, ...], ctx: ScoringContext) -> tuple[set[int]
     honors = False
     for t in ctx.concealed_tiles:
         v = int(tile_id_type(t))
-        if v < 27:
-            suits.add(v // 9)
+        if v < N_SUITED_TYPES:
+            suits.add(v // RANKS_PER_SUIT)
         else:
             honors = True
     return suits, honors
@@ -242,7 +244,7 @@ def _detect_seat_wind(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     if split is None:
         return 0
     groups, _pair = split
-    want = TileType(27 + int(ctx.seat_wind))
+    want = TileType(TileType.WIND_EAST + int(ctx.seat_wind))
     return 1 if any(m.kind in _PUNG_OR_KONG and m.tile_type == want for m in groups) else 0
 
 
@@ -254,7 +256,7 @@ def _detect_prevailing_wind(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     if split is None:
         return 0
     groups, _pair = split
-    want = TileType(27 + int(ctx.prevailing_wind))
+    want = TileType(TileType.WIND_EAST + int(ctx.prevailing_wind))
     return 1 if any(m.kind in _PUNG_OR_KONG and m.tile_type == want for m in groups) else 0
 
 
@@ -315,11 +317,11 @@ def _detect_big_four_winds(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
 
 def _is_terminal(tile_type: TileType) -> bool:
     v = int(tile_type)
-    return v < 27 and v % 9 in (0, 8)
+    return v < N_SUITED_TYPES and v % RANKS_PER_SUIT in (0, 8)
 
 
 def _is_honor(tile_type: TileType) -> bool:
-    return int(tile_type) >= 27
+    return int(tile_type) >= N_SUITED_TYPES
 
 
 def _detect_mixed_terminals(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
@@ -383,7 +385,7 @@ def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     types = [tile_id_type(t) for t in tiles]
     if any(_is_honor(t) for t in types):
         return 0
-    suits = {int(t) // 9 for t in types}
+    suits = {int(t) // RANKS_PER_SUIT for t in types}
     if len(suits) != 1:
         return 0
     base = suits.pop() * 9

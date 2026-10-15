@@ -19,7 +19,7 @@ from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_me
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
-from mahjong_core.tiles import ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
+from mahjong_core.tiles import N_TILE_TYPES, ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
 
 
 class ActionKind(StrEnum):
@@ -198,7 +198,7 @@ def _is_winning_shape(concealed: Sequence[TileId], *, closed: bool) -> bool:
     `_is_seven_pairs`/`_is_thirteen_orphans`/`decompose` form in tests/test_winning_shape.py."""
     if len(concealed) % 3 != 2:
         return False
-    counts = [0] * 34
+    counts = [0] * N_TILE_TYPES
     for t in concealed:
         counts[tile_id_type(t)] += 1
     if closed and len(concealed) == 14:

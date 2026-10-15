@@ -32,7 +32,7 @@ from collections.abc import Sequence
 from functools import cache
 
 from mahjong_core.config import HandSet
-from mahjong_core.tiles import ORPHAN_INDICES
+from mahjong_core.tiles import N_SUITED_TYPES, N_TILE_TYPES, ORPHAN_INDICES, RANKS_PER_SUIT
 
 __all__ = [
     "AGARI",
@@ -108,10 +108,11 @@ def standard_shanten(tiles34: Sequence[int]) -> int:
     """Standard-shape shanten (4 melds + 1 pair) -- min over every way to split man/pin/sou/
     honors into complete melds, partial sets, and (at most one) pair, block-cap applied."""
     groups = (
-        _frontier(tuple(tiles34[0:9]), True),
-        _frontier(tuple(tiles34[9:18]), True),
-        _frontier(tuple(tiles34[18:27]), True),
-        _frontier(tuple(tiles34[27:34]), False),
+        *(
+            _frontier(tuple(tiles34[base : base + RANKS_PER_SUIT]), True)
+            for base in range(0, N_SUITED_TYPES, RANKS_PER_SUIT)
+        ),
+        _frontier(tuple(tiles34[N_SUITED_TYPES:N_TILE_TYPES]), False),
     )
     best: int | None = None
     for combo in itertools.product(*groups):
@@ -184,13 +185,13 @@ def ukeire(
     """
     result: dict[int, tuple[int, int]] = {}
     after = list(hand34)
-    for d in range(34):
+    for d in range(N_TILE_TYPES):
         if hand34[d] == 0:
             continue
         after[d] -= 1
         base = shanten(after, closed=closed, hand_sets=hand_sets)
         kinds = tiles = 0
-        for t in range(34):
+        for t in range(N_TILE_TYPES):
             live = 4 - seen34[t]
             if live <= 0:
                 continue

@@ -30,6 +30,7 @@ import torch
 
 from mahjong_core.config import RuleSet
 from mahjong_core.state import Phase
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.aux_data import AuxData, danger_raw
 from ml.aux_train import to_tensors
 from ml.encode import PAD, PHASE_INDEX, encode_batch
@@ -103,7 +104,7 @@ def evaluate_aux_model(
                 continue
             go = g[own]
             hand = (raw["concealed"] + raw["melds"][:, 0])[own] > 0
-            cand = np.broadcast_to(hand[:, None], (int(own.sum()), 3, 34))
+            cand = np.broadcast_to(hand[:, None], (int(own.sum()), 3, N_TILE_TYPES))
             g_tiles = np.broadcast_to(go[:, None, None], cand.shape)
             legal_y = t["legal"][own]
             scorers = {"policy": (_sig(aux.legal_wait)[own], _sig(aux.tenpai)[own])}
@@ -115,7 +116,7 @@ def evaluate_aux_model(
                 d_tiles, d_scalars = encode_batch(rep, opp, data.danger_ruleset_vec)
                 d = danger(torch.from_numpy(d_tiles), torch.from_numpy(d_scalars))
                 scorers["danger"] = (
-                    _sig(d.legal_wait).reshape(b, 3, 34),
+                    _sig(d.legal_wait).reshape(b, 3, N_TILE_TYPES),
                     _sig(d.tenpai).reshape(b, 3),
                 )
             for name, (lw, tp) in scorers.items():
@@ -211,14 +212,14 @@ def evaluate_v3(
             b = len(idx)
             legal = raw["opponent_expected_faan"] > 0
             tenpai = raw["opponent_is_tenpai"]
-            cand = np.broadcast_to((raw["hand_counts"] > 0)[:, None], (b, 3, 34))
-            g = np.broadcast_to(game_of[idx][:, None, None], (b, 3, 34))
+            cand = np.broadcast_to((raw["hand_counts"] > 0)[:, None], (b, 3, N_TILE_TYPES))
+            g = np.broadcast_to(game_of[idx][:, None, None], (b, 3, N_TILE_TYPES))
             scorers = {"policy": (_sig(aux.legal_wait), _sig(aux.tenpai))}
             if danger is not None:
                 d_tiles, d_scalars, _ = data.batch(rows[idx], np.arange(3 * b))
                 d = danger(d_tiles, d_scalars)
                 scorers["danger"] = (
-                    _sig(d.legal_wait).reshape(b, 3, 34),
+                    _sig(d.legal_wait).reshape(b, 3, N_TILE_TYPES),
                     _sig(d.tenpai).reshape(b, 3),
                 )
             for name, (lw, tp) in scorers.items():

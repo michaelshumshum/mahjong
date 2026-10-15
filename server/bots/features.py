@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from app.views import SeatView
 from mahjong_core.melds import Meld
-from mahjong_core.tiles import new_count_array, tile_id_type
+from mahjong_core.tiles import N_SUITED_TYPES, RANKS_PER_SUIT, new_count_array, tile_id_type
 
 __all__ = ["is_closed", "is_terminal_or_honor", "own_hand34", "seen34"]
 
@@ -78,7 +78,7 @@ def seen34(view: SeatView) -> list[int]:
 
 def is_terminal_or_honor(tile_type: int) -> bool:
     """1/9 of a suit, or any wind/dragon -- T1's discard tiebreak prefers these."""
-    if tile_type >= 27:
+    if tile_type >= N_SUITED_TYPES:
         return True
-    rank = tile_type % 9
+    rank = tile_type % RANKS_PER_SUIT
     return rank == 0 or rank == 8

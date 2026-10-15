@@ -35,7 +35,7 @@ from mahjong_core.ml import (
 )
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import TileId, new_count_array, tile_id_type
+from mahjong_core.tiles import N_TILE_TYPES, TileId, new_count_array, tile_id_type
 from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
@@ -119,7 +119,7 @@ def _best_after_discard(
     stay independently editable) but also returns the hand."""
     best_shanten: int | None = None
     best_hand: list[int] | None = None
-    for t in range(34):
+    for t in range(N_TILE_TYPES):
         if hand34[t] == 0:
             continue
         after = list(hand34)
@@ -319,7 +319,7 @@ class FaanBot:
         best_kong_aid: int | None = None
         best_kong_shanten = base
         for kong_base, concealed in ((CONCEALED_KONG_BASE, True), (ADDED_KONG_BASE, False)):
-            for t in range(34):
+            for t in range(N_TILE_TYPES):
                 aid = kong_base + t
                 if not mask[aid]:
                     continue
@@ -369,7 +369,7 @@ class FaanBot:
         w_flex *= profile.w_flex
         accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
 
-        risks = {d: tile_risk(view, d) for d in range(34) if mask[DISCARD_BASE + d]}
+        risks = {d: tile_risk(view, d) for d in range(N_TILE_TYPES) if mask[DISCARD_BASE + d]}
         candidates = list(risks)
         if view.hands is not None:
             # exact risk is a certain deal-in, not a likelihood: never pay it while a safe tile exists

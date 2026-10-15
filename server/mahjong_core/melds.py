@@ -11,7 +11,15 @@ from dataclasses import dataclass
 from enum import StrEnum
 from itertools import combinations_with_replacement
 
-from mahjong_core.tiles import N_SUITED_TYPES, N_TILE_TYPES, TileId, TileType, tile_id_type
+from mahjong_core.tiles import (
+    COPIES_PER_TYPE,
+    N_SUITED_TYPES,
+    N_TILE_TYPES,
+    RANKS_PER_SUIT,
+    TileId,
+    TileType,
+    tile_id_type,
+)
 
 
 class MeldKind(StrEnum):
@@ -66,7 +74,7 @@ class Meld:
         types = [tile_id_type(t) for t in self.tiles]
         if self.kind == MeldKind.CHOW:
             a, b, c = sorted(types)
-            if not (a < N_SUITED_TYPES and a % 9 <= 6 and b == a + 1 and c == a + 2):
+            if not (a < N_SUITED_TYPES and a % RANKS_PER_SUIT <= 6 and b == a + 1 and c == a + 2):
                 raise ValueError(f"not a valid chow: tile types {types}")
         elif len(set(types)) != 1:
             raise ValueError(f"{self.kind} needs identical tile types, got {types}")
@@ -141,8 +149,8 @@ def _chow_options(
     if discard_type >= N_SUITED_TYPES:
         return ()
 
-    suit_base = (discard_type // 9) * 9
-    rank = discard_type % 9
+    suit_base = (discard_type // RANKS_PER_SUIT) * RANKS_PER_SUIT
+    rank = discard_type % RANKS_PER_SUIT
     by_type: dict[TileType, list[TileId]] = {}
     for t in concealed:
         by_type.setdefault(tile_id_type(t), []).append(t)
@@ -206,8 +214,8 @@ def decompose(tiles: Sequence[TileId]) -> tuple[tuple[Meld, ...], ...]:
     if len(tiles) % 3 != 2:
         return ()
 
-    counts = [0] * 34
-    queues: list[deque[TileId]] = [deque() for _ in range(34)]
+    counts = [0] * N_TILE_TYPES
+    queues: list[deque[TileId]] = [deque() for _ in range(N_TILE_TYPES)]
     for t in tiles:
         tt = int(tile_id_type(t))
         counts[tt] += 1
@@ -243,7 +251,7 @@ def decompose(tiles: Sequence[TileId]) -> tuple[tuple[Meld, ...], ...]:
 
         if (
             idx < N_SUITED_TYPES
-            and idx % 9 <= 6
+            and idx % RANKS_PER_SUIT <= 6
             and counts[idx] >= 1
             and counts[idx + 1] >= 1
             and counts[idx + 2] >= 1
@@ -282,18 +290,20 @@ def _materialize(
 def _complete_suit_shapes() -> dict[tuple[int, ...], bool]:
     """Every 9-rank count vector of one suit that splits fully into chows/pungs, mapped to
     whether that split also uses the hand's single pair. At most 4 melds + 1 pair (14 tiles)."""
-    groups = [(r, r + 1, r + 2) for r in range(7)] + [(r, r, r) for r in range(9)]
+    groups = [(r, r + 1, r + 2) for r in range(RANKS_PER_SUIT - 2)] + [
+        (r, r, r) for r in range(RANKS_PER_SUIT)
+    ]
     shapes: dict[tuple[int, ...], bool] = {}
     for n in range(5):
         for combo in combinations_with_replacement(groups, n):
-            base = [0] * 9
+            base = [0] * RANKS_PER_SUIT
             for group in combo:
                 for rank in group:
                     base[rank] += 1
-            if max(base) > 4:
+            if max(base) > COPIES_PER_TYPE:
                 continue
             shapes[tuple(base)] = False
-            for rank in range(9):
+            for rank in range(RANKS_PER_SUIT):
                 if base[rank] <= 2:
                     with_pair = base.copy()
                     with_pair[rank] += 2

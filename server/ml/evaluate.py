@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.danger_model import DangerNet, DangerNetConfig
 from ml.dataset import DangerData
 from ml.encode import N_OPPONENTS
@@ -50,13 +51,13 @@ def legal_wait_probs(
 ) -> np.ndarray:
     """`(len(rows), 3, 34)` legal-wait probabilities for every (row, opponent, tile)."""
     n = len(rows) * N_OPPONENTS
-    out = np.empty((n, 34), dtype=np.float32)
+    out = np.empty((n, N_TILE_TYPES), dtype=np.float32)
     with torch.no_grad():
         for i in range(0, n, chunk):
             idx = np.arange(i, min(i + chunk, n))
             tiles, scalars, _ = data.batch(rows, idx)
             out[idx] = torch.sigmoid(model(tiles, scalars).legal_wait).numpy()
-    return out.reshape(len(rows), N_OPPONENTS, 34)
+    return out.reshape(len(rows), N_OPPONENTS, N_TILE_TYPES)
 
 
 def evaluate_model(

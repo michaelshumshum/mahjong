@@ -17,7 +17,14 @@ import random
 from dataclasses import dataclass
 
 from mahjong_core.config import RuleSet
-from mahjong_core.tiles import Flower, TileId, all_flowers, all_tile_ids
+from mahjong_core.tiles import (
+    N_FLOWERS,
+    TOTAL_PHYSICAL_TILES,
+    Flower,
+    TileId,
+    all_flowers,
+    all_tile_ids,
+)
 
 WallTile = TileId | Flower
 """One physical tile as it sits in the wall or a hand: either a playable `TileId` or a
@@ -171,7 +178,7 @@ def max_turns_per_seat(ruleset: RuleSet) -> int:
     randomness this function deliberately ignores so it stays a pure, allocation-time function of
     `RuleSet` rather than a simulation.
     """
-    total = 144 if ruleset.flowers_enabled else 136
+    total = TOTAL_PHYSICAL_TILES - (0 if ruleset.flowers_enabled else N_FLOWERS)
     dealt = _HAND_SIZE * _SEATS + 1
     available = total - dealt - ruleset.wall_reserve
     return max(available, 0) // _SEATS

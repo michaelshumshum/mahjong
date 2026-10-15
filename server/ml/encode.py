@@ -20,7 +20,14 @@ from bots.features import own_hand34
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.scoring.patterns import PATTERNS, seat_wind_for
 from mahjong_core.state import Phase
-from mahjong_core.tiles import N_TILE_TYPES, TileType, new_count_array, tile_id_type
+from mahjong_core.tiles import (
+    N_SUITED_TYPES,
+    N_TILE_TYPES,
+    RANKS_PER_SUIT,
+    TileType,
+    new_count_array,
+    tile_id_type,
+)
 from ml.raw import visible_meld_counts34
 
 __all__ = [
@@ -181,7 +188,9 @@ def _static_tile_channels() -> np.ndarray:
 
 
 _STATIC = _static_tile_channels()
-_SUIT_RANK = np.array([t % 9 if t < 27 else -1 for t in range(N_TILE_TYPES)])
+_SUIT_RANK = np.array(
+    [t % RANKS_PER_SUIT if t < N_SUITED_TYPES else -1 for t in range(N_TILE_TYPES)]
+)
 _HAS_LOWER = (_SUIT_RANK >= 3) & (_SUIT_RANK >= 0)
 _HAS_UPPER = (_SUIT_RANK <= 5) & (_SUIT_RANK >= 0)
 

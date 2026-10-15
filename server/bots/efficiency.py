@@ -24,7 +24,7 @@ from mahjong_core.ml import (
 )
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import tile_id_type
+from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
 
 __all__ = ["EfficiencyBot"]
 
@@ -33,7 +33,7 @@ def _best_after_discard(hand34: list[int], *, closed: bool, hand_sets: frozenset
     """Best shanten after discarding one tile -- exposed so claim evaluation can compare against
     the best resulting hand, not just the meld's own shape."""
     best: int | None = None
-    for t in range(34):
+    for t in range(N_TILE_TYPES):
         if hand34[t] == 0:
             continue
         after = list(hand34)
@@ -105,7 +105,7 @@ class EfficiencyBot:
         best_kong_aid: int | None = None
         best_kong_shanten = base
         for kong_base in (CONCEALED_KONG_BASE, ADDED_KONG_BASE):
-            for t in range(34):
+            for t in range(N_TILE_TYPES):
                 aid = kong_base + t
                 if not mask[aid]:
                     continue
@@ -131,7 +131,7 @@ class EfficiencyBot:
         accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
         best_key: tuple[int, int, int, int] | None = None
         best_aid = -1
-        for d in range(34):
+        for d in range(N_TILE_TYPES):
             aid = DISCARD_BASE + d
             if not mask[aid]:
                 continue
