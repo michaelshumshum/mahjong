@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-	MOCK_SCENARIOS,
-	relativeSeat,
-	type MockGameState,
-	type MockSeatState,
-	type Seat
-} from './mock-game-state';
+import type { Seat } from '$lib/game/types';
+import { MOCK_SCENARIOS } from './mock-game-state';
+import type { MockGameState, MockSeatState } from './view-types';
 
 const VALID_PHASES = new Set([
 	'AWAIT_DRAW',
@@ -88,25 +84,6 @@ function assertValidState(state: MockGameState): void {
 		expect(state.gameEnd!.standings).toHaveLength(4);
 	}
 }
-
-describe('relativeSeat', () => {
-	it('returns 0 when seat equals you', () => {
-		expect(relativeSeat(0, 0)).toBe(0);
-		expect(relativeSeat(2, 2)).toBe(0);
-	});
-
-	it('counts clockwise from you in seat-index space', () => {
-		expect(relativeSeat(1, 0)).toBe(1);
-		expect(relativeSeat(2, 0)).toBe(2);
-		expect(relativeSeat(3, 0)).toBe(3);
-	});
-
-	it('wraps around seat 0', () => {
-		expect(relativeSeat(0, 1)).toBe(3);
-		expect(relativeSeat(0, 3)).toBe(1);
-		expect(relativeSeat(2, 3)).toBe(3);
-	});
-});
 
 describe('MOCK_SCENARIOS', () => {
 	it('has unique ids and non-empty labels', () => {

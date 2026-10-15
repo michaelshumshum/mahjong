@@ -4,7 +4,7 @@
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import FairnessBadge from '$lib/ui/FairnessBadge.svelte';
-	import type { MockHandResult, MockMeld } from '$lib/table/mock-game-state';
+	import type { MockHandResult, MockMeld } from '$lib/table/view-types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {

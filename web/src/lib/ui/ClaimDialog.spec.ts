@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import ClaimDialog from './ClaimDialog.svelte';
-import type { ClaimOption } from './ClaimButtons.svelte';
+import type { ClaimOption } from '$lib/game/types';
 
 describe('ClaimDialog', () => {
 	const noop = () => {};

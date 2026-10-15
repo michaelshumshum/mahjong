@@ -1,5 +1,6 @@
 <script lang="ts">
-	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
+	import Settings from '$lib/ui/Settings.svelte';
+	import type { AutoArm, ClientPrefs } from '$lib/ui/client-prefs';
 	import { m } from '$lib/paraglide/messages.js';
 	import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from '$lib/ui/settings-storage';
 

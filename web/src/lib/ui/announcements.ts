@@ -1,4 +1,5 @@
-import type { MeldKind, MockGameState } from '$lib/table/mock-game-state';
+import type { MeldKind } from '$lib/game/types';
+import type { MockGameState } from '$lib/table/view-types';
 import type { TileCode } from '$lib/table/tile-code';
 import { tileName } from '$lib/table/tile-name';
 import { m } from '$lib/paraglide/messages.js';
@@ -10,9 +11,16 @@ export interface AnnounceSnapshot {
 	names: string[];
 	discards: TileCode[][];
 	meldKinds: MeldKind[][];
-	claim: { kind: 'discard' | 'kong_rob'; sourceSeat: number; tile: TileCode } | null;
+	claim: {
+		kind: 'discard' | 'kong_rob';
+		sourceSeat: number;
+		tile: TileCode;
+	} | null;
 	yourTurn: boolean;
-	handResult: { outcome: 'win' | 'exhaustive_draw'; winner: number | null } | null;
+	handResult: {
+		outcome: 'win' | 'exhaustive_draw';
+		winner: number | null;
+	} | null;
 }
 
 // a spectator has no "you": every seat is announced by name.

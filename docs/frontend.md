@@ -374,7 +374,7 @@ keeps pinch-zoom. Not a `touchend` `preventDefault` guard — on iOS that also c
 `click`, eating the second tap of a two-step discard. Hand tile buttons also drop the iOS tap
 highlight, callout and text selection that rapid taps triggered.
 
-**Discard mode.** A client pref (`ClientPrefs.discardMode`, `lib/ui/Settings.svelte`), default
+**Discard mode.** A client pref (`ClientPrefs.discardMode`, `lib/ui/client-prefs.ts`, edited in `lib/ui/Settings.svelte`), default
 `'two-step'`, persisted the same way as `motion`/`soundEnabled` (§6 Persistence):
 
 | Mode | Desktop and touch |
@@ -857,7 +857,7 @@ own 0 tab, the faan it actually scores.
 
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
 fixed at table construction. A seat ring with one tap-to-cycle difficulty pill per bot seat
-(seats 1-3, matching `mock-game-state.ts`'s `relativeSeat` offsets — the position names are
+(seats 1-3, matching `wind.ts`'s `relativeSeat` offsets — the position names are
 aria-labels only, no visible captions; seat 0 is the
 human, shown as bold "You" text) around the same `CompassFelt` centerpiece as the pre-game
 rings and `/tables` cards,
@@ -903,6 +903,18 @@ generic table title regardless of which scenario is selected.
 one render tree (`TileFace`/`ClaimButtons`/`TimerRing`/`FaanBreakdown`/`ScoreSheet`/…) and can't
 visually drift. Mock tiles are bare `TileCode`s; `LiveTableView.ownHand` carries the real
 `tile_id`s index-aligned with `concealedHand`/`drawn`, so a clicked tile maps to a real intent.
+
+Types and shared constants live apart from the components and the fixture:
+
+| Module | Holds |
+| --- | --- |
+| `lib/game/types.ts` | domain types (`Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`/`ClaimOption`, `FaanPattern`, `WinningMeld`, `Payments`) and the score-sheet shapes (`HandRecord`, `RoundResult`, `SeatInfo`, `Totals`, `Standing`). Hand-written: the wire types seats as `number` and meld/claim kinds as `string`, so `protocol.d.ts` has nothing narrower to derive from |
+| `lib/table/view-types.ts` | the view model (`MockGameState`, `MockSeatState`, `MockMeld`, …, plus `OwnHandTile`/`DeclareOption`); the `Mock` prefix predates the live path |
+| `lib/table/mock-game-state.ts` | the frozen `MOCK_SCENARIOS` fixtures only |
+| `lib/ui/client-prefs.ts` | `ClientPrefs`/`AutoArm` and their field types (`settings-storage.ts` holds the defaults) |
+| `lib/net/practice-difficulty.ts` | `PRACTICE_DIFFICULTIES` (cycle order) and `PracticeDifficulty`, free of `lobby.ts`'s `$env` import |
+| `lib/table/tile-code.ts`, `meld-face.ts` | `sortTiles`/`tileSortKey` (reading order), `sortMelds`, `MELD_SEAL_GLYPH` |
+| `lib/table/pregame-preview.ts` | `?pregame=` values, shared by `/table/[id]` and `/demo` |
 
 **Join flow.** No auto-join: a live table shows a seat picker that sends `join{seat, name?}` for
 the clicked seat. Sitting down implies readiness — `ready` fires right behind a successful join.
@@ -1106,8 +1118,8 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | deltas | `--color-positive`, `--color-negative` | score/faan gains and losses only |
 | seats | `--color-seat-right/across/left` | opponent seat hues (self uses brass) |
 | status | `--color-status-error`, `--color-rank-gold/silver/bronze` | error states; game-end podium |
-| shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
-| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
+| shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--radius-pill`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
+| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--dur-control` 130ms (control hover/press/selected colour), `--dur-spin` 900ms (loading spinner turn), `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
 | layers | `--z-table/tiles/hud/overlay/modal/toast` | modal dialogs are in the top layer, which no z-index reaches; toasts move into the open dialog instead (§5 Toasts) |
 
 ### Contrast audit

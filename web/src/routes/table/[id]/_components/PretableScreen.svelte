@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ConnectionStatus } from '$lib/game/state';
-	import type { Seat } from '$lib/table/mock-game-state';
+	import type { Seat } from '$lib/game/types';
 	import { seatWind, windWord } from '$lib/table/wind';
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import SeatRing from '$lib/table/SeatRing.svelte';
@@ -271,7 +271,7 @@
 		border-radius: 50%;
 		border: 3px solid var(--color-border);
 		border-top-color: var(--color-accent);
-		animation: pretable-spin 900ms linear infinite;
+		animation: pretable-spin var(--dur-spin) linear infinite;
 	}
 
 	@keyframes pretable-spin {

@@ -10,9 +10,9 @@
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 	import { MOCK_SCENARIOS } from '$lib/table/mock-game-state';
+	import { PREGAME_PREVIEWS } from '$lib/table/pregame-preview';
 	import AnimationDemoPanel from './_components/AnimationDemoPanel.svelte';
 
-	const PREGAME_PREVIEWS = ['connecting', 'join', 'waiting'];
 	let showAnimationDemo = $state(false);
 </script>
 

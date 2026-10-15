@@ -1,5 +1,6 @@
 <script lang="ts">
-	import ClaimButtons, { type ClaimOption } from '$lib/ui/ClaimButtons.svelte';
+	import ClaimButtons from '$lib/ui/ClaimButtons.svelte';
+	import type { ClaimOption } from '$lib/game/types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	// mock props only, no claim_offer wiring. Two chow options on the same discarded 6s

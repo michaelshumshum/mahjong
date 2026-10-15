@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { page } from 'vitest/browser';
 import { render, cleanupAll } from './test-render';
 import OpponentRegion from './OpponentRegion.svelte';
-import type { MockSeatState } from './mock-game-state';
+import type { MockSeatState } from './view-types';
 
 function mockSeat(overrides: Partial<MockSeatState> = {}): MockSeatState {
 	return {

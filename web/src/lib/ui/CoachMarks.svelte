@@ -3,7 +3,7 @@
 </script>
 
 <script lang="ts">
-	import type { DiscardMode } from './Settings.svelte';
+	import type { DiscardMode } from './client-prefs';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {

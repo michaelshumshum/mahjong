@@ -4,7 +4,8 @@
 	import SeatPlate from './SeatPlate.svelte';
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
-	import type { MockSeatState, Seat } from './mock-game-state';
+	import type { Seat } from '$lib/game/types';
+	import type { MockSeatState } from './view-types';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 

@@ -1,12 +1,8 @@
 <script lang="ts">
 	// Auto-shown once a real `game_end` lands -- unlike the per-hand hold overlay, not
 	// dismissable back into play. Final standings first, then the full ScoreSheet.
-	import ScoreSheet, {
-		type HandRecord,
-		type SeatInfo,
-		type Standing,
-		type Totals
-	} from './ScoreSheet.svelte';
+	import ScoreSheet from './ScoreSheet.svelte';
+	import type { HandRecord, SeatInfo, Standing, Totals } from '$lib/game/types';
 	import { placements, rankLabel, RANK_TONE } from './rank';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -207,7 +203,7 @@
 	.final-rank {
 		justify-self: start;
 		padding: 2px var(--space-2);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--rank-tone);
 		color: var(--color-tile-ink);
 		font-size: var(--font-size-sm);
@@ -230,7 +226,7 @@
 		flex: none;
 		padding: 1px var(--space-2);
 		border: 1px solid var(--color-border);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		color: var(--color-text-muted);
 		font-size: var(--font-size-xs);
 		font-weight: 600;

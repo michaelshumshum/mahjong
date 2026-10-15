@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/public';
+import type { PracticeDifficulty } from './practice-difficulty';
 import type { RuleSet } from './ruleset';
 
 // hand-written: GET/POST /tables are plain HTTP, outside the WS protocol make proto generates.
@@ -77,13 +78,9 @@ export interface CreateTableRequest {
 	rules?: RuleSet;
 	practice?: boolean;
 	// practice mode's per-seat difficulty picker: seat 1..3 -> a bot tier (seat 0 is the human
-	// seat, never included). Server-side: app/main.py's CreateTableRequest.bot_tiers.
+	// seat, never included). Server-side: app/api_models.py's CreateTableRequest.bot_tiers.
 	bot_tiers?: Record<number, string>;
 }
-
-// the four real, selectable practice difficulties -- T0/RandomBot is never one (docs/bots.md
-// §2/§6). Keep in sync with server/app/main.py's _PRACTICE_BOT_TIERS.
-export type PracticeDifficulty = 'easy' | 'normal' | 'expert' | 'impossible';
 
 export const PRACTICE_DIFFICULTY_TO_TIER: Record<PracticeDifficulty, string> = {
 	easy: 'T1',
@@ -91,13 +88,6 @@ export const PRACTICE_DIFFICULTY_TO_TIER: Record<PracticeDifficulty, string> = {
 	expert: 'T4',
 	impossible: 'ORACLE'
 };
-
-export const PRACTICE_DIFFICULTY_OPTIONS: { value: PracticeDifficulty; label: string }[] = [
-	{ value: 'easy', label: 'Easy' },
-	{ value: 'normal', label: 'Normal' },
-	{ value: 'expert', label: 'Expert' },
-	{ value: 'impossible', label: 'Impossible' }
-];
 
 export interface CreateTableResponse {
 	table_id: string;

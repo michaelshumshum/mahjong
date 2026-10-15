@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
 	import type { TileCode } from '../table/tile-code';
-	import type { ClaimOption } from './ClaimButtons.svelte';
+	import type { ClaimOption } from '$lib/game/types';
 	import { claimOptionAriaLabel, claimOptionKey, claimOptionLabel } from './claim-option';
 	import DialogTimer from './DialogTimer.svelte';
 	import { m } from '$lib/paraglide/messages.js';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
 	import { tileName } from './tile-name';
-	import type { MockSeatState } from './mock-game-state';
+	import type { MockSeatState } from './view-types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	// tablet-up: all four pools box the centre hub, `position` picking the side and rotation;

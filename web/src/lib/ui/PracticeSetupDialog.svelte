@@ -1,15 +1,12 @@
 <script lang="ts">
 	import ModalDialog from './ModalDialog.svelte';
-	import {
-		createTable,
-		PRACTICE_DIFFICULTY_TO_TIER,
-		type PracticeDifficulty
-	} from '$lib/net/lobby';
+	import { createTable, PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/lobby';
+	import { PRACTICE_DIFFICULTIES, type PracticeDifficulty } from '$lib/net/practice-difficulty';
 	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import PracticeDifficultySlot from './PracticeDifficultySlot.svelte';
 	import CompassFelt from '$lib/table/CompassFelt.svelte';
-	import { loadPracticeSetup, savePracticeSetup } from './settings-storage';
+	import { loadPracticeSetup, savePracticeSetup, type PracticeSetup } from './settings-storage';
 
 	let { onCreated, onCancel }: { onCreated: (tableId: string) => void; onCancel: () => void } =
 		$props();
@@ -24,15 +21,15 @@
 		}
 	];
 
-	const DIFFICULTY_CYCLE: PracticeDifficulty[] = ['easy', 'normal', 'expert', 'impossible'];
-
 	function nextDifficulty(current: PracticeDifficulty): PracticeDifficulty {
-		return DIFFICULTY_CYCLE[(DIFFICULTY_CYCLE.indexOf(current) + 1) % DIFFICULTY_CYCLE.length];
+		return PRACTICE_DIFFICULTIES[
+			(PRACTICE_DIFFICULTIES.indexOf(current) + 1) % PRACTICE_DIFFICULTIES.length
+		];
 	}
 
 	// seats 1-3 only -- seat 0 is the human's own seat, never configured here. Offsets from your
-	// own seat, clockwise, matching mock-game-state.ts's relativeSeat: 1 right, 2 across, 3 left.
-	let difficulty = $state<Record<1 | 2 | 3, PracticeDifficulty>>(
+	// own seat, clockwise, matching wind.ts's relativeSeat: 1 right, 2 across, 3 left.
+	let difficulty = $state<PracticeSetup>(
 		loadPracticeSetup() ?? { 1: 'normal', 2: 'normal', 3: 'normal' }
 	);
 	let submitting = $state(false);

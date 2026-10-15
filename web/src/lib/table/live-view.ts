@@ -4,21 +4,23 @@
 import type { ClientGameState, MeldState } from '../game/state';
 import { tileIdToCode, type TileCode } from './tile-code';
 import type {
-	FaanPatternMock,
+	ClaimOption,
+	FaanPattern,
 	HandOutcome,
 	MeldKind,
-	MockClaimOption,
+	Phase,
+	Seat,
+	Wind,
+	WinType
+} from '$lib/game/types';
+import type {
 	MockClaimWindow,
 	MockGameState,
 	MockHandResult,
 	MockMeld,
 	MockSeatState,
-	Phase,
-	Seat,
-	Seats,
-	Wind,
-	WinType
-} from './mock-game-state';
+	Seats
+} from './view-types';
 
 export interface LiveOwnHand {
 	/** tile_ids for `view.seats[you].concealedHand`, same order, same length. */
@@ -66,10 +68,10 @@ export function meldToView(m: MeldState): MockMeld {
 	};
 }
 
-function claimOptionToView(o: Record<string, unknown>): MockClaimOption {
+function claimOptionToView(o: Record<string, unknown>): ClaimOption {
 	const tiles = o.tiles as number[] | undefined;
 	return {
-		kind: o.kind as MockClaimOption['kind'],
+		kind: o.kind as ClaimOption['kind'],
 		tiles: tiles ? tiles.map(tileIdToCode) : undefined
 	};
 }
@@ -124,7 +126,10 @@ function handResultToView(state: ClientGameState): MockHandResult | null {
 		winType: d.winType !== null ? (d.winType as WinType) : undefined,
 		winningHand: d.winningHand ? d.winningHand.map(tileIdToCode) : undefined,
 		patterns: d.faanBreakdown
-			? Object.entries(d.faanBreakdown).map(([name, faan]): FaanPatternMock => ({ name, faan }))
+			? Object.entries(d.faanBreakdown).map(([name, faan]): FaanPattern => ({
+					name,
+					faan
+				}))
 			: undefined,
 		totalFaan: d.faan ?? undefined,
 		payments: (d.payments ?? undefined) as MockHandResult['payments'],

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Seat } from './mock-game-state';
+	import type { Seat } from '$lib/game/types';
 	import { seatWind, WIND_CHAR } from './wind';
 	import CompassFelt from './CompassFelt.svelte';
 	import SeatRingSlot from './SeatRingSlot.svelte';

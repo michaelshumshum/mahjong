@@ -1,52 +1,8 @@
 <script lang="ts">
-	import WinningHand, { type FaanPattern, type WinningMeld } from './WinningHand.svelte';
-	import type { TileCode } from '../table/tile-code';
+	import WinningHand from './WinningHand.svelte';
+	import type { HandRecord, Seat, SeatInfo, Standing, Totals, Wind } from '$lib/game/types';
 	import { placements, rankLabel, RANK_TONE } from './rank';
 	import { m } from '$lib/paraglide/messages.js';
-
-	export type Seat = 0 | 1 | 2 | 3;
-	export type Wind = 'E' | 'S' | 'W' | 'N';
-
-	// mirrors hand_end.payments (docs/protocol.md §3): per-seat point delta for one hand.
-	export type Payments = Partial<Record<Seat, number>>;
-
-	export interface SeatInfo {
-		seat: Seat;
-		name: string;
-	}
-
-	// mirrors score.totals: authoritative running total per seat, last received from the server.
-	// Kept as its own prop rather than derived only from `hands` -- see `historyComplete`.
-	export type Totals = Record<Seat, number>;
-
-	// mirrors hand_end.payments for one already-finished hand. Sparse: a seat with nothing to
-	// pay or collect has no entry rather than an explicit 0.
-	export interface HandRecord {
-		handNo: number;
-		dealer: Seat;
-		prevailing: Wind;
-		deltas: Partial<Record<Seat, number>>;
-		/** Optional per-round detail -- present, this round's row becomes expandable, revealing
-		 * the winning hand or a plain draw note inline via `WinningHand`. */
-		result?: RoundResult;
-	}
-
-	export interface RoundResult {
-		outcome: 'win' | 'exhaustive_draw';
-		winner?: Seat;
-		winningHand?: TileCode[];
-		melds?: WinningMeld[];
-		patterns?: FaanPattern[];
-		totalFaan?: number;
-		payments?: Payments;
-	}
-
-	// `game_end` only ever carries {hand_no, scores} -- absolute totals, no ranking baked in.
-	// `standings` (ranked order, index 0 = 1st) is left for a caller to fill in when it has one.
-	export interface Standing {
-		seat: Seat;
-		total: number;
-	}
 
 	function windLabel(wind: Wind): string {
 		switch (wind) {
@@ -394,9 +350,9 @@
 		font-weight: 700;
 		cursor: pointer;
 		transition:
-			background-color 130ms ease,
-			border-color 130ms ease,
-			color 130ms ease;
+			background-color var(--dur-control) ease,
+			border-color var(--dur-control) ease,
+			color var(--dur-control) ease;
 
 		&:hover {
 			border-color: var(--color-accent);
@@ -466,7 +422,7 @@
 		border-radius: var(--radius-md);
 		background: var(--color-surface);
 		font-variant-numeric: tabular-nums;
-		transition: background-color 130ms ease;
+		transition: background-color var(--dur-control) ease;
 
 		&:hover {
 			background: rgb(255 255 255 / 0.03);

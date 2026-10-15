@@ -1,23 +1,9 @@
 <script lang="ts">
 	import TileFace from '../table/TileFace.svelte';
-	import { meldTileFace } from '../table/meld-face';
-	import type { TileCode } from '../table/tile-code';
+	import { meldTileFace, sortMelds } from '../table/meld-face';
+	import { sortTiles, type TileCode } from '../table/tile-code';
+	import type { FaanPattern, WinningMeld } from '$lib/game/types';
 	import { m } from '$lib/paraglide/messages.js';
-
-	export type Seat = 0 | 1 | 2 | 3;
-
-	// mirrors melds.MeldKind, minus PAIR -- kept local since this only needs kind/tiles.
-	export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong';
-
-	export interface WinningMeld {
-		kind: MeldKind;
-		tiles: TileCode[];
-	}
-
-	export interface FaanPattern {
-		name: string;
-		faan: number;
-	}
 
 	let {
 		winningHand,
@@ -31,22 +17,7 @@
 		totalFaan: number;
 	} = $props();
 
-	// reading order within a suit (docs/rules.md §1's index layout: m, p, s, then honors).
-	const SUIT_ORDER: Record<string, number> = { m: 0, p: 1, s: 2 };
-	function tileSortKey(code: TileCode): number {
-		return code[0] === 'z'
-			? 30 + Number(code[1])
-			: (SUIT_ORDER[code[1]] ?? 9) * 9 + Number(code[0]);
-	}
-	function sortTiles(tiles: TileCode[]): TileCode[] {
-		return tiles.slice().sort((a, b) => tileSortKey(a) - tileSortKey(b));
-	}
-
-	let sortedMelds = $derived(
-		melds
-			.map((meld) => ({ ...meld, tiles: sortTiles(meld.tiles) }))
-			.sort((a, b) => tileSortKey(a.tiles[0]) - tileSortKey(b.tiles[0]))
-	);
+	let sortedMelds = $derived(sortMelds(melds));
 	let sortedConcealedHand = $derived(sortTiles(winningHand));
 
 	let patternSum = $derived(patterns.reduce((sum, p) => sum + p.faan, 0));

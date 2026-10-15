@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PracticeDifficulty } from '$lib/net/lobby';
+	import type { PracticeDifficulty } from '$lib/net/practice-difficulty';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -41,7 +41,7 @@
 	.seat-ring-slot {
 		padding: var(--space-1) var(--space-3);
 		border: 1px solid var(--color-border);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: none;
 		color: var(--color-text);
 		font: inherit;

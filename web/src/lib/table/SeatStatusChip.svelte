@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { MockSeatState } from './mock-game-state';
+	import type { MockSeatState } from './view-types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let { status }: { status: MockSeatState['status'] } = $props();

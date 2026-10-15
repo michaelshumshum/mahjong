@@ -6,11 +6,12 @@
 	import SeatPlate from './SeatPlate.svelte';
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
-	import type { MockSeatState, Seat } from './mock-game-state';
+	import type { Seat } from '$lib/game/types';
+	import type { DeclareOption, MockSeatState, OwnHandTile } from './view-types';
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
 	import TileOptionLabel from '$lib/ui/TileOptionLabel.svelte';
-	import type { DiscardMode } from '$lib/ui/Settings.svelte';
+	import type { DiscardMode } from '$lib/ui/client-prefs';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { motionMs } from '$lib/ui/motion';
 	import { m } from '$lib/paraglide/messages.js';
@@ -21,23 +22,6 @@
 	// how long a sent discard waits for the server echo before a stalled indicator (§5) --
 	// cosmetic, resolved by the normal reconnect/resync path, never a client-side guess.
 	const PENDING_STALL_MS = 3000;
-
-	interface OwnHandTile {
-		key: string;
-		code: TileCode;
-		tileId: number | null;
-		drawn: boolean;
-	}
-
-	interface DeclareOption {
-		key: string;
-		label: string;
-		tiles?: TileCode[];
-		onClick: () => void;
-		// a self-drawn win: the one declare option worth making unmissable (P1.10) -- kongs stay
-		// secondary buttons alongside it, never competing for the eye.
-		hero?: boolean;
-	}
 
 	let {
 		seat,

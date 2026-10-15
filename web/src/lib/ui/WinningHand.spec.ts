@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import WinningHand from './WinningHand.svelte';
-import type { FaanPattern, WinningMeld } from './WinningHand.svelte';
+import type { FaanPattern, WinningMeld } from '$lib/game/types';
 
 describe('WinningHand', () => {
 	const patterns: FaanPattern[] = [

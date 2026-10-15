@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasTileArt, TILE_ASSET, tileIdToCode, type TileCode } from './tile-code';
+import { hasTileArt, sortTiles, TILE_ASSET, tileIdToCode, type TileCode } from './tile-code';
 
 const ALL_TILE_CODES: TileCode[] = [
 	...Array.from({ length: 9 }, (_, i) => `${i + 1}m` as TileCode),
@@ -74,5 +74,13 @@ describe('tileIdToCode', () => {
 		expect(tileIdToCode(HONOR_START + 4)).toBe('z2');
 		expect(tileIdToCode(HONOR_START + 27)).toBe('z7');
 		expect(tileIdToCode(135)).toBe('z7');
+	});
+});
+
+describe('sortTiles', () => {
+	it('sorts m, p, s by rank, then honors, without mutating the input', () => {
+		const tiles: TileCode[] = ['z1', '3s', '9m', '1p', '1m', 'z5'];
+		expect(sortTiles(tiles)).toEqual(['1m', '9m', '1p', '3s', 'z1', 'z5']);
+		expect(tiles[0]).toBe('z1');
 	});
 });

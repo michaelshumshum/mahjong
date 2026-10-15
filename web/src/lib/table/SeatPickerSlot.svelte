@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Seat } from './mock-game-state';
+	import type { Seat } from '$lib/game/types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -66,7 +66,7 @@
 	.seat-ring-slot--open {
 		padding: var(--space-1) var(--space-3);
 		border: 1px dashed var(--color-accent);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		cursor: pointer;
 
 		&:hover {

@@ -3,7 +3,7 @@ import { flushSync } from 'svelte';
 import { userEvent } from 'vitest/browser';
 import { cleanupAll, render } from '$lib/table/test-render';
 import Settings from './Settings.svelte';
-import type { AutoArm, ClientPrefs } from './Settings.svelte';
+import type { AutoArm, ClientPrefs } from './client-prefs';
 import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from './settings-storage';
 
 function mountSettings(autoArm: AutoArm, prefs: ClientPrefs) {

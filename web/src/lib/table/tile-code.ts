@@ -81,3 +81,15 @@ export function tileIdToCode(tileId: number): TileCode {
 	}
 	return `z${value - 26}` as TileCode;
 }
+
+// reading order: suits in tile_id index order (docs/rules.md §1: m, p, s), then honors.
+const SUIT_ORDER: Record<string, number> = Object.fromEntries(ID_SUITS.map((suit, i) => [suit, i]));
+
+export function tileSortKey(code: TileCode): number {
+	return code[0] === 'z' ? 30 + Number(code[1]) : (SUIT_ORDER[code[1]] ?? 9) * 9 + Number(code[0]);
+}
+
+/** A sorted copy -- tiles arrive in claim/draw order, not reading order. */
+export function sortTiles(tiles: TileCode[]): TileCode[] {
+	return tiles.slice().sort((a, b) => tileSortKey(a) - tileSortKey(b));
+}

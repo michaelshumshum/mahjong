@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TimerRing from '$lib/ui/TimerRing.svelte';
-	import { relativeSeat, type Seat } from './mock-game-state';
+	import type { Seat } from '$lib/game/types';
+	import { relativeSeat } from './wind';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 

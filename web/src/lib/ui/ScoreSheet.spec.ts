@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import ScoreSheet from './ScoreSheet.svelte';
-import type { HandRecord, SeatInfo, Standing, Totals } from './ScoreSheet.svelte';
+import type { HandRecord, SeatInfo, Standing, Totals } from '$lib/game/types';
 
 describe('ScoreSheet', () => {
 	const seats: SeatInfo[] = [

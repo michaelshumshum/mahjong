@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import Settings from './Settings.svelte';
-import type { AutoArm, ClientPrefs } from './Settings.svelte';
+import type { AutoArm, ClientPrefs } from './client-prefs';
 
 // Toggle firing is covered end-to-end (routes/page.e2e.ts) -- this file covers that rendered
 // checked/unchecked state matches the given props.

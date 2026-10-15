@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import ClaimButtons from './ClaimButtons.svelte';
-import type { ClaimOption } from './ClaimButtons.svelte';
+import type { ClaimOption } from '$lib/game/types';
 
 // `onChoose` firing on click is covered end-to-end (routes/page.e2e.ts) -- svelte/server only
 // renders markup here. This file covers button count, labels, and chow disambiguation.

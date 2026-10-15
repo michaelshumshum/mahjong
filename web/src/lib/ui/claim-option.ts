@@ -1,4 +1,4 @@
-import type { ClaimKind, ClaimOption } from './ClaimButtons.svelte';
+import type { ClaimKind, ClaimOption } from '$lib/game/types';
 import { tileOptionAriaLabel } from '$lib/table/tile-name';
 import { m } from '$lib/paraglide/messages.js';
 

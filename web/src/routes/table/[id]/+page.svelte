@@ -4,13 +4,20 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import TileFace from '$lib/table/TileFace.svelte';
-	import {
-		MOCK_SCENARIOS,
-		relativeSeat,
-		type MeldKind,
-		type MockSeatState,
-		type Seat
-	} from '$lib/table/mock-game-state';
+	import type {
+		ClaimOption,
+		HandRecord,
+		RoundResult,
+		Seat,
+		SeatInfo,
+		Standing,
+		Totals
+	} from '$lib/game/types';
+	import type { DeclareOption, MockSeatState, OwnHandTile } from '$lib/table/view-types';
+	import { relativeSeat } from '$lib/table/wind';
+	import { MOCK_SCENARIOS } from '$lib/table/mock-game-state';
+	import { MELD_SEAL_GLYPH } from '$lib/table/meld-face';
+	import { PREGAME_PREVIEWS, type PregamePreview } from '$lib/table/pregame-preview';
 	import { tileIdToCode } from '$lib/table/tile-code';
 	import { moveTile, reconcileHandOrder } from '$lib/table/hand-order';
 	import { meldToView, viewFromClientState, wireWindToCode } from '$lib/table/live-view';
@@ -19,18 +26,12 @@
 	import type { ClientGameState, ConnectionStatus, HandHistoryEntry } from '$lib/game/state';
 	import type { ServerEvent } from '$lib/net/protocol';
 	import ClaimDialog from '$lib/ui/ClaimDialog.svelte';
-	import type { ClaimOption } from '$lib/ui/ClaimButtons.svelte';
-	import ScoreSheet, {
-		type HandRecord,
-		type RoundResult,
-		type SeatInfo,
-		type Standing,
-		type Totals
-	} from '$lib/ui/ScoreSheet.svelte';
+	import ScoreSheet from '$lib/ui/ScoreSheet.svelte';
 	import GameEndScreen from '$lib/ui/GameEndScreen.svelte';
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import CoachMarks, { type CoachTarget } from '$lib/ui/CoachMarks.svelte';
-	import Settings, { type AutoArm, type ClientPrefs } from '$lib/ui/Settings.svelte';
+	import Settings from '$lib/ui/Settings.svelte';
+	import type { AutoArm, ClientPrefs } from '$lib/ui/client-prefs';
 	import { applyMotionPref, isMotionReduced } from '$lib/ui/motion';
 	import { applyTileSize } from '$lib/ui/tile-size';
 	import { vibrate } from '$lib/ui/haptics';
@@ -68,7 +69,6 @@
 	import { shareOrCopy } from '$lib/ui/share-invite';
 	import { createTable, PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/lobby';
 	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
-	import type { TileCode } from '$lib/table/tile-code';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
 	import CenterHub from '$lib/table/CenterHub.svelte';
@@ -95,8 +95,6 @@
 
 	// `?pregame=connecting|join|waiting` freezes on one live pre-game state with no real socket --
 	// a MOCK_SCENARIOS fixture (always fully-seated) has no room for these, so it's a mode of its own.
-	const PREGAME_PREVIEWS = ['connecting', 'join', 'waiting'] as const;
-	type PregamePreview = (typeof PREGAME_PREVIEWS)[number];
 	let pregamePreview = $derived.by((): PregamePreview | null => {
 		const raw = page.url.searchParams.get('pregame');
 		return (PREGAME_PREVIEWS as readonly string[]).includes(raw ?? '')
@@ -355,14 +353,6 @@
 		isMock ? (gameState.minFaan ?? 3) : (liveStore?.state.ruleset?.min_faan ?? null)
 	);
 
-	// --- your hand: real discard/declare interactivity (live only) -------------------------
-	interface OwnHandTile {
-		key: string;
-		code: TileCode;
-		tileId: number | null;
-		drawn: boolean;
-	}
-
 	// manual hand order (ClientPrefs.handOrder): local presentation only, reconciled against the
 	// live hand on every change so held tiles keep their place and new ones join at the right.
 	let manualOrder = $state<number[]>([]);
@@ -426,14 +416,6 @@
 	function discardTile(tileId: number | null): void {
 		if (isMock || !liveStore || tileId === null) return;
 		liveStore.socket.discard(tileId);
-	}
-
-	interface DeclareOption {
-		key: string;
-		label: string;
-		tiles?: TileCode[];
-		onClick: () => void;
-		hero?: boolean;
 	}
 
 	// legal_actions' own kind tags are the longer declare_*/claim_* forms; the wire declare{kind}
@@ -514,13 +496,6 @@
 
 	// P3.1(d) claim seal stamp: a transient signal off a seat's own meld count growing, never
 	// set under reduced motion. Keyed on `scenarioId`/`handNo` so a scenario/hand change resets.
-	const MELD_SEAL_GLYPH: Record<MeldKind, string> = {
-		chow: '上',
-		pung: '碰',
-		exposed_kong: '槓',
-		concealed_kong: '槓',
-		added_kong: '槓'
-	};
 	let sealStamp = $state<{ seat: number; glyph: string; key: number } | null>(null);
 	let sealPrevMeldCounts: number[] = [0, 0, 0, 0];
 	let sealPrevHandKey: string | null = null;

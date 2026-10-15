@@ -1,4 +1,4 @@
-import type { TileSize } from './Settings.svelte';
+import type { TileSize } from './client-prefs';
 
 /** Mirrors the tile size setting onto `html[data-tile-size]`, which `app.scss` turns into
  * `--tile-scale`. */

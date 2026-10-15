@@ -3,10 +3,11 @@
 	// opacity-only transition contract work end to end. No JS ticker -- `ontransitionend` commits the change.
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import TileFace from '$lib/table/TileFace.svelte';
-	import { meldTileFace } from '$lib/table/meld-face';
+	import { MELD_SEAL_GLYPH, meldTileFace } from '$lib/table/meld-face';
 	import SeatPlate from '$lib/table/SeatPlate.svelte';
 	import SealStamp from '$lib/table/SealStamp.svelte';
-	import type { MeldKind, MockMeld } from '$lib/table/mock-game-state';
+	import type { MeldKind } from '$lib/game/types';
+	import type { MockMeld } from '$lib/table/view-types';
 	import type { TileCode } from '$lib/table/tile-code';
 	import {
 		initialSlotState,
@@ -119,18 +120,11 @@
 
 	// SealStamp and SeatPlate's scoreDelta are transient signals -- previewed here on real
 	// instances since the frozen mock scenarios never produce the transition that triggers them.
-	const SEAL_GLYPH: Record<MeldKind, string> = {
-		chow: '上',
-		pung: '碰',
-		exposed_kong: '槓',
-		concealed_kong: '槓',
-		added_kong: '槓'
-	};
 	let demoSealSeq = 0;
 	let demoSealStamp: { glyph: string; key: number } | null = $state(null);
 	function triggerDemoSeal(kind: MeldKind): void {
 		demoSealSeq += 1;
-		demoSealStamp = { glyph: SEAL_GLYPH[kind], key: demoSealSeq };
+		demoSealStamp = { glyph: MELD_SEAL_GLYPH[kind], key: demoSealSeq };
 	}
 
 	let demoScoreDeltaSeq = 0;

@@ -1,10 +1,6 @@
 <script lang="ts">
-	import ScoreSheet, {
-		type HandRecord,
-		type SeatInfo,
-		type Standing,
-		type Totals
-	} from '$lib/ui/ScoreSheet.svelte';
+	import ScoreSheet from '$lib/ui/ScoreSheet.svelte';
+	import type { HandRecord, SeatInfo, Standing, Totals } from '$lib/game/types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	// mock score/game_end data. EAST_ONLY (一圈) means a full game is one round, so 4 hands here

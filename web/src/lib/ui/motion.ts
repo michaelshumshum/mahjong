@@ -1,4 +1,4 @@
-import type { MotionPref } from './Settings.svelte';
+import type { MotionPref } from './client-prefs';
 
 /** Mirrors the "Reduce motion" setting onto `html[data-motion]`, which `_a11y.scss`'s
  * `motion-ok`/`motion-reduced` mixins read. */

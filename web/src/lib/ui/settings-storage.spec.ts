@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AutoArm, ClientPrefs } from './Settings.svelte';
+import type { AutoArm, ClientPrefs } from './client-prefs';
 import {
 	AUTO_ARM_STORAGE_KEY,
 	CLIENT_PREFS_STORAGE_KEY,

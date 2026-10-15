@@ -1,17 +1,8 @@
 <script lang="ts">
-	import type { TileCode } from '../table/tile-code';
+	import type { ClaimOption } from '$lib/game/types';
 	import { claimOptionAriaLabel, claimOptionKey, claimOptionLabel } from './claim-option';
 	import TileOptionLabel from './TileOptionLabel.svelte';
 	import { m } from '$lib/paraglide/messages.js';
-
-	export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
-
-	// mirrors the wire claim{window_id, choice, tiles?} shape; `tiles` only disambiguates chow.
-	// no `window_id` here -- pure presentation, wiring to a real window is the caller's job.
-	export interface ClaimOption {
-		kind: ClaimKind;
-		tiles?: TileCode[];
-	}
 
 	let { options, onChoose }: { options: ClaimOption[]; onChoose: (option: ClaimOption) => void } =
 		$props();
