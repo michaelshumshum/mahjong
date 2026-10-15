@@ -47,6 +47,11 @@ class Wind(IntEnum):
     NORTH = 3
 
 
+def validate_seat(seat: int) -> None:
+    if not 0 <= seat < 4:
+        raise ValueError(f"seat must be 0..3, got {seat}")
+
+
 class ClaimKind(StrEnum):
     """What opened the live claim window: a discard, or an added-kong declaration opening a
     robbing-the-kong window (搶槓) — same machinery, different trigger."""
@@ -67,8 +72,7 @@ class ClaimOffer:
     melds: tuple[Meld, ...] = ()
 
     def __post_init__(self) -> None:
-        if not 0 <= self.seat < 4:
-            raise ValueError(f"seat must be 0..3, got {self.seat}")
+        validate_seat(self.seat)
         if not self.can_win and not self.melds:
             raise ValueError("a claim offer must include at least a win or a meld option")
 

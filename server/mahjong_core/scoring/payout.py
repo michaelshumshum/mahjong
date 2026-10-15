@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from mahjong_core.config import DiscardPayment, RuleSet, ScoreTable
+from mahjong_core.state import validate_seat
 
 _MAX_FAAN = 13  # config.py's _VALID_FAAN_CAP tops out at 13
 
@@ -52,11 +53,6 @@ def _round_half_up(numerator: int, denominator: int) -> int:
     return (2 * numerator + denominator) // (2 * denominator)
 
 
-def _check_seat(seat: int) -> None:
-    if not 0 <= seat < 4:
-        raise ValueError(f"seat must be 0..3, got {seat}")
-
-
 def payout(
     winner_seat: int,
     points: int,
@@ -71,8 +67,8 @@ def payout(
     `points()`. Dealer advantage in this ruleset is entirely `dealer_repeat_on_win`/
     `dealer_repeat_on_draw` (flow, not points).
     """
-    _check_seat(winner_seat)
-    _check_seat(dealer_seat)
+    validate_seat(winner_seat)
+    validate_seat(dealer_seat)
     if points < 0:
         raise ValueError(f"points must be >= 0, got {points}")
 
@@ -87,7 +83,7 @@ def payout(
         return deltas
 
     discarder_seat = win_type.discarder_seat
-    _check_seat(discarder_seat)
+    validate_seat(discarder_seat)
     if discarder_seat == winner_seat:
         raise ValueError("discarder cannot be the winner")
 

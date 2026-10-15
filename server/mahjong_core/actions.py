@@ -18,7 +18,7 @@ from typing import Any, Literal
 from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_melds
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
-from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
+from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState, validate_seat
 from mahjong_core.tiles import N_TILE_TYPES, ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
 
 
@@ -35,11 +35,6 @@ class ActionKind(StrEnum):
     DECLARE_CONCEALED_KONG = "declare_concealed_kong"
     DECLARE_ADDED_KONG = "declare_added_kong"
     DECLARE_WIN = "declare_win"
-
-
-def _validate_seat(seat: int) -> None:
-    if not 0 <= seat < 4:
-        raise ValueError(f"seat must be 0..3, got {seat}")
 
 
 @dataclass(frozen=True)
@@ -61,7 +56,7 @@ class ClaimChow:
     kind: Literal[ActionKind.CLAIM_CHOW] = ActionKind.CLAIM_CHOW
 
     def __post_init__(self) -> None:
-        _validate_seat(self.seat)
+        validate_seat(self.seat)
         if self.meld.kind != MeldKind.CHOW:
             raise ValueError(f"ClaimChow needs a chow meld, got {self.meld.kind}")
 
@@ -74,7 +69,7 @@ class ClaimPung:
     kind: Literal[ActionKind.CLAIM_PUNG] = ActionKind.CLAIM_PUNG
 
     def __post_init__(self) -> None:
-        _validate_seat(self.seat)
+        validate_seat(self.seat)
         if self.meld.kind != MeldKind.PUNG:
             raise ValueError(f"ClaimPung needs a pung meld, got {self.meld.kind}")
 
@@ -91,7 +86,7 @@ class ClaimKong:
     kind: Literal[ActionKind.CLAIM_KONG] = ActionKind.CLAIM_KONG
 
     def __post_init__(self) -> None:
-        _validate_seat(self.seat)
+        validate_seat(self.seat)
         if self.meld.kind != MeldKind.EXPOSED_KONG:
             raise ValueError(f"ClaimKong needs an exposed_kong meld, got {self.meld.kind}")
 
@@ -106,7 +101,7 @@ class ClaimWin:
     kind: Literal[ActionKind.CLAIM_WIN] = ActionKind.CLAIM_WIN
 
     def __post_init__(self) -> None:
-        _validate_seat(self.seat)
+        validate_seat(self.seat)
 
 
 @dataclass(frozen=True)
@@ -119,7 +114,7 @@ class Pass:
     kind: Literal[ActionKind.PASS] = ActionKind.PASS
 
     def __post_init__(self) -> None:
-        _validate_seat(self.seat)
+        validate_seat(self.seat)
 
 
 @dataclass(frozen=True)
@@ -259,7 +254,7 @@ def can_declare_win(state: GameState, seat: int) -> bool:
 def legal_actions(state: GameState, seat: int) -> tuple[Action, ...]:
     """Every action `seat` may legally take right now. Returns `()` for a seat not currently
     expected to decide anything (see module docstring)."""
-    _validate_seat(seat)
+    validate_seat(seat)
 
     if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
         return _claim_actions(state.claim_window, seat)
