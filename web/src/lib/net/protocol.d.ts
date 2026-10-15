@@ -1,6 +1,8 @@
 // GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.
 // Source of truth: server/app/protocol.py (docs/protocol.md §6).
 
+export type BotTier = 'T0' | 'T1' | 'T2' | 'T4' | 'ORACLE';
+
 export interface Envelope {
 	v: 1;
 	seq?: number | null;
@@ -229,7 +231,7 @@ export interface StateSyncPayload {
 	hand_history?: HandHistoryEntryPayload[];
 	ruleset_preset?: string | null;
 	ruleset?: Record<string, unknown>;
-	bot_levels?: (string | null)[];
+	bot_levels?: (BotTier | null)[];
 	seed_commit?: string | null;
 }
 

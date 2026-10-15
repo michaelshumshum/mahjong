@@ -1,18 +1,12 @@
 <script lang="ts">
+	import { TIER_LABEL } from '$lib/net/practice-difficulty';
+	import type { BotTier } from '$lib/net/protocol';
 	import { m } from '$lib/paraglide/messages.js';
 
-	let { level = null }: { level?: string | null } = $props();
+	let { level = null }: { level?: BotTier | null } = $props();
 
-	// level word alone (the chip reads as a bot); mirrors lobby.ts's PRACTICE_DIFFICULTY_TO_TIER,
-	// not imported since lobby.ts pulls in $env/dynamic/public. unknown tier -> plain "Bot".
-	const LEVEL_LABEL: Record<string, () => string> = {
-		T1: m.practiceDifficultySlot_easyLabel,
-		T2: m.practiceDifficultySlot_normalLabel,
-		T4: m.practiceDifficultySlot_expertLabel,
-		ORACLE: m.practiceDifficultySlot_impossibleLabel
-	};
-
-	const levelLabel = $derived(level ? LEVEL_LABEL[level]?.() : undefined);
+	// level word alone (the chip reads as a bot). unknown tier -> plain "Bot".
+	const levelLabel = $derived(level ? TIER_LABEL[level]?.() : undefined);
 </script>
 
 <span

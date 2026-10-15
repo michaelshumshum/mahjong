@@ -14,6 +14,7 @@ import type {
 	Wind,
 	WinType
 } from '$lib/game/types';
+import type { BotTier } from '$lib/net/protocol';
 import type { TileCode } from './tile-code';
 
 export interface MockMeld {
@@ -38,7 +39,7 @@ export interface MockSeatState {
 	// wire seat_status -- optional since no mock fixture sets it (no bot concept in mocks);
 	// live-view.ts populates it from ClientGameState.seatStatus.
 	status?: string;
-	botLevel?: string | null;
+	botLevel?: BotTier | null;
 }
 
 export type Seats = [MockSeatState, MockSeatState, MockSeatState, MockSeatState];

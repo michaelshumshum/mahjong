@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PracticeDifficulty } from '$lib/net/practice-difficulty';
+	import { DIFFICULTY_LABEL, type PracticeDifficulty } from '$lib/net/practice-difficulty';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -13,13 +13,6 @@
 		difficulty: PracticeDifficulty;
 		onCycle: () => void;
 	} = $props();
-
-	const DIFFICULTY_LABEL: Record<PracticeDifficulty, () => string> = {
-		easy: m.practiceDifficultySlot_easyLabel,
-		normal: m.practiceDifficultySlot_normalLabel,
-		expert: m.practiceDifficultySlot_expertLabel,
-		impossible: m.practiceDifficultySlot_impossibleLabel
-	};
 </script>
 
 <button

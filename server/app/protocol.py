@@ -13,6 +13,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from bots.tiers import BotTier
+
 
 class Envelope(BaseModel):
     """Common frame fields. `t` and `d` are added by each concrete subclass."""
@@ -245,8 +247,8 @@ class StateSyncPayload(BaseModel):
     # ruleset; ruleset is always the full resolved values either way.
     ruleset_preset: str | None = None
     ruleset: dict[str, Any] = {}
-    # per-seat bot tier (`bots.tiers.BOT_TIERS`), `null` for a non-`bot` seat
-    bot_levels: list[str | None] = []
+    # per-seat bot tier, `null` for a non-`bot` seat
+    bot_levels: list[BotTier | None] = []
     # provable_fairness only, omitted otherwise: the current hand's hand_start.seed_commit
     seed_commit: str | None = None
 

@@ -673,8 +673,10 @@ server trims/caps/defaults it, so the client doesn't validate. `ClientGameState.
 seat's *resolved* name back: set from `state_sync.names`, kept live from `seat_state.name`. Bot
 seats get a random per-table-unique display name (`server/app/table.py`'s `_draw_bot_name`, from
 `_BOT_NAME_POOL`) — cosmetic, not the tier. The tier is `state_sync.bot_levels` →
-`ClientGameState.botLevels`, shown by `BotBadge.svelte` as the level word alone ("Expert"; plain
-"Bot" for an unknown tier) on opponents, and on the bottom seat too while spectating.
+`ClientGameState.botLevels` (typed by the generated `BotTier`), shown by `BotBadge.svelte` as the
+level word alone (`practice-difficulty.ts`'s `TIER_LABEL`, derived from
+`PRACTICE_DIFFICULTY_TO_TIER`; "Expert", plain "Bot" for an unknown tier) on opponents, and on
+the bottom seat too while spectating.
 
 ### Last-discard marker
 
@@ -912,7 +914,7 @@ Types and shared constants live apart from the components and the fixture:
 | `lib/table/view-types.ts` | the view model (`MockGameState`, `MockSeatState`, `MockMeld`, …, plus `OwnHandTile`/`DeclareOption`); the `Mock` prefix predates the live path |
 | `lib/table/mock-game-state.ts` | the frozen `MOCK_SCENARIOS` fixtures only |
 | `lib/ui/client-prefs.ts` | `ClientPrefs`/`AutoArm` and their field types (`settings-storage.ts` holds the defaults) |
-| `lib/net/practice-difficulty.ts` | `PRACTICE_DIFFICULTIES` (cycle order) and `PracticeDifficulty`, free of `lobby.ts`'s `$env` import |
+| `lib/net/practice-difficulty.ts` | `PRACTICE_DIFFICULTIES` (cycle order), `PracticeDifficulty`, the difficulty → `BotTier` map and both label maps; free of `lobby.ts`'s `$env` import |
 | `lib/table/tile-code.ts`, `meld-face.ts` | `sortTiles`/`tileSortKey` (reading order), `sortMelds`, `MELD_SEAL_GLYPH` |
 | `lib/table/pregame-preview.ts` | `?pregame=` values, shared by `/table/[id]` and `/demo` |
 

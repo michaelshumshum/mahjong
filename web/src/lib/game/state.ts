@@ -1,6 +1,7 @@
 // plain data, no runes -- store.svelte.ts wraps this in `$state`, so reducer.spec.ts can test
 // transitions with no Svelte compile step. Field names camelCase the wire; protocol.d.ts stays snake_case.
 
+import type { BotTier } from '$lib/net/protocol';
 import type { RuleSet } from '$lib/net/ruleset';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'resyncing' | 'closed';
@@ -80,7 +81,7 @@ export interface ClientGameState {
 	/** Each seat's resolved guest display name; `null` for an `empty` seat. */
 	names: (string | null)[];
 	/** Each `bot` seat's tier (`T1`/`T2`/`T4`/`ORACLE`); `null` for every other seat. */
-	botLevels: (string | null)[];
+	botLevels: (BotTier | null)[];
 	/** Whichever seat's `join` was this table's first. Never changes for the life of the table. */
 	hostSeat: number | null;
 	/** This table's ruleset, fixed at construction; `null` until the first `state_sync` lands.

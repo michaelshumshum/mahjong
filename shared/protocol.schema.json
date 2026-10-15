@@ -182,6 +182,17 @@
       "title": "AutoPayload",
       "type": "object"
     },
+    "BotTier": {
+      "enum": [
+        "T0",
+        "T1",
+        "T2",
+        "T4",
+        "ORACLE"
+      ],
+      "title": "BotTier",
+      "type": "string"
+    },
     "Claim": {
       "additionalProperties": false,
       "properties": {
@@ -2765,7 +2776,7 @@
           "items": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/$defs/BotTier"
               },
               {
                 "type": "null"

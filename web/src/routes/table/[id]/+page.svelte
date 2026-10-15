@@ -67,7 +67,8 @@
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
 	import { serverErrorToastMessage } from '$lib/net/server-error-messages';
 	import { shareOrCopy } from '$lib/ui/share-invite';
-	import { createTable, PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/lobby';
+	import { createTable } from '$lib/net/lobby';
+	import { PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/practice-difficulty';
 	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
 	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
 	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';

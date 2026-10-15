@@ -1,7 +1,11 @@
 <script lang="ts">
 	import ModalDialog from './ModalDialog.svelte';
-	import { createTable, PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/lobby';
-	import { PRACTICE_DIFFICULTIES, type PracticeDifficulty } from '$lib/net/practice-difficulty';
+	import { createTable } from '$lib/net/lobby';
+	import {
+		PRACTICE_DIFFICULTIES,
+		PRACTICE_DIFFICULTY_TO_TIER,
+		type PracticeDifficulty
+	} from '$lib/net/practice-difficulty';
 	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import PracticeDifficultySlot from './PracticeDifficultySlot.svelte';

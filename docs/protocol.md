@@ -151,7 +151,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `seat_status` | `connected\|disconnected\|autoplay\|bot\|empty` per seat. `empty` = nobody has joined that seat yet |
 | `names` | each seat's resolved display name; `null` for an `empty` seat, a real string for any bound seat, human or bot |
 | `host_seat` | the first seat to `join`, or `null` |
-| `bot_levels` | each `bot` seat's tier (`T1`\|`T2`\|`T4`\|`ORACLE`, [bots.md §6](bots.md)), `null` for every other seat, `autoplay` included. Fixed for the table's life (bot seats are bound at construction). Defaults to `[]` |
+| `bot_levels` | each `bot` seat's tier (`BotTier`: `T0`\|`T1`\|`T2`\|`T4`\|`ORACLE`, [bots.md §6](bots.md)), `null` for every other seat, `autoplay` included. Fixed for the table's life (bot seats are bound at construction). Defaults to `[]` |
 | `hands` | every seat's concealed tiles for an open-hands spectator, `null` otherwise |
 | `hand_history` | every completed hand, oldest first: `hand_end`'s fields plus `dealer`/`prevailing`/`winner_melds`. Lets a client with no earlier live stream (mid-game spectator, resync) render past hands. Defaults to `[]` |
 | `ruleset` / `ruleset_preset` | the table's fixed `RuleSet.to_dict()` and matching preset id (or `null`) |
@@ -307,6 +307,9 @@ one guarantee this pipeline exists for — TypeScript flagging an unhandled even
 - `shared/protocol.schema.json` is still emitted (`TypeAdapter(AnyMessage).json_schema()`) as an
   informational artifact; nothing generates TS from it.
 
+A `StrEnum` field type (`BotTier`) is emitted once as a named string-literal union
+(`export type BotTier = 'T0' | …`), not inlined.
+
 `make proto` regenerates both; the `proto-check` CI job fails if the committed output is stale
 ([infra.md §9](infra.md)). §10's HTTP payloads are typed by hand, not generated.
 
@@ -427,8 +430,9 @@ POST /tables
   `mahjong_core.presets.resolve_ruleset` and fall back to `hk_classic` on bad input.
 - `bot_tiers` is practice mode's per-seat difficulty ([bots.md §6](bots.md)): seat keys `1`-`3`
   only (seat `0` is the human), values `T1`/`T2`/`T4`/`ORACLE` (`_PRACTICE_BOT_TIERS`; `T0` is
-  never selectable). A plain string field, not in `shared/protocol.schema.json`: adding a tier
-  needs no `make proto`. An out-of-range seat or unknown tier is dropped and that seat falls back to
+  never selectable). The HTTP field itself is a plain string, but `bots/tiers.py`'s `BotTier`
+  also types `state_sync.bot_levels`, so adding a tier needs `make proto` (it regenerates
+  `protocol.d.ts`'s `BotTier` union, which `lobby.ts` types this field with). An out-of-range seat or unknown tier is dropped and that seat falls back to
   `DEFAULT_BOT_TIER` (`T2`). Ignored when `practice` is false.
 - A table created via `POST /tables` and one auto-created by a direct WS connect behave
   identically; whichever happens first for an id sticks.

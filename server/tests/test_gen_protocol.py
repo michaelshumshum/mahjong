@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from app.protocol import AnyMessage, ClientMessage, ServerMessage
+from bots.tiers import BotTier
 from tools.gen_protocol import (
     _union_members,
     render_assert_never_fixture,
@@ -78,3 +79,11 @@ def test_assert_never_fixture_covers_every_server_event() -> None:
         assert f"case '{t_value}':" in fixture
     assert "assertNever(e)" in fixture
     assert fixture.count("case '") == len(server_members)
+
+
+def test_str_enum_field_emits_one_named_union() -> None:
+    ts = render_ts(**_kwargs())
+    union = " | ".join(f"'{t.value}'" for t in BotTier)
+    assert ts.count("export type BotTier =") == 1
+    assert f"export type BotTier = {union};" in ts
+    assert ts_type(list[BotTier | None]) == "(BotTier | null)[]"

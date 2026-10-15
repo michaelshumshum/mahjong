@@ -3,6 +3,7 @@ import { page } from 'vitest/browser';
 import { render, cleanupAll } from './test-render';
 import OpponentRegion from './OpponentRegion.svelte';
 import type { MockSeatState } from './view-types';
+import type { BotTier } from '$lib/net/protocol';
 
 function mockSeat(overrides: Partial<MockSeatState> = {}): MockSeatState {
 	return {
@@ -78,7 +79,7 @@ describe('OpponentRegion', () => {
 
 	it('falls back to a plain bot badge for an unknown level', () => {
 		const { target } = render(OpponentRegion, {
-			seat: mockSeat({ status: 'bot', botLevel: 'T9' }),
+			seat: mockSeat({ status: 'bot', botLevel: 'T9' as BotTier }),
 			position: 'across',
 			dealer: 0,
 			turn: 0

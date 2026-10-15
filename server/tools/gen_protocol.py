@@ -15,6 +15,7 @@ import argparse
 import json
 import types
 import typing
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,18 @@ def _nested_models(annotation: Any) -> list[type[BaseModel]]:
     return []
 
 
+def _nested_enums(annotation: Any) -> list[type[StrEnum]]:
+    """Every StrEnum reachable from a field annotation, emitted once as a named TS union."""
+    origin = typing.get_origin(annotation)
+    if origin is typing.Literal:
+        return []
+    if origin is not None:
+        return [e for a in typing.get_args(annotation) for e in _nested_enums(a)]
+    if isinstance(annotation, type) and issubclass(annotation, StrEnum):
+        return [annotation]
+    return []
+
+
 def _collect_models(roots: list[type[BaseModel]]) -> list[type[BaseModel]]:
     """BFS from `roots` over field types, so any future nested payload model
     is picked up automatically without touching this generator."""
@@ -120,6 +133,8 @@ def ts_type(annotation: Any) -> str:
         return "null"
     if annotation is Any:
         return "unknown"
+    if isinstance(annotation, type) and issubclass(annotation, StrEnum):
+        return annotation.__name__
     if annotation is str:
         return "string"
     if annotation in (int, float):
@@ -172,6 +187,15 @@ def render_ts(*, client_message: Any, server_message: Any, any_message: Any) -> 
 
     message_names = {m.__name__ for m in any_members}
     parts = [_GENERATED_HEADER.rstrip("\n")]
+
+    enums = {
+        e.__name__: e
+        for cls in all_models
+        for field in cls.model_fields.values()
+        for e in _nested_enums(field.annotation)
+    }
+    for name, enum in sorted(enums.items()):
+        parts.append(f"export type {name} = {' | '.join(_literal_ts(m.value) for m in enum)};")
 
     for cls in all_models:
         extends = Envelope if cls.__name__ in message_names and cls is not Envelope else None
