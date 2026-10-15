@@ -901,7 +901,7 @@ Mahjong". Mock scenarios are frozen snapshots, not live turn state, so they alwa
 generic table title regardless of which scenario is selected.
 
 **One view model, two sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a real
-`ClientGameState` into the same `MockGameState` shape the template renders, so mock and live share
+`ClientGameState` into the same `TableView` shape the template renders, so mock and live share
 one render tree (`TileFace`/`ClaimButtons`/`TimerRing`/`FaanBreakdown`/`ScoreSheet`/…) and can't
 visually drift. Mock tiles are bare `TileCode`s; `LiveTableView.ownHand` carries the real
 `tile_id`s index-aligned with `concealedHand`/`drawn`, so a clicked tile maps to a real intent.
@@ -911,7 +911,7 @@ Types and shared constants live apart from the components and the fixture:
 | Module | Holds |
 | --- | --- |
 | `lib/game/types.ts` | domain types (`Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`/`ClaimOption`, `FaanPattern`, `WinningMeld`, `Payments`) and the score-sheet shapes (`HandRecord`, `RoundResult`, `SeatInfo`, `Totals`, `Standing`). Hand-written: the wire types seats as `number` and meld/claim kinds as `string`, so `protocol.d.ts` has nothing narrower to derive from |
-| `lib/table/view-types.ts` | the view model (`MockGameState`, `MockSeatState`, `MockMeld`, …, plus `OwnHandTile`/`DeclareOption`); the `Mock` prefix predates the live path |
+| `lib/table/view-types.ts` | the view model (`TableView`, `SeatView`, `MeldView`, …, plus `OwnHandTile`/`DeclareOption`) |
 | `lib/table/mock-game-state.ts` | the frozen `MOCK_SCENARIOS` fixtures only |
 | `lib/ui/client-prefs.ts` | `ClientPrefs`/`AutoArm` and their field types (`settings-storage.ts` holds the defaults) |
 | `lib/net/practice-difficulty.ts` | `PRACTICE_DIFFICULTIES` (cycle order), `PracticeDifficulty`, the difficulty → `BotTier` map and both label maps; free of `lobby.ts`'s `$env` import |
@@ -1002,7 +1002,7 @@ seat switches to autoplay until you reconnect"); otherwise it navigates straight
 
 ### Bot seat badge and status chips
 
-`MockSeatState.status` (populated from `ClientGameState.seatStatus` by `viewFromClientState`, never
+`SeatView.status` (populated from `ClientGameState.seatStatus` by `viewFromClientState`, never
 set by mocks) drives a `.bot-badge` chip ("Bot") next to the dealer badge when `status === 'bot'` —
 a quiet bordered chip, not `--color-accent`, since a bot seat doesn't change mid-hand.
 `disconnected`/`autoplay` get their own `.status-chip--away`/`.status-chip--autoplay` chips
@@ -1063,7 +1063,7 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
   game-end screen (`liveRoundResult`, converting `winnerMelds`/`winningHand` tile ids to
   `TileCode`s as `live-view.ts` does).
 - Mock: `mock-game-state.ts`'s `gameJustEnded` (`?mock=game-ended`) is a frozen `GAME_OVER`
-  snapshot carrying `MockGameState.gameEnd`; `+page.svelte`'s `gameEndReached`/`scoreHands`/
+  snapshot carrying `TableView.gameEnd`; `+page.svelte`'s `gameEndReached`/`scoreHands`/
   `scoreStandings` branch on `isMock` rather than forking the render path.
 
 ## 8. Assets and styling

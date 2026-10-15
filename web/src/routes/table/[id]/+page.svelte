@@ -13,7 +13,7 @@
 		Standing,
 		Totals
 	} from '$lib/game/types';
-	import type { DeclareOption, MockSeatState, OwnHandTile } from '$lib/table/view-types';
+	import type { DeclareOption, SeatView, OwnHandTile } from '$lib/table/view-types';
 	import { relativeSeat } from '$lib/table/wind';
 	import { MOCK_SCENARIOS } from '$lib/table/mock-game-state';
 	import { MELD_SEAL_GLYPH } from '$lib/table/meld-face';
@@ -339,7 +339,7 @@
 
 	$effect(() => () => cancelCopiedReset?.());
 
-	function seatAt(position: 0 | 1 | 2 | 3): MockSeatState {
+	function seatAt(position: 0 | 1 | 2 | 3): SeatView {
 		return gameState.seats.find((s) => relativeSeat(s.seat, gameState.you) === position)!;
 	}
 

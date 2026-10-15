@@ -7,7 +7,7 @@
 	import SeatPlate from '$lib/table/SeatPlate.svelte';
 	import SealStamp from '$lib/table/SealStamp.svelte';
 	import type { MeldKind } from '$lib/game/types';
-	import type { MockMeld } from '$lib/table/view-types';
+	import type { MeldView } from '$lib/table/view-types';
 	import type { TileCode } from '$lib/table/tile-code';
 	import {
 		initialSlotState,
@@ -31,7 +31,7 @@
 
 	let demoOpponentSlots: SlotState = $state(initialSlotState(13));
 	let demoOpponentDiscards: TileCode[] = $state([]);
-	let demoOpponentMelds: MockMeld[] = $state([]);
+	let demoOpponentMelds: MeldView[] = $state([]);
 	let leavingOpponentSlotKey: number | null = $state(null);
 	let leavingOpponentTile: TileCode | null = $state(null);
 

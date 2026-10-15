@@ -1,5 +1,5 @@
 // table view model, single-seat redacted; rendered from both MOCK_SCENARIOS and the live store
-// (live-view.ts) so they share one render tree. the `Mock` prefix predates the live path.
+// (live-view.ts) so they share one render tree.
 
 import type { FairnessState } from '$lib/game/state';
 import type {
@@ -17,7 +17,7 @@ import type {
 import type { BotTier } from '$lib/net/protocol';
 import type { TileCode } from './tile-code';
 
-export interface MockMeld {
+export interface MeldView {
 	kind: MeldKind;
 	// real tile identities always; a concealed_kong shows its end tiles as backs (meld-face.ts).
 	tiles: TileCode[];
@@ -26,13 +26,13 @@ export interface MockMeld {
 
 // mirrors state.SeatState, redacted: `concealedHand` is only populated for the "you" seat;
 // every other seat gets `concealedCount` only.
-export interface MockSeatState {
+export interface SeatView {
 	seat: Seat;
 	name: string;
 	concealedCount: number;
 	concealedHand?: TileCode[]; // the "you" seat, or every seat for an open-hands spectator
 	drawn?: TileCode | null; // held-apart 14th tile; "you" seat only, real events redact this too
-	melds: MockMeld[];
+	melds: MeldView[];
 	discards: TileCode[];
 	flowers: TileCode[];
 	score: number;
@@ -42,11 +42,11 @@ export interface MockSeatState {
 	botLevel?: BotTier | null;
 }
 
-export type Seats = [MockSeatState, MockSeatState, MockSeatState, MockSeatState];
+export type Seats = [SeatView, SeatView, SeatView, SeatView];
 
 // mirrors state.ClaimWindow, redacted to this seat's own offer only. `null` (not an empty
 // array) means "not offered".
-export interface MockClaimWindow {
+export interface ClaimWindowView {
 	windowId: number;
 	kind: 'discard' | 'kong_rob';
 	sourceSeat: Seat;
@@ -57,7 +57,7 @@ export interface MockClaimWindow {
 
 // mirrors state.HandResult plus FaanBreakdown.svelte's payments shape -- only populated for
 // outcome 'win'; exhaustive_draw carries no winner/patterns/payments.
-export interface MockHandResult {
+export interface HandResultView {
 	outcome: HandOutcome;
 	winner?: Seat;
 	winType?: WinType;
@@ -69,36 +69,36 @@ export interface MockHandResult {
 }
 
 // mirrors types.ts's `RoundResult`, kept as a separate parallel type since its melds keep
-// MockMeld's `fromSeat`.
-export interface MockRoundResult {
+// MeldView's `fromSeat`.
+export interface RoundResultView {
 	outcome: HandOutcome;
 	winner?: Seat;
 	winningHand?: TileCode[];
-	melds?: MockMeld[];
+	melds?: MeldView[];
 	patterns?: FaanPattern[];
 	totalFaan?: number;
 	payments?: Payments;
 }
 
 // mirrors types.ts's `HandRecord`, minus the seat-name resolution ScoreSheet does itself.
-export interface MockScoreRound {
+export interface ScoreRoundView {
 	handNo: number;
 	dealer: Seat;
 	prevailing: Wind;
 	deltas: Payments;
-	result?: MockRoundResult;
+	result?: RoundResultView;
 }
 
 // a completed game's full history + final ranking -- present only on the one scenario that's
 // actually reached `game_end`.
-export interface MockGameEndSummary {
-	rounds: MockScoreRound[];
+export interface GameEndSummaryView {
+	rounds: ScoreRoundView[];
 	standings: Standing[];
 }
 
 // mirrors state.GameState, redacted to one seat's point of view. `you` is always 0 in the
 // mock scenarios but kept as a field since the real per-seat stream will vary it.
-export interface MockGameState {
+export interface TableView {
 	phase: Phase;
 	turn: Seat;
 	dealer: Seat;
@@ -106,8 +106,8 @@ export interface MockGameState {
 	handNo: number;
 	wallCount: number;
 	seats: Seats;
-	claimWindow: MockClaimWindow | null;
-	handResult: MockHandResult | null;
+	claimWindow: ClaimWindowView | null;
+	handResult: HandResultView | null;
 	// hand-end hold's remaining time; `null` when `handResult` is (no hold to show).
 	handEndHoldMs: number | null;
 	// the acting seat's AWAIT_ACTION deadline (any seat); `null` outside AWAIT_ACTION.
@@ -115,7 +115,7 @@ export interface MockGameState {
 	you: Seat;
 	/** Set only on the one scenario that's actually reached `game_end` -- lets `GameEndScreen`
 	 * be reachable/screenshot-able with no backend running. */
-	gameEnd?: MockGameEndSummary;
+	gameEnd?: GameEndSummaryView;
 	/** Most recent unclaimed discard, by its index in that seat's own `discards` array -- the
 	 * pool marker (CenterDiscardPool). `undefined`/`null` in every static mock scenario. */
 	lastDiscard?: { seat: Seat; index: number } | null;

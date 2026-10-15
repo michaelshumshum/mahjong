@@ -3,9 +3,9 @@ import { page, userEvent } from 'vitest/browser';
 import { flushSync } from 'svelte';
 import { render, cleanupAll } from './test-render';
 import YourSeatRegion from './YourSeatRegion.svelte';
-import type { MockSeatState } from './view-types';
+import type { SeatView } from './view-types';
 
-function mockSeat(overrides: Partial<MockSeatState> = {}): MockSeatState {
+function mockSeat(overrides: Partial<SeatView> = {}): SeatView {
 	return {
 		seat: 0,
 		name: 'You',

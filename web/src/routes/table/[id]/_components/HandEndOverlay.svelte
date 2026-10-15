@@ -4,7 +4,7 @@
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import FairnessBadge from '$lib/ui/FairnessBadge.svelte';
-	import type { MockHandResult, MockMeld } from '$lib/table/view-types';
+	import type { HandResultView, MeldView } from '$lib/table/view-types';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -15,11 +15,11 @@
 		winnerMelds,
 		onDismiss
 	}: {
-		handResult: MockHandResult;
+		handResult: HandResultView;
 		handNo: number;
 		handEndHoldMs: number | null;
 		seatNames: Record<0 | 1 | 2 | 3, string>;
-		winnerMelds: MockMeld[];
+		winnerMelds: MeldView[];
 		onDismiss: () => void;
 	} = $props();
 

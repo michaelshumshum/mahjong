@@ -2,10 +2,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { page } from 'vitest/browser';
 import { render, cleanupAll } from './test-render';
 import OpponentRegion from './OpponentRegion.svelte';
-import type { MockSeatState } from './view-types';
+import type { SeatView } from './view-types';
 import type { BotTier } from '$lib/net/protocol';
 
-function mockSeat(overrides: Partial<MockSeatState> = {}): MockSeatState {
+function mockSeat(overrides: Partial<SeatView> = {}): SeatView {
 	return {
 		seat: 1,
 		name: 'Bob',

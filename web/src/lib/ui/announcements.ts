@@ -1,5 +1,5 @@
 import type { MeldKind } from '$lib/game/types';
-import type { MockGameState } from '$lib/table/view-types';
+import type { TableView } from '$lib/table/view-types';
 import type { TileCode } from '$lib/table/tile-code';
 import { tileName } from '$lib/table/tile-name';
 import { m } from '$lib/paraglide/messages.js';
@@ -25,7 +25,7 @@ export interface AnnounceSnapshot {
 
 // a spectator has no "you": every seat is announced by name.
 export function announceSnapshot(
-	state: MockGameState,
+	state: TableView,
 	handKey: string,
 	yourTurn: boolean,
 	spectating: boolean

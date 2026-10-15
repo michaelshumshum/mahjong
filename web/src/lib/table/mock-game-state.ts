@@ -1,12 +1,12 @@
-// frozen MockGameState fixtures (e2e + screenshots depend on them): pre-redacted for a single
+// frozen TableView fixtures (e2e + screenshots depend on them): pre-redacted for a single
 // seat's view. Opponent hands are plain counts; TileCodes only where the wire would reveal them.
 
 import type { Seat } from '$lib/game/types';
-import type { MockGameState, MockSeatState } from './view-types';
+import type { TableView, SeatView } from './view-types';
 
 const SEAT_NAMES = ['You', 'Bob', 'Carol', 'Dave'];
 
-function emptySeat(seat: Seat, overrides: Partial<MockSeatState> = {}): MockSeatState {
+function emptySeat(seat: Seat, overrides: Partial<SeatView> = {}): SeatView {
 	return {
 		seat,
 		name: SEAT_NAMES[seat],
@@ -20,7 +20,7 @@ function emptySeat(seat: Seat, overrides: Partial<MockSeatState> = {}): MockSeat
 }
 
 // Scenario 1: your turn to discard, holding a drawn tile. No claim window, no hand result.
-export const yourTurnToDiscard: MockGameState = {
+export const yourTurnToDiscard: TableView = {
 	phase: 'AWAIT_ACTION',
 	turn: 0,
 	dealer: 0,
@@ -67,7 +67,7 @@ export const yourTurnToDiscard: MockGameState = {
 
 // Scenario 2: seat 1 just discarded a tile you (seat 0) can pung or win on. Turn still shows
 // the last actor (seat 1) since it doesn't advance until the window resolves.
-export const claimWindowOpenForYou: MockGameState = {
+export const claimWindowOpenForYou: TableView = {
 	phase: 'AWAIT_CLAIMS',
 	turn: 1,
 	dealer: 2,
@@ -113,7 +113,7 @@ export const claimWindowOpenForYou: MockGameState = {
 };
 
 // Scenario 3: seat 2 self-drew a Half Flush hand; payments spread across all three other seats.
-export const handJustEnded: MockGameState = {
+export const handJustEnded: TableView = {
 	phase: 'HAND_OVER',
 	turn: 2,
 	dealer: 2,
@@ -167,7 +167,7 @@ export const handJustEnded: MockGameState = {
 
 // Scenario 4: exhaustive draw -- same hold as a win, but no winner/patterns/payments; the
 // overlay falls back to a plain draw summary whenever outcome !== 'win'.
-export const handJustEndedDraw: MockGameState = {
+export const handJustEndedDraw: TableView = {
 	phase: 'HAND_OVER',
 	turn: 3,
 	dealer: 2,
@@ -197,7 +197,7 @@ export const handJustEndedDraw: MockGameState = {
 
 // scenario 5: a full EAST_ONLY game (一圈) just reached game_end -- no hold, since the wire only
 // reaches game_end once the final hand's hold resolves. Four hands (dealer 0->1->2->3) is the minimum.
-export const gameJustEnded: MockGameState = {
+export const gameJustEnded: TableView = {
 	phase: 'GAME_OVER',
 	turn: 3,
 	dealer: 3,
@@ -296,7 +296,7 @@ export const gameJustEnded: MockGameState = {
 
 // Scenario 6: late in a hand -- full discard pools, every opponent heavily melded. Stresses the
 // phone layouts (pool wrapping, meld rows), which the early-hand fixtures never fill.
-export const lateHandCrowded: MockGameState = {
+export const lateHandCrowded: TableView = {
 	...yourTurnToDiscard,
 	handNo: 6,
 	wallCount: 9,
@@ -436,7 +436,7 @@ export const lateHandCrowded: MockGameState = {
 export interface MockScenario {
 	id: string;
 	label: string;
-	state: MockGameState;
+	state: TableView;
 }
 
 export const MOCK_SCENARIOS: MockScenario[] = [

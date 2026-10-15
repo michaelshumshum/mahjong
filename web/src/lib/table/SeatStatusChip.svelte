@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { MockSeatState } from './view-types';
+	import type { SeatView } from './view-types';
 	import { m } from '$lib/paraglide/messages.js';
 
-	let { status }: { status: MockSeatState['status'] } = $props();
+	let { status }: { status: SeatView['status'] } = $props();
 </script>
 
 {#if status === 'disconnected'}<span

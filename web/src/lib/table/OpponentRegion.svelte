@@ -5,7 +5,7 @@
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
 	import type { Seat } from '$lib/game/types';
-	import type { MockSeatState } from './view-types';
+	import type { SeatView } from './view-types';
 	import { seatWind, windWord, WIND_CHAR } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -16,7 +16,7 @@
 		turn,
 		scoreDelta = null
 	}: {
-		seat: MockSeatState;
+		seat: SeatView;
 		position: 'across' | 'left' | 'right';
 		dealer: Seat;
 		turn: number;

@@ -1,4 +1,4 @@
-// projects a real `ClientGameState` into the `MockGameState`-shaped view model so live and mock
+// projects a real `ClientGameState` into the `TableView`-shaped view model so live and mock
 // share one render tree. `LiveTableView.ownHand` carries real tile_ids alongside, index-aligned with the view.
 
 import type { ClientGameState, MeldState } from '../game/state';
@@ -14,11 +14,11 @@ import type {
 	WinType
 } from '$lib/game/types';
 import type {
-	MockClaimWindow,
-	MockGameState,
-	MockHandResult,
-	MockMeld,
-	MockSeatState,
+	ClaimWindowView,
+	TableView,
+	HandResultView,
+	MeldView,
+	SeatView,
 	Seats
 } from './view-types';
 
@@ -30,12 +30,12 @@ export interface LiveOwnHand {
 }
 
 export interface LiveTableView {
-	view: MockGameState;
+	view: TableView;
 	ownHand: LiveOwnHand;
 }
 
 // wire prevailing is the `Wind` enum's *name* (EAST/SOUTH/WEST/NORTH), not the single-letter
-// code MockGameState uses everywhere else.
+// code TableView uses everywhere else.
 const WIRE_WIND_TO_CODE: Record<string, Wind> = { EAST: 'E', SOUTH: 'S', WEST: 'W', NORTH: 'N' };
 
 export function wireWindToCode(wind: string): Wind {
@@ -60,7 +60,7 @@ function splitOwnHand(state: ClientGameState): LiveOwnHand {
 	};
 }
 
-export function meldToView(m: MeldState): MockMeld {
+export function meldToView(m: MeldState): MeldView {
 	return {
 		kind: m.kind as MeldKind,
 		tiles: m.tiles.map(tileIdToCode),
@@ -76,7 +76,7 @@ function claimOptionToView(o: Record<string, unknown>): ClaimOption {
 	};
 }
 
-function claimWindowToView(state: ClientGameState): MockClaimWindow | null {
+function claimWindowToView(state: ClientGameState): ClaimWindowView | null {
 	const offer = state.claimOffer;
 	// a window_id-less offer comes from a state_sync snapshot with no live claim_offer yet --
 	// no real id to claim against, so don't offer buttons; the real claim_offer will carry one.
@@ -117,7 +117,7 @@ function handEndHoldMsFromState(state: ClientGameState): number | null {
 		: null;
 }
 
-function handResultToView(state: ClientGameState): MockHandResult | null {
+function handResultToView(state: ClientGameState): HandResultView | null {
 	const d = state.lastHandEnd;
 	if (!d) return null;
 	return {
@@ -132,7 +132,7 @@ function handResultToView(state: ClientGameState): MockHandResult | null {
 				}))
 			: undefined,
 		totalFaan: d.faan ?? undefined,
-		payments: (d.payments ?? undefined) as MockHandResult['payments'],
+		payments: (d.payments ?? undefined) as HandResultView['payments'],
 		fairness: d.fairness ?? undefined
 	};
 }
@@ -149,7 +149,7 @@ export function viewFromClientState(
 	const concealedCodes = ownHand.concealedIds.map(tileIdToCode);
 	const drawnCode = ownHand.drawnId !== null ? tileIdToCode(ownHand.drawnId) : null;
 
-	const seats = [0, 1, 2, 3].map((seat): MockSeatState => {
+	const seats = [0, 1, 2, 3].map((seat): SeatView => {
 		const isYou = state.seat !== null && seat === you;
 		const openHand = state.hands?.[seat];
 		return {
@@ -174,7 +174,7 @@ export function viewFromClientState(
 		};
 	}) as unknown as Seats;
 
-	const view: MockGameState = {
+	const view: TableView = {
 		phase: state.phase as Phase,
 		turn: state.turn as Seat,
 		dealer: state.dealer as Seat,

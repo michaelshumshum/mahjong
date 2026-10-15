@@ -7,7 +7,7 @@
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
 	import type { Seat } from '$lib/game/types';
-	import type { DeclareOption, MockSeatState, OwnHandTile } from './view-types';
+	import type { DeclareOption, SeatView, OwnHandTile } from './view-types';
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
 	import TileOptionLabel from '$lib/ui/TileOptionLabel.svelte';
@@ -38,7 +38,7 @@
 		declareOptions,
 		scoreDelta = null
 	}: {
-		seat: MockSeatState;
+		seat: SeatView;
 		spectating: boolean;
 		dealer: Seat;
 		turn: number;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Seat } from '$lib/game/types';
 import { MOCK_SCENARIOS } from './mock-game-state';
-import type { MockGameState, MockSeatState } from './view-types';
+import type { TableView, SeatView } from './view-types';
 
 const VALID_PHASES = new Set([
 	'AWAIT_DRAW',
@@ -13,7 +13,7 @@ const VALID_PHASES = new Set([
 	'GAME_OVER'
 ]);
 
-function assertValidSeat(seat: MockSeatState, you: Seat, phase: string): void {
+function assertValidSeat(seat: SeatView, you: Seat, phase: string): void {
 	expect(seat.seat).toBeGreaterThanOrEqual(0);
 	expect(seat.seat).toBeLessThan(4);
 	expect(seat.name).toBeTruthy();
@@ -39,7 +39,7 @@ function assertValidSeat(seat: MockSeatState, you: Seat, phase: string): void {
 	}
 }
 
-function assertValidState(state: MockGameState): void {
+function assertValidState(state: TableView): void {
 	expect(VALID_PHASES.has(state.phase)).toBe(true);
 	expect(state.turn).toBeGreaterThanOrEqual(0);
 	expect(state.turn).toBeLessThan(4);

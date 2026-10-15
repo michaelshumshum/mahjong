@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { page } from 'vitest/browser';
 import { render, cleanupAll } from './test-render';
 import CenterDiscardPool from './CenterDiscardPool.svelte';
-import type { MockSeatState } from './view-types';
+import type { SeatView } from './view-types';
 
-function mockSeat(overrides: Partial<MockSeatState> = {}): MockSeatState {
+function mockSeat(overrides: Partial<SeatView> = {}): SeatView {
 	return {
 		seat: 0,
 		name: 'You',
