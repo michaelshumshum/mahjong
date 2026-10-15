@@ -28,7 +28,7 @@ from mahjong_core.tiles import (
     new_count_array,
     tile_id_type,
 )
-from ml.raw import visible_meld_counts34
+from ml.raw import relative_seats, visible_meld_counts34
 
 __all__ = [
     "MAX_DISCARDS",
@@ -72,12 +72,6 @@ N_TILE_CHANNELS = N_THERMOMETER * (1 + 4 + 4) + 2 * len(_AGE_BUCKETS) + 1 + (4 +
 N_SCALARS = 3 + 4 + 4 + 4 + 1 + 16 + N_RULESET_FEATURES
 
 
-def _relative_seats(seat: int) -> tuple[int, int, int, int]:
-    """(self, next, across, previous) as absolute seat indices, so a view's own encoding always
-    puts itself at relative position 0 regardless of which physical seat it sits in."""
-    return (seat, (seat + 1) % 4, (seat + 2) % 4, (seat + 3) % 4)
-
-
 def _thermometer(counts: list[int]) -> np.ndarray:
     """(N_THERMOMETER, 34): plane k is 1.0 wherever a tile type's count is > k."""
     arr = np.asarray(counts, dtype=np.float32)
@@ -100,7 +94,7 @@ def _one_hot(index: int, size: int) -> np.ndarray:
 @dataclass(frozen=True)
 class EncodedSeatView:
     """Fixed-shape arrays for one `SeatView`; every per-seat axis is in relative-seat order
-    (index 0 = this view's own seat, per `_relative_seats`).
+    (index 0 = this view's own seat, per `ml.raw.relative_seats`).
 
     hand:              (N_THERMOMETER, 34) -- this seat's own concealed+meld tiles. The only
                         seat this view is ever entitled to full tile identities for.
@@ -125,7 +119,7 @@ class EncodedSeatView:
 def encode_seat_view(view: SeatView) -> EncodedSeatView:
     if view.seat is None:
         raise ValueError("encode_seat_view needs a seated view, not a spectator's")
-    order = _relative_seats(view.seat)
+    order = relative_seats(view.seat)
 
     hand = _thermometer(own_hand34(view))
     melds = np.stack([_thermometer(visible_meld_counts34(view, s)) for s in order])

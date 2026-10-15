@@ -22,7 +22,13 @@ from mahjong_core.ml import N_ACTIONS, PASS_ID
 from mahjong_core.tiles import N_TILE_TYPES
 from ml.danger_model import N_FAAN_CLASSES, _Block, _padded_positions
 from ml.encode import N_OPPONENTS, PADDED_WIDTH
-from ml.encode_v2 import N_ORACLE_CHANNELS, N_POLICY_CHANNELS, N_POLICY_SCALARS, POLICY_CHANNELS
+from ml.encode_v2 import (
+    N_ORACLE_CHANNELS,
+    N_POLICY_CHANNELS,
+    N_POLICY_SCALARS,
+    POLICY_CHANNELS,
+    layout_slices,
+)
 
 __all__ = [
     "CLAIM_CHANNEL",
@@ -58,16 +64,8 @@ _AUX_TILE = (
 _AUX_GLOBAL = (("tenpai", N_OPPONENTS), ("win", 1), ("deal_in", 1), ("points", 1))
 
 
-def _slices(layout: tuple[tuple[str, int], ...]) -> dict[str, slice]:
-    out, at = {}, 0
-    for name, n in layout:
-        out[name] = slice(at, at + n)
-        at += n
-    return out
-
-
-_AUX_TILE_SLICES = _slices(_AUX_TILE)
-_AUX_GLOBAL_SLICES = _slices(_AUX_GLOBAL)
+_AUX_TILE_SLICES = layout_slices(_AUX_TILE)
+_AUX_GLOBAL_SLICES = layout_slices(_AUX_GLOBAL)
 
 
 @dataclass(frozen=True)

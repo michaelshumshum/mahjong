@@ -9,7 +9,6 @@ signal handling as `ml.train.train`.
 from __future__ import annotations
 
 import json
-import signal
 import time
 from pathlib import Path
 from typing import Any
@@ -21,6 +20,7 @@ from ml.aux_data import AuxData
 from ml.losses import AuxWeights, aux_loss
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.splits import TRAIN, VAL
+from ml.stop_signal import StopSignal
 from ml.train import TrainConfig, lr_at
 
 __all__ = ["evaluate_aux", "to_tensors", "train_aux"]
@@ -91,22 +91,14 @@ def train_aux(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None =
         )
         tmp.replace(path)
 
-    stop = False
-
-    def request_stop(signum: int, _frame: object) -> None:
-        nonlocal stop
-        print(f"received signal {signum}, saving after this step", flush=True)
-        stop = True
-
-    signal.signal(signal.SIGINT, request_stop)
-    signal.signal(signal.SIGTERM, request_stop)
+    stop = StopSignal("saving after this step")
 
     steps_per_epoch = len(train_rows) // cfg.batch_size
     final = cfg.steps if max_steps is None else min(cfg.steps, max_steps)
     started, running = time.monotonic(), {}
     model.train()
     with (out / "metrics.jsonl").open("a") as metrics:
-        while step < final and not stop:
+        while step < final and not stop.requested:
             epoch, k = divmod(step, steps_per_epoch)
             order = np.random.default_rng([cfg.seed, epoch]).permutation(len(train_rows))
             batch = train_rows[order[k * cfg.batch_size : (k + 1) * cfg.batch_size]]

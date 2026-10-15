@@ -53,7 +53,6 @@ import asyncio
 import concurrent.futures
 import json
 import random
-import signal
 import sys
 import time
 from collections.abc import Callable, Sequence
@@ -75,6 +74,7 @@ from mahjong_core.state import Phase
 from mahjong_core.tiles import N_TILE_TYPES
 from ml.mp import mp_context
 from ml.raw import raw_row, relative_seats
+from ml.stop_signal import StopSignal
 
 __all__ = ["build_parser", "main"]
 
@@ -345,20 +345,12 @@ def main(argv: list[str] | None = None) -> None:
     bot_names = args.bots.split(",")
     _write_manifest(args.out, ruleset, args.ruleset, bot_names)
 
-    stop_flag = False
-
-    def _request_stop(signum: int, _frame: object) -> None:
-        nonlocal stop_flag
-        print(f"received signal {signum}, finishing in-flight work then exiting", flush=True)
-        stop_flag = True
-
-    signal.signal(signal.SIGTERM, _request_stop)
-    signal.signal(signal.SIGINT, _request_stop)
+    stop = StopSignal("finishing in-flight work then exiting")
 
     if args.parallel > 1:
-        _run_parallel(args, ruleset, bot_names, lambda: stop_flag)
+        _run_parallel(args, ruleset, bot_names, lambda: stop.requested)
     else:
-        _run_sequential(args, ruleset, bot_names, lambda: stop_flag)
+        _run_sequential(args, ruleset, bot_names, lambda: stop.requested)
 
 
 if __name__ == "__main__":

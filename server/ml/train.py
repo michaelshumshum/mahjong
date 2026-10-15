@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import signal
 import sys
 import time
 from dataclasses import dataclass, field
@@ -24,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from ml.stop_signal import StopSignal
 
 __all__ = ["ALGORITHMS", "TrainConfig", "build_parser", "load_config", "main", "train"]
 
@@ -153,15 +154,7 @@ def train(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None = Non
         )
         tmp.replace(path)
 
-    stop = False
-
-    def request_stop(signum: int, _frame: object) -> None:
-        nonlocal stop
-        print(f"received signal {signum}, saving after this step", flush=True)
-        stop = True
-
-    signal.signal(signal.SIGINT, request_stop)
-    signal.signal(signal.SIGTERM, request_stop)
+    stop = StopSignal("saving after this step")
 
     n_samples = len(train_rows) * 3
     steps_per_epoch = n_samples // cfg.batch_size
@@ -172,7 +165,7 @@ def train(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None = Non
     started, running = time.monotonic(), {}
     model.train()
 
-    while step < final and not stop:
+    while step < final and not stop.requested:
         epoch, k = divmod(step, steps_per_epoch)
         order = data.epoch_order(len(train_rows), cfg.seed, epoch)
         samples = order[k * cfg.batch_size : (k + 1) * cfg.batch_size]

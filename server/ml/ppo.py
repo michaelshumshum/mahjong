@@ -36,7 +36,6 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 import json
 import math
-import signal
 import time
 import zlib
 from collections.abc import Callable
@@ -78,6 +77,7 @@ from ml.policy_net import (
     masked_entropy,
     masked_log_softmax,
 )
+from ml.stop_signal import StopSignal
 from ml.train_env import (
     FROZEN,
     INFO_FIELDS,
@@ -1122,14 +1122,7 @@ def train_ppo(
         )
         tmp.replace(path)
 
-    stop = False
-
-    def request_stop(signum: int, _frame: object) -> None:
-        nonlocal stop
-        print(f"received signal {signum}, saving after this update", flush=True)
-        stop = True
-
-    previous = {sig: signal.signal(sig, request_stop) for sig in (signal.SIGINT, signal.SIGTERM)}
+    stop = StopSignal("saving after this update")
 
     started = time.monotonic()
     deadline = math.inf if max_minutes is None else started + 60 * max_minutes
@@ -1140,7 +1133,7 @@ def train_ppo(
                 decisions < cfg.total_decisions
                 and updates < final
                 and time.monotonic() < deadline
-                and not stop
+                and not stop.requested
                 and not schedule.complete()
             ):
                 league_record: dict[str, Any] = {}
@@ -1211,8 +1204,7 @@ def train_ppo(
                     save(out / f"ckpt_{snapshot}.pt")
         save()
     finally:
-        for sig, handler in previous.items():
-            signal.signal(sig, handler)
+        stop.restore()
         if isinstance(venv, SubprocVecTrainEnv):
             venv.close()
     return out

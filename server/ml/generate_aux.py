@@ -24,7 +24,6 @@ import asyncio
 import concurrent.futures
 import json
 import random
-import signal
 import sys
 import time
 from collections.abc import Sequence
@@ -47,6 +46,7 @@ from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.generate_dataset import _make_bots, _shuffled_roster
 from ml.mp import mp_context
+from ml.stop_signal import StopSignal
 
 __all__ = [
     "LABEL_FIELDS",
@@ -248,15 +248,7 @@ def main(argv: list[str] | None = None) -> None:
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
-    stop = False
-
-    def request_stop(signum: int, _frame: object) -> None:
-        nonlocal stop
-        print(f"received signal {signum}, finishing in-flight games", flush=True)
-        stop = True
-
-    signal.signal(signal.SIGINT, request_stop)
-    signal.signal(signal.SIGTERM, request_stop)
+    stop = StopSignal("finishing in-flight games")
 
     seeds = iter(range(args.seed_start, args.seed_start + args.games))
     pending: list[dict[str, np.ndarray]] = []
@@ -281,7 +273,7 @@ def main(argv: list[str] | None = None) -> None:
         in_flight: dict[concurrent.futures.Future[dict[str, np.ndarray]], int] = {}
 
         def top_up() -> None:
-            while len(in_flight) < args.parallel and not stop:
+            while len(in_flight) < args.parallel and not stop.requested:
                 seed = next(seeds, None)
                 if seed is None:
                     return

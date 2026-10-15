@@ -50,6 +50,7 @@ __all__ = [
     "encode_oracle_batch",
     "encode_policy",
     "encode_policy_batch",
+    "layout_slices",
     "oracle_raw",
     "policy_raw",
     "policy_raw_from_view",
@@ -104,7 +105,8 @@ _ORACLE_LAYOUT = (
 )
 
 
-def _slices(layout: tuple[tuple[str, int], ...]) -> dict[str, slice]:
+def layout_slices(layout: tuple[tuple[str, int], ...]) -> dict[str, slice]:
+    """`(name, width)` pairs -> each name's contiguous slice, in order."""
     out, at = {}, 0
     for name, n in layout:
         out[name] = slice(at, at + n)
@@ -112,8 +114,8 @@ def _slices(layout: tuple[tuple[str, int], ...]) -> dict[str, slice]:
     return out
 
 
-POLICY_CHANNELS = _slices(_POLICY_LAYOUT)
-ORACLE_CHANNELS = _slices(_ORACLE_LAYOUT)
+POLICY_CHANNELS = layout_slices(_POLICY_LAYOUT)
+ORACLE_CHANNELS = layout_slices(_ORACLE_LAYOUT)
 N_POLICY_CHANNELS = sum(n for _, n in _POLICY_LAYOUT)
 N_ORACLE_CHANNELS = sum(n for _, n in _ORACLE_LAYOUT)
 # concealed(4) turn(4) dealer(4) prevailing(4) seat wind(4) phase(7) wall(1) flowers(4)

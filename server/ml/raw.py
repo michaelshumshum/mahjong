@@ -8,9 +8,8 @@ concealed kongs included, are public (docs/rules.md, docs/protocol.md §3).
 from __future__ import annotations
 
 from app.views import SeatView
-from bots.features import own_hand34
+from bots.features import add_meld, own_hand34
 from bots.labels import discard_counts34
-from mahjong_core.melds import Meld
 from mahjong_core.scoring.patterns import seat_wind_for
 from mahjong_core.tiles import new_count_array, tile_id_type
 
@@ -18,7 +17,8 @@ __all__ = ["concealed_kong_counts", "raw_row", "relative_seats", "visible_meld_c
 
 
 def relative_seats(seat: int) -> tuple[int, int, int, int]:
-    """(self, next, across, previous) as absolute seat indices."""
+    """(self, next, across, previous) as absolute seat indices, so a view's own encoding always
+    puts itself at relative position 0 regardless of which physical seat it sits in."""
     return (seat, (seat + 1) % 4, (seat + 2) % 4, (seat + 3) % 4)
 
 
@@ -27,7 +27,7 @@ def visible_meld_counts34(view: SeatView, seat: int) -> list[int]:
     kong contributes 3 tiles, matching `mahjong_core.shanten`'s convention."""
     counts = new_count_array()
     for meld in view.melds[seat]:
-        _add_meld(counts, meld)
+        add_meld(counts, meld)
     return counts
 
 
@@ -57,9 +57,3 @@ def raw_row(view: SeatView) -> dict[str, object]:
         "seat_wind": int(seat_wind_for(view.seat, view.dealer)),
         "wall_remaining": view.wall_remaining,
     }
-
-
-def _add_meld(counts: list[int], meld: Meld) -> None:
-    tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
-    for t in tiles:
-        counts[int(tile_id_type(t))] += 1
