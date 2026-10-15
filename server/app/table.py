@@ -89,6 +89,7 @@ from typing import Any, Final, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.clock import now_ms
 from app.db.records import save_game_record
 from app.errors import (
     TABLE_CLOSED_ERROR,
@@ -202,10 +203,6 @@ def _shared_bot_pool() -> ProcessPoolExecutor:
     if _default_bot_pool is None:
         _default_bot_pool = ProcessPoolExecutor()
     return _default_bot_pool
-
-
-def _now_ms() -> int:
-    return time.time_ns() // 1_000_000
 
 
 def _turn_draw_tile_for_current_turn(events: list[Event], state: GameState) -> TileId | None:
@@ -1168,7 +1165,7 @@ class Table:
         self.deadlines.add(deadline, timer_id)
         self._turn_timer_seat[timer_id] = seat
         self._active_turn_timer[seat] = timer_id
-        deadline_ts = _now_ms() + round(duration * 1000)
+        deadline_ts = now_ms() + round(duration * 1000)
         self._turn_deadline_ms[seat] = deadline_ts
         return deadline_ts
 
@@ -1404,7 +1401,7 @@ class Table:
             if binding is not None and binding.status in ("bot", "autoplay")
         }
         duration = self.state.ruleset.hand_end_seconds
-        self._hand_end_deadline_ms = _now_ms() + round(duration * 1000)
+        self._hand_end_deadline_ms = now_ms() + round(duration * 1000)
         # an all-bot table rides out the full hold: nobody seated would dismiss it, and it's
         # the spectators' only chance to read the result
         if len(self._hand_end_acked) >= 4 and not self.all_bots:
@@ -1492,7 +1489,7 @@ class Table:
         self._active_seat_timer[(window_id, seat)] = timer_id
         # deadline above is monotonic loop time; the wire needs server epoch ms -- duration
         # converts directly since it's the same elapsed span in both clocks.
-        self._claim_deadline_ms[(window_id, seat)] = _now_ms() + round(duration * 1000)
+        self._claim_deadline_ms[(window_id, seat)] = now_ms() + round(duration * 1000)
 
     def _rearm_seat_claim_timer(self, seat: int) -> bool:
         """If `seat` holds a live, unresolved claim offer, give it a fresh full-length window

@@ -30,7 +30,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-import time
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Executor
 from dataclasses import dataclass
@@ -38,6 +37,7 @@ from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.clock import now_ms
 from app.fairness import new_game_seed
 from app.table import Table
 from app.table_types import TableSettings, WireSeatStatus
@@ -50,10 +50,6 @@ logger = logging.getLogger(__name__)
 
 
 SHOWCASE_RESTART_SECONDS = 30.0
-
-
-def _now_ms() -> int:
-    return time.time_ns() // 1_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,7 +238,7 @@ class TableRegistry:
         self.draining = True
         if self._showcase_task is not None:
             self._showcase_task.cancel()  # also cancels the game task it's awaiting
-        ts = deadline_ts if deadline_ts is not None else _now_ms() + round(grace_seconds * 1000)
+        ts = deadline_ts if deadline_ts is not None else now_ms() + round(grace_seconds * 1000)
         targets = [
             (table_id, table)
             for table_id, table in self._tables.items()

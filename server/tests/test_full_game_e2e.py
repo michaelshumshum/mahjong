@@ -40,7 +40,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import itertools
-import time
 import uuid
 from pathlib import Path
 from typing import Any, cast
@@ -50,6 +49,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from starlette.testclient import WebSocketTestSession
 
+from app.clock import now_ms
 from app.db.models import Base, GameRecord
 from app.db.session import make_engine, make_session_factory
 from app.main import app
@@ -84,12 +84,8 @@ _MAN_9 = tile_ids_for_type(TileType.MAN_9)
 _MAN_3 = tile_ids_for_type(TileType.MAN_3)
 
 
-def _ts() -> int:
-    return time.time_ns() // 1_000_000
-
-
 def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": _ts(), "d": d}
+    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
     if id_ is not None:
         frame["id"] = id_
     return frame

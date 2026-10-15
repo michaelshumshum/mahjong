@@ -40,6 +40,7 @@ mahjong/
 │   │   ├── table.py            # Table actor: task loop, timers, claim windows, seq/ring
 │   │   ├── table_types.py      # SeatBinding, Command, BotJobTag/BotResult, TableSettings
 │   │   ├── errors.py           # Table exceptions (one per wire error code), TABLE_CLOSED_ERROR
+│   │   ├── clock.py            # now_ms(): server epoch ms for every wire ts/deadline_ts
 │   │   ├── registry.py         # TableRegistry, showcase table, graceful-shutdown drain
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)

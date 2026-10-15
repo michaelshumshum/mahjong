@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-import time
 import uuid
 from concurrent.futures import Executor
 from typing import Any, Protocol
@@ -29,6 +28,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import protocol as proto
+from app.clock import now_ms
 from app.errors import (
     TABLE_CLOSED_ERROR,
     NotHostError,
@@ -72,10 +72,6 @@ _DECLARE_WIRE_TO_MELD_KIND = {
     "concealed_kong": MeldKind.CONCEALED_KONG,
     "added_kong": MeldKind.ADDED_KONG,
 }
-
-
-def _now_ms() -> int:
-    return time.time_ns() // 1_000_000
 
 
 def get_table(table_id: str) -> Table | None:
@@ -196,13 +192,13 @@ class Session:
         """Registered with `Table` as this seat's `SeatBinding.send` once joined."""
         t = wire["t"]
         d = {k: v for k, v in wire.items() if k != "t"}
-        self.outbox.push({"v": 1, "t": t, "seq": seq, "ts": _now_ms(), "d": d})
+        self.outbox.push({"v": 1, "t": t, "seq": seq, "ts": now_ms(), "d": d})
 
     def _send_local(self, t: str, payload: dict[str, Any]) -> None:
         """Pre-join (or join-failure) frames only -- the per-connection counter, never the
         per-seat stream (there is no seat yet)."""
         self._local_seq += 1
-        self.outbox.push({"v": 1, "t": t, "seq": self._local_seq, "ts": _now_ms(), "d": payload})
+        self.outbox.push({"v": 1, "t": t, "seq": self._local_seq, "ts": now_ms(), "d": payload})
 
     def _ack(
         self,
@@ -241,7 +237,7 @@ class Session:
             await self._handle_hello(message)
             return
         if isinstance(message, proto.Ping):
-            self._send_local("pong", {"t0": message.d.t0, "t1": _now_ms()})
+            self._send_local("pong", {"t0": message.d.t0, "t1": now_ms()})
             return
         if isinstance(message, proto.Join):
             await self._handle_join(message)
@@ -471,7 +467,7 @@ async def ws_endpoint(
     await websocket.accept()
     if _registry.is_closed(table):
         # an abandoned table's id is never recycled (docs/architecture.md §8.2)
-        frame = {"v": 1, "t": "error", "seq": 1, "ts": _now_ms(), "d": dict(TABLE_CLOSED_ERROR)}
+        frame = {"v": 1, "t": "error", "seq": 1, "ts": now_ms(), "d": dict(TABLE_CLOSED_ERROR)}
         await websocket.send_text(json.dumps(frame))
         await websocket.close()
         return
