@@ -128,3 +128,16 @@ Commands table. Add them here as they turn up.
   real shutdown drain ([architecture.md §8.1](architecture.md)).
 - CI has no Postgres; DB tests run against SQLite via the JSON/JSONB column variant
   ([infra.md §6](infra.md)).
+- A helper used by more than one test module lives in a plain module under `server/tests/`,
+  imported as `from tests.<module> import …`; fixtures go in `conftest.py` instead. Don't
+  re-declare one locally.
+
+| Module | Holds |
+| --- | --- |
+| `conftest.py` | `session` (in-memory SQLite `AsyncSession`, fresh schema), `games` |
+| `game_state.py` | `with_seat(state, seat, **overrides)`, `total_tiles(state)` (tile-conservation count) |
+| `hands.py` | `tile_ids(*types)` (one physical copy per occurrence), `pung`, `concealed_kong` |
+| `decisions.py` | `decision_points(seed, ruleset)` (seeded random self-play, every live decision), `discard_mask` |
+| `ws_frames.py` | client frame builders: `msg`, `next_id`, `hello`, `first_tile_ids(*types, count=)` |
+| `game_records.py` | `fetch_latest_record(database_url)` |
+| `latency.py` / `ml_synthetic.py` | `check_latency` (§1) / synthetic packed ML datasets |

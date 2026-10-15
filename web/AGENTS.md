@@ -106,8 +106,8 @@ model, two sources".
 
 | Concept | Home |
 | --- | --- |
-| Wire types, incl. `BotTier` (generated, never hand-edited) | `lib/net/protocol.d.ts` |
-| Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`) | `lib/game/types.ts` |
+| Wire types and vocabularies (`BotTier`, `Seat`, `Phase`, `MeldKind`, `WireSeatStatus`, `ErrorCode`, `WindName`, …; generated, never hand-edited) | `lib/net/protocol.d.ts` |
+| Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
 | Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`) | `lib/table/view-types.ts` |
 | Mock fixtures (`MOCK_SCENARIOS`) — fixtures only; live code never imports types from here | `lib/table/mock-game-state.ts` |
@@ -116,6 +116,8 @@ model, two sources".
 | Ruleset types, presets, defaults | `lib/net/ruleset.ts` |
 | Client prefs types / storage keys | `lib/ui/client-prefs.ts` / `lib/ui/settings-storage.ts` |
 | Pregame preview ids | `lib/table/pregame-preview.ts` |
+| Shared style mixins (`btn-base`, `seat-compass-grid`/`seat-ring`, `field-text`/`-label`/`-desc`, `settings-card`) | `lib/styles/_buttons.scss` / `_layout.scss` / `_forms.scss` (`docs/frontend.md §8`) |
+| Indeterminate wait spinner | `lib/ui/Spinner.svelte` |
 
 - `.ts` modules never import types from a `.svelte` file. A component's own prop types stay in
   the component only while that component's parent is their only consumer.

@@ -502,10 +502,10 @@ layer, so `ToastStack` moves its stack element into the topmost open dialog (`Mo
 visible, clickable and announced over a dialog. A `popover="manual"` stack was tried first: it paints
 above the modal but is inert like the rest of the page (no dismiss click, dropped from the a11y tree). Current call sites (`routes/table/[id]/+page.svelte`): a rejected `ack` is `warn`,
 a server `error` frame is `error`, a waiting-room arrival is the default `info`. `error` frames map
-through `lib/net/server-error-messages.ts`'s `serverErrorToastMessage()` — the known
-`server/app/ws.py` codes (`bad_frame`, `already_joined`, `no_such_seat`, `seat_taken`,
-`bad_secret`, `not_joined`, `table_closed`) get a human Paraglide message; an unrecognized code
-falls back to the raw wire message via `tablePage_serverErrorToast`.
+through `lib/net/server-error-messages.ts`'s `serverErrorToastMessage()` — its map is keyed by
+the generated `ErrorCode` (`server/app/errors.py`), so a new server code fails `pnpm check` until
+it has a Paraglide message; a code this build doesn't know (a newer server) falls back to the raw
+wire message via `tablePage_serverErrorToast`.
 
 ### Motion (P3)
 
@@ -738,8 +738,8 @@ The mock fixtures hardcode values the real wire doesn't send this way:
   (the turn it timed is over).
 - `prevailing` goes over the wire as the `Wind` enum's member _name_ (`"EAST"`…), not the
   `'E'|'S'|'W'|'N'` code mocks use and `WIND_LABEL` indexes by. `live-view.ts`'s
-  `wireWindToCode()` maps it — the one enum-shaped field needing this; `phase`/meld `kind`/claim
-  `kind` serialize through `StrEnum.value`.
+  `wireWindToCode()` maps it (generated type `WindName`) — the one enum-shaped field needing
+  this; `phase`/meld `kind`/claim `kind` serialize through `StrEnum.value`.
 - `hand_end.faan_breakdown` keys are Chinese pattern names. `lib/ui/faan-pattern-labels.ts`'s
   `faanPatternLabel()` maps all 36 patterns to the active locale and passes anything unrecognized
   through, so mock fixtures' English literals render unchanged.
@@ -910,7 +910,7 @@ Types and shared constants live apart from the components and the fixture:
 
 | Module | Holds |
 | --- | --- |
-| `lib/game/types.ts` | domain types (`Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`/`ClaimOption`, `FaanPattern`, `WinningMeld`, `Payments`) and the score-sheet shapes (`HandRecord`, `RoundResult`, `SeatInfo`, `Totals`, `Standing`). Hand-written: the wire types seats as `number` and meld/claim kinds as `string`, so `protocol.d.ts` has nothing narrower to derive from |
+| `lib/game/types.ts` | domain types (`Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`/`ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`) and the score-sheet shapes (`HandRecord`, `RoundResult`, `SeatInfo`, `Totals`, `Standing`). Wire vocabularies are aliases of `protocol.d.ts` (`Seat`, `Phase`, `HandOutcome`, `WinType`; `ClaimKind` = `ClaimChoice`; `MeldKind` = the wire `MeldKind` minus `pair`); `Wind` is the client's own `'E'…'N'` code |
 | `lib/table/view-types.ts` | the view model (`TableView`, `SeatView`, `MeldView`, …, plus `OwnHandTile`/`DeclareOption`) |
 | `lib/table/mock-game-state.ts` | the frozen `MOCK_SCENARIOS` fixtures only |
 | `lib/ui/client-prefs.ts` | `ClientPrefs`/`AutoArm` and their field types (`settings-storage.ts` holds the defaults) |
@@ -932,7 +932,7 @@ app's panel/button vocabulary (`panel-elevated`, `_buttons.scss`). All three sha
 the table code, large on a tile-coloured chip, plus a primary "Invite friends" button (the table URL
 _is_ the invite) — and a seat ring: four slots arranged across/left/right/self like
 `layout.seat-region-grid`, around the same mini felt square (`lib/table/CompassFelt.svelte`) the
-`/tables` cards use, laid out on the same compass grid (top/bottom seats span the felt's width,
+`/tables` cards use, laid out on the same compass grid (`layout.seat-compass-grid`; top/bottom seats span the felt's width,
 side seats hug the felt like the cards' compass names) and styled like the cards' compass seats — an open seat is a dashed pill
 (accent-tinted and clickable in the picker; muted and gently breathing while waiting), a taken
 seat is plain bold name text, and your own seat is your wind glyph in bold text — once seated,
@@ -1098,11 +1098,14 @@ compiles to plain CSS, so it's an authoring-layer choice only.
 src/lib/styles/
   _tokens.scss      colour (walnut chrome, felt/rim/tile materials, accent, brass, ±deltas),
                     spacing, radii, type scale, motion durations/easings, z-layers
-  _buttons.scss     btn-primary/secondary/ghost, panel-elevated, input-recessed
-  _forms.scss       panel-header/title/badge, form-group, option row chrome
+  _buttons.scss     btn-base(padding-inline) (tap-target size, include before a tier),
+                    btn-primary/secondary/ghost, panel-elevated, input-recessed
+  _forms.scss       panel-header/title/badge, form-group, option row chrome, field-text/
+                    label/desc (label-over-description column), settings-card
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
-  _layout.scss      seat-region grid, breakpoint mixins
+  _layout.scss      seat-region grid, breakpoint mixins, seat-compass-grid (four seats
+                    around a mini felt) and seat-ring (the pre-game `.seat-ring*` rules)
   _a11y.scss        mixins only: focus-ring, sr-only, motion-ok/motion-reduced (§9), and
                     `globals` (the :focus-visible ring and .sr-only class) that app.scss emits
   app.scss          entry: tokens, layout, a11y globals, global resets
@@ -1121,7 +1124,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | seats | `--color-seat-right/across/left` | opponent seat hues (self uses brass) |
 | status | `--color-status-error`, `--color-rank-gold/silver/bronze` | error states; game-end podium |
 | shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--radius-pill`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
-| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--dur-control` 130ms (control hover/press/selected colour), `--dur-spin` 900ms (loading spinner turn), `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
+| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--dur-control` 130ms (control hover/press/selected colour), `--dur-spin` 900ms (`lib/ui/Spinner.svelte`, the connecting spinner), `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
 | layers | `--z-table/tiles/hud/overlay/modal/toast` | modal dialogs are in the top layer, which no z-index reaches; toasts move into the open dialog instead (§5 Toasts) |
 
 ### Contrast audit

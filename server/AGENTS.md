@@ -66,12 +66,17 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Tile geometry: `N_TILE_TYPES`, `N_SUITED_TYPES`, `RANKS_PER_SUIT`, `COPIES_PER_TYPE`, `N_FLOWERS`, `TOTAL_PHYSICAL_TILES`, `WIND_TYPES`/`DRAGON_TYPES`/`ORPHAN_TYPES`/`ORPHAN_INDICES` | `mahjong_core/tiles.py` |
 | Action-id layout: `N_ACTIONS`, `*_BASE`, `PASS_ID`…`WIN_ID`, `CHOW_IDS` | `mahjong_core/ml.py` |
 | Action types / engine event types (`Event`, `EventKind`) | `mahjong_core/actions.py` / `mahjong_core/events.py` |
+| Seat range check (`validate_seat`) | `mahjong_core/state.py` |
 | Bot tier ids (`BotTier`, `BOT_TIERS`, `DEFAULT_BOT_TIER`, `LEARNED_TIERS`) — wire values, generated to TS | `bots/tiers.py` |
 | Harness limits: `NO_DEADLINE`, `GAME_STEP_CAP` | `bots/base.py` |
+| `SeatView` → count-array features (`own_hand34`, `seen34`, `add_meld`, `claimed_tile_type`, …) | `bots/features.py` |
 | ML format: `PAD`, `MAX_DISCARDS`, `PADDED_WIDTH`/`PADDED_POSITIONS`, `PHASE_INDEX`, `N_OPPONENTS` | `ml/encode.py` (torch-free) |
 | Dataset splits (`SPLITS`) | `ml/splits.py` |
-| Table exceptions + `TABLE_CLOSED_ERROR` / table dataclasses (`Command`, `Envelope`, `SeatBinding`, `TableSettings`, …) | `app/errors.py` / `app/table_types.py` |
+| Channel/head layout → slices (`layout_slices`) | `ml/encode_v2.py` (torch-free; `policy_net.py` imports it) |
+| SIGINT/SIGTERM stop flag for long jobs (`StopSignal`) | `ml/stop_signal.py` |
+| Shared test helpers (plain modules; fixtures only in `conftest.py`) | `tests/game_state.py`, `hands.py`, `decisions.py`, `ws_frames.py`, `game_records.py` (`docs/testing.md §3`) |
+| Table exceptions, wire `ErrorCode`, `TABLE_CLOSED_ERROR` / table dataclasses (`Command`, `Envelope`, `SeatBinding`, `TableSettings`, …) and seat-status aliases (`SeatStatus`, `WireSeatStatus`) | `app/errors.py` / `app/table_types.py` |
 | REST request/response models | `app/api_models.py` |
-| WS wire models (source of `protocol.d.ts`) | `app/protocol.py` |
-| Redacted wire dataclasses (`*Wire`, `SeatView`), `CLAIM_KIND_WIRE` | `app/views.py`. They stay beside the redaction code because their `Entitlement` annotations are what the redaction walker checks |
+| WS wire models (source of `protocol.d.ts`), wire `Seat` alias. Wire field types reuse the owning enum/alias (`docs/protocol.md §6`) | `app/protocol.py` |
+| Redacted wire dataclasses (`*Wire`, `SeatView`), `CLAIM_KIND_WIRE`, `ClaimChoice`, `WindName` | `app/views.py`. They stay beside the redaction code because their `Entitlement` annotations are what the redaction walker checks |
 | Server epoch ms (`now_ms`) | `app/clock.py` |

@@ -50,9 +50,10 @@ mahjong/
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
 │   │   └── weights/learned.npz # T4's exported policy, committed (bots.md §2)
-│   ├── ml/                     # RL + supervised training (ml.md)
+│   ├── ml/                     # RL + supervised training (ml.md); stop_signal.py (SIGINT/SIGTERM flag)
 │   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6
-│   └── tests/                  # pytest; pins/ holds pinned fixtures
+│   └── tests/                  # pytest; pins/ holds pinned fixtures; shared helper modules
+│                               # (game_state, hands, decisions, ws_frames, game_records; testing.md §3)
 ├── web/
 │   ├── package.json, Dockerfile, vite.config.ts, playwright.config.ts
 │   ├── messages/               # i18n sources (frontend.md §9)

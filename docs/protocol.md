@@ -29,7 +29,7 @@ Every frame, both directions:
 
 | Field | Meaning |
 | --- | --- |
-| `v` | protocol version; mismatch → `error{code:"version"}`, then close |
+| `v` | protocol version; anything but `1` fails validation → `error{code:"bad_frame"}` |
 | `t` | message type |
 | `seq` | server→client, **per-seat** (and per-spectator-session): dense and gapless within the stream sent to *that recipient*, not per table. What one player is or isn't offered (e.g. a `claim_offer`) never shows up as a gap for anyone else (§5, §7). The table's internal `event_id` never goes on the wire and is not what `last_seq` compares against |
 | `id` | client→server idempotency key (below) |
@@ -307,8 +307,26 @@ one guarantee this pipeline exists for — TypeScript flagging an unhandled even
 - `shared/protocol.schema.json` is still emitted (`TypeAdapter(AnyMessage).json_schema()`) as an
   informational artifact; nothing generates TS from it.
 
-A `StrEnum` field type (`BotTier`) is emitted once as a named string-literal union
-(`export type BotTier = 'T0' | …`), not inlined.
+A `StrEnum` field type (`BotTier`, `Phase`, `MeldKind`, …) or a `type X = …` alias (`Seat`,
+`WindName`, `WireSeatStatus`, …) is emitted once as a named TS type (`export type BotTier = 'T0' |
+…`), not inlined; two different types with one name fail generation. A bare `Literal[...]` is
+still inlined.
+
+| Wire type | Values | Server source | Fields |
+| --- | --- | --- | --- |
+| `Seat` | `0..3` | `app/protocol.py` | every server→client seat field. Client→server `seat`s stay `number`: narrowing them would change how an out-of-range seat is rejected |
+| `WindName` | `EAST`…`NORTH` | `app/views.py` (`Wind`'s member names) | `prevailing` |
+| `Phase` | `AWAIT_DRAW`… | `mahjong_core.state.Phase` | `state_sync.phase`, `turn.phase` |
+| `MeldKind` | `chow`…`pair` | `mahjong_core.melds.MeldKind` | `meld.meld_kind` (never `pair` in practice) |
+| `ClaimKind` / `ActionKind` | | `mahjong_core.state` / `mahjong_core.actions` | `claim_resolved.claim_kind` / `.action_kind` (a claim action or `pass` in practice) |
+| `ClaimChoice` | `pass\|chow\|pung\|kong\|win` | `app/views.py` (beside `CLAIM_KIND_WIRE`) | `claim.choice` |
+| `HandOutcome` / `WinType` | | `mahjong_core.state` | `hand_end`, `hand_history[i]` |
+| `SeatStatus` / `WireSeatStatus` | without / with `empty` | `app/table_types.py` | `seat_state.status` / `state_sync.seat_status`, `hand_start.seats` |
+| `ErrorCode` | `bad_frame`… | `app/errors.py` | `error.code`. `ack.error` stays a plain string |
+
+`ws.py` validates incoming frames against `AnyMessage`, server→client members included, so a
+client sending a wrong-direction frame with an out-of-vocabulary value gets `bad_frame` rather than
+being ignored.
 
 `make proto` regenerates both; the `proto-check` CI job fails if the committed output is stale
 ([infra.md §9](infra.md)). §10's HTTP payloads are typed by hand, not generated.

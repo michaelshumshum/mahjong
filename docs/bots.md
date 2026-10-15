@@ -469,7 +469,7 @@ already prices each tile's real faan, including sub-minimum hands.
 **`seen34` and concealed kongs.** `mahjong_core.engine._apply_self_kong` removes a concealed kong's
 tiles from `SeatState.concealed`, and `_omniscient_seat_view` builds `.hands` from `concealed`, so
 `.hands` never holds them; both branches count them from the meld loop like any other meld
-(`_add_meld`, 3 per kong) — they're public ([ADR 0023](decisions/0023-concealed-kong-public.md)).
+(`add_meld`, 3 per kong) — they're public ([ADR 0023](decisions/0023-concealed-kong-public.md)).
 
 **Kong-rob avoidance.** `FaanBot._act_on_turn`'s kong loop skips any kong that
 `kong_rob_risk(view, t, concealed=...)` proves would be robbed (`if view.hands is not None and
