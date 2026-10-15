@@ -13,11 +13,13 @@ from typing import NewType
 TileId = NewType("TileId", int)
 """Opaque physical-tile identifier, 0..135. Never assume it encodes wall position."""
 
-_COPIES_PER_TYPE = 4
-_TILE_TYPE_COUNT = 34
-_TILE_ID_COUNT = _COPIES_PER_TYPE * _TILE_TYPE_COUNT  # 136, §1 "Playable subtotal"
-_FLOWER_COUNT = 8
-TOTAL_PHYSICAL_TILES = _TILE_ID_COUNT + _FLOWER_COUNT  # 144, §1 "Total"
+COPIES_PER_TYPE = 4
+N_TILE_TYPES = 34
+N_SUITED_TYPES = 27  # types 0-26 are suited (m/p/s); 27-33 are winds/dragons
+RANKS_PER_SUIT = 9
+_TILE_ID_COUNT = COPIES_PER_TYPE * N_TILE_TYPES  # 136, §1 "Playable subtotal"
+N_FLOWERS = 8
+TOTAL_PHYSICAL_TILES = _TILE_ID_COUNT + N_FLOWERS  # 144, §1 "Total"
 
 _SUITS = "mps"
 
@@ -77,8 +79,27 @@ class Flower(IntEnum):
 
 Tile = TileType | Flower
 
+WIND_TYPES = frozenset(
+    {TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.WIND_NORTH}
+)
+DRAGON_TYPES = frozenset({TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_WHITE})
+ORPHAN_TYPES = frozenset(
+    {
+        TileType.MAN_1,
+        TileType.MAN_9,
+        TileType.PIN_1,
+        TileType.PIN_9,
+        TileType.SOU_1,
+        TileType.SOU_9,
+        *WIND_TYPES,
+        *DRAGON_TYPES,
+    }
+)
+"""Terminals and honors: the 13 types of Thirteen Orphans."""
+ORPHAN_INDICES = tuple(sorted(int(t) for t in ORPHAN_TYPES))
+
 _TILE_ID_TYPES: tuple[TileType, ...] = tuple(
-    TileType(i // _COPIES_PER_TYPE) for i in range(_TILE_ID_COUNT)
+    TileType(i // COPIES_PER_TYPE) for i in range(_TILE_ID_COUNT)
 )
 
 
@@ -88,9 +109,9 @@ def tile_code(tile: Tile) -> str:
     if isinstance(tile, Flower):
         return f"f{int(tile) + 1}"
     value = int(tile)
-    if value < 27:
-        suit = _SUITS[value // 9]
-        rank = value % 9 + 1
+    if value < N_SUITED_TYPES:
+        suit = _SUITS[value // RANKS_PER_SUIT]
+        rank = value % RANKS_PER_SUIT + 1
         return f"{rank}{suit}"
     return f"z{value - 26}"
 
@@ -100,7 +121,7 @@ def parse_tile(code: str) -> Tile:
     that isn't exactly one of the 42 valid codes."""
     if len(code) == 2 and code[0] in "123456789" and code[1] in _SUITS:
         rank = int(code[0]) - 1
-        return TileType(_SUITS.index(code[1]) * 9 + rank)
+        return TileType(_SUITS.index(code[1]) * RANKS_PER_SUIT + rank)
     if len(code) == 2 and code[0] == "z" and code[1] in "1234567":
         return TileType(26 + int(code[1]))
     if len(code) == 2 and code[0] == "f" and code[1] in "12345678":
@@ -118,8 +139,8 @@ def tile_id_type(tile_id: TileId) -> TileType:
 
 def tile_ids_for_type(tile_type: TileType) -> tuple[TileId, ...]:
     """The 4 canonical `TileId`s for a given `TileType`."""
-    base = int(tile_type) * _COPIES_PER_TYPE
-    return tuple(TileId(i) for i in range(base, base + _COPIES_PER_TYPE))
+    base = int(tile_type) * COPIES_PER_TYPE
+    return tuple(TileId(i) for i in range(base, base + COPIES_PER_TYPE))
 
 
 def all_tile_ids() -> tuple[TileId, ...]:
@@ -134,7 +155,7 @@ def all_flowers() -> tuple[Flower, ...]:
 
 def new_count_array() -> list[int]:
     """A zeroed 34-array, indexed by `TileType` value."""
-    return [0] * _TILE_TYPE_COUNT
+    return [0] * N_TILE_TYPES
 
 
 def count_array_from_types(tile_types: Iterable[TileType]) -> list[int]:

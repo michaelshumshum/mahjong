@@ -13,7 +13,7 @@ ends (`Phase.HAND_OVER`). Advancing from `HAND_OVER` to the next hand (or `GAME_
 decision, so it can't go through `reduce()`'s `(state, action)` shape.
 
 Hang-safety: the only loop in this module is the flower-replacement cascade, bounded by the
-fixed 8-physical-flower count (`_MAX_FLOWERS`) with an assertion. Hand-to-hand bookkeeping
+fixed 8-physical-flower count (`tiles.N_FLOWERS`) with an assertion. Hand-to-hand bookkeeping
 (`start_next_hand`) is straight-line arithmetic and cannot loop.
 
 `Phase.SCORING` never actually appears in `GameState.phase`: `_finish_win` folds that
@@ -30,13 +30,10 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Mapping
-from dataclasses import dataclass
-from enum import StrEnum
-from typing import Literal, cast
+from typing import cast
 
 from mahjong_core.actions import (
     Action,
-    ActionKind,
     ClaimChow,
     ClaimKong,
     ClaimPung,
@@ -53,6 +50,17 @@ from mahjong_core.actions import (
 )
 from mahjong_core.claims import ClaimResponse, can_close_early, resolve_claims
 from mahjong_core.config import GameLength, RuleSet
+from mahjong_core.events import (
+    ClaimResolved,
+    Discarded,
+    Drawn,
+    Event,
+    FlowerReplaced,
+    GameEnded,
+    HandEnded,
+    KongReplacementDrawn,
+    MeldFormed,
+)
 from mahjong_core.melds import Meld, MeldKind, legal_claims
 from mahjong_core.scoring import payout as payout_mod
 from mahjong_core.scoring.faan import score_winning_hand
@@ -72,23 +80,13 @@ from mahjong_core.state import (
     derive_hand_seed,
     new_game,
 )
-from mahjong_core.tiles import Flower, TileId
+from mahjong_core.tiles import N_FLOWERS, Flower, TileId
 from mahjong_core.wall import WallTile, deal_hands, draw_back, draw_front, new_wall, replace_flowers
 
 __all__ = [
     "ENGINE_VERSION",
     "Action",
-    "ClaimResolved",
-    "Discarded",
-    "Drawn",
-    "Event",
-    "EventKind",
-    "FlowerReplaced",
-    "GameEnded",
-    "HandEnded",
     "IllegalActionError",
-    "KongReplacementDrawn",
-    "MeldFormed",
     "game_outcome",
     "new_game",
     "new_hand",
@@ -108,110 +106,6 @@ class IllegalActionError(ValueError):
     unvalidated is an app/ bug, not a game state to tolerate."""
 
 
-class EventKind(StrEnum):
-    """Discriminator tag, one per `Event` variant -- mirrors `actions.ActionKind`."""
-
-    DRAWN = "drawn"
-    FLOWER_REPLACED = "flower_replaced"
-    DISCARDED = "discarded"
-    MELD_FORMED = "meld_formed"
-    CLAIM_RESOLVED = "claim_resolved"
-    KONG_REPLACEMENT_DRAWN = "kong_replacement_drawn"
-    HAND_ENDED = "hand_ended"
-    GAME_ENDED = "game_ended"
-
-
-@dataclass(frozen=True)
-class Drawn:
-    """A normal front-of-wall draw landed in `seat`'s hand."""
-
-    seat: int
-    tile_id: TileId
-    kind: Literal[EventKind.DRAWN] = EventKind.DRAWN
-
-
-@dataclass(frozen=True)
-class FlowerReplaced:
-    """`seat` revealed `flower` and drew a replacement (§3 step 4, §11.1). One event per
-    flower shed -- a chained replacement that's itself a flower produces another of these,
-    followed eventually by exactly one `Drawn`/`KongReplacementDrawn` for the tile that
-    finally lands."""
-
-    seat: int
-    flower: Flower
-    kind: Literal[EventKind.FLOWER_REPLACED] = EventKind.FLOWER_REPLACED
-
-
-@dataclass(frozen=True)
-class Discarded:
-    seat: int
-    tile_id: TileId
-    kind: Literal[EventKind.DISCARDED] = EventKind.DISCARDED
-
-
-@dataclass(frozen=True)
-class MeldFormed:
-    """`seat` formed `meld` -- by claiming a discard, or declaring a concealed/added kong on
-    their own turn. `meld.from_seat` (melds.py) already distinguishes claimed from
-    self-declared; no separate event needed for that."""
-
-    seat: int
-    meld: Meld
-    kind: Literal[EventKind.MELD_FORMED] = EventKind.MELD_FORMED
-
-
-@dataclass(frozen=True)
-class ClaimResolved:
-    """A claim window (`AWAIT_CLAIMS`/`AWAIT_KONG_ROB`) closed. `winning_seat`/`action_kind`
-    are both `None` when nobody's claim beat a Pass."""
-
-    window_id: int
-    claim_kind: ClaimKind
-    winning_seat: int | None
-    action_kind: ActionKind | None
-    kind: Literal[EventKind.CLAIM_RESOLVED] = EventKind.CLAIM_RESOLVED
-
-
-@dataclass(frozen=True)
-class KongReplacementDrawn:
-    """A kong (own-turn declare or claimed) drew its replacement from the back of the wall.
-    Distinct from `Drawn` so a client/bot can tell 槓上開花 apart from a normal draw."""
-
-    seat: int
-    tile_id: TileId
-    kind: Literal[EventKind.KONG_REPLACEMENT_DRAWN] = EventKind.KONG_REPLACEMENT_DRAWN
-
-
-@dataclass(frozen=True)
-class HandEnded:
-    hand_no: int
-    outcome: HandOutcome
-    winner: int | None
-    win_type: WinType | None
-    discarder: int | None
-    kind: Literal[EventKind.HAND_ENDED] = EventKind.HAND_ENDED
-
-
-@dataclass(frozen=True)
-class GameEnded:
-    hand_no: int  # the last hand actually played
-    scores: tuple[int, int, int, int]
-    kind: Literal[EventKind.GAME_ENDED] = EventKind.GAME_ENDED
-
-
-Event = (
-    Drawn
-    | FlowerReplaced
-    | Discarded
-    | MeldFormed
-    | ClaimResolved
-    | KongReplacementDrawn
-    | HandEnded
-    | GameEnded
-)
-
-
-_MAX_FLOWERS = 8  # tiles.py TOTAL_PHYSICAL_TILES - 136: the whole physical flower/season set
 _ALLOWED_ROUNDS: dict[GameLength, int] = {
     GameLength.EAST_ONLY: 1,
     GameLength.EAST_SOUTH: 2,
@@ -377,7 +271,7 @@ def _draw_and_cascade(
     already revealed this cascade stay revealed even though the hand ends before a real tile
     lands.
 
-    Bounded by `_MAX_FLOWERS`: a flower is a unique physical tile that can never reappear once
+    Bounded by `N_FLOWERS`: a flower is a unique physical tile that can never reappear once
     revealed, so the cascade provably cannot exceed the 8 that exist -- the `AssertionError`
     below is a can't-happen guard.
     """
@@ -393,7 +287,7 @@ def _draw_and_cascade(
     steps = 0
     while isinstance(tile, Flower):
         steps += 1
-        if steps > _MAX_FLOWERS:
+        if steps > N_FLOWERS:
             raise AssertionError("flower cascade exceeded the physical flower count")
         seat_state = dataclasses.replace(seat_state, flowers=(*seat_state.flowers, tile))
         events.append(FlowerReplaced(seat=seat, flower=tile))

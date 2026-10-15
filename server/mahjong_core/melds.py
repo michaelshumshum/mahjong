@@ -11,9 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from itertools import combinations_with_replacement
 
-from mahjong_core.tiles import TileId, TileType, tile_id_type
-
-_SUIT_TYPE_COUNT = 27  # types 0-26 are suited (m/p/s), 27-33 are winds/dragons: no chows
+from mahjong_core.tiles import N_SUITED_TYPES, N_TILE_TYPES, TileId, TileType, tile_id_type
 
 
 class MeldKind(StrEnum):
@@ -68,7 +66,7 @@ class Meld:
         types = [tile_id_type(t) for t in self.tiles]
         if self.kind == MeldKind.CHOW:
             a, b, c = sorted(types)
-            if not (a < _SUIT_TYPE_COUNT and a % 9 <= 6 and b == a + 1 and c == a + 2):
+            if not (a < N_SUITED_TYPES and a % 9 <= 6 and b == a + 1 and c == a + 2):
                 raise ValueError(f"not a valid chow: tile types {types}")
         elif len(set(types)) != 1:
             raise ValueError(f"{self.kind} needs identical tile types, got {types}")
@@ -140,7 +138,7 @@ def _chow_options(
     occupy in the run. A middle tile with concealed tiles on both sides yields more than one
     legal option — e.g. holding 3m,4m,6m,7m on a 5m discard offers (3,4,5), (4,5,6), (5,6,7)."""
     discard_type = tile_id_type(discarded_tile)
-    if discard_type >= _SUIT_TYPE_COUNT:
+    if discard_type >= N_SUITED_TYPES:
         return ()
 
     suit_base = (discard_type // 9) * 9
@@ -244,7 +242,7 @@ def decompose(tiles: Sequence[TileId]) -> tuple[tuple[Meld, ...], ...]:
             counts[idx] += 3
 
         if (
-            idx < _SUIT_TYPE_COUNT
+            idx < N_SUITED_TYPES
             and idx % 9 <= 6
             and counts[idx] >= 1
             and counts[idx + 1] >= 1
@@ -315,7 +313,7 @@ def _is_standard_shape(counts: Sequence[int]) -> bool:
         if has_pair is None:
             return False
         pairs += has_pair
-    for c in counts[_SUIT_TYPE_COUNT:34]:
+    for c in counts[N_SUITED_TYPES:N_TILE_TYPES]:
         if c == 2:
             pairs += 1
         elif c != 0 and c != 3:

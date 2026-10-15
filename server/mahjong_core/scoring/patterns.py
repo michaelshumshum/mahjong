@@ -49,35 +49,17 @@ from dataclasses import dataclass
 from mahjong_core.config import HandSet
 from mahjong_core.melds import KONG_KINDS, Meld, MeldKind
 from mahjong_core.state import Wind
-from mahjong_core.tiles import Flower, TileId, TileType, tile_id_type
-
-_DRAGON_TYPES = frozenset({TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_WHITE})
-_WIND_TYPES = frozenset(
-    {TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.WIND_NORTH}
+from mahjong_core.tiles import (
+    DRAGON_TYPES,
+    ORPHAN_TYPES,
+    WIND_TYPES,
+    Flower,
+    TileId,
+    TileType,
+    tile_id_type,
 )
+
 _PUNG_OR_KONG = frozenset({MeldKind.PUNG, *KONG_KINDS})
-
-_ORPHAN_TYPES = frozenset(
-    {
-        TileType.MAN_1,
-        TileType.MAN_9,
-        TileType.PIN_1,
-        TileType.PIN_9,
-        TileType.SOU_1,
-        TileType.SOU_9,
-        TileType.WIND_EAST,
-        TileType.WIND_SOUTH,
-        TileType.WIND_WEST,
-        TileType.WIND_NORTH,
-        TileType.DRAGON_RED,
-        TileType.DRAGON_GREEN,
-        TileType.DRAGON_WHITE,
-    }
-)
-"""Mirrors `actions.py`'s `_ORPHAN_TYPES` -- kept as a separate copy rather than an import so
-this module doesn't depend on the state-machine layer for one frozenset. Any change to what
-counts as an orphan type must be made in both places; `test_scoring.py` cross-checks them.
-"""
 
 _NINE_GATES_BASE_COUNTS = (3, 1, 1, 1, 1, 1, 1, 1, 3)
 """九蓮寶燈's fixed 13-tile skeleton within one suit, ranks 1..9: three of the 1, one each of
@@ -286,7 +268,7 @@ def _detect_dragon_pung(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     if split is None:
         return 0
     groups, _pair = split
-    return sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES)
+    return sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in DRAGON_TYPES)
 
 
 def _detect_small_three_dragons(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
@@ -297,10 +279,8 @@ def _detect_small_three_dragons(hand: tuple[Meld, ...], _ctx: ScoringContext) ->
     if split is None:
         return 0
     groups, pair = split
-    dragon_pungs = sum(
-        1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
-    )
-    return 1 if dragon_pungs == 2 and pair.tile_type in _DRAGON_TYPES else 0
+    dragon_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in DRAGON_TYPES)
+    return 1 if dragon_pungs == 2 and pair.tile_type in DRAGON_TYPES else 0
 
 
 def _detect_big_three_dragons(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
@@ -309,9 +289,7 @@ def _detect_big_three_dragons(hand: tuple[Meld, ...], _ctx: ScoringContext) -> i
     if split is None:
         return 0
     groups, _pair = split
-    dragon_pungs = sum(
-        1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _DRAGON_TYPES
-    )
+    dragon_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in DRAGON_TYPES)
     return 1 if dragon_pungs == 3 else 0
 
 
@@ -321,8 +299,8 @@ def _detect_small_four_winds(hand: tuple[Meld, ...], _ctx: ScoringContext) -> in
     if split is None:
         return 0
     groups, pair = split
-    wind_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _WIND_TYPES)
-    return 1 if wind_pungs == 3 and pair.tile_type in _WIND_TYPES else 0
+    wind_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in WIND_TYPES)
+    return 1 if wind_pungs == 3 and pair.tile_type in WIND_TYPES else 0
 
 
 def _detect_big_four_winds(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
@@ -331,7 +309,7 @@ def _detect_big_four_winds(hand: tuple[Meld, ...], _ctx: ScoringContext) -> int:
     if split is None:
         return 0
     groups, _pair = split
-    wind_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in _WIND_TYPES)
+    wind_pungs = sum(1 for m in groups if m.kind in _PUNG_OR_KONG and m.tile_type in WIND_TYPES)
     return 1 if wind_pungs == 4 else 0
 
 
@@ -418,14 +396,14 @@ def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
 def _detect_thirteen_orphans(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """十三么: all 13 terminal/honor types present at least once among 14 concealed tiles
     (the 14th is necessarily a duplicate of one of them). Mirrors `actions.py`'s
-    `_is_thirteen_orphans` -- see `_ORPHAN_TYPES`'s docstring. Reads `ctx.concealed_tiles` and
+    `_is_thirteen_orphans` -- see `ORPHAN_TYPES`'s docstring. Reads `ctx.concealed_tiles` and
     guards `if hand: return 0`, same reason as `_detect_nine_gates`."""
     if hand:
         return 0
     tiles = ctx.concealed_tiles
     if len(tiles) != 14:
         return 0
-    return 1 if {tile_id_type(t) for t in tiles} == _ORPHAN_TYPES else 0
+    return 1 if {tile_id_type(t) for t in tiles} == ORPHAN_TYPES else 0
 
 
 def _detect_heavenly_hand(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -508,7 +486,7 @@ def _detect_flower_set(_hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
 
 def _detect_seven_pairs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     """七對子: 14 concealed tiles as 7 *distinct* pairs. Mirrors `actions.py`'s
-    `_is_seven_pairs` -- see `_ORPHAN_TYPES`'s docstring. Unlike Thirteen Orphans, §7 gives
+    `_is_seven_pairs` -- see `ORPHAN_TYPES`'s docstring. Unlike Thirteen Orphans, §7 gives
     this a plain 4 faan, not a limit hand (`is_limit=False` below), so it isn't shielded from
     double-counting by the limit-hand collapse -- the `if hand: return 0` guard (see
     `_detect_nine_gates`) matters especially here since a hand that also parses as a real

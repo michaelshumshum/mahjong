@@ -24,37 +24,39 @@ from mahjong_core.tiles import TileType, tile_id_type
 
 N_ACTIONS = 109
 
-_DISCARD_BASE = 0
-_CONCEALED_KONG_BASE = 34
-_ADDED_KONG_BASE = 68
-_PASS = 102
-_CHOW_LOW = 103
-_CHOW_MIDDLE = 104
-_CHOW_HIGH = 105
-_PUNG = 106
-_KONG = 107
-_WIN = 108
+# layout: docs/ml.md §1
+DISCARD_BASE = 0
+CONCEALED_KONG_BASE = 34
+ADDED_KONG_BASE = 68
+PASS_ID = 102
+CHOW_LOW_ID = 103
+CHOW_MIDDLE_ID = 104
+CHOW_HIGH_ID = 105
+PUNG_ID = 106
+KONG_ID = 107
+WIN_ID = 108
+CHOW_IDS = (CHOW_LOW_ID, CHOW_MIDDLE_ID, CHOW_HIGH_ID)
 
 
 def action_id(action: Action, state: GameState) -> int:
     """The fixed id for `action`, given the `state` it was legal in. `state` is only read for
     `ClaimChow` -- every other variant is self-describing."""
     if isinstance(action, Discard):
-        return _DISCARD_BASE + int(tile_id_type(action.tile_id))
+        return DISCARD_BASE + int(tile_id_type(action.tile_id))
     if isinstance(action, DeclareConcealedKong):
-        return _CONCEALED_KONG_BASE + int(action.meld.tile_type)
+        return CONCEALED_KONG_BASE + int(action.meld.tile_type)
     if isinstance(action, DeclareAddedKong):
-        return _ADDED_KONG_BASE + int(action.meld.tile_type)
+        return ADDED_KONG_BASE + int(action.meld.tile_type)
     if isinstance(action, Pass):
-        return _PASS
+        return PASS_ID
     if isinstance(action, ClaimChow):
-        return _CHOW_LOW + _chow_offset(action.meld, state)
+        return CHOW_LOW_ID + _chow_offset(action.meld, state)
     if isinstance(action, ClaimPung):
-        return _PUNG
+        return PUNG_ID
     if isinstance(action, ClaimKong):
-        return _KONG
+        return KONG_ID
     if isinstance(action, (ClaimWin, DeclareWin)):
-        return _WIN
+        return WIN_ID
     raise AssertionError(f"unhandled action type: {action!r}")
 
 
@@ -77,31 +79,31 @@ def decode_action(aid: int, state: GameState, seat: int) -> Action:
     if not 0 <= aid < N_ACTIONS:
         raise ValueError(f"action id out of range 0..{N_ACTIONS - 1}: {aid}")
 
-    if _DISCARD_BASE <= aid < _CONCEALED_KONG_BASE:
-        return _decode_discard(aid - _DISCARD_BASE, state, seat)
-    if _CONCEALED_KONG_BASE <= aid < _ADDED_KONG_BASE:
-        meld = _self_kong_meld(aid - _CONCEALED_KONG_BASE, state, seat, MeldKind.CONCEALED_KONG)
+    if DISCARD_BASE <= aid < CONCEALED_KONG_BASE:
+        return _decode_discard(aid - DISCARD_BASE, state, seat)
+    if CONCEALED_KONG_BASE <= aid < ADDED_KONG_BASE:
+        meld = _self_kong_meld(aid - CONCEALED_KONG_BASE, state, seat, MeldKind.CONCEALED_KONG)
         return DeclareConcealedKong(meld=meld)
-    if _ADDED_KONG_BASE <= aid < _PASS:
-        meld = _self_kong_meld(aid - _ADDED_KONG_BASE, state, seat, MeldKind.ADDED_KONG)
+    if ADDED_KONG_BASE <= aid < PASS_ID:
+        meld = _self_kong_meld(aid - ADDED_KONG_BASE, state, seat, MeldKind.ADDED_KONG)
         return DeclareAddedKong(meld=meld)
-    if aid == _PASS:
+    if aid == PASS_ID:
         return Pass(window_id=_require_window(state).window_id, seat=seat)
-    if aid in (_CHOW_LOW, _CHOW_MIDDLE, _CHOW_HIGH):
-        return _decode_chow(aid - _CHOW_LOW, state, seat)
-    if aid == _PUNG:
+    if aid in CHOW_IDS:
+        return _decode_chow(aid - CHOW_LOW_ID, state, seat)
+    if aid == PUNG_ID:
         return ClaimPung(
             window_id=_require_window(state).window_id,
             seat=seat,
             meld=_offer_meld(state, seat, MeldKind.PUNG),
         )
-    if aid == _KONG:
+    if aid == KONG_ID:
         return ClaimKong(
             window_id=_require_window(state).window_id,
             seat=seat,
             meld=_offer_meld(state, seat, MeldKind.EXPOSED_KONG),
         )
-    if aid == _WIN:
+    if aid == WIN_ID:
         return _decode_win(state, seat)
     raise AssertionError(f"unhandled action id: {aid}")
 

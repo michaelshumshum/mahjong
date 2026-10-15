@@ -15,19 +15,16 @@ from mahjong_core.actions import (
     legal_actions,
 )
 from mahjong_core.config import DEFAULT_RULESET, GameLength, RuleSet
-from mahjong_core.engine import (
+from mahjong_core.engine import IllegalActionError, new_game, reduce, start_next_hand
+from mahjong_core.events import (
     ClaimResolved,
     Discarded,
     Drawn,
     FlowerReplaced,
     GameEnded,
     HandEnded,
-    IllegalActionError,
     KongReplacementDrawn,
     MeldFormed,
-    new_game,
-    reduce,
-    start_next_hand,
 )
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import (

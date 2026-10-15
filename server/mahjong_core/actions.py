@@ -19,7 +19,7 @@ from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_me
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
-from mahjong_core.tiles import TileId, TileType, tile_id_type
+from mahjong_core.tiles import ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
 
 
 class ActionKind(StrEnum):
@@ -169,28 +169,6 @@ Action = (
 )
 
 
-_ORPHAN_TYPES = frozenset(
-    {
-        TileType.MAN_1,
-        TileType.MAN_9,
-        TileType.PIN_1,
-        TileType.PIN_9,
-        TileType.SOU_1,
-        TileType.SOU_9,
-        TileType.WIND_EAST,
-        TileType.WIND_SOUTH,
-        TileType.WIND_WEST,
-        TileType.WIND_NORTH,
-        TileType.DRAGON_RED,
-        TileType.DRAGON_GREEN,
-        TileType.DRAGON_WHITE,
-    }
-)
-
-
-_ORPHAN_INDICES = tuple(sorted(int(t) for t in _ORPHAN_TYPES))
-
-
 def _is_seven_pairs(concealed: Sequence[TileId]) -> bool:
     """Seven pairs (七對子): 14 concealed tiles as 7 *distinct* pairs. Shape only — whether it
     scores depends on the table's `hand_sets`/`faan_overrides`."""
@@ -205,7 +183,7 @@ def _is_thirteen_orphans(concealed: Sequence[TileId]) -> bool:
     concealed tiles (the 14th is necessarily a duplicate of one of them)."""
     if len(concealed) != 14:
         return False
-    return {tile_id_type(t) for t in concealed} == _ORPHAN_TYPES
+    return {tile_id_type(t) for t in concealed} == ORPHAN_TYPES
 
 
 def hand_is_winning_shape(seat: SeatState) -> bool:
@@ -226,10 +204,7 @@ def _is_winning_shape(concealed: Sequence[TileId], *, closed: bool) -> bool:
     if closed and len(concealed) == 14:
         if all(c == 0 or c == 2 for c in counts):
             return True
-        if (
-            all(counts[i] for i in _ORPHAN_INDICES)
-            and sum(counts[i] for i in _ORPHAN_INDICES) == 14
-        ):
+        if all(counts[i] for i in ORPHAN_INDICES) and sum(counts[i] for i in ORPHAN_INDICES) == 14:
             return True
     return _is_standard_shape(counts)
 

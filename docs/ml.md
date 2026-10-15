@@ -27,6 +27,8 @@ A fixed, flat, complete discrete space — every legal action maps to exactly on
                                                  N_ACTIONS = 109
 ```
 
+- **Ids are public constants** in `mahjong_core/ml.py` (`DISCARD_BASE`…`WIN_ID`, `CHOW_IDS`);
+  bots and `ml/` import them, never re-declare the layout.
 - **Chow is relative** (low/middle/high) — the claimed tile is known from context. Same
   convention as Suphx/Mortal.
 - **Kongs are tile-indexed** because you can hold several options at once on your turn.

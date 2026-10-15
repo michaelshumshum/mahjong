@@ -761,9 +761,9 @@ def test_thirteen_orphans_false_missing_one_type() -> None:
 
 
 def test_thirteen_orphans_false_for_a_standard_hand_cross_checked_against_actions() -> None:
-    """patterns.py mirrors, rather than imports, `actions.py`'s shape check (see
-    `_ORPHAN_TYPES`'s docstring in patterns.py) -- cross-validate the two agree on an
-    ordinary, nowhere-near-orphans hand so the copies can't silently drift apart."""
+    """patterns.py and actions.py each implement the shape check over `tiles.ORPHAN_TYPES` --
+    cross-validate the two agree on an ordinary, nowhere-near-orphans hand so they can't
+    silently drift apart."""
     hand = (
         _chow(TileType.MAN_1),
         _chow(TileType.MAN_5),

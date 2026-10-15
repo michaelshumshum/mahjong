@@ -32,6 +32,7 @@ from collections.abc import Sequence
 from functools import cache
 
 from mahjong_core.config import HandSet
+from mahjong_core.tiles import ORPHAN_INDICES
 
 __all__ = [
     "AGARI",
@@ -45,7 +46,6 @@ __all__ = [
 AGARI = -1
 """Shanten value for a complete hand. 0 = tenpai, -1 = won."""
 
-_ORPHAN_INDICES = (0, 8, 9, 17, 18, 26, 27, 28, 29, 30, 31, 32, 33)
 _CAP = 4
 _ALL_HAND_SETS: frozenset[HandSet] = frozenset(HandSet)
 
@@ -139,8 +139,8 @@ def seven_pairs_shanten(tiles34: Sequence[int]) -> int:
 
 def thirteen_orphans_shanten(tiles34: Sequence[int]) -> int:
     """十三么 shanten: `13 - distinct_terminals_honors - (1 if has_pair else 0)`."""
-    present = sum(1 for i in _ORPHAN_INDICES if tiles34[i] >= 1)
-    has_pair = any(tiles34[i] >= 2 for i in _ORPHAN_INDICES)
+    present = sum(1 for i in ORPHAN_INDICES if tiles34[i] >= 1)
+    has_pair = any(tiles34[i] >= 2 for i in ORPHAN_INDICES)
     return 13 - present - (1 if has_pair else 0)
 
 
