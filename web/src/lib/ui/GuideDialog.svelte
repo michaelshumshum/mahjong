@@ -141,10 +141,7 @@
 
 	.tab {
 		flex-shrink: 0;
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-3);
-		font: inherit;
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-3));
 		@include buttons.btn-secondary;
 	}
 

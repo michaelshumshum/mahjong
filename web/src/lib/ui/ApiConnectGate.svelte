@@ -4,6 +4,7 @@
 	import { waitForApiHealthy } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { m } from '$lib/paraglide/messages.js';
+	import Spinner from '$lib/ui/Spinner.svelte';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -61,7 +62,7 @@
 	<div class="connect-gate">
 		<div class="connect-panel">
 			{#if status === 'connecting'}
-				<div class="connect-spinner"></div>
+				<Spinner />
 				<p class="connect-status">{m.apiConnectGate_connectingStatus()}</p>
 				{#if attempt > 1}
 					<p class="connect-counter">{m.apiConnectGate_attemptCounter({ attempt })}</p>
@@ -85,7 +86,6 @@
 {/if}
 
 <style lang="scss">
-	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 
 	.connect-gate {
@@ -123,33 +123,7 @@
 	}
 
 	.connect-retry {
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-5);
-		font: inherit;
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-5));
 		@include buttons.btn-primary;
-	}
-
-	// indeterminate connection spinner, same treatment as /table/[id]'s PretableScreen.
-	.connect-spinner {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		border: 3px solid var(--color-border);
-		border-top-color: var(--color-accent);
-		animation: connect-spin var(--dur-spin) linear infinite;
-	}
-
-	@keyframes connect-spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.connect-spinner {
-		@include a11y.motion-reduced {
-			animation: none;
-			opacity: 0.6;
-		}
 	}
 </style>

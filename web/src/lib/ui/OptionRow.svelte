@@ -95,20 +95,15 @@
 	}
 
 	.option-text {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
+		@include forms.field-text;
 	}
 
 	.option-label {
-		font-weight: 600;
+		@include forms.field-label;
 	}
 
 	.option-desc {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
-		line-height: 1.35;
+		@include forms.field-desc;
 	}
 
 	.native-input {

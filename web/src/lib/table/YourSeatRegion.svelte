@@ -650,10 +650,7 @@
 
 	// kongs are secondary: real but unhurried, never competing with a self-drawn win for the eye.
 	.declare-btn {
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-3);
-		font: inherit;
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-3));
 		@include buttons.btn-secondary;
 
 		// the hero variant below uses btn-primary's :active translateY(3px), which moves the

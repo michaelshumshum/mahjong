@@ -133,6 +133,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.practice-dialog {
 		display: flex;
@@ -155,48 +156,7 @@
 		color: var(--color-text-muted);
 	}
 
-	// same compass layout as SeatRing/SeatPicker and the table cards (docs/frontend.md's
-	// "Pre-game states"): top/bottom seats span the full width, side seats flank the mini felt.
-	.seat-ring {
-		display: grid;
-		grid-template-areas:
-			'top   top  top'
-			'left  felt right'
-			'bottom bottom bottom';
-		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-		align-items: center;
-		gap: var(--space-2);
-		width: 100%;
-	}
-
-	.seat-ring-felt {
-		grid-area: felt;
-		width: 4.5rem;
-	}
-
-	.seat-ring-pos {
-		display: flex;
-		justify-content: center;
-		min-width: 0;
-	}
-
-	.seat-ring-pos--across {
-		grid-area: top;
-	}
-
-	.seat-ring-pos--left {
-		grid-area: left;
-		justify-content: flex-end;
-	}
-
-	.seat-ring-pos--right {
-		grid-area: right;
-		justify-content: flex-start;
-	}
-
-	.seat-ring-pos--self {
-		grid-area: bottom;
-	}
+	@include layout.seat-ring(4.5rem);
 
 	// dealer isn't known until table construction, so this reads "you", not a wind letter --
 	// plain bold text, matching SeatRingSlot's self treatment.
@@ -250,10 +210,7 @@
 		width: 100%;
 
 		button {
-			min-height: var(--tap-target-min);
-			padding: var(--space-2) var(--space-4);
-			font: inherit;
-			cursor: pointer;
+			@include buttons.btn-base(var(--space-4));
 			@include buttons.btn-secondary;
 		}
 

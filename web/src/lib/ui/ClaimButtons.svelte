@@ -40,10 +40,7 @@
 	.claim-btn {
 		pointer-events: auto;
 		min-width: var(--tap-target-min);
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-4);
-		font: inherit;
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-4));
 	}
 
 	// Pung/Chow/Kong: standard claim actions, secondary tier.

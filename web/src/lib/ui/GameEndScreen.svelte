@@ -265,11 +265,8 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-5);
-		font: inherit;
+		@include buttons.btn-base(var(--space-5));
 		text-decoration: none;
-		cursor: pointer;
 	}
 
 	.action--primary {

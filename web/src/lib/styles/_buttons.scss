@@ -1,6 +1,15 @@
 // button/panel/input chrome mixins: three-tier hierarchy -- primary an ink-seal block (presses on
 // :active), secondary a bevelled wood tile (lifts on :hover), tertiary bare text until touched.
 
+// tap-target sizing every tier shares; include before the tier mixin, whose font-weight must win
+// over `font: inherit`.
+@mixin btn-base($padding-inline) {
+	min-height: var(--tap-target-min);
+	padding: var(--space-2) $padding-inline;
+	font: inherit;
+	cursor: pointer;
+}
+
 @mixin btn-primary {
 	position: relative;
 	border: none;

@@ -67,20 +67,15 @@
 	}
 
 	.switch-text {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
+		@include forms.field-text;
 	}
 
 	.switch-label {
-		font-weight: 600;
+		@include forms.field-label;
 	}
 
 	.switch-desc {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
-		line-height: 1.35;
+		@include forms.field-desc;
 	}
 
 	.track {

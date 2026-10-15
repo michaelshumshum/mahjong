@@ -56,10 +56,7 @@
 		gap: var(--space-3);
 
 		button {
-			min-height: var(--tap-target-min);
-			padding: var(--space-2) var(--space-4);
-			font: inherit;
-			cursor: pointer;
+			@include buttons.btn-base(var(--space-4));
 			@include buttons.btn-secondary;
 		}
 

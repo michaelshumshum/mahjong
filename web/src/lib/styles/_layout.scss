@@ -1,5 +1,5 @@
-// layout mixins: breakpoint set, the four seat rotations, and the seat-region grid (§3's
-// ASCII diagram).
+// layout mixins: breakpoint set, the four seat rotations, the seat-region grid (§3's ASCII
+// diagram) and the pre-game seat compass.
 
 $breakpoint-tablet: 768px;
 $breakpoint-desktop: 1180px;
@@ -99,5 +99,54 @@ $breakpoint-short: 500px;
 			repeat(4, minmax(min-content, auto)) minmax(min-content, 1fr)
 			minmax(min-content, auto);
 		gap: var(--space-1) var(--space-2);
+	}
+}
+
+// four seats around a mini felt (CompassFelt): top/bottom span the width, sides flank the felt.
+@mixin seat-compass-grid($felt-column: auto) {
+	display: grid;
+	grid-template-areas:
+		'top   top  top'
+		'left  felt right'
+		'bottom bottom bottom';
+	grid-template-columns: minmax(0, 1fr) $felt-column minmax(0, 1fr);
+	align-items: center;
+	gap: var(--space-2);
+}
+
+// the `.seat-ring*` rules SeatRing/SeatPicker/PracticeSetupDialog's markup shares.
+@mixin seat-ring($felt-width) {
+	.seat-ring {
+		@include seat-compass-grid;
+		width: 100%;
+	}
+
+	.seat-ring-felt {
+		grid-area: felt;
+		width: $felt-width;
+	}
+
+	.seat-ring-pos {
+		display: flex;
+		justify-content: center;
+		min-width: 0;
+	}
+
+	.seat-ring-pos--across {
+		grid-area: top;
+	}
+
+	.seat-ring-pos--left {
+		grid-area: left;
+		justify-content: flex-end;
+	}
+
+	.seat-ring-pos--right {
+		grid-area: right;
+		justify-content: flex-start;
+	}
+
+	.seat-ring-pos--self {
+		grid-area: bottom;
 	}
 }

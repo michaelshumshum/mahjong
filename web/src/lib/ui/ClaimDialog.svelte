@@ -222,10 +222,7 @@
 		align-items: center;
 		justify-content: center;
 		gap: 2px;
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-3);
-		font: inherit;
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-3));
 	}
 
 	.claim-btn-key {

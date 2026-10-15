@@ -57,6 +57,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
 	.panel {
 		background: var(--color-surface);
@@ -102,14 +103,7 @@
 	}
 
 	.compass {
-		display: grid;
-		grid-template-areas:
-			'top top top'
-			'left felt right'
-			'bottom bottom bottom';
-		grid-template-columns: minmax(0, 1fr) 5rem minmax(0, 1fr);
-		align-items: center;
-		gap: var(--space-2);
+		@include layout.seat-compass-grid(5rem);
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -181,10 +175,7 @@
 	}
 
 	button {
-		font: inherit;
-		padding: var(--space-2) var(--space-4);
-		min-height: var(--tap-target-min);
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-4));
 		@include buttons.btn-secondary;
 	}
 

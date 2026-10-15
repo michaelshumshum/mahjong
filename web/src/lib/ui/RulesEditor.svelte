@@ -547,10 +547,7 @@
 	}
 
 	.card {
-		padding-inline: var(--space-3);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
+		@include forms.settings-card;
 	}
 
 	.hint {
