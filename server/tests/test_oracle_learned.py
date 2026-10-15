@@ -20,20 +20,10 @@ from bots.safety import tile_risk
 from bots.worker import compute_action
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.state import Phase, Wind
-from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from mahjong_core.tiles import TileId, TileType
 from ml.env import HandEnv
+from tests.hands import tile_ids
 from tests.latency import check_latency
-
-
-def _pool(*types: TileType) -> tuple[TileId, ...]:
-    used: dict[TileType, int] = {}
-    ids = []
-    for t in types:
-        n = used.get(t, 0)
-        ids.append(tile_ids_for_type(t)[n])
-        used[t] = n + 1
-    return tuple(ids)
-
 
 # seat 0: 123m 456m 789m 12p + 東 南 (14 tiles, 1-shanten after an honor discard)
 _OWN = [
@@ -54,7 +44,7 @@ _OWN = [
 ]
 
 # seat 1: seven pairs one 北 short
-_SEVEN_PAIRS_ON_NORTH = _pool(
+_SEVEN_PAIRS_ON_NORTH = tile_ids(
     TileType.SOU_1,
     TileType.SOU_1,
     TileType.SOU_3,
@@ -72,7 +62,7 @@ _SEVEN_PAIRS_ON_NORTH = _pool(
 
 
 def _view(hands: tuple[tuple[TileId, ...], ...] | None) -> SeatView:
-    own = _pool(*_OWN)
+    own = tile_ids(*_OWN)
     return SeatView(
         seat=0,
         hand_no=1,

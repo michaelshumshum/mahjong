@@ -10,14 +10,11 @@ service in CI).
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Base, GameRecord
+from app.db.models import GameRecord
 from app.db.records import get_game_record, is_replayable, save_game_record
-from app.db.session import make_engine, make_session_factory
 from bots.random import RandomBot
 from bots.selfplay import play_and_record_game, play_game
 from mahjong_core.actions import (
@@ -47,18 +44,6 @@ from mahjong_core.state import GameOutcome, Phase
 from mahjong_core.tiles import TileId
 
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
-
-
-@pytest.fixture
-async def session() -> AsyncIterator[AsyncSession]:
-    """In-memory SQLite, fresh schema per test."""
-    engine = make_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    factory = make_session_factory(engine)
-    async with factory() as s:
-        yield s
-    await engine.dispose()
 
 
 # --- action_to_dict / action_from_dict round trip --------------------------------------------

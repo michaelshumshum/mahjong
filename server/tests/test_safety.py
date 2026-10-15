@@ -29,6 +29,7 @@ from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import Phase, SeatState, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from tests.hands import tile_ids
 
 
 def _view(
@@ -80,16 +81,6 @@ def _view(
     )
 
 
-def _pool(*types: TileType) -> tuple[TileId, ...]:
-    used: dict[TileType, int] = {}
-    ids = []
-    for t in types:
-        n = used.get(t, 0)
-        ids.append(tile_ids_for_type(t)[n])
-        used[t] = n + 1
-    return tuple(ids)
-
-
 def _pung(tile_type: TileType) -> Meld:
     return Meld(MeldKind.PUNG, tile_ids_for_type(tile_type)[:3], from_seat=0)
 
@@ -122,7 +113,7 @@ def test_deal_in_probability_zero_when_no_chance() -> None:
 def test_genbutsu_lowers_but_never_zeroes_probability() -> None:
     tile = int(TileType.SOU_5)
     no_read = _view()
-    genbutsu = _view(discard_pools=((), _pool(TileType.SOU_5), (), ()))
+    genbutsu = _view(discard_pools=((), tile_ids(TileType.SOU_5), (), ()))
 
     p_no_read = deal_in_probability(no_read, opponent_seat=1, tile_type=tile)
     p_genbutsu = deal_in_probability(genbutsu, opponent_seat=1, tile_type=tile)
@@ -135,7 +126,7 @@ def test_genbutsu_is_per_opponent() -> None:
     """Genbutsu against seat 1 must not make the same tile look safer against seat 2, who
     never discarded it -- each opponent's own discard pool is the only evidence about them."""
     tile = int(TileType.SOU_5)
-    view = _view(discard_pools=((), _pool(TileType.SOU_5), (), ()))
+    view = _view(discard_pools=((), tile_ids(TileType.SOU_5), (), ()))
     assert is_genbutsu(view, 1, tile)
     assert not is_genbutsu(view, 2, tile)
 
@@ -146,8 +137,8 @@ def test_genbutsu_is_per_opponent() -> None:
 def test_suji_lowers_probability_less_than_genbutsu() -> None:
     tile = int(TileType.SOU_5)  # suji of SOU_2 and SOU_8
     no_read = _view()
-    suji = _view(discard_pools=((), _pool(TileType.SOU_2), (), ()))
-    genbutsu = _view(discard_pools=((), _pool(TileType.SOU_5), (), ()))
+    suji = _view(discard_pools=((), tile_ids(TileType.SOU_2), (), ()))
+    genbutsu = _view(discard_pools=((), tile_ids(TileType.SOU_5), (), ()))
 
     p_no_read = deal_in_probability(no_read, opponent_seat=1, tile_type=tile)
     p_suji = deal_in_probability(suji, opponent_seat=1, tile_type=tile)
@@ -163,7 +154,7 @@ def test_suji_never_applies_to_honors() -> None:
     ranks)."""
     tile = int(TileType.DRAGON_RED)
     no_read = _view()
-    other_dragon = _view(discard_pools=((), _pool(TileType.DRAGON_GREEN), (), ()))
+    other_dragon = _view(discard_pools=((), tile_ids(TileType.DRAGON_GREEN), (), ()))
     assert deal_in_probability(other_dragon, 1, tile) == deal_in_probability(no_read, 1, tile)
 
 
@@ -239,7 +230,7 @@ def test_tempo_shift_raises_threat_and_probability() -> None:
     steady = _view(
         discard_pools=(
             (),
-            _pool(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.SOU_1),
+            tile_ids(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.SOU_1),
             (),
             (),
         )
@@ -247,7 +238,7 @@ def test_tempo_shift_raises_threat_and_probability() -> None:
     settled = _view(
         discard_pools=(
             (),
-            _pool(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.PIN_4),
+            tile_ids(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.PIN_4),
             (),
             (),
         )
@@ -263,8 +254,8 @@ def test_tempo_shift_raises_threat_and_probability() -> None:
 def test_tempo_shift_needs_a_string_of_terminal_honor_discards_first() -> None:
     """Too few prior discards to establish a "tempo" at all -- no shift detected."""
     tile = int(TileType.PIN_4)
-    short_history = _view(discard_pools=((), _pool(TileType.WIND_EAST, TileType.PIN_4), (), ()))
-    no_history = _view(discard_pools=((), _pool(TileType.PIN_4), (), ()))
+    short_history = _view(discard_pools=((), tile_ids(TileType.WIND_EAST, TileType.PIN_4), (), ()))
+    no_history = _view(discard_pools=((), tile_ids(TileType.PIN_4), (), ()))
     assert deal_in_probability(short_history, 1, tile) == deal_in_probability(no_history, 1, tile)
 
 
@@ -318,7 +309,7 @@ def test_opponent_threat_level_hands_aware_flags_a_near_tenpai_opponent_the_prox
     tanki wait on 5s). Hands-aware `opponent_threat_level` must flag them as threatening; the
     probabilistic proxy on the exact same position must not -- proving the fix catches a real
     threat the proxy misses, not just adding an unused code path."""
-    tenpai_hand = _pool(
+    tenpai_hand = tile_ids(
         TileType.MAN_1,
         TileType.MAN_2,
         TileType.MAN_3,
@@ -356,14 +347,14 @@ def test_opponent_threat_level_hands_aware_clears_an_opponent_that_looks_threate
     melds = ((), (_pung(TileType.PIN_1), _pung(TileType.PIN_9)), (), ())
     discard_pools = (
         (),
-        _pool(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.PIN_4),
+        tile_ids(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, TileType.PIN_4),
         (),
         (),
     )
     proxy_view = _view(melds=melds, discard_pools=discard_pools)
     assert opponent_threat_level(proxy_view, 1) > _THREAT_THRESHOLD
 
-    far_hand = _pool(
+    far_hand = tile_ids(
         TileType.MAN_2,
         TileType.MAN_6,
         TileType.SOU_2,
@@ -406,7 +397,7 @@ def test_tile_risk_hands_aware_flags_an_exact_deal_in() -> None:
     report exactly the real faan the scorer computes, not `_ASSUMED_DEALIN_FAAN`'s 5.0 proxy."""
     tile_type = int(TileType.SOU_9)
     opp_seat = 1
-    opp_hand = _pool(
+    opp_hand = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_3,
@@ -426,7 +417,7 @@ def test_tile_risk_hands_aware_flags_an_exact_deal_in() -> None:
     view = _view(
         ruleset=RuleSet(hand_sets=frozenset(HandSet)),
         hands=((), opp_hand, (), ()),
-        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
+        discard_pools=(tile_ids(TileType.WIND_EAST), (), (), ()),
     )
 
     candidate = (*opp_hand, TileId(int(TileType.SOU_9) * 4 + 1))
@@ -456,7 +447,7 @@ def test_tile_risk_hands_aware_clears_a_tile_that_looks_dangerous_by_probabilist
     probabilistic_view = _view(melds=melds)
     assert deal_in_probability(probabilistic_view, opponent_seat=1, tile_type=tile_type) > 0.0
 
-    far_hand = _pool(
+    far_hand = tile_ids(
         TileType.MAN_2,
         TileType.MAN_4,
         TileType.MAN_6,
@@ -492,7 +483,7 @@ def test_tile_risk_hands_aware_does_not_flag_a_sub_minimum_structural_win() -> N
         ),
         from_seat=2,
     )
-    opp_hand = _pool(
+    opp_hand = tile_ids(
         TileType.MAN_4,
         TileType.MAN_5,
         TileType.MAN_6,
@@ -510,7 +501,7 @@ def test_tile_risk_hands_aware_does_not_flag_a_sub_minimum_structural_win() -> N
     view = _view(
         hands=((), opp_hand, (), ()),
         melds=melds,
-        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
+        discard_pools=(tile_ids(TileType.WIND_EAST), (), (), ()),
     )
 
     candidate = (*opp_hand, TileId(int(TileType.PIN_9) * 4))
@@ -555,7 +546,7 @@ def test_tile_risk_hands_aware_handles_a_concealed_kong_of_the_candidate_type() 
     in via it, the same fact the probabilistic `no_chance` signal captures for the non-hands-aware
     path."""
     tile_type = int(TileType.PIN_5)
-    opp_hand = _pool(
+    opp_hand = tile_ids(
         TileType.PIN_5,
         TileType.PIN_5,
         TileType.PIN_5,
@@ -584,7 +575,7 @@ def test_kong_rob_risk_added_kong_flags_a_real_deal_in() -> None:
     discard's, just triggered by exposing a tile instead of discarding one."""
     tile_type = int(TileType.SOU_9)
     opp_seat = 1
-    opp_hand = _pool(
+    opp_hand = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_3,
@@ -602,7 +593,7 @@ def test_kong_rob_risk_added_kong_flags_a_real_deal_in() -> None:
     view = _view(
         ruleset=RuleSet(hand_sets=frozenset(HandSet)),
         hands=((), opp_hand, (), ()),
-        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
+        discard_pools=(tile_ids(TileType.WIND_EAST), (), (), ()),
     )
 
     candidate = (*opp_hand, TileId(int(TileType.SOU_9) * 4 + 1))
@@ -623,7 +614,7 @@ def test_kong_rob_risk_added_kong_clears_a_safe_tile() -> None:
     """Opponent 1's real hand is nowhere near tenpai on this tile -- added-kong risk must read
     0.0, same convention as `tile_risk`'s own safe-tile test."""
     tile_type = int(TileType.PIN_4)
-    far_hand = _pool(
+    far_hand = tile_ids(
         TileType.MAN_2,
         TileType.MAN_4,
         TileType.MAN_6,
@@ -647,7 +638,7 @@ def test_kong_rob_risk_respects_kong_rob_enabled_false() -> None:
     the engine never opens a robbing window at all, so this must read 0.0 even for a tile that
     would otherwise be a certain deal-in."""
     tile_type = int(TileType.SOU_9)
-    opp_hand = _pool(
+    opp_hand = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_3,
@@ -664,7 +655,7 @@ def test_kong_rob_risk_respects_kong_rob_enabled_false() -> None:
     )
     view = _view(
         hands=((), opp_hand, (), ()),
-        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
+        discard_pools=(tile_ids(TileType.WIND_EAST), (), (), ()),
         ruleset=RuleSet(kong_rob_enabled=False),
     )
     assert kong_rob_risk(view, tile_type, concealed=False) == 0.0
@@ -677,7 +668,7 @@ def test_kong_rob_risk_concealed_kong_unreachable_under_default_ruleset() -> Non
     under the default ruleset -- the engine itself would never open a claim window here either
     (`_kong_rob_offers`'s own early return)."""
     tile_type = int(TileType.DRAGON_WHITE)
-    thirteen_orphans_wait = _pool(
+    thirteen_orphans_wait = tile_ids(
         TileType.MAN_1,
         TileType.MAN_9,
         TileType.PIN_1,
@@ -703,7 +694,7 @@ def test_kong_rob_risk_concealed_kong_flags_a_real_thirteen_orphans_completion()
     real HK convention actually allows a concealed-kong robbing claim."""
     tile_type = int(TileType.DRAGON_WHITE)
     opp_seat = 1
-    thirteen_orphans_wait = _pool(
+    thirteen_orphans_wait = tile_ids(
         TileType.MAN_1,
         TileType.MAN_9,
         TileType.PIN_1,
@@ -745,7 +736,7 @@ def test_kong_rob_risk_concealed_kong_ignores_a_non_thirteen_orphans_completion(
     still read 0.0 for the concealed-kong path, even though the identical tile/hand is a real
     flagged deal-in for an *added* kong (`test_kong_rob_risk_added_kong_flags_a_real_deal_in`)."""
     tile_type = int(TileType.SOU_9)
-    opp_hand = _pool(
+    opp_hand = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_3,
@@ -762,7 +753,7 @@ def test_kong_rob_risk_concealed_kong_ignores_a_non_thirteen_orphans_completion(
     )
     view = _view(
         hands=((), opp_hand, (), ()),
-        discard_pools=(_pool(TileType.WIND_EAST), (), (), ()),
+        discard_pools=(tile_ids(TileType.WIND_EAST), (), (), ()),
         ruleset=RuleSet(concealed_kong_robbable=True),
     )
     assert kong_rob_risk(view, tile_type, concealed=True) == 0.0
@@ -789,13 +780,13 @@ _LOOSE_WINDS_HAND = (
 
 
 def test_ron_credit_counts_surplus_copies_and_not_needed_ones() -> None:
-    view = _view(hands=((), _pool(*_LOOSE_WINDS_HAND), (), ()))
+    view = _view(hands=((), tile_ids(*_LOOSE_WINDS_HAND), (), ()))
     east, pin1, sou9 = int(TileType.WIND_EAST), int(TileType.PIN_1), int(TileType.SOU_9)
     assert ron_credit(view, [east, pin1, sou9]) == {east: 0.5, pin1: 0.0, sou9: 0.0}
 
 
 def test_ron_credit_sums_over_opponents() -> None:
-    hand = _pool(*_LOOSE_WINDS_HAND)
+    hand = tile_ids(*_LOOSE_WINDS_HAND)
     view = _view(hands=((), hand, hand, ()))
     east = int(TileType.WIND_EAST)
     assert ron_credit(view, [east]) == {east: 1.0}

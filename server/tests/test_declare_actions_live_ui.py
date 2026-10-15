@@ -61,6 +61,7 @@ from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.state import GameState, Phase, new_game
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from tests.game_state import with_seat
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("RUN_LIVE_BACKEND_TESTS"),
@@ -80,12 +81,6 @@ def _free_port() -> int:
         # getsockname()'s return type is the untyped _RetAddress in typeshed; for AF_INET
         # it's always (host, port).
         return int(s.getsockname()[1])
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
 def _make_junk(used: set[TileId], n: int) -> tuple[TileId, ...]:
@@ -114,9 +109,9 @@ def _rig_concealed_kong(seed: int) -> GameState:
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
     used: set[TileId] = set(tile_ids_for_type(TileType.MAN_1))
     seat0 = (*tile_ids_for_type(TileType.MAN_1), *_make_junk(used, 10))
-    state = _with_seat(state, 0, concealed=seat0, melds=(), discards=())
+    state = with_seat(state, 0, concealed=seat0, melds=(), discards=())
     for seat in (1, 2, 3):
-        state = _with_seat(state, seat, concealed=_make_junk(used, 13))
+        state = with_seat(state, seat, concealed=_make_junk(used, 13))
     return state
 
 

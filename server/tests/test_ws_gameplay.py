@@ -23,50 +23,34 @@ currently-bound seat; a unicast reaches one), not hand-counted.
 from __future__ import annotations
 
 import dataclasses
-import itertools
 import uuid
 
 from fastapi.testclient import TestClient
 
-from app.clock import now_ms
 from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
+from tests.game_state import with_seat
+from tests.ws_frames import first_tile_ids, msg, next_id
 
 _MAN_4 = tile_ids_for_type(TileType.MAN_4)
 _MAN_5 = tile_ids_for_type(TileType.MAN_5)
 _MAN_6 = tile_ids_for_type(TileType.MAN_6)
 
 
-def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
-    ids = [tid for t in types for tid in tile_ids_for_type(t)]
-    return tuple(ids[:count])
-
-
 # unlike test_table_claims.py's fixture, this test plays a real second discard, so each seat's
 # junk must be physically distinct (no shared tile_id) and type-exclusive (seat 2's eventual discard uses honors, so no other seat can chow or pung it).
-_SEAT0_JUNK = _tiles(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13)
-_SEAT1_JUNK = _tiles(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
-_SEAT2_JUNK = _tiles(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
-_SEAT3_JUNK = _tiles(
+_SEAT0_JUNK = first_tile_ids(
+    TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
+)
+_SEAT1_JUNK = first_tile_ids(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
+_SEAT2_JUNK = first_tile_ids(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
+_SEAT3_JUNK = first_tile_ids(
     TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_WHITE, TileType.WIND_NORTH, count=13
 )
-
-_id_gen = itertools.count(1)
-
-
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
 
 
 def _payload(frame: dict[str, object]) -> dict[str, object]:
@@ -75,22 +59,16 @@ def _payload(frame: dict[str, object]) -> dict[str, object]:
     return data
 
 
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
 def _rig_state(seed: int) -> GameState:
     """Seat 0 on turn holding 5m plus junk; seat 1 can chow the 5m (holds 4m/6m), seat 2 can
     pung it (holds two more 5m), seat 3 holds nothing relevant. Wall emptied so the hand ends
     in exhaustive draw right after the pung's claimant discards a junk tile."""
     state = new_game(DEFAULT_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = _with_seat(state, 0, concealed=(*_SEAT0_JUNK, _MAN_5[0]), discards=())
-    state = _with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_SEAT1_JUNK))
-    state = _with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_SEAT2_JUNK))
-    state = _with_seat(state, 3, concealed=_SEAT3_JUNK)
+    state = with_seat(state, 0, concealed=(*_SEAT0_JUNK, _MAN_5[0]), discards=())
+    state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_SEAT1_JUNK))
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_SEAT2_JUNK))
+    state = with_seat(state, 3, concealed=_SEAT3_JUNK)
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
 
 
@@ -109,13 +87,13 @@ def test_full_hand_over_real_ws_multi_client() -> None:
         ):
             wss = [ws0, ws1, ws2, ws3]
             for ws in wss:
-                ws.send_json(_msg("hello", {"client_version": "test"}))
+                ws.send_json(msg("hello", {"client_version": "test"}))
 
             # --- join: each join broadcasts seat_state to every already-bound seat (this one
             # included), then unicasts state_sync + ack to the joiner only.
             bound = [False, False, False, False]
             for seat, ws in enumerate(wss):
-                ws.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
+                ws.send_json(msg("join", {"seat": seat}, id_=next_id()))
                 bound[seat] = True
                 for s, other in enumerate(wss):
                     if bound[s]:
@@ -139,11 +117,11 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             # --- ready: each ack fires immediately; the 4th also cascades hand_start/deal/turn
             # to every seat (dealing gates on all-four-ready, protocol.md §2).
             for seat in range(3):
-                wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
+                wss[seat].send_json(msg("ready", {}, id_=next_id()))
                 ack = wss[seat].receive_json()
                 assert ack["t"] == "ack" and ack["d"]["ok"] is True
 
-            wss[3].send_json(_msg("ready", {}, id_=_next_id()))
+            wss[3].send_json(msg("ready", {}, id_=next_id()))
             hand_start_3 = wss[3].receive_json()
             deal_3 = wss[3].receive_json()
             turn_3 = wss[3].receive_json()
@@ -177,8 +155,8 @@ def test_full_hand_over_real_ws_multi_client() -> None:
 
             # --- seat 0 discards 5m: broadcast discard (with tile/pool_index filled in), then
             # claim_offer unicast to seats 1 (chow) and 2 (pung) only -- seat 3 gets neither.
-            discard_id = _next_id()
-            wss[0].send_json(_msg("discard", {"tile_id": _MAN_5[0]}, id_=discard_id))
+            discard_id = next_id()
+            wss[0].send_json(msg("discard", {"tile_id": _MAN_5[0]}, id_=discard_id))
             ack_d0 = wss[0].receive_json()
             assert ack_d0["d"] == {"id": discard_id, "ok": True}
 
@@ -205,9 +183,9 @@ def test_full_hand_over_real_ws_multi_client() -> None:
 
             # --- seat 2 pungs (higher priority than seat 1's un-answered chow -- early exit,
             # architecture.md §4). No response is ever sent for seat 1's offer.
-            claim_id = _next_id()
+            claim_id = next_id()
             wss[2].send_json(
-                _msg(
+                msg(
                     "claim",
                     {"window_id": window_id, "choice": "pung", "tiles": pung_option["tiles"]},
                     id_=claim_id,
@@ -241,9 +219,9 @@ def test_full_hand_over_real_ws_multi_client() -> None:
 
             # seat 2 discards a junk tile: nobody claims it, so reduce() cascades straight to
             # wall-exhausted hand over, and Table chains start_next_hand() into hand 2 same tick.
-            discard2_id = _next_id()
+            discard2_id = next_id()
             wss[2].send_json(
-                _msg("discard", {"tile_id": discard_action["tile_id"]}, id_=discard2_id)
+                msg("discard", {"tile_id": discard_action["tile_id"]}, id_=discard2_id)
             )
             ack_d2 = wss[2].receive_json()
             assert ack_d2["d"] == {"id": discard2_id, "ok": True}
@@ -271,13 +249,13 @@ def test_full_hand_over_real_ws_multi_client() -> None:
             # hand-end hold needs all 4 hand_end_ack's before the next hand starts (same "wait
             # for all 4" shape as ready above); the 4th ack cascades hand_start/deal/turn synchronously, landing ahead of its own ack, like ack_3 above.
             for seat in range(3):
-                ack_id = _next_id()
-                wss[seat].send_json(_msg("hand_end_ack", {}, id_=ack_id))
+                ack_id = next_id()
+                wss[seat].send_json(msg("hand_end_ack", {}, id_=ack_id))
                 ack = wss[seat].receive_json()
                 assert ack["d"] == {"id": ack_id, "ok": True}
 
-            ack3_id = _next_id()
-            wss[3].send_json(_msg("hand_end_ack", {}, id_=ack3_id))
+            ack3_id = next_id()
+            wss[3].send_json(msg("hand_end_ack", {}, id_=ack3_id))
             next_hand_start_3 = wss[3].receive_json()
             next_deal_3 = wss[3].receive_json()
             next_turn_3 = wss[3].receive_json()
@@ -306,8 +284,8 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
     table_id = f"idempotency-{uuid.uuid4()}"
 
     with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
-        ws.send_json(_msg("hello", {"client_version": "test"}))
-        ws.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        ws.send_json(msg("hello", {"client_version": "test"}))
+        ws.send_json(msg("join", {"seat": 0}, id_=next_id()))
         assert ws.receive_json()["t"] == "seat_state"
         assert ws.receive_json()["t"] == "state_sync"
         join_ack = ws.receive_json()
@@ -319,28 +297,28 @@ def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -
 
         # not necessarily this seat's turn -- irrelevant to the id contract, which fires
         # before Table judges legality; an illegal command is just dropped silently, unrelated to this test.
-        ws.send_json(_msg("discard", {"tile_id": int(tile_a)}, id_="d-1"))
+        ws.send_json(msg("discard", {"tile_id": int(tile_a)}, id_="d-1"))
         first_ack = ws.receive_json()
         assert first_ack["d"] == {"id": "d-1", "ok": True}
 
         # exact retry: same id, same payload -> re-sent ack, not reapplied.
-        ws.send_json(_msg("discard", {"tile_id": int(tile_a)}, id_="d-1"))
+        ws.send_json(msg("discard", {"tile_id": int(tile_a)}, id_="d-1"))
         retry_ack = ws.receive_json()
         assert retry_ack["d"] == {"id": "d-1", "ok": True}
 
         # same id, different payload -> rejected, neither payload applied.
-        ws.send_json(_msg("discard", {"tile_id": int(tile_b)}, id_="d-1"))
+        ws.send_json(msg("discard", {"tile_id": int(tile_b)}, id_="d-1"))
         conflict_ack = ws.receive_json()
         assert conflict_ack["d"]["ok"] is False
         assert conflict_ack["d"]["error"] == "id_conflict"
 
         # a genuinely illegal claim (unknown window) still gets ok=False without ever
         # reaching Table.submit -- and is itself idempotent under the same id contract.
-        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pung"}, id_="bad-1"))
+        ws.send_json(msg("claim", {"window_id": 999999, "choice": "pung"}, id_="bad-1"))
         bad_ack = ws.receive_json()
         assert bad_ack["d"] == {"id": "bad-1", "ok": False, "error": "illegal"}
 
-        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pung"}, id_="bad-1"))
+        ws.send_json(msg("claim", {"window_id": 999999, "choice": "pung"}, id_="bad-1"))
         bad_ack_retry = ws.receive_json()
         assert bad_ack_retry["d"] == {"id": "bad-1", "ok": False, "error": "illegal"}
 
@@ -352,13 +330,13 @@ def test_pass_on_a_closed_claim_window_is_acked_ok() -> None:
     table_id = f"stale-pass-{uuid.uuid4()}"
 
     with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
-        ws.send_json(_msg("hello", {"client_version": "test"}))
-        ws.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        ws.send_json(msg("hello", {"client_version": "test"}))
+        ws.send_json(msg("join", {"seat": 0}, id_=next_id()))
         assert ws.receive_json()["t"] == "seat_state"
         assert ws.receive_json()["t"] == "state_sync"
         assert ws.receive_json()["d"]["ok"] is True
 
-        ws.send_json(_msg("claim", {"window_id": 999999, "choice": "pass"}, id_="late-pass"))
+        ws.send_json(msg("claim", {"window_id": 999999, "choice": "pass"}, id_="late-pass"))
         assert ws.receive_json()["d"] == {"id": "late-pass", "ok": True}
 
 
@@ -374,12 +352,12 @@ def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
         client.websocket_connect(f"/ws?table={table_id}") as ws1,
     ):
-        ws0.send_json(_msg("hello", {"client_version": "test"}))
-        ws1.send_json(_msg("hello", {"client_version": "test"}))
+        ws0.send_json(msg("hello", {"client_version": "test"}))
+        ws1.send_json(msg("hello", {"client_version": "test"}))
 
         # --- seat 0 joins alone: its own state_sync sees itself connected, every other seat
         # (never joined by anyone) as empty -- not "connected", the pre-fix behavior.
-        ws0.send_json(_msg("join", {"seat": 0, "name": "Alice"}, id_=_next_id()))
+        ws0.send_json(msg("join", {"seat": 0, "name": "Alice"}, id_=next_id()))
         assert ws0.receive_json()["t"] == "seat_state"  # its own join, broadcast to itself
         sync0 = ws0.receive_json()
         assert sync0["t"] == "state_sync"
@@ -391,7 +369,7 @@ def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
 
         # seat 1 joins: seat 0 sees a live seat_state broadcast (not just its next resync), and
         # seat 1's fresh state_sync already reflects both bound seats as connected.
-        ws1.send_json(_msg("join", {"seat": 1, "name": "Bob"}, id_=_next_id()))
+        ws1.send_json(msg("join", {"seat": 1, "name": "Bob"}, id_=next_id()))
         live_update = ws0.receive_json()
         assert live_update["t"] == "seat_state"
         assert live_update["d"] == {"seat": 1, "status": "connected", "name": "Bob"}
@@ -420,21 +398,21 @@ def test_host_is_first_joiner_and_start_with_bots_fills_and_starts() -> None:
         client.websocket_connect(f"/ws?table={table_id}") as ws2,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
     ):
-        ws2.send_json(_msg("hello", {"client_version": "test"}))
-        ws0.send_json(_msg("hello", {"client_version": "test"}))
+        ws2.send_json(msg("hello", {"client_version": "test"}))
+        ws0.send_json(msg("hello", {"client_version": "test"}))
 
         # seat 2 joins first -> becomes host, even though it isn't seat 0.
-        ws2.send_json(_msg("join", {"seat": 2, "name": "Carol"}, id_=_next_id()))
+        ws2.send_json(msg("join", {"seat": 2, "name": "Carol"}, id_=next_id()))
         assert ws2.receive_json()["t"] == "seat_state"
         sync2 = ws2.receive_json()
         assert sync2["t"] == "state_sync"
         assert sync2["d"]["host_seat"] == 2
         assert ws2.receive_json()["d"]["ok"] is True
-        ws2.send_json(_msg("ready", {}, id_=_next_id()))
+        ws2.send_json(msg("ready", {}, id_=next_id()))
         assert ws2.receive_json()["d"]["ok"] is True  # seats 0/1/3 still open -- not started yet
 
         # seat 0 joins second -> not host.
-        ws0.send_json(_msg("join", {"seat": 0, "name": "Alice"}, id_=_next_id()))
+        ws0.send_json(msg("join", {"seat": 0, "name": "Alice"}, id_=next_id()))
         assert ws2.receive_json()["t"] == "seat_state"  # live update to the already-joined host
         assert ws0.receive_json()["t"] == "seat_state"
         sync0 = ws0.receive_json()
@@ -443,17 +421,17 @@ def test_host_is_first_joiner_and_start_with_bots_fills_and_starts() -> None:
         assert ws0.receive_json()["d"]["ok"] is True
 
         # a non-host start_with_bots is rejected outright -- nothing bound, nothing started.
-        ws0.send_json(_msg("start_with_bots", {}, id_=_next_id()))
+        ws0.send_json(msg("start_with_bots", {}, id_=next_id()))
         not_host_ack = ws0.receive_json()
         assert not_host_ack["t"] == "ack"
         assert not_host_ack["d"]["ok"] is False
         assert not_host_ack["d"]["error"] == "not_host"
 
-        ws0.send_json(_msg("ready", {}, id_=_next_id()))
+        ws0.send_json(msg("ready", {}, id_=next_id()))
         assert ws0.receive_json()["d"]["ok"] is True
 
         # the host fills seats 1 and 3 with bots and the hand starts immediately.
-        ws2.send_json(_msg("start_with_bots", {}, id_=_next_id()))
+        ws2.send_json(msg("start_with_bots", {}, id_=next_id()))
         bot_seat_states = [ws2.receive_json(), ws2.receive_json()]
         assert {f["d"]["seat"] for f in bot_seat_states} == {1, 3}
         assert all(f["t"] == "seat_state" and f["d"]["status"] == "bot" for f in bot_seat_states)
@@ -466,7 +444,7 @@ def test_host_is_first_joiner_and_start_with_bots_fills_and_starts() -> None:
         assert start_ack["d"]["ok"] is True
 
         # already started -- even the host's second start_with_bots is rejected.
-        ws2.send_json(_msg("start_with_bots", {}, id_=_next_id()))
+        ws2.send_json(msg("start_with_bots", {}, id_=next_id()))
         already_ack = ws2.receive_json()
         assert already_ack["t"] == "ack"
         assert already_ack["d"]["ok"] is False

@@ -14,9 +14,6 @@ was itself calibrated against a real arena run, not just intuition.
 
 from __future__ import annotations
 
-import random
-from collections.abc import Iterator
-
 import pytest
 
 from app.views import SeatView, seat_view
@@ -29,16 +26,14 @@ from bots.faanbot import (
     FaanBot,
     _turn_breakpoints,
 )
-from bots.random import random_action
 from mahjong_core.config import HandSet, RuleSet
-from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.ml import CONCEALED_KONG_BASE, decode_action, legal_mask
-from mahjong_core.state import GameState, Phase, Wind
+from mahjong_core.state import Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 from mahjong_core.wall import max_turns_per_seat
+from tests.decisions import decision_points, discard_mask
 
-_STEP_CAP = 2000
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
 T = TileType
 
@@ -87,15 +82,6 @@ def _build_view(
     )
 
 
-def _discard_mask(types: list[TileType], *, extra: list[int] | None = None) -> list[bool]:
-    mask = [False] * 109
-    for t in set(types):
-        mask[int(t)] = True
-    for aid in extra or ():
-        mask[aid] = True
-    return mask
-
-
 def _dummy_pool(n: int, *, base_type: int = 18) -> tuple[TileId, ...]:
     """`n` (<= 9) placeholder discards, one distinct rank each -- used only to control `turn`
     (own discard-pool length) in scripted tests. `base_type` picks which 9-rank suit band
@@ -126,39 +112,10 @@ def _own_pool(n: int, *, avoid: set[TileType]) -> tuple[TileId, ...]:
 # --- legality: swept across real self-play states -------------------------------------------
 
 
-def _decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, int]]:
-    """Same traversal as `tests/test_efficiency.py`'s helper of the same name."""
-    rng = random.Random(seed)
-    state = new_game(ruleset, seed)
-    steps = 0
-    while state.phase != Phase.GAME_OVER:
-        steps += 1
-        assert steps <= _STEP_CAP, f"seed={seed}: exceeded {_STEP_CAP} steps"
-
-        if state.phase == Phase.HAND_OVER:
-            state, _ = start_next_hand(state)
-            continue
-
-        if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
-            seat = rng.choice(pending)
-        else:
-            seat = state.turn
-
-        yield state, seat
-        action = random_action(state, seat, rng)
-        state, _ = reduce(state, action)
-
-
 @pytest.mark.parametrize("seed", range(5))
 async def test_never_returns_an_illegal_id(seed: int) -> None:
     bot = FaanBot()
-    for state, seat in _decision_points(seed, _BOUNDED_RULESET):
+    for state, seat in decision_points(seed, _BOUNDED_RULESET):
         mask = legal_mask(state, seat)
         view = seat_view(state, seat)
         aid = await bot.act(view, mask, NO_DEADLINE)
@@ -210,7 +167,7 @@ async def test_chases_half_flush_edge_only_from_midgame() -> None:
     own_pool = _own_pool(13, avoid=set(hand))
     for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (13, T.PIN_5)):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
-        mask = _discard_mask(hand)
+        mask = discard_mask(hand)
         aid = await FaanBot().act(view, mask, NO_DEADLINE)
         assert aid == int(expected), f"turn={turn}"
 
@@ -241,7 +198,7 @@ async def test_commits_to_a_strong_value_signal() -> None:
     own_pool = _own_pool(13, avoid=set(hand))
     for turn in (3, 8, 13):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
-        mask = _discard_mask(hand)
+        mask = discard_mask(hand)
         aid = await FaanBot().act(view, mask, NO_DEADLINE)
         assert aid == int(T.PIN_5), f"turn={turn}"
 
@@ -295,7 +252,7 @@ async def test_folds_to_a_safe_tile_late_against_a_threatening_opponent() -> Non
         discard_pools=(_FOLD_HAND_OWN_POOL, seat1_pool, (), ()),
         melds=((), (seat1_pung,), (), ()),
     )
-    mask = _discard_mask(_FOLD_HAND)
+    mask = discard_mask(_FOLD_HAND)
     aid = await FaanBot().act(view, mask, NO_DEADLINE)
     assert aid == int(T.WIND_NORTH)
 
@@ -329,7 +286,7 @@ async def test_aggressive_chases_a_marginal_value_signal_baseline_declines() -> 
         T.WIND_SOUTH,
     ]
     own_pool = _own_pool(13, avoid=set(hand))
-    mask = _discard_mask(hand)
+    mask = discard_mask(hand)
     for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (13, T.WIND_SOUTH)):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
         aid = await FaanBot(weight_profile=AGGRESSIVE).act(view, mask, NO_DEADLINE)
@@ -361,7 +318,7 @@ async def test_flush_chasing_also_chases_the_same_marginal_value_signal() -> Non
         T.WIND_SOUTH,
     ]
     own_pool = _own_pool(13, avoid=set(hand))
-    mask = _discard_mask(hand)
+    mask = discard_mask(hand)
     for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (10, T.PIN_5), (13, T.WIND_SOUTH)):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
         aid = await FaanBot(weight_profile=FLUSH_CHASING).act(view, mask, NO_DEADLINE)
@@ -393,7 +350,7 @@ async def test_defensive_discards_the_genbutsu_floater_baseline_keeps() -> None:
         T.PIN_5,
     ]
     seat1_pool = (tile_ids_for_type(T.PIN_5)[0],)  # genbutsu source for 5p
-    mask = _discard_mask(hand)
+    mask = discard_mask(hand)
     for turn in (3, 6, 8, 10):
         view = _build_view(0, hand, turn=turn, discard_pools=((), seat1_pool, (), ()))
         baseline_aid = await FaanBot(weight_profile=BASELINE).act(view, mask, NO_DEADLINE)
@@ -516,7 +473,7 @@ async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
         T.MAN_4,
         T.MAN_5,
     ]
-    mask = _discard_mask(hand)
+    mask = discard_mask(hand)
 
     view_new_18_on = _build_view(0, hand, ruleset=RuleSet(hand_sets=frozenset(HandSet)))
     aid_on = await FaanBot().act(view_new_18_on, mask, NO_DEADLINE)
@@ -561,7 +518,7 @@ async def test_discard_follows_faan_overrides_boosting_a_route() -> None:
         T.WIND_SOUTH,
     ]
     own_pool = _own_pool(13, avoid=set(hand))
-    mask = _discard_mask(hand)
+    mask = discard_mask(hand)
     for turn in (3,):
         discard_pools = (own_pool[:turn], (), (), ())
 
@@ -603,7 +560,7 @@ async def test_discard_with_empty_faan_overrides_matches_default_route_faan() ->
         T.WIND_SOUTH,
     ]
     own_pool = _own_pool(13, avoid=set(hand))
-    mask = _discard_mask(hand)
+    mask = discard_mask(hand)
     discard_pools = (own_pool[:3], (), (), ())
 
     view_default = _build_view(0, hand, turn=3, discard_pools=discard_pools)
@@ -654,7 +611,7 @@ async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
     seat1_pool = (tile_ids_for_type(T.WIND_NORTH)[3],)  # genbutsu source for 北
     discard_pools = (_FOLD_HAND_OWN_POOL[:8], seat1_pool, (), ())
     melds = ((), (seat1_pung,), (), ())
-    mask = _discard_mask(_FOLD_HAND)
+    mask = discard_mask(_FOLD_HAND)
 
     view_default = _build_view(0, _FOLD_HAND, turn=8, discard_pools=discard_pools, melds=melds)
     aid_default = await FaanBot().act(view_default, mask, NO_DEADLINE)
@@ -681,7 +638,7 @@ async def test_never_declares_a_self_kong_when_hands_is_none() -> None:
     behavior must stay exactly what it was before that fix -- same convention as
     `tests/test_efficiency.py::test_never_declares_a_self_kong`. Holding all 4 copies of a tile
     concealed never strictly helps here (a kong always counts as exactly 3 tiles in the shanten
-    array, same as a plain triplet, `bots/features._add_meld`) -- the bot must discard instead of
+    array, same as a plain triplet, `bots/features.add_meld`) -- the bot must discard instead of
     declaring the legal concealed kong."""
     hand = [
         T.MAN_1,
@@ -701,7 +658,7 @@ async def test_never_declares_a_self_kong_when_hands_is_none() -> None:
     ]
     view = _build_view(0, hand)
     assert view.hands is None
-    mask = _discard_mask(hand, extra=[CONCEALED_KONG_BASE + int(T.MAN_1)])
+    mask = discard_mask(hand, extra=[CONCEALED_KONG_BASE + int(T.MAN_1)])
     aid = await FaanBot().act(view, mask, NO_DEADLINE)
     assert aid != CONCEALED_KONG_BASE + int(T.MAN_1)
     assert aid < 34  # took a discard, not the kong

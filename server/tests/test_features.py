@@ -15,6 +15,7 @@ from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from tests.hands import concealed_kong
 
 
 def _view(
@@ -66,10 +67,6 @@ def _pung(tile_type: TileType) -> Meld:
     return Meld(MeldKind.PUNG, tile_ids_for_type(tile_type)[:3], from_seat=0)
 
 
-def _concealed_kong(tile_type: TileType) -> Meld:
-    return Meld(MeldKind.CONCEALED_KONG, tile_ids_for_type(tile_type))
-
-
 # --- view.hands is None: byte-identical regression pin ----------------------------------------
 
 
@@ -79,8 +76,8 @@ def test_seen34_hands_none_matches_the_original_probabilistic_behavior() -> None
     pool, computed by hand here rather than re-deriving it from `seen34` itself."""
     own_types = (TileType.MAN_1, TileType.MAN_2, TileType.MAN_3)
     exposed_pung = _pung(TileType.PIN_5)
-    concealed_kong = _concealed_kong(TileType.SOU_9)
-    melds = ((), (exposed_pung,), (concealed_kong,), ())
+    kong = concealed_kong(TileType.SOU_9)
+    melds = ((), (exposed_pung,), (kong,), ())
     discard_pools = ((), _pool((TileType.WIND_EAST,)), (), _pool((TileType.DRAGON_WHITE,) * 2))
     view = _view(own_types=own_types, melds=melds, discard_pools=discard_pools)
     assert view.hands is None
@@ -172,7 +169,7 @@ def test_seen34_counts_an_opponents_concealed_kong_with_or_without_hands() -> No
         TileType.PIN_7,
         TileType.DRAGON_WHITE,
     )
-    kong = _concealed_kong(TileType.SOU_9)
+    kong = concealed_kong(TileType.SOU_9)
     melds = ((), (kong,), (), ())
     opp1_remaining = _pool(
         (
@@ -193,6 +190,6 @@ def test_seen34_counts_an_opponents_concealed_kong_with_or_without_hands() -> No
 
     sou9 = int(TileType.SOU_9)
     assert seen34(probabilistic_view)[sou9] == 3
-    # a kong contributes 3 to a 34-count array, matching `_add_meld`'s existing convention for
+    # a kong contributes 3 to a 34-count array, matching `add_meld`'s existing convention for
     # every other meld this module counts (docs/bots.md §3).
     assert seen34(hands_view)[sou9] == 3

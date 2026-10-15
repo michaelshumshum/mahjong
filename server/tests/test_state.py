@@ -18,15 +18,7 @@ from mahjong_core.state import (
     new_game,
 )
 from mahjong_core.tiles import TOTAL_PHYSICAL_TILES, Flower, TileId
-
-
-def _total_tiles(state: GameState) -> int:
-    seat_tiles = sum(
-        len(seat.concealed) + sum(len(m.tiles) for m in seat.melds) + len(seat.discards)
-        for seat in state.seats
-    )
-    seat_flowers = sum(len(seat.flowers) for seat in state.seats)
-    return seat_tiles + len(state.wall.tiles) + seat_flowers
+from tests.game_state import total_tiles
 
 
 def _tag(tile: object) -> tuple[str, int]:
@@ -51,7 +43,7 @@ def _all_tiles(state: GameState) -> list[object]:
 
 def test_new_game_conserves_144_tiles() -> None:
     state = new_game(DEFAULT_RULESET, game_seed=1)
-    assert _total_tiles(state) == TOTAL_PHYSICAL_TILES == 144
+    assert total_tiles(state) == TOTAL_PHYSICAL_TILES == 144
 
 
 def test_new_game_every_tile_unique() -> None:
@@ -64,14 +56,14 @@ def test_new_game_every_tile_unique() -> None:
 def test_new_game_conserves_136_tiles_when_flowers_disabled() -> None:
     ruleset = RuleSet(flowers_enabled=False)
     state = new_game(ruleset, game_seed=1)
-    assert _total_tiles(state) == 136
+    assert total_tiles(state) == 136
     assert all(len(seat.flowers) == 0 for seat in state.seats)
 
 
 @given(st.integers(min_value=0, max_value=100_000))
 def test_property_new_game_conserves_tiles(game_seed: int) -> None:
     state = new_game(DEFAULT_RULESET, game_seed)
-    assert _total_tiles(state) == TOTAL_PHYSICAL_TILES
+    assert total_tiles(state) == TOTAL_PHYSICAL_TILES
     tiles = _all_tiles(state)
     assert len({_tag(t) for t in tiles}) == TOTAL_PHYSICAL_TILES
 

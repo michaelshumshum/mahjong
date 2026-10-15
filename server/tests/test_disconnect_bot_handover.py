@@ -23,55 +23,18 @@ which tile the bot chooses, only that the game keeps moving.
 from __future__ import annotations
 
 import dataclasses
-import itertools
 import uuid
 
 from fastapi.testclient import TestClient
 
-from app.clock import now_ms
 from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
-
-_id_gen = itertools.count(1)
-
-
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
-
-
-def _hello(
-    *, last_seq: int | None = None, seat: int | None = None, secret: str | None = None
-) -> dict[str, object]:
-    d: dict[str, object] = {"client_version": "test"}
-    if last_seq is not None:
-        d["last_seq"] = last_seq
-    if seat is not None:
-        d["seat"] = seat
-    if secret is not None:
-        d["secret"] = secret
-    return _msg("hello", d)
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
-def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
-    ids = [tid for t in types for tid in tile_ids_for_type(t)]
-    return tuple(ids[:count])
+from tests.game_state import with_seat
+from tests.ws_frames import first_tile_ids, hello, msg, next_id
 
 
 def _join_and_ready_all(wss: list) -> dict[int, str]:  # type: ignore[type-arg]
@@ -79,13 +42,13 @@ def _join_and_ready_all(wss: list) -> dict[int, str]:  # type: ignore[type-arg]
     `tests/test_reconnect.py`'s helper of the same name established, minus its `last_seq`
     bookkeeping (this file never needs a gap-replay `last_seq`). Returns each seat's
     `reconnect_secret` from its own `join` ack (architecture.md §2.1), needed by this file's
-    own `_hello(seat=..., secret=...)` reconnect."""
+    own `hello(seat=..., secret=...)` reconnect."""
     for ws in wss:
-        ws.send_json(_hello())
+        ws.send_json(hello())
     bound = [False, False, False, False]
     secret: dict[int, str] = {}
     for seat, ws in enumerate(wss):
-        ws.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
+        ws.send_json(msg("join", {"seat": seat}, id_=next_id()))
         bound[seat] = True
         for s, other in enumerate(wss):
             if bound[s]:
@@ -98,11 +61,11 @@ def _join_and_ready_all(wss: list) -> dict[int, str]:  # type: ignore[type-arg]
         secret[seat] = ack["d"]["reconnect_secret"]
 
     for seat in range(3):
-        wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
+        wss[seat].send_json(msg("ready", {}, id_=next_id()))
         ack = wss[seat].receive_json()
         assert ack["t"] == "ack"
 
-    wss[3].send_json(_msg("ready", {}, id_=_next_id()))
+    wss[3].send_json(msg("ready", {}, id_=next_id()))
     for seat in range(4):
         hand_start = wss[seat].receive_json()
         assert hand_start["t"] == "hand_start"
@@ -123,7 +86,7 @@ def _rig_disconnect_state(seed: int) -> GameState:
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
 
     seat0 = (
-        *_tiles(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
+        *first_tile_ids(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
         tile_ids_for_type(TileType.WIND_EAST)[0],
     )
     seat1 = (
@@ -133,7 +96,7 @@ def _rig_disconnect_state(seed: int) -> GameState:
         tile_ids_for_type(TileType.DRAGON_RED)[0],
         tile_ids_for_type(TileType.DRAGON_GREEN)[0],
         tile_ids_for_type(TileType.DRAGON_WHITE)[0],
-        # one tile each: `_tiles(..., count=7)` slices the flattened id list (4 copies of the
+        # one tile each: `first_tile_ids(..., count=7)` slices the flattened id list (4 copies of the
         # first type first), not one-per-type -- wrong shape for 7 distinct types here.
         tile_ids_for_type(TileType.MAN_1)[0],
         tile_ids_for_type(TileType.MAN_2)[0],
@@ -143,13 +106,13 @@ def _rig_disconnect_state(seed: int) -> GameState:
         tile_ids_for_type(TileType.MAN_6)[0],
         tile_ids_for_type(TileType.MAN_7)[0],
     )
-    seat2 = _tiles(TileType.SOU_1, TileType.SOU_3, TileType.SOU_5, TileType.SOU_7, count=13)
-    seat3 = _tiles(TileType.PIN_1, TileType.PIN_3, TileType.PIN_5, TileType.PIN_7, count=13)
+    seat2 = first_tile_ids(TileType.SOU_1, TileType.SOU_3, TileType.SOU_5, TileType.SOU_7, count=13)
+    seat3 = first_tile_ids(TileType.PIN_1, TileType.PIN_3, TileType.PIN_5, TileType.PIN_7, count=13)
 
-    state = _with_seat(state, 0, concealed=seat0, discards=())
-    state = _with_seat(state, 1, concealed=seat1)
-    state = _with_seat(state, 2, concealed=seat2)
-    state = _with_seat(state, 3, concealed=seat3)
+    state = with_seat(state, 0, concealed=seat0, discards=())
+    state = with_seat(state, 1, concealed=seat1)
+    state = with_seat(state, 2, concealed=seat2)
+    state = with_seat(state, 3, concealed=seat3)
 
     # seat 1's forced draw (after seat 0's discard) is a 14th distinct type -- no pair, no kong,
     # no win shape; a plain suited tile, not a flower (no extra flower_replace/draw pair).
@@ -200,7 +163,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
         # --- seat 0 discards its uncontested tile -> cascades straight to seat 1's draw+turn
         # (claim-proof by construction, module docstring).
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
-        ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
+        ws0.send_json(msg("discard", {"tile_id": discard_tile}, id_=next_id()))
         ack = ws0.receive_json()
         assert ack["t"] == "ack" and ack["d"]["ok"] is True
 
@@ -231,7 +194,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
         # --- reconnect: status flips back, the bot stops acting for the seat (D12 staleness
         # drop doubling as "stop", app/table.py's reconnect() docstring).
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
-            ws1b.send_json(_hello(seat=1, secret=seat1_secret))
+            ws1b.send_json(hello(seat=1, secret=seat1_secret))
 
             for ws in observers:
                 frame = ws.receive_json()
@@ -267,7 +230,7 @@ def _rig_faan_discard_state(seed: int) -> GameState:
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
 
     seat0 = (
-        *_tiles(TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
+        *first_tile_ids(TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
         tile_ids_for_type(TileType.DRAGON_RED)[0],
     )
     seat1 = (
@@ -285,13 +248,13 @@ def _rig_faan_discard_state(seed: int) -> GameState:
         tile_ids_for_type(TileType.SOU_4)[0],
         tile_ids_for_type(TileType.SOU_6)[0],
     )
-    seat2 = _tiles(TileType.SOU_1, TileType.SOU_3, TileType.SOU_5, TileType.SOU_7, count=13)
-    seat3 = _tiles(TileType.PIN_1, TileType.PIN_3, TileType.PIN_5, TileType.PIN_7, count=13)
+    seat2 = first_tile_ids(TileType.SOU_1, TileType.SOU_3, TileType.SOU_5, TileType.SOU_7, count=13)
+    seat3 = first_tile_ids(TileType.PIN_1, TileType.PIN_3, TileType.PIN_5, TileType.PIN_7, count=13)
 
-    state = _with_seat(state, 0, concealed=seat0, discards=())
-    state = _with_seat(state, 1, concealed=seat1)
-    state = _with_seat(state, 2, concealed=seat2)
-    state = _with_seat(state, 3, concealed=seat3)
+    state = with_seat(state, 0, concealed=seat0, discards=())
+    state = with_seat(state, 1, concealed=seat1)
+    state = with_seat(state, 2, concealed=seat2)
+    state = with_seat(state, 3, concealed=seat3)
 
     draw_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
     wall = state.wall
@@ -341,7 +304,7 @@ def test_disconnect_bot_runs_faanbot_not_random() -> None:
             assert frame["d"] == {"seat": 1, "status": "autoplay", "name": "Guest 2"}
 
         discard_tile = tile_ids_for_type(TileType.DRAGON_RED)[0]
-        ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
+        ws0.send_json(msg("discard", {"tile_id": discard_tile}, id_=next_id()))
         ack = ws0.receive_json()
         assert ack["t"] == "ack" and ack["d"]["ok"] is True
 

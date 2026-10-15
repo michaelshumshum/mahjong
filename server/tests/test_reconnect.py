@@ -42,57 +42,20 @@ one `receive_json` produced by that same `hello`'s handling, never before.
 from __future__ import annotations
 
 import dataclasses
-import itertools
 import uuid
 from collections import deque
 
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from app.clock import now_ms
 from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
-
-_id_gen = itertools.count(1)
-
-
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
-
-
-def _hello(
-    *, last_seq: int | None = None, seat: int | None = None, secret: str | None = None
-) -> dict[str, object]:
-    d: dict[str, object] = {"client_version": "test"}
-    if last_seq is not None:
-        d["last_seq"] = last_seq
-    if seat is not None:
-        d["seat"] = seat
-    if secret is not None:
-        d["secret"] = secret
-    return _msg("hello", d)
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
-def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
-    ids = [tid for t in types for tid in tile_ids_for_type(t)]
-    return tuple(ids[:count])
+from tests.game_state import with_seat
+from tests.ws_frames import first_tile_ids, hello, msg, next_id
 
 
 def _join_and_ready_all(wss: list) -> tuple[dict[int, int], dict[int, str]]:  # type: ignore[type-arg]
@@ -102,14 +65,14 @@ def _join_and_ready_all(wss: list) -> tuple[dict[int, int], dict[int, str]]:  # 
     read straight off the frames actually received rather than hand-derived, so later
     `last_seq=` values in this file are always exactly what that connection really has -- plus
     each seat's `reconnect_secret` from its own `join` ack (architecture.md §2.1), needed by
-    any later `_hello(seat=..., secret=...)` reconnect in this file."""
+    any later `hello(seat=..., secret=...)` reconnect in this file."""
     for ws in wss:
-        ws.send_json(_hello())
+        ws.send_json(hello())
     bound = [False, False, False, False]
     last_seq: dict[int, int] = {}
     secret: dict[int, str] = {}
     for seat, ws in enumerate(wss):
-        ws.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
+        ws.send_json(msg("join", {"seat": seat}, id_=next_id()))
         bound[seat] = True
         for s, other in enumerate(wss):
             if bound[s]:
@@ -125,12 +88,12 @@ def _join_and_ready_all(wss: list) -> tuple[dict[int, int], dict[int, str]]:  # 
         secret[seat] = ack["d"]["reconnect_secret"]
 
     for seat in range(3):
-        wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
+        wss[seat].send_json(msg("ready", {}, id_=next_id()))
         ack = wss[seat].receive_json()
         assert ack["t"] == "ack"
         last_seq[seat] = ack["seq"]
 
-    wss[3].send_json(_msg("ready", {}, id_=_next_id()))
+    wss[3].send_json(msg("ready", {}, id_=next_id()))
     for seat in range(4):
         hand_start = wss[seat].receive_json()
         assert hand_start["t"] == "hand_start"
@@ -168,24 +131,24 @@ def _rig_uncontested_state(seed: int) -> GameState:
     state = new_game(DEFAULT_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
     seat0 = (
-        *_tiles(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
+        *first_tile_ids(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12),
         tile_ids_for_type(TileType.WIND_EAST)[0],
     )
-    seat1 = _tiles(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, TileType.SOU_8, count=13)
-    seat2 = _tiles(
+    seat1 = first_tile_ids(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, TileType.SOU_8, count=13)
+    seat2 = first_tile_ids(
         TileType.DRAGON_RED,
         TileType.DRAGON_GREEN,
         TileType.DRAGON_WHITE,
         TileType.WIND_SOUTH,
         count=13,
     )
-    seat3 = _tiles(
+    seat3 = first_tile_ids(
         TileType.WIND_WEST, TileType.WIND_NORTH, TileType.PIN_1, TileType.PIN_3, count=13
     )
-    state = _with_seat(state, 0, concealed=seat0, discards=())
-    state = _with_seat(state, 1, concealed=seat1)
-    state = _with_seat(state, 2, concealed=seat2)
-    state = _with_seat(state, 3, concealed=seat3)
+    state = with_seat(state, 0, concealed=seat0, discards=())
+    state = with_seat(state, 1, concealed=seat1)
+    state = with_seat(state, 2, concealed=seat2)
+    state = with_seat(state, 3, concealed=seat3)
     # force seat 1's next draw to a plain suited tile, not a flower -- avoids an extra
     # flower_replace/draw pair this fixture doesn't need to model.
     safe_tile = tile_ids_for_type(TileType.PIN_5)[0]
@@ -205,20 +168,24 @@ def _rig_claim_window_state(seed: int) -> GameState:
     man4 = tile_ids_for_type(TileType.MAN_4)
     man5 = tile_ids_for_type(TileType.MAN_5)
     man6 = tile_ids_for_type(TileType.MAN_6)
-    seat0_junk = _tiles(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12)
-    seat1_junk = _tiles(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
-    seat2_junk = _tiles(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
-    seat3_junk = _tiles(
+    seat0_junk = first_tile_ids(
+        TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=12
+    )
+    seat1_junk = first_tile_ids(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
+    seat2_junk = first_tile_ids(
+        TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11
+    )
+    seat3_junk = first_tile_ids(
         TileType.DRAGON_RED,
         TileType.DRAGON_GREEN,
         TileType.DRAGON_WHITE,
         TileType.WIND_NORTH,
         count=13,
     )
-    state = _with_seat(state, 0, concealed=(*seat0_junk, man5[0]), discards=())
-    state = _with_seat(state, 1, concealed=(man4[0], man6[0], *seat1_junk))
-    state = _with_seat(state, 2, concealed=(man5[1], man5[2], *seat2_junk))
-    state = _with_seat(state, 3, concealed=seat3_junk)
+    state = with_seat(state, 0, concealed=(*seat0_junk, man5[0]), discards=())
+    state = with_seat(state, 1, concealed=(man4[0], man6[0], *seat1_junk))
+    state = with_seat(state, 2, concealed=(man5[1], man5[2], *seat2_junk))
+    state = with_seat(state, 3, concealed=seat3_junk)
     return state
 
 
@@ -244,7 +211,7 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
         _drain_teardown_disconnects(ws0)
 
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
-        ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
+        ws0.send_json(msg("discard", {"tile_id": discard_tile}, id_=next_id()))
         ack = ws0.receive_json()
         assert ack["t"] == "ack" and ack["d"]["ok"] is True
         discard_evt = ws0.receive_json()
@@ -261,7 +228,7 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
         seat_seq_before_resume = table.seat_seq[1]
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
-            ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
+            ws1b.send_json(hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
 
             # seat1_last_seq predates the 3 disconnect broadcasts too (captured back in
             # `_join_and_ready_all`, before any of this) -- replay picks those up first.
@@ -303,7 +270,7 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
         _drain_teardown_disconnects(ws0)
 
         discard_tile = tile_ids_for_type(TileType.WIND_EAST)[0]
-        ws0.send_json(_msg("discard", {"tile_id": discard_tile}, id_=_next_id()))
+        ws0.send_json(msg("discard", {"tile_id": discard_tile}, id_=next_id()))
         # ack, discard, draw, turn -- from ws0's own uncontested discard
         ws0.receive_json()
         ws0.receive_json()
@@ -316,7 +283,7 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
         assert table.ring[1] and table.ring[1][0].seq > seat1_last_seq
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
-            ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
+            ws1b.send_json(hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
             frame = ws1b.receive_json()
             assert frame["t"] == "state_sync"
             assert frame["d"]["seat"] == 1
@@ -350,7 +317,7 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
         ring_len_before = len(table.ring[1])
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
-            ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
+            ws1b.send_json(hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
 
             # no replay needed, but reconnecting from `disconnected` still bumps seq by one
             # `seat_state` -- receive it before asserting table state directly (`send_json` doesn't guarantee resume() ran yet).
@@ -363,9 +330,7 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             # the connection is genuinely live again: a fresh broadcast reaches it with the
             # very next seq, no gap.
             ws0.send_json(
-                _msg(
-                    "discard", {"tile_id": tile_ids_for_type(TileType.WIND_EAST)[0]}, id_=_next_id()
-                )
+                msg("discard", {"tile_id": tile_ids_for_type(TileType.WIND_EAST)[0]}, id_=next_id())
             )
             live_frame = ws1b.receive_json()
             assert live_frame["t"] == "discard"
@@ -405,7 +370,7 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
             seat1_secret = secret[1]
 
             man5 = tile_ids_for_type(TileType.MAN_5)
-            ws0.send_json(_msg("discard", {"tile_id": man5[0]}, id_=_next_id()))
+            ws0.send_json(msg("discard", {"tile_id": man5[0]}, id_=next_id()))
             ws0.receive_json()  # ack
             ws0.receive_json()  # discard, seat 0's own stream
 
@@ -432,8 +397,8 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
 
             # a real Pass from seat 2 -- the window's other, still-open offer -- with seat 1
             # never sending anything itself (this module's own docstring, above).
-            claim_id = _next_id()
-            ws2.send_json(_msg("claim", {"window_id": window_id, "choice": "pass"}, id_=claim_id))
+            claim_id = next_id()
+            ws2.send_json(msg("claim", {"window_id": window_id, "choice": "pass"}, id_=claim_id))
             ack = ws2.receive_json()
             assert ack["d"] == {"id": claim_id, "ok": True}
 
@@ -450,7 +415,7 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
         # seat 1's claim offer was already forfeited and the window resolved while offline, so
         # no `claim_offer` appears in the replay -- drain until resume()'s reconnect frame (always last) and check.
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
-            ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
+            ws1b.send_json(hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
 
             seen_types: list[str] = []
             while True:
@@ -475,15 +440,15 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
         assert table is not None
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws1:
-            ws0.send_json(_hello())
-            ws1.send_json(_hello())
-            ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+            ws0.send_json(hello())
+            ws1.send_json(hello())
+            ws0.send_json(msg("join", {"seat": 0}, id_=next_id()))
             # seat_state (own join), state_sync, ack
             ws0.receive_json()
             ws0.receive_json()
             ws0.receive_json()
 
-            ws1.send_json(_msg("join", {"seat": 1, "name": "Carol"}, id_=_next_id()))
+            ws1.send_json(msg("join", {"seat": 1, "name": "Carol"}, id_=next_id()))
             joined = ws0.receive_json()  # seat_state broadcast reaches seat 0 live
             assert joined["t"] == "seat_state"
             assert joined["d"] == {"seat": 1, "status": "connected", "name": "Carol"}
@@ -506,7 +471,7 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             # reconnect carries no `name` at all -- the server still knows it.
-            ws1b.send_json(_hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
+            ws1b.send_json(hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
             # its own disconnect broadcast landed in its own ring too (same seat, same stream)
             # -- replayed back first, name intact, before the fresh "connected" announcement.
             replayed_disconnect = ws1b.receive_json()
@@ -534,8 +499,8 @@ def test_hello_wrong_or_missing_secret_refuses_the_reclaim() -> None:
         table = get_table(table_id)
         assert table is not None
 
-        ws0.send_json(_hello())
-        ws0.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        ws0.send_json(hello())
+        ws0.send_json(msg("join", {"seat": 0}, id_=next_id()))
         ws0.receive_json()  # seat_state (own join)
         ws0.receive_json()  # state_sync
         ack0 = ws0.receive_json()
@@ -544,13 +509,13 @@ def test_hello_wrong_or_missing_secret_refuses_the_reclaim() -> None:
         assert isinstance(real_secret, str) and real_secret
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws_wrong:
-            ws_wrong.send_json(_hello(seat=0, secret="not-the-real-secret"))
+            ws_wrong.send_json(hello(seat=0, secret="not-the-real-secret"))
             frame = ws_wrong.receive_json()
             assert frame["t"] == "error"
             assert frame["d"]["code"] == "bad_secret"
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws_missing:
-            ws_missing.send_json(_hello(seat=0))
+            ws_missing.send_json(hello(seat=0))
             frame = ws_missing.receive_json()
             assert frame["t"] == "error"
             assert frame["d"]["code"] == "bad_secret"
@@ -558,7 +523,7 @@ def test_hello_wrong_or_missing_secret_refuses_the_reclaim() -> None:
         # neither bad attempt reclaimed the seat -- the real secret still works, proving
         # reconnect never rebound the connection (ws0 never closed, so resume() sends state_sync).
         with client.websocket_connect(f"/ws?table={table_id}") as ws0b:
-            ws0b.send_json(_hello(seat=0, secret=real_secret))
+            ws0b.send_json(hello(seat=0, secret=real_secret))
             reconnected = ws0b.receive_json()
             assert reconnected["t"] == "state_sync"
             assert reconnected["d"]["seat"] == 0

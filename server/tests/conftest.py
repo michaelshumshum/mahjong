@@ -25,8 +25,13 @@ is safe."""
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 os.environ.setdefault("SHUTDOWN_GRACE_SECONDS", "0")
 os.environ.setdefault("BOT_THINK_MIN_SECONDS", "0")
@@ -61,3 +66,19 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         if not any(mark.name == "slow" for mark in item.iter_markers()):
             item.add_marker(fast_marker)
+
+
+@pytest.fixture
+async def session() -> AsyncIterator[AsyncSession]:
+    """In-memory SQLite, fresh schema per test."""
+    # imported here so the env defaults above land before any `app` module loads
+    from app.db.models import Base
+    from app.db.session import make_engine, make_session_factory
+
+    engine = make_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = make_session_factory(engine)
+    async with factory() as s:
+        yield s
+    await engine.dispose()

@@ -8,14 +8,10 @@ docs/ml.md §1's property test calls for: "across every state the self-play harn
 
 from __future__ import annotations
 
-import random
-from collections.abc import Iterator
-
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from bots.random import random_action
 from mahjong_core import ml
 from mahjong_core.actions import (
     Action,
@@ -26,11 +22,11 @@ from mahjong_core.actions import (
     legal_actions,
 )
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import new_game, reduce, start_next_hand
-from mahjong_core.state import GameState, Phase
+from mahjong_core.engine import new_game
+from mahjong_core.state import GameState
 from mahjong_core.tiles import TileId, TileType, tile_id_type
+from tests.decisions import decision_points
 
-_STEP_CAP = 2000  # generous vs. test_selfplay.py's observed ~450-step max for a 4-hand game
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
 
 _EXPECTED_RANGES: list[tuple[str, int, int]] = [
@@ -89,37 +85,6 @@ def test_pass_and_win_ids_are_fixed_constants() -> None:
 # --- self-play state sweep ---------------------------------------------------------------------
 
 
-def _decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, int]]:
-    """Play one seeded `RandomBot` game to completion, yielding every `(state, seat)` where
-    `seat` has a live decision -- the same traversal `test_selfplay.py`'s `_play_one_game` uses,
-    minus the tile-conservation assertions (out of scope here)."""
-    rng = random.Random(seed)
-    state = new_game(ruleset, seed)
-    steps = 0
-    while state.phase != Phase.GAME_OVER:
-        steps += 1
-        assert steps <= _STEP_CAP, f"seed={seed}: exceeded {_STEP_CAP} steps"
-
-        if state.phase == Phase.HAND_OVER:
-            state, _ = start_next_hand(state)
-            continue
-
-        if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
-            seat = rng.choice(pending)
-        else:
-            seat = state.turn
-
-        yield state, seat
-        action = random_action(state, seat, rng)
-        state, _ = reduce(state, action)
-
-
 def _actions_equivalent(a: Action, b: Action) -> bool:
     """Type-level equivalence: a `Discard` matches iff its `tile_type` matches (ml.md §1 --
     the action space is type-level only, physical `tile_id` is fungible); every other variant
@@ -135,7 +100,7 @@ def test_legal_mask_matches_legal_actions_directly(seed: int) -> None:
     """`legal_mask` bit `i` is set iff some action `actions.legal_actions` actually offers
     encodes to `i` -- checked at every decision point of a played-out game, not hand-picked
     states."""
-    for state, seat in _decision_points(seed, _BOUNDED_RULESET):
+    for state, seat in decision_points(seed, _BOUNDED_RULESET):
         legal = legal_actions(state, seat)
         assert legal, f"seed={seed}: legal_actions empty at a yielded decision point"
 
@@ -166,7 +131,7 @@ def test_round_trip_property_across_selfplay(seed: int) -> None:
     checked here as `action_id(decode_action(action_id(a), ...)) == action_id(a)`, since both
     sides operate on `tile_type`, never physical `tile_id` (the doc's own resolution of why the
     naive `tile_id`-level version of this test was false by construction)."""
-    for state, seat in _decision_points(seed, _BOUNDED_RULESET):
+    for state, seat in decision_points(seed, _BOUNDED_RULESET):
         legal = legal_actions(state, seat)
         assert legal
 

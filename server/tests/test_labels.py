@@ -23,17 +23,12 @@ from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import GameState, new_game
 from mahjong_core.tiles import TileType, tile_ids_for_type
+from tests.game_state import with_seat
 
 
 def _state(**overrides: object) -> GameState:
     state = new_game(RuleSet(hand_sets=frozenset(HandSet)), game_seed=1)
     return dataclasses.replace(state, **overrides)  # type: ignore[arg-type]
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
 def _tids(tile_type: TileType, n: int = 1, start: int = 0) -> tuple[int, ...]:
@@ -86,7 +81,7 @@ _JUNK_HAND = (
 
 
 def test_is_tenpai_and_winning_tile_types_for_a_ryanmen_wait() -> None:
-    state = _with_seat(_state(), 1, concealed=_RYANMEN_HAND, melds=(), flowers=())
+    state = with_seat(_state(), 1, concealed=_RYANMEN_HAND, melds=(), flowers=())
     assert is_tenpai(state, 1)
     hand34 = seat_hand34(state.seats[1])
     winners = winning_tile_types(hand34, closed=True, hand_sets=state.ruleset.hand_sets)
@@ -94,7 +89,7 @@ def test_is_tenpai_and_winning_tile_types_for_a_ryanmen_wait() -> None:
 
 
 def test_expected_faan_if_won_returns_zero_for_a_non_winning_tile_type() -> None:
-    state = _with_seat(_state(), 1, concealed=_RYANMEN_HAND, melds=(), flowers=())
+    state = with_seat(_state(), 1, concealed=_RYANMEN_HAND, melds=(), flowers=())
     assert expected_faan_if_won(state, 1, int(TileType.DRAGON_RED), discarder=2) == 0.0
 
 
@@ -115,7 +110,7 @@ def test_expected_faan_if_won_matches_the_real_scorer_for_a_valuable_hand() -> N
         tile_ids_for_type(TileType.PIN_2)[1],
         tile_ids_for_type(TileType.PIN_4)[1],
     )
-    state = _with_seat(_state(), 1, concealed=hand, melds=(), flowers=())
+    state = with_seat(_state(), 1, concealed=hand, melds=(), flowers=())
     assert expected_faan_if_won(state, 1, int(TileType.PIN_3), discarder=2) == 6.0
 
 
@@ -140,7 +135,7 @@ def test_expected_faan_if_won_returns_zero_for_a_structurally_complete_sub_minim
         *_tids(TileType.SOU_4),
         *_tids(TileType.SOU_5),
     )
-    state = _with_seat(_state(), 1, concealed=concealed, melds=(exposed,), flowers=())
+    state = with_seat(_state(), 1, concealed=concealed, melds=(exposed,), flowers=())
     assert expected_faan_if_won(state, 1, int(TileType.SOU_3), discarder=0) == 0.0
     assert expected_faan_if_won(state, 1, int(TileType.SOU_6), discarder=0) == 0.0
 
@@ -149,7 +144,7 @@ def test_expected_faan_if_won_returns_zero_when_all_four_copies_are_already_held
     """A concealed kong already holds all 4 physical copies of its type -- a 5th can't exist, so
     this must return 0.0 rather than raise looking for an unused physical id."""
     kong = Meld(kind=MeldKind.CONCEALED_KONG, tiles=tile_ids_for_type(TileType.DRAGON_WHITE))
-    state = _with_seat(_state(), 1, concealed=_tids(TileType.MAN_1, 9), melds=(kong,), flowers=())
+    state = with_seat(_state(), 1, concealed=_tids(TileType.MAN_1, 9), melds=(kong,), flowers=())
     assert expected_faan_if_won(state, 1, int(TileType.DRAGON_WHITE), discarder=0) == 0.0
 
 
@@ -157,7 +152,7 @@ def test_is_tenpai_seven_pairs_gated_by_hand_sets() -> None:
     """Mirrors `tests/test_shanten.py::test_seven_pairs_gated_by_hand_sets` at the labels layer:
     a hand only tenpai via Seven Pairs (NEW_18) must not be reported tenpai once NEW_18 is off
     (docs/bots.md §8)."""
-    state = _with_seat(_state(), 1, concealed=_SEVEN_PAIRS_HAND, melds=(), flowers=())
+    state = with_seat(_state(), 1, concealed=_SEVEN_PAIRS_HAND, melds=(), flowers=())
     assert is_tenpai(state, 1)
 
     strict = dataclasses.replace(state, ruleset=RuleSet(hand_sets=frozenset({HandSet.CLASSIC})))
@@ -166,9 +161,9 @@ def test_is_tenpai_seven_pairs_gated_by_hand_sets() -> None:
 
 def test_danger_labels_for_opponents_covers_every_seat_but_self_with_real_labels() -> None:
     state = _state()
-    state = _with_seat(state, 1, concealed=_RYANMEN_HAND, melds=(), flowers=())
-    state = _with_seat(state, 2, concealed=_SEVEN_PAIRS_HAND, melds=(), flowers=())
-    state = _with_seat(state, 3, concealed=_JUNK_HAND, melds=(), flowers=())
+    state = with_seat(state, 1, concealed=_RYANMEN_HAND, melds=(), flowers=())
+    state = with_seat(state, 2, concealed=_SEVEN_PAIRS_HAND, melds=(), flowers=())
+    state = with_seat(state, 3, concealed=_JUNK_HAND, melds=(), flowers=())
 
     labels = danger_labels_for_opponents(state, 0)
     assert set(labels) == {1, 2, 3}
@@ -195,7 +190,7 @@ def test_meld_counts34_matches_seat_hand34_when_concealed_is_empty() -> None:
         kind=MeldKind.EXPOSED_KONG, tiles=tile_ids_for_type(TileType.DRAGON_RED), from_seat=1
     )
     pung = Meld(kind=MeldKind.PUNG, tiles=tile_ids_for_type(TileType.WIND_EAST)[:3], from_seat=2)
-    state = _with_seat(_state(), 1, concealed=(), melds=(kong, pung), flowers=())
+    state = with_seat(_state(), 1, concealed=(), melds=(kong, pung), flowers=())
     assert meld_counts34(state.seats[1].melds) == seat_hand34(state.seats[1])
     # kong contributes 3, not 4 -- matches mahjong_core.shanten's convention
     assert meld_counts34(state.seats[1].melds)[int(TileType.DRAGON_RED)] == 3

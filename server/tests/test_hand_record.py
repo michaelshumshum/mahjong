@@ -5,35 +5,21 @@
 from __future__ import annotations
 
 import random
-from collections.abc import AsyncIterator
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Base
 from app.db.records import (
     get_hand_record,
     hand_record_columns,
     is_replayable,
     save_hand_record,
 )
-from app.db.session import make_engine, make_session_factory
 from mahjong_core.actions import Action, action_from_dict
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game, new_hand, reduce
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.state import GameState, Phase, Wind
-
-
-@pytest.fixture
-async def session() -> AsyncIterator[AsyncSession]:
-    engine = make_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    factory = make_session_factory(engine)
-    async with factory() as s:
-        yield s
-    await engine.dispose()
 
 
 def _play_hand(state: GameState, seed: int) -> tuple[GameState, list[Action]]:

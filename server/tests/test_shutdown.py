@@ -37,6 +37,7 @@ from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
+from tests.game_state import with_seat
 
 _SEAT0_JUNK = tile_ids_for_type(TileType.PIN_2)[:4] + tile_ids_for_type(TileType.PIN_4)[:4]
 _SEAT0_JUNK += tile_ids_for_type(TileType.PIN_6)[:4] + tile_ids_for_type(TileType.PIN_8)[:1]
@@ -57,12 +58,6 @@ _SEAT3_JUNK = (
 )
 
 
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
 # `_bind_fake_seats` binds real "connected" SeatBindings (not bot/autoplay), so the hand-end
 # hold never auto-acks; `hand_end_seconds=0` is what lets it resolve (test_table.py's `_BOUNDED_RULESET` idiom).
 _ZERO_HOLD_RULESET = dataclasses.replace(DEFAULT_RULESET, hand_end_seconds=0)
@@ -76,10 +71,10 @@ def _rig_uncontested_state(seed: int) -> GameState:
     boundary, matching `Table.wait_for_shutdown_boundary`'s contract."""
     state = new_game(_ZERO_HOLD_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = _with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
-    state = _with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
-    state = _with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
-    state = _with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
+    state = with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
+    state = with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
+    state = with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
+    state = with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
 
 

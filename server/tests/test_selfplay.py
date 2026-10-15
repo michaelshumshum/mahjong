@@ -32,19 +32,9 @@ from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TOTAL_PHYSICAL_TILES
+from tests.game_state import total_tiles
 
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
-
-
-def _total_tiles(state: GameState) -> int:
-    """All physical tiles accounted for: concealed + melds + discards per seat, plus flowers,
-    plus what's left in the wall (docs/testing.md §1's tile-conservation invariant)."""
-    seat_tiles = sum(
-        len(seat.concealed) + sum(len(m.tiles) for m in seat.melds) + len(seat.discards)
-        for seat in state.seats
-    )
-    seat_flowers = sum(len(seat.flowers) for seat in state.seats)
-    return seat_tiles + len(state.wall.tiles) + seat_flowers
 
 
 def _assert_hand_sizes(state: GameState) -> None:
@@ -76,7 +66,7 @@ def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = GAME_STEP_CAP
     rng = random.Random(seed)
     state = new_game(ruleset, seed)
     total = TOTAL_PHYSICAL_TILES if ruleset.flowers_enabled else 136
-    assert _total_tiles(state) == total
+    assert total_tiles(state) == total
     _assert_hand_sizes(state)
 
     steps = 0
@@ -88,7 +78,7 @@ def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = GAME_STEP_CAP
 
         if state.phase == Phase.HAND_OVER:
             state, _ = start_next_hand(state)
-            assert _total_tiles(state) == total
+            assert total_tiles(state) == total
             _assert_hand_sizes(state)
             continue
 
@@ -109,7 +99,7 @@ def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = GAME_STEP_CAP
         assert action in actions
 
         state, _ = reduce(state, action)
-        assert _total_tiles(state) == total
+        assert total_tiles(state) == total
         _assert_hand_sizes(state)
 
     assert state.phase == Phase.GAME_OVER

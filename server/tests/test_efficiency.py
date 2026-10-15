@@ -11,9 +11,6 @@ report for the derivation, not repeated in comments here.
 
 from __future__ import annotations
 
-import random
-from collections.abc import Iterator
-
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -21,14 +18,12 @@ from hypothesis import strategies as st
 from app.views import SeatView, seat_view
 from bots.base import NO_DEADLINE
 from bots.efficiency import EfficiencyBot
-from bots.random import random_action
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
-from mahjong_core.state import GameState, Phase, Wind
+from mahjong_core.state import Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from tests.decisions import decision_points, discard_mask
 
-_STEP_CAP = 2000
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
 
 
@@ -73,52 +68,13 @@ def _build_view(
     )
 
 
-def _discard_mask(types: list[TileType], *, extra: list[int] | None = None) -> list[bool]:
-    mask = [False] * 109
-    for t in set(types):
-        mask[int(t)] = True
-    for aid in extra or ():
-        mask[aid] = True
-    return mask
-
-
 # --- legality: swept across real self-play states -------------------------------------------
-
-
-def _decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, int]]:
-    """Same traversal as `tests/test_ml.py`'s `_decision_points`: a seeded random-policy
-    self-play game, yielding every `(state, seat)` with a live decision."""
-    rng = random.Random(seed)
-    state = new_game(ruleset, seed)
-    steps = 0
-    while state.phase != Phase.GAME_OVER:
-        steps += 1
-        assert steps <= _STEP_CAP, f"seed={seed}: exceeded {_STEP_CAP} steps"
-
-        if state.phase == Phase.HAND_OVER:
-            state, _ = start_next_hand(state)
-            continue
-
-        if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
-            seat = rng.choice(pending)
-        else:
-            seat = state.turn
-
-        yield state, seat
-        action = random_action(state, seat, rng)
-        state, _ = reduce(state, action)
 
 
 @pytest.mark.parametrize("seed", range(5))
 async def test_never_returns_an_illegal_id(seed: int) -> None:
     bot = EfficiencyBot()
-    for state, seat in _decision_points(seed, _BOUNDED_RULESET):
+    for state, seat in decision_points(seed, _BOUNDED_RULESET):
         mask = legal_mask(state, seat)
         view = seat_view(state, seat)
         aid = await bot.act(view, mask, NO_DEADLINE)
@@ -134,7 +90,7 @@ async def test_never_returns_an_illegal_id(seed: int) -> None:
 async def test_never_returns_an_illegal_id_hypothesis(seed: int) -> None:
     """Slow-tier: broader seed coverage than the fixed parametrize above, same assertion."""
     bot = EfficiencyBot()
-    for state, seat in _decision_points(seed, _BOUNDED_RULESET):
+    for state, seat in decision_points(seed, _BOUNDED_RULESET):
         mask = legal_mask(state, seat)
         view = seat_view(state, seat)
         aid = await bot.act(view, mask, NO_DEADLINE)
@@ -178,7 +134,7 @@ async def test_discard_keeps_tenpai_over_breaking_a_complete_meld() -> None:
         T.MAN_9,
     ]
     view = _build_view(0, hand)
-    mask = _discard_mask(hand, extra=[102])
+    mask = discard_mask(hand, extra=[102])
     aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == int(T.MAN_9)
 
@@ -204,7 +160,7 @@ async def test_discard_prefers_honor_on_an_exact_tie() -> None:
         T.PIN_5,
     ]
     view = _build_view(0, hand)
-    mask = _discard_mask(hand, extra=[102])
+    mask = discard_mask(hand, extra=[102])
     aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == int(T.WIND_EAST)
 
@@ -288,7 +244,7 @@ async def test_never_declares_a_self_kong() -> None:
         T.WIND_EAST,
     ]
     view = _build_view(0, hand)
-    mask = _discard_mask(hand, extra=[102, 34 + int(T.MAN_1)])
+    mask = discard_mask(hand, extra=[102, 34 + int(T.MAN_1)])
     aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid != 34 + int(T.MAN_1)
     assert aid < 34  # took a discard, not the kong

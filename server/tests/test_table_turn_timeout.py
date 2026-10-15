@@ -25,6 +25,7 @@ from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
+from tests.game_state import with_seat
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)
 _MAN_2 = tile_ids_for_type(TileType.MAN_2)
@@ -58,12 +59,6 @@ _NORTH = tile_ids_for_type(TileType.WIND_NORTH)
 _RED = tile_ids_for_type(TileType.DRAGON_RED)
 _GREEN = tile_ids_for_type(TileType.DRAGON_GREEN)
 _WHITE = tile_ids_for_type(TileType.DRAGON_WHITE)
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
 def _bind(table: Table, seat: int, *, status: str = "connected") -> None:
@@ -112,10 +107,10 @@ def _rig_uncontested_draw_state(seed: int, *, turn_seconds: int) -> GameState:
     seat2 = (*_SOU_1[:3], *_SOU_3[:3], *_SOU_5[:3], _SOU_7[0])
     seat3 = (*_PIN_1[:3], *_PIN_3[:3], *_PIN_5[:3], _PIN_7[0])
 
-    state = _with_seat(state, 0, concealed=seat0, discards=())
-    state = _with_seat(state, 1, concealed=seat1)
-    state = _with_seat(state, 2, concealed=seat2)
-    state = _with_seat(state, 3, concealed=seat3)
+    state = with_seat(state, 0, concealed=seat0, discards=())
+    state = with_seat(state, 1, concealed=seat1)
+    state = with_seat(state, 2, concealed=seat2)
+    state = with_seat(state, 3, concealed=seat3)
 
     draw_tile = _MAN_9[0]
     wall = state.wall
@@ -178,10 +173,10 @@ def _rig_pre_pung_state(seed: int, *, claim_seconds: int = 999) -> GameState:
     )
     seat3 = (*_PIN_2[:3], *_PIN_4[:3], *_PIN_6[:3], *_PIN_8[:3], _MAN_1[0])
 
-    state = _with_seat(state, 0, concealed=seat0, discards=())
-    state = _with_seat(state, 1, concealed=seat1)
-    state = _with_seat(state, 2, concealed=seat2)
-    state = _with_seat(state, 3, concealed=seat3)
+    state = with_seat(state, 0, concealed=seat0, discards=())
+    state = with_seat(state, 1, concealed=seat1)
+    state = with_seat(state, 2, concealed=seat2)
+    state = with_seat(state, 3, concealed=seat3)
     return state
 
 

@@ -31,7 +31,6 @@ unbounded and this test unpredictably slow rather than a bounded, fast, determin
 from __future__ import annotations
 
 import dataclasses
-import itertools
 import uuid
 from typing import Any, cast
 
@@ -39,32 +38,19 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from app.clock import now_ms
 from app.main import app
 from app.table import _BOT_NAME_POOL
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import Phase
-
-_id_gen = itertools.count(1)
+from tests.ws_frames import msg, next_id
 
 # same rationale as test_full_game_e2e.py's _GAME_RULESET: dealer-repeat off bounds EAST_ONLY
 # to exactly 4 hands (dealer 0->1->2->3, then GAME_OVER) so this unscripted game terminates.
 _GAME_RULESET = dataclasses.replace(
     DEFAULT_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
 )
-
-
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
 
 
 def _play_practice_game(ws: WebSocketTestSession) -> list[dict[str, Any]]:
@@ -89,13 +75,13 @@ def _play_practice_game(ws: WebSocketTestSession) -> list[dict[str, Any]]:
             legal = d["legal"]
             win = next((a for a in legal if a["kind"] == "win"), None)
             if win is not None:
-                ws.send_json(_msg("declare", {"kind": "win"}, id_=_next_id()))
+                ws.send_json(msg("declare", {"kind": "win"}, id_=next_id()))
                 continue
             discard = next(a for a in legal if a["kind"] == "discard")
-            ws.send_json(_msg("discard", {"tile_id": discard["tile_id"]}, id_=_next_id()))
+            ws.send_json(msg("discard", {"tile_id": discard["tile_id"]}, id_=next_id()))
         elif t == "claim_offer":
             ws.send_json(
-                _msg("claim", {"window_id": d["window_id"], "choice": "pass"}, id_=_next_id())
+                msg("claim", {"window_id": d["window_id"], "choice": "pass"}, id_=next_id())
             )
 
 
@@ -132,9 +118,9 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
         # every frame the human ever receives (including its own join's state_sync) reflects it.
         table.state = new_game(_GAME_RULESET, seed)
 
-        ws0.send_json(_msg("hello", {"client_version": "test"}))
-        ws0.send_json(_msg("join", {"seat": 0, "name": "Dave"}, id_=_next_id()))
-        ws0.send_json(_msg("ready", {}, id_=_next_id()))
+        ws0.send_json(msg("hello", {"client_version": "test"}))
+        ws0.send_json(msg("join", {"seat": 0, "name": "Dave"}, id_=next_id()))
+        ws0.send_json(msg("ready", {}, id_=next_id()))
 
         frames = _play_practice_game(ws0)
 

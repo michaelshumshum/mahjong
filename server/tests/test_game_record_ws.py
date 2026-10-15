@@ -21,17 +21,14 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import itertools
 import uuid
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
-from app.clock import now_ms
-from app.db.models import Base, GameRecord
-from app.db.session import make_engine, make_session_factory
+from app.db.models import Base
+from app.db.session import make_engine
 from app.main import app
 from app.ws import get_table
 from mahjong_core.actions import action_from_dict
@@ -39,8 +36,9 @@ from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
-
-_id_gen = itertools.count(1)
+from tests.game_records import fetch_latest_record
+from tests.game_state import with_seat
+from tests.ws_frames import msg, next_id
 
 _SEAT0_JUNK = tile_ids_for_type(TileType.PIN_2)[:4] + tile_ids_for_type(TileType.PIN_4)[:4]
 _SEAT0_JUNK += tile_ids_for_type(TileType.PIN_6)[:4] + tile_ids_for_type(TileType.PIN_8)[:1]
@@ -65,23 +63,6 @@ _LAST_HAND_RULESET = dataclasses.replace(
 )
 
 
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
 def _rig_last_hand_state(seed: int) -> GameState:
     """Seat 0 on turn, dealer set to seat 3 (so this hand ending -- win or draw -- always wraps
     the deal back to seat 0 with no round left under `EAST_ONLY`, i.e. `Phase.GAME_OVER`).
@@ -91,25 +72,11 @@ def _rig_last_hand_state(seed: int) -> GameState:
     state = dataclasses.replace(
         state, phase=Phase.AWAIT_ACTION, turn=0, dealer=3, claim_window=None
     )
-    state = _with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
-    state = _with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
-    state = _with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
-    state = _with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
+    state = with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
+    state = with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
+    state = with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
+    state = with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
-
-
-def _fetch_latest_record(database_url: str) -> GameRecord | None:
-    async def _run() -> GameRecord | None:
-        engine = make_engine(database_url)
-        try:
-            factory = make_session_factory(engine)
-            async with factory() as session:
-                result = await session.execute(select(GameRecord).order_by(GameRecord.id.desc()))
-                return result.scalars().first()
-        finally:
-            await engine.dispose()
-
-    return asyncio.run(_run())
 
 
 def test_full_game_via_ws_persists_a_game_record(
@@ -146,8 +113,8 @@ def test_full_game_via_ws_persists_a_game_record(
         wss = [ws0, ws1, ws2, ws3]
         names = {seat: f"Player {seat}" for seat in range(4)}
         for seat, sock in enumerate(wss):
-            sock.send_json(_msg("hello", {"client_version": "test"}))
-            sock.send_json(_msg("join", {"seat": seat, "name": names[seat]}, id_=_next_id()))
+            sock.send_json(msg("hello", {"client_version": "test"}))
+            sock.send_json(msg("join", {"seat": seat, "name": names[seat]}, id_=next_id()))
             for s in range(seat + 1):
                 frame = wss[s].receive_json()
                 assert frame["t"] == "seat_state"
@@ -163,10 +130,10 @@ def test_full_game_via_ws_persists_a_game_record(
             assert binding.name == names[seat]
 
         for seat in range(3):
-            wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
+            wss[seat].send_json(msg("ready", {}, id_=next_id()))
             ack = wss[seat].receive_json()
             assert ack["t"] == "ack" and ack["d"]["ok"] is True
-        wss[3].send_json(_msg("ready", {}, id_=_next_id()))
+        wss[3].send_json(msg("ready", {}, id_=next_id()))
         for seat in range(4):
             hand_start = wss[seat].receive_json()
             assert hand_start["t"] == "hand_start"
@@ -179,8 +146,8 @@ def test_full_game_via_ws_persists_a_game_record(
 
         # one uncontested discard -- unclaimed, wall already empty -> exhaustive draw -> (dealer
         # wraps to seat 0, no round left under EAST_ONLY) -> Phase.GAME_OVER, all in this tick.
-        discard_id = _next_id()
-        wss[0].send_json(_msg("discard", {"tile_id": _SEAT0_DISCARD}, id_=discard_id))
+        discard_id = next_id()
+        wss[0].send_json(msg("discard", {"tile_id": _SEAT0_DISCARD}, id_=discard_id))
         ack_d0 = wss[0].receive_json()
         assert ack_d0["d"] == {"id": discard_id, "ok": True}
 
@@ -194,7 +161,7 @@ def test_full_game_via_ws_persists_a_game_record(
 
     # the table's background task must finish (GAME_OVER persist included) before the DB row
     # is trustworthy -- Table.run() returns only after that.
-    record = _fetch_latest_record(database_url)
+    record = fetch_latest_record(database_url)
     assert record is not None
     assert record.engine_version == ENGINE_VERSION
     assert record.seed == seed

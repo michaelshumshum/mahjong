@@ -20,56 +20,37 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from app.clock import now_ms
 from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
+from tests.game_state import with_seat
+from tests.ws_frames import first_tile_ids, msg, next_id
 
 _MAN_5 = tile_ids_for_type(TileType.MAN_5)
 
-_id_gen = itertools.count(1)
 
-
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
-
-
-def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
-    ids = [tid for t in types for tid in tile_ids_for_type(t)]
-    return tuple(ids[:count])
-
-
-_SEAT0_JUNK = _tiles(TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13)
-_SEAT1_JUNK = _tiles(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, TileType.SOU_8, count=13)
-_SEAT2_JUNK = _tiles(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
-_SEAT3_JUNK = _tiles(
+_SEAT0_JUNK = first_tile_ids(
+    TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
+)
+_SEAT1_JUNK = first_tile_ids(
+    TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, TileType.SOU_8, count=13
+)
+_SEAT2_JUNK = first_tile_ids(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
+_SEAT3_JUNK = first_tile_ids(
     TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_WHITE, TileType.WIND_NORTH, count=13
 )
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
 
 
 def _rig_state(seed: int) -> GameState:
     state = new_game(DEFAULT_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = _with_seat(state, 0, concealed=(*_SEAT0_JUNK, _MAN_5[0]), discards=())
-    state = _with_seat(state, 1, concealed=_SEAT1_JUNK)
-    state = _with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_SEAT2_JUNK))
-    state = _with_seat(state, 3, concealed=_SEAT3_JUNK)
+    state = with_seat(state, 0, concealed=(*_SEAT0_JUNK, _MAN_5[0]), discards=())
+    state = with_seat(state, 1, concealed=_SEAT1_JUNK)
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_SEAT2_JUNK))
+    state = with_seat(state, 3, concealed=_SEAT3_JUNK)
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
 
 
@@ -101,13 +82,13 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             assert sync["d"]["claim_options"] == []
 
             for ws in wss:
-                ws.send_json(_msg("hello", {"client_version": "test"}))
+                ws.send_json(msg("hello", {"client_version": "test"}))
 
             # --- join all four real seats; the spectator sees each `seat_state` broadcast too,
             # exactly once per join, same as every already-bound seat does.
             bound = [False, False, False, False]
             for seat, ws in enumerate(wss):
-                ws.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
+                ws.send_json(msg("join", {"seat": seat}, id_=next_id()))
                 bound[seat] = True
                 for s, other in enumerate(wss):
                     if bound[s]:
@@ -124,11 +105,11 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             # --- ready all four; the spectator gets the broadcast `hand_start` (never the
             # per-seat private `deal`) and the public half of `turn` (no `legal`).
             for seat in range(3):
-                wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
+                wss[seat].send_json(msg("ready", {}, id_=next_id()))
                 ack = wss[seat].receive_json()
                 assert ack["t"] == "ack" and ack["d"]["ok"] is True
 
-            wss[3].send_json(_msg("ready", {}, id_=_next_id()))
+            wss[3].send_json(msg("ready", {}, id_=next_id()))
             for ws in wss:
                 assert ws.receive_json()["t"] == "hand_start"
                 assert ws.receive_json()["t"] == "deal"
@@ -148,8 +129,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
 
             # seat 0 discards 5m: claim_offer unicasts to seat 2 only -- the spectator must
             # never see it (would leak seat 2's concealed tiles), only the public discard.
-            discard_id = _next_id()
-            ws0.send_json(_msg("discard", {"tile_id": _MAN_5[0]}, id_=discard_id))
+            discard_id = next_id()
+            ws0.send_json(msg("discard", {"tile_id": _MAN_5[0]}, id_=discard_id))
             ack_d0 = ws0.receive_json()
             assert ack_d0["d"] == {"id": discard_id, "ok": True}
 
@@ -170,9 +151,9 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
 
             # seat 2 pungs: the next frame this spectator sees is `claim_resolved`, never the
             # claim_offer that preceded it -- proving the offer really was unicast-only.
-            claim_id = _next_id()
+            claim_id = next_id()
             ws2.send_json(
-                _msg(
+                msg(
                     "claim",
                     {"window_id": window_id, "choice": "pung", "tiles": pung_option["tiles"]},
                     id_=claim_id,
@@ -206,8 +187,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
 
             # seat 2 discards a junk tile (post-pung hand is deterministically `_SEAT2_JUNK`);
             # nobody claims it and the wall is empty, so it cascades discard -> hand_end -> score.
-            discard2_id = _next_id()
-            ws2.send_json(_msg("discard", {"tile_id": _SEAT2_JUNK[0]}, id_=discard2_id))
+            discard2_id = next_id()
+            ws2.send_json(msg("discard", {"tile_id": _SEAT2_JUNK[0]}, id_=discard2_id))
             ack_d2 = ws2.receive_json()
             assert ack_d2["d"] == {"id": discard2_id, "ok": True}
 
@@ -277,7 +258,7 @@ def test_join_from_spectating_connection_promotes_and_stops_duplicate_stream() -
         sync = ws.receive_json()
         assert sync["t"] == "state_sync" and sync["d"]["seat"] is None
 
-        ws.send_json(_msg("join", {"seat": 0}, id_=_next_id()))
+        ws.send_json(msg("join", {"seat": 0}, id_=next_id()))
         seat_state = ws.receive_json()
         assert seat_state["t"] == "seat_state" and seat_state["d"]["seat"] == 0
         real_sync = ws.receive_json()
@@ -294,7 +275,7 @@ def test_join_from_spectating_connection_promotes_and_stops_duplicate_stream() -
         # a further live event (seat 1 joining) reaches this connection exactly once, through
         # its now-real seat stream -- not doubled by a leftover spectator registration.
         with client.websocket_connect(f"/ws?table={table_id}") as ws1:
-            ws1.send_json(_msg("join", {"seat": 1}, id_=_next_id()))
+            ws1.send_json(msg("join", {"seat": 1}, id_=next_id()))
             live_update = ws.receive_json()
             assert live_update["t"] == "seat_state" and live_update["d"]["seat"] == 1
 

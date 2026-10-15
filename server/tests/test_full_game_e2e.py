@@ -39,19 +39,16 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import itertools
 import uuid
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 from starlette.testclient import WebSocketTestSession
 
-from app.clock import now_ms
-from app.db.models import Base, GameRecord
-from app.db.session import make_engine, make_session_factory
+from app.db.models import Base
+from app.db.session import make_engine
 from app.main import app
 from app.ws import get_table
 from mahjong_core.actions import action_from_dict
@@ -59,8 +56,9 @@ from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game
 from mahjong_core.state import GameState, Phase, derive_hand_seed
 from mahjong_core.tiles import TileType, tile_ids_for_type
-
-_id_gen = itertools.count(1)
+from tests.game_records import fetch_latest_record
+from tests.game_state import with_seat
+from tests.ws_frames import first_tile_ids, msg, next_id
 
 # both repeat flags off + EAST_ONLY rotates dealer 0->1->2->3 unconditionally and ends the game
 # on dealer 0 again -- exactly 4 hands, deterministically, the cheapest multi-hand terminal case.
@@ -84,34 +82,12 @@ _MAN_9 = tile_ids_for_type(TileType.MAN_9)
 _MAN_3 = tile_ids_for_type(TileType.MAN_3)
 
 
-def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, object]:
-    frame: dict[str, object] = {"v": 1, "t": t, "ts": now_ms(), "d": d}
-    if id_ is not None:
-        frame["id"] = id_
-    return frame
-
-
-def _next_id() -> str:
-    return f"c-{next(_id_gen)}"
-
-
-def _tiles(*types: TileType, count: int) -> tuple[int, ...]:
-    ids = [tid for t in types for tid in tile_ids_for_type(t)]
-    return tuple(ids[:count])
-
-
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
 def _rig_hands(state: GameState, hands: dict[int, tuple[int, ...]]) -> GameState:
     """Overwrite each listed seat's concealed tiles (clearing discards/flowers) and empty the
     wall tail -- the shared tail of every hand rig below, once `state` is already a real,
     engine-dealt `AWAIT_ACTION` state for the hand being scripted."""
     for seat, concealed in hands.items():
-        state = _with_seat(state, seat, concealed=concealed, discards=(), flowers=())
+        state = with_seat(state, seat, concealed=concealed, discards=(), flowers=())
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
 
 
@@ -162,20 +138,6 @@ def _standard_winning_hand() -> tuple[int, ...]:
     )
 
 
-def _fetch_latest_record(database_url: str) -> GameRecord | None:
-    async def _run() -> GameRecord | None:
-        engine = make_engine(database_url)
-        try:
-            factory = make_session_factory(engine)
-            async with factory() as session:
-                result = await session.execute(select(GameRecord).order_by(GameRecord.id.desc()))
-                return result.scalars().first()
-        finally:
-            await engine.dispose()
-
-    return asyncio.run(_run())
-
-
 def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -209,12 +171,14 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         # tests/test_ws_gameplay.py's fixture) ending in exhaustive draw.
         state = new_game(_GAME_RULESET, game_seed=seed)
         state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-        seat0_junk = _tiles(
+        seat0_junk = first_tile_ids(
             TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
         )
-        seat1_junk = _tiles(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
-        seat2_junk = _tiles(TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11)
-        seat3_junk = _tiles(
+        seat1_junk = first_tile_ids(TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, count=11)
+        seat2_junk = first_tile_ids(
+            TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=11
+        )
+        seat3_junk = first_tile_ids(
             TileType.DRAGON_RED,
             TileType.DRAGON_GREEN,
             TileType.DRAGON_WHITE,
@@ -236,11 +200,11 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         with client.websocket_connect(f"/ws?table={table_id}") as ws3:
             wss: list[WebSocketTestSession] = [ws0, ws1, ws2, ws3]
             for ws in wss:
-                ws.send_json(_msg("hello", {"client_version": "test"}))
+                ws.send_json(msg("hello", {"client_version": "test"}))
 
             bound = [False, False, False, False]
             for seat, ws in enumerate(wss):
-                ws.send_json(_msg("join", {"seat": seat}, id_=_next_id()))
+                ws.send_json(msg("join", {"seat": seat}, id_=next_id()))
                 bound[seat] = True
                 for s, other in enumerate(wss):
                     if bound[s]:
@@ -249,9 +213,9 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 assert _recv(ws, seat)["d"]["ok"] is True
 
             for seat in range(3):
-                wss[seat].send_json(_msg("ready", {}, id_=_next_id()))
+                wss[seat].send_json(msg("ready", {}, id_=next_id()))
                 assert _recv(wss[seat], seat)["d"]["ok"] is True
-            wss[3].send_json(_msg("ready", {}, id_=_next_id()))
+            wss[3].send_json(msg("ready", {}, id_=next_id()))
 
             hand_starts = {3: _recv(wss[3], 3)}
             deals = {3: _recv(wss[3], 3)}
@@ -278,7 +242,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             # --- hand 1 play: seat 0 discards 5m; seat 2's pung beats seat 1's un-answered
             # chow (early exit), seat 2 then discards uncontested -> wall empty -> exh. draw.
-            wss[0].send_json(_msg("discard", {"tile_id": _MAN_5[0]}, id_=_next_id()))
+            wss[0].send_json(msg("discard", {"tile_id": _MAN_5[0]}, id_=next_id()))
             assert _recv(wss[0], 0)["d"]["ok"] is True
             for seat, ws in enumerate(wss):
                 assert _recv(ws, seat)["t"] == "discard"
@@ -288,7 +252,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert _recv(wss[1], 1)["t"] == "claim_offer"
 
             wss[2].send_json(
-                _msg("claim", {"window_id": window_id, "choice": "pung"}, id_=_next_id())
+                msg("claim", {"window_id": window_id, "choice": "pung"}, id_=next_id())
             )
             assert _recv(wss[2], 2)["d"]["ok"] is True
             for seat, ws in enumerate(wss):
@@ -302,9 +266,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 a for a in post_pung_turn[2]["d"]["legal"] if a["kind"] == "discard"
             )
 
-            wss[2].send_json(
-                _msg("discard", {"tile_id": discard_action["tile_id"]}, id_=_next_id())
-            )
+            wss[2].send_json(msg("discard", {"tile_id": discard_action["tile_id"]}, id_=next_id()))
             assert _recv(wss[2], 2)["d"]["ok"] is True
             expected_types = ["discard", "hand_end", "score", "hand_start", "deal", "turn"]
             frames_h1: dict[int, list[dict[str, Any]]] = {s: [] for s in range(4)}
@@ -333,17 +295,17 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             assert table.state.hand_seed == derive_hand_seed(seed, 2)
 
             # --- hand 2 rig: seat 1 (dealer) self-draw wins immediately on a standard hand.
-            seat0_junk_2 = _tiles(
+            seat0_junk_2 = first_tile_ids(
                 TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, TileType.SOU_8, count=13
             )
-            seat2_junk_2 = _tiles(
+            seat2_junk_2 = first_tile_ids(
                 TileType.WIND_EAST,
                 TileType.WIND_SOUTH,
                 TileType.WIND_WEST,
                 TileType.WIND_NORTH,
                 count=13,
             )
-            seat3_junk_2 = _tiles(
+            seat3_junk_2 = first_tile_ids(
                 TileType.DRAGON_RED,
                 TileType.DRAGON_GREEN,
                 TileType.DRAGON_WHITE,
@@ -363,7 +325,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             # instead of the 清一色/自摸/無花 breakdown asserted below (won_before_any_discard).
             table.state = dataclasses.replace(rigged_2, total_discards=1)
 
-            wss[1].send_json(_msg("declare", {"kind": "win"}, id_=_next_id()))
+            wss[1].send_json(msg("declare", {"kind": "win"}, id_=next_id()))
             assert _recv(wss[1], 1)["d"]["ok"] is True
             expected_types_2 = ["hand_end", "score", "hand_start", "deal", "turn"]
             frames_h2: dict[int, list[dict[str, Any]]] = {s: [] for s in range(4)}
@@ -399,16 +361,16 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             # hand 3 rig: seat 2 (dealer) discards a tile only seat 3 can chow (no pung
             # available), so the window stays open on seat 3 alone -- needed for the disconnect/reconnect scenario below.
-            seat0_junk_3 = _tiles(
+            seat0_junk_3 = first_tile_ids(
                 TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
             )
-            seat1_junk_3 = _tiles(
+            seat1_junk_3 = first_tile_ids(
                 TileType.SOU_2, TileType.SOU_4, TileType.SOU_6, TileType.SOU_8, count=13
             )
-            seat2_junk_3 = _tiles(
+            seat2_junk_3 = first_tile_ids(
                 TileType.WIND_EAST, TileType.WIND_SOUTH, TileType.WIND_WEST, count=12
             )
-            seat3_junk_3 = _tiles(
+            seat3_junk_3 = first_tile_ids(
                 TileType.DRAGON_RED, TileType.DRAGON_GREEN, TileType.DRAGON_WHITE, count=11
             )
             assert table.state.phase == Phase.AWAIT_ACTION  # real deal already landed here
@@ -436,7 +398,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         assert _recv(ws1, 1)["t"] == "seat_state"
         assert _recv(ws2, 2)["t"] == "seat_state"
 
-        ws2.send_json(_msg("discard", {"tile_id": _MAN_5[0]}, id_=_next_id()))
+        ws2.send_json(msg("discard", {"tile_id": _MAN_5[0]}, id_=next_id()))
         assert _recv(ws2, 2)["d"]["ok"] is True
         for seat, ws in ((0, ws0), (1, ws1), (2, ws2)):
             assert _recv(ws, seat)["t"] == "discard"
@@ -454,7 +416,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
         with client.websocket_connect(f"/ws?table={table_id}") as ws3b:
             ws3b.send_json(
-                _msg(
+                msg(
                     "hello",
                     {
                         "client_version": "test",
@@ -498,7 +460,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             # seat 3 answers for real (genuine Pass, not synthesized timeout) -> window
             # resolves unclaimed -> seat 3 draws into an empty wall -> exhaustive draw.
             ws3b.send_json(
-                _msg("claim", {"window_id": window_id_3, "choice": "pass"}, id_=_next_id())
+                msg("claim", {"window_id": window_id_3, "choice": "pass"}, id_=next_id())
             )
             assert _recv(ws3b, 3)["d"]["ok"] is True
 
@@ -524,13 +486,13 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
 
             # hand 4 rig: final hand of EAST_ONLY (dealer 3) -- one uncontested discard drives
             # straight to Phase.GAME_OVER.
-            seat0_junk_4 = _tiles(
+            seat0_junk_4 = first_tile_ids(
                 TileType.PIN_2, TileType.PIN_4, TileType.PIN_6, TileType.PIN_8, count=13
             )
-            seat1_junk_4 = _tiles(
+            seat1_junk_4 = first_tile_ids(
                 TileType.SOU_1, TileType.SOU_3, TileType.SOU_5, TileType.SOU_7, count=13
             )
-            seat2_junk_4 = _tiles(
+            seat2_junk_4 = first_tile_ids(
                 TileType.WIND_SOUTH,
                 TileType.WIND_WEST,
                 TileType.WIND_NORTH,
@@ -538,7 +500,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
                 count=13,
             )
             seat3_discard = tile_ids_for_type(TileType.MAN_1)[0]
-            seat3_junk_4 = _tiles(
+            seat3_junk_4 = first_tile_ids(
                 TileType.DRAGON_GREEN, TileType.DRAGON_WHITE, TileType.MAN_2, count=12
             )
             assert table.state.dealer == 3
@@ -554,7 +516,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             )
 
             live[3] = ws3b
-            ws3b.send_json(_msg("discard", {"tile_id": seat3_discard}, id_=_next_id()))
+            ws3b.send_json(msg("discard", {"tile_id": seat3_discard}, id_=next_id()))
             assert _recv(ws3b, 3)["d"]["ok"] is True
 
             expected_types_4 = ["discard", "hand_end", "score", "game_end"]
@@ -581,7 +543,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
         # = 7 -- no drift/gap/duplication from the 3 hand boundaries or the mid-h3 disconnect.
         assert len(table.actions) == 7
 
-    record = _fetch_latest_record(database_url)
+    record = fetch_latest_record(database_url)
     assert record is not None
     assert record.engine_version == ENGINE_VERSION
     assert record.seed == seed

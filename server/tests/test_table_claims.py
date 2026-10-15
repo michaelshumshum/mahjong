@@ -17,8 +17,9 @@ from mahjong_core.actions import ClaimPung, Discard, Pass, legal_actions
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import new_game
 from mahjong_core.melds import MeldKind
-from mahjong_core.state import GameState, Phase
+from mahjong_core.state import Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
+from tests.game_state import with_seat
 
 _MAN_4 = tile_ids_for_type(TileType.MAN_4)
 _MAN_5 = tile_ids_for_type(TileType.MAN_5)
@@ -53,22 +54,16 @@ _JUNK_HAND = (
 )
 
 
-def _with_seat(state: GameState, seat: int, **overrides: object) -> GameState:
-    seats = list(state.seats)
-    seats[seat] = dataclasses.replace(seats[seat], **overrides)  # type: ignore[arg-type]
-    return dataclasses.replace(state, seats=tuple(seats))  # type: ignore[arg-type]
-
-
 def _pre_discard_table(ruleset: RuleSet, *, game_seed: int = 1) -> Table:
     """A `Table` one command away from opening a claim window: seat 0 is on turn holding 5m
     plus junk, seat 1 can chow it, seat 2 can pung it, seat 3 holds nothing relevant."""
     table = Table("table-claims", ruleset, game_seed=game_seed)
     state = new_game(ruleset, game_seed=game_seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = _with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]), discards=())
-    state = _with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_JUNK_HAND[:11]))
-    state = _with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_JUNK_HAND[:11]))
-    state = _with_seat(state, 3, concealed=_JUNK_HAND)
+    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]), discards=())
+    state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_JUNK_HAND[:11]))
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_JUNK_HAND[:11]))
+    state = with_seat(state, 3, concealed=_JUNK_HAND)
     table.state = state
     return table
 
@@ -133,8 +128,8 @@ async def test_no_claim_deadline_armed_when_a_discard_draws_no_claims() -> None:
     ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=5)
     table = _pre_discard_table(ruleset)
     # nobody can claim a tile nobody holds a match for
-    table.state = _with_seat(table.state, 0, concealed=(*_JUNK_HAND, _SOU_8[2]), discards=())
-    table.state = _with_seat(table.state, 2, concealed=_JUNK_HAND)
+    table.state = with_seat(table.state, 0, concealed=(*_JUNK_HAND, _SOU_8[2]), discards=())
+    table.state = with_seat(table.state, 2, concealed=_JUNK_HAND)
     table.submit(0, Discard(tile_id=_SOU_8[2]))
     await table.process_one()
 

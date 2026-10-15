@@ -17,22 +17,7 @@ from mahjong_core.scoring.faan import CHICKEN_HAND_NAME, FaanResult, score_winni
 from mahjong_core.scoring.patterns import ScoringContext
 from mahjong_core.state import Wind
 from mahjong_core.tiles import Flower, TileId, TileType, tile_ids_for_type
-
-
-def _tiles(*types: TileType) -> tuple[TileId, ...]:
-    """One concealed hand as tile ids, one copy of each `TileType` given, in order --
-    duplicates draw a fresh physical tile each time (up to 4 copies per type)."""
-    seen: dict[TileType, int] = {}
-    ids = []
-    for t in types:
-        n = seen.get(t, 0)
-        ids.append(tile_ids_for_type(t)[n])
-        seen[t] = n + 1
-    return tuple(ids)
-
-
-def _pung(tile_type: TileType, from_seat: int | None = None) -> Meld:
-    return Meld(MeldKind.PUNG, tile_ids_for_type(tile_type)[:3], from_seat=from_seat)
+from tests.hands import tile_ids
 
 
 def _ctx(
@@ -64,7 +49,7 @@ def test_seven_pairs_vs_standard_decomposition_maximizes() -> None:
     123m 123m 456m 456m 77m (平糊 + 清一色 + 一般高). Both parses tie at 12 (門前清 never
     stacks on seven pairs); the raw-shape candidate wins ties; 七對子 must not leak onto the
     standard candidate."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_2,
@@ -98,7 +83,7 @@ def test_maximizes_across_decompositions() -> None:
     """111p 222p 333p 444p 99s parses two ways: four concealed pungs (四暗刻 8, 9 total), or
     123p x3 chows + 444p pung (無花 1 only) -- rules.md §11 edge case 9.
     Maximisation must pick the pung parse, not whichever `decompose()` lists first."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.PIN_1,
         TileType.PIN_1,
         TileType.PIN_1,
@@ -133,7 +118,7 @@ def _nine_gates_tiles(extra_rank: int) -> tuple[TileId, ...]:
     types = [
         TileType(int(TileType.PIN_1) + rank) for rank, n in enumerate(counts) for _ in range(n)
     ]
-    return _tiles(*types)
+    return tile_ids(*types)
 
 
 def test_limit_shape_vs_standard_decomposition_picks_the_limit() -> None:
@@ -177,7 +162,7 @@ def test_two_simultaneous_limit_patterns_collapse_to_one() -> None:
         TileType.DRAGON_GREEN,
         TileType.DRAGON_WHITE,
     ]
-    tiles = _tiles(*orphan_types, TileType.MAN_1)
+    tiles = tile_ids(*orphan_types, TileType.MAN_1)
     ctx = _ctx(
         seat_wind=Wind.EAST, prevailing_wind=Wind.EAST, self_drawn=True, won_before_any_discard=True
     )
@@ -193,7 +178,7 @@ def test_two_simultaneous_limit_patterns_collapse_to_one() -> None:
 def test_faan_cap_clamps_a_hand_that_exceeds_it() -> None:
     """111p 333p 555p 777p 99p, self-drawn: 四暗刻(8) + 清一色(7) + 自摸(1) + 無花(1) =
     17 raw, clamped to the default `faan_cap` of 10."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.PIN_1,
         TileType.PIN_1,
         TileType.PIN_1,
@@ -225,7 +210,7 @@ def test_hand_below_min_faan_does_not_clear_the_gate() -> None:
     conceptually -- here it's simply not self-drawn and has no open meld, three suits used (no
     缺一門), one pung breaks 平糊: only 無花(1) + 門前清(1) = 2, below the default
     `min_faan` of 3."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_2,
         TileType.MAN_3,
         TileType.MAN_4,
@@ -254,7 +239,7 @@ def test_hand_below_min_faan_does_not_clear_the_gate() -> None:
 def test_hand_sets_disabled_pattern_contributes_nothing() -> None:
     """Seven Pairs (七對子) is `NEW_18` -- disabling that hand_set must drop it entirely, not
     just cap it, leaving only the `CLASSIC` context patterns (自摸/無花) behind."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.PIN_5,
@@ -286,7 +271,7 @@ def test_faan_overrides_replace_a_patterns_value() -> None:
     """`RuleSet.faan_overrides` (config.py): a per-pattern value swap applied at this layer,
     after `hand_sets` selection. `0` disables a pattern the same way an unmatched `hand_set`
     does; any other value replaces its per-occurrence faan."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.PIN_5,
@@ -325,7 +310,7 @@ def test_genuine_chicken_hand() -> None:
     pung. `score_hand` matches nothing at all on this hand -- only reachable at `min_faan ==
     0` (§7 note ¹), where Chicken Hand's 0-faan floor applies."""
     open_pung = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.PIN_2)[:3], from_seat=2)
-    concealed = _tiles(
+    concealed = tile_ids(
         TileType.MAN_2,
         TileType.MAN_3,
         TileType.MAN_4,
@@ -356,7 +341,7 @@ def test_chicken_hand_does_not_apply_above_min_faan_zero() -> None:
     "servers should skip evaluating this pattern entirely when min_faan >= 1"), and the hand
     correctly fails to clear the gate instead."""
     open_pung = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.PIN_2)[:3], from_seat=2)
-    concealed = _tiles(
+    concealed = tile_ids(
         TileType.MAN_2,
         TileType.MAN_3,
         TileType.MAN_4,
@@ -383,7 +368,7 @@ def test_chicken_hand_does_not_apply_above_min_faan_zero() -> None:
 def test_chicken_hand_not_gated_by_hand_sets() -> None:
     """Chicken Hand is a baseline win, not a hand_set pattern."""
     open_pung = Meld(MeldKind.PUNG, tile_ids_for_type(TileType.PIN_2)[:3], from_seat=2)
-    concealed = _tiles(
+    concealed = tile_ids(
         TileType.MAN_2,
         TileType.MAN_3,
         TileType.MAN_4,
@@ -417,7 +402,7 @@ def test_kong_replacement_last_tile_exclusion_survives_maximization() -> None:
     as 槓上開花 only, never also 海底撈月 -- `patterns.py`'s detectors already enforce this;
     this proves `score_winning_hand`'s maximisation/candidate scoring doesn't reintroduce
     double-counting across candidates."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_2,
         TileType.MAN_3,

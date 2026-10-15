@@ -36,18 +36,9 @@ from mahjong_core.ml import ADDED_KONG_BASE, PASS_ID, PUNG_ID, decode_action, le
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import ClaimOffer, GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from tests.hands import tile_ids
 
 _STEP_CAP = 2000
-
-
-def _pool(*types: TileType) -> tuple[TileId, ...]:
-    used: dict[TileType, int] = {}
-    ids = []
-    for t in types:
-        n = used.get(t, 0)
-        ids.append(tile_ids_for_type(t)[n])
-        used[t] = n + 1
-    return tuple(ids)
 
 
 def _view(
@@ -165,7 +156,7 @@ async def test_omniscient_view_avoids_a_real_deal_in_the_probabilistic_view_walk
 
     # seat 1's real hand: Seven Pairs, one 北 short of completing it (4 faan, clears min_faan=3)
     # -- reshaped since discarding their first 北, legal under HK's no-furiten rule.
-    seat1_hand = _pool(
+    seat1_hand = tile_ids(
         TileType.MAN_2,
         TileType.MAN_2,
         TileType.MAN_3,
@@ -182,7 +173,7 @@ async def test_omniscient_view_avoids_a_real_deal_in_the_probabilistic_view_walk
     )
     # seat 2's real hand: nowhere near tenpai on anything, including 發 -- the exposed 中 pung
     # bumped 發's probabilistic reading, but the real hand can't back it up.
-    seat2_hand = _pool(
+    seat2_hand = tile_ids(
         TileType.MAN_2,
         TileType.MAN_4,
         TileType.MAN_6,
@@ -233,7 +224,7 @@ _NORTH_IS_BEST = [
 ]
 
 # 9 own discards: mid-game, where w_safety is 0.3.
-_MID_GAME_OWN_POOL = _pool(
+_MID_GAME_OWN_POOL = tile_ids(
     TileType.WIND_EAST,
     TileType.WIND_SOUTH,
     TileType.WIND_WEST,
@@ -246,7 +237,7 @@ _MID_GAME_OWN_POOL = _pool(
 )
 
 # seven pairs one 北 short.
-_SEVEN_PAIRS_ON_NORTH = _pool(
+_SEVEN_PAIRS_ON_NORTH = tile_ids(
     TileType.SOU_1,
     TileType.SOU_1,
     TileType.SOU_3,
@@ -283,7 +274,7 @@ async def test_omniscient_view_never_discards_a_certain_deal_in_when_a_safe_tile
 async def test_omniscient_view_discards_the_cheapest_deal_in_when_every_discard_deals_in() -> None:
     """only 北 and 西 are legal; 西 completes two opponents' hands, 北 one."""
     seven_pairs_on_west = (
-        _pool(
+        tile_ids(
             TileType.PIN_1,
             TileType.PIN_1,
             TileType.PIN_3,
@@ -298,7 +289,7 @@ async def test_omniscient_view_discards_the_cheapest_deal_in_when_every_discard_
             TileType.DRAGON_RED,
         )
         + (tile_ids_for_type(TileType.WIND_WEST)[0],),
-        _pool(
+        tile_ids(
             TileType.MAN_1,
             TileType.MAN_1,
             TileType.MAN_3,
@@ -346,7 +337,7 @@ _SHANPON_OR_PINGHU = [
     TileType.SOU_3,
 ]
 # every 1s and one 4s gone: the pinghu side waits on 3 copies, the shanpon on 4.
-_SHANPON_OR_PINGHU_POOL = _pool(
+_SHANPON_OR_PINGHU_POOL = tile_ids(
     TileType.SOU_1,
     TileType.SOU_1,
     TileType.SOU_1,
@@ -374,7 +365,7 @@ async def test_omniscient_view_prefers_a_narrower_wait_that_clears_min_faan() ->
 
 async def test_omniscient_view_prefers_a_live_wait_over_a_dead_one() -> None:
     """min_faan 1 so both waits clear; the shanpon's last 2s/5s copies are in seat 1's pool."""
-    dead = _pool(TileType.SOU_2, TileType.SOU_2, TileType.SOU_5, TileType.SOU_5)
+    dead = tile_ids(TileType.SOU_2, TileType.SOU_2, TileType.SOU_5, TileType.SOU_5)
     discard_pools = (_SHANPON_OR_PINGHU_POOL, dead, (), ())
     view = dataclasses.replace(
         _view(0, _SHANPON_OR_PINGHU, discard_pools=discard_pools, hands=((), (), (), ())),
@@ -408,7 +399,7 @@ _CLAIMED_EAST = tile_ids_for_type(TileType.WIND_EAST)[3]
 def _east_claim_view(
     hands: tuple[tuple[TileId, ...], ...] | None, seat1_pool: tuple[TileId, ...] = ()
 ) -> SeatView:
-    own_pool = _pool(TileType.WIND_SOUTH, TileType.SOU_9, TileType.PIN_9, TileType.MAN_9)
+    own_pool = tile_ids(TileType.WIND_SOUTH, TileType.SOU_9, TileType.PIN_9, TileType.MAN_9)
     base = _view(
         0,
         _EAST_PAIR_HAND,
@@ -439,13 +430,13 @@ async def test_omniscient_view_claims_into_a_clearing_tenpai() -> None:
 
 
 async def test_omniscient_view_passes_when_the_claimed_tenpai_is_dead() -> None:
-    every_7p = _pool(TileType.PIN_7, TileType.PIN_7, TileType.PIN_7, TileType.PIN_7)
+    every_7p = tile_ids(TileType.PIN_7, TileType.PIN_7, TileType.PIN_7, TileType.PIN_7)
     view = _east_claim_view(((), (), (), ()), seat1_pool=every_7p)
     assert await FaanBot().act(view, _pung_mask(), NO_DEADLINE) == PASS_ID
 
 
 async def test_omniscient_view_passes_when_the_tenpai_discard_deals_in() -> None:
-    seven_pairs_on_8m = _pool(
+    seven_pairs_on_8m = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_3,
@@ -486,7 +477,7 @@ async def test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_a
     `_best_discard`'s scoring formula at all -- this is the concrete gap docs/bots.md §9
     names as the reason `opponent_threat_level` needed the same hands-aware treatment
     `tile_risk` already got."""
-    tenpai_hand = _pool(
+    tenpai_hand = tile_ids(
         TileType.PIN_1,
         TileType.PIN_2,
         TileType.PIN_3,
@@ -567,7 +558,7 @@ async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> 
     views for these two specific candidates is PIN_9's own ukeire count.
     """
     hidden_type = TileType.WIND_EAST
-    opp1_hand = _pool(
+    opp1_hand = tile_ids(
         hidden_type,
         hidden_type,
         hidden_type,
@@ -582,7 +573,7 @@ async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> 
         TileType.DRAGON_RED,
         TileType.DRAGON_RED,
     )
-    opp2_hand = _pool(
+    opp2_hand = tile_ids(
         TileType.WIND_NORTH,
         TileType.WIND_NORTH,
         TileType.WIND_NORTH,
@@ -597,7 +588,7 @@ async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> 
         TileType.DRAGON_GREEN,
         TileType.MAN_1,
     )
-    opp3_hand = _pool(
+    opp3_hand = tile_ids(
         TileType.PIN_9,
         TileType.PIN_9,
         TileType.PIN_9,
@@ -743,7 +734,7 @@ async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
         mask[int(t)] = True
 
     # seat 1's real hand: one 中 short of Seven Pairs.
-    seat1_hand = _pool(
+    seat1_hand = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_3,

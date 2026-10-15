@@ -26,6 +26,7 @@ from mahjong_core.scoring.patterns import (
 )
 from mahjong_core.state import Wind
 from mahjong_core.tiles import Flower, TileId, TileType, tile_ids_for_type
+from tests.hands import pung, tile_ids
 
 
 def _chow(low: TileType, from_seat: int | None = None) -> Meld:
@@ -33,16 +34,8 @@ def _chow(low: TileType, from_seat: int | None = None) -> Meld:
     return Meld(MeldKind.CHOW, ids, from_seat=from_seat)
 
 
-def _pung(tile_type: TileType, from_seat: int | None = None) -> Meld:
-    return Meld(MeldKind.PUNG, tile_ids_for_type(tile_type)[:3], from_seat=from_seat)
-
-
 def _kong(tile_type: TileType, from_seat: int | None = None) -> Meld:
     return Meld(MeldKind.EXPOSED_KONG, tile_ids_for_type(tile_type), from_seat=from_seat)
-
-
-def _concealed_kong(tile_type: TileType) -> Meld:
-    return Meld(MeldKind.CONCEALED_KONG, tile_ids_for_type(tile_type))
 
 
 def _pair(tile_type: TileType) -> Meld:
@@ -76,18 +69,6 @@ def _ctx(
         is_robbing_kong=is_robbing_kong,
         flowers_score=flowers_score,
     )
-
-
-def _tiles(*types: TileType) -> tuple[TileId, ...]:
-    """One concealed hand as tile ids, one copy of each `TileType` given, in order --
-    duplicates draw a fresh physical tile each time (up to 4 copies per type)."""
-    seen: dict[TileType, int] = {}
-    ids = []
-    for t in types:
-        n = seen.get(t, 0)
-        ids.append(tile_ids_for_type(t)[n])
-        seen[t] = n + 1
-    return tuple(ids)
 
 
 def _occurrences(name: str, hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
@@ -164,7 +145,7 @@ def test_all_sequences_false_with_one_pung() -> None:
         _chow(TileType.MAN_1),
         _chow(TileType.MAN_5),
         _chow(TileType.PIN_2),
-        _pung(TileType.SOU_7),
+        pung(TileType.SOU_7),
         _pair(TileType.DRAGON_GREEN),
     )
     assert _occurrences("平糊", hand, _ctx()) == 0
@@ -175,9 +156,9 @@ def test_all_sequences_false_with_one_pung() -> None:
 
 def test_all_pungs() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_5),
-        _pung(TileType.SOU_9),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_5),
+        pung(TileType.SOU_9),
         _kong(TileType.WIND_NORTH),
         _pair(TileType.DRAGON_RED),
     )
@@ -186,9 +167,9 @@ def test_all_pungs() -> None:
 
 def test_all_pungs_false_with_one_chow() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_5),
-        _pung(TileType.SOU_9),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_5),
+        pung(TileType.SOU_9),
         _chow(TileType.MAN_5),
         _pair(TileType.DRAGON_RED),
     )
@@ -205,8 +186,8 @@ def test_half_flush() -> None:
     hand = (
         _chow(TileType.SOU_1),
         _chow(TileType.SOU_4),
-        _pung(TileType.DRAGON_WHITE),
-        _pung(TileType.WIND_NORTH),
+        pung(TileType.DRAGON_WHITE),
+        pung(TileType.WIND_NORTH),
         _pair(TileType.SOU_9),
     )
     assert _occurrences("混一色", hand, _ctx()) == 1
@@ -217,8 +198,8 @@ def test_full_flush() -> None:
     hand = (
         _chow(TileType.PIN_1),
         _chow(TileType.PIN_4),
-        _pung(TileType.PIN_7),
-        _pung(TileType.PIN_8),
+        pung(TileType.PIN_7),
+        pung(TileType.PIN_8),
         _pair(TileType.PIN_9),
     )
     assert _occurrences("清一色", hand, _ctx()) == 1
@@ -305,7 +286,7 @@ def test_seat_and_prevailing_wind_stack_on_dealers_own_hand() -> None:
     prevailing wind is also East, so an East pung earns both patterns -- 2 faan total, not 1.
     See the note in patterns.py's `_detect_prevailing_wind`."""
     hand = (
-        _pung(TileType.WIND_EAST),
+        pung(TileType.WIND_EAST),
         _chow(TileType.MAN_1),
         _chow(TileType.PIN_4),
         _chow(TileType.SOU_2),
@@ -321,7 +302,7 @@ def test_seat_and_prevailing_wind_stack_on_dealers_own_hand() -> None:
 
 def test_seat_wind_only_when_winds_differ() -> None:
     hand = (
-        _pung(TileType.WIND_SOUTH),
+        pung(TileType.WIND_SOUTH),
         _chow(TileType.MAN_1),
         _chow(TileType.PIN_4),
         _chow(TileType.SOU_2),
@@ -334,7 +315,7 @@ def test_seat_wind_only_when_winds_differ() -> None:
 
 def test_wind_pung_absent_scores_neither() -> None:
     hand = (
-        _pung(TileType.MAN_1),
+        pung(TileType.MAN_1),
         _chow(TileType.PIN_4),
         _chow(TileType.SOU_2),
         _chow(TileType.MAN_5),
@@ -350,8 +331,8 @@ def test_wind_pung_absent_scores_neither() -> None:
 
 def test_dragon_pung_counts_each() -> None:
     hand = (
-        _pung(TileType.DRAGON_RED),
-        _pung(TileType.DRAGON_GREEN),
+        pung(TileType.DRAGON_RED),
+        pung(TileType.DRAGON_GREEN),
         _chow(TileType.MAN_1),
         _chow(TileType.PIN_4),
         _pair(TileType.SOU_9),
@@ -376,8 +357,8 @@ def test_dragon_pair_alone_does_not_count() -> None:
 
 def test_small_three_dragons() -> None:
     hand = (
-        _pung(TileType.DRAGON_RED),
-        _pung(TileType.DRAGON_GREEN),
+        pung(TileType.DRAGON_RED),
+        pung(TileType.DRAGON_GREEN),
         _chow(TileType.MAN_1),
         _chow(TileType.PIN_4),
         _pair(TileType.DRAGON_WHITE),
@@ -389,8 +370,8 @@ def test_small_three_dragons() -> None:
 
 def test_big_three_dragons() -> None:
     hand = (
-        _pung(TileType.DRAGON_RED),
-        _pung(TileType.DRAGON_GREEN),
+        pung(TileType.DRAGON_RED),
+        pung(TileType.DRAGON_GREEN),
         _kong(TileType.DRAGON_WHITE),
         _chow(TileType.MAN_1),
         _pair(TileType.SOU_9),
@@ -403,8 +384,8 @@ def test_big_three_dragons() -> None:
 def test_small_three_dragons_includes_the_dragon_pungs() -> None:
     """rules.md §7 note ²: 小三元 is 5 in total, so 箭刻 is dropped when it fires."""
     hand = (
-        _pung(TileType.DRAGON_RED),
-        _pung(TileType.DRAGON_GREEN),
+        pung(TileType.DRAGON_RED),
+        pung(TileType.DRAGON_GREEN),
         _chow(TileType.MAN_1),
         _chow(TileType.PIN_4),
         _pair(TileType.DRAGON_WHITE),
@@ -420,9 +401,9 @@ def test_small_three_dragons_includes_the_dragon_pungs() -> None:
 
 def test_small_four_winds() -> None:
     hand = (
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.WIND_SOUTH),
-        _pung(TileType.WIND_WEST),
+        pung(TileType.WIND_EAST),
+        pung(TileType.WIND_SOUTH),
+        pung(TileType.WIND_WEST),
         _chow(TileType.MAN_1),
         _pair(TileType.WIND_NORTH),
     )
@@ -433,9 +414,9 @@ def test_small_four_winds() -> None:
 
 def test_big_four_winds() -> None:
     hand = (
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.WIND_SOUTH),
-        _pung(TileType.WIND_WEST),
+        pung(TileType.WIND_EAST),
+        pung(TileType.WIND_SOUTH),
+        pung(TileType.WIND_WEST),
         _kong(TileType.WIND_NORTH),
         _pair(TileType.SOU_9),
     )
@@ -446,9 +427,9 @@ def test_big_four_winds() -> None:
 
 def test_three_wind_pungs_without_wind_pair_is_neither_small_nor_big() -> None:
     hand = (
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.WIND_SOUTH),
-        _pung(TileType.WIND_WEST),
+        pung(TileType.WIND_EAST),
+        pung(TileType.WIND_SOUTH),
+        pung(TileType.WIND_WEST),
         _chow(TileType.MAN_1),
         _pair(TileType.SOU_9),
     )
@@ -460,9 +441,9 @@ def test_three_wind_pungs_without_wind_pair_is_neither_small_nor_big() -> None:
 def test_small_four_winds_includes_the_wind_pungs() -> None:
     """小四喜 is 6 and 門風/圈風 still apply on top."""
     hand = (
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.WIND_SOUTH),
-        _pung(TileType.WIND_WEST),
+        pung(TileType.WIND_EAST),
+        pung(TileType.WIND_SOUTH),
+        pung(TileType.WIND_WEST),
         _chow(TileType.MAN_1),
         _pair(TileType.WIND_NORTH),
     )
@@ -478,10 +459,10 @@ def test_small_four_winds_includes_the_wind_pungs() -> None:
 
 def test_mixed_terminals() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_9),
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.DRAGON_RED),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_9),
+        pung(TileType.WIND_EAST),
+        pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
     assert _occurrences("花么九", hand, _ctx()) == 1
@@ -489,10 +470,10 @@ def test_mixed_terminals() -> None:
 
 def test_mixed_terminals_false_with_a_chow() -> None:
     hand = (
-        _pung(TileType.MAN_1),
+        pung(TileType.MAN_1),
         _chow(TileType.PIN_7),  # 7-8-9: lowest tile isn't terminal, but 8 isn't either
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.DRAGON_RED),
+        pung(TileType.WIND_EAST),
+        pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
     assert _occurrences("花么九", hand, _ctx()) == 0
@@ -500,10 +481,10 @@ def test_mixed_terminals_false_with_a_chow() -> None:
 
 def test_mixed_terminals_false_with_a_middle_tile_pung() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_5),
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.DRAGON_RED),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_5),
+        pung(TileType.WIND_EAST),
+        pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
     assert _occurrences("花么九", hand, _ctx()) == 0
@@ -513,10 +494,10 @@ def test_mixed_terminals_false_terminals_only_no_honors() -> None:
     """rules.md §7 note ²: terminals with no honor present is All Terminals (清么九,
     limit, not implemented yet) territory, not 花么九."""
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_9),
-        _pung(TileType.SOU_1),
-        _pung(TileType.MAN_9),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_9),
+        pung(TileType.SOU_1),
+        pung(TileType.MAN_9),
         _pair(TileType.SOU_9),
     )
     assert _occurrences("花么九", hand, _ctx()) == 0
@@ -526,10 +507,10 @@ def test_mixed_terminals_false_honors_only_no_terminals() -> None:
     """rules.md §7 note ²: honors with no terminal present is All Honors (字一色,
     limit, not implemented yet) territory, not 花么九."""
     hand = (
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.WIND_SOUTH),
-        _pung(TileType.WIND_WEST),
-        _pung(TileType.DRAGON_RED),
+        pung(TileType.WIND_EAST),
+        pung(TileType.WIND_SOUTH),
+        pung(TileType.WIND_WEST),
+        pung(TileType.DRAGON_RED),
         _pair(TileType.DRAGON_GREEN),
     )
     assert _occurrences("花么九", hand, _ctx()) == 0
@@ -544,10 +525,10 @@ def test_full_flush_stacks_with_all_pungs() -> None:
     Concealed Pungs (fourth sub-task, needs 3+ concealed) -- see
     `test_three_concealed_pungs_stacks_with_all_pungs` for that combination instead."""
     hand = (
-        _pung(TileType.PIN_1),
-        _pung(TileType.PIN_3, from_seat=2),
-        _pung(TileType.PIN_5, from_seat=3),
-        _pung(TileType.PIN_7),
+        pung(TileType.PIN_1),
+        pung(TileType.PIN_3, from_seat=2),
+        pung(TileType.PIN_5, from_seat=3),
+        pung(TileType.PIN_7),
         _pair(TileType.PIN_9),
     )
     ctx = _ctx(seat_wind=Wind.WEST, prevailing_wind=Wind.WEST)
@@ -575,7 +556,7 @@ def test_self_draw_all_sequences_no_flowers_combination() -> None:
 def test_empty_when_no_pattern_matches() -> None:
     hand = (
         _chow(TileType.MAN_1),
-        _pung(TileType.PIN_5),
+        pung(TileType.PIN_5),
         _chow(TileType.SOU_2),
         _chow(TileType.MAN_5),
         _pair(TileType.SOU_9),
@@ -595,9 +576,9 @@ def test_empty_when_no_pattern_matches() -> None:
 
 def test_all_honors() -> None:
     hand = (
-        _pung(TileType.DRAGON_RED),
-        _pung(TileType.DRAGON_GREEN),
-        _pung(TileType.WIND_EAST),
+        pung(TileType.DRAGON_RED),
+        pung(TileType.DRAGON_GREEN),
+        pung(TileType.WIND_EAST),
         _kong(TileType.WIND_SOUTH),
         _pair(TileType.DRAGON_WHITE),
     )
@@ -606,10 +587,10 @@ def test_all_honors() -> None:
 
 def test_all_honors_false_with_a_suited_tile() -> None:
     hand = (
-        _pung(TileType.DRAGON_RED),
-        _pung(TileType.DRAGON_GREEN),
-        _pung(TileType.WIND_EAST),
-        _pung(TileType.MAN_1),
+        pung(TileType.DRAGON_RED),
+        pung(TileType.DRAGON_GREEN),
+        pung(TileType.WIND_EAST),
+        pung(TileType.MAN_1),
         _pair(TileType.DRAGON_WHITE),
     )
     assert _occurrences("字一色", hand, _ctx()) == 0
@@ -620,10 +601,10 @@ def test_all_honors_false_with_a_suited_tile() -> None:
 
 def test_all_terminals() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.MAN_9),
-        _pung(TileType.PIN_1),
-        _pung(TileType.SOU_9),
+        pung(TileType.MAN_1),
+        pung(TileType.MAN_9),
+        pung(TileType.PIN_1),
+        pung(TileType.SOU_9),
         _pair(TileType.SOU_1),
     )
     assert _occurrences("清么九", hand, _ctx()) == 1
@@ -633,10 +614,10 @@ def test_all_terminals_false_with_an_honor() -> None:
     """An honor present is 花么九 (Mixed Terminals) territory, not 清么九 -- see
     `_detect_all_terminals`'s docstring."""
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.MAN_9),
-        _pung(TileType.PIN_1),
-        _pung(TileType.DRAGON_RED),
+        pung(TileType.MAN_1),
+        pung(TileType.MAN_9),
+        pung(TileType.PIN_1),
+        pung(TileType.DRAGON_RED),
         _pair(TileType.SOU_1),
     )
     assert _occurrences("清么九", hand, _ctx()) == 0
@@ -646,10 +627,10 @@ def test_all_terminals_false_with_a_chow() -> None:
     """Boundary mirrored from 花么九: a 1-2-3 chow's `tile_type` (its lowest tile) reads as
     terminal even though 2m/3m aren't."""
     hand = (
-        _pung(TileType.MAN_1),
+        pung(TileType.MAN_1),
         _chow(TileType.PIN_1),
-        _pung(TileType.SOU_9),
-        _pung(TileType.SOU_1),
+        pung(TileType.SOU_9),
+        pung(TileType.SOU_1),
         _pair(TileType.MAN_9),
     )
     assert _occurrences("清么九", hand, _ctx()) == 0
@@ -662,7 +643,7 @@ def _tiles_from_counts(suit_base: TileType, counts: list[int]) -> tuple[TileId, 
     types: list[TileType] = []
     for rank, n in enumerate(counts):
         types.extend([TileType(int(suit_base) + rank)] * n)
-    return _tiles(*types)
+    return tile_ids(*types)
 
 
 def _nine_gates_tiles(suit_base: TileType, extra_rank: int) -> tuple[TileId, ...]:
@@ -748,14 +729,14 @@ _ORPHAN_TYPE_LIST = [
 
 
 def test_thirteen_orphans() -> None:
-    tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)  # 14th tile duplicates one orphan
+    tiles = tile_ids(*_ORPHAN_TYPE_LIST, TileType.MAN_1)  # 14th tile duplicates one orphan
     assert _actions_is_thirteen_orphans(tiles) is True
     assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 1
 
 
 def test_thirteen_orphans_false_missing_one_type() -> None:
     types = [*_ORPHAN_TYPE_LIST[:-1], TileType.MAN_9, TileType.MAN_1]  # no DRAGON_WHITE at all
-    tiles = _tiles(*types)
+    tiles = tile_ids(*types)
     assert _actions_is_thirteen_orphans(tiles) is False
     assert _occurrences("十三么", (), _ctx(concealed_tiles=tiles)) == 0
 
@@ -780,7 +761,7 @@ def test_thirteen_orphans_false_when_hand_is_non_empty_even_if_concealed_tiles_q
     """Regression, same shape as `test_nine_gates_false_when_hand_is_non_empty_...` above --
     see `_detect_nine_gates`'s docstring for why `ctx.concealed_tiles` alone qualifying isn't
     enough once `hand` carries a real (if here unrelated/nonsensical) decomposition."""
-    tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
+    tiles = tile_ids(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
     hand = (
         _chow(TileType.MAN_1),
         _chow(TileType.MAN_5),
@@ -799,7 +780,7 @@ def test_score_hand_thirteen_orphans_includes_the_limit_entry() -> None:
     `無花`/`門前清` still fire since they read only `ctx`, not `hand` -- `score_hand` doesn't
     suppress that (excluding non-limit faan once a limit pattern applies is faan.py's job, see
     rules.md §7 "Limit hands do not stack with anything")."""
-    tiles = _tiles(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
+    tiles = tile_ids(*_ORPHAN_TYPE_LIST, TileType.MAN_1)
     scored = score_hand((), _ctx(concealed_tiles=tiles))
     assert scored["十三么"] == LIMIT_FAAN
     assert set(scored) <= {"十三么", "無花", "門前清"}
@@ -1004,7 +985,7 @@ def test_limit_patterns_flagged_for_future_non_stacking() -> None:
 
 
 def test_seven_pairs() -> None:
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.PIN_5,
@@ -1034,7 +1015,7 @@ def test_seven_pairs_is_not_a_limit_hand() -> None:
 
 def test_seven_pairs_false_with_a_triple() -> None:
     """Three of one type plus a lone extra isn't seven *distinct* pairs."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.MAN_1,
@@ -1075,7 +1056,7 @@ def test_seven_pairs_false_when_hand_is_non_empty_even_if_concealed_tiles_qualif
     *and* have a real standard decomposition (test_faan.py's
     `test_seven_pairs_vs_standard_decomposition_maximizes` has one) would otherwise add 七對子's
     faan on top of that unrelated decomposition's own patterns."""
-    tiles = _tiles(
+    tiles = tile_ids(
         TileType.MAN_1,
         TileType.MAN_1,
         TileType.PIN_5,
@@ -1113,10 +1094,10 @@ def test_seven_pairs_false_when_hand_is_non_empty_even_if_concealed_tiles_qualif
 
 def test_four_concealed_pungs_supersede_three_and_all_pungs() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_2),
-        _pung(TileType.SOU_3),
-        _pung(TileType.MAN_4),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_2),
+        pung(TileType.SOU_3),
+        pung(TileType.MAN_4),
         _pair(TileType.PIN_9),
     )
     scored = score_hand(hand, _ctx())
@@ -1127,10 +1108,10 @@ def test_four_concealed_pungs_supersede_three_and_all_pungs() -> None:
 
 def test_pung_completed_by_the_winning_discard_is_not_concealed() -> None:
     hand = (
-        _pung(TileType.MAN_1),
-        _pung(TileType.PIN_2),
-        _pung(TileType.SOU_3),
-        _pung(TileType.MAN_4),
+        pung(TileType.MAN_1),
+        pung(TileType.PIN_2),
+        pung(TileType.SOU_3),
+        pung(TileType.MAN_4),
         _pair(TileType.PIN_9),
     )
     ron = replace(_ctx(), winning_tile=tile_ids_for_type(TileType.SOU_3)[0])
