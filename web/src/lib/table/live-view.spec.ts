@@ -15,7 +15,7 @@ describe('viewFromClientState own-hand split', () => {
 			d: {
 				seat: 1,
 				hand_no: 1,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 0,
 				turn: 0,
 				phase: 'AWAIT_ACTION',
@@ -25,7 +25,7 @@ describe('viewFromClientState own-hand split', () => {
 				discard_pools: [[0], [], [], []],
 				flowers: [[], [], [], []],
 				wall_remaining: 50,
-				seat_status: ['bot', 'human', 'bot', 'bot'],
+				seat_status: ['bot', 'connected', 'bot', 'bot'],
 				names: [null, null, null, null],
 				host_seat: null,
 				scores: [0, 0, 0, 0],
@@ -180,7 +180,7 @@ describe('viewFromClientState spectator', () => {
 			d: {
 				seat: null,
 				hand_no: 2,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 1,
 				turn: 2,
 				phase: 'AWAIT_ACTION',

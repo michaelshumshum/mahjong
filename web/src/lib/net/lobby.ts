@@ -1,10 +1,10 @@
 import { env } from '$env/dynamic/public';
-import type { BotTier } from './protocol';
+import type { BotTier, WireSeatStatus } from './protocol';
 import type { RuleSet } from './ruleset';
 
 // hand-written: GET/POST /tables are plain HTTP, outside the WS protocol make proto generates.
 export interface SeatSummary {
-	status: 'connected' | 'disconnected' | 'autoplay' | 'bot' | 'empty';
+	status: WireSeatStatus;
 	name: string | null;
 }
 

@@ -13,7 +13,17 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.errors import ErrorCode
+from app.table_types import SeatStatus, WireSeatStatus
+from app.views import ClaimChoice, WindName
 from bots.tiers import BotTier
+from mahjong_core.actions import ActionKind
+from mahjong_core.melds import MeldKind
+from mahjong_core.state import ClaimKind, HandOutcome, Phase, WinType
+
+# client->server seat fields stay `int`: narrowing them would change how an out-of-range seat
+# is rejected.
+type Seat = Literal[0, 1, 2, 3]
 
 
 class Envelope(BaseModel):
@@ -58,7 +68,7 @@ class PongPayload(BaseModel):
 class ErrorPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    code: str
+    code: ErrorCode
     message: str
 
 
@@ -117,7 +127,7 @@ class ClaimPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     window_id: int
-    choice: Literal["pass", "chow", "pung", "kong", "win"]
+    choice: ClaimChoice
     tiles: list[int] | None = None  # disambiguates a chow; unused otherwise
 
 
@@ -193,18 +203,18 @@ class HandHistoryEntryPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     hand_no: int
-    outcome: str
-    winner: int | None
-    win_type: str | None
-    discarder: int | None
+    outcome: HandOutcome
+    winner: Seat | None
+    win_type: WinType | None
+    discarder: Seat | None
     faan: int | None
     faan_breakdown: dict[str, int] | None
     points: int | None
     payments: dict[int, int] | None
     revealed: bool
     winning_hand: list[int] | None
-    dealer: int
-    prevailing: str
+    dealer: Seat
+    prevailing: WindName
     winner_melds: list[dict[str, Any]] | None
     fairness: FairnessPayload | None = None
 
@@ -216,19 +226,19 @@ class StateSyncPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    seat: int | None
+    seat: Seat | None
     hand_no: int
-    prevailing: str
-    dealer: int
-    turn: int
-    phase: str
+    prevailing: WindName
+    dealer: Seat
+    turn: Seat
+    phase: Phase
     own_hand: list[int]
     concealed_counts: list[int]
     melds: list[list[dict[str, Any]]]
     discard_pools: list[list[int]]
     flowers: list[list[str]]
     wall_remaining: int
-    seat_status: list[str]
+    seat_status: list[WireSeatStatus]
     # per-seat display name, same indexing as seat_status -- null only for an unjoined seat.
     names: list[str | None]
     scores: list[int]
@@ -236,7 +246,7 @@ class StateSyncPayload(BaseModel):
     claim_options: list[dict[str, Any]]
     deadline_ts: int | None
     # whichever seat's join was first; never actually null on the wire.
-    host_seat: int | None
+    host_seat: Seat | None
     # every seat's concealed tiles -- spectators of a `spectators_see_hands` table only
     # (`app/table.py`'s `TableSettings`), `null` everywhere else
     hands: list[list[int]] | None = None
@@ -257,10 +267,9 @@ class HandStartPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     hand_no: int
-    prevailing: str
-    dealer: int
-    # per-seat status, seat_view's shape: connected/disconnected/autoplay/bot/empty
-    seats: list[str]
+    prevailing: WindName
+    dealer: Seat
+    seats: list[WireSeatStatus]
     # provable_fairness only, omitted otherwise: SHA256(hand_seed || nonce), hex
     seed_commit: str | None = None
 
@@ -277,7 +286,7 @@ class DealPayload(BaseModel):
 class FlowerReplacePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
+    seat: Seat
     flower: str
     replacement: int | None = None  # only ever populated for the seat's own stream
 
@@ -285,14 +294,14 @@ class FlowerReplacePayload(BaseModel):
 class DrawPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
+    seat: Seat
     tile_id: int | None = None  # populated only for the drawing seat's own stream
 
 
 class DiscardEventPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
+    seat: Seat
     tile_id: int
     tile: str
     pool_index: int
@@ -310,32 +319,32 @@ class ClaimResolvedPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     window_id: int
-    claim_kind: str
-    seat: int | None
-    action_kind: str | None
+    claim_kind: ClaimKind
+    seat: Seat | None
+    action_kind: ActionKind | None
 
 
 class MeldPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
-    meld_kind: str
+    seat: Seat
+    meld_kind: MeldKind
     tiles: list[int]
-    from_seat: int | None = None
+    from_seat: Seat | None = None
 
 
 class KongReplacePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
+    seat: Seat
     tile_id: int | None = None  # populated only for the drawing seat's own stream
 
 
 class TurnPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
-    phase: str
+    seat: Seat
+    phase: Phase
     deadline_ts: int
     legal: list[dict[str, Any]] | None = None  # unicast to the acting seat only
 
@@ -344,10 +353,10 @@ class HandEndPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     hand_no: int
-    outcome: str
-    winner: int | None
-    win_type: str | None
-    discarder: int | None
+    outcome: HandOutcome
+    winner: Seat | None
+    win_type: WinType | None
+    discarder: Seat | None
     faan: int | None
     faan_breakdown: dict[str, int] | None
     points: int | None
@@ -379,8 +388,8 @@ class GameEndPayload(BaseModel):
 class SeatStatePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seat: int
-    status: Literal["connected", "disconnected", "autoplay", "bot"]
+    seat: Seat
+    status: SeatStatus
     # carried on every seat_state broadcast, not just the one from join.
     name: str | None = None
 

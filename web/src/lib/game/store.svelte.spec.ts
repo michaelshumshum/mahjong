@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameStore } from './store.svelte';
 import type { MahjongSocket } from '../net/socket';
-import type { ServerEvent } from '../net/protocol';
+import type { Seat, ServerEvent } from '../net/protocol';
 import type { ConnectionStatus } from './state';
 
 /** Fake MahjongSocket for testing store wiring. Needs the 'client' vitest project —
@@ -38,7 +38,7 @@ class FakeSocket {
 	}
 }
 
-function stateSyncEvent(seat: number | null, seq: number): ServerEvent {
+function stateSyncEvent(seat: Seat | null, seq: number): ServerEvent {
 	return {
 		v: 1,
 		ts: 1,
@@ -47,7 +47,7 @@ function stateSyncEvent(seat: number | null, seq: number): ServerEvent {
 		d: {
 			seat,
 			hand_no: 1,
-			prevailing: 'E',
+			prevailing: 'EAST',
 			dealer: 0,
 			turn: 0,
 			phase: 'AWAIT_DRAW',

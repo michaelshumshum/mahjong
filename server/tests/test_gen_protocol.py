@@ -1,8 +1,11 @@
 import re
-from typing import Any
+from typing import Any, get_args
 
-from app.protocol import AnyMessage, ClientMessage, ServerMessage
+from app.protocol import AnyMessage, ClientMessage, Seat, ServerMessage
+from app.table_types import SeatStatus, WireSeatStatus
+from app.views import CLAIM_KIND_WIRE, ClaimChoice, WindName
 from bots.tiers import BotTier
+from mahjong_core.state import Wind
 from tools.gen_protocol import (
     _union_members,
     render_assert_never_fixture,
@@ -87,3 +90,20 @@ def test_str_enum_field_emits_one_named_union() -> None:
     assert ts.count("export type BotTier =") == 1
     assert f"export type BotTier = {union};" in ts
     assert ts_type(list[BotTier | None]) == "(BotTier | null)[]"
+
+
+def test_type_alias_field_emits_one_named_type() -> None:
+    ts = render_ts(**_kwargs())
+    assert ts.count("export type Seat =") == 1
+    assert "export type Seat = 0 | 1 | 2 | 3;" in ts
+    assert "export type WireSeatStatus = 'connected' | " in ts
+    assert ts_type(Seat | None) == "Seat | null"
+    assert ts_type(list[WireSeatStatus]) == "WireSeatStatus[]"
+
+
+def test_wire_aliases_match_their_server_sources() -> None:
+    assert get_args(WindName.__value__) == tuple(w.name for w in Wind)
+    assert set(CLAIM_KIND_WIRE.values()) < set(get_args(ClaimChoice.__value__))
+    assert set(get_args(SeatStatus.__value__)) | {"empty"} == set(
+        get_args(WireSeatStatus.__value__)
+    )

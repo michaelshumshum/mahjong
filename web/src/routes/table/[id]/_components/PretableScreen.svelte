@@ -1,11 +1,13 @@
 <script lang="ts">
 	import type { ConnectionStatus } from '$lib/game/state';
 	import type { Seat } from '$lib/game/types';
+	import type { WireSeatStatus } from '$lib/net/protocol';
 	import { seatWind, windWord } from '$lib/table/wind';
 	import SeatPicker from '$lib/table/SeatPicker.svelte';
 	import SeatRing from '$lib/table/SeatRing.svelte';
 	import FormGroup from '$lib/ui/FormGroup.svelte';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import Spinner from '$lib/ui/Spinner.svelte';
 	import { RULESET_PRESET_OPTIONS } from '$lib/net/ruleset';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -40,7 +42,7 @@
 		dealer: Seat;
 		displayName: string;
 		onDisplayNameChange: (value: string) => void;
-		seatStatus: string[];
+		seatStatus: WireSeatStatus[];
 		names: (string | null)[];
 		onJoin: (seat: Seat) => void;
 		isHost: boolean;
@@ -98,7 +100,7 @@
 
 	{#if !effectiveConnection || effectiveConnection === 'idle' || effectiveConnection === 'connecting'}
 		<div class="pretable-center">
-			<div class="pretable-spinner"></div>
+			<Spinner />
 			<p class="pretable-status">{m.pretableScreen_connectingStatus()}</p>
 		</div>
 	{:else if effectiveSeat === null}
@@ -134,7 +136,6 @@
 </div>
 
 <style lang="scss">
-	@use '$lib/styles/a11y';
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 
@@ -210,11 +211,8 @@
 
 	.pretable-invite-btn {
 		width: min(100%, 16rem);
-		min-height: var(--tap-target-min);
+		@include buttons.btn-base(var(--space-5));
 		margin-top: var(--space-1);
-		padding: var(--space-2) var(--space-5);
-		font: inherit;
-		cursor: pointer;
 		@include buttons.btn-primary;
 	}
 
@@ -242,10 +240,7 @@
 
 	// secondary: "Invite friends" is the panel's one primary action.
 	.pretable-cta {
-		min-height: var(--tap-target-min);
-		padding: var(--space-2) var(--space-5);
-		font: inherit;
-		cursor: pointer;
+		@include buttons.btn-base(var(--space-5));
 		@include buttons.btn-secondary;
 	}
 
@@ -260,30 +255,6 @@
 
 		&::placeholder {
 			color: var(--color-text-muted);
-		}
-	}
-
-	// indeterminate connection spinner -- no durationMs to anchor a TimerRing to (unknown,
-	// still trying).
-	.pretable-spinner {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		border: 3px solid var(--color-border);
-		border-top-color: var(--color-accent);
-		animation: pretable-spin var(--dur-spin) linear infinite;
-	}
-
-	@keyframes pretable-spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.pretable-spinner {
-		@include a11y.motion-reduced {
-			animation: none;
-			opacity: 0.6;
 		}
 	}
 

@@ -31,6 +31,7 @@ from app import protocol as proto
 from app.clock import now_ms
 from app.errors import (
     TABLE_CLOSED_ERROR,
+    ErrorCode,
     NotHostError,
     SeatAuthError,
     SeatNotBoundError,
@@ -221,7 +222,7 @@ class Session:
             self._send_local("ack", payload)
 
     async def send_bad_frame(self, message: str) -> None:
-        self._send_local("error", {"code": "bad_frame", "message": message})
+        self._send_local("error", {"code": ErrorCode.BAD_FRAME, "message": message})
 
     async def handle(self, message: object) -> None:
         """`ping` gets a connection-local `pong`, no `ack`, no per-seat `seq` -- it isn't one of
@@ -274,7 +275,7 @@ class Session:
             return
         if self.seat is not None:
             self._send_local(
-                "error", {"code": "already_joined", "message": "connection already bound"}
+                "error", {"code": ErrorCode.ALREADY_JOINED, "message": "connection already bound"}
             )
             return
         try:
@@ -283,19 +284,22 @@ class Session:
             )
         except SeatNotBoundError:
             self._send_local(
-                "error", {"code": "no_such_seat", "message": f"seat {msg.d.seat} is not bound"}
+                "error",
+                {"code": ErrorCode.NO_SUCH_SEAT, "message": f"seat {msg.d.seat} is not bound"},
             )
             return
         except SeatTakenError:
             # seat is a bot seat, no human occupant to reclaim from -- same wire error join
             # gives an already-taken seat.
             self._send_local(
-                "error", {"code": "seat_taken", "message": f"seat {msg.d.seat} is a bot seat"}
+                "error",
+                {"code": ErrorCode.SEAT_TAKEN, "message": f"seat {msg.d.seat} is a bot seat"},
             )
             return
         except SeatAuthError:
             self._send_local(
-                "error", {"code": "bad_secret", "message": f"wrong secret for seat {msg.d.seat}"}
+                "error",
+                {"code": ErrorCode.BAD_SECRET, "message": f"wrong secret for seat {msg.d.seat}"},
             )
             return
         self.seat = msg.d.seat
@@ -329,7 +333,9 @@ class Session:
         `Table.submit`.
         """
         if self.seat is None:
-            self._send_local("error", {"code": "not_joined", "message": "join a seat first"})
+            self._send_local(
+                "error", {"code": ErrorCode.NOT_JOINED, "message": "join a seat first"}
+            )
             return
         binding = self.table.seat_bindings[self.seat]
         assert binding is not None  # self.seat is only ever set once Table.join bound it

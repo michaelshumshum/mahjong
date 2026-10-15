@@ -60,6 +60,8 @@ def _union_members(discriminated: Any) -> list[type[BaseModel]]:
 
 def _nested_models(annotation: Any) -> list[type[BaseModel]]:
     """Every pydantic BaseModel reachable from a field annotation."""
+    if isinstance(annotation, typing.TypeAliasType):
+        return _nested_models(annotation.__value__)
     origin = typing.get_origin(annotation)
     if origin is typing.Annotated:
         return _nested_models(typing.get_args(annotation)[0])
@@ -77,16 +79,28 @@ def _nested_models(annotation: Any) -> list[type[BaseModel]]:
     return []
 
 
-def _nested_enums(annotation: Any) -> list[type[StrEnum]]:
-    """Every StrEnum reachable from a field annotation, emitted once as a named TS union."""
+type _NamedType = type[StrEnum] | typing.TypeAliasType
+
+
+def _named_types(annotation: Any) -> list[_NamedType]:
+    """Every StrEnum and `type X = ...` alias reachable from a field annotation, each emitted
+    once as a named TS type."""
+    if isinstance(annotation, typing.TypeAliasType):
+        return [annotation, *_named_types(annotation.__value__)]
     origin = typing.get_origin(annotation)
     if origin is typing.Literal:
         return []
     if origin is not None:
-        return [e for a in typing.get_args(annotation) for e in _nested_enums(a)]
+        return [e for a in typing.get_args(annotation) for e in _named_types(a)]
     if isinstance(annotation, type) and issubclass(annotation, StrEnum):
         return [annotation]
     return []
+
+
+def _render_named_type(named: _NamedType) -> str:
+    if isinstance(named, typing.TypeAliasType):
+        return f"export type {named.__name__} = {ts_type(named.__value__)};"
+    return f"export type {named.__name__} = {' | '.join(_literal_ts(m.value) for m in named)};"
 
 
 def _collect_models(roots: list[type[BaseModel]]) -> list[type[BaseModel]]:
@@ -117,6 +131,8 @@ def _literal_ts(value: Any) -> str:
 
 
 def ts_type(annotation: Any) -> str:
+    if isinstance(annotation, typing.TypeAliasType):
+        return annotation.__name__
     origin = typing.get_origin(annotation)
     if origin is typing.Annotated:
         return ts_type(typing.get_args(annotation)[0])
@@ -188,14 +204,13 @@ def render_ts(*, client_message: Any, server_message: Any, any_message: Any) -> 
     message_names = {m.__name__ for m in any_members}
     parts = [_GENERATED_HEADER.rstrip("\n")]
 
-    enums = {
-        e.__name__: e
-        for cls in all_models
-        for field in cls.model_fields.values()
-        for e in _nested_enums(field.annotation)
-    }
-    for name, enum in sorted(enums.items()):
-        parts.append(f"export type {name} = {' | '.join(_literal_ts(m.value) for m in enum)};")
+    named: dict[str, _NamedType] = {}
+    for cls in all_models:
+        for field in cls.model_fields.values():
+            for t in _named_types(field.annotation):
+                if named.setdefault(t.__name__, t) is not t:
+                    raise TypeError(f"gen_protocol: two wire types named {t.__name__}")
+    parts += [_render_named_type(t) for _, t in sorted(named.items())]
 
     for cls in all_models:
         extends = Envelope if cls.__name__ in message_names and cls is not Envelope else None

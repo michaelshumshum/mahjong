@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Seat } from '$lib/game/types';
+	import type { WireSeatStatus } from '$lib/net/protocol';
 	import { seatWind, WIND_CHAR } from './wind';
 	import CompassFelt from './CompassFelt.svelte';
 	import SeatRingSlot from './SeatRingSlot.svelte';
@@ -10,7 +11,7 @@
 		dealer,
 		seatStatus,
 		names
-	}: { you: Seat; dealer: Seat; seatStatus: string[]; names: (string | null)[] } = $props();
+	}: { you: Seat; dealer: Seat; seatStatus: WireSeatStatus[]; names: (string | null)[] } = $props();
 
 	// dealer is fixed at table creation, so your wind is real once seated: rotate the felt so it
 	// sits at the bottom edge, matching the self slot below.
@@ -46,46 +47,7 @@
 </div>
 
 <style lang="scss">
-	// same compass layout as the table cards (TableCard): name labels above/below spanning the
-	// full width, side seats in flexible columns flanking the mini felt (CompassFelt).
-	.seat-ring {
-		display: grid;
-		grid-template-areas:
-			'top   top  top'
-			'left  felt right'
-			'bottom bottom bottom';
-		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-		align-items: center;
-		gap: var(--space-2);
-		width: 100%;
-	}
+	@use '$lib/styles/layout';
 
-	.seat-ring-felt {
-		grid-area: felt;
-		width: 5.5rem;
-	}
-
-	.seat-ring-pos {
-		display: flex;
-		justify-content: center;
-		min-width: 0;
-	}
-
-	.seat-ring-pos--across {
-		grid-area: top;
-	}
-
-	.seat-ring-pos--left {
-		grid-area: left;
-		justify-content: flex-end;
-	}
-
-	.seat-ring-pos--right {
-		grid-area: right;
-		justify-content: flex-start;
-	}
-
-	.seat-ring-pos--self {
-		grid-area: bottom;
-	}
+	@include layout.seat-ring(5.5rem);
 </style>

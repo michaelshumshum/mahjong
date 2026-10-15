@@ -1,7 +1,14 @@
 // plain data, no runes -- store.svelte.ts wraps this in `$state`, so reducer.spec.ts can test
 // transitions with no Svelte compile step. Field names camelCase the wire; protocol.d.ts stays snake_case.
 
-import type { BotTier } from '$lib/net/protocol';
+import type {
+	BotTier,
+	HandOutcome,
+	MeldKind,
+	Phase,
+	WinType,
+	WireSeatStatus
+} from '$lib/net/protocol';
 import type { RuleSet } from '$lib/net/ruleset';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'resyncing' | 'closed';
@@ -15,7 +22,7 @@ export interface ClaimWindowState {
 }
 
 export interface MeldState {
-	kind: string;
+	kind: MeldKind;
 	tiles: number[];
 	fromSeat: number | null;
 }
@@ -30,9 +37,9 @@ export interface FairnessState {
 
 export interface HandEndState {
 	handNo: number;
-	outcome: string;
+	outcome: HandOutcome;
 	winner: number | null;
-	winType: string | null;
+	winType: WinType | null;
 	discarder: number | null;
 	faan: number | null;
 	faanBreakdown: Record<string, number> | null;
@@ -65,7 +72,8 @@ export interface ClientGameState {
 	prevailing: string;
 	dealer: number;
 	turn: number;
-	phase: string;
+	/** `'IDLE'` until the first `state_sync`. */
+	phase: Phase | 'IDLE';
 	ownHand: number[];
 	/** tile_id held apart from the sorted hand, physical-play style (docs/frontend.md §1).
 	 * `null` after a claimed chow/pung/kong too — a claim never leaves a spare tile to hold apart. */
@@ -77,7 +85,7 @@ export interface ClientGameState {
 	discardPools: number[][];
 	flowers: string[][];
 	wallRemaining: number;
-	seatStatus: string[];
+	seatStatus: WireSeatStatus[];
 	/** Each seat's resolved guest display name; `null` for an `empty` seat. */
 	names: (string | null)[];
 	/** Each `bot` seat's tier (`T1`/`T2`/`T4`/`ORACLE`); `null` for every other seat. */

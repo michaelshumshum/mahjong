@@ -14,7 +14,7 @@ import type {
 	Wind,
 	WinType
 } from '$lib/game/types';
-import type { BotTier } from '$lib/net/protocol';
+import type { BotTier, ClaimKind as ClaimWindowKind, WireSeatStatus } from '$lib/net/protocol';
 import type { TileCode } from './tile-code';
 
 export interface MeldView {
@@ -38,7 +38,7 @@ export interface SeatView {
 	score: number;
 	// wire seat_status -- optional since no mock fixture sets it (no bot concept in mocks);
 	// live-view.ts populates it from ClientGameState.seatStatus.
-	status?: string;
+	status?: WireSeatStatus;
 	botLevel?: BotTier | null;
 }
 
@@ -48,7 +48,7 @@ export type Seats = [SeatView, SeatView, SeatView, SeatView];
 // array) means "not offered".
 export interface ClaimWindowView {
 	windowId: number;
-	kind: 'discard' | 'kong_rob';
+	kind: ClaimWindowKind;
 	sourceSeat: Seat;
 	tile: TileCode;
 	durationMs: number;

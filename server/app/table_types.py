@@ -23,11 +23,11 @@ __all__ = [
     "WireSeatStatus",
 ]
 
-SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
+type SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
 
 # `empty` has no `SeatBinding` counterpart -- only `seat_status_tuple()` reports it, for a
 # `None` slot in `Table.seat_bindings`.
-WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
+type WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
 
 
 @dataclass(frozen=True, slots=True)

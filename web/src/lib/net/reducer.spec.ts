@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { reduce } from './reducer';
-import { initialClientGameState, type ClientGameState, type HandHistoryEntry } from '../game/state';
+import {
+	initialClientGameState,
+	type ClientGameState,
+	type HandHistoryEntry,
+	type MeldState
+} from '../game/state';
 import type { HandHistoryEntryPayload, ServerEvent } from './protocol';
 
 function state(patch: Partial<ClientGameState> = {}): ClientGameState {
@@ -54,7 +59,7 @@ describe('reduce', () => {
 			d: {
 				seat: 2,
 				hand_no: 3,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 1,
 				turn: 2,
 				phase: 'AWAIT_CLAIMS',
@@ -101,7 +106,7 @@ describe('reduce', () => {
 			d: {
 				seat: 0,
 				hand_no: 3,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 1,
 				turn: 0,
 				phase: 'AWAIT_ACTION',
@@ -152,7 +157,7 @@ describe('reduce', () => {
 			t: 'hand_start',
 			d: {
 				hand_no: 2,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 1,
 				seats: ['connected', 'connected', 'connected', 'connected']
 			}
@@ -571,7 +576,7 @@ describe('reduce', () => {
 	});
 
 	it("hand_end snapshots the winner's melds off state.melds at the moment it fires", () => {
-		const winnerMelds = [{ kind: 'pung', tiles: [4, 5, 6], fromSeat: 1 }];
+		const winnerMelds: MeldState[] = [{ kind: 'pung', tiles: [4, 5, 6], fromSeat: 1 }];
 		const s = state({ melds: [winnerMelds, [], [], []] });
 		const next = reduce(s, {
 			v: 1,
@@ -628,7 +633,7 @@ describe('reduce', () => {
 	});
 
 	it("winnerMelds survives the next hand_start clearing state.melds, since it's a copy taken at hand_end", () => {
-		const winnerMelds = [{ kind: 'exposed_kong', tiles: [4, 5, 6, 7], fromSeat: 2 }];
+		const winnerMelds: MeldState[] = [{ kind: 'exposed_kong', tiles: [4, 5, 6, 7], fromSeat: 2 }];
 		let s = state({ melds: [winnerMelds, [], [], []] });
 		s = reduce(s, {
 			v: 1,
@@ -657,7 +662,7 @@ describe('reduce', () => {
 			t: 'hand_start',
 			d: {
 				hand_no: 2,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 1,
 				seats: ['connected', 'connected', 'connected', 'connected']
 			}
@@ -756,7 +761,7 @@ describe('reduce', () => {
 			d: {
 				seat: 2,
 				hand_no: 2,
-				prevailing: 'E',
+				prevailing: 'EAST',
 				dealer: 1,
 				turn: 2,
 				phase: 'AWAIT_ACTION',

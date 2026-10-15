@@ -1,7 +1,54 @@
 // GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.
 // Source of truth: server/app/protocol.py (docs/protocol.md §6).
 
+export type ActionKind =
+	| 'discard'
+	| 'claim_chow'
+	| 'claim_pung'
+	| 'claim_kong'
+	| 'claim_win'
+	| 'pass'
+	| 'declare_concealed_kong'
+	| 'declare_added_kong'
+	| 'declare_win';
+
 export type BotTier = 'T0' | 'T1' | 'T2' | 'T4' | 'ORACLE';
+
+export type ClaimChoice = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
+
+export type ClaimKind = 'discard' | 'kong_rob';
+
+export type ErrorCode =
+	| 'bad_frame'
+	| 'already_joined'
+	| 'no_such_seat'
+	| 'seat_taken'
+	| 'bad_secret'
+	| 'not_joined'
+	| 'table_closed';
+
+export type HandOutcome = 'win' | 'exhaustive_draw';
+
+export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong' | 'pair';
+
+export type Phase =
+	| 'AWAIT_DRAW'
+	| 'AWAIT_ACTION'
+	| 'AWAIT_CLAIMS'
+	| 'AWAIT_KONG_ROB'
+	| 'SCORING'
+	| 'HAND_OVER'
+	| 'GAME_OVER';
+
+export type Seat = 0 | 1 | 2 | 3;
+
+export type SeatStatus = 'connected' | 'disconnected' | 'autoplay' | 'bot';
+
+export type WinType = 'self_draw' | 'discard' | 'kong_rob' | 'flowers';
+
+export type WindName = 'EAST' | 'SOUTH' | 'WEST' | 'NORTH';
+
+export type WireSeatStatus = 'connected' | 'disconnected' | 'autoplay' | 'bot' | 'empty';
 
 export interface Envelope {
 	v: 1;
@@ -181,7 +228,7 @@ export interface DiscardPayload {
 
 export interface ClaimPayload {
 	window_id: number;
-	choice: 'pass' | 'chow' | 'pung' | 'kong' | 'win';
+	choice: ClaimChoice;
 	tiles?: number[] | null;
 }
 
@@ -203,30 +250,30 @@ export interface PongPayload {
 }
 
 export interface ErrorPayload {
-	code: string;
+	code: ErrorCode;
 	message: string;
 }
 
 export interface StateSyncPayload {
-	seat: number | null;
+	seat: Seat | null;
 	hand_no: number;
-	prevailing: string;
-	dealer: number;
-	turn: number;
-	phase: string;
+	prevailing: WindName;
+	dealer: Seat;
+	turn: Seat;
+	phase: Phase;
 	own_hand: number[];
 	concealed_counts: number[];
 	melds: Record<string, unknown>[][];
 	discard_pools: number[][];
 	flowers: string[][];
 	wall_remaining: number;
-	seat_status: string[];
+	seat_status: WireSeatStatus[];
 	names: (string | null)[];
 	scores: number[];
 	legal_actions: Record<string, unknown>[];
 	claim_options: Record<string, unknown>[];
 	deadline_ts: number | null;
-	host_seat: number | null;
+	host_seat: Seat | null;
 	hands?: number[][] | null;
 	hand_history?: HandHistoryEntryPayload[];
 	ruleset_preset?: string | null;
@@ -237,9 +284,9 @@ export interface StateSyncPayload {
 
 export interface HandStartPayload {
 	hand_no: number;
-	prevailing: string;
-	dealer: number;
-	seats: string[];
+	prevailing: WindName;
+	dealer: Seat;
+	seats: WireSeatStatus[];
 	seed_commit?: string | null;
 }
 
@@ -251,18 +298,18 @@ export interface DealPayload {
 }
 
 export interface FlowerReplacePayload {
-	seat: number;
+	seat: Seat;
 	flower: string;
 	replacement?: number | null;
 }
 
 export interface DrawPayload {
-	seat: number;
+	seat: Seat;
 	tile_id?: number | null;
 }
 
 export interface DiscardEventPayload {
-	seat: number;
+	seat: Seat;
 	tile_id: number;
 	tile: string;
 	pool_index: number;
@@ -276,36 +323,36 @@ export interface ClaimOfferPayload {
 
 export interface ClaimResolvedPayload {
 	window_id: number;
-	claim_kind: string;
-	seat: number | null;
-	action_kind: string | null;
+	claim_kind: ClaimKind;
+	seat: Seat | null;
+	action_kind: ActionKind | null;
 }
 
 export interface MeldPayload {
-	seat: number;
-	meld_kind: string;
+	seat: Seat;
+	meld_kind: MeldKind;
 	tiles: number[];
-	from_seat?: number | null;
+	from_seat?: Seat | null;
 }
 
 export interface KongReplacePayload {
-	seat: number;
+	seat: Seat;
 	tile_id?: number | null;
 }
 
 export interface TurnPayload {
-	seat: number;
-	phase: string;
+	seat: Seat;
+	phase: Phase;
 	deadline_ts: number;
 	legal?: Record<string, unknown>[] | null;
 }
 
 export interface HandEndPayload {
 	hand_no: number;
-	outcome: string;
-	winner: number | null;
-	win_type: string | null;
-	discarder: number | null;
+	outcome: HandOutcome;
+	winner: Seat | null;
+	win_type: WinType | null;
+	discarder: Seat | null;
 	faan: number | null;
 	faan_breakdown: Record<string, number> | null;
 	points: number | null;
@@ -326,8 +373,8 @@ export interface GameEndPayload {
 }
 
 export interface SeatStatePayload {
-	seat: number;
-	status: 'connected' | 'disconnected' | 'autoplay' | 'bot';
+	seat: Seat;
+	status: SeatStatus;
 	name?: string | null;
 }
 
@@ -344,18 +391,18 @@ export interface AckPayload {
 
 export interface HandHistoryEntryPayload {
 	hand_no: number;
-	outcome: string;
-	winner: number | null;
-	win_type: string | null;
-	discarder: number | null;
+	outcome: HandOutcome;
+	winner: Seat | null;
+	win_type: WinType | null;
+	discarder: Seat | null;
 	faan: number | null;
 	faan_breakdown: Record<string, number> | null;
 	points: number | null;
 	payments: Record<number, number> | null;
 	revealed: boolean;
 	winning_hand: number[] | null;
-	dealer: number;
-	prevailing: string;
+	dealer: Seat;
+	prevailing: WindName;
 	winner_melds: Record<string, unknown>[] | null;
 	fairness?: FairnessPayload | null;
 }

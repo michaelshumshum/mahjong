@@ -1,7 +1,8 @@
 <script lang="ts">
+	import type { WireSeatStatus } from '$lib/net/protocol';
 	import { m } from '$lib/paraglide/messages.js';
 
-	let { status, name }: { status: string; name: string | null } = $props();
+	let { status, name }: { status: WireSeatStatus; name: string | null } = $props();
 	let open = $derived(status === 'empty');
 </script>
 

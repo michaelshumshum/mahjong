@@ -3,16 +3,8 @@
 
 import type { ClientGameState, MeldState } from '../game/state';
 import { tileIdToCode, type TileCode } from './tile-code';
-import type {
-	ClaimOption,
-	FaanPattern,
-	HandOutcome,
-	MeldKind,
-	Phase,
-	Seat,
-	Wind,
-	WinType
-} from '$lib/game/types';
+import type { ClaimOption, FaanPattern, MeldKind, Phase, Seat, Wind } from '$lib/game/types';
+import type { WindName } from '$lib/net/protocol';
 import type {
 	ClaimWindowView,
 	TableView,
@@ -36,10 +28,10 @@ export interface LiveTableView {
 
 // wire prevailing is the `Wind` enum's *name* (EAST/SOUTH/WEST/NORTH), not the single-letter
 // code TableView uses everywhere else.
-const WIRE_WIND_TO_CODE: Record<string, Wind> = { EAST: 'E', SOUTH: 'S', WEST: 'W', NORTH: 'N' };
+const WIRE_WIND_TO_CODE: Record<WindName, Wind> = { EAST: 'E', SOUTH: 'S', WEST: 'W', NORTH: 'N' };
 
 export function wireWindToCode(wind: string): Wind {
-	return WIRE_WIND_TO_CODE[wind] ?? (wind as Wind);
+	return WIRE_WIND_TO_CODE[wind as WindName] ?? (wind as Wind);
 }
 
 function sortByTileType(ids: readonly number[]): number[] {
@@ -121,9 +113,9 @@ function handResultToView(state: ClientGameState): HandResultView | null {
 	const d = state.lastHandEnd;
 	if (!d) return null;
 	return {
-		outcome: d.outcome as HandOutcome,
+		outcome: d.outcome,
 		winner: d.winner !== null ? (d.winner as Seat) : undefined,
-		winType: d.winType !== null ? (d.winType as WinType) : undefined,
+		winType: d.winType ?? undefined,
 		winningHand: d.winningHand ? d.winningHand.map(tileIdToCode) : undefined,
 		patterns: d.faanBreakdown
 			? Object.entries(d.faanBreakdown).map(([name, faan]): FaanPattern => ({

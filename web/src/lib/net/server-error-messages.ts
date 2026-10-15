@@ -1,8 +1,9 @@
 import { m } from '$lib/paraglide/messages.js';
+import type { ErrorCode } from './protocol';
 
-// ws.py's ErrorPayload.code values, the only ones the server actually sends (grep for them
-// there before adding one). An unmapped code falls back to tablePage_serverErrorToast.
-const SERVER_ERROR_MESSAGE: Record<string, () => string> = {
+// keyed by the generated `ErrorCode`, so a new server code fails typecheck until translated.
+// a code from a newer server than this build falls back to tablePage_serverErrorToast.
+const SERVER_ERROR_MESSAGE: Record<ErrorCode, () => string> = {
 	bad_frame: m.serverError_badFrame,
 	already_joined: m.serverError_alreadyJoined,
 	no_such_seat: m.serverError_noSuchSeat,
@@ -13,6 +14,7 @@ const SERVER_ERROR_MESSAGE: Record<string, () => string> = {
 };
 
 export function serverErrorToastMessage(code: string, rawMessage: string): string {
-	const known = SERVER_ERROR_MESSAGE[code];
+	const byCode: Partial<Record<string, () => string>> = SERVER_ERROR_MESSAGE;
+	const known = byCode[code];
 	return known ? known() : m.tablePage_serverErrorToast({ message: rawMessage });
 }

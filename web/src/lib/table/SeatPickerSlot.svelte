@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Seat } from '$lib/game/types';
+	import type { WireSeatStatus } from '$lib/net/protocol';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -11,7 +12,7 @@
 	}: {
 		seat: Seat;
 		self?: boolean;
-		status: string;
+		status: WireSeatStatus;
 		name: string | null;
 		onJoin: (seat: Seat) => void;
 	} = $props();

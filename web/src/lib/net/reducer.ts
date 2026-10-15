@@ -1,4 +1,4 @@
-import type { HandHistoryEntryPayload, ServerEvent } from './protocol';
+import type { HandHistoryEntryPayload, MeldKind, ServerEvent } from './protocol';
 import { type ClientGameState, type HandHistoryEntry, type MeldState } from '../game/state';
 import type { RuleSet } from './ruleset';
 
@@ -45,7 +45,7 @@ function updateHand(
  * `meld_kind` — two different upstream serializers for the same concept. */
 function mapMeldDict(m: Record<string, unknown>): MeldState {
 	return {
-		kind: (m.kind ?? m.meld_kind) as string,
+		kind: (m.kind ?? m.meld_kind) as MeldKind,
 		tiles: m.tiles as number[],
 		fromSeat: (m.from_seat as number | null | undefined) ?? null
 	};

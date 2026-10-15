@@ -1,26 +1,17 @@
-// domain types shared by table, win/score screens and mock fixtures. hand-written: the wire
-// types seats as `number` and meld/claim kinds as `string`, nothing narrower to derive from.
+// domain types shared by table, win/score screens and mock fixtures. wire vocabularies are
+// re-exported from protocol.d.ts; `Wind` is TableView's own letter code (the wire sends `WindName`).
 
 import type { TileCode } from '$lib/table/tile-code';
+import type { ClaimChoice, HandOutcome, MeldKind as WireMeldKind, Seat } from '$lib/net/protocol';
 
-export type Seat = 0 | 1 | 2 | 3;
+export type { HandOutcome, Phase, Seat, WinType } from '$lib/net/protocol';
+
 export type Wind = 'E' | 'S' | 'W' | 'N';
 
-// mirrors state.Phase; AWAIT_KONG_ROB/SCORING/GAME_OVER included for completeness though no
-// mock scenario uses them yet.
-export type Phase =
-	| 'AWAIT_DRAW'
-	| 'AWAIT_ACTION'
-	| 'AWAIT_CLAIMS'
-	| 'AWAIT_KONG_ROB'
-	| 'SCORING'
-	| 'HAND_OVER'
-	| 'GAME_OVER';
+// SeatState.melds never holds a bare pair.
+export type MeldKind = Exclude<WireMeldKind, 'pair'>;
 
-// mirrors melds.MeldKind, minus PAIR (SeatState.melds never holds a bare pair).
-export type MeldKind = 'chow' | 'pung' | 'exposed_kong' | 'concealed_kong' | 'added_kong';
-
-export type ClaimKind = 'pass' | 'chow' | 'pung' | 'kong' | 'win';
+export type ClaimKind = ClaimChoice;
 
 // mirrors the wire claim{window_id, choice, tiles?} shape; `tiles` only disambiguates chow.
 // no `window_id` here -- pure presentation, wiring to a real window is the caller's job.
@@ -28,9 +19,6 @@ export interface ClaimOption {
 	kind: ClaimKind;
 	tiles?: TileCode[];
 }
-
-export type HandOutcome = 'win' | 'exhaustive_draw';
-export type WinType = 'self_draw' | 'discard' | 'kong_rob';
 
 export interface FaanPattern {
 	name: string;

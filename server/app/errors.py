@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Final
 
 __all__ = [
     "TABLE_CLOSED_ERROR",
+    "ErrorCode",
     "NotHostError",
     "SeatAuthError",
     "SeatNotBoundError",
@@ -15,9 +17,26 @@ __all__ = [
     "TableFullError",
 ]
 
+
+class ErrorCode(StrEnum):
+    """Every wire `error{code}` the server sends. Ack failures (`ack{error}`) are a separate,
+    untyped vocabulary."""
+
+    BAD_FRAME = "bad_frame"
+    ALREADY_JOINED = "already_joined"
+    NO_SUCH_SEAT = "no_such_seat"
+    SEAT_TAKEN = "seat_taken"
+    BAD_SECRET = "bad_secret"
+    NOT_JOINED = "not_joined"
+    TABLE_CLOSED = "table_closed"
+
+
 # error payload for every socket on (or later connecting to) an abandoned table; the client stops
 # reconnecting on this code
-TABLE_CLOSED_ERROR: Final = {"code": "table_closed", "message": "table closed: every player left"}
+TABLE_CLOSED_ERROR: Final = {
+    "code": ErrorCode.TABLE_CLOSED,
+    "message": "table closed: every player left",
+}
 
 
 class SeatTakenError(Exception):

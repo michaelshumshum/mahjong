@@ -66,6 +66,7 @@ from mahjong_core.tiles import Flower, TileId, tile_code
 
 __all__ = [
     "CLAIM_KIND_WIRE",
+    "ClaimChoice",
     "ClaimResolvedWire",
     "DiscardWire",
     "DrawWire",
@@ -77,6 +78,7 @@ __all__ = [
     "KongReplaceWire",
     "MeldWire",
     "SeatView",
+    "WindName",
     "hand_history_wire",
     "redact_event",
     "seat_view",
@@ -415,7 +417,11 @@ def _wire_value(value: Any) -> Any:
     return value
 
 
-CLAIM_KIND_WIRE: dict[MeldKind, str] = {
+# `Wind`'s member *names*; the IntEnum's values never go on the wire.
+type WindName = Literal["EAST", "SOUTH", "WEST", "NORTH"]
+type ClaimChoice = Literal["pass", "chow", "pung", "kong", "win"]
+
+CLAIM_KIND_WIRE: dict[MeldKind, ClaimChoice] = {
     MeldKind.CHOW: "chow",
     MeldKind.PUNG: "pung",
     MeldKind.EXPOSED_KONG: "kong",

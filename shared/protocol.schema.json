@@ -97,6 +97,22 @@
       "title": "AckPayload",
       "type": "object"
     },
+    "ActionKind": {
+      "description": "Discriminator tag for the `Action` union \u2014 variants are distinctly-shaped dataclasses\nthat share nothing but this tag.",
+      "enum": [
+        "discard",
+        "claim_chow",
+        "claim_pung",
+        "claim_kong",
+        "claim_win",
+        "pass",
+        "declare_concealed_kong",
+        "declare_added_kong",
+        "declare_win"
+      ],
+      "title": "ActionKind",
+      "type": "string"
+    },
     "Auto": {
       "additionalProperties": false,
       "properties": {
@@ -247,6 +263,25 @@
       "title": "Claim",
       "type": "object"
     },
+    "ClaimChoice": {
+      "enum": [
+        "pass",
+        "chow",
+        "pung",
+        "kong",
+        "win"
+      ],
+      "type": "string"
+    },
+    "ClaimKind": {
+      "description": "What opened the live claim window: a discard, or an added-kong declaration opening a\nrobbing-the-kong window (\u6436\u69d3) \u2014 same machinery, different trigger.",
+      "enum": [
+        "discard",
+        "kong_rob"
+      ],
+      "title": "ClaimKind",
+      "type": "string"
+    },
     "ClaimOffer": {
       "additionalProperties": false,
       "properties": {
@@ -337,15 +372,7 @@
           "type": "integer"
         },
         "choice": {
-          "enum": [
-            "pass",
-            "chow",
-            "pung",
-            "kong",
-            "win"
-          ],
-          "title": "Choice",
-          "type": "string"
+          "$ref": "#/$defs/ClaimChoice"
         },
         "tiles": {
           "anyOf": [
@@ -432,30 +459,27 @@
           "type": "integer"
         },
         "claim_kind": {
-          "title": "Claim Kind",
-          "type": "string"
+          "$ref": "#/$defs/ClaimKind"
         },
         "seat": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Seat"
+          ]
         },
         "action_kind": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/ActionKind"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Action Kind"
+          ]
         }
       },
       "required": [
@@ -762,8 +786,7 @@
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "tile_id": {
           "title": "Tile Id",
@@ -859,8 +882,7 @@
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "tile_id": {
           "anyOf": [
@@ -935,12 +957,25 @@
       "title": "Error",
       "type": "object"
     },
+    "ErrorCode": {
+      "description": "Every wire `error{code}` the server sends. Ack failures (`ack{error}`) are a separate,\nuntyped vocabulary.",
+      "enum": [
+        "bad_frame",
+        "already_joined",
+        "no_such_seat",
+        "seat_taken",
+        "bad_secret",
+        "not_joined",
+        "table_closed"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
     "ErrorPayload": {
       "additionalProperties": false,
       "properties": {
         "code": {
-          "title": "Code",
-          "type": "string"
+          "$ref": "#/$defs/ErrorCode"
         },
         "message": {
           "title": "Message",
@@ -1032,8 +1067,7 @@
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "flower": {
           "title": "Flower",
@@ -1259,41 +1293,37 @@
           "type": "integer"
         },
         "outcome": {
-          "title": "Outcome",
-          "type": "string"
+          "$ref": "#/$defs/HandOutcome"
         },
         "winner": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Winner"
+          ]
         },
         "win_type": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/WinType"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Win Type"
+          ]
         },
         "discarder": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Discarder"
+          ]
         },
         "faan": {
           "anyOf": [
@@ -1405,41 +1435,37 @@
           "type": "integer"
         },
         "outcome": {
-          "title": "Outcome",
-          "type": "string"
+          "$ref": "#/$defs/HandOutcome"
         },
         "winner": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Winner"
+          ]
         },
         "win_type": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/WinType"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Win Type"
+          ]
         },
         "discarder": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Discarder"
+          ]
         },
         "faan": {
           "anyOf": [
@@ -1510,12 +1536,10 @@
           "title": "Winning Hand"
         },
         "dealer": {
-          "title": "Dealer",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "prevailing": {
-          "title": "Prevailing",
-          "type": "string"
+          "$ref": "#/$defs/WindName"
         },
         "winner_melds": {
           "anyOf": [
@@ -1562,6 +1586,15 @@
       ],
       "title": "HandHistoryEntryPayload",
       "type": "object"
+    },
+    "HandOutcome": {
+      "description": "How a hand ended.",
+      "enum": [
+        "win",
+        "exhaustive_draw"
+      ],
+      "title": "HandOutcome",
+      "type": "string"
     },
     "HandStart": {
       "additionalProperties": false,
@@ -1625,16 +1658,14 @@
           "type": "integer"
         },
         "prevailing": {
-          "title": "Prevailing",
-          "type": "string"
+          "$ref": "#/$defs/WindName"
         },
         "dealer": {
-          "title": "Dealer",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "seats": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/WireSeatStatus"
           },
           "title": "Seats",
           "type": "array"
@@ -1908,8 +1939,7 @@
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "tile_id": {
           "anyOf": [
@@ -1984,16 +2014,27 @@
       "title": "Meld",
       "type": "object"
     },
+    "MeldKind": {
+      "description": "Every way three or more tiles can form a named group. Kong is split into three\ndistinct kinds rather than one kind + a flag: exposed/concealed/added differ in how\nthey're formed, how they're claimed (added kong alone opens \u6436\u69d3), and whether their\ntiles are public (`Meld.concealed`).",
+      "enum": [
+        "chow",
+        "pung",
+        "exposed_kong",
+        "concealed_kong",
+        "added_kong",
+        "pair"
+      ],
+      "title": "MeldKind",
+      "type": "string"
+    },
     "MeldPayload": {
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "meld_kind": {
-          "title": "Meld Kind",
-          "type": "string"
+          "$ref": "#/$defs/MeldKind"
         },
         "tiles": {
           "items": {
@@ -2005,14 +2046,13 @@
         "from_seat": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "From Seat"
+          "default": null
         }
       },
       "required": [
@@ -2022,6 +2062,20 @@
       ],
       "title": "MeldPayload",
       "type": "object"
+    },
+    "Phase": {
+      "description": "Every distinct state the turn machine can be in. `EXHAUSTIVE_DRAW` (\u6d41\u5c40) isn't its\nown phase \u2014 it's modeled as a `HAND_OVER` outcome via `HandResult` instead.",
+      "enum": [
+        "AWAIT_DRAW",
+        "AWAIT_ACTION",
+        "AWAIT_CLAIMS",
+        "AWAIT_KONG_ROB",
+        "SCORING",
+        "HAND_OVER",
+        "GAME_OVER"
+      ],
+      "title": "Phase",
+      "type": "string"
     },
     "Ping": {
       "additionalProperties": false,
@@ -2302,6 +2356,15 @@
       "title": "ScorePayload",
       "type": "object"
     },
+    "Seat": {
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "type": "integer"
+    },
     "SeatState": {
       "additionalProperties": false,
       "properties": {
@@ -2360,18 +2423,10 @@
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "status": {
-          "enum": [
-            "connected",
-            "disconnected",
-            "autoplay",
-            "bot"
-          ],
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/SeatStatus"
         },
         "name": {
           "anyOf": [
@@ -2392,6 +2447,15 @@
       ],
       "title": "SeatStatePayload",
       "type": "object"
+    },
+    "SeatStatus": {
+      "enum": [
+        "connected",
+        "disconnected",
+        "autoplay",
+        "bot"
+      ],
+      "type": "string"
     },
     "ServerShutdown": {
       "additionalProperties": false,
@@ -2584,33 +2648,28 @@
         "seat": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Seat"
+          ]
         },
         "hand_no": {
           "title": "Hand No",
           "type": "integer"
         },
         "prevailing": {
-          "title": "Prevailing",
-          "type": "string"
+          "$ref": "#/$defs/WindName"
         },
         "dealer": {
-          "title": "Dealer",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "turn": {
-          "title": "Turn",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "phase": {
-          "title": "Phase",
-          "type": "string"
+          "$ref": "#/$defs/Phase"
         },
         "own_hand": {
           "items": {
@@ -2663,7 +2722,7 @@
         },
         "seat_status": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/WireSeatStatus"
           },
           "title": "Seat Status",
           "type": "array"
@@ -2719,13 +2778,12 @@
         "host_seat": {
           "anyOf": [
             {
-              "type": "integer"
+              "$ref": "#/$defs/Seat"
             },
             {
               "type": "null"
             }
-          ],
-          "title": "Host Seat"
+          ]
         },
         "hands": {
           "anyOf": [
@@ -2881,12 +2939,10 @@
       "additionalProperties": false,
       "properties": {
         "seat": {
-          "title": "Seat",
-          "type": "integer"
+          "$ref": "#/$defs/Seat"
         },
         "phase": {
-          "title": "Phase",
-          "type": "string"
+          "$ref": "#/$defs/Phase"
         },
         "deadline_ts": {
           "title": "Deadline Ts",
@@ -2916,6 +2972,36 @@
       ],
       "title": "TurnPayload",
       "type": "object"
+    },
+    "WinType": {
+      "description": "How the winning tile was obtained -- affects New-6 faan patterns (\u81ea\u6478/\u6d77\u5e95\u6488\u6708/\u6436\u69d3).\n`FLOWERS` is the instant-win variant (`seven_flowers_instant_win`/\n`eight_flowers_instant_win`): ends the hand on flower count alone, no winning tile or\nmeld decomposition, so it's its own value rather than forced into `SELF_DRAW` -- still\npays out like a self-draw since no seat fed the win.",
+      "enum": [
+        "self_draw",
+        "discard",
+        "kong_rob",
+        "flowers"
+      ],
+      "title": "WinType",
+      "type": "string"
+    },
+    "WindName": {
+      "enum": [
+        "EAST",
+        "SOUTH",
+        "WEST",
+        "NORTH"
+      ],
+      "type": "string"
+    },
+    "WireSeatStatus": {
+      "enum": [
+        "connected",
+        "disconnected",
+        "autoplay",
+        "bot",
+        "empty"
+      ],
+      "type": "string"
     }
   },
   "anyOf": [
