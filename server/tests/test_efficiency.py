@@ -19,6 +19,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from app.views import SeatView, seat_view
+from bots.base import NO_DEADLINE
 from bots.efficiency import EfficiencyBot
 from bots.random import random_action
 from mahjong_core.config import RuleSet
@@ -29,7 +30,6 @@ from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 
 _STEP_CAP = 2000
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
-_NO_DEADLINE = float("inf")
 
 
 def _build_view(
@@ -121,7 +121,7 @@ async def test_never_returns_an_illegal_id(seed: int) -> None:
     for state, seat in _decision_points(seed, _BOUNDED_RULESET):
         mask = legal_mask(state, seat)
         view = seat_view(state, seat)
-        aid = await bot.act(view, mask, _NO_DEADLINE)
+        aid = await bot.act(view, mask, NO_DEADLINE)
         assert mask[aid], f"seed={seed} seat={seat} phase={state.phase}: aid {aid} not legal"
         decode_action(aid, state, seat)  # must not raise
 
@@ -137,7 +137,7 @@ async def test_never_returns_an_illegal_id_hypothesis(seed: int) -> None:
     for state, seat in _decision_points(seed, _BOUNDED_RULESET):
         mask = legal_mask(state, seat)
         view = seat_view(state, seat)
-        aid = await bot.act(view, mask, _NO_DEADLINE)
+        aid = await bot.act(view, mask, NO_DEADLINE)
         assert mask[aid]
 
 
@@ -179,7 +179,7 @@ async def test_discard_keeps_tenpai_over_breaking_a_complete_meld() -> None:
     ]
     view = _build_view(0, hand)
     mask = _discard_mask(hand, extra=[102])
-    aid = await EfficiencyBot().act(view, mask, _NO_DEADLINE)
+    aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == int(T.MAN_9)
 
 
@@ -205,7 +205,7 @@ async def test_discard_prefers_honor_on_an_exact_tie() -> None:
     ]
     view = _build_view(0, hand)
     mask = _discard_mask(hand, extra=[102])
-    aid = await EfficiencyBot().act(view, mask, _NO_DEADLINE)
+    aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == int(T.WIND_EAST)
 
 
@@ -235,7 +235,7 @@ async def test_claims_pung_when_it_strictly_reduces_shanten() -> None:
     mask = [False] * 109
     mask[102] = True
     mask[106] = True  # pung
-    aid = await EfficiencyBot().act(view, mask, _NO_DEADLINE)
+    aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == 106
 
 
@@ -263,7 +263,7 @@ async def test_declines_pung_when_it_does_not_strictly_reduce_shanten() -> None:
     mask = [False] * 109
     mask[102] = True
     mask[106] = True
-    aid = await EfficiencyBot().act(view, mask, _NO_DEADLINE)
+    aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == 102
 
 
@@ -289,7 +289,7 @@ async def test_never_declares_a_self_kong() -> None:
     ]
     view = _build_view(0, hand)
     mask = _discard_mask(hand, extra=[102, 34 + int(T.MAN_1)])
-    aid = await EfficiencyBot().act(view, mask, _NO_DEADLINE)
+    aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid != 34 + int(T.MAN_1)
     assert aid < 34  # took a discard, not the kong
 
@@ -299,5 +299,5 @@ async def test_win_always_takes_priority() -> None:
     mask = [False] * 109
     mask[0] = True
     mask[108] = True
-    aid = await EfficiencyBot().act(view, mask, _NO_DEADLINE)
+    aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid == 108

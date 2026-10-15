@@ -25,15 +25,13 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from bots.base import GAME_STEP_CAP
 from bots.random import random_action
 from mahjong_core.actions import legal_actions
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TOTAL_PHYSICAL_TILES
-
-_STEP_CAP = 8000  # generous vs. the observed max of ~450 steps for a 4-hand EAST_ONLY game
-# (see module docstring); a trip is a hard failure, never a silent early exit.
 
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
 
@@ -70,7 +68,7 @@ def _assert_hand_sizes(state: GameState) -> None:
         )
 
 
-def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = _STEP_CAP) -> int:
+def _play_one_game(seed: int, ruleset: RuleSet, *, step_cap: int = GAME_STEP_CAP) -> int:
     """Play one complete game with four `RandomBot`s sharing a single seeded `Random` stream --
     (ruleset, seed) alone reproduces it, per `server/AGENTS.md`'s determinism rule. Asserts
     every invariant after every `reduce()`/`start_next_hand()` call; returns the step count.

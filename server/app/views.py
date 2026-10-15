@@ -49,7 +49,7 @@ from typing import Any, Literal, cast
 from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.actions import legal_actions as compute_legal_actions
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import (
+from mahjong_core.events import (
     ClaimResolved,
     Discarded,
     Drawn,
@@ -60,11 +60,12 @@ from mahjong_core.engine import (
     KongReplacementDrawn,
     MeldFormed,
 )
-from mahjong_core.melds import Meld
+from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import ClaimOffer, GameState, HandOutcome, Phase, Wind
 from mahjong_core.tiles import Flower, TileId, tile_code
 
 __all__ = [
+    "CLAIM_KIND_WIRE",
     "ClaimResolvedWire",
     "DiscardWire",
     "DrawWire",
@@ -412,6 +413,14 @@ def _wire_value(value: Any) -> Any:
     if isinstance(value, Mapping):
         return dict(value)
     return value
+
+
+CLAIM_KIND_WIRE: dict[MeldKind, str] = {
+    MeldKind.CHOW: "chow",
+    MeldKind.PUNG: "pung",
+    MeldKind.EXPOSED_KONG: "kong",
+}
+"""Claimable meld kind -> its `claim.choice` / `claim_offer` option wire name."""
 
 
 def _meld_wire(meld: Meld) -> dict[str, Any]:

@@ -18,7 +18,8 @@ import dataclasses
 from concurrent.futures import Executor, Future
 from typing import Any
 
-from app.table import SeatBinding, Table
+from app.table import Table
+from app.table_types import SeatBinding
 from mahjong_core.actions import ClaimPung, Discard, legal_actions
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game

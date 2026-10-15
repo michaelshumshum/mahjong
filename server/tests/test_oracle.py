@@ -23,7 +23,8 @@ import random
 import pytest
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
-from bots.faanbot import _ADDED_KONG_BASE, _PASS, _PUNG, _THREAT_THRESHOLD, FaanBot
+from bots.base import NO_DEADLINE
+from bots.faanbot import _THREAT_THRESHOLD, FaanBot
 from bots.features import own_hand34, seen34
 from bots.oracle_learned import OracleLearnedBot
 from bots.safety import opponent_threat_level, tile_risk
@@ -31,12 +32,11 @@ from bots.worker import _make_bot
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
-from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.ml import ADDED_KONG_BASE, PASS_ID, PUNG_ID, decode_action, legal_mask
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import ClaimOffer, GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 
-_NO_DEADLINE = float("inf")
 _STEP_CAP = 2000
 
 
@@ -199,8 +199,8 @@ async def test_omniscient_view_avoids_a_real_deal_in_the_probabilistic_view_walk
         0, _FOLD_HAND, turn=13, discard_pools=discard_pools, melds=melds, hands=hands
     )
 
-    probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
-    omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    probabilistic_result = await FaanBot().act(probabilistic_view, mask, NO_DEADLINE)
+    omniscient_result = await FaanBot().act(omniscient_view, mask, NO_DEADLINE)
 
     assert probabilistic_result == int(TileType.WIND_NORTH), (
         "sanity: the probabilistic-only view must actually walk into this deal-in, or the rest "
@@ -272,10 +272,10 @@ async def test_omniscient_view_never_discards_a_certain_deal_in_when_a_safe_tile
     north = int(TileType.WIND_NORTH)
     assert tile_risk(omniscient_view, north) > 0.0
 
-    assert await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE) == north, (
+    assert await FaanBot().act(probabilistic_view, mask, NO_DEADLINE) == north, (
         "sanity: hands=None keeps the shanten-best discard"
     )
-    chosen = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    chosen = await FaanBot().act(omniscient_view, mask, NO_DEADLINE)
     assert chosen != north
     assert tile_risk(omniscient_view, chosen) == 0.0
 
@@ -323,7 +323,7 @@ async def test_omniscient_view_discards_the_cheapest_deal_in_when_every_discard_
     north, west = int(TileType.WIND_NORTH), int(TileType.WIND_WEST)
     assert 0.0 < tile_risk(view, north) < tile_risk(view, west)
 
-    assert await FaanBot().act(view, mask, _NO_DEADLINE) == north
+    assert await FaanBot().act(view, mask, NO_DEADLINE) == north
 
 
 # --- exact tenpai valuation (ADR 0019 §5.2) ------------------------------------------------------
@@ -365,10 +365,10 @@ async def test_omniscient_view_prefers_a_narrower_wait_that_clears_min_faan() ->
         0, _SHANPON_OR_PINGHU, discard_pools=discard_pools, hands=((), (), (), ())
     )
 
-    assert await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE) == int(TileType.SOU_3), (
+    assert await FaanBot().act(probabilistic_view, mask, NO_DEADLINE) == int(TileType.SOU_3), (
         "sanity: the structural proxy takes the wider, sub-minimum shanpon"
     )
-    chosen = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    chosen = await FaanBot().act(omniscient_view, mask, NO_DEADLINE)
     assert chosen in (int(TileType.SOU_2), int(TileType.SOU_5))
 
 
@@ -380,7 +380,7 @@ async def test_omniscient_view_prefers_a_live_wait_over_a_dead_one() -> None:
         _view(0, _SHANPON_OR_PINGHU, discard_pools=discard_pools, hands=((), (), (), ())),
         ruleset=RuleSet(min_faan=1),
     )
-    chosen = await FaanBot().act(view, _discard_mask(_SHANPON_OR_PINGHU), _NO_DEADLINE)
+    chosen = await FaanBot().act(view, _discard_mask(_SHANPON_OR_PINGHU), NO_DEADLINE)
     assert chosen in (int(TileType.SOU_2), int(TileType.SOU_5))
 
 
@@ -426,22 +426,22 @@ def _east_claim_view(
 
 def _pung_mask() -> list[bool]:
     mask = [False] * 109
-    mask[_PASS] = mask[_PUNG] = True
+    mask[PASS_ID] = mask[PUNG_ID] = True
     return mask
 
 
 async def test_omniscient_view_claims_into_a_clearing_tenpai() -> None:
-    assert await FaanBot().act(_east_claim_view(None), _pung_mask(), _NO_DEADLINE) == _PASS, (
+    assert await FaanBot().act(_east_claim_view(None), _pung_mask(), NO_DEADLINE) == PASS_ID, (
         "sanity: the structural claim guard declines this pung"
     )
     omniscient = _east_claim_view(((), (), (), ()))
-    assert await FaanBot().act(omniscient, _pung_mask(), _NO_DEADLINE) == _PUNG
+    assert await FaanBot().act(omniscient, _pung_mask(), NO_DEADLINE) == PUNG_ID
 
 
 async def test_omniscient_view_passes_when_the_claimed_tenpai_is_dead() -> None:
     every_7p = _pool(TileType.PIN_7, TileType.PIN_7, TileType.PIN_7, TileType.PIN_7)
     view = _east_claim_view(((), (), (), ()), seat1_pool=every_7p)
-    assert await FaanBot().act(view, _pung_mask(), _NO_DEADLINE) == _PASS
+    assert await FaanBot().act(view, _pung_mask(), NO_DEADLINE) == PASS_ID
 
 
 async def test_omniscient_view_passes_when_the_tenpai_discard_deals_in() -> None:
@@ -462,7 +462,7 @@ async def test_omniscient_view_passes_when_the_tenpai_discard_deals_in() -> None
     )
     view = _east_claim_view(((), seven_pairs_on_8m, (), ()))
     assert tile_risk(view, int(TileType.MAN_8)) > 0.0
-    assert await FaanBot().act(view, _pung_mask(), _NO_DEADLINE) == _PASS
+    assert await FaanBot().act(view, _pung_mask(), NO_DEADLINE) == PASS_ID
 
 
 # --- behavioral proof: real shanten (not the meld/tempo proxy) decides whether to fold --------
@@ -516,8 +516,8 @@ async def test_omniscient_view_folds_against_a_tenpai_opponent_the_proxy_reads_a
         "sanity: seat 1's real tenpai hand must genuinely flag as threatening"
     )
 
-    probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
-    omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    probabilistic_result = await FaanBot().act(probabilistic_view, mask, NO_DEADLINE)
+    omniscient_result = await FaanBot().act(omniscient_view, mask, NO_DEADLINE)
 
     assert probabilistic_result == int(TileType.MAN_4), (
         "sanity: the ordinary view must actually walk into this deal-in, or the rest of this "
@@ -641,8 +641,8 @@ async def test_omniscient_view_prefers_a_discard_with_more_real_live_tiles() -> 
         "omniscient view either -- the flip below is seen34's doing, not tile_risk's"
     )
 
-    probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
-    omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    probabilistic_result = await FaanBot().act(probabilistic_view, mask, NO_DEADLINE)
+    omniscient_result = await FaanBot().act(omniscient_view, mask, NO_DEADLINE)
 
     assert probabilistic_result == int(TileType.PIN_9), (
         "sanity: the probabilistic view must actually pick PIN_9, or the rest of this test "
@@ -737,7 +737,7 @@ async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
     monkeypatch.setattr("bots.faanbot.shanten", _fake_shanten)
 
     mask = [False] * 109
-    kong_aid = _ADDED_KONG_BASE + kong_type
+    kong_aid = ADDED_KONG_BASE + kong_type
     mask[kong_aid] = True
     for t in filler_types:
         mask[int(t)] = True
@@ -760,8 +760,8 @@ async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
     )
     omniscient_view = _build(((), seat1_hand, (), ()))
 
-    probabilistic_result = await FaanBot().act(probabilistic_view, mask, _NO_DEADLINE)
-    omniscient_result = await FaanBot().act(omniscient_view, mask, _NO_DEADLINE)
+    probabilistic_result = await FaanBot().act(probabilistic_view, mask, NO_DEADLINE)
+    omniscient_result = await FaanBot().act(omniscient_view, mask, NO_DEADLINE)
 
     assert probabilistic_result == kong_aid, (
         "sanity: the forced shanten-improvement precondition must actually make the unfixed "
@@ -803,7 +803,7 @@ async def _play_oracle_tier_vs_faanbot(seed: int, ruleset: RuleSet) -> GameState
             seat = state.turn
         view = _omniscient_seat_view(state, seat) if seat == oracle_seat else seat_view(state, seat)
         mask = legal_mask(state, seat)
-        aid = await bots[seat].act(view, mask, _NO_DEADLINE)
+        aid = await bots[seat].act(view, mask, NO_DEADLINE)
         action = decode_action(aid, state, seat)
         state, _ = reduce(state, action)
     return state

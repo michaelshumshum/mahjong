@@ -19,30 +19,35 @@ mahjong/
 ├── server/
 │   ├── pyproject.toml, uv.lock, Dockerfile, alembic/
 │   ├── mahjong_core/           # PURE. no asyncio, no I/O, no deps beyond stdlib
-│   │   ├── tiles.py            # TileType/TileId, 34-array helpers, parsing ("5s", "1m")
+│   │   ├── tiles.py            # TileType/TileId, geometry constants, 34-array helpers, parsing
 │   │   ├── wall.py             # seeded shuffle, dice, draw front/back, flower replacement
 │   │   ├── melds.py            # meld types, legality, decomposition
 │   │   ├── shanten.py          # standard / seven pairs / thirteen orphans + ukeire
 │   │   ├── state.py            # GameState, SeatState, Phase (frozen dataclasses)
 │   │   ├── actions.py          # Action union, legal_actions(state, seat)
 │   │   ├── engine.py           # reduce(state, action) -> (state, events)
+│   │   ├── events.py           # Event union (engine output), EventKind
 │   │   ├── claims.py           # claim priority resolution (pure part)
 │   │   ├── config.py           # RuleSet
 │   │   ├── presets.py          # RULESET_PRESETS, resolve_ruleset
-│   │   ├── ml.py               # action_id / decode_action / legal_mask
+│   │   ├── ml.py               # action-id layout constants, action_id / decode_action / legal_mask
 │   │   └── scoring/            # patterns.py (faan detectors), faan.py (maximise over
 │   │                           # decompositions), payout.py (faan -> points -> payments)
 │   ├── app/
 │   │   ├── main.py             # FastAPI app, lifespan, /healthz, GET/POST /tables
+│   │   ├── api_models.py       # REST request/response models for main.py
 │   │   ├── ws.py               # WebSocket endpoint, Session
 │   │   ├── table.py            # Table actor: task loop, timers, claim windows, seq/ring
+│   │   ├── table_types.py      # SeatBinding, Command, BotJobTag/BotResult, TableSettings
+│   │   ├── errors.py           # Table exceptions (one per wire error code), TABLE_CLOSED_ERROR
 │   │   ├── registry.py         # TableRegistry, showcase table, graceful-shutdown drain
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
-│   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay
+│   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
+│   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
 │   │   └── weights/learned.npz # T4's exported policy, committed (bots.md §2)
 │   ├── ml/                     # RL + supervised training (ml.md)
 │   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6

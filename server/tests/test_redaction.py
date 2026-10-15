@@ -40,7 +40,7 @@ from app.views import (
     seat_view_wire,
 )
 from bots.random import random_action
-from bots.worker import BOT_TIERS
+from bots.tiers import BOT_TIERS
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -51,7 +51,8 @@ from mahjong_core.actions import (
     Discard,
 )
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import (
+from mahjong_core.engine import new_game, reduce, start_next_hand
+from mahjong_core.events import (
     ClaimResolved,
     Discarded,
     Drawn,
@@ -61,9 +62,6 @@ from mahjong_core.engine import (
     HandEnded,
     KongReplacementDrawn,
     MeldFormed,
-    new_game,
-    reduce,
-    start_next_hand,
 )
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import ClaimOffer, GameState, HandOutcome, HandResult, Phase, WinType

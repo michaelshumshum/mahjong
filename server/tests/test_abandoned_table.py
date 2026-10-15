@@ -23,7 +23,8 @@ from starlette.websockets import WebSocketDisconnect
 from app import ws
 from app.main import app
 from app.registry import TableRegistry
-from app.table import BotResult, SeatBinding, Table
+from app.table import Table
+from app.table_types import BotResult, SeatBinding
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.ml import legal_mask
 

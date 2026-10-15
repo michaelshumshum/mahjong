@@ -188,7 +188,7 @@ closes, and reconnecting is always a brand-new spectator session with a fresh `s
 spectator gets `seat_view(state, None)`, every broadcast, and every `redact_event(state, None,
 event)` output — except `claim_offer`, which would name the offered seat's own concealed tiles.
 
-**Table settings.** `TableSettings` (`app/table.py`) holds per-table options that aren't game rules
+**Table settings.** `TableSettings` (`app/table_types.py`) holds per-table options that aren't game rules
 (those are `RuleSet`). `spectators_see_hands` switches every spectator to the open-hands view (§5);
 `Table.update_settings` swaps it mid-game and resyncs spectators. No wire message sets it.
 

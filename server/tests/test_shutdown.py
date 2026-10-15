@@ -30,7 +30,8 @@ from app import ws
 from app.db.session import make_engine, make_session_factory
 from app.main import app
 from app.registry import TableRegistry
-from app.table import SeatBinding, Table
+from app.table import Table
+from app.table_types import SeatBinding
 from mahjong_core.actions import Discard
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game

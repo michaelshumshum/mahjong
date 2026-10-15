@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import GameRecord
 from app.db.records import save_game_record
 from app.views import seat_view
-from bots.base import Bot
+from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.random import RandomBot
 from mahjong_core.actions import Action
 from mahjong_core.config import RuleSet
@@ -31,16 +31,13 @@ from mahjong_core.state import GameState, Phase
 
 __all__ = ["play_and_record_game", "play_game"]
 
-_STEP_CAP = 8000  # matches tests/test_selfplay.py's cap -- see that module for the bound's origin
-_NO_DEADLINE = float("inf")  # self-play has no wall-clock budget; heuristic bots ignore it anyway
-
 
 async def play_game(
     seed: int,
     ruleset: RuleSet,
     bots: Sequence[Bot] | None = None,
     *,
-    step_cap: int = _STEP_CAP,
+    step_cap: int = GAME_STEP_CAP,
 ) -> tuple[GameState, list[Action]]:
     """Plays one complete game to `Phase.GAME_OVER`. Returns `(final_state, actions)`, the action
     log that reproduces `final_state` from `new_game(ruleset, seed)` via `reduce` --
@@ -80,7 +77,7 @@ async def play_game(
 
         view = seat_view(state, seat)
         mask = legal_mask(state, seat)
-        aid = await seats[seat].act(view, mask, _NO_DEADLINE)
+        aid = await seats[seat].act(view, mask, NO_DEADLINE)
         action = decode_action(aid, state, seat)
         actions.append(action)
         state, _ = reduce(state, action)

@@ -39,8 +39,9 @@ from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.fairness import new_game_seed
-from app.table import Table, TableSettings, WireSeatStatus
-from bots.worker import DEFAULT_BOT_TIER
+from app.table import Table
+from app.table_types import TableSettings, WireSeatStatus
+from bots.tiers import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
 
 __all__ = ["TableRegistry", "TableSummary"]

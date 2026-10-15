@@ -15,14 +15,9 @@ import numpy as np
 from app.views import SeatView
 from bots.learned import DEFAULT_WEIGHTS, LearnedBot
 from bots.safety import kong_rob_risk, tile_risk
+from mahjong_core.ml import ADDED_KONG_BASE, CONCEALED_KONG_BASE, PASS_ID, WIN_ID
 
 __all__ = ["OracleLearnedBot"]
-
-_N_TYPES = 34
-_CONCEALED_KONG_BASE = 34
-_ADDED_KONG_BASE = 68
-_SELF_KONG_END = 102
-_WIN = 108
 
 
 class OracleLearnedBot:
@@ -33,35 +28,35 @@ class OracleLearnedBot:
         del deadline
         if view.hands is None:
             raise ValueError("OracleLearnedBot needs an omniscient view")
-        if mask[_WIN]:
-            return _WIN
+        if mask[WIN_ID]:
+            return WIN_ID
         return self.choose(view, mask, self.policy.logits(replace(view, hands=None)))
 
     def choose(self, view: SeatView, mask: list[bool], logits: np.ndarray) -> int:
         """The vetoes over any policy's logits; `view` must be omniscient."""
         assert view.hands is not None
-        if mask[_WIN]:
-            return _WIN
+        if mask[WIN_ID]:
+            return WIN_ID
         legal = np.asarray(mask, dtype=bool)
         order = [int(a) for a in np.argsort(-np.where(legal, logits, -np.inf)) if legal[a]]
 
-        discards = [a for a in order if a < _N_TYPES]
+        discards = [a for a in order if a < CONCEALED_KONG_BASE]
         risk = {a: tile_risk(view, a) for a in discards}
         safe = [a for a in discards if risk[a] == 0.0]
 
         for aid in order:
-            if aid < _N_TYPES:
+            if aid < CONCEALED_KONG_BASE:
                 if not safe:
                     return min(discards, key=lambda a: (risk[a], discards.index(a)))
                 if risk[aid] > 0.0:
                     continue
                 return aid
-            if aid < _ADDED_KONG_BASE:
-                if kong_rob_risk(view, aid - _CONCEALED_KONG_BASE, concealed=True) > 0.0:
+            if aid < ADDED_KONG_BASE:
+                if kong_rob_risk(view, aid - CONCEALED_KONG_BASE, concealed=True) > 0.0:
                     continue
                 return aid
-            if aid < _SELF_KONG_END:
-                if kong_rob_risk(view, aid - _ADDED_KONG_BASE, concealed=False) > 0.0:
+            if aid < PASS_ID:
+                if kong_rob_risk(view, aid - ADDED_KONG_BASE, concealed=False) > 0.0:
                     continue
                 return aid
             return aid

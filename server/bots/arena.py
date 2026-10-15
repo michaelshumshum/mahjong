@@ -36,14 +36,16 @@ from pathlib import Path
 from typing import Any
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
-from bots.base import Bot
+from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.efficiency import EfficiencyBot
 from bots.faanbot import AGGRESSIVE, DEFENSIVE, FLUSH_CHASING, FaanBot, WeightProfile
 from bots.labels import is_tenpai, seat_hand34, unused_tile_id_for_type, winning_tile_types
 from bots.random import RandomBot
+from bots.tiers import BotTier
 from mahjong_core.actions import build_scoring_context
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import Discarded, HandEnded, new_game, reduce, start_next_hand
+from mahjong_core.engine import new_game, reduce, start_next_hand
+from mahjong_core.events import Discarded, HandEnded
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.state import GameState, HandOutcome, Phase, WinType
@@ -107,18 +109,16 @@ BOT_REGISTRY: dict[str, Callable[[int], Bot]] = {
     "FaanBotDefensive": _weight_profile_factory(DEFENSIVE),
     "FaanBotFlushChasing": _weight_profile_factory(FLUSH_CHASING),
     "LearnedBot": _learned_bot_factory,
-    "ORACLE": _oracle_learned_factory,
+    BotTier.ORACLE: _oracle_learned_factory,
     "OracleLearned": _oracle_learned_factory,
     "OracleFaanBot": _faan_bot_factory,
 }
 """`ORACLE` is the served Impossible tier (`bots/worker.py`'s `_make_bot`), so it tracks whatever
 `OracleLearned` is; `OracleFaanBot` is the tier before docs/decisions/0022, comparison only."""
 
-OMNISCIENT_BOTS: frozenset[str] = frozenset({"ORACLE", "OracleLearned", "OracleFaanBot"})
+OMNISCIENT_BOTS: frozenset[str] = frozenset({BotTier.ORACLE, "OracleLearned", "OracleFaanBot"})
 """`BOT_REGISTRY` names played on an omniscient view; any other harness must refuse them."""
 
-_STEP_CAP = 8000
-_NO_DEADLINE = float("inf")
 
 # see module docstring: keeps hand count independent of who wins.
 _ARENA_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
@@ -188,8 +188,8 @@ async def _play_instrumented_game(
     steps = 0
     while state.phase != Phase.GAME_OVER:
         steps += 1
-        if steps > _STEP_CAP:
-            raise RuntimeError(f"seed={seed}: exceeded {_STEP_CAP} steps -- possible deadlock")
+        if steps > GAME_STEP_CAP:
+            raise RuntimeError(f"seed={seed}: exceeded {GAME_STEP_CAP} steps -- possible deadlock")
 
         if state.phase == Phase.HAND_OVER:
             state, _ = start_next_hand(state)
@@ -209,7 +209,7 @@ async def _play_instrumented_game(
 
         view = _view_for(state, seat, names[seat])
         mask = legal_mask(state, seat)
-        aid = await bots[seat].act(view, mask, _NO_DEADLINE)
+        aid = await bots[seat].act(view, mask, NO_DEADLINE)
         action = decode_action(aid, state, seat)
         state, events = reduce(state, action)
 

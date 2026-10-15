@@ -29,18 +29,19 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import protocol as proto
-from app.outbox import BoundedOutbox
-from app.registry import TableRegistry
-from app.table import (
+from app.errors import (
     TABLE_CLOSED_ERROR,
     NotHostError,
     SeatAuthError,
     SeatNotBoundError,
     SeatTakenError,
-    Table,
     TableAlreadyStartedError,
     TableFullError,
 )
+from app.outbox import BoundedOutbox
+from app.registry import TableRegistry
+from app.table import Table
+from app.views import CLAIM_KIND_WIRE
 from mahjong_core.actions import (
     Action,
     ClaimChow,
@@ -66,11 +67,7 @@ _OUTBOX_MAXSIZE = 64  # docs/architecture.md "Outbound backpressure" / protocol.
 
 _registry = TableRegistry()
 
-_CLAIM_WIRE_TO_MELD_KIND = {
-    "chow": MeldKind.CHOW,
-    "pung": MeldKind.PUNG,
-    "kong": MeldKind.EXPOSED_KONG,
-}
+_CLAIM_WIRE_TO_MELD_KIND = {wire: kind for kind, wire in CLAIM_KIND_WIRE.items()}
 _DECLARE_WIRE_TO_MELD_KIND = {
     "concealed_kong": MeldKind.CONCEALED_KONG,
     "added_kong": MeldKind.ADDED_KONG,

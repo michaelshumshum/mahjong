@@ -23,24 +23,22 @@ from bots.valuation import (
 )
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.melds import MeldKind
+from mahjong_core.ml import (
+    ADDED_KONG_BASE,
+    CHOW_IDS,
+    CHOW_LOW_ID,
+    CONCEALED_KONG_BASE,
+    DISCARD_BASE,
+    PASS_ID,
+    PUNG_ID,
+    WIN_ID,
+)
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
 from mahjong_core.tiles import TileId, new_count_array, tile_id_type
 from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
-
-_DISCARD_BASE = 0
-_CONCEALED_KONG_BASE = 34
-_ADDED_KONG_BASE = 68
-_PASS = 102
-_CHOW_LOW = 103
-_CHOW_MIDDLE = 104
-_CHOW_HIGH = 105
-_CHOW_AIDS = (_CHOW_LOW, _CHOW_MIDDLE, _CHOW_HIGH)
-_PUNG = 106
-_KONG = 107
-_WIN = 108
 
 _SHANTEN_UNIT = 5.0
 """Cost, in composite-score units, of one extra shanten -- sized so a large value gain (6+ faan
@@ -190,8 +188,8 @@ class FaanBot:
 
     async def act(self, view: SeatView, mask: list[bool], deadline: float) -> int:
         del deadline  # no search budget; O(1)-ish per candidate
-        if mask[_WIN]:
-            return _WIN
+        if mask[WIN_ID]:
+            return WIN_ID
         if view.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
             return self._act_on_claim(view, mask)
         return self._act_on_turn(view, mask)
@@ -204,13 +202,13 @@ class FaanBot:
         before_shanten = shanten(hand, closed=closed, hand_sets=hand_sets)
         before_value, _ = estimate_best_faan(hand, closed=closed, route_faan=route_faan)
 
-        best_aid = _PASS
+        best_aid = PASS_ID
         best_shanten = before_shanten
 
         min_faan = view.ruleset.min_faan
         claimed_type = _claimed_type(view)
         if claimed_type is not None:
-            if mask[_PUNG]:
+            if mask[PUNG_ID]:
                 candidate = list(hand)
                 candidate[claimed_type] += 1
                 s, resulting_hand = _best_after_discard(
@@ -219,9 +217,9 @@ class FaanBot:
                 if s < best_shanten and self._should_claim(
                     before_value, resulting_hand, min_faan, route_faan
                 ):
-                    best_shanten, best_aid = s, _PUNG
+                    best_shanten, best_aid = s, PUNG_ID
 
-            chow_aid = next((aid for aid in _CHOW_AIDS if mask[aid]), None)
+            chow_aid = next((aid for aid in CHOW_IDS if mask[aid]), None)
             if chow_aid is not None:
                 candidate = list(hand)
                 candidate[claimed_type] += 1
@@ -236,7 +234,7 @@ class FaanBot:
         # claiming an exposed kong never helps shanten (same reason as bots/efficiency.py) -- skip.
         # ORACLE-only: the proxy claim guard passed, but the exact post-claim tenpai may be worth it.
         if (
-            best_aid == _PASS
+            best_aid == PASS_ID
             and view.hands is not None
             and claimed_type is not None
             and before_shanten >= 1
@@ -252,13 +250,13 @@ class FaanBot:
         claimed_id = view.discard_pools[view.turn][-1]
         claimed_type = int(tile_id_type(claimed_id))
         seen = seen34(view)
-        best = (0.0, _PASS)
+        best = (0.0, PASS_ID)
         for offer in view.claim_options:
             for meld in offer.melds:
                 if meld.kind == MeldKind.PUNG:
-                    aid = _PUNG
+                    aid = PUNG_ID
                 elif meld.kind == MeldKind.CHOW:
-                    aid = _CHOW_LOW + claimed_type - int(meld.tile_type)
+                    aid = CHOW_LOW_ID + claimed_type - int(meld.tile_type)
                 else:
                     continue
                 if not mask[aid]:
@@ -320,7 +318,7 @@ class FaanBot:
 
         best_kong_aid: int | None = None
         best_kong_shanten = base
-        for kong_base, concealed in ((_CONCEALED_KONG_BASE, True), (_ADDED_KONG_BASE, False)):
+        for kong_base, concealed in ((CONCEALED_KONG_BASE, True), (ADDED_KONG_BASE, False)):
             for t in range(34):
                 aid = kong_base + t
                 if not mask[aid]:
@@ -371,7 +369,7 @@ class FaanBot:
         w_flex *= profile.w_flex
         accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
 
-        risks = {d: tile_risk(view, d) for d in range(34) if mask[_DISCARD_BASE + d]}
+        risks = {d: tile_risk(view, d) for d in range(34) if mask[DISCARD_BASE + d]}
         candidates = list(risks)
         if view.hands is not None:
             # exact risk is a certain deal-in, not a likelihood: never pay it while a safe tile exists
@@ -382,7 +380,7 @@ class FaanBot:
         best_key: tuple[float, int, int] | None = None
         best_aid = -1
         for d in candidates:
-            aid = _DISCARD_BASE + d
+            aid = DISCARD_BASE + d
             after = list(hand)
             after[d] -= 1
             result_shanten = shanten(after, closed=closed, hand_sets=hand_sets)

@@ -84,15 +84,34 @@ import time
 from collections import deque
 from collections.abc import Callable, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
-from dataclasses import dataclass, field
-from typing import Any, Final, Literal, cast
+from dataclasses import dataclass
+from typing import Any, Final, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.records import save_game_record
+from app.errors import (
+    TABLE_CLOSED_ERROR,
+    NotHostError,
+    SeatAuthError,
+    SeatNotBoundError,
+    SeatTakenError,
+    TableAlreadyStartedError,
+    TableFullError,
+)
 from app.fairness import fairness_reveal, new_nonce, seed_commit
-from app.idempotency import IdempotencyCache
+from app.table_types import (
+    BotJobTag,
+    BotResult,
+    Command,
+    Envelope,
+    SeatBinding,
+    SeatDisconnected,
+    TableSettings,
+    WireSeatStatus,
+)
 from app.views import (
+    CLAIM_KIND_WIRE,
     HandHistoryRecord,
     _omniscient_seat_view,
     hand_history_wire,
@@ -100,19 +119,12 @@ from app.views import (
     seat_view,
     seat_view_wire,
 )
-from bots.worker import BOT_TIERS, DEFAULT_BOT_TIER, compute_action
+from bots.tiers import BOT_TIERS, DEFAULT_BOT_TIER, BotTier
+from bots.worker import compute_action
 from mahjong_core.actions import Action, Discard, Pass, action_to_dict, legal_actions
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import (
-    Discarded,
-    Drawn,
-    Event,
-    HandEnded,
-    KongReplacementDrawn,
-    new_game,
-    reduce,
-    start_next_hand,
-)
+from mahjong_core.engine import new_game, reduce, start_next_hand
+from mahjong_core.events import Discarded, Drawn, Event, HandEnded, KongReplacementDrawn
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import preset_id_for
@@ -120,29 +132,9 @@ from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
 __all__ = [
-    "TABLE_CLOSED_ERROR",
-    "BotJobTag",
-    "BotResult",
-    "Command",
-    "Envelope",
-    "NotHostError",
-    "SeatBinding",
-    "SeatNotBoundError",
-    "SeatStatus",
-    "SeatTakenError",
     "Table",
-    "TableAlreadyStartedError",
-    "TableFullError",
-    "TableSettings",
     "TimerHeap",
-    "WireSeatStatus",
 ]
-
-SeatStatus = Literal["connected", "disconnected", "autoplay", "bot"]
-
-# `empty` has no `SeatBinding` counterpart -- only `seat_status_tuple()` reports it, for a
-# `None` slot in `Table.seat_bindings`.
-WireSeatStatus = Literal["connected", "disconnected", "autoplay", "bot", "empty"]
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +142,7 @@ _BOT_JOB_TIMEOUT_SECONDS = 10.0  # hard deadline (architecture.md §8 "Bot raise
 
 # disconnect-handover always drives the autoplay bot at T2/FaanBot, never self._bot_tier -- must
 # never land on ORACLE, which would leak every seat's concealed tiles. See _effective_bot_tier.
-_DISCONNECT_HANDOVER_BOT_TIER: Final = "T2"
-# error payload for every socket on (or later connecting to) an abandoned table; the client stops
-# reconnecting on this code
-TABLE_CLOSED_ERROR: Final = {"code": "table_closed", "message": "table closed: every player left"}
-
+_DISCONNECT_HANDOVER_BOT_TIER: Final = BotTier.T2
 # humanising think delay, applied after the worker replies so it never touches the real
 # turn/claim deadline math -- a real tier answers in single-digit ms otherwise. Env-overridable.
 _BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
@@ -216,13 +204,6 @@ def _shared_bot_pool() -> ProcessPoolExecutor:
     return _default_bot_pool
 
 
-_CLAIM_KIND_WIRE = {
-    MeldKind.CHOW: "chow",
-    MeldKind.PUNG: "pung",
-    MeldKind.EXPOSED_KONG: "kong",
-}
-
-
 def _now_ms() -> int:
     return time.time_ns() // 1_000_000
 
@@ -241,164 +222,6 @@ def _turn_draw_tile_for_current_turn(events: list[Event], state: GameState) -> T
         if isinstance(event, (Drawn, KongReplacementDrawn)) and event.seat == state.turn:
             return event.tile_id
     return None
-
-
-@dataclass(frozen=True, slots=True)
-class TableSettings:
-    spectators_see_hands: bool = False
-
-
-class SeatTakenError(Exception):
-    """Raised by `Table.join(seat=...)` when the requested seat is already bound
-    (wire `error{code:'seat_taken'}`)."""
-
-    def __init__(self, seat: int) -> None:
-        super().__init__(f"seat {seat} is already taken")
-        self.seat = seat
-
-
-class TableFullError(Exception):
-    """Raised by `Table.join(seat=None)` when every seat is bound (wire
-    `error{code:'table_full'}`)."""
-
-
-class SeatNotBoundError(Exception):
-    """Raised by `Table.reconnect(seat, ...)` when nothing has ever `join`ed this seat -- no
-    `SeatBinding` to reclaim (wire `error{code:'no_such_seat'}`). Distinct from `SeatTakenError`:
-    that fires on `join` finding a seat already bound; this fires on `hello` finding one never
-    bound."""
-
-    def __init__(self, seat: int) -> None:
-        super().__init__(f"seat {seat} has never been joined")
-        self.seat = seat
-
-
-class SeatAuthError(Exception):
-    """Raised by `Table.reconnect(seat, ..., secret=...)` when the presented `secret` doesn't
-    match `SeatBinding.reconnect_secret` (wire `error{code:'bad_secret'}`), including a missing
-    one."""
-
-    def __init__(self, seat: int) -> None:
-        super().__init__(f"seat {seat} secret mismatch")
-        self.seat = seat
-
-
-class NotHostError(Exception):
-    """Raised by `Table.start_with_bots(seat)` when `seat` isn't `self.host_seat` (wire
-    `error{code:'not_host'}`). Host is whichever seat's `join` was this table's first."""
-
-    def __init__(self, seat: int) -> None:
-        super().__init__(f"seat {seat} is not the host")
-        self.seat = seat
-
-
-class TableAlreadyStartedError(Exception):
-    """Raised by `Table.start_with_bots(seat)` once `self.started` (wire
-    `error{code:'already_started'}`)."""
-
-
-@dataclass
-class SeatBinding:
-    """One seat's session binding. Lives on `Table`, not `Session`: idempotency is scoped per
-    seat binding, not per socket, so it has to survive a reconnect swapping out the socket
-    underneath it.
-
-    `send` is the live connection's push callback; `ready`/`no_calls`/`auto_pass_chow` are the
-    lobby/pre-arm state. `status` (`connected`/`disconnected`/`autoplay`/`bot` -- `empty` never
-    applies here; that's `seat_status_tuple()`'s report for a `None` slot instead) transitions
-    via `mark_disconnected`/`reconnect`/the disconnect-grace timer.
-
-    `bot` (practice mode, `_bind_bot_seat`) is the other way a `SeatBinding` comes to exist:
-    a seat bound to a bot from table construction, never a human `join`. Reuses this exact
-    dataclass (`send` a no-op, `ready=True`) rather than a parallel tracking structure, so
-    `_poke_bots()` drives it through the identical path an `autoplay` seat uses. Unlike
-    `autoplay`, `bot` is never reached by `mark_disconnected` and `reconnect` refuses to hijack
-    it (`SeatTakenError`) -- there is no human occupant to hand it back to.
-
-    `turn_timeout_strikes` (architecture.md §8: three strikes -> `AUTOPLAY` for the rest of
-    the game) is never reset anywhere -- that omission *is* the "for the rest of the game"
-    policy, since this binding is one long-lived object for the table's entire game.
-
-    `name` is this seat's resolved guest display name -- set once at `join` or `_bind_bot_seat`
-    and never touched again (a `hello` reconnect never resends it).
-
-    `reconnect_secret` (architecture.md §2.1) is a random per-seat credential, minted once
-    and handed back exactly once, in `join`'s own `ack`. Every later `hello{seat, secret}` must
-    present it back; `reconnect()` compares with `secrets.compare_digest` and refuses the
-    reclaim on any mismatch (`SeatAuthError`). A bot seat's secret is never handed to anyone.
-    """
-
-    session_id: str
-    send: Callable[[int, dict[str, Any]], None]
-    name: str
-    status: SeatStatus = "connected"
-    ready: bool = False
-    no_calls: bool = False
-    auto_pass_chow: bool = False
-    idempotency: IdempotencyCache = field(default_factory=IdempotencyCache)
-    turn_timeout_strikes: int = 0
-    reconnect_secret: str = field(default_factory=lambda: secrets.token_urlsafe(16))
-
-
-@dataclass(frozen=True)
-class Command:
-    """One already-validated `(seat, Action)` pair flowing through `Table.inbox`. Most
-    claim-window `Action`s already carry their own `seat` field; `Discard`/`DeclareWin`/
-    `DeclareConcealedKong`/`DeclareAddedKong` don't (`engine._acting_seat` reads `state.turn`
-    instead), so `Command.seat` is the only place the claimed acting seat is recorded for them
-    before `_authorize` checks it against `state.turn`.
-    """
-
-    seat: int
-    action: Action
-
-
-@dataclass(frozen=True)
-class Envelope:
-    """One already-redacted wire frame in a seat's ring buffer, stamped with that stream's own
-    `seq` (per-seat, dense, gapless -- never per-table, never derived from `event_id`)."""
-
-    seq: int
-    event: dict[str, object]
-
-
-@dataclass(frozen=True)
-class BotJobTag:
-    """What a submitted bot job was computed against. `state_version` is `Table.event_id` at
-    submission time -- `self.state` is provably unchanged from what the job saw as long as
-    `event_id` hasn't moved, since `_apply` is the only place either ever changes, together.
-    `key` disambiguates what kind of decision this was for: the acting seat for a `turn`
-    decision, or the `window_id` for a `claim` decision."""
-
-    kind: Literal["turn", "claim"]
-    key: int
-    state_version: int
-
-
-@dataclass(frozen=True)
-class BotResult:
-    """A `ProcessPoolExecutor` worker's answer, re-entering through `Table.inbox` exactly like a
-    real `Command` -- `tag` is compared against `Table._pending_bot[seat]` and dropped silently
-    if it no longer matches.
-
-    `aid` is a bare action id, not a concrete `Action` -- a worker process never receives
-    `GameState`, so `_handle_bot_result` does the `decode_action(aid, state, seat)` step here,
-    against the real `GameState` this process already holds."""
-
-    seat: int
-    tag: BotJobTag
-    aid: int
-
-
-@dataclass(frozen=True)
-class SeatDisconnected:
-    """A seat's live socket just closed (`mark_disconnected`, called directly from `Session`,
-    outside this table's own loop). Routed through `Table.inbox` rather than forfeiting the
-    seat's claim inline: forfeiting means calling `_apply()`, which mutates `self.state`, and
-    server/AGENTS.md reserves every `GameState` mutation for this table's own task processing
-    its inbox in order. Handled by `_handle_seat_disconnected`."""
-
-    seat: int
 
 
 @dataclass(frozen=True)
@@ -454,7 +277,7 @@ class Table:
     """Owns exactly one `GameState`, mutated only via `reduce()`/`start_next_hand()`. See module
     docstring for disconnect/bot-handover (`mark_disconnected`/`_poke_bots`).
 
-    `bot_tier` (`bots.worker.BOT_TIERS`, default `T2`/`FaanBot`) picks which real tier answers
+    `bot_tier` (`bots.tiers.BOT_TIERS`, default `T2`/`FaanBot`) picks which real tier answers
     for a practice-mode `bot` seat (`_bind_bot_seat`, at construction) or an in-game `autoplay`
     seat this table has, both routed through `_poke_bots` -- with one deliberate exception:
     disconnect-handover (a real human's seat gone `autoplay`) always uses `T2`/`FaanBot`
@@ -489,7 +312,9 @@ class Table:
         abandon_grace_seconds: float | None = None,
     ) -> None:
         if bot_tier not in BOT_TIERS:
-            raise ValueError(f"unknown bot tier {bot_tier!r}; choices: {BOT_TIERS}")
+            raise ValueError(
+                f"unknown bot tier {bot_tier!r}; choices: {tuple(map(str, BOT_TIERS))}"
+            )
         self._bot_tier = bot_tier
         # per-seat override on top of self._bot_tier (_effective_bot_tier). Validated here too,
         # since Table is also constructed directly by tests/tools, not just via the API boundary.
@@ -498,7 +323,9 @@ class Table:
                 if not 0 <= seat < 4:
                     raise ValueError(f"seat must be 0..3, got {seat}")
                 if tier not in BOT_TIERS:
-                    raise ValueError(f"unknown bot tier {tier!r}; choices: {BOT_TIERS}")
+                    raise ValueError(
+                        f"unknown bot tier {tier!r}; choices: {tuple(map(str, BOT_TIERS))}"
+                    )
         self._seat_bot_tiers: dict[int, str] = dict(seat_bot_tiers) if seat_bot_tiers else {}
         # seeded off game_seed (reproducible from ruleset/seed/actions), XORed with a constant so
         # this stream doesn't just echo the wall shuffle new_game() also derives from game_seed.
@@ -1420,7 +1247,7 @@ class Table:
         seed = hash((self.table_id, tag.kind, tag.key, tag.state_version, seat)) & 0xFFFFFFFF
         deadline = time.monotonic() + _BOT_JOB_TIMEOUT_SECONDS
 
-        if tier == "ORACLE":
+        if tier == BotTier.ORACLE:
             # the only live call site for _omniscient_seat_view (see its docstring for the safety
             # argument) -- unreachable for a real human seat since disconnect-handover forces T2.
             view = _omniscient_seat_view(self.state, seat)
@@ -1739,7 +1566,7 @@ class Table:
             options.append({"kind": "win"})
         for meld in offer.melds:
             own = [t for t in meld.tiles if t != claimed]
-            options.append({"kind": _CLAIM_KIND_WIRE[meld.kind], "tiles": own})
+            options.append({"kind": CLAIM_KIND_WIRE[meld.kind], "tiles": own})
         options.append({"kind": "pass"})
         return options
 

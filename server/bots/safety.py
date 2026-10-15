@@ -31,7 +31,14 @@ from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.shanten import shanten
 from mahjong_core.state import SeatState
-from mahjong_core.tiles import TileId, TileType, new_count_array, tile_id_type
+from mahjong_core.tiles import (
+    DRAGON_TYPES,
+    N_SUITED_TYPES,
+    RANKS_PER_SUIT,
+    TileId,
+    new_count_array,
+    tile_id_type,
+)
 
 __all__ = [
     "deal_in_probability",
@@ -45,11 +52,6 @@ __all__ = [
     "tile_risk",
 ]
 
-_HONOR_START = 27
-_RANKS_PER_SUIT = 9
-_DRAGON_TYPES = frozenset(
-    {int(TileType.DRAGON_RED), int(TileType.DRAGON_GREEN), int(TileType.DRAGON_WHITE)}
-)
 
 _BASE_RATE = 0.06
 """Flat prior P(deal-in) before any signal adjusts it -- not calibrated to a real rate (no
@@ -126,13 +128,13 @@ def is_genbutsu(view: SeatView, opponent_seat: int, tile_type: int) -> bool:
 def _is_suji(view: SeatView, opponent_seat: int, tile_type: int) -> bool:
     """`tile_type` is a suji of a tile `opponent_seat` already discarded (same suit, 3 ranks
     apart); honors are never suji."""
-    if tile_type >= _HONOR_START:
+    if tile_type >= N_SUITED_TYPES:
         return False
-    suit, rank = divmod(tile_type, _RANKS_PER_SUIT)
+    suit, rank = divmod(tile_type, RANKS_PER_SUIT)
     for offset in (-3, 3):
         other_rank = rank + offset
-        if 0 <= other_rank < _RANKS_PER_SUIT:
-            other_type = suit * _RANKS_PER_SUIT + other_rank
+        if 0 <= other_rank < RANKS_PER_SUIT:
+            other_type = suit * RANKS_PER_SUIT + other_rank
             if is_genbutsu(view, opponent_seat, other_type):
                 return True
     return False
@@ -142,25 +144,25 @@ def _opponent_suit_meld_counts(view: SeatView, opponent_seat: int) -> dict[int, 
     counts: dict[int, int] = {}
     for meld in view.melds[opponent_seat]:
         v = int(meld.tile_type)
-        if v < _HONOR_START:
-            counts[v // _RANKS_PER_SUIT] = counts.get(v // _RANKS_PER_SUIT, 0) + 1
+        if v < N_SUITED_TYPES:
+            counts[v // RANKS_PER_SUIT] = counts.get(v // RANKS_PER_SUIT, 0) + 1
     return counts
 
 
 def _opponent_dragon_pung_count(view: SeatView, opponent_seat: int) -> int:
-    return sum(1 for m in view.melds[opponent_seat] if int(m.tile_type) in _DRAGON_TYPES)
+    return sum(1 for m in view.melds[opponent_seat] if int(m.tile_type) in DRAGON_TYPES)
 
 
 def _meld_danger_multiplier(view: SeatView, opponent_seat: int, tile_type: int) -> float:
     """Visible melds narrowing likely hand shape, applied as a multiplier on tiles that shape
     would want -- never standalone."""
     multiplier = 1.0
-    if tile_type < _HONOR_START:
-        suit = tile_type // _RANKS_PER_SUIT
+    if tile_type < N_SUITED_TYPES:
+        suit = tile_type // RANKS_PER_SUIT
         suit_melds = _opponent_suit_meld_counts(view, opponent_seat)
         if suit_melds.get(suit, 0) >= 2:
             multiplier *= _MELD_SUIT_DANGER
-    if tile_type in _DRAGON_TYPES and _opponent_dragon_pung_count(view, opponent_seat) >= 1:
+    if tile_type in DRAGON_TYPES and _opponent_dragon_pung_count(view, opponent_seat) >= 1:
         multiplier *= _DRAGON_PUNG_DANGER
     return multiplier
 

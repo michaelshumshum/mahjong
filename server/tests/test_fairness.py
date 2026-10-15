@@ -10,10 +10,11 @@ import random
 
 from app.fairness import GAME_SEED_BITS, new_game_seed
 from app.table import Table
+from bots.base import GAME_STEP_CAP
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.state import Phase, derive_hand_seed
 from mahjong_core.wall import deal_hands, new_wall, replace_flowers
-from tests.test_table import _STEP_CAP, _drive_one_step
+from tests.test_table import _drive_one_step
 from tools.verify_fairness import main as verify_main
 
 _RULES = RuleSet(
@@ -31,7 +32,7 @@ def _frames(table: Table, seat: int, kind: str) -> list[dict[str, object]]:
 
 async def _play_game(table: Table, seed: int) -> None:
     rng = random.Random(seed)
-    for _ in range(_STEP_CAP):
+    for _ in range(GAME_STEP_CAP):
         if table.state.phase == Phase.GAME_OVER:
             return
         await _drive_one_step(table, rng)

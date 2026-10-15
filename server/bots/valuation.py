@@ -28,7 +28,13 @@ from mahjong_core.melds import Meld
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import SeatState
-from mahjong_core.tiles import TileId, TileType
+from mahjong_core.tiles import (
+    DRAGON_TYPES,
+    N_SUITED_TYPES,
+    N_TILE_TYPES,
+    RANKS_PER_SUIT,
+    TileId,
+)
 
 __all__ = [
     "ROUTE_FAAN",
@@ -39,9 +45,6 @@ __all__ = [
     "route_faan_for",
 ]
 
-_HONOR_START = 27
-_RANKS_PER_SUIT = 9
-_DRAGON_TYPES = (int(TileType.DRAGON_RED), int(TileType.DRAGON_GREEN), int(TileType.DRAGON_WHITE))
 
 # base faan per route, before closed bonus (docs/bots.md §4). "Half Flush + dragon/wind pung"
 # isn't modeled separately -- it's half_flush + a dragon block bumping small_three_dragons.
@@ -93,11 +96,11 @@ is taken."""
 
 
 def _suits_present(hand34: Sequence[int]) -> set[int]:
-    return {t // _RANKS_PER_SUIT for t in range(_HONOR_START) if hand34[t] > 0}
+    return {t // RANKS_PER_SUIT for t in range(N_SUITED_TYPES) if hand34[t] > 0}
 
 
 def _honors_present(hand34: Sequence[int]) -> bool:
-    return any(hand34[t] > 0 for t in range(_HONOR_START, 34))
+    return any(hand34[t] > 0 for t in range(N_SUITED_TYPES, N_TILE_TYPES))
 
 
 def _sequence_potential(hand34: Sequence[int]) -> int:
@@ -106,15 +109,15 @@ def _sequence_potential(hand34: Sequence[int]) -> int:
     enough to run per candidate discard."""
     potential = 0
     for suit in range(3):
-        base = suit * _RANKS_PER_SUIT
-        for rank in range(_RANKS_PER_SUIT):
+        base = suit * RANKS_PER_SUIT
+        for rank in range(RANKS_PER_SUIT):
             t = base + rank
             if hand34[t] == 0:
                 continue
             if (
-                rank + 1 < _RANKS_PER_SUIT
+                rank + 1 < RANKS_PER_SUIT
                 and hand34[t + 1] > 0
-                or rank + 2 < _RANKS_PER_SUIT
+                or rank + 2 < RANKS_PER_SUIT
                 and hand34[t + 2] > 0
             ):
                 potential += 1
@@ -136,11 +139,11 @@ def reachable_routes(
 
     if len(suits) == 1:
         (suit,) = suits
-        base = suit * _RANKS_PER_SUIT
-        tiles_in_suit = sum(hand34[base : base + _RANKS_PER_SUIT])
+        base = suit * RANKS_PER_SUIT
+        tiles_in_suit = sum(hand34[base : base + RANKS_PER_SUIT])
         if not honors and tiles_in_suit >= _FULL_FLUSH_MIN_TILES:
             routes.append((route_faan["full_flush"], "full_flush"))
-        tiles_in_suit_and_honors = tiles_in_suit + sum(hand34[_HONOR_START:34])
+        tiles_in_suit_and_honors = tiles_in_suit + sum(hand34[N_SUITED_TYPES:N_TILE_TYPES])
         if tiles_in_suit_and_honors >= _HALF_FLUSH_MIN_TILES:
             routes.append((route_faan["half_flush"], "half_flush"))
 
@@ -151,7 +154,7 @@ def reachable_routes(
     ):
         routes.append((route_faan["all_pungs"], "all_pungs"))
 
-    dragon_pairs = sum(1 for t in _DRAGON_TYPES if hand34[t] >= 2)
+    dragon_pairs = sum(1 for t in DRAGON_TYPES if hand34[t] >= 2)
     if dragon_pairs >= _SMALL_DRAGONS_MIN_PAIRS:
         routes.append((route_faan["small_three_dragons"], "small_three_dragons"))
 

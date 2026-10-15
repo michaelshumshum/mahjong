@@ -11,7 +11,14 @@ from typing import Protocol, runtime_checkable
 
 from app.views import SeatView
 
-__all__ = ["Bot"]
+__all__ = ["GAME_STEP_CAP", "NO_DEADLINE", "Bot"]
+
+NO_DEADLINE = float("inf")
+"""`deadline` for offline harnesses (self-play, arena, dataset generation): no wall-clock budget."""
+
+GAME_STEP_CAP = 8000
+"""Step cap for an offline full-game harness; a trip is a hard failure (deadlock), never a silent
+early exit. Generous vs. the observed max of ~450 steps for a 4-hand `EAST_ONLY` game."""
 
 
 @runtime_checkable

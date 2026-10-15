@@ -13,23 +13,20 @@ from __future__ import annotations
 from app.views import SeatView
 from bots.features import is_closed, is_terminal_or_honor, own_hand34, seen34
 from mahjong_core.config import HandSet
+from mahjong_core.ml import (
+    ADDED_KONG_BASE,
+    CHOW_IDS,
+    CONCEALED_KONG_BASE,
+    DISCARD_BASE,
+    PASS_ID,
+    PUNG_ID,
+    WIN_ID,
+)
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
 from mahjong_core.tiles import tile_id_type
 
 __all__ = ["EfficiencyBot"]
-
-_DISCARD_BASE = 0
-_CONCEALED_KONG_BASE = 34
-_ADDED_KONG_BASE = 68
-_PASS = 102
-_CHOW_LOW = 103
-_CHOW_MIDDLE = 104
-_CHOW_HIGH = 105
-_CHOW_AIDS = (_CHOW_LOW, _CHOW_MIDDLE, _CHOW_HIGH)
-_PUNG = 106
-_KONG = 107
-_WIN = 108
 
 
 def _best_after_discard(hand34: list[int], *, closed: bool, hand_sets: frozenset[HandSet]) -> int:
@@ -66,8 +63,8 @@ class EfficiencyBot:
 
     async def act(self, view: SeatView, mask: list[bool], deadline: float) -> int:
         del deadline  # no search budget; every decision is O(1)
-        if mask[_WIN]:
-            return _WIN
+        if mask[WIN_ID]:
+            return WIN_ID
         if view.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
             return self._act_on_claim(view, mask)
         return self._act_on_turn(view, mask)
@@ -76,19 +73,19 @@ class EfficiencyBot:
         hand = own_hand34(view)
         closed = is_closed(view)
         hand_sets = view.ruleset.hand_sets
-        best_aid = _PASS
+        best_aid = PASS_ID
         best_shanten = shanten(hand, closed=closed, hand_sets=hand_sets)
 
         claimed_type = _claimed_type(view)
         if claimed_type is not None:
-            if mask[_PUNG]:
+            if mask[PUNG_ID]:
                 candidate = list(hand)
                 candidate[claimed_type] += 1
                 s = _best_after_discard(candidate, closed=False, hand_sets=hand_sets)
                 if s < best_shanten:
-                    best_shanten, best_aid = s, _PUNG
+                    best_shanten, best_aid = s, PUNG_ID
 
-            chow_aid = next((aid for aid in _CHOW_AIDS if mask[aid]), None)
+            chow_aid = next((aid for aid in CHOW_IDS if mask[aid]), None)
             if chow_aid is not None:
                 candidate = list(hand)
                 candidate[claimed_type] += 1
@@ -107,7 +104,7 @@ class EfficiencyBot:
 
         best_kong_aid: int | None = None
         best_kong_shanten = base
-        for kong_base in (_CONCEALED_KONG_BASE, _ADDED_KONG_BASE):
+        for kong_base in (CONCEALED_KONG_BASE, ADDED_KONG_BASE):
             for t in range(34):
                 aid = kong_base + t
                 if not mask[aid]:
@@ -135,7 +132,7 @@ class EfficiencyBot:
         best_key: tuple[int, int, int, int] | None = None
         best_aid = -1
         for d in range(34):
-            aid = _DISCARD_BASE + d
+            aid = DISCARD_BASE + d
             if not mask[aid]:
                 continue
             after = list(hand)

@@ -16,20 +16,25 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from app import ws
+from app.api_models import (
+    CreateTableRequest,
+    CreateTableResponse,
+    SeatSummary,
+    TableList,
+    TableSummaryOut,
+)
 from app.db.session import make_engine, make_session_factory
-from app.table import WireSeatStatus
 from bots.learned import weights_problem
+from bots.tiers import LEARNED_TIERS, BotTier
 from mahjong_core.config import DEFAULT_RULESET
-from mahjong_core.presets import DEFAULT_PRESET_ID, preset_id_for, resolve_ruleset
+from mahjong_core.presets import preset_id_for, resolve_ruleset
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # tunable via env
 # must stay well above RuleSet.disconnect_grace_seconds (20s) so a refresh never ends a game
@@ -43,8 +48,6 @@ _TABLE_ID_GENERATION_ATTEMPTS = 10  # astronomically unlikely to ever retry once
 
 logger = logging.getLogger(__name__)
 
-# the tiers that load bots/weights/learned.npz (docs/bots.md §2)
-_LEARNED_TIERS = frozenset({"T4", "ORACLE"})
 _learned_weights_problem: str | None = None
 
 
@@ -57,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if _learned_weights_problem is not None:
         logger.error(
             "learned weights unusable, %s disabled: %s",
-            "/".join(sorted(_LEARNED_TIERS)),
+            "/".join(sorted(LEARNED_TIERS)),
             _learned_weights_problem,
         )
     database_url = os.environ.get("DATABASE_URL")
@@ -104,40 +107,6 @@ app.add_middleware(
 )
 
 
-class SeatSummary(BaseModel):
-    status: WireSeatStatus
-    name: str | None
-
-
-class TableSummaryOut(BaseModel):
-    id: str
-    status: Literal["open", "in_progress"]
-    hand_no: int
-    seats: list[SeatSummary]
-
-
-class TableList(BaseModel):
-    tables: list[TableSummaryOut]
-
-
-class CreateTableRequest(BaseModel):
-    # `mahjong_core.presets.RULESET_PRESETS` key, or "custom" to take `rules` below instead.
-    ruleset: str = DEFAULT_PRESET_ID
-    # `RuleSet.from_dict`-shaped; only read when `ruleset == "custom"`.
-    rules: dict[str, Any] | None = None
-    practice: bool = False
-    # practice mode's per-seat difficulty picker: {1: "T1", 2: "T4", 3: "ORACLE"}-shaped, seat 0
-    # excluded (the human seat) -- only meaningful when practice=True, see _resolve_seat_bot_tiers.
-    bot_tiers: dict[int, str] | None = None
-
-
-class CreateTableResponse(BaseModel):
-    table_id: str
-    # same shape as state_sync.ruleset/ruleset_preset
-    ruleset_preset: str | None
-    ruleset: dict[str, Any]
-
-
 def _generate_table_id() -> str:
     """Six characters from a look-alike-free alphabet. `secrets.choice`, not `random.choice`:
     this id doubles as the only real access control a table has (guest-only, no auth), so it
@@ -153,12 +122,12 @@ def _generate_table_id() -> str:
 
 # practice-mode difficulty picker (docs/bots.md §6): Easy/Normal/Expert/Impossible =
 # T1/T2/T4/ORACLE. T0/RandomBot is deliberately excluded -- never shipped as a difficulty (§2).
-_PRACTICE_BOT_TIERS = ("T1", "T2", "T4", "ORACLE")
+_PRACTICE_BOT_TIERS = (BotTier.T1, BotTier.T2, BotTier.T4, BotTier.ORACLE)
 
 
 def _available_bot_tiers() -> tuple[str, ...]:
-    """`_PRACTICE_BOT_TIERS` minus `_LEARNED_TIERS` while the startup weight check failed."""
-    unavailable = _LEARNED_TIERS if _learned_weights_problem is not None else frozenset()
+    """`_PRACTICE_BOT_TIERS` minus `LEARNED_TIERS` while the startup weight check failed."""
+    unavailable = LEARNED_TIERS if _learned_weights_problem is not None else frozenset()
     return tuple(t for t in _PRACTICE_BOT_TIERS if t not in unavailable)
 
 
@@ -170,7 +139,7 @@ def _resolve_seat_bot_tiers(
     outside 1..3 (seat 0 is the human seat in practice mode) or a tier outside
     `_PRACTICE_BOT_TIERS` is silently dropped rather than raising -- a malformed entry just falls
     back to that seat's `DEFAULT_BOT_TIER` instead of failing the whole request. So is a
-    `_LEARNED_TIERS` tier while the startup weight check failed (`/healthz` reports it).
+    `LEARNED_TIERS` tier while the startup weight check failed (`/healthz` reports it).
     `practice=False` has no bot seats to apply this to, so it resolves to `None` unconditionally.
     """
     if not practice or not bot_tiers:
@@ -212,7 +181,7 @@ async def healthz() -> JSONResponse:
         return JSONResponse(
             {
                 "status": "degraded",
-                "disabled_tiers": sorted(_LEARNED_TIERS),
+                "disabled_tiers": sorted(LEARNED_TIERS),
                 "reason": _learned_weights_problem,
             }
         )

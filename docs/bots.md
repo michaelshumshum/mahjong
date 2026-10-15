@@ -25,7 +25,7 @@ tens of milliseconds of pure-Python CPU (§3), which would stall every other tab
 1. The table submits `(bot_id, view, mask, deadline, window_id, state_version)` to a
    `ProcessPoolExecutor` (the GIL makes a thread pool useless for CPU-bound work).
 2. The worker (`bots/worker.py`'s `compute_action`) builds the requested tier
-   (`bots.worker.BOT_TIERS`), drives its `act(view, mask, deadline)` via `asyncio.run`, and returns
+   (`bots.tiers.BOT_TIERS`), drives its `act(view, mask, deadline)` via `asyncio.run`, and returns
    `(window_id, state_version, action_id)` to the table's inbox.
 3. The table compares the tag against its current `window_id`/`state_version`; a stale result is
    **dropped silently**, exactly like a stale human claim.
@@ -479,7 +479,7 @@ matching `_should_claim`'s "never do what provably backfires" precedent. Gating 
 `concealed_kong_robbable` and the robbing hand is 十三么.
 
 **Certain deal-ins.** Under `view.hands`, `tile_risk > 0` is not a likelihood: every tier always
-takes `_WIN`, so it is a certain deal-in. `_best_discard` therefore drops every discard with
+takes `WIN_ID`, so it is a certain deal-in. `_best_discard` therefore drops every discard with
 `tile_risk > 0` from its candidates while any zero-risk legal discard exists, in fold and non-fold
 mode alike. Same "never do what provably backfires" precedent as kong-rob avoidance. When every
 legal discard deals in, the usual `w_safety * risk` trade-off ranks them. Before this, a certain

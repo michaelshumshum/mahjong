@@ -21,14 +21,15 @@ from typing import Any
 
 import pytest
 
-from app.table import SeatBinding, Table
+from app.table import Table
+from app.table_types import SeatBinding
+from bots.base import GAME_STEP_CAP
 from bots.random import random_action
 from mahjong_core.actions import Discard
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.state import Phase
 from mahjong_core.tiles import tile_code
 
-_STEP_CAP = 8000  # matches bots/selfplay.py's _STEP_CAP for the same bounded ruleset
 _BOUNDED_RULESET = RuleSet(
     dealer_repeat_on_win=False,
     dealer_repeat_on_draw=False,
@@ -70,8 +71,8 @@ async def test_full_game_through_table_progresses_and_publishes_gapless_redacted
     steps = 0
     while table.state.phase != Phase.GAME_OVER:
         steps += 1
-        if steps > _STEP_CAP:
-            raise RuntimeError(f"exceeded {_STEP_CAP} steps -- possible deadlock")
+        if steps > GAME_STEP_CAP:
+            raise RuntimeError(f"exceeded {GAME_STEP_CAP} steps -- possible deadlock")
         await _drive_one_step(table, rng)
         seen_hand_numbers.add(table.state.hand_no)
         assert table.event_id >= prev_event_id  # never decreases
@@ -117,8 +118,8 @@ async def test_hand_history_accumulates_across_full_game_and_reconciles_with_fin
     steps = 0
     while table.state.phase != Phase.GAME_OVER:
         steps += 1
-        if steps > _STEP_CAP:
-            raise RuntimeError(f"exceeded {_STEP_CAP} steps -- possible deadlock")
+        if steps > GAME_STEP_CAP:
+            raise RuntimeError(f"exceeded {GAME_STEP_CAP} steps -- possible deadlock")
         await _drive_one_step(table, rng)
 
     history = table.state_sync_wire(None)["hand_history"]

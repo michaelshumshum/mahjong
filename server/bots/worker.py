@@ -14,43 +14,36 @@ from __future__ import annotations
 
 import asyncio
 import random
-from typing import Final
 
 from app.views import SeatView
 from bots.base import Bot
 from bots.efficiency import EfficiencyBot
 from bots.faanbot import FaanBot
 from bots.random import RandomBot
+from bots.tiers import BOT_TIERS, BotTier
 
-__all__ = ["BOT_TIERS", "DEFAULT_BOT_TIER", "compute_action"]
-
-# "T4" is the learned policy; "T3" stays retired with SearchBot (docs/decisions/0012). "ORACLE"
-# is not a rung on the ladder but a full-information bot a table opts into explicitly.
-BOT_TIERS: Final = ("T0", "T1", "T2", "T4", "ORACLE")
-DEFAULT_BOT_TIER: Final = "T2"
-"""A bot-filled table runs `FaanBot`, not a weaker tier -- an all-T1 table produces endless
-exhaustive draws under `min_faan=3` (docs/bots.md §4)."""
+__all__ = ["compute_action"]
 
 
 def _make_bot(tier: str, seed: int) -> Bot:
-    if tier == "T0":
+    if tier == BotTier.T0:
         return RandomBot(rng=random.Random(seed))
-    if tier == "T1":
+    if tier == BotTier.T1:
         return EfficiencyBot()
-    if tier == "T2":
+    if tier == BotTier.T2:
         return FaanBot()
-    if tier == "T4":
+    if tier == BotTier.T4:
         # lazy: numpy + the weights load only in a worker that serves a T4 seat, once per process
         from bots.learned import LearnedBot
 
         return LearnedBot()
-    if tier == "ORACLE":
+    if tier == BotTier.ORACLE:
         # the T4 policy plus exact vetoes (docs/bots.md §9); no FaanBot fallback when the weights
         # don't load -- it raises like T4 does.
         from bots.oracle_learned import OracleLearnedBot
 
         return OracleLearnedBot()
-    raise ValueError(f"unknown bot tier {tier!r}; choices: {BOT_TIERS}")
+    raise ValueError(f"unknown bot tier {tier!r}; choices: {tuple(map(str, BOT_TIERS))}")
 
 
 def compute_action(view: SeatView, mask: list[bool], seed: int, tier: str, deadline: float) -> int:

@@ -32,7 +32,8 @@ from bots.labels import seat_hand34
 from bots.random import random_action
 from bots.valuation import estimate_best_faan
 from mahjong_core.config import RuleSet
-from mahjong_core.engine import HandEnded, new_game, reduce, start_next_hand
+from mahjong_core.engine import new_game, reduce, start_next_hand
+from mahjong_core.events import HandEnded
 from mahjong_core.state import HandOutcome, Phase
 
 _STEP_CAP = 4000

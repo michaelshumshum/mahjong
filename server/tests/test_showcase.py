@@ -14,7 +14,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.registry import TableRegistry
-from app.table import Table, TableSettings
+from app.table import Table
+from app.table_types import TableSettings
 from mahjong_core.actions import Pass
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.state import Phase

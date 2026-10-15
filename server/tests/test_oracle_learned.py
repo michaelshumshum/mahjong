@@ -13,6 +13,7 @@ import pytest
 
 from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.arena import BOT_REGISTRY, OMNISCIENT_BOTS
+from bots.base import NO_DEADLINE
 from bots.learned import LearnedBot
 from bots.oracle_learned import OracleLearnedBot
 from bots.safety import tile_risk
@@ -22,8 +23,6 @@ from mahjong_core.state import Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 from ml.env import HandEnv
 from tests.latency import check_latency
-
-_NO_DEADLINE = float("inf")
 
 
 def _pool(*types: TileType) -> tuple[TileId, ...]:
@@ -132,12 +131,12 @@ def _bot(prefs: dict[int, float]) -> tuple[OracleLearnedBot, list]:
 async def test_refuses_a_public_view() -> None:
     bot, _ = _bot({})
     with pytest.raises(ValueError):
-        await bot.act(_view(None), _mask(*_discards()), _NO_DEADLINE)
+        await bot.act(_view(None), _mask(*_discards()), NO_DEADLINE)
 
 
 async def test_policy_never_sees_hands() -> None:
     bot, seen = _bot({int(TileType.WIND_EAST): 5.0})
-    await bot.act(_view(_HANDS), _mask(*_discards()), _NO_DEADLINE)
+    await bot.act(_view(_HANDS), _mask(*_discards()), NO_DEADLINE)
     assert seen and all(v.hands is None for v in seen)
     assert dataclasses.replace(seen[0], hands=_HANDS) == _view(_HANDS)
 
@@ -145,7 +144,7 @@ async def test_policy_never_sees_hands() -> None:
 async def test_keeps_the_policy_choice_when_it_is_safe() -> None:
     east = int(TileType.WIND_EAST)
     bot, _ = _bot({east: 5.0, int(TileType.WIND_NORTH): 4.0})
-    assert await bot.act(_view(_HANDS), _mask(*_discards()), _NO_DEADLINE) == east
+    assert await bot.act(_view(_HANDS), _mask(*_discards()), NO_DEADLINE) == east
 
 
 async def test_vetoes_a_certain_deal_in_for_the_next_safe_discard() -> None:
@@ -154,18 +153,18 @@ async def test_vetoes_a_certain_deal_in_for_the_next_safe_discard() -> None:
     assert tile_risk(view, north) > 0.0
     assert tile_risk(view, east) == 0.0
     bot, _ = _bot({north: 5.0, east: 4.0})
-    assert await bot.act(view, _mask(*_discards()), _NO_DEADLINE) == east
+    assert await bot.act(view, _mask(*_discards()), NO_DEADLINE) == east
 
 
 async def test_every_discard_deals_in_takes_the_cheapest() -> None:
     north = int(TileType.WIND_NORTH)
     bot, _ = _bot({north: 5.0})
-    assert await bot.act(_view(_HANDS), _mask(north), _NO_DEADLINE) == north
+    assert await bot.act(_view(_HANDS), _mask(north), NO_DEADLINE) == north
 
 
 async def test_takes_a_legal_win() -> None:
     bot, _ = _bot({0: 5.0, 108: -5.0})
-    assert await bot.act(_view(_HANDS), _mask(0, 108), _NO_DEADLINE) == 108
+    assert await bot.act(_view(_HANDS), _mask(0, 108), NO_DEADLINE) == 108
 
 
 def test_registered_as_omniscient() -> None:

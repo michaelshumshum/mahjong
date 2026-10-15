@@ -16,7 +16,8 @@ import bots.learned
 from app.views import _omniscient_seat_view, seat_view
 from bots.arena import BOT_REGISTRY, OMNISCIENT_BOTS
 from bots.learned import DEFAULT_WEIGHTS, LearnedBot, policy_meta, weights_problem
-from bots.worker import BOT_TIERS, compute_action
+from bots.tiers import BOT_TIERS
+from bots.worker import compute_action
 from mahjong_core.engine import ENGINE_VERSION
 from ml.env import HandEnv
 from ml.export import EXPORT_VERSION

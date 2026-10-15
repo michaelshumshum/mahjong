@@ -20,8 +20,8 @@ from collections.abc import Iterator
 import pytest
 
 from app.views import SeatView, seat_view
+from bots.base import NO_DEADLINE
 from bots.faanbot import (
-    _CONCEALED_KONG_BASE,
     AGGRESSIVE,
     BASELINE,
     DEFENSIVE,
@@ -33,14 +33,13 @@ from bots.random import random_action
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
-from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.ml import CONCEALED_KONG_BASE, decode_action, legal_mask
 from mahjong_core.state import GameState, Phase, Wind
 from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
 from mahjong_core.wall import max_turns_per_seat
 
 _STEP_CAP = 2000
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
-_NO_DEADLINE = float("inf")
 T = TileType
 
 
@@ -162,7 +161,7 @@ async def test_never_returns_an_illegal_id(seed: int) -> None:
     for state, seat in _decision_points(seed, _BOUNDED_RULESET):
         mask = legal_mask(state, seat)
         view = seat_view(state, seat)
-        aid = await bot.act(view, mask, _NO_DEADLINE)
+        aid = await bot.act(view, mask, NO_DEADLINE)
         assert mask[aid], f"seed={seed} seat={seat} phase={state.phase}: aid {aid} not legal"
         decode_action(aid, state, seat)  # must not raise
 
@@ -212,7 +211,7 @@ async def test_chases_half_flush_edge_only_from_midgame() -> None:
     for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (13, T.PIN_5)):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
         mask = _discard_mask(hand)
-        aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+        aid = await FaanBot().act(view, mask, NO_DEADLINE)
         assert aid == int(expected), f"turn={turn}"
 
 
@@ -243,7 +242,7 @@ async def test_commits_to_a_strong_value_signal() -> None:
     for turn in (3, 8, 13):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
         mask = _discard_mask(hand)
-        aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+        aid = await FaanBot().act(view, mask, NO_DEADLINE)
         assert aid == int(T.PIN_5), f"turn={turn}"
 
 
@@ -297,7 +296,7 @@ async def test_folds_to_a_safe_tile_late_against_a_threatening_opponent() -> Non
         melds=((), (seat1_pung,), (), ()),
     )
     mask = _discard_mask(_FOLD_HAND)
-    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+    aid = await FaanBot().act(view, mask, NO_DEADLINE)
     assert aid == int(T.WIND_NORTH)
 
 
@@ -333,7 +332,7 @@ async def test_aggressive_chases_a_marginal_value_signal_baseline_declines() -> 
     mask = _discard_mask(hand)
     for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (13, T.WIND_SOUTH)):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
-        aid = await FaanBot(weight_profile=AGGRESSIVE).act(view, mask, _NO_DEADLINE)
+        aid = await FaanBot(weight_profile=AGGRESSIVE).act(view, mask, NO_DEADLINE)
         assert aid == int(expected), f"turn={turn}"
 
 
@@ -365,7 +364,7 @@ async def test_flush_chasing_also_chases_the_same_marginal_value_signal() -> Non
     mask = _discard_mask(hand)
     for turn, expected in ((3, T.WIND_SOUTH), (8, T.PIN_5), (10, T.PIN_5), (13, T.WIND_SOUTH)):
         view = _build_view(0, hand, turn=turn, discard_pools=(own_pool[:turn], (), (), ()))
-        aid = await FaanBot(weight_profile=FLUSH_CHASING).act(view, mask, _NO_DEADLINE)
+        aid = await FaanBot(weight_profile=FLUSH_CHASING).act(view, mask, NO_DEADLINE)
         assert aid == int(expected), f"turn={turn}"
 
 
@@ -397,8 +396,8 @@ async def test_defensive_discards_the_genbutsu_floater_baseline_keeps() -> None:
     mask = _discard_mask(hand)
     for turn in (3, 6, 8, 10):
         view = _build_view(0, hand, turn=turn, discard_pools=((), seat1_pool, (), ()))
-        baseline_aid = await FaanBot(weight_profile=BASELINE).act(view, mask, _NO_DEADLINE)
-        defensive_aid = await FaanBot(weight_profile=DEFENSIVE).act(view, mask, _NO_DEADLINE)
+        baseline_aid = await FaanBot(weight_profile=BASELINE).act(view, mask, NO_DEADLINE)
+        defensive_aid = await FaanBot(weight_profile=DEFENSIVE).act(view, mask, NO_DEADLINE)
         assert baseline_aid == int(T.SOU_5), f"turn={turn}"
         assert defensive_aid == int(T.PIN_5), f"turn={turn}"
 
@@ -440,7 +439,7 @@ async def test_declines_a_claim_that_would_drop_the_hand_below_min_faan() -> Non
     mask = [False] * 109
     mask[102] = True
     mask[106] = True  # pung
-    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+    aid = await FaanBot().act(view, mask, NO_DEADLINE)
     assert aid == 102  # pass
 
 
@@ -480,7 +479,7 @@ async def test_should_claim_reads_min_faan_from_the_live_ruleset() -> None:
     mask = [False] * 109
     mask[102] = True
     mask[106] = True  # pung
-    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
+    aid = await FaanBot().act(view, mask, NO_DEADLINE)
     assert aid == 106  # pung -- opposite of the min_faan=3 default's "pass"
 
 
@@ -520,13 +519,13 @@ async def test_discard_stops_chasing_seven_pairs_when_new_18_is_off() -> None:
     mask = _discard_mask(hand)
 
     view_new_18_on = _build_view(0, hand, ruleset=RuleSet(hand_sets=frozenset(HandSet)))
-    aid_on = await FaanBot().act(view_new_18_on, mask, _NO_DEADLINE)
+    aid_on = await FaanBot().act(view_new_18_on, mask, NO_DEADLINE)
     assert aid_on == int(T.MAN_4)  # chases the seven-pairs tenpai, ryanmen sacrificed
 
     view_new_18_off = _build_view(
         0, hand, ruleset=RuleSet(hand_sets=frozenset({HandSet.CLASSIC, HandSet.NEW_6}))
     )
-    aid_off = await FaanBot().act(view_new_18_off, mask, _NO_DEADLINE)
+    aid_off = await FaanBot().act(view_new_18_off, mask, NO_DEADLINE)
     assert aid_off != int(T.MAN_4)
     assert aid_off != int(T.MAN_5)  # keeps the ryanmen -- seven pairs is a dead end here
 
@@ -567,7 +566,7 @@ async def test_discard_follows_faan_overrides_boosting_a_route() -> None:
         discard_pools = (own_pool[:turn], (), (), ())
 
         view_default = _build_view(0, hand, turn=turn, discard_pools=discard_pools)
-        aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
+        aid_default = await FaanBot().act(view_default, mask, NO_DEADLINE)
         assert aid_default == int(T.WIND_SOUTH), f"turn={turn}"
 
         view_boosted = _build_view(
@@ -577,7 +576,7 @@ async def test_discard_follows_faan_overrides_boosting_a_route() -> None:
             discard_pools=discard_pools,
             ruleset=RuleSet(faan_overrides={"混一色": 15}),
         )
-        aid_boosted = await FaanBot().act(view_boosted, mask, _NO_DEADLINE)
+        aid_boosted = await FaanBot().act(view_boosted, mask, NO_DEADLINE)
         assert aid_boosted == int(T.PIN_5), f"turn={turn}"  # flips once Half Flush is boosted
 
 
@@ -611,8 +610,8 @@ async def test_discard_with_empty_faan_overrides_matches_default_route_faan() ->
     view_empty_override = _build_view(
         0, hand, turn=3, discard_pools=discard_pools, ruleset=RuleSet(faan_overrides={})
     )
-    aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
-    aid_empty_override = await FaanBot().act(view_empty_override, mask, _NO_DEADLINE)
+    aid_default = await FaanBot().act(view_default, mask, NO_DEADLINE)
+    aid_empty_override = await FaanBot().act(view_empty_override, mask, NO_DEADLINE)
     assert aid_default == aid_empty_override == int(T.WIND_SOUTH)
 
 
@@ -658,7 +657,7 @@ async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
     mask = _discard_mask(_FOLD_HAND)
 
     view_default = _build_view(0, _FOLD_HAND, turn=8, discard_pools=discard_pools, melds=melds)
-    aid_default = await FaanBot().act(view_default, mask, _NO_DEADLINE)
+    aid_default = await FaanBot().act(view_default, mask, NO_DEADLINE)
     assert aid_default != int(T.WIND_NORTH)  # turn 8 is still mid-game under the default ruleset
 
     view_reduced = _build_view(
@@ -669,7 +668,7 @@ async def test_fold_mode_triggers_earlier_under_a_smaller_turn_budget() -> None:
         melds=melds,
         ruleset=RuleSet(wall_reserve=40),
     )
-    aid_reduced = await FaanBot().act(view_reduced, mask, _NO_DEADLINE)
+    aid_reduced = await FaanBot().act(view_reduced, mask, NO_DEADLINE)
     assert aid_reduced == int(T.WIND_NORTH)  # already late under the smaller turn budget
 
 
@@ -702,7 +701,7 @@ async def test_never_declares_a_self_kong_when_hands_is_none() -> None:
     ]
     view = _build_view(0, hand)
     assert view.hands is None
-    mask = _discard_mask(hand, extra=[_CONCEALED_KONG_BASE + int(T.MAN_1)])
-    aid = await FaanBot().act(view, mask, _NO_DEADLINE)
-    assert aid != _CONCEALED_KONG_BASE + int(T.MAN_1)
+    mask = _discard_mask(hand, extra=[CONCEALED_KONG_BASE + int(T.MAN_1)])
+    aid = await FaanBot().act(view, mask, NO_DEADLINE)
+    assert aid != CONCEALED_KONG_BASE + int(T.MAN_1)
     assert aid < 34  # took a discard, not the kong
