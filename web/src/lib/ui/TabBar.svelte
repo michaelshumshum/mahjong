@@ -78,8 +78,8 @@
 
 		@include a11y.motion-ok {
 			transition:
-				color 130ms ease,
-				border-color 130ms ease;
+				color var(--dur-control) ease,
+				border-color var(--dur-control) ease;
 		}
 
 		&:hover {

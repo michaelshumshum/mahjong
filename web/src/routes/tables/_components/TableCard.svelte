@@ -89,7 +89,7 @@
 	.table-state {
 		padding: 1px var(--space-2);
 		border: 1px solid var(--color-border);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		color: var(--color-text-muted);
 		font-size: var(--font-size-xs);
 		font-weight: 600;
@@ -165,7 +165,7 @@
 	.compass-seat--open .compass-name {
 		padding: 0 var(--space-2);
 		border: 1px dashed var(--color-border);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		color: var(--color-text-muted);
 		font-weight: 400;
 	}

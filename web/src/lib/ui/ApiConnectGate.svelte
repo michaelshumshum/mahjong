@@ -137,7 +137,7 @@
 		border-radius: 50%;
 		border: 3px solid var(--color-border);
 		border-top-color: var(--color-accent);
-		animation: connect-spin 900ms linear infinite;
+		animation: connect-spin var(--dur-spin) linear infinite;
 	}
 
 	@keyframes connect-spin {

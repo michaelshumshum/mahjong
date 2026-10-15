@@ -82,8 +82,8 @@
 
 		@include a11y.motion-ok {
 			transition:
-				background-color 130ms ease,
-				color 130ms ease;
+				background-color var(--dur-control) ease,
+				color var(--dur-control) ease;
 		}
 
 		&:hover:not(.segment--checked) {

@@ -89,7 +89,7 @@
 		width: 2.75rem;
 		height: 1.5rem;
 		border: 1px solid var(--color-border);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--color-surface);
 		pointer-events: none;
 

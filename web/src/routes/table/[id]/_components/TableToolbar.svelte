@@ -164,7 +164,7 @@
 	.table-tag {
 		padding: 1px var(--space-2);
 		border: 1px solid color-mix(in srgb, var(--color-brass) 45%, transparent);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		color: var(--color-brass);
 		font-size: var(--font-size-xs);
 		font-weight: 700;

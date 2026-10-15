@@ -57,6 +57,8 @@
 	--radius-sm: 6px;
 	--radius-md: 12px;
 	--radius-lg: 20px;
+	// fully rounded ends (chips, pills, switch tracks) at any height.
+	--radius-pill: 999px;
 
 	// right/across/left, clockwise from you — muted, each hue clear of both accents above. your
 	// own seat uses --color-brass.
@@ -89,6 +91,10 @@
 	--dur-2: 200ms;
 	--dur-3: 320ms;
 	--dur-4: 600ms;
+	// hover/press/selected colour and border changes on controls (buttons, tabs, form rows).
+	--dur-control: 130ms;
+	// one turn of an indeterminate loading spinner.
+	--dur-spin: 900ms;
 	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 	--ease-place: cubic-bezier(0.3, 1.35, 0.5, 1);
 

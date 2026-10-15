@@ -15,9 +15,9 @@
 		0 3px 0 rgb(0 0 0 / 0.4),
 		0 7px 12px -2px rgb(10 4 2 / 0.55);
 	transition:
-		transform 130ms ease,
-		box-shadow 130ms ease,
-		background-color 130ms ease;
+		transform var(--dur-control) ease,
+		box-shadow var(--dur-control) ease,
+		background-color var(--dur-control) ease;
 
 	&:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--color-accent) 90%, white 10%);
@@ -49,10 +49,10 @@
 		inset 0 -1px 0 rgb(0 0 0 / 0.3),
 		0 1px 2px rgb(10 4 2 / 0.35);
 	transition:
-		transform 130ms ease,
-		box-shadow 130ms ease,
-		border-color 130ms ease,
-		background-color 130ms ease;
+		transform var(--dur-control) ease,
+		box-shadow var(--dur-control) ease,
+		border-color var(--dur-control) ease,
+		background-color var(--dur-control) ease;
 
 	&:hover:not(:disabled) {
 		border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%);
@@ -84,8 +84,8 @@
 	// can sit over anything (tiles, felt, a scrim) -- a shadow keeps the label legible at rest.
 	text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
 	transition:
-		background-color 130ms ease,
-		color 130ms ease;
+		background-color var(--dur-control) ease,
+		color var(--dur-control) ease;
 
 	&:hover:not(:disabled) {
 		background: rgb(255 255 255 / 0.07);
@@ -120,8 +120,8 @@
 	background: var(--color-surface-raised);
 	box-shadow: inset 0 1px 4px rgb(0 0 0 / 0.4);
 	transition:
-		border-color 130ms ease,
-		box-shadow 130ms ease;
+		border-color var(--dur-control) ease,
+		box-shadow var(--dur-control) ease;
 
 	&:hover {
 		border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border) 70%);

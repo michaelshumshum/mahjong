@@ -23,7 +23,7 @@
 		max-width: 100%;
 		padding: var(--space-1) var(--space-3);
 		border: 1px dashed var(--color-border);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
 		white-space: nowrap;
