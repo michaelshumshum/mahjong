@@ -32,16 +32,13 @@ from mahjong_core.config import RuleSet
 from mahjong_core.state import Phase
 from ml.aux_data import AuxData, danger_raw
 from ml.aux_train import to_tensors
-from ml.encode import encode_batch
-from ml.encode_v2 import PAD, encode_policy_batch, ruleset_features
+from ml.encode import PAD, PHASE_INDEX, encode_batch
+from ml.encode_v2 import encode_policy_batch, ruleset_features
 from ml.metrics import add_stats, game_bootstrap, game_stats, metric_fns
 from ml.policy_net import PolicyNet, PolicyNetConfig
-from ml.splits import TEST, TRAIN, VAL
+from ml.splits import SPLITS, TEST
 
 __all__ = ["evaluate_aux_model", "evaluate_v3", "load_policy", "main", "v3_policy_raw"]
-
-_SPLITS = {"train": TRAIN, "val": VAL, "test": TEST}
-_PHASES = tuple(Phase)
 
 
 def load_policy(ckpt_path: Path) -> PolicyNet:
@@ -175,7 +172,7 @@ def v3_policy_raw(raw: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         "dealer": raw["dealer_idx"],
         "prevailing": raw["prevailing_wind"],
         "turn": np.zeros(n, dtype=np.uint8),
-        "phase": np.full(n, _PHASES.index(Phase.AWAIT_ACTION), dtype=np.uint8),
+        "phase": np.full(n, PHASE_INDEX[Phase.AWAIT_ACTION], dtype=np.uint8),
         "wall_remaining": raw["wall_remaining"],
         "claim_tile": np.full(n, PAD, dtype=np.uint8),
     }
@@ -246,7 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ckpt", type=Path, required=True)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--danger-ckpt", type=Path)
-    parser.add_argument("--split", choices=[*_SPLITS, "all"], default="test")
+    parser.add_argument("--split", choices=[*SPLITS, "all"], default="test")
     parser.add_argument("--max-rows", type=int)
     parser.add_argument("--n-boot", type=int, default=500)
     parser.add_argument("--threads", type=int, default=4)
@@ -260,9 +257,7 @@ def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     torch.set_num_threads(args.threads)
     data = AuxData(args.data)
-    rows = (
-        np.arange(data.meta["rows"]) if args.split == "all" else data.rows_of(_SPLITS[args.split])
-    )
+    rows = np.arange(data.meta["rows"]) if args.split == "all" else data.rows_of(SPLITS[args.split])
     if args.max_rows is not None and args.max_rows < len(rows):
         rows = np.sort(np.random.default_rng(0).choice(rows, args.max_rows, replace=False))
     danger = None
@@ -276,7 +271,7 @@ def main(argv: list[str] | None = None) -> None:
         result["v3"] = evaluate_v3(
             model,
             args.v3_data,
-            split=_SPLITS[args.split] if args.split != "all" else TEST,
+            split=SPLITS[args.split] if args.split != "all" else TEST,
             danger=danger,
             max_rows=args.v3_max_rows,
             n_boot=args.n_boot,

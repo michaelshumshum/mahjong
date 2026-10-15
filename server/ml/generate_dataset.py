@@ -65,21 +65,19 @@ import pyarrow.parquet as pq
 
 from app.views import SeatView, seat_view
 from bots.arena import BOT_REGISTRY, OMNISCIENT_BOTS
-from bots.base import Bot
+from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.labels import OpponentDangerLabel, danger_labels_for_opponents
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from mahjong_core.state import Phase
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.mp import mp_context
 from ml.raw import raw_row, relative_seats
 
 __all__ = ["build_parser", "main"]
 
-_STEP_CAP = 8000
-_NO_DEADLINE = float("inf")
-_N_TILE_TYPES = 34
 SCHEMA_VERSION = 3
 
 
@@ -107,7 +105,7 @@ def _shuffled_roster(bot_names: Sequence[str], seed: int) -> list[str]:
 
 
 def _winning_tiles_multihot(winning_tiles: tuple[int, ...]) -> list[int]:
-    row = [0] * _N_TILE_TYPES
+    row = [0] * N_TILE_TYPES
     for t in winning_tiles:
         row[t] = 1
     return row
@@ -157,8 +155,8 @@ async def play_and_label(
 
     while state.phase != Phase.GAME_OVER:
         steps += 1
-        if steps > _STEP_CAP:
-            raise RuntimeError(f"seed={seed}: exceeded {_STEP_CAP} steps -- possible deadlock")
+        if steps > GAME_STEP_CAP:
+            raise RuntimeError(f"seed={seed}: exceeded {GAME_STEP_CAP} steps -- possible deadlock")
 
         if state.phase == Phase.HAND_OVER:
             state, _ = start_next_hand(state)
@@ -182,7 +180,7 @@ async def play_and_label(
             rows.append(_example_row(seed, view, seat_personalities, labels))
 
         mask = legal_mask(state, seat)
-        aid = await bots[seat].act(view, mask, _NO_DEADLINE)
+        aid = await bots[seat].act(view, mask, NO_DEADLINE)
         action = decode_action(aid, state, seat)
         state, _ = reduce(state, action)
 
@@ -218,7 +216,7 @@ def _write_manifest(
         "ruleset_preset": ruleset_preset,
         "ruleset": ruleset.to_dict(),
         "bot_roster": bot_names,
-        "n_tile_types": _N_TILE_TYPES,
+        "n_tile_types": N_TILE_TYPES,
         "note": (
             "seat_personalities in each row records that game's randomized seat->roster-entry "
             "assignment -- metadata only, never a model input. Every row is captured at the "

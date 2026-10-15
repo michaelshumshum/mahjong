@@ -14,6 +14,7 @@ ml_generate_dataset = pytest.importorskip("ml.generate_dataset")
 
 import pyarrow.parquet as pq
 
+from ml.encode import PAD
 from ml.splits import split_of
 
 
@@ -49,7 +50,7 @@ def test_pack_matches_the_parquet_rows_field_by_field(shard_dir, tmp_path) -> No
         for slot, seq in enumerate(r["discard_seq"]):
             got = packed["discard_seq"][i, slot]
             assert list(got[: len(seq)]) == seq
-            assert (got[len(seq) :] == ml_pack.PAD).all()
+            assert (got[len(seq) :] == PAD).all()
 
 
 def test_pack_rejects_a_discard_pool_longer_than_the_pad(shard_dir, tmp_path) -> None:  # type: ignore[no-untyped-def]

@@ -34,7 +34,7 @@ from pathlib import Path
 import numpy as np
 
 from app.views import seat_view
-from bots.base import Bot
+from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.labels import danger_labels_for_opponents, seat_hand34
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -42,7 +42,9 @@ from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from ml.encode_v2 import ORACLE_FIELDS, PAD, POLICY_FIELDS, oracle_raw, policy_raw
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.encode import PAD
+from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.generate_dataset import _make_bots, _shuffled_roster
 from ml.mp import mp_context
 
@@ -56,16 +58,13 @@ __all__ = [
 ]
 
 SCHEMA_VERSION = 1
-_STEP_CAP = 8000
-_NO_DEADLINE = float("inf")
-_TILES = 34
 
 LABEL_FIELDS: dict[str, tuple[tuple[int, ...], str]] = {
     "opp_tenpai": ((3,), "uint8"),
-    "opp_wait": ((3, _TILES), "uint8"),
-    "opp_faan": ((3, _TILES), "uint8"),
-    "shanten": ((_TILES,), "uint8"),
-    "ukeire": ((_TILES,), "uint8"),
+    "opp_wait": ((3, N_TILE_TYPES), "uint8"),
+    "opp_faan": ((3, N_TILE_TYPES), "uint8"),
+    "shanten": ((N_TILE_TYPES,), "uint8"),
+    "ukeire": ((N_TILE_TYPES,), "uint8"),
     "own_turn": ((), "uint8"),
     "win": ((), "uint8"),
     "deal_in": ((), "uint8"),
@@ -81,19 +80,19 @@ def shanten_labels(state: GameState, seat: int, unseen: np.ndarray) -> tuple[lis
     types that would then lower shanten. `PAD`/0 for types not held."""
     seat_state = state.seats[seat]
     hand = seat_hand34(seat_state)
-    concealed = [0] * _TILES
+    concealed = [0] * N_TILE_TYPES
     for t in seat_state.concealed:
         concealed[t // 4] += 1
     closed = not seat_state.melds
     sets = state.ruleset.hand_sets
-    sh_out, uk_out = [PAD] * _TILES, [0] * _TILES
-    for t in range(_TILES):
+    sh_out, uk_out = [PAD] * N_TILE_TYPES, [0] * N_TILE_TYPES
+    for t in range(N_TILE_TYPES):
         if not concealed[t]:
             continue
         hand[t] -= 1
         sh = shanten(hand, closed=closed, hand_sets=sets)
         uk = 0
-        for u in range(_TILES):
+        for u in range(N_TILE_TYPES):
             if unseen[u] and hand[u] < 4:
                 hand[u] += 1
                 if shanten(hand, closed=closed, hand_sets=sets) < sh:
@@ -107,7 +106,7 @@ def shanten_labels(state: GameState, seat: int, unseen: np.ndarray) -> tuple[lis
 def _unseen(row: dict[str, np.ndarray]) -> np.ndarray:
     melds = row["melds"].astype(np.int64)
     seq = row["discard_seq"]
-    disc = np.bincount(seq[seq != PAD], minlength=_TILES)
+    disc = np.bincount(seq[seq != PAD], minlength=N_TILE_TYPES)
     seen = row["concealed"] + melds.sum(axis=0) + disc
     return np.clip(4 - seen, 0, 4)
 
@@ -115,7 +114,7 @@ def _unseen(row: dict[str, np.ndarray]) -> np.ndarray:
 def _label_row(state: GameState, seat: int) -> dict[str, object]:
     labels = danger_labels_for_opponents(state, seat)
     opps = [(seat + r) % 4 for r in (1, 2, 3)]
-    wait = np.zeros((3, _TILES), dtype=np.uint8)
+    wait = np.zeros((3, N_TILE_TYPES), dtype=np.uint8)
     for i, o in enumerate(opps):
         wait[i, list(labels[o].winning_tiles)] = 1
     row: dict[str, object] = {
@@ -138,8 +137,8 @@ async def _play(
     steps = hands = 0
     while state.phase != Phase.GAME_OVER:
         steps += 1
-        if steps > _STEP_CAP:
-            raise RuntimeError(f"seed={seed}: exceeded {_STEP_CAP} steps")
+        if steps > GAME_STEP_CAP:
+            raise RuntimeError(f"seed={seed}: exceeded {GAME_STEP_CAP} steps")
         if state.phase == Phase.HAND_OVER:
             _fill_outcome(state, hand_rows)
             rows += hand_rows
@@ -158,7 +157,7 @@ async def _play(
         mask = legal_mask(state, seat)
         if sum(mask) > 1:
             hand_rows.append(_row(state, seat))
-        aid = await bots[seat].act(seat_view(state, seat), mask, _NO_DEADLINE)
+        aid = await bots[seat].act(seat_view(state, seat), mask, NO_DEADLINE)
         state, _ = reduce(state, decode_action(aid, state, seat))
     if state.hand_result is not None and hand_rows:
         _fill_outcome(state, hand_rows)
@@ -172,7 +171,7 @@ def _row(state: GameState, seat: int) -> dict[str, object]:
     if own_turn:
         sh, uk = shanten_labels(state, seat, _unseen(pol))
     else:
-        sh, uk = [PAD] * _TILES, [0] * _TILES
+        sh, uk = [PAD] * N_TILE_TYPES, [0] * N_TILE_TYPES
     return {
         **pol,
         **oracle_raw(state, seat),

@@ -18,9 +18,10 @@ from dataclasses import asdict, dataclass
 import torch
 from torch import nn
 
-from mahjong_core.ml import N_ACTIONS
-from ml.danger_model import _PADDED_WIDTH, N_FAAN_CLASSES, _Block, _padded_positions
-from ml.encode import N_TILE_TYPES
+from mahjong_core.ml import N_ACTIONS, PASS_ID
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.danger_model import N_FAAN_CLASSES, _Block, _padded_positions
+from ml.encode import N_OPPONENTS, PADDED_WIDTH
 from ml.encode_v2 import N_ORACLE_CHANNELS, N_POLICY_CHANNELS, N_POLICY_SCALARS, POLICY_CHANNELS
 
 __all__ = [
@@ -41,21 +42,20 @@ __all__ = [
     "n_parameters",
 ]
 
-N_TILE_ACTION_KINDS = 3
+N_TILE_ACTION_KINDS = PASS_ID // N_TILE_TYPES  # discard, concealed kong, added kong
 GLOBAL_ACTIONS = ("pass", "chow_low", "chow_middle", "chow_high", "pung", "kong", "win")
 N_HIDDEN_LOCATIONS = 4  # next, across, previous opponent, live wall
 CLAIM_CHANNEL = POLICY_CHANNELS["claimable"].start
-_OPP = 3
 # aux tile-conv channel layout
 _AUX_TILE = (
-    ("legal_wait", _OPP),
-    ("struct_wait", _OPP),
-    ("faan", _OPP * N_FAAN_CLASSES),
+    ("legal_wait", N_OPPONENTS),
+    ("struct_wait", N_OPPONENTS),
+    ("faan", N_OPPONENTS * N_FAAN_CLASSES),
     ("hidden", N_HIDDEN_LOCATIONS),
     ("shanten", 1),
     ("ukeire", 1),
 )
-_AUX_GLOBAL = (("tenpai", _OPP), ("win", 1), ("deal_in", 1), ("points", 1))
+_AUX_GLOBAL = (("tenpai", N_OPPONENTS), ("win", 1), ("deal_in", 1), ("points", 1))
 
 
 def _slices(layout: tuple[tuple[str, int], ...]) -> dict[str, slice]:
@@ -93,7 +93,7 @@ class Trunk(nn.Module):
         self.blocks = nn.ModuleList(_Block(channels, se) for _ in range(blocks))
         self.final_norm = nn.GroupNorm(8, channels)
         self.register_buffer("positions", _padded_positions(), persistent=False)
-        mask = torch.zeros(1, 1, _PADDED_WIDTH)
+        mask = torch.zeros(1, 1, PADDED_WIDTH)
         mask[..., self.positions] = 1.0
         self.register_buffer("mask", mask, persistent=False)
 
@@ -101,7 +101,7 @@ class Trunk(nn.Module):
         self, tiles: torch.Tensor, scalars: torch.Tensor, stem_bias: torch.Tensor | None = None
     ) -> torch.Tensor:
         """`stem_bias` `(B, channels, 37)` is added after the stem (the PPO oracle input)."""
-        x = tiles.new_zeros(tiles.shape[0], tiles.shape[1], _PADDED_WIDTH)
+        x = tiles.new_zeros(tiles.shape[0], tiles.shape[1], PADDED_WIDTH)
         x[:, :, self.positions] = tiles
         h = self.stem(x) + self.scalar_proj(scalars).unsqueeze(-1)
         if stem_bias is not None:
@@ -217,7 +217,7 @@ class PolicyNet(nn.Module):
         g = self.aux_global(pooled)
         ts, gs = _AUX_TILE_SLICES, _AUX_GLOBAL_SLICES
         b = t.shape[0]
-        faan = t[:, ts["faan"]].reshape(b, _OPP, N_FAAN_CLASSES, N_TILE_TYPES)
+        faan = t[:, ts["faan"]].reshape(b, N_OPPONENTS, N_FAAN_CLASSES, N_TILE_TYPES)
         return AuxOutput(
             tenpai=g[:, gs["tenpai"]],
             legal_wait=t[:, ts["legal_wait"]],

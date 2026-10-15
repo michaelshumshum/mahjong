@@ -22,26 +22,28 @@ from app.views import SeatView
 from mahjong_core.config import RuleSet
 from mahjong_core.scoring.patterns import seat_wind_for
 from mahjong_core.state import GameState, Phase
-from mahjong_core.tiles import Flower, TileType, tile_id_type
+from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES, Flower, TileType, tile_id_type
 from ml.encode import (
+    _HAS_LOWER,
+    _HAS_UPPER,
+    _STATIC,
+    MAX_DISCARDS,
     N_RULESET_FEATURES,
     N_THERMOMETER,
-    N_TILE_TYPES,
+    PAD,
+    PHASE_INDEX,
     _min_age,
-    _static_tile_channels,
     encode_ruleset,
 )
 from ml.raw import concealed_kong_counts, visible_meld_counts34
 
 __all__ = [
-    "MAX_DISCARDS",
     "N_ORACLE_CHANNELS",
     "N_POLICY_CHANNELS",
     "N_POLICY_SCALARS",
     "ORACLE_CHANNELS",
     "ORACLE_FIELDS",
     "ORACLE_MAX_DRAWS",
-    "PAD",
     "POLICY_CHANNELS",
     "POLICY_FIELDS",
     "encode_oracle",
@@ -55,11 +57,7 @@ __all__ = [
     "stack_rows",
 ]
 
-PAD = 255
-MAX_DISCARDS = 32
 ORACLE_MAX_DRAWS = 13
-_PHASES = tuple(Phase)
-_COPIES = 4
 _RECENCY = ((1, 2), (3, 5), (6, 10**6))  # age 0 is the last-discard plane
 
 POLICY_FIELDS: dict[str, tuple[int, ...]] = {
@@ -120,17 +118,12 @@ N_POLICY_CHANNELS = sum(n for _, n in _POLICY_LAYOUT)
 N_ORACLE_CHANNELS = sum(n for _, n in _ORACLE_LAYOUT)
 # concealed(4) turn(4) dealer(4) prevailing(4) seat wind(4) phase(7) wall(1) flowers(4)
 # concealed kongs(4) own seat flowers / flower set / season set(3) + ruleset
-N_POLICY_SCALARS = 4 + 4 + 4 + 4 + 4 + len(_PHASES) + 1 + 4 + 4 + 3 + N_RULESET_FEATURES
+N_POLICY_SCALARS = 4 + 4 + 4 + 4 + 4 + len(PHASE_INDEX) + 1 + 4 + 4 + 3 + N_RULESET_FEATURES
 
-_PHASE_INDEX = {p: i for i, p in enumerate(_PHASES)}
-_STATIC = _static_tile_channels()
-_RANK = np.array([t % 9 if t < 27 else -1 for t in range(N_TILE_TYPES)])
-_HAS_LOWER = _RANK >= 3
-_HAS_UPPER = (_RANK >= 0) & (_RANK <= 5)
 _LEVELS = np.arange(N_THERMOMETER)[:, None]
 _EYE35 = np.eye(N_TILE_TYPES + 1, dtype=np.int64)[:, :N_TILE_TYPES]
 _EYE4 = np.eye(4, dtype=np.float32)
-_EYE_PHASE = np.eye(len(_PHASES), dtype=np.float32)
+_EYE_PHASE = np.eye(len(PHASE_INDEX), dtype=np.float32)
 _DRAGONS = (np.arange(N_TILE_TYPES) >= int(TileType.DRAGON_RED)).astype(np.float32)
 _ruleset_cache: tuple[RuleSet | None, np.ndarray | None] = (None, None)
 
@@ -170,7 +163,7 @@ def policy_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
     seats = state.seats
     concealed = [0] * N_TILE_TYPES
     for t in seats[seat].concealed:
-        concealed[t // _COPIES] += 1
+        concealed[t // COPIES_PER_TYPE] += 1
     melds, seqs, counts, kongs, flowers = [], [], [], [], []
     for rel in range(4):
         s = seats[(seat + rel) % 4]
@@ -180,16 +173,16 @@ def policy_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
             if meld.concealed:
                 n_kongs += 1
             for t in meld.tiles[:3] if meld.is_kong else meld.tiles:
-                row[t // _COPIES] += 1
+                row[t // COPIES_PER_TYPE] += 1
         melds.append(row)
-        seqs.append(_seq_row([t // _COPIES for t in s.discards]))
+        seqs.append(_seq_row([t // COPIES_PER_TYPE for t in s.discards]))
         counts.append(len(s.concealed))
         kongs.append(n_kongs)
         flowers.append(len(s.flowers))
     window = state.claim_window
     claim = PAD
     if window is not None and any(o.seat == seat for o in window.offers):
-        claim = window.tile // _COPIES
+        claim = window.tile // COPIES_PER_TYPE
     return _finish(
         {
             "concealed": concealed,
@@ -203,7 +196,7 @@ def policy_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
             "dealer": (state.dealer - seat) % 4,
             "prevailing": int(state.prevailing),
             "turn": (state.turn - seat) % 4,
-            "phase": _PHASE_INDEX[state.phase],
+            "phase": PHASE_INDEX[state.phase],
             "wall_remaining": len(state.wall.tiles),
             "claim_tile": claim,
         }
@@ -241,7 +234,7 @@ def policy_raw_from_view(view: SeatView) -> dict[str, np.ndarray]:
             "dealer": order.index(view.dealer),
             "prevailing": int(view.prevailing),
             "turn": order.index(view.turn),
-            "phase": _PHASE_INDEX[view.phase],
+            "phase": PHASE_INDEX[view.phase],
             "wall_remaining": view.wall_remaining,
             "claim_tile": claim,
         }
@@ -256,7 +249,7 @@ def oracle_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
         s = state.seats[(seat + rel) % 4]
         row = [0] * N_TILE_TYPES
         for t in s.concealed:
-            row[t // _COPIES] += 1
+            row[t // COPIES_PER_TYPE] += 1
         opp_concealed.append(row)
         krow = [0] * N_TILE_TYPES
         for meld in s.melds:
@@ -267,11 +260,11 @@ def oracle_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
     tiles = state.wall.tiles
     for t in tiles:
         if not isinstance(t, Flower):
-            wall[t // _COPIES] += 1
+            wall[t // COPIES_PER_TYPE] += 1
     draws = [PAD] * ORACLE_MAX_DRAWS
     for i, t in enumerate(tiles[:ORACLE_MAX_DRAWS]):
         if not isinstance(t, Flower):
-            draws[i] = t // _COPIES
+            draws[i] = t // COPIES_PER_TYPE
     return {
         "opp_concealed": np.asarray(opp_concealed, dtype=np.uint8),
         "opp_concealed_kongs": np.asarray(opp_kongs, dtype=np.uint8),

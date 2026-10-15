@@ -20,16 +20,21 @@ from bots.features import own_hand34
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.scoring.patterns import PATTERNS, seat_wind_for
 from mahjong_core.state import Phase
-from mahjong_core.tiles import TileType, new_count_array, tile_id_type
+from mahjong_core.tiles import N_TILE_TYPES, TileType, new_count_array, tile_id_type
 from ml.raw import visible_meld_counts34
 
 __all__ = [
+    "MAX_DISCARDS",
+    "N_OPPONENTS",
     "N_PATTERNS",
     "N_RULESET_FEATURES",
     "N_SCALARS",
     "N_THERMOMETER",
     "N_TILE_CHANNELS",
-    "N_TILE_TYPES",
+    "PAD",
+    "PADDED_POSITIONS",
+    "PADDED_WIDTH",
+    "PHASE_INDEX",
     "EncodedSeatView",
     "encode_batch",
     "encode_ruleset",
@@ -37,15 +42,19 @@ __all__ = [
     "rows_to_arrays",
 ]
 
-N_TILE_TYPES = 34
+N_OPPONENTS = 3
 N_THERMOMETER = 4  # tile count 1..4 -> four "count > k" planes (Suphx/Mortal convention)
 _HAND_SETS = (HandSet.CLASSIC, HandSet.NEW_6, HandSet.NEW_18)
 N_PATTERNS = len(PATTERNS)
-_PHASES = tuple(Phase)
+PHASE_INDEX = {p: i for i, p in enumerate(Phase)}
 # min_faan, wall_reserve (2 scalars) + hand_sets bitmask + one effective-faan slot per pattern
 N_RULESET_FEATURES = 2 + len(_HAND_SETS) + N_PATTERNS
 
-_PAD = 255
+PAD = 255
+MAX_DISCARDS = 32
+PADDED_WIDTH = 37
+PADDED_POSITIONS = (*range(9), *range(10, 19), *range(20, 29), *range(30, 37))
+"""Conv column of each tile type: one empty column after each suit, so no kernel spans two suits."""
 _AGE_BUCKETS = ((0, 0), (1, 2), (3, 5), (6, 10**6))
 _NEVER = 10**7
 # hand + 4 seats' melds + 4 seats' discards (thermometer) + target/others discard-age buckets
@@ -122,7 +131,7 @@ def encode_seat_view(view: SeatView) -> EncodedSeatView:
             _one_hot(order.index(view.dealer), 4),
             _one_hot(int(view.prevailing), 4),
             _one_hot(int(seat_wind_for(view.seat, view.dealer)), 4),
-            _one_hot(_PHASES.index(view.phase), len(_PHASES)),
+            _one_hot(PHASE_INDEX[view.phase], len(PHASE_INDEX)),
         ]
     )
     wall_remaining = np.asarray([view.wall_remaining], dtype=np.float32)
@@ -188,10 +197,10 @@ def _rotate(a: np.ndarray, rot: np.ndarray) -> np.ndarray:
 
 
 def _min_age(seq: np.ndarray) -> np.ndarray:
-    """(B, L) discard order, `_PAD`-padded -> (B, 34) turns since each tile type was last
+    """(B, L) discard order, `PAD`-padded -> (B, 34) turns since each tile type was last
     discarded by that seat (0 = its most recent discard), `_NEVER` if never."""
     b, length = seq.shape
-    valid = seq != _PAD
+    valid = seq != PAD
     n = valid.sum(axis=1)
     ages = np.full((b, N_TILE_TYPES), _NEVER, dtype=np.int64)
     rows = np.arange(b)
@@ -279,7 +288,7 @@ def encode_batch(
     )
 
     eye4 = np.eye(4, dtype=np.float32)
-    n_discards = (seq != _PAD).sum(axis=2)
+    n_discards = (seq != PAD).sum(axis=2)
     ruleset = ruleset_vec.astype(np.float32).copy()
     ruleset[0] /= 10.0
     ruleset[1] /= 100.0
@@ -302,7 +311,9 @@ def encode_batch(
     return tiles, scalars
 
 
-def rows_to_arrays(rows: list[dict[str, object]], max_discards: int = 32) -> dict[str, np.ndarray]:
+def rows_to_arrays(
+    rows: list[dict[str, object]], max_discards: int = MAX_DISCARDS
+) -> dict[str, np.ndarray]:
     """`ml.raw.raw_row` dicts -> the batched uint8 arrays `encode_batch` reads, laid out the
     same way as `ml.pack`."""
     out: dict[str, np.ndarray] = {}
@@ -319,7 +330,7 @@ def rows_to_arrays(rows: list[dict[str, object]], max_discards: int = 32) -> dic
         "wall_remaining",
     ):
         out[key] = np.asarray([r[key] for r in rows], dtype=np.uint8)
-    seq = np.full((len(rows), 4, max_discards), _PAD, dtype=np.uint8)
+    seq = np.full((len(rows), 4, max_discards), PAD, dtype=np.uint8)
     for i, r in enumerate(rows):
         for p, pool in enumerate(r["discard_seq"]):  # type: ignore[attr-defined]
             seq[i, p, : len(pool)] = pool

@@ -17,7 +17,8 @@ from mahjong_core.engine import reduce
 from mahjong_core.ml import decode_action
 from mahjong_core.shanten import shanten
 from mahjong_core.state import Phase
-from ml.encode_v2 import ORACLE_FIELDS, PAD, POLICY_FIELDS, oracle_raw, policy_raw_from_view
+from ml.encode import PAD
+from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw_from_view
 from ml.train_env import (
     FROZEN,
     LEARNER,

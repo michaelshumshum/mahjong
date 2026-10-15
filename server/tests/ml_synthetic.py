@@ -9,9 +9,10 @@ from pathlib import Path
 import numpy as np
 
 from mahjong_core.presets import RULESET_PRESETS
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.splits import split_ids
 
-TILES = 34
+TILES = N_TILE_TYPES
 
 
 def synthetic_packed(path: Path, n_games: int = 60, rows_per_game: int = 20) -> None:

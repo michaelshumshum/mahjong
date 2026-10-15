@@ -18,10 +18,10 @@ from pathlib import Path
 import numpy as np
 
 from mahjong_core.config import RuleSet
-from ml.encode import encode_ruleset
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.encode import PAD, encode_ruleset
 from ml.encode_v2 import (
     ORACLE_FIELDS,
-    PAD,
     POLICY_FIELDS,
     encode_oracle_batch,
     encode_policy_batch,
@@ -31,8 +31,6 @@ from ml.generate_aux import SCHEMA_VERSION
 from ml.splits import DEFAULT_SALT, split_ids
 
 __all__ = ["AuxData", "aux_targets", "danger_raw", "hidden_counts", "main", "pack_aux"]
-
-_TILES = 34
 
 
 def pack_aux(src: Path, dst: Path, *, salt: str = DEFAULT_SALT) -> dict[str, object]:
@@ -116,11 +114,13 @@ def aux_targets(raw: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
 def danger_raw(raw: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     """Rows in the v3 `ml.pack` layout that `ml.encode.encode_batch` reads."""
     seq = raw["discard_seq"]
-    disc = np.eye(_TILES + 1, dtype=np.uint8)[np.minimum(seq, _TILES)].sum(axis=2, dtype=np.uint8)
+    disc = np.eye(N_TILE_TYPES + 1, dtype=np.uint8)[np.minimum(seq, N_TILE_TYPES)].sum(
+        axis=2, dtype=np.uint8
+    )
     return {
         "hand_counts": raw["concealed"] + raw["melds"][:, 0],
         "meld_counts": raw["melds"],
-        "discard_counts": disc[..., :_TILES],
+        "discard_counts": disc[..., :N_TILE_TYPES],
         "discard_seq": seq,
         "concealed_counts": raw["concealed_counts"],
         "concealed_kongs": raw["concealed_kongs"],

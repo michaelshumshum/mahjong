@@ -14,10 +14,11 @@ import numpy as np
 from app.views import seat_view
 from mahjong_core.config import RuleSet
 from mahjong_core.state import GameState, Phase
+from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES
 from ml.encode import (
     N_RULESET_FEATURES,
     N_THERMOMETER,
-    N_TILE_TYPES,
+    PHASE_INDEX,
     encode_ruleset,
     encode_seat_view,
 )
@@ -33,9 +34,7 @@ _OFF_WALL = _OFF_CONTEXT + _N_CONTEXT
 _OFF_RULESET = _OFF_WALL + 1
 OBS_DIM = _OFF_RULESET + N_RULESET_FEATURES
 
-_PHASE_INDEX = {p: i for i, p in enumerate(Phase)}
 _LEVELS = np.arange(N_THERMOMETER).reshape(1, N_THERMOMETER, 1)
-_COPIES = 4  # tile ids are 4 consecutive per type (mahjong_core.tiles)
 _ruleset_cache: tuple[RuleSet | None, np.ndarray | None] = (None, None)
 
 
@@ -55,7 +54,7 @@ def encode_state(state: GameState, seat: int, out: np.ndarray | None = None) -> 
     idx: list[int] = []
     own = seats[seat]
     for t in own.concealed:
-        idx.append(t // _COPIES)
+        idx.append(t // COPIES_PER_TYPE)
     for rel in range(4):
         abs_seat = (seat + rel) % 4
         s = seats[abs_seat]
@@ -64,12 +63,12 @@ def encode_state(state: GameState, seat: int, out: np.ndarray | None = None) -> 
         for meld in s.melds:
             tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
             for t in tiles:
-                idx.append(meld_base + t // _COPIES)
+                idx.append(meld_base + t // COPIES_PER_TYPE)
                 if own_melds:
-                    idx.append(t // _COPIES)
+                    idx.append(t // COPIES_PER_TYPE)
         disc_base = (5 + rel) * N_TILE_TYPES
         for t in s.discards:
-            idx.append(disc_base + t // _COPIES)
+            idx.append(disc_base + t // COPIES_PER_TYPE)
         out[_OFF_CONCEALED + rel] = len(s.concealed)
 
     counts = np.bincount(idx, minlength=_N_ROWS * N_TILE_TYPES).reshape(_N_ROWS, 1, N_TILE_TYPES)
@@ -81,7 +80,7 @@ def encode_state(state: GameState, seat: int, out: np.ndarray | None = None) -> 
     ctx[4 + (state.dealer - seat) % 4] = 1.0
     ctx[8 + int(state.prevailing)] = 1.0
     ctx[12 + (seat - state.dealer) % 4] = 1.0
-    ctx[16 + _PHASE_INDEX[state.phase]] = 1.0
+    ctx[16 + PHASE_INDEX[state.phase]] = 1.0
     out[_OFF_WALL] = len(state.wall.tiles)
     out[_OFF_RULESET:] = _ruleset_vec(state.ruleset)
     return out

@@ -13,7 +13,7 @@ np = pytest.importorskip("numpy")
 pytest.importorskip("torch")
 
 from ml.curriculum import Contingency, Curriculum
-from ml.encode_v2 import PAD
+from ml.encode import PAD
 from ml.ppo import HandStat, build_schedule, main_config
 from ml.train_env import EnvConfig, TrainEnv, unpack_rows
 

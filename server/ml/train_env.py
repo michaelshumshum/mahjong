@@ -33,13 +33,16 @@ from typing import Any, Self
 import numpy as np
 
 from bots.arena import _tenpai_can_reach_min_faan
+from bots.base import NO_DEADLINE
 from bots.labels import is_tenpai, seat_hand34
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
-from mahjong_core.ml import N_ACTIONS
+from mahjong_core.ml import N_ACTIONS, PASS_ID
 from mahjong_core.presets import RULESET_PRESETS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from ml.encode_v2 import ORACLE_FIELDS, PAD, POLICY_FIELDS, oracle_raw, policy_raw
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.encode import PAD
+from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.env import HandEnv
 from ml.generate_aux import _label_row, _unseen, shanten_labels
 from ml.mp import mp_context
@@ -66,15 +69,13 @@ __all__ = [
 
 LEARNER = 0
 FROZEN = 1
-_PASS = 102
-_TILES = 34
 
 AUX_LABEL_FIELDS: dict[str, tuple[int, ...]] = {
     "opp_tenpai": (3,),
-    "opp_wait": (3, _TILES),
-    "opp_faan": (3, _TILES),
-    "shanten": (_TILES,),
-    "ukeire": (_TILES,),
+    "opp_wait": (3, N_TILE_TYPES),
+    "opp_faan": (3, N_TILE_TYPES),
+    "shanten": (N_TILE_TYPES,),
+    "ukeire": (N_TILE_TYPES,),
 }
 ROW_FIELDS: dict[str, tuple[int, ...]] = {
     **POLICY_FIELDS,
@@ -123,8 +124,8 @@ def tsumogiri(state: GameState, seat: int, mask: np.ndarray) -> int:
         t = state.seats[seat].concealed[-1] // 4
         if mask[t]:
             return int(t)
-        return int(np.flatnonzero(mask[:_TILES])[0])
-    return _PASS
+        return int(np.flatnonzero(mask[:N_TILE_TYPES])[0])
+    return PASS_ID
 
 
 Opponent = Callable[[GameState, int, np.ndarray], int]
@@ -141,7 +142,7 @@ def _faanbot_teacher() -> Callable[[GameState, int, np.ndarray], int]:
     bot = FaanBot()
 
     def act(state: GameState, seat: int, mask: np.ndarray) -> int:
-        return asyncio.run(bot.act(seat_view(state, seat), mask.tolist(), float("inf")))
+        return asyncio.run(bot.act(seat_view(state, seat), mask.tolist(), NO_DEADLINE))
 
     return act
 
@@ -336,12 +337,12 @@ class TrainEnv:
             if state.phase == Phase.AWAIT_ACTION and state.turn == seat:
                 sh_after, uk = shanten_labels(state, seat, _unseen(values))
             else:
-                sh_after, uk = [PAD] * _TILES, [0] * _TILES
+                sh_after, uk = [PAD] * N_TILE_TYPES, [0] * N_TILE_TYPES
             values["shanten"], values["ukeire"] = sh_after, uk
         else:
             for name, shape in AUX_LABEL_FIELDS.items():
                 values[name] = np.zeros(shape, dtype=np.uint8)
-            values["shanten"] = np.full(_TILES, PAD, dtype=np.uint8)
+            values["shanten"] = np.full(N_TILE_TYPES, PAD, dtype=np.uint8)
         for name, (lo, hi, _) in _OFFSETS.items():
             row[lo:hi] = np.asarray(values[name]).ravel()
 

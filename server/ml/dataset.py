@@ -10,13 +10,11 @@ import numpy as np
 import torch
 
 from mahjong_core.config import RuleSet
-from ml.encode import encode_batch, encode_ruleset
+from ml.encode import N_OPPONENTS, encode_batch, encode_ruleset
 from ml.losses import targets_from_raw
 from ml.pack import load_packed
 
 __all__ = ["DangerData"]
-
-_OPPONENTS = 3
 
 
 class DangerData:
@@ -34,14 +32,14 @@ class DangerData:
     def epoch_order(n_rows: int, seed: int, epoch: int) -> np.ndarray:
         """Shuffled sample indices for one pass; a pure function of `(seed, epoch)` so a resumed
         run continues the same order."""
-        return np.random.default_rng([seed, epoch]).permutation(n_rows * _OPPONENTS)
+        return np.random.default_rng([seed, epoch]).permutation(n_rows * N_OPPONENTS)
 
     def batch(
         self, rows: np.ndarray, samples: np.ndarray
     ) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor]]:
         """Encoded tensors and targets for `samples` (indices into `rows`' sample space)."""
-        row_idx = rows[samples // _OPPONENTS]
-        opp = samples % _OPPONENTS
+        row_idx = rows[samples // N_OPPONENTS]
+        opp = samples % N_OPPONENTS
         needed = {k: np.asarray(v[row_idx]) for k, v in self.raw.items() if k != "split"}
         tiles, scalars = encode_batch(needed, opp, self.ruleset_vec)
         targets = targets_from_raw(needed, np.arange(len(row_idx)), opp)

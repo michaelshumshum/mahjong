@@ -14,18 +14,16 @@ import numpy as np
 import torch
 from torch import nn
 
-from ml.encode import N_SCALARS, N_TILE_CHANNELS, N_TILE_TYPES
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.encode import N_SCALARS, N_TILE_CHANNELS, PADDED_POSITIONS, PADDED_WIDTH
 
 __all__ = ["N_FAAN_CLASSES", "DangerNet", "DangerNetConfig", "DangerOutput"]
 
 N_FAAN_CLASSES = 10  # faan 1..10; class k is faan k + 1, higher values clip to the last class
-_PADDED_WIDTH = 37
 
 
 def _padded_positions() -> torch.Tensor:
-    pos = [*range(9), *range(10, 19), *range(20, 29), *range(30, 37)]
-    assert len(pos) == N_TILE_TYPES
-    return torch.tensor(pos)
+    return torch.tensor(PADDED_POSITIONS)
 
 
 @dataclass(frozen=True)
@@ -82,13 +80,13 @@ class DangerNet(nn.Module):
             nn.Linear(2 * ch + self.config.in_scalars, ch), nn.ReLU(), nn.Linear(ch, 1)
         )
         self.register_buffer("positions", _padded_positions(), persistent=False)
-        mask = torch.zeros(1, 1, _PADDED_WIDTH)
+        mask = torch.zeros(1, 1, PADDED_WIDTH)
         mask[..., self.positions] = 1.0
         self.register_buffer("mask", mask, persistent=False)
 
     def forward(self, tiles: torch.Tensor, scalars: torch.Tensor) -> DangerOutput:
         b = tiles.shape[0]
-        x = tiles.new_zeros(b, tiles.shape[1], _PADDED_WIDTH)
+        x = tiles.new_zeros(b, tiles.shape[1], PADDED_WIDTH)
         x[:, :, self.positions] = tiles
         h = (self.stem(x) + self.scalar_proj(scalars).unsqueeze(-1)) * self.mask
         for block in self.blocks:

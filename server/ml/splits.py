@@ -7,9 +7,10 @@ import hashlib
 
 import numpy as np
 
-__all__ = ["DEFAULT_SALT", "TEST", "TRAIN", "VAL", "split_ids", "split_of"]
+__all__ = ["DEFAULT_SALT", "SPLITS", "TEST", "TRAIN", "VAL", "split_ids", "split_of"]
 
 TRAIN, VAL, TEST = 0, 1, 2
+SPLITS = {"train": TRAIN, "val": VAL, "test": TEST}
 DEFAULT_SALT = "danger-v1"
 _BUCKETS = 20  # 2/20 test, 1/20 val, rest train
 

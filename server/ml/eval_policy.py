@@ -52,7 +52,7 @@ from bots.arena import (
     _tenpai_can_reach_min_faan,
     _view_for,
 )
-from bots.base import Bot
+from bots.base import NO_DEADLINE, Bot
 from bots.labels import is_tenpai
 from mahjong_core.actions import Discard
 from mahjong_core.config import RuleSet
@@ -154,7 +154,7 @@ async def _play(
         assert env.state is not None
         name = names[seat] if names is not None else None
         view = _view(env.state, seat, bots[seat], name)
-        aid = await bots[seat].act(view, mask.tolist(), float("inf"))
+        aid = await bots[seat].act(view, mask.tolist(), NO_DEADLINE)
         seat, _, mask, _, _ = env.step(aid)
     return _hand(env), env.record()
 

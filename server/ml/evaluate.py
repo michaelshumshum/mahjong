@@ -20,6 +20,7 @@ import torch
 
 from ml.danger_model import DangerNet, DangerNetConfig
 from ml.dataset import DangerData
+from ml.encode import N_OPPONENTS
 from ml.metrics import (
     add_stats,
     game_bootstrap,
@@ -28,12 +29,9 @@ from ml.metrics import (
     reliability_sums,
     reliability_table,
 )
-from ml.splits import TEST, TRAIN, VAL
+from ml.splits import SPLITS
 
 __all__ = ["evaluate_model", "legal_wait_probs", "load_model", "main"]
-
-_SPLITS = {"train": TRAIN, "val": VAL, "test": TEST}
-_OPPONENTS = 3
 
 
 def load_model(ckpt_path: Path) -> DangerNet:
@@ -51,14 +49,14 @@ def legal_wait_probs(
     model: DangerNet, data: DangerData, rows: np.ndarray, chunk: int = 2048
 ) -> np.ndarray:
     """`(len(rows), 3, 34)` legal-wait probabilities for every (row, opponent, tile)."""
-    n = len(rows) * _OPPONENTS
+    n = len(rows) * N_OPPONENTS
     out = np.empty((n, 34), dtype=np.float32)
     with torch.no_grad():
         for i in range(0, n, chunk):
             idx = np.arange(i, min(i + chunk, n))
             tiles, scalars, _ = data.batch(rows, idx)
             out[idx] = torch.sigmoid(model(tiles, scalars).legal_wait).numpy()
-    return out.reshape(len(rows), _OPPONENTS, 34)
+    return out.reshape(len(rows), N_OPPONENTS, 34)
 
 
 def evaluate_model(
@@ -74,7 +72,7 @@ def evaluate_model(
     """Metrics of `model` over `rows`' (row, opponent) samples. Keys: `legal_wait` and
     `struct_wait` at candidate-discard tiles, `legal_wait_all_tiles`, `tenpai`; each maps metric
     name to `(point, lo, hi)`. `base_rate` and `reliability` describe the legal-wait candidates."""
-    n_samples = len(rows) * _OPPONENTS
+    n_samples = len(rows) * N_OPPONENTS
     samples = np.arange(n_samples)
     if max_samples is not None and max_samples < n_samples:
         samples = np.sort(np.random.default_rng(seed).choice(n_samples, max_samples, replace=False))
@@ -90,9 +88,9 @@ def evaluate_model(
             idx = samples[i : i + chunk]
             tiles, scalars, targets = data.batch(rows, idx)
             out = model(tiles, scalars)
-            row_idx = rows[idx // _OPPONENTS]
+            row_idx = rows[idx // N_OPPONENTS]
             cand = np.asarray(data.raw["hand_counts"][row_idx]) > 0
-            g = game_of_row[idx // _OPPONENTS]
+            g = game_of_row[idx // N_OPPONENTS]
             g_tiles = np.broadcast_to(g[:, None], cand.shape)
 
             legal_p, legal_y = _sigmoid(out.legal_wait), targets["legal"].numpy()
@@ -123,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m ml.evaluate", description=__doc__)
     parser.add_argument("--ckpt", type=Path, required=True)
     parser.add_argument("--data", type=Path, required=True)
-    parser.add_argument("--split", choices=[*_SPLITS, "all"], default="test")
+    parser.add_argument("--split", choices=[*SPLITS, "all"], default="test")
     parser.add_argument("--max-samples", type=int)
     parser.add_argument("--n-boot", type=int, default=500)
     parser.add_argument("--threads", type=int, default=4)
@@ -138,7 +136,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.split == "all":
         rows = np.arange(data.meta["rows"])
     else:
-        rows = data.rows_of(_SPLITS[args.split])
+        rows = data.rows_of(SPLITS[args.split])
     result = evaluate_model(
         load_model(args.ckpt), data, rows, max_samples=args.max_samples, n_boot=args.n_boot
     )

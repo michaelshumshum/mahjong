@@ -17,7 +17,7 @@ from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.patterns import PATTERNS
 from mahjong_core.state import Phase, Wind
-from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from mahjong_core.tiles import N_TILE_TYPES, TileId, TileType, tile_ids_for_type
 
 
 def _view(
@@ -110,7 +110,7 @@ def test_hand_thermometer_plane_matches_tile_counts_one_through_four() -> None:
         )
     )
     encoded = ml_encode.encode_seat_view(view)
-    assert encoded.hand.shape == (ml_encode.N_THERMOMETER, ml_encode.N_TILE_TYPES)
+    assert encoded.hand.shape == (ml_encode.N_THERMOMETER, N_TILE_TYPES)
     # count 0 (MAN_5, unheld) -> every plane 0; count 1/2/3/4 -> exactly that many planes lit
     for tile_type, count in (
         (TileType.MAN_5, 0),

@@ -16,7 +16,8 @@ from ml import train as ml_train
 from ml.aux_data import AuxData, danger_raw, pack_aux
 from ml.aux_eval import evaluate_aux_model, evaluate_v3, load_policy, v3_policy_raw
 from ml.danger_model import DangerNet, DangerNetConfig
-from ml.encode_v2 import PAD, policy_raw, stack_rows
+from ml.encode import PAD
+from ml.encode_v2 import policy_raw, stack_rows
 from ml.env import HandEnv
 from ml.generate_aux import main as generate_main
 from ml.generate_aux import record_game

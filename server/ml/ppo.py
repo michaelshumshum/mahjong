@@ -54,13 +54,13 @@ from mahjong_core.config import RuleSet
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.presets import RULESET_PRESETS
 from ml.aux_data import aux_targets
-from ml.danger_model import _PADDED_WIDTH, _padded_positions
+from ml.danger_model import _padded_positions
+from ml.encode import PAD, PADDED_WIDTH
 from ml.encode_v2 import (
     N_ORACLE_CHANNELS,
     ORACLE_CHANNELS,
     ORACLE_FIELDS,
     ORACLE_MAX_DRAWS,
-    PAD,
     POLICY_FIELDS,
     encode_oracle_batch,
     encode_policy_batch,
@@ -376,7 +376,7 @@ class OracleAdapter(nn.Module):
         self.register_buffer("positions", _padded_positions(), persistent=False)
 
     def forward(self, masked_oracle: torch.Tensor) -> torch.Tensor:
-        x = masked_oracle.new_zeros(masked_oracle.shape[0], N_ORACLE_CHANNELS, _PADDED_WIDTH)
+        x = masked_oracle.new_zeros(masked_oracle.shape[0], N_ORACLE_CHANNELS, PADDED_WIDTH)
         x[:, :, self.positions] = masked_oracle
         return self.conv(x)
 

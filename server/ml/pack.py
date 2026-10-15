@@ -19,25 +19,24 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.encode import MAX_DISCARDS, PAD
 from ml.generate_dataset import SCHEMA_VERSION
 from ml.splits import DEFAULT_SALT, split_ids
 
-__all__ = ["PAD", "load_packed", "main", "pack_dataset"]
+__all__ = ["load_packed", "main", "pack_dataset"]
 
-PAD = 255
-MAX_DISCARDS = 32
-_TILES = 34
 
 _FIELDS: dict[str, tuple[int, ...]] = {
-    "hand_counts": (_TILES,),
-    "meld_counts": (4, _TILES),
-    "discard_counts": (4, _TILES),
+    "hand_counts": (N_TILE_TYPES,),
+    "meld_counts": (4, N_TILE_TYPES),
+    "discard_counts": (4, N_TILE_TYPES),
     "concealed_counts": (4,),
     "concealed_kongs": (4,),
     "flowers": (4,),
     "opponent_is_tenpai": (3,),
-    "opponent_winning_tiles_multihot": (3, _TILES),
-    "opponent_expected_faan": (3, _TILES),
+    "opponent_winning_tiles_multihot": (3, N_TILE_TYPES),
+    "opponent_expected_faan": (3, N_TILE_TYPES),
 }
 _SCALARS = ("hand_no", "dealer_idx", "prevailing_wind", "seat_wind", "wall_remaining", "seat")
 

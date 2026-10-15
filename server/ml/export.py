@@ -20,6 +20,9 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from mahjong_core.tiles import N_TILE_TYPES
+from ml.encode import PADDED_POSITIONS, PADDED_WIDTH
+
 if TYPE_CHECKING:
     from mahjong_core.state import GameState
 
@@ -37,12 +40,10 @@ __all__ = [
     "numpy_trunk",
 ]
 
-_PADDED_WIDTH = 37
-_N_TILE_TYPES = 34
 _GROUPS = 8
 _EPS = 1e-5
-_POSITIONS = np.array([*range(9), *range(10, 19), *range(20, 29), *range(30, 37)])
-_MASK = np.zeros((1, 1, _PADDED_WIDTH), dtype=np.float32)
+_POSITIONS = np.array(PADDED_POSITIONS)
+_MASK = np.zeros((1, 1, PADDED_WIDTH), dtype=np.float32)
 _MASK[..., _POSITIONS] = 1.0
 _POLICY_PREFIXES = ("trunk.", "policy_tile.", "policy_global.")
 
@@ -144,7 +145,7 @@ def numpy_trunk(
     """`DangerNet`'s trunk (weights under `prefix`) on `tiles (B, C, 34)`: the final-norm,
     ReLU'd features `(B, channels, 37)`, pad columns zero."""
     b = tiles.shape[0]
-    x = np.zeros((b, tiles.shape[1], _PADDED_WIDTH), dtype=np.float32)
+    x = np.zeros((b, tiles.shape[1], PADDED_WIDTH), dtype=np.float32)
     x[:, :, _POSITIONS] = tiles
     scalar_bias = scalars @ w[prefix + "scalar_proj.weight"].T + w[prefix + "scalar_proj.bias"]
     h = _conv3(x, w[prefix + "stem.weight"], w[prefix + "stem.bias"])
@@ -162,7 +163,7 @@ def numpy_trunk(
             w[p + "conv2.weight"],
             w[p + "conv2.bias"],
         )
-        pooled = (r * _MASK).sum(-1) / _N_TILE_TYPES
+        pooled = (r * _MASK).sum(-1) / N_TILE_TYPES
         hidden = np.maximum(pooled @ w[p + "se1.weight"].T + w[p + "se1.bias"], 0)
         gate = _sigmoid(hidden @ w[p + "se2.weight"].T + w[p + "se2.bias"])
         h = (h + r * gate[:, :, None]) * _MASK
@@ -189,7 +190,7 @@ class NumpyDangerNet:
         per_tile = (head + w["tile_head.bias"][None, :, None])[:, :, _POSITIONS]
 
         pooled = np.concatenate(
-            [h.sum(-1) / _N_TILE_TYPES, h[:, :, _POSITIONS].max(-1), scalars], axis=1
+            [h.sum(-1) / N_TILE_TYPES, h[:, :, _POSITIONS].max(-1), scalars], axis=1
         )
         z = np.maximum(pooled @ w["tenpai_head.0.weight"].T + w["tenpai_head.0.bias"], 0)
         tenpai = (z @ w["tenpai_head.2.weight"].T + w["tenpai_head.2.bias"])[:, 0]
@@ -225,9 +226,7 @@ class NumpyPolicyNet:
         h_tiles = h[:, :, _POSITIONS]
         tile_logits = np.einsum("oc,bct->bot", self.tile_w, h_tiles) + self.tile_b[None, :, None]
         claim = np.einsum("bct,bt->bc", h_tiles, tiles[:, self.claim_channel])
-        pooled = np.concatenate(
-            [h.sum(-1) / _N_TILE_TYPES, h_tiles.max(-1), scalars, claim], axis=1
-        )
+        pooled = np.concatenate([h.sum(-1) / N_TILE_TYPES, h_tiles.max(-1), scalars, claim], axis=1)
         z = np.maximum(pooled @ w["policy_global.0.weight"].T + w["policy_global.0.bias"], 0)
         global_logits = z @ w["policy_global.2.weight"].T + w["policy_global.2.bias"]
         return np.concatenate([tile_logits.reshape(len(h), -1), global_logits], axis=1)
