@@ -96,6 +96,31 @@ the task on tooling. This is the only exception; otherwise these are not suggest
 - Terse and lowercase. State the fact, not the reasoning, and skip the emphasis. Full sentences are not encouraged
 - No banner or section-divider comments.
 
+## Types and constants
+
+Where each shared value lives: `server/AGENTS.md` and `web/AGENTS.md` ("Where things live").
+
+- **Define once, import everywhere.** A type or constant that more than one module reads lives in
+  the module that owns its concept and is imported, never copied. A second copy of the same value
+  (`34`, `_PASS = 102`, a duplicated `Seat` union) is a bug waiting to drift.
+- **No catch-all `constants.py` / `constants.ts` / `types.ts`.** Group by concept: tile geometry
+  goes in the tile module, wire enums in the protocol, and so on.
+- **Split type clusters out of large logic files** into a sibling module (`engine.py` →
+  `events.py`, `table.py` → `table_types.py`/`errors.py`, `+page.svelte` → `view-types.ts`).
+  Don't export shared types from a `.svelte` file's `<script module>`.
+- **Wire enums are defined once, server-side,** and reach the web via `make proto` (`BotTier`
+  → `protocol.d.ts`). Never re-type a wire vocabulary by hand on the client.
+- **Name derived numbers.** Use the owning constant (`N_TILE_TYPES`, `RANKS_PER_SUIT`), not a
+  bare `34`/`9`, in code. Shape notes in docstrings and comments may keep the literal.
+- **Keep it local when** (each is a real reason, not a default):
+  - a single consumer, with its rationale documented beside it (bot tuning knobs in
+    `safety.py`/`valuation.py`/`faanbot.py`);
+  - it's coupled to one component's own markup/CSS (`TimerRing`'s radius, the mural geometry);
+  - the value only *coincides* numerically with another (`LIMIT_FAAN = 13` vs hand size `13`).
+    Merging them would couple unrelated rules;
+  - it's pinned on purpose and must not follow a shared default (`ml/migrate_ckpt.py`'s
+    `'hk_classic'`, each dataset's `SCHEMA_VERSION`, `ENGINE_VERSION`).
+
 ## Conventions
 
 - Commits: `action(scope): description`. Small and single-purpose; don't mix refactor with

@@ -96,3 +96,26 @@ talks to `http://localhost:8000` / `ws://localhost:8000/ws` unless `PUBLIC_API_U
 - Stylesheets are SCSS (`<style lang="scss">`). `@use`, never `@import`; two levels of nesting
   max. Runtime-varying values are CSS custom properties, not Sass variables — see
   `docs/frontend.md §8`.
+- A CSS value repeated across components (a duration, a radius, a colour) is a token in
+  `lib/styles/_tokens.scss` (`--dur-control`, `--dur-spin`, `--radius-pill`, …), not a literal.
+
+## Where things live
+
+Rule: root `AGENTS.md` "Types and constants". Module table: `docs/frontend.md §7` "One view
+model, two sources".
+
+| Concept | Home |
+| --- | --- |
+| Wire types, incl. `BotTier` (generated, never hand-edited) | `lib/net/protocol.d.ts` |
+| Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`) | `lib/game/types.ts` |
+| Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
+| Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`) | `lib/table/view-types.ts` |
+| Mock fixtures (`MOCK_SCENARIOS`) — fixtures only; live code never imports types from here | `lib/table/mock-game-state.ts` |
+| Tile codes, suit order, `sortTiles` / meld order, `MELD_SEAL_GLYPH` / seat-wind helpers | `lib/table/tile-code.ts` / `meld-face.ts` / `wind.ts` |
+| Practice difficulties, difficulty → `BotTier` map, difficulty/tier labels | `lib/net/practice-difficulty.ts` (free of `lobby.ts`'s `$env` import) |
+| Ruleset types, presets, defaults | `lib/net/ruleset.ts` |
+| Client prefs types / storage keys | `lib/ui/client-prefs.ts` / `lib/ui/settings-storage.ts` |
+| Pregame preview ids | `lib/table/pregame-preview.ts` |
+
+- `.ts` modules never import types from a `.svelte` file. A component's own prop types stay in
+  the component only while that component's parent is their only consumer.
