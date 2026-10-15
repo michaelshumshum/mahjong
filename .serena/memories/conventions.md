@@ -9,4 +9,6 @@
 - Python: ruff (line 100), frozen dataclasses for state, fully typed, `async def` only for real I/O.
 - Svelte: runes not stores; SCSS `@use` never `@import`, max 2 nesting levels; runtime values as CSS custom properties; motion via CSS, never JS ticker.
 
+- Types/constants: define once in the concept-owning module, import everywhere; no catch-all constants/types file; wire enums via `make proto`; named constants over bare 34/27/9. Keep-local exceptions + ownership tables: root `AGENTS.md` "Types and constants", `server/AGENTS.md` / `web/AGENTS.md` "Where things live".
+
 Module-specific rules: `mem:server/core`, `mem:web/core`.
