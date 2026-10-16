@@ -227,6 +227,8 @@ HK house tables; no single authoritative source. Off by disabling `NEW_6`.
 **Off by default** (`hand_sets`, §10; opt-in, on in `hk_casual`). Seven Pairs is the one `NEW_18` pattern bot shanten also
 cares about: `mahjong_core/shanten.py`'s `shanten()`/`ukeire()` run the Seven Pairs parse only when
 `NEW_18` is present ([bots.md §8](bots.md)). Thirteen Orphans (十三么) is `CLASSIC` and always on.
+When Seven Pairs doesn't score (`NEW_18` off, or a `七對子: 0` override) the shape is not a win at all —
+`can_declare_win` and `_can_win_with` drop it via `seven_pairs_enabled`, so it can't slip through on 自摸/無花 alone.
 
 | Faan | Hand | Chinese |
 | --- | --- | --- |

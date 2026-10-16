@@ -16,7 +16,7 @@ from enum import StrEnum
 from typing import Any, Literal
 
 from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_melds
-from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.scoring.faan import score_winning_hand, seven_pairs_enabled
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState, validate_seat
 from mahjong_core.tiles import N_TILE_TYPES, ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
@@ -181,14 +181,17 @@ def _is_thirteen_orphans(concealed: Sequence[TileId]) -> bool:
     return {tile_id_type(t) for t in concealed} == ORPHAN_TYPES
 
 
-def hand_is_winning_shape(seat: SeatState) -> bool:
+def hand_is_winning_shape(seat: SeatState, *, seven_pairs: bool = True) -> bool:
     """Structurally complete hand right now — standard melds+pair, Seven Pairs, or Thirteen
     Orphans. Shape only, no `min_faan` check. Seven Pairs/Thirteen Orphans require a fully
-    concealed hand; any exposed meld rules both out."""
-    return _is_winning_shape(seat.concealed, closed=not seat.melds)
+    concealed hand; any exposed meld rules both out. `seven_pairs=False` drops Seven Pairs
+    (ruleset doesn't score it, `seven_pairs_enabled`)."""
+    return _is_winning_shape(seat.concealed, closed=not seat.melds, seven_pairs=seven_pairs)
 
 
-def _is_winning_shape(concealed: Sequence[TileId], *, closed: bool) -> bool:
+def _is_winning_shape(
+    concealed: Sequence[TileId], *, closed: bool, seven_pairs: bool = True
+) -> bool:
     """`hand_is_winning_shape` on one 34-array pass; equivalence-tested against the
     `_is_seven_pairs`/`_is_thirteen_orphans`/`decompose` form in tests/test_winning_shape.py."""
     if len(concealed) % 3 != 2:
@@ -197,7 +200,7 @@ def _is_winning_shape(concealed: Sequence[TileId], *, closed: bool) -> bool:
     for t in concealed:
         counts[tile_id_type(t)] += 1
     if closed and len(concealed) == 14:
-        if all(c == 0 or c == 2 for c in counts):
+        if seven_pairs and all(c == 0 or c == 2 for c in counts):
             return True
         if all(counts[i] for i in ORPHAN_INDICES) and sum(counts[i] for i in ORPHAN_INDICES) == 14:
             return True
@@ -244,7 +247,7 @@ def can_declare_win(state: GameState, seat: int) -> bool:
     if not state.self_draw_win_allowed:
         return False
     seat_state = state.seats[seat]
-    if not hand_is_winning_shape(seat_state):
+    if not hand_is_winning_shape(seat_state, seven_pairs=seven_pairs_enabled(state.ruleset)):
         return False
     ctx = build_scoring_context(state, seat, self_drawn=True)
     result = score_winning_hand(seat_state.concealed, seat_state.melds, ctx, state.ruleset)

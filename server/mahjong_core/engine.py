@@ -63,7 +63,7 @@ from mahjong_core.events import (
 )
 from mahjong_core.melds import Meld, MeldKind, legal_claims
 from mahjong_core.scoring import payout as payout_mod
-from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.scoring.faan import score_winning_hand, seven_pairs_enabled
 from mahjong_core.state import (
     ClaimKind,
     ClaimOffer,
@@ -243,7 +243,11 @@ def _can_win_with(
     """
     seat_state = state.seats[seat]
     concealed = (*seat_state.concealed, tile)
-    if not _is_winning_shape(concealed, closed=not seat_state.melds):
+    if not _is_winning_shape(
+        concealed,
+        closed=not seat_state.melds,
+        seven_pairs=seven_pairs_enabled(state.ruleset),
+    ):
         return False
     ctx = build_scoring_context(
         state,

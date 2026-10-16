@@ -15,7 +15,7 @@ from mahjong_core.actions import (
     hand_is_winning_shape,
     legal_actions,
 )
-from mahjong_core.config import DEFAULT_RULESET
+from mahjong_core.config import DEFAULT_RULESET, HandSet, RuleSet
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import (
     ClaimKind,
@@ -233,6 +233,49 @@ def test_seven_pairs_not_recognized_with_exposed_melds() -> None:
     # 12 tiles of the seven-pairs shape plus an exposed pung is not itself seven pairs.
     seat = SeatState(concealed=_seven_pairs_hand()[:11], melds=(pung,))
     assert not hand_is_winning_shape(seat)
+
+
+def _scattered_seven_pairs_hand() -> tuple[TileId, ...]:
+    """Seven pairs with no standard decomposition (11223344556677m parses as one)."""
+    types = (
+        TileType.MAN_1,
+        TileType.PIN_5,
+        TileType.SOU_9,
+        TileType.WIND_EAST,
+        TileType.DRAGON_RED,
+        TileType.MAN_3,
+        TileType.PIN_7,
+    )
+    return tuple(t for ty in types for t in tile_ids_for_type(ty)[:2])
+
+
+@pytest.mark.parametrize(
+    "ruleset",
+    [
+        RuleSet(hand_sets=frozenset({HandSet.CLASSIC}), min_faan=1),
+        RuleSet(hand_sets=frozenset(HandSet), min_faan=1, faan_overrides={"七對子": 0}),
+    ],
+    ids=["new_18_off", "override_zero"],
+)
+def test_seven_pairs_self_draw_not_a_win_when_ruleset_does_not_score_it(
+    ruleset: RuleSet,
+) -> None:
+    """Regression: the raw-shape candidate used to win on 自摸/無花 alone, so a ruleset that
+    doesn't score 七對子 still offered `DeclareWin` on seven pairs."""
+    state = _with_seat_concealed(
+        _base_state(phase=Phase.AWAIT_ACTION, turn=0), 0, _scattered_seven_pairs_hand()
+    )
+    state = dataclasses.replace(state, ruleset=ruleset)
+    assert not any(isinstance(a, DeclareWin) for a in legal_actions(state, 0))
+
+
+def test_seven_pairs_self_draw_is_a_win_when_scored() -> None:
+    ruleset = RuleSet(hand_sets=frozenset(HandSet), min_faan=1)
+    state = _with_seat_concealed(
+        _base_state(phase=Phase.AWAIT_ACTION, turn=0), 0, _scattered_seven_pairs_hand()
+    )
+    state = dataclasses.replace(state, ruleset=ruleset)
+    assert any(isinstance(a, DeclareWin) for a in legal_actions(state, 0))
 
 
 def test_declare_win_offered_for_structurally_complete_hand() -> None:

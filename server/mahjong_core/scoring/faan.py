@@ -95,6 +95,16 @@ def _score_candidate(
     return min(total, ruleset.faan_cap), raw
 
 
+def seven_pairs_enabled(ruleset: RuleSet) -> bool:
+    """Whether 七對子 scores under `ruleset`. When it doesn't, a seven-pairs hand isn't a win at
+    all -- otherwise the raw-shape candidate would still pass on 自摸/無花 alone."""
+    pattern = _PATTERNS_BY_NAME["七對子"]
+    return (
+        pattern.hand_set in ruleset.hand_sets
+        and ruleset.faan_overrides.get(pattern.name, pattern.faan) != 0
+    )
+
+
 def _chicken_hand_allowed(ruleset: RuleSet) -> bool:
     """雞糊 is only reachable at `min_faan == 0` -- at any higher minimum a zero-faan hand can
     never win, so evaluating it would be dead config."""
