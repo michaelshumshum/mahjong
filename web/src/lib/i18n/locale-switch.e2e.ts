@@ -34,7 +34,7 @@ test('switching locale via the UI writes the cookie and re-renders zh-Hant, surv
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
 	await expect(page.locator('h1')).toHaveText('麻雀');
-	await expect(page.getByTestId('lobby-create-table')).toHaveText('開枱');
+	await expect(page.getByTestId('lobby-play-online')).toHaveText('網上對戰');
 	await expect(page.getByTestId('lobby-practice-bots')).toHaveText('對戰機械人');
 
 	// persistence: a plain reload re-reads the same cookie, no re-selection needed.
@@ -48,5 +48,5 @@ test('defaults to English lobby copy with no locale cookie set', async ({ page }
 	await page.waitForLoadState('networkidle');
 
 	await expect(page.locator('h1')).toHaveText('Mahjong');
-	await expect(page.getByTestId('lobby-create-table')).toHaveText('Create a table');
+	await expect(page.getByTestId('lobby-play-online')).toHaveText('Play online');
 });

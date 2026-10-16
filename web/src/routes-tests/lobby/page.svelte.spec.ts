@@ -9,7 +9,7 @@ vi.mock('$lib/paraglide/messages.js', async () => {
 	return { m: createMessagesProxy() };
 });
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-// CreateTableDialog pulls in $lib/net/lobby, which reads $env/dynamic/public -- unset outside
+// PracticeSetupDialog pulls in $lib/net/lobby, which reads $env/dynamic/public -- unset outside
 // SvelteKit's own dev/build server (web/AGENTS.md's $env note). Unused by anything under test.
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -29,27 +29,26 @@ describe('LobbyPage', () => {
 
 	it('renders the lobby actions', () => {
 		component = mount(LobbyPage, { target });
-		expect(target.querySelector('[data-testid="lobby-create-table"]')).not.toBeNull();
-		expect(target.querySelector('[data-testid="lobby-join-game-link"]')).not.toBeNull();
+		expect(target.querySelector('[data-testid="lobby-play-online"]')).not.toBeNull();
 		expect(target.querySelector('[data-testid="lobby-practice-bots"]')).not.toBeNull();
+		expect(target.querySelector('[data-testid="lobby-guide"]')).not.toBeNull();
 	});
 
-	it('opens the create-table dialog when the create button is clicked', async () => {
+	it('links play online to the tables page', () => {
 		component = mount(LobbyPage, { target });
-		const createButton = target.querySelector(
-			'[data-testid="lobby-create-table"]'
+		const playLink = target.querySelector(
+			'[data-testid="lobby-play-online"]'
+		) as HTMLAnchorElement;
+		expect(playLink?.getAttribute('href')).toBe('/tables');
+	});
+
+	it('opens the practice dialog when the practice button is clicked', async () => {
+		component = mount(LobbyPage, { target });
+		const practiceButton = target.querySelector(
+			'[data-testid="lobby-practice-bots"]'
 		) as HTMLButtonElement;
-		expect(createButton).not.toBeNull();
-		createButton.click();
+		practiceButton.click();
 		await Promise.resolve();
 		expect(target.querySelector('dialog')?.open).toBe(true);
-	});
-
-	it('navigates to /tables when the join link is clicked', () => {
-		component = mount(LobbyPage, { target });
-		const joinLink = target.querySelector(
-			'[data-testid="lobby-join-game-link"]'
-		) as HTMLAnchorElement;
-		expect(joinLink?.getAttribute('href')).toBe('/tables');
 	});
 });

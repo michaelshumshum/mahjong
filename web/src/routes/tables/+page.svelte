@@ -82,6 +82,12 @@
 				<RotateCw size="1.1em" />
 				{m.tablesPage_refreshButton()}
 			</button>
+			<button
+				type="button"
+				class="primary"
+				data-testid="tables-header-create-table"
+				onclick={() => (showCreateDialog = true)}>{m.lobby_createTableButton()}</button
+			>
 		</div>
 	</header>
 
@@ -178,6 +184,7 @@
 
 	.refresh {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-3);
 	}

@@ -23,7 +23,7 @@ test('shows a connecting screen until the API health check succeeds, then the lo
 	await page.goto('/');
 
 	await expect(page.getByText('Connecting…')).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Create a table' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Play online' })).toBeVisible();
 	await expect(page.getByText('Connecting…')).not.toBeVisible();
 });
 
@@ -59,15 +59,17 @@ function mockCreateTable(page: import('@playwright/test').Page, tableId: string)
 	});
 }
 
-test('lobby create table opens a rules dialog, then navigates to the created table', async ({
+test('lobby play online leads to create table, which opens a rules dialog, then navigates to the created table', async ({
 	page
 }) => {
 	await mockCreateTable(page, 'ABC123');
 	await page.goto('/');
+	await page.getByTestId('lobby-play-online').click();
+	await expect(page).toHaveURL('/tables');
 	// wait past hydration: the create button is server-rendered but its click handler only
 	// attaches once svelte-kit finishes loading, so an immediate click can race it.
 	await page.waitForLoadState('networkidle');
-	await page.getByTestId('lobby-create-table').click();
+	await page.getByTestId('tables-header-create-table').click();
 
 	await expect(page.getByTestId('create-table-dialog')).toBeVisible();
 	await page.getByTestId('create-table-submit').click();
@@ -88,9 +90,9 @@ async function captureCreateBody(page: Page): Promise<{ body: Record<string, unk
 }
 
 async function openCustomRules(page: Page): Promise<Locator> {
-	await page.goto('/');
+	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
-	await page.getByTestId('lobby-create-table').click();
+	await page.getByTestId('tables-header-create-table').click();
 	const dialog = page.getByTestId('create-table-dialog');
 	// click, not check(): choosing Custom swaps the view, unmounting the radio
 	await dialog.locator('input[type="radio"][value="custom"]').click();
@@ -179,9 +181,9 @@ test('the create dialog reopens on the last custom setup', async ({ page }) => {
 	await dialog.getByTestId('create-table-submit').click();
 	await expect(page).toHaveURL('/table/CUSTOM1');
 
-	await page.goto('/');
+	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');
-	await page.getByTestId('lobby-create-table').click();
+	await page.getByTestId('tables-header-create-table').click();
 	const reopened = page.getByTestId('create-table-dialog');
 	await expect(reopened.locator('input[type="radio"][value="custom"]')).toBeChecked();
 	await expect(reopened.getByText('Based on Strict · 1 change')).toBeVisible();
@@ -235,9 +237,9 @@ test('lobby practice vs bots sends the chosen per-seat difficulty', async ({ pag
 	});
 });
 
-test('lobby join a game link opens the tables page', async ({ page }) => {
+test('lobby play online opens the tables page', async ({ page }) => {
 	await page.goto('/');
-	await page.getByTestId('lobby-join-game-link').click();
+	await page.getByTestId('lobby-play-online').click();
 	await expect(page).toHaveURL('/tables');
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tables');
 	await expect(page).toHaveTitle('Tables · Mahjong');
@@ -352,6 +354,37 @@ test('tables page empty state offers to create a table, and stamps the last refr
 	await expect(page.getByTestId('tables-empty')).toBeVisible();
 	await expect(page.getByTestId('tables-updated')).toContainText('Updated');
 	await page.getByTestId('tables-create-table').click();
+	await expect(page.getByTestId('create-table-dialog')).toBeVisible();
+});
+
+test('tables page offers create table in the header while tables are listed', async ({ page }) => {
+	await page.route('**/tables', (route) =>
+		route.request().resourceType() === 'fetch'
+			? route.fulfill({
+					json: {
+						tables: [
+							{
+								id: 'OPEN22',
+								status: 'open',
+								hand_no: 1,
+								seats: [
+									{ status: 'connected', name: 'Alice' },
+									{ status: 'empty', name: null },
+									{ status: 'empty', name: null },
+									{ status: 'empty', name: null }
+								]
+							}
+						]
+					}
+				})
+			: route.fallback()
+	);
+	await page.goto('/tables');
+	await page.waitForLoadState('networkidle');
+
+	await expect(page.getByTestId('table-card')).toHaveCount(1);
+	await expect(page.getByTestId('tables-empty')).toHaveCount(0);
+	await page.getByTestId('tables-header-create-table').click();
 	await expect(page.getByTestId('create-table-dialog')).toBeVisible();
 });
 

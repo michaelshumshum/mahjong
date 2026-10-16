@@ -782,7 +782,8 @@ before rendering the page. Without it a page looks interactive before the backen
 
 ### Create a table
 
-The lobby's "Create a table" opens `CreateTableDialog.svelte`, two views in one dialog:
+"Create a table" on `/tables` (header, and the empty state) opens `CreateTableDialog.svelte`, two
+views in one dialog:
 
 - **Presets** — one radio per `RULESET_PRESET_OPTIONS` entry (an `OptionRow` with its
   `description` as a muted second line), plus "Custom". Picking a named preset and pressing Create
@@ -830,12 +831,13 @@ Submitting calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates 
 ### Lobby
 
 A brand lockup (a 麻雀 seal mark beside a visible `--font-size-display` "Mahjong" `h1`), then
-three **equal-weight** action cards — "Create a table", "Practice vs Bots",
-"Faan guide" — each a tile-glyph icon, a title and a one-line description. No hero card: the three
-are peers by design. The card's `<button>` holds only the title (its accessible name, which e2e and
-the screenshot script match exactly); the description sits outside it, wired up via
-`aria-describedby`, and the button's `::after` stretches the hit area over the whole card. Below
-the cards, quiet underlined links: "Have a code? Join a game" (→ `/tables`) and the language
+three **equal-weight** action cards — "Play online", "Practice vs Bots",
+"Faan guide" — each a tile-glyph icon and a title. No hero card: the three
+are peers by design. "Play online" is a link to `/tables`, the one multiplayer hub (create, join
+by code, browse): invitees arrive by table URL, not through the lobby, so separate create/join
+entries here split one intent across two controls. The other two are `<button>`s opening dialogs.
+Each card's control holds only the title (its accessible name, which e2e matches exactly), and its
+`::after` stretches the hit area over the whole card. Below the cards, a quiet underlined language
 toggle. A muted "Source code" link (GitHub mark + label, new tab) sits in the page's
 bottom-right corner. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
 middle (a radial gradient) so this copy reads over the tiles.
@@ -969,15 +971,15 @@ heuristic.
 
 ### Table browser (`/tables`)
 
-A join-by-code form and a responsive grid of table cards (`repeat(auto-fill, minmax(19rem, 1fr))`)
+A header with Refresh and a primary "Create a table" (always shown, opening
+`CreateTableDialog`), a join-by-code form, and a responsive grid of table cards (`repeat(auto-fill, minmax(19rem, 1fr))`)
 showing code, an open/in-progress status chip and a mini compass of the four seats around a felt
 square (seat 0 at the bottom, then 1 right / 2 top / 3 left — the same arrangement the table
 itself uses; open seats as dashed "Open" pills, bots badged). The felt carries the four wind
 glyphs (東 bottom / 南 right / 西 top / 北 left, rotated to read from each seat's side) as
 decorative direction markers — they don't imply dealt seat winds. The header's Refresh is a real
 secondary button beside a static "Updated <time>" stamp of the last successful poll (not a ticking
-"n seconds ago" — no JS ticker). With no tables, an empty-state panel offers "Create a table",
-opening the same `CreateTableDialog` as the lobby. Polls `GET /tables` every 5s
+"n seconds ago" — no JS ticker). With no tables, an empty-state panel repeats "Create a table". Polls `GET /tables` every 5s
 ([protocol.md §10](protocol.md)), open tables first. "Sit down" and "Watch" both go to
 `/table/<id>`, which decides picker vs. spectator itself, so a table that fills between poll and
 click still lands sensibly. If the browser holds a reconnect credential for the table, the card

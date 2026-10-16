@@ -61,21 +61,21 @@ const LOBBY_TABLES = [
 const PAGES = [
 	{ name: 'lobby', url: '/' },
 	// the ruleset picker `POST /tables` (docs/protocol.md §10) needs before a table can be
-	// created -- genuinely distinct from the plain lobby buttons above.
+	// created -- opened from the tables page header.
 	{
 		name: 'lobby-create-dialog',
-		url: '/',
+		url: '/tables',
 		async before(page) {
-			await page.getByRole('button', { name: 'Create a table' }).click();
+			await page.getByTestId('tables-header-create-table').click();
 		}
 	},
 	// the custom ruleset editor behind the create dialog's "Custom" option (docs/frontend.md's
 	// "Create a table"): tabbed rules seeded from a preset, with a change summary.
 	{
 		name: 'lobby-create-custom',
-		url: '/',
+		url: '/tables',
 		async before(page) {
-			await page.getByRole('button', { name: 'Create a table' }).click();
+			await page.getByTestId('tables-header-create-table').click();
 			const dialog = page.getByTestId('create-table-dialog');
 			await dialog.locator('input[type="radio"][value="custom"]').click();
 			await dialog
