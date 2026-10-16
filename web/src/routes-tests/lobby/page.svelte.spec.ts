@@ -36,9 +36,7 @@ describe('LobbyPage', () => {
 
 	it('links play online to the tables page', () => {
 		component = mount(LobbyPage, { target });
-		const playLink = target.querySelector(
-			'[data-testid="lobby-play-online"]'
-		) as HTMLAnchorElement;
+		const playLink = target.querySelector('[data-testid="lobby-play-online"]') as HTMLAnchorElement;
 		expect(playLink?.getAttribute('href')).toBe('/tables');
 	});
 
