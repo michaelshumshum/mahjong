@@ -1196,14 +1196,33 @@ English and zh-Hant via Paraglide JS — runes-native and SSR-safe, unlike store
 | Aspect | Detail |
 | --- | --- |
 | Locale strategy | cookie only (`['cookie', 'baseLocale']`), no URL prefix, so invite links (`/table/ABC123`) stay locale-agnostic. `lib/i18n/LocaleSwitcher.svelte` (in `Settings.svelte`) writes the cookie and reloads |
-| Sources | `messages/en.json`, `messages/zh-Hant.json`, edited directly |
+| Sources | `messages/<locale>/<area>.json`, edited directly; one file per area, same file set in every locale, each file listed in `project.inlang/settings.json`'s `pathPattern` array (table below) |
 | Generated | `src/lib/paraglide/` — never hand-edited; `pnpm run paraglide:compile` (wired into `build`/`check`). During `pnpm dev` the vite plugin watches `messages/` and recompiles on save, then Vite reloads the page (message modules aren't HMR-acceptable, so it's a full reload, not a patch) |
 | Keys | semantic, namespaced `component_field` (e.g. `lobby_createTableButton`), called as `m.lobby_createTableButton()`; interpolation via `{placeholder}` args |
 | Cantonese terms | 碰/上/槓/食糊 stay as glyphs in both locales, UI and live-region text |
 
-**Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to **both**
-locale files in the same change — a missing key falls back to English silently
-(`web/AGENTS.md`'s "No literal user-facing strings").
+**Message files.** All files of a locale merge into one flat key namespace — the file a key sits
+in doesn't change its name or its `m.*` function, and compiled output is identical however keys are
+spread. Files group key prefixes by app area:
+
+| File | Key prefixes |
+| --- | --- |
+| `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
+| `lobby.json` | `/`, `/tables`, `/profile`, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage` |
+| `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
+| `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
+| `tiles.json` | `tileName`, `tileFace` |
+| `settings.json` | `settings`, `localeSwitcher` |
+| `guide.json` | `guide`, `coachMarks` |
+| `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
+
+**Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the
+matching area file in **both** locales in the same change — a missing key falls back to English
+silently (`web/AGENTS.md`'s "No literal user-facing strings"). A key's prefix is its component;
+all keys sharing a prefix live in one file. A new component's prefix goes in the area file its
+component belongs to; add a new area file only for a new app area, never per component, and
+register it in `pathPattern` for every locale (the plugin ignores unlisted files). Keep a file's
+keys in the same order in both locales.
 
 **Plurals:** the inlang plugin (`@inlang/plugin-message-format@4`) does *not* support flat ICU
 strings like `"{count, plural, one {...} other {...}}"` — it compiles but mangles the braces into

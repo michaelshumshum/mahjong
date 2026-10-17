@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import en from '../../../messages/en.json';
-import zhHant from '../../../messages/zh-Hant.json';
+import en from '../../../messages/en/tiles.json';
+import zhHant from '../../../messages/zh-Hant/tiles.json';
 import { TILE_ASSET } from './tile-code';
 import { TILE_NAME, tileName } from './tile-name';
 

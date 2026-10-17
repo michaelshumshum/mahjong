@@ -1,0 +1,43 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"closeButton_ariaLabel": "關閉",
+	"toast_dismissLabel": "關閉",
+	"botBadge_title": "電腦操控座位",
+	"botBadge_label": "機械人",
+	"botBadge_levelTitle": "電腦操控座位（{level}）",
+	"serverError_badFrame": "傳送時發生錯誤，請再試一次。",
+	"serverError_alreadyJoined": "此瀏覽器分頁已連接至一個座位。",
+	"serverError_noSuchSeat": "此牌枱沒有該座位。",
+	"serverError_seatTaken": "該座位已被佔用。",
+	"serverError_badSecret": "無法重新連接至你的座位 -- 可能已被接管。",
+	"serverError_notJoined": "請先加入座位。",
+	"serverError_tableClosed": "此牌枱已關閉 -- 所有玩家已離開。",
+	"connectionBanner_title": "重新連線中…",
+	"connectionBanner_body": "牌局將從中斷之處繼續。",
+	"rank_first": "第一名",
+	"rank_second": "第二名",
+	"rank_third": "第三名",
+	"rank_fourth": "第四名",
+	"rank_nth": "第{n}名",
+	"errorPage_pageTitle": "{status} · 麻雀",
+	"errorPage_notFound": "找不到頁面",
+	"errorPage_generic": "出了點問題",
+	"errorPage_backLabel": "大堂",
+	"apiConnectGate_connectingStatus": "連接中…",
+	"apiConnectGate_attemptCounter": "第 {attempt} 次嘗試",
+	"apiConnectGate_nextAttemptCounter": "{seconds} 秒後重試",
+	"apiConnectGate_unreachableStatus": "無法連接伺服器。",
+	"apiConnectGate_noResponseCounter": [
+		{
+			"declarations": ["input attempts", "local attemptsPlural = attempts: plural"],
+			"selectors": ["attemptsPlural"],
+			"match": {
+				"attemptsPlural=one": "嘗試 {attempts} 次後仍無回應。",
+				"attemptsPlural=other": "嘗試 {attempts} 次後仍無回應。"
+			}
+		}
+	],
+	"apiConnectGate_retryButton": "重試",
+	"stepper_decrease": "減少{label}",
+	"stepper_increase": "增加{label}"
+}

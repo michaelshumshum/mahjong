@@ -1,0 +1,43 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"closeButton_ariaLabel": "Close",
+	"toast_dismissLabel": "Dismiss",
+	"botBadge_title": "Bot-controlled seat",
+	"botBadge_label": "Bot",
+	"botBadge_levelTitle": "Bot-controlled seat ({level})",
+	"serverError_badFrame": "Something went wrong sending that -- please try again.",
+	"serverError_alreadyJoined": "This browser tab is already connected to a seat.",
+	"serverError_noSuchSeat": "That seat doesn't exist at this table.",
+	"serverError_seatTaken": "That seat is already taken.",
+	"serverError_badSecret": "Couldn't reconnect to your seat -- it may have been taken over.",
+	"serverError_notJoined": "Join a seat first.",
+	"serverError_tableClosed": "This table has closed -- every player left.",
+	"connectionBanner_title": "Reconnecting…",
+	"connectionBanner_body": "The table will pick up right where it left off.",
+	"rank_first": "1st",
+	"rank_second": "2nd",
+	"rank_third": "3rd",
+	"rank_fourth": "4th",
+	"rank_nth": "{n}th",
+	"errorPage_pageTitle": "{status} · Mahjong",
+	"errorPage_notFound": "Page not found",
+	"errorPage_generic": "Something went wrong",
+	"errorPage_backLabel": "Lobby",
+	"apiConnectGate_connectingStatus": "Connecting…",
+	"apiConnectGate_attemptCounter": "Attempt {attempt}",
+	"apiConnectGate_nextAttemptCounter": "Next attempt in {seconds}s",
+	"apiConnectGate_unreachableStatus": "Can't reach the server.",
+	"apiConnectGate_noResponseCounter": [
+		{
+			"declarations": ["input attempts", "local attemptsPlural = attempts: plural"],
+			"selectors": ["attemptsPlural"],
+			"match": {
+				"attemptsPlural=one": "No response after {attempts} attempt.",
+				"attemptsPlural=other": "No response after {attempts} attempts."
+			}
+		}
+	],
+	"apiConnectGate_retryButton": "Retry",
+	"stepper_decrease": "Decrease {label}",
+	"stepper_increase": "Increase {label}"
+}
