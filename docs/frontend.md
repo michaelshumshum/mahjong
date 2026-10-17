@@ -1224,6 +1224,9 @@ component belongs to; add a new area file only for a new app area, never per com
 register it in `pathPattern` for every locale (the plugin ignores unlisted files). Keep a file's
 keys in the same order in both locales.
 
+`lib/i18n/messages.spec.ts` enforces this: each locale has exactly the registered files, every
+file has the base locale's keys in the same order, and no prefix spans two files.
+
 **Plurals:** the inlang plugin (`@inlang/plugin-message-format@4`) does *not* support flat ICU
 strings like `"{count, plural, one {...} other {...}}"` — it compiles but mangles the braces into
 garbage placeholders. Use the variant-array form:
@@ -1255,7 +1258,7 @@ sets `data-tile="<code>"` as the locale-independent hook specs match on.
 Tests assert on `data-testid`/stable classes for core flows, not English wording. Locale switching
 and SSR `<html lang>` have e2e coverage (`lib/i18n/locale-switch.e2e.ts`, `hooks.server.e2e.ts`).
 
-The zh-Hant file (484/484 keys, parity-checked) is machine-generated and not yet reviewed by a
+The zh-Hant catalog (key parity enforced by `messages.spec.ts`) is machine-generated and not yet reviewed by a
 fluent Hong Kong mahjong player.
 
 ### Accessibility
