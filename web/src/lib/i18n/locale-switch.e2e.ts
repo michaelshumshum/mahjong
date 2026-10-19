@@ -33,20 +33,20 @@ test('switching locale via the UI writes the cookie and re-renders zh-Hant, surv
 	// sr-only heading and the primary CTA.
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
-	await expect(page.locator('h1')).toHaveText('麻雀');
+	await expect(page.locator('h1')).toHaveText('開枱');
 	await expect(page.getByTestId('lobby-play-online')).toHaveText('網上對戰');
 	await expect(page.getByTestId('lobby-practice-bots')).toHaveText('對戰機械人');
 
 	// persistence: a plain reload re-reads the same cookie, no re-selection needed.
 	await page.reload();
 	await page.waitForLoadState('networkidle');
-	await expect(page.locator('h1')).toHaveText('麻雀');
+	await expect(page.locator('h1')).toHaveText('開枱');
 });
 
 test('defaults to English lobby copy with no locale cookie set', async ({ page }) => {
 	await page.goto('/');
 	await page.waitForLoadState('networkidle');
 
-	await expect(page.locator('h1')).toHaveText('Mahjong');
+	await expect(page.locator('h1')).toHaveText('Hoi Toi');
 	await expect(page.getByTestId('lobby-play-online')).toHaveText('Play online');
 });

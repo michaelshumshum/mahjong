@@ -158,7 +158,7 @@ test('four real seats join, ready, and play real discards/claims through the liv
 					const btn = p.locator('.hand-tile-btn').first();
 					if (await btn.count()) {
 						// the acting seat's own tab title flips to the your-turn state (P1.12).
-						await expect(p).toHaveTitle('Your turn · Mahjong');
+						await expect(p).toHaveTitle('Your turn · Hoi Toi');
 						await btn.click();
 						discards++;
 						acted = true;

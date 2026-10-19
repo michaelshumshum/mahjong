@@ -20,13 +20,13 @@ test('table route renders the default (your-turn) scenario without errors', asyn
 	await expect(page.getByTestId('faan-overlay')).toHaveCount(0);
 	expect(errors).toEqual([]);
 	// mock scenarios are frozen snapshots, not live turn state -- always the generic table title.
-	await expect(page).toHaveTitle('Table abc123 · Mahjong');
+	await expect(page).toHaveTitle('Table abc123 · Hoi Toi');
 });
 
 test('leaving the table via client-side navigation drops the table title', async ({ page }) => {
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 	await page.goto('/table/abc123?mock=1');
-	await expect(page).toHaveTitle('Table abc123 · Mahjong');
+	await expect(page).toHaveTitle('Table abc123 · Hoi Toi');
 	// svelte never restores document.title on unmount, so the next page has to set its own.
 	await page.evaluate(() => {
 		const a = document.createElement('a');
@@ -35,7 +35,7 @@ test('leaving the table via client-side navigation drops the table title', async
 		a.click();
 	});
 	await expect(page).toHaveURL('/');
-	await expect(page).toHaveTitle('Mahjong');
+	await expect(page).toHaveTitle('Hoi Toi');
 });
 
 test('switching to the claim-window scenario surfaces claim buttons, and choosing one records the choice', async ({

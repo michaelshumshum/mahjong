@@ -1,7 +1,7 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"demoPage_backLabel": "大堂",
-	"demoPage_pageTitle": "示範 · 麻雀",
+	"demoPage_pageTitle": "示範 · 開枱",
 	"demoPage_heading": "示範",
 	"demoPage_docsLinkPrefix": "前往",
 	"demoPage_docsLinkText": "svelte.dev/docs/kit",

@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 test('home page loads and has a title', async ({ page }) => {
 	const response = await page.goto('/');
 	expect(response?.status()).toBe(200);
-	await expect(page).toHaveTitle('Mahjong');
+	await expect(page).toHaveTitle('Hoi Toi');
 });
 
 test('shows a connecting screen until the API health check succeeds, then the lobby', async ({
@@ -242,11 +242,11 @@ test('lobby play online opens the tables page', async ({ page }) => {
 	await page.getByTestId('lobby-play-online').click();
 	await expect(page).toHaveURL('/tables');
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tables');
-	await expect(page).toHaveTitle('Tables · Mahjong');
+	await expect(page).toHaveTitle('Tables · Hoi Toi');
 	// client-side nav back: the lobby must set its own title, not inherit the previous page's.
 	await page.getByRole('link', { name: 'Lobby' }).click();
 	await expect(page).toHaveURL('/');
-	await expect(page).toHaveTitle('Mahjong');
+	await expect(page).toHaveTitle('Hoi Toi');
 });
 
 test('tables page join navigates to the table route with the entered code', async ({ page }) => {
@@ -269,21 +269,21 @@ test('replay route renders', async ({ page }) => {
 	const response = await page.goto('/replay/abc123');
 	expect(response?.status()).toBe(200);
 	await expect(page.locator('h1')).toHaveText('Replay');
-	await expect(page).toHaveTitle('Replay · Mahjong');
+	await expect(page).toHaveTitle('Replay · Hoi Toi');
 });
 
 test('profile route renders', async ({ page }) => {
 	const response = await page.goto('/profile');
 	expect(response?.status()).toBe(200);
 	await expect(page.locator('h1')).toHaveText('Profile');
-	await expect(page).toHaveTitle('Profile · Mahjong');
+	await expect(page).toHaveTitle('Profile · Hoi Toi');
 });
 
 test('unknown route renders the error page with a status title', async ({ page }) => {
 	const response = await page.goto('/no-such-page');
 	expect(response?.status()).toBe(404);
 	await expect(page.locator('h1')).toHaveText('404');
-	await expect(page).toHaveTitle('404 · Mahjong');
+	await expect(page).toHaveTitle('404 · Hoi Toi');
 });
 
 test('tables page lists tables with sit-down for open ones and watch for ones in progress', async ({

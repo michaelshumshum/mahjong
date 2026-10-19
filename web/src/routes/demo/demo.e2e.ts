@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('demo page loads', async ({ page }) => {
 	const response = await page.goto('/demo');
 	expect(response?.status()).toBe(200);
-	await expect(page).toHaveTitle('Demo · Mahjong');
+	await expect(page).toHaveTitle('Demo · Hoi Toi');
 });
 
 test('claim buttons demo: choosing an option reports the right one, disambiguated chows included', async ({

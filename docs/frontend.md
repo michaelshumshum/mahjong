@@ -760,11 +760,11 @@ The web image builds with adapter-node (`pnpm build`, `node build`), so SSR is o
 opts out.
 
 **Page titles.** Every route (and `+error.svelte`) sets its own `<svelte:head><title>`, as
-"`<page>` · Mahjong" (`*_pageTitle` keys, so it's localized). The lobby uses the bare app name
-(`lobby_title`). `app.html` has no `<title>`. A static one there would be emitted before
+"`<page>` · Hoi Toi" (`*_pageTitle` keys, so it's localized; zh-Hant uses 開枱). The lobby uses the
+bare app name (`lobby_title`). `app.html` has no `<title>`. A static one there would be emitted before
 `%sveltekit.head%`, and browsers honour the first `<title>`, so it would shadow the page's title in
 SSR HTML. Svelte never restores `document.title` when a component unmounts, so a page without its
-own title would keep the previous page's, e.g. a stale "Your turn · Mahjong" after leaving a table.
+own title would keep the previous page's, e.g. a stale "Your turn · Hoi Toi" after leaving a table.
 `ApiConnectGate` shows the app name while it holds the page back.
 
 ### API health gate (`ApiConnectGate`)
@@ -830,7 +830,8 @@ Submitting calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates 
 
 ### Lobby
 
-A brand lockup (a 麻雀 seal mark beside a visible `--font-size-display` "Mahjong" `h1`), then
+A brand lockup: a seal mark beside a visible `--font-size-display` `h1`. en pairs a 開枱 seal with
+"Hoi Toi"; zh-Hant pairs a 麻雀 seal with 開枱, so the seal never repeats the heading. Then
 three **equal-weight** action cards — "Play online", "Practice vs Bots",
 "Faan guide" — each a tile-glyph icon and a title. No hero card: the three
 are peers by design. "Play online" is a link to `/tables`, the one multiplayer hub (create, join
@@ -897,9 +898,9 @@ WS URL, which binds seats 1-3 at construction (`server/app/ws.py`'s `ws_endpoint
 | `?mock=<scenarioId>` (or bare `?mock`) | a frozen `MOCK_SCENARIOS` fixture, no backend — used by the screenshot workflow (`.claude/skills/frontend-screenshots/SKILL.md`) and design iteration. The url is the only scenario picker: the page wears the real header rail (§3), no dev controls, so a capture shows exactly what players see. `/demo`'s "Table scenarios" section links every scenario and `?pregame=` preview, and hosts `AnimationDemoPanel` ("Animate a turn") |
 | `?pregame=connecting\|join\|waiting` | freezes one pre-game state (below) with no socket — mock scenarios are always fully seated |
 
-**Tab title.** `<svelte:head><title>` reads live turn/claim state: "Your turn · Mahjong" while this
-seat has a legal discard, "Claim? · Mahjong" while a claim offer is open, else "Table `<id>` ·
-Mahjong". Mock scenarios are frozen snapshots, not live turn state, so they always show the
+**Tab title.** `<svelte:head><title>` reads live turn/claim state: "Your turn · Hoi Toi" while this
+seat has a legal discard, "Claim? · Hoi Toi" while a claim offer is open, else "Table `<id>` ·
+Hoi Toi". Mock scenarios are frozen snapshots, not live turn state, so they always show the
 generic table title regardless of which scenario is selected.
 
 **One view model, two sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a real

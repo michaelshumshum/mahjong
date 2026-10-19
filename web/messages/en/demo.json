@@ -1,7 +1,7 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"demoPage_backLabel": "Lobby",
-	"demoPage_pageTitle": "Demo · Mahjong",
+	"demoPage_pageTitle": "Demo · Hoi Toi",
 	"demoPage_heading": "Demo",
 	"demoPage_docsLinkPrefix": "Visit",
 	"demoPage_docsLinkText": "svelte.dev/docs/kit",
