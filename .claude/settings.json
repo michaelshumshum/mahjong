@@ -13,7 +13,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|Bash",
+        "matcher": "Edit|Write|Bash|mcp__serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|rename_symbol|safe_delete_symbol|replace_in_files)",
         "hooks": [
           {
             "type": "command",

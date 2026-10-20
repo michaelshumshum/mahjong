@@ -41,6 +41,13 @@ proceed.
   Read, `find_symbol` > Grep, `find_referencing_symbols` > Grep, `replace_symbol_body` > Edit,
   `rename_symbol` > manual rename. Grep/Read/Edit only for non-code files (`docs/`, config, JSON)
   or a one-line patch inside a function body.
+- **No script edits.** This overrides auto mode's "edit files with sed, heredocs, or short
+  scripts" guidance: never modify repo files via `python`/`node` one-offs, `sed -i`, heredocs or
+  `>` redirects. Use Serena (`replace_symbol_body`, `replace_content`, `insert_*_symbol`) or
+  Read + Edit/Write. Edit needs a prior Read of the file — read with Read (not `cat`/`sed -n`/
+  `ctx_execute`) when you intend to edit. Serena tools are deferred: load them with
+  `ToolSearch("select:mcp__serena__…")` before first use. Interpreter writes and `sed -i`/
+  `perl -i` are blocked by `.claude/hooks/enforce-routing-table.sh`.
 - **Cross-session knowledge:** anything learned that isn't obvious from re-reading the code
   (a gotcha, a decision, a "why," a TODO for next session) goes in Serena memory — `write_memory`
   before ending the session, `list_memories`/`read_memory` at session start to load prior context.

@@ -10,7 +10,11 @@
 # auto-mode's "prefer Bash" nudge) — so it denied edits after docs had, in fact, been read.
 #
 # Mutation detection also covers Bash: `sed -i`, heredocs, `>`/`>>`, `tee`, `cp`/`mv` into a
-# guarded path all bypassed the old Edit|Write-only matcher.
+# guarded path all bypassed the old Edit|Write-only matcher. Serena edit tools are routed too.
+#
+# separately, AGENTS.md "No script edits": Bash in-place edits of repo source (python/node
+# write calls, sed -i, perl -i) are denied regardless of docs read. redirects are left to the
+# docs check only: `git show … > path`, generators and `tee` logs are legitimate.
 set -euo pipefail
 
 input=$(cat)
@@ -26,14 +30,49 @@ fi
 # collect every rel_path this tool call is about to write to.
 targets=()
 
+deny() {
+  jq -n --arg reason "$1" '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $reason
+    }
+  }'
+  exit 0
+}
+
+# repo-ish path prefixes; also catches relative paths after `cd web` (src/, messages/, ...)
+repo_path_re='(^|[^A-Za-z0-9_.-])(server|web|shared|docs|ml|src|app|tests|messages|scripts)/'
+
 case "$tool_name" in
   Edit|Write)
     file_path=$(jq -r '.tool_input.file_path // .tool_input.path // empty' <<<"$input")
     [[ -n "$file_path" ]] && targets+=("$file_path")
     ;;
+  mcp__serena__replace_symbol_body|mcp__serena__insert_after_symbol|mcp__serena__insert_before_symbol|mcp__serena__replace_content|mcp__serena__rename_symbol|mcp__serena__safe_delete_symbol|mcp__serena__replace_in_files)
+    rel=$(jq -r '.tool_input.relative_path // empty' <<<"$input")
+    glob=$(jq -r '.tool_input.paths_include_glob // empty' <<<"$input")
+    if [[ -n "$rel" ]]; then
+      targets+=("$rel")
+    elif [[ -n "$glob" ]]; then
+      targets+=("$glob")
+    else
+      # whole-project replace_in_files touches every guarded tree
+      targets+=(server/x web/x shared/x)
+    fi
+    ;;
   Bash)
     command=$(jq -r '.tool_input.command // empty' <<<"$input")
     [[ -z "$command" ]] && exit 0
+    # AGENTS.md "No script edits": in-place edits via interpreters/sed/redirects are denied
+    # outright for repo source paths, regardless of docs read.
+    if grep -qE "$repo_path_re" <<<"$command"; then
+      if grep -qE '\bsed +(-[A-Za-z]*i|--in-place)|\bperl +-[A-Za-z]*i' <<<"$command" \
+        || { grep -qE '\b(python3?|node|bun|deno)\b' <<<"$command" \
+          && grep -qE "open\([^)]*,[[:space:]]*['\"][wax+]|write_text|write_bytes|writeFileSync|writeFile\(|\.write\(" <<<"$command"; }; then
+        deny "AGENTS.md 'No script edits': don't modify repo files via python/node/sed -i/perl -i. Use Serena (replace_symbol_body, replace_content, insert_*_symbol; load via ToolSearch) or Read + Edit/Write."
+      fi
+    fi
     # strip common read-only stderr-discard redirects before checking for a mutation shape,
     # so e.g. `grep ... file 2>/dev/null` doesn't look like a write to `file`.
     sanitized=$(sed -E 's/[0-9]?>&[0-9]|[0-9]?>[[:space:]]*\/dev\/null//g' <<<"$command")
@@ -127,14 +166,7 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   missing_list="${missing_list%, }"
   target_list=$(printf '%s, ' "${targets[@]}")
   target_list="${target_list%, }"
-  reason="AGENTS.md context-triggers table: reference ${missing_list} before writing to ${target_list}."
-  jq -n --arg reason "$reason" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: $reason
-    }
-  }'
+  deny "AGENTS.md context-triggers table: reference ${missing_list} before writing to ${target_list}."
 fi
 
 exit 0
