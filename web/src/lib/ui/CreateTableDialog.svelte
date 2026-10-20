@@ -18,6 +18,7 @@
 	import PanelHeader from './PanelHeader.svelte';
 	import FormGroup from './FormGroup.svelte';
 	import OptionRow from './OptionRow.svelte';
+	import SwitchRow from './SwitchRow.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
 	import RulesEditor, { type OverrideRow, type RulesTab } from './RulesEditor.svelte';
 	import { loadCreateTableSetup, saveCreateTableSetup } from './settings-storage';
@@ -170,8 +171,8 @@
 						><SlidersHorizontal size={16} />{m.createTableDialog_editCustomButton()}</button
 					>
 				{/if}
-				<OptionRow
-					type="checkbox"
+				<SwitchRow
+					card
 					label={m.createTableDialog_privateLabel()}
 					checked={isPrivate}
 					onChange={(checked) => (isPrivate = checked)}

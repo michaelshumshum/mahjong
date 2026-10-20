@@ -4,19 +4,27 @@
 		description,
 		checked,
 		disabled = false,
+		card = false,
 		onChange
 	}: {
 		label: string;
 		description?: string;
 		checked: boolean;
 		disabled?: boolean;
+		// standalone option-row card with a larger switch, outside a settings card
+		card?: boolean;
 		onChange: (next: boolean) => void;
 	} = $props();
 
 	const uid = $props.id();
 </script>
 
-<label class="switch-row" class:switch-row--disabled={disabled}>
+<label
+	class="switch-row"
+	class:switch-row--disabled={disabled}
+	class:switch-row--card={card}
+	class:switch-row--card-on={card && checked}
+>
 	<span class="switch-text">
 		<span class="switch-label">{label}</span>
 		{#if description}
@@ -57,6 +65,21 @@
 		}
 	}
 
+	.switch-row--card {
+		@include forms.option;
+
+		--track-w: 3.5rem;
+		--track-h: 2rem;
+
+		&:focus-within .track {
+			outline: none;
+		}
+	}
+
+	.switch-row--card-on {
+		@include forms.option-checked;
+	}
+
 	.switch-row--disabled {
 		cursor: not-allowed;
 		opacity: 0.5;
@@ -81,8 +104,8 @@
 	.track {
 		flex: none;
 		position: relative;
-		width: 2.75rem;
-		height: 1.5rem;
+		width: var(--track-w, 2.75rem);
+		height: var(--track-h, 1.5rem);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-pill);
 		background: var(--color-surface);
@@ -99,8 +122,8 @@
 		position: absolute;
 		top: 2px;
 		left: 2px;
-		width: calc(1.5rem - 6px);
-		height: calc(1.5rem - 6px);
+		width: calc(var(--track-h, 1.5rem) - 6px);
+		height: calc(var(--track-h, 1.5rem) - 6px);
 		border-radius: 50%;
 		background: var(--color-text-muted);
 
@@ -116,7 +139,7 @@
 		background: var(--color-brass);
 
 		.thumb {
-			translate: 1.25rem 0;
+			translate: calc(var(--track-w, 2.75rem) - var(--track-h, 1.5rem)) 0;
 			background: var(--color-tile-ink);
 		}
 	}

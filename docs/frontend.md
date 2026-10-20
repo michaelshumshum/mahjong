@@ -825,7 +825,7 @@ views in one dialog:
 - The custom view has a fixed height (`min(44rem, 100dvh - 2rem)`) so switching tabs never resizes
   it; Cancel/Create stay pinned below the scroll region.
 
-- **Private table** — a checkbox `OptionRow` under the presets (presets view only, applies to
+- **Private table** — a `SwitchRow card` (option-row card, larger switch) under the presets (presets view only, applies to
   custom rules too) posts `private: true`, which keeps the table off `/tables`; invitees use the
   link or join-by-code. Off by default, remembered with the rest of the setup.
 

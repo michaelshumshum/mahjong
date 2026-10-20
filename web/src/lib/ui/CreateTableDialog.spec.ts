@@ -42,9 +42,9 @@ describe('CreateTableDialog', () => {
 		expect(body).toContain('Custom');
 	});
 
-	it('offers a private-table option, off by default', () => {
+	it('offers a private-table switch, off by default', () => {
 		const { body } = render(CreateTableDialog, { props: { onCreated: noop, onCancel: noop } });
 		expect(body).toContain('Private table');
-		expect(body).toMatch(/type="checkbox"(?![^>]*checked)[^>]*>/);
+		expect(body).toMatch(/role="switch"(?![^>]*checked)[^>]*>/);
 	});
 });
