@@ -18,6 +18,7 @@
 	import PanelHeader from './PanelHeader.svelte';
 	import FormGroup from './FormGroup.svelte';
 	import OptionRow from './OptionRow.svelte';
+	import SwitchRow from './SwitchRow.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
 	import RulesEditor, { type OverrideRow, type RulesTab } from './RulesEditor.svelte';
 	import { loadCreateTableSetup, saveCreateTableSetup } from './settings-storage';
@@ -47,6 +48,7 @@
 			? draftFrom(saved.customBase, saved.custom)
 			: draftFrom(DEFAULT_PRESET_ID, RULESET_PRESET_RULES[DEFAULT_PRESET_ID])
 	);
+	let isPrivate = $state(saved?.private ?? false);
 	let view = $state<'presets' | 'custom'>('presets');
 	let activeTab = $state<RulesTab>('scoring');
 	// the draft a "Start from"/Reset just replaced, offered back until the next edit
@@ -110,11 +112,11 @@
 		error = null;
 		const custom = withInertDefaults($state.snapshot(customRules) as RuleSet);
 		const body: CreateTableRequest = isCustom
-			? { ruleset: CUSTOM_PRESET_ID, rules: custom }
-			: { ruleset: presetId };
+			? { ruleset: CUSTOM_PRESET_ID, rules: custom, private: isPrivate }
+			: { ruleset: presetId, private: isPrivate };
 		try {
 			const response = await createTable(body);
-			saveCreateTableSetup({ presetId, customBase: draft.base, custom });
+			saveCreateTableSetup({ presetId, customBase: draft.base, custom, private: isPrivate });
 			onCreated(response.table_id);
 		} catch {
 			error = m.createTableDialog_createError();
@@ -169,6 +171,14 @@
 						><SlidersHorizontal size={16} />{m.createTableDialog_editCustomButton()}</button
 					>
 				{/if}
+				<FormGroup legend={m.createTableDialog_visibilityLegend()}>
+					<SwitchRow
+						label={m.createTableDialog_privateLabel()}
+						description={m.createTableDialog_privateDesc()}
+						checked={isPrivate}
+						onChange={(checked) => (isPrivate = checked)}
+					/>
+				</FormGroup>
 			</div>
 		{:else}
 			<header class="custom-header">

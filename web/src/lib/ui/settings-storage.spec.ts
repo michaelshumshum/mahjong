@@ -255,12 +255,21 @@ describe('settings-storage', () => {
 	describe('createTableSetup', () => {
 		it('round-trips a saved value', () => {
 			const custom = { ...RULESET_PRESET_RULES.hk_strict, faan_overrides: { 平糊: 2 } };
-			saveCreateTableSetup({ presetId: 'custom', customBase: 'hk_strict', custom });
+			saveCreateTableSetup({ presetId: 'custom', customBase: 'hk_strict', custom, private: true });
 			expect(loadCreateTableSetup()).toEqual({
 				presetId: 'custom',
 				customBase: 'hk_strict',
-				custom
+				custom,
+				private: true
 			});
+		});
+
+		it('defaults private to false for a setup saved before the toggle existed', () => {
+			localStorage.setItem(
+				CREATE_TABLE_SETUP_STORAGE_KEY,
+				JSON.stringify({ presetId: 'hk_classic', customBase: 'hk_classic', custom: {} })
+			);
+			expect(loadCreateTableSetup()?.private).toBe(false);
 		});
 
 		it('returns null when nothing has been stored', () => {

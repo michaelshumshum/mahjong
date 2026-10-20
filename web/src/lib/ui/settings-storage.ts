@@ -338,6 +338,7 @@ export interface CreateTableSetup {
 	presetId: string;
 	customBase: string;
 	custom: RuleSet;
+	private: boolean;
 }
 
 export function loadCreateTableSetup(): CreateTableSetup | null {
@@ -346,11 +347,16 @@ export function loadCreateTableSetup(): CreateTableSetup | null {
 	try {
 		const v: unknown = JSON.parse(raw);
 		if (typeof v !== 'object' || v === null) return null;
-		const { presetId, customBase, custom } = v as Record<string, unknown>;
+		const { presetId, customBase, custom, private: isPrivate } = v as Record<string, unknown>;
 		const known = (id: unknown): id is string =>
 			typeof id === 'string' && id in RULESET_PRESET_RULES;
 		if (!(known(presetId) || presetId === CUSTOM_PRESET_ID) || !known(customBase)) return null;
-		return { presetId, customBase, custom: sanitizeRuleSet(custom) };
+		return {
+			presetId,
+			customBase,
+			custom: sanitizeRuleSet(custom),
+			private: isPrivate === true
+		};
 	} catch {
 		return null;
 	}

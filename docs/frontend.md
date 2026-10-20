@@ -818,12 +818,16 @@ views in one dialog:
 - **Inert fields** (`INERT_RULE_FIELDS`: every `RuleSet` field with no server reader, rules.md §10,
   including `multi_win`) are never shown and always posted at their defaults (`withInertDefaults`)
   — a toggle must not promise a rule the engine ignores.
-- **Remembered.** A successful create stores `{presetId, customBase, custom}` under
+- **Remembered.** A successful create stores `{presetId, customBase, custom, private}` under
   `mahjong:createTableSetup:v1`; the next open restores the selection and the custom draft.
   `loadCreateTableSetup` drops an unknown preset id and repairs a stale ruleset field-by-field
   (`sanitizeRuleSet`) instead of discarding it.
 - The custom view has a fixed height (`min(44rem, 100dvh - 2rem)`) so switching tabs never resizes
   it; Cancel/Create stay pinned below the scroll region.
+
+- **Private table** — a "Visibility" switch under the presets (presets view only, applies to
+  custom rules too) posts `private: true`, which keeps the table off `/tables`; invitees use the
+  link or join-by-code. Off by default, remembered with the rest of the setup.
 
 Submitting calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates to
 `/table/<table_id>`. The waiting room shows the resolved preset name (`PretableScreen.svelte`).

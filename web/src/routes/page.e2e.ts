@@ -89,6 +89,21 @@ async function captureCreateBody(page: Page): Promise<{ body: Record<string, unk
 	return sent;
 }
 
+test('create table private switch sends private: true', async ({ page }) => {
+	const sent = await captureCreateBody(page);
+	await page.goto('/tables');
+	await page.waitForLoadState('networkidle');
+	await page.getByTestId('tables-header-create-table').click();
+	const dialog = page.getByTestId('create-table-dialog');
+	const toggle = dialog.getByRole('switch', { name: /Private table/ });
+	await expect(toggle).not.toBeChecked();
+	await toggle.click({ force: true });
+	await dialog.getByTestId('create-table-submit').click();
+
+	await expect(page).toHaveURL('/table/CUSTOM1');
+	expect(sent.body).toMatchObject({ ruleset: 'hk_classic', private: true });
+});
+
 async function openCustomRules(page: Page): Promise<Locator> {
 	await page.goto('/tables');
 	await page.waitForLoadState('networkidle');

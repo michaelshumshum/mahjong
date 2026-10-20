@@ -80,6 +80,8 @@ export interface CreateTableRequest {
 	// practice mode's per-seat difficulty picker: seat 1..3 -> a bot tier (seat 0 is the human
 	// seat, never included). Server-side: app/api_models.py's CreateTableRequest.bot_tiers.
 	bot_tiers?: Record<number, BotTier>;
+	// left out of GET /tables; joinable by link or code only
+	private?: boolean;
 }
 
 export interface CreateTableResponse {
