@@ -21,6 +21,7 @@ friends by sharing a table link.
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Architecture](#architecture)
+- [Machine learning](#machine-learning)
 - [Getting started](#getting-started)
 - [Development](#development)
 - [Testing](#testing)
@@ -106,6 +107,25 @@ flowchart LR
 Each table is a single asyncio task that owns its game state and applies player and bot actions
 through `mahjong_core`, a pure, stdlib-only rules engine with no I/O. Outbound events are redacted
 per seat before they are sent. Full component map: [architecture §2](docs/architecture.md).
+
+## Machine learning
+
+The Expert bot is a policy trained from scratch by self-play reinforcement learning. It has no
+teacher: no human game records, and no imitation of the heuristic bots, which are kept as held-out
+evaluation opponents only ([ml §3, §6](docs/ml.md)).
+
+| Piece | Summary |
+| --- | --- |
+| Action space | 109 discrete actions (discard, kongs, chow low/middle/high, pung, win, pass); the legal-action mask comes from the rules engine, never from the network ([ml §1](docs/ml.md)) |
+| Model | ~0.4M-parameter 1-D residual network over the 34 tile types, with the `RuleSet` as an input, so one policy plays every preset ([ml §8](docs/ml.md)) |
+| Training | PPO with an asymmetric critic that sees the full state. Reward is the hand's point delta, not shanten: under the 3-faan minimum, the fastest hand is often one that is not allowed to win ([ml §4, §9](docs/ml.md)) |
+| Curriculum | a cold start against passive opponents with oracle information that is annealed away, then self-play, then a league of past and persona snapshots ([ml §10, §11](docs/ml.md)) |
+| Serving | exported to numpy (no PyTorch at runtime), with p99 under 5 ms per decision including encoding; weights committed as `server/bots/weights/learned.npz` ([bots §2](docs/bots.md)) |
+
+The shipped policy scores **+10.75 points/hand [+9.64, +11.86]** against three `FaanBot`
+(Normal) opponents over 1,000 fresh sets ([ml §14](docs/ml.md)). The Impossible tier runs the same
+policy and adds vetoes that use full information ([bots §9](docs/bots.md)). Training code lives in
+`server/ml/` and needs the `ml` extra (`uv sync --extra ml`).
 
 ## Getting started
 
