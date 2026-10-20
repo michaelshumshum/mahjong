@@ -191,6 +191,11 @@ event)` output — except `claim_offer`, which would name the offered seat's own
 **Table settings.** `TableSettings` (`app/table_types.py`) holds per-table options that aren't game rules
 (those are `RuleSet`). `spectators_see_hands` switches every spectator to the open-hands view (§5);
 `Table.update_settings` swaps it mid-game and resyncs spectators. No wire message sets it.
+It is allowed only on an `all_bots` table (`Table._check_settings`: construction and
+`update_settings` raise `ValueError` otherwise), and `Table.join` refuses every human on an
+`all_bots` table with `table_full`, even on a freed seat. On a table a human can sit at, live open
+hands to spectators would be a collusion channel. The check keys on `all_bots`, not current
+occupancy, so it holds for the table's whole life without re-checking on each join.
 
 **Ruleset selection.** `RuleSet` is fixed at table construction — `mahjong_core` has no path to
 change it mid-game.

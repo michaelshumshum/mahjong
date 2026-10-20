@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.errors import SeatTakenError, TableFullError
 from app.main import app
 from app.registry import TableRegistry
 from app.table import Table
@@ -178,7 +179,7 @@ async def test_all_bot_table_holds_hand_end_for_spectators() -> None:
 
 
 def test_update_settings_resyncs_spectators_only_when_reveal_changes() -> None:
-    table = Table("t-settings", DEFAULT_RULESET, 1)
+    table = Table("t-settings", DEFAULT_RULESET, 1, all_bots=True)
     spectator = _Capture()
     table.register_spectator("spec-1", spectator.send)
     assert spectator.frames[-1]["hands"] is None
@@ -193,12 +194,66 @@ def test_update_settings_resyncs_spectators_only_when_reveal_changes() -> None:
 
 
 def test_seats_never_see_other_hands_on_an_open_hands_table() -> None:
-    table = Table("t-open", DEFAULT_RULESET, 1, settings=TableSettings(spectators_see_hands=True))
-    player = _Capture()
-    table.join("s-alice", player.send, seat=0, name="Alice")
-    sync = next(f for f in player.frames if f["t"] == "state_sync")
+    table = Table(
+        "t-open",
+        DEFAULT_RULESET,
+        1,
+        all_bots=True,
+        settings=TableSettings(spectators_see_hands=True),
+    )
+    sync = table.state_sync_wire(0)
     assert sync["hands"] is None
     assert sync["own_hand"] == list(table.state.seats[0].concealed)
+
+
+@pytest.mark.parametrize("mode", [{}, {"practice": True}, {"require_ready": True}])
+def test_open_hands_rejected_at_construction_unless_all_bots(mode: dict[str, bool]) -> None:
+    with pytest.raises(ValueError, match="all-bot"):
+        Table(
+            "t-open", DEFAULT_RULESET, 1, settings=TableSettings(spectators_see_hands=True), **mode
+        )
+
+
+def test_update_settings_rejects_open_hands_on_a_table_with_human_seats() -> None:
+    table = Table("t-practice", DEFAULT_RULESET, 1, practice=True)
+    player = _Capture()
+    table.join("s-alice", player.send, seat=0, name="Alice")
+    spectator = _Capture()
+    table.register_spectator("spec-1", spectator.send)
+    count = len(spectator.frames)
+
+    with pytest.raises(ValueError, match="all-bot"):
+        table.update_settings(TableSettings(spectators_see_hands=True))
+    assert not table.settings.spectators_see_hands
+    assert len(spectator.frames) == count
+    assert table.state_sync_wire(None)["hands"] is None
+
+    table.update_settings(TableSettings(spectators_see_hands=False))
+
+
+def test_no_human_can_take_a_seat_on_an_open_hands_table() -> None:
+    table = Table(
+        "t-open",
+        DEFAULT_RULESET,
+        1,
+        all_bots=True,
+        settings=TableSettings(spectators_see_hands=True),
+    )
+    player = _Capture()
+    with pytest.raises(TableFullError):
+        table.join("s-alice", player.send)
+    with pytest.raises(TableFullError):
+        table.join("s-alice", player.send, seat=0)
+    with pytest.raises(SeatTakenError):
+        table.reconnect(0, "s-alice", player.send, None)
+
+    # refused on all_bots itself, not on seat occupancy: a freed bot seat stays closed
+    table.seat_bindings[0] = None
+    with pytest.raises(TableFullError):
+        table.join("s-alice", player.send)
+    with pytest.raises(TableFullError):
+        table.join("s-alice", player.send, seat=0)
+    assert player.frames == []
 
 
 def test_lifespan_starts_showcase_from_env(monkeypatch: pytest.MonkeyPatch) -> None:

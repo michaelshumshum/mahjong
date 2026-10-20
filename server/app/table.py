@@ -36,7 +36,8 @@ starts -- `app/registry.py`'s always-on showcase table.
 
 Table settings. `TableSettings` holds per-table options that aren't game rules (those live
 on `RuleSet`): `spectators_see_hands` switches spectators to the open-hands redaction. Swappable
-mid-game via `update_settings`.
+mid-game via `update_settings`. Only an `all_bots` table may set it, and `join` never seats a
+human there (`_check_settings`).
 
 Early exit is already inside `reduce()`. `mahjong_core.engine._apply_claim_response` calls
 `claims.can_close_early`/`resolve_claims` itself, inline, the moment a claim response makes the
@@ -408,6 +409,7 @@ class Table:
         # practice mode: seat 0 stays open for the human; seats 1-3 bind immediately to their
         # resolved tier (self._seat_bot_tiers, falling back to self._bot_tier).
         self.all_bots = all_bots
+        self._check_settings(self.settings)
         if practice or all_bots:
             for seat in range(0 if all_bots else 1, 4):
                 self._bind_bot_seat(seat)
@@ -431,7 +433,12 @@ class Table:
         already-bound seat and unicasts a fresh `state_sync` to the joining seat.
 
         `name` is this seat's chosen guest display name -- normalized and stored once, here;
-        there is no later path that changes it (a `hello` reconnect never resends it)."""
+        there is no later path that changes it (a `hello` reconnect never resends it).
+
+        An `all_bots` table never seats a human, even on a freed seat: its spectators may see
+        every hand (`_check_settings`)."""
+        if self.all_bots:
+            raise TableFullError()
         if seat is not None:
             if not 0 <= seat < 4:
                 raise ValueError(f"seat must be 0..3, got {seat}")
@@ -724,9 +731,18 @@ class Table:
         for close in list(self._spectator_close.values()):
             close()
 
+    def _check_settings(self, settings: TableSettings) -> None:
+        """Raise `ValueError` for settings this table may not run with. `spectators_see_hands`
+        needs `all_bots`: on a table a human can sit at, live open hands are a collusion channel.
+        Keyed on `all_bots`, not current occupancy, so `join` refusing every human on such a
+        table keeps it true for the table's lifetime."""
+        if settings.spectators_see_hands and not self.all_bots:
+            raise ValueError("spectators_see_hands is only allowed on an all-bot table")
+
     def update_settings(self, settings: TableSettings) -> None:
         """Swap this table's `TableSettings`; spectators get a fresh `state_sync` when what they
-        may see changed."""
+        may see changed. Raises `ValueError` (settings unchanged) per `_check_settings`."""
+        self._check_settings(settings)
         reveal_changed = settings.spectators_see_hands != self.settings.spectators_see_hands
         self.settings = settings
         if reveal_changed:

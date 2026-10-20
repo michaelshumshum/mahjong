@@ -105,7 +105,8 @@ ruleset comes back on every `state_sync` as `ruleset` (full `RuleSet.to_dict()`)
 then every broadcast event and the public half of `turn`. A `join`/`hello{seat}` on the same
 connection promotes it to a seat. A spectator session is never reconnectable (§5).
 
-On a table with `spectators_see_hands` ([architecture.md §3](architecture.md)), spectators get the
+On a table with `spectators_see_hands` (all-bot tables only, never client-settable;
+[architecture.md §3](architecture.md)), spectators get the
 open-hands view: `state_sync.hands` is every seat's concealed tiles and `draw`/`kong_replace` carry
 `tile_id`. Spectators get no `deal`, so each new hand is
 followed by a fresh `state_sync` to every spectator. Seats' own streams are unchanged (`hands` is
