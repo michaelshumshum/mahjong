@@ -69,6 +69,10 @@ Both load `learned.npz`, so new weights change both tiers and both gates re-run 
 **`T4` decision path.** `ml.encode_v2.policy_raw_from_view(view)` → `encode_policy_batch` →
 `ml.export.NumpyPolicyNet` → argmax over the legal ids: the path `ml.eval_policy` gated, with numpy
 in place of torch. The worker imports it lazily; `load_policy` caches the weights once per process.
+Each net also flattens its kernel-3 conv weights to `(out, 3 * in)` matrices once at load
+(`ml.export.flatten_conv_weights`), and `_conv3` writes its three shifted copies straight into one
+buffer instead of `np.pad` + `concatenate`: at batch size 1 that per-call overhead was most of the
+forward (1.39 → 0.88 ms, bit-identical logits).
 
 **`learned.npz`:**
 
@@ -153,10 +157,6 @@ thousand distinct suit shapes and a scan's evaluations share most sub-shapes, so
 within a hand or two. `tests/test_shanten.py`'s perf/import-time tests pin this. A 200-table load
 test has not been run ([ADR 0003](decisions/0003-product-scope.md)).
 
-**Ukeire** (受入れ) = for each candidate discard, how many unseen tiles reduce shanten:
-
-```python
-def ukeire(hand34, seen34) -> dict[Discard, tuple[int, int]]:
 `standard_shanten` then combines the four frontiers pairwise, not as their full 4-way product:
 `_merge(man, pin)` and `_merge(sou, honors)` keep only the distinct summed `(melds, tatsu,
 pairs)` triples, since the score reads nothing else, and `_best_standard` scores the two merged
@@ -166,6 +166,10 @@ evaluation, so most merges are cache hits. The full product was ~110 combination
 ~4.1 ms to ~0.7 ms (`T1`), with identical actions (`test_faanbot_trajectory_pin.py`) and
 `test_pairwise_merge_matches_full_product` pinning equality with the product form.
 
+**Ukeire** (受入れ) = for each candidate discard, how many unseen tiles reduce shanten:
+
+```python
+def ukeire(hand34, seen34) -> dict[Discard, tuple[int, int]]:
     """-> {discard: (kinds_accepted, tiles_accepted)}"""
     for d in distinct(hand34):
         after = hand34 - d

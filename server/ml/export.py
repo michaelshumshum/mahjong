@@ -34,6 +34,7 @@ __all__ = [
     "export_checkpoint",
     "export_policy_state",
     "export_state",
+    "flatten_conv_weights",
     "load_meta",
     "main",
     "masked_log_softmax",
@@ -130,37 +131,53 @@ def _group_norm(x: np.ndarray, weight: np.ndarray, bias: np.ndarray) -> np.ndarr
     return g.reshape(b, ch, w) * weight[None, :, None] + bias[None, :, None]
 
 
-def _conv3(x: np.ndarray, weight: np.ndarray, bias: np.ndarray) -> np.ndarray:
+def flatten_conv_weights(w: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    """Every kernel-3 conv weight `(out, in, 3)` as the `(out, 3 * in)` matrix `_conv3` multiplies
+    by, keyed like `w`. Built once per loaded net: the transpose copies the whole weight."""
+    return {
+        k: np.ascontiguousarray(v.transpose(0, 2, 1).reshape(v.shape[0], 3 * v.shape[1]))
+        for k, v in w.items()
+        if v.ndim == 3 and v.shape[2] == 3
+    }
+
+
+def _conv3(x: np.ndarray, flat: np.ndarray, bias: np.ndarray) -> np.ndarray:
     """Kernel-3, zero-padded-by-1 conv as one matmul over the three shifted copies."""
-    _, ch, w = x.shape
-    p = np.pad(x, ((0, 0), (0, 0), (1, 1)))
-    stacked = np.concatenate([p[:, :, k : k + w] for k in range(3)], axis=1)
-    flat = weight.transpose(0, 2, 1).reshape(weight.shape[0], 3 * ch)
+    b, ch, w = x.shape
+    stacked = np.zeros((b, 3 * ch, w), dtype=x.dtype)
+    stacked[:, :ch, 1:] = x[:, :, :-1]
+    stacked[:, ch : 2 * ch] = x
+    stacked[:, 2 * ch :, :-1] = x[:, :, 1:]
     return flat @ stacked + bias[None, :, None]
 
 
 def numpy_trunk(
-    w: dict[str, np.ndarray], prefix: str, tiles: np.ndarray, scalars: np.ndarray, blocks: int
+    w: dict[str, np.ndarray],
+    conv: dict[str, np.ndarray],
+    prefix: str,
+    tiles: np.ndarray,
+    scalars: np.ndarray,
+    blocks: int,
 ) -> np.ndarray:
     """`DangerNet`'s trunk (weights under `prefix`) on `tiles (B, C, 34)`: the final-norm,
-    ReLU'd features `(B, channels, 37)`, pad columns zero."""
+    ReLU'd features `(B, channels, 37)`, pad columns zero. `conv` is `flatten_conv_weights(w)`."""
     b = tiles.shape[0]
     x = np.zeros((b, tiles.shape[1], PADDED_WIDTH), dtype=np.float32)
     x[:, :, _POSITIONS] = tiles
     scalar_bias = scalars @ w[prefix + "scalar_proj.weight"].T + w[prefix + "scalar_proj.bias"]
-    h = _conv3(x, w[prefix + "stem.weight"], w[prefix + "stem.bias"])
+    h = _conv3(x, conv[prefix + "stem.weight"], w[prefix + "stem.bias"])
     h = (h + scalar_bias[:, :, None]) * _MASK
 
     for i in range(blocks):
         p = f"{prefix}blocks.{i}."
         r = _conv3(
             np.maximum(_group_norm(h, w[p + "norm1.weight"], w[p + "norm1.bias"]), 0) * _MASK,
-            w[p + "conv1.weight"],
+            conv[p + "conv1.weight"],
             w[p + "conv1.bias"],
         )
         r = _conv3(
             np.maximum(_group_norm(r, w[p + "norm2.weight"], w[p + "norm2.bias"]), 0) * _MASK,
-            w[p + "conv2.weight"],
+            conv[p + "conv2.weight"],
             w[p + "conv2.bias"],
         )
         pooled = (r * _MASK).sum(-1) / N_TILE_TYPES
@@ -175,6 +192,7 @@ def numpy_trunk(
 class NumpyDangerNet:
     def __init__(self, arrays: dict[str, np.ndarray], config: dict[str, int]) -> None:
         self.w = arrays
+        self.conv = flatten_conv_weights(arrays)
         self.config = config
 
     @classmethod
@@ -185,7 +203,7 @@ class NumpyDangerNet:
         """Logits for `tiles (B, C, 34)` and `scalars (B, S)`: `tenpai (B,)`, `legal_wait` and
         `struct_wait` `(B, 34)`, `faan (B, 34, classes)`."""
         w = self.w
-        h = numpy_trunk(w, "", tiles, scalars, self.config["blocks"])
+        h = numpy_trunk(w, self.conv, "", tiles, scalars, self.config["blocks"])
         head = np.einsum("oc,bcw->bow", w["tile_head.weight"][:, :, 0], h)
         per_tile = (head + w["tile_head.bias"][None, :, None])[:, :, _POSITIONS]
 
@@ -207,6 +225,7 @@ class NumpyPolicyNet:
 
     def __init__(self, arrays: dict[str, np.ndarray], config: dict[str, int]) -> None:
         self.w = arrays
+        self.conv = flatten_conv_weights(arrays)
         self.config = config
         self.tile_w = arrays["policy_tile.weight"][:, :, 0]
         self.tile_b = arrays["policy_tile.bias"]
@@ -222,7 +241,7 @@ class NumpyPolicyNet:
         """Unmasked logits `(B, 109)` in `mahjong_core.ml` id order, for encoder v2's
         `tiles (B, C, 34)` and `scalars (B, S)`."""
         w = self.w
-        h = numpy_trunk(w, "trunk.", tiles, scalars, self.config["blocks"])
+        h = numpy_trunk(w, self.conv, "trunk.", tiles, scalars, self.config["blocks"])
         h_tiles = h[:, :, _POSITIONS]
         tile_logits = np.einsum("oc,bct->bot", self.tile_w, h_tiles) + self.tile_b[None, :, None]
         claim = np.einsum("bct,bt->bc", h_tiles, tiles[:, self.claim_channel])
