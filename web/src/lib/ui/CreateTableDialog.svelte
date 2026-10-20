@@ -174,7 +174,6 @@
 				<FormGroup legend={m.createTableDialog_visibilityLegend()}>
 					<SwitchRow
 						label={m.createTableDialog_privateLabel()}
-						description={m.createTableDialog_privateDesc()}
 						checked={isPrivate}
 						onChange={(checked) => (isPrivate = checked)}
 					/>

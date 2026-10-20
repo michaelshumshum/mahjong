@@ -8,7 +8,6 @@
 	"createTableDialog_title": "開枱",
 	"createTableDialog_visibilityLegend": "公開程度",
 	"createTableDialog_privateLabel": "私人枱",
-	"createTableDialog_privateDesc": "唔會喺枱列表出現，要分享連結或枱號先可以入。",
 	"createTableDialog_rulesLegend": "規則",
 	"createTableDialog_customLabel": "自訂",
 	"createTableDialog_minFaanLabel": "起糊",
