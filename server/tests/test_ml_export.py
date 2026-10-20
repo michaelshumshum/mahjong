@@ -61,7 +61,8 @@ def test_export_checkpoint_reads_a_training_checkpoint(tmp_path) -> None:  # typ
 @pytest.mark.latency
 def test_three_opponents_score_faster_than_a_faanbot_decision(tmp_path) -> None:  # type: ignore[no-untyped-def]
     """The median `DangerNet` forward over three opponents, against a `FaanBot` decision timed back
-    to back. The absolute 5 ms is `make bench-latency` (`tests/latency.py`)."""
+    to back. The absolute 5 ms is `make bench-latency` (`tests/latency.py`); the 3x ratio is
+    docs/testing.md §1's."""
     import asyncio
 
     from app.views import seat_view
@@ -88,4 +89,4 @@ def test_three_opponents_score_faster_than_a_faanbot_decision(tmp_path) -> None:
         asyncio.run(bot.act(view, m, 0.0))
         danger.append(mid - start)
         faan.append(time.perf_counter() - mid)
-    check_latency("DangerNet x3", danger, "FaanBot", faan, q=50)
+    check_latency("DangerNet x3", danger, "FaanBot", faan, max_ratio=3.0, q=50)

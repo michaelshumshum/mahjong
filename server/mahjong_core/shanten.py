@@ -27,9 +27,8 @@ across 60k random hands that don't hit this exact edge case.
 
 from __future__ import annotations
 
-import itertools
 from collections.abc import Sequence
-from functools import cache
+from functools import cache, lru_cache
 
 from mahjong_core.config import HandSet
 from mahjong_core.tiles import N_SUITED_TYPES, N_TILE_TYPES, ORPHAN_INDICES, RANKS_PER_SUIT
@@ -47,6 +46,8 @@ AGARI = -1
 """Shanten value for a complete hand. 0 = tenpai, -1 = won."""
 
 _CAP = 4
+# bounds the pairwise merge caches; _frontier's own cache stays unbounded (module docstring)
+_MERGE_CACHE_SIZE = 1 << 16
 _ALL_HAND_SETS: frozenset[HandSet] = frozenset(HandSet)
 
 
@@ -107,25 +108,34 @@ def _frontier(counts: tuple[int, ...], sequences: bool) -> tuple[tuple[int, int,
 def standard_shanten(tiles34: Sequence[int]) -> int:
     """Standard-shape shanten (4 melds + 1 pair) -- min over every way to split man/pin/sou/
     honors into complete melds, partial sets, and (at most one) pair, block-cap applied."""
-    groups = (
-        *(
-            _frontier(tuple(tiles34[base : base + RANKS_PER_SUIT]), True)
-            for base in range(0, N_SUITED_TYPES, RANKS_PER_SUIT)
-        ),
-        _frontier(tuple(tiles34[N_SUITED_TYPES:N_TILE_TYPES]), False),
+    man, pin, sou = (
+        _frontier(tuple(tiles34[base : base + RANKS_PER_SUIT]), True)
+        for base in range(0, N_SUITED_TYPES, RANKS_PER_SUIT)
     )
-    best: int | None = None
-    for combo in itertools.product(*groups):
-        melds = sum(c[0] for c in combo)
-        tatsu = sum(c[1] for c in combo)
-        pairs = sum(c[2] for c in combo)
-        result = 8 - 2 * melds - tatsu - pairs
-        blocks = melds + tatsu + (pairs - 1 if pairs > 0 else 0)
-        if blocks > _CAP:
-            result += blocks - _CAP
-        if best is None or result < best:
-            best = result
-    assert best is not None
+    honors = _frontier(tuple(tiles34[N_SUITED_TYPES:N_TILE_TYPES]), False)
+    return _best_standard(_merge(man, pin), _merge(sou, honors))
+
+
+@lru_cache(maxsize=_MERGE_CACHE_SIZE)
+def _merge(
+    a: tuple[tuple[int, int, int], ...], b: tuple[tuple[int, int, int], ...]
+) -> tuple[tuple[int, int, int], ...]:
+    """Distinct summed `(melds, tatsu, pairs)` over two groups' frontiers. Exact: the score only
+    reads the sums, so deduplicating them drops nothing the full 4-way product would see."""
+    return tuple({(x[0] + y[0], x[1] + y[1], x[2] + y[2]) for x in a for y in b})
+
+
+@lru_cache(maxsize=_MERGE_CACHE_SIZE)
+def _best_standard(a: tuple[tuple[int, int, int], ...], b: tuple[tuple[int, int, int], ...]) -> int:
+    best = 8
+    for am, at, ap in a:
+        for bm, bt, bp in b:
+            melds, tatsu, pairs = am + bm, at + bt, ap + bp
+            result = 8 - 2 * melds - tatsu - pairs
+            blocks = melds + tatsu + (pairs - 1 if pairs > 0 else 0)
+            if blocks > _CAP:
+                result += blocks - _CAP
+            best = min(best, result)
     return best
 
 

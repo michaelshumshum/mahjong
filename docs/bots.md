@@ -157,6 +157,15 @@ test has not been run ([ADR 0003](decisions/0003-product-scope.md)).
 
 ```python
 def ukeire(hand34, seen34) -> dict[Discard, tuple[int, int]]:
+`standard_shanten` then combines the four frontiers pairwise, not as their full 4-way product:
+`_merge(man, pin)` and `_merge(sou, honors)` keep only the distinct summed `(melds, tatsu,
+pairs)` triples, since the score reads nothing else, and `_best_standard` scores the two merged
+sets. Both are `lru_cache`d (`_MERGE_CACHE_SIZE`), and an ukeire scan changes one suit per
+evaluation, so most merges are cache hits. The full product was ~110 combinations per call and
+~95% of a `T1`/`T2` decision; merging cut a warm decision from ~4.4 ms to ~1.0 ms (`T2`) and
+~4.1 ms to ~0.7 ms (`T1`), with identical actions (`test_faanbot_trajectory_pin.py`) and
+`test_pairwise_merge_matches_full_product` pinning equality with the product form.
+
     """-> {discard: (kinds_accepted, tiles_accepted)}"""
     for d in distinct(hand34):
         after = hand34 - d

@@ -12,6 +12,7 @@ try).
 
 from __future__ import annotations
 
+import itertools
 import random
 import time
 
@@ -23,6 +24,7 @@ from mahjong.shanten import Shanten as OracleShanten
 from mahjong_core.config import HandSet
 from mahjong_core.shanten import (
     AGARI,
+    _frontier,
     seven_pairs_shanten,
     shanten,
     standard_shanten,
@@ -233,6 +235,27 @@ def test_matches_oracle_over_random_hands() -> None:
     # sanity: the quad-biased sampling actually exercises the known-divergence path at all,
     # so this test would notice if the documented boundary ever widened.
     assert mismatches_with_quad < n_trials
+
+
+def _full_product_standard_shanten(c: list[int]) -> int:
+    groups = [_frontier(tuple(c[b : b + 9]), True) for b in (0, 9, 18)]
+    groups.append(_frontier(tuple(c[27:34]), False))
+    best = 8
+    for combo in itertools.product(*groups):
+        melds, tatsu, pairs = (sum(x[i] for x in combo) for i in range(3))
+        blocks = melds + tatsu + (pairs - 1 if pairs > 0 else 0)
+        best = min(best, 8 - 2 * melds - tatsu - pairs + max(0, blocks - 4))
+    return best
+
+
+def test_pairwise_merge_matches_full_product() -> None:
+    """`standard_shanten` merges suits pairwise into deduplicated sums instead of scoring the
+    full 4-way frontier product; it must agree on every hand size, quads included (where the
+    oracle check above tolerates divergence)."""
+    rng = random.Random(20261020)
+    for _ in range(3000):
+        c = _random_hand(rng, rng.choice((1, 4, 7, 10, 11, 13, 14)), quad_bias=rng.random() < 0.5)
+        assert standard_shanten(c) == _full_product_standard_shanten(c), c
 
 
 @given(st.integers(min_value=0, max_value=2**32 - 1))

@@ -41,7 +41,12 @@ see the same CPU load:
 | `test_learned_bot.py::test_single_decision_latency` | `T4` via `compute_action` | `T2` | p99 < reference p99 |
 | `test_oracle_learned.py::test_served_tier_decision_latency` | `ORACLE` via `compute_action` | `T4` | p99 < 2 × reference p99 |
 | `test_ml_policy_export.py::test_single_sample_latency_with_encoding` | numpy policy serve, full size | `FaanBot` decision | p99 < reference p99 |
-| `test_ml_export.py::test_three_opponents_score_faster_than_a_faanbot_decision` | `DangerNet` ×3 opponents | `FaanBot` decision | median < reference median |
+| `test_ml_export.py::test_three_opponents_score_faster_than_a_faanbot_decision` | `DangerNet` ×3 opponents | `FaanBot` decision | median < 3 × reference median |
+
+The `DangerNet` gate was 1× until `standard_shanten`'s pairwise merge ([bots.md §3](bots.md))
+made a `FaanBot` decision ~4× cheaper (~1 ms); `DangerNet` is offline-only (never served), so
+its reference was rebased rather than its forward pass held to the new `FaanBot`. The `T4` and
+policy-serve gates still hold at 1× on p99, but their medians now sit level with `T2`'s.
 
 Where each budget is enforced:
 
