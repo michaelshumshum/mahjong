@@ -10,6 +10,7 @@ describe('Settings', () => {
 	const offArm: AutoArm = { noCalls: false, autoPassChow: false };
 	const offPrefs: ClientPrefs = {
 		soundEnabled: false,
+		sfxVolume: 80,
 		motion: 'system',
 		discardMode: 'two-step',
 		haptics: false,
@@ -38,6 +39,7 @@ describe('Settings', () => {
 		const autoArm: AutoArm = { noCalls: true, autoPassChow: true };
 		const prefs: ClientPrefs = {
 			soundEnabled: true,
+			sfxVolume: 80,
 			motion: 'system',
 			discardMode: 'two-step',
 			haptics: false,
@@ -54,6 +56,7 @@ describe('Settings', () => {
 	it('marks the motion radio matching the current pref as checked, others not', () => {
 		const prefs: ClientPrefs = {
 			soundEnabled: false,
+			sfxVolume: 80,
 			motion: 'reduced',
 			discardMode: 'two-step',
 			haptics: false,
@@ -109,6 +112,7 @@ describe('Settings', () => {
 	it('reflects a checked haptics toggle independently of sound', () => {
 		const prefs: ClientPrefs = {
 			soundEnabled: false,
+			sfxVolume: 80,
 			motion: 'system',
 			discardMode: 'two-step',
 			haptics: true,
@@ -125,6 +129,7 @@ describe('Settings', () => {
 	it('marks the discard-mode radio matching the current pref as checked, others not', () => {
 		const prefs: ClientPrefs = {
 			soundEnabled: false,
+			sfxVolume: 80,
 			motion: 'system',
 			discardMode: 'one-tap',
 			haptics: false,

@@ -22,6 +22,8 @@ export type HandOrder = 'auto' | 'manual';
 // always feature-detected to mobile, this setting only gates whether it fires at all.
 export interface ClientPrefs {
 	soundEnabled: boolean;
+	// 0-100 in steps of 5, perceived loudness; sfx.ts squares it into a gain.
+	sfxVolume: number;
 	motion: MotionPref;
 	discardMode: DiscardMode;
 	haptics: boolean;

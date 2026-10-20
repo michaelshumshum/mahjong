@@ -36,6 +36,7 @@ const HAND_ORDERS: readonly HandOrder[] = ['auto', 'manual'];
 
 export const DEFAULT_CLIENT_PREFS: Readonly<ClientPrefs> = {
 	soundEnabled: true,
+	sfxVolume: 50,
 	motion: 'system',
 	discardMode: 'two-step',
 	haptics: true,
@@ -60,6 +61,10 @@ function isTileSize(value: unknown): value is TileSize {
 
 function isHandOrder(value: unknown): value is HandOrder {
 	return typeof value === 'string' && (HAND_ORDERS as readonly string[]).includes(value);
+}
+
+function isVolume(value: unknown): value is number {
+	return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 100;
 }
 
 // only the fields that have always existed are required -- every later field is migrated
@@ -124,8 +129,10 @@ export function loadClientPrefs(): ClientPrefs | null {
 	const rawAnnounce = (raw as unknown as Record<string, unknown>).announceAllDiscards;
 	const rawTileSize = (raw as unknown as Record<string, unknown>).tileSize;
 	const rawHandOrder = (raw as unknown as Record<string, unknown>).handOrder;
+	const rawVolume = (raw as unknown as Record<string, unknown>).sfxVolume;
 	return {
 		...raw,
+		sfxVolume: isVolume(rawVolume) ? rawVolume : DEFAULT_CLIENT_PREFS.sfxVolume,
 		discardMode: isDiscardMode(rawDiscardMode) ? rawDiscardMode : DEFAULT_CLIENT_PREFS.discardMode,
 		haptics: typeof rawHaptics === 'boolean' ? rawHaptics : DEFAULT_CLIENT_PREFS.haptics,
 		announceAllDiscards:

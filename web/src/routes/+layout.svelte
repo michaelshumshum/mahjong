@@ -18,19 +18,21 @@
 	import ApiConnectGate from '$lib/ui/ApiConnectGate.svelte';
 	import { muralVisibility } from '$lib/ui/mural-visibility.svelte';
 	import { browser } from '$app/environment';
-	import { cleanupStaleTableCredentials, loadClientPrefs } from '$lib/ui/settings-storage';
-	import { applyMotionPref } from '$lib/ui/motion';
-	import { applyTileSize } from '$lib/ui/tile-size';
+	import {
+		cleanupStaleTableCredentials,
+		DEFAULT_CLIENT_PREFS,
+		loadClientPrefs
+	} from '$lib/ui/settings-storage';
+	import { applyClientPrefs } from '$lib/ui/apply-client-prefs';
+	import { installClickSound } from '$lib/ui/sfx';
 
 	// clear abandoned per-table reconnect credentials so they don't sit in localStorage forever.
 	cleanupStaleTableCredentials();
 
 	// before children mount, so the mural's one-time motion check already sees it.
-	if (browser) {
-		const prefs = loadClientPrefs();
-		applyMotionPref(prefs?.motion ?? 'system');
-		applyTileSize(prefs?.tileSize ?? 'medium');
-	}
+	if (browser) applyClientPrefs(loadClientPrefs() ?? DEFAULT_CLIENT_PREFS);
+
+	$effect(() => installClickSound());
 
 	let { children } = $props();
 </script>

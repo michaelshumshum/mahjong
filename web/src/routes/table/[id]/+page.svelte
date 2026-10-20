@@ -32,8 +32,8 @@
 	import CoachMarks, { type CoachTarget } from '$lib/ui/CoachMarks.svelte';
 	import Settings from '$lib/ui/Settings.svelte';
 	import type { AutoArm, ClientPrefs } from '$lib/ui/client-prefs';
-	import { applyMotionPref, isMotionReduced } from '$lib/ui/motion';
-	import { applyTileSize } from '$lib/ui/tile-size';
+	import { isMotionReduced } from '$lib/ui/motion';
+	import { applyClientPrefs } from '$lib/ui/apply-client-prefs';
 	import { vibrate } from '$lib/ui/haptics';
 	import {
 		clearSeatForTable,
@@ -1007,8 +1007,7 @@
 					onPrefsChange={(next) => {
 						clientPrefs = next;
 						saveClientPrefs(next);
-						applyMotionPref(next.motion);
-						applyTileSize(next.tileSize);
+						applyClientPrefs(next);
 					}}
 					onReset={() => pushToast(m.settings_resetDone())}
 				/>

@@ -75,6 +75,7 @@ describe('settings-storage', () => {
 		it('round-trips a saved value', () => {
 			const prefs: ClientPrefs = {
 				soundEnabled: false,
+				sfxVolume: 30,
 				motion: 'reduced',
 				discardMode: 'one-tap',
 				haptics: false,
@@ -97,6 +98,7 @@ describe('settings-storage', () => {
 			);
 			expect(loadClientPrefs()).toEqual({
 				soundEnabled: true,
+				sfxVolume: 50,
 				motion: 'system',
 				discardMode: 'two-step',
 				haptics: true,
@@ -139,6 +141,7 @@ describe('settings-storage', () => {
 			);
 			expect(loadClientPrefs()).toEqual({
 				soundEnabled: true,
+				sfxVolume: 50,
 				motion: 'system',
 				discardMode: 'one-tap',
 				haptics: false,
@@ -161,6 +164,20 @@ describe('settings-storage', () => {
 				JSON.stringify({ ...base, tileSize: 'small' })
 			);
 			expect(loadClientPrefs()?.tileSize).toBe('small');
+		});
+
+		it('migrates a pre-sfxVolume stored value to 50 and rejects an out-of-range volume', () => {
+			const base = { soundEnabled: true, motion: 'system' };
+			localStorage.setItem(CLIENT_PREFS_STORAGE_KEY, JSON.stringify(base));
+			expect(loadClientPrefs()?.sfxVolume).toBe(50);
+
+			for (const sfxVolume of [-5, 101, 12.5, '50']) {
+				localStorage.setItem(CLIENT_PREFS_STORAGE_KEY, JSON.stringify({ ...base, sfxVolume }));
+				expect(loadClientPrefs()?.sfxVolume).toBe(50);
+			}
+
+			localStorage.setItem(CLIENT_PREFS_STORAGE_KEY, JSON.stringify({ ...base, sfxVolume: 0 }));
+			expect(loadClientPrefs()?.sfxVolume).toBe(0);
 		});
 
 		it('migrates a pre-handOrder stored value to auto-sort and rejects an unknown order', () => {
@@ -451,6 +468,7 @@ describe('settings-storage', () => {
 			expect(() =>
 				saveClientPrefs({
 					soundEnabled: true,
+					sfxVolume: 80,
 					motion: 'full',
 					discardMode: 'two-step',
 					haptics: true,
@@ -474,6 +492,7 @@ describe('settings-storage', () => {
 			expect(() =>
 				saveClientPrefs({
 					soundEnabled: true,
+					sfxVolume: 80,
 					motion: 'full',
 					discardMode: 'two-step',
 					haptics: true,

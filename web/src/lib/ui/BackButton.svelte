@@ -15,7 +15,7 @@
 </script>
 
 {#if href}
-	<a class="back-button" {href}>
+	<a class="back-button" data-sfx="on" {href}>
 		<ChevronLeft size={18} />
 		<span>{label}</span>
 	</a>

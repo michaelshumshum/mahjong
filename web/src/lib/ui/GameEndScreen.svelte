@@ -97,6 +97,7 @@
 			class="action"
 			class:action--primary={!onPlayAgain}
 			class:action--secondary={!!onPlayAgain}
+			data-sfx="on"
 			href="/">{m.gameEndScreen_backToHomeLabel()}</a
 		>
 	</div>

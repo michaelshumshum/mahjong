@@ -63,3 +63,27 @@ describe('Settings reset', () => {
 		expect(onReset).toHaveBeenCalledOnce();
 	});
 });
+
+describe('Settings sfx volume', () => {
+	afterEach(cleanupAll);
+
+	function volumeSlider(): HTMLInputElement {
+		return document.querySelector<HTMLInputElement>('[data-testid="settings-sfx-volume"]')!;
+	}
+
+	it('reports the dragged volume through onPrefsChange', () => {
+		const { onPrefsChange } = mountSettings(DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS);
+		const slider = volumeSlider();
+		expect(slider.valueAsNumber).toBe(DEFAULT_CLIENT_PREFS.sfxVolume);
+		expect(slider.getAttribute('aria-valuetext')).toBe(`${DEFAULT_CLIENT_PREFS.sfxVolume}%`);
+
+		slider.value = '40';
+		slider.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(onPrefsChange).toHaveBeenCalledWith({ ...DEFAULT_CLIENT_PREFS, sfxVolume: 40 });
+	});
+
+	it('is disabled while sound effects are off', () => {
+		mountSettings(DEFAULT_AUTO_ARM, { ...DEFAULT_CLIENT_PREFS, soundEnabled: false });
+		expect(volumeSlider().disabled).toBe(true);
+	});
+});

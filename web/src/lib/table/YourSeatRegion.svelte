@@ -402,6 +402,7 @@
 								class:hand-tile--pending={pending}
 								disabled={pending}
 								data-tile-id={tile.tileId}
+								data-sfx="off"
 								tabindex={rovingTileId === tile.tileId ? 0 : -1}
 								onfocus={() => (focusedTileId = tile.tileId)}
 								aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}

@@ -6,7 +6,7 @@
 	<title>{m.profilePage_pageTitle()}</title>
 </svelte:head>
 
-<a class="back-link" href="/">← {m.profilePage_backLabel()}</a>
+<a class="back-link" data-sfx="on" href="/">← {m.profilePage_backLabel()}</a>
 <h1>{m.profilePage_heading()}</h1>
 
 <style lang="scss">

@@ -2,10 +2,12 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
+	import SliderRow from './SliderRow.svelte';
 	import SwitchRow from './SwitchRow.svelte';
 	import TabBar from './TabBar.svelte';
 	import LocaleSwitcher from '$lib/i18n/LocaleSwitcher.svelte';
 	import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from './settings-storage';
+	import { previewClick } from './sfx';
 	import type { AutoArm, ClientPrefs } from './client-prefs';
 
 	type Tab = 'calls' | 'gameplay' | 'display';
@@ -209,6 +211,17 @@
 						description={m.settings_soundEffectsDesc()}
 						checked={prefs.soundEnabled}
 						onChange={(checked) => onPrefsChange({ ...prefs, soundEnabled: checked })}
+					/>
+					<SliderRow
+						label={m.settings_sfxVolumeLabel()}
+						description={m.settings_sfxVolumeDesc()}
+						value={prefs.sfxVolume}
+						step={5}
+						valueText={m.settings_sfxVolumeValue({ volume: prefs.sfxVolume })}
+						disabled={!prefs.soundEnabled}
+						testid="settings-sfx-volume"
+						onInput={(sfxVolume) => onPrefsChange({ ...prefs, sfxVolume })}
+						onCommit={previewClick}
 					/>
 					<SwitchRow
 						label={m.settings_hapticsLabel()}

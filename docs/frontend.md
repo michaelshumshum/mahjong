@@ -625,7 +625,7 @@ wrap, `Home`/`End`):
 | --- | --- |
 | Calls | `autoArm`: No calls, Auto-pass chow (switches) |
 | Gameplay | discard mode and hand order (segmented), Announce every discard (switch) |
-| Display | tile size and motion (segmented), Sound effects and Haptic feedback (switches), language (`LocaleSwitcher`, segmented) |
+| Display | tile size and motion (segmented), Sound effects (switch), Volume (`SliderRow`, disabled while sound is off), Haptic feedback (switch), language (`LocaleSwitcher`, segmented) |
 
 - Every control carries a one-line description; a segmented control (`SegmentedControl.svelte`,
   a native radio group) shows only the selected option's description.
@@ -653,7 +653,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | --- | --- | --- |
 | `mahjong:seat:v2:<tableId>` | this browser's seat at that table (`saveSeatForTable`/`loadSeatForTable`) | saved the moment `state_sync` confirms a seat; fed back into `connect()` on mount. Without it a reload falls into the seat picker and `join` fails with `table_full` |
 | `mahjong:reconnectSecret:v2:<tableId>` | `join`'s `reconnect_secret` (`saveSecretForTable`/`loadSecretForTable`) | presented on every `hello{seat, secret}` ([architecture.md §2.1](architecture.md)); stale `v1` keys are swept on load |
-| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards`, `tileSize`, `handOrder` | purely local; every field after `motion` postdates this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
+| `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards`, `tileSize`, `handOrder`, `sfxVolume` | purely local; every field after `motion` postdates this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
@@ -1092,9 +1092,27 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
   Size and weight are props (`size`, `strokeWidth`); colour is `currentColor`, and an icon is
   `aria-hidden` unless given an `aria-*`/`title` prop, so the button's label stays the accessible
   name. Not icons: `TimerRing` (a countdown ring) and the favicon.
-- **Sound (planned, deferred):** draw click, discard clack, shuffle — short, preloaded, muted
-  until opt-in. Settings' "Sound effects" toggle is persisted but nothing plays yet. No recorded
-  call-outs ([ADR 0010](decisions/0010-client-scope-cuts.md)).
+- **Sound:** `lib/ui/sfx.ts` plays `lib/assets/sfx/click.mp3` (90ms mono, ~2KB) on every
+  button-like control.
+  - One delegated `click` listener on `document`, installed by root `+layout.svelte`. It matches
+    `button`, `[role=button]`, `[role=tab]`, `<summary>` and native checkbox/radio, so a click on a
+    switch's or segmented control's `<label>` sounds once, through the control. Keyboard
+    activation sounds too; disabled controls never do.
+  - Links are silent unless styled as a button and marked `data-sfx="on"`: lobby "Play online",
+    `BackButton`'s link form, the game-end "Back to home", the profile back link. Not
+    `role="button"` on them: they navigate, and screen readers should announce them as links.
+  - Opt-out: `data-sfx="off"` on the control or an ancestor. Hand tiles carry it, keeping the
+    discard free for its own sound.
+  - Web Audio, not `<audio>`: no iOS start lag, and rapid clicks overlap instead of cutting off.
+    The `AudioContext` is created and the clip decoded on the first click, inside the gesture, so
+    autoplay policy lets it run.
+  - Gated by `ClientPrefs.soundEnabled` (default on) and scaled by `sfxVolume` (0–100, default
+    50; gain is its square, since a linear gain slider crowds all the audible change into its
+    bottom end). `applySoundPrefs` takes both, via `lib/ui/apply-client-prefs.ts`'s
+    `applyClientPrefs`: root layout on load, and the lobby's and table's Settings callbacks on
+    change. Releasing the volume slider plays a preview click (`previewClick`).
+  - Planned: draw click, discard clack, shuffle. No recorded call-outs
+    ([ADR 0010](decisions/0010-client-scope-cuts.md)).
 
 ### Styling: SCSS
 
