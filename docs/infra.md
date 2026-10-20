@@ -121,6 +121,7 @@ pnpm --dir web dev
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
+| `CLAIM_HOLD_SECONDS` | `BOT_THINK_MAX_SECONDS` + 0.2 (1.6) | the pause after every discard that hides whether a claim window opened; `0` disables ([architecture.md §4](architecture.md) "Claim hold") |
 | `LOG_LEVEL` | `info` | |
 | `API_DOCS` | on; `0` disables | `/docs`, `/redoc`, `/openapi.json`; the prod overlay sets `0` |
 | `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7) |

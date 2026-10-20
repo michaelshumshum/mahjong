@@ -40,7 +40,9 @@ sleeps after the worker replies, before re-entering the result — applied by th
 touches `_BOT_JOB_TIMEOUT_SECONDS`/`turn_seconds`/`claim_seconds` deadline math. Without it, turns
 resolve faster than a human can follow. Seeded off the per-decision seed `_submit_bot_job` derives
 (reproducible), and slept in that job's own task so it delays only that seat. The delay does not
-vary with decision difficulty — no tier returns a confidence signal to scale it by.
+vary with decision difficulty — no tier returns a confidence signal to scale it by. The claim
+hold's default sits just above its maximum, so a bot's claim decision never shows in the
+discard-to-draw gap ([architecture.md §4](architecture.md) "Claim hold").
 
 ## 2. Tiers
 

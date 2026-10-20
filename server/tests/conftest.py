@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 os.environ.setdefault("SHUTDOWN_GRACE_SECONDS", "0")
 os.environ.setdefault("BOT_THINK_MIN_SECONDS", "0")
 os.environ.setdefault("BOT_THINK_MAX_SECONDS", "0")
+# claim hold (app/table.py's `_begin_hold`): tests that assert on it pass `claim_hold_seconds`
+os.environ.setdefault("CLAIM_HOLD_SECONDS", "0")
 # read once when `app.main` builds its CORS middleware -- tests/test_main.py asserts against it
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 # no always-on bot table: every `TestClient(app)` would otherwise start a real all-bot game

@@ -464,7 +464,9 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             )
             assert _recv(ws3b, 3)["d"]["ok"] is True
 
-            expected_types_3 = ["claim_resolved", "hand_end", "score", "hand_start", "deal", "turn"]
+            # a no-claim resolution reaches only the offered seat (docs/protocol.md §3)
+            assert _recv(ws3b, 3)["t"] == "claim_resolved"
+            expected_types_3 = ["hand_end", "score", "hand_start", "deal", "turn"]
             frames_h3: dict[int, list[dict[str, Any]]] = {0: [], 1: [], 2: [], 3: []}
             live: dict[int, WebSocketTestSession] = {0: ws0, 1: ws1, 2: ws2, 3: ws3b}
             for _ in expected_types_3:
@@ -473,16 +475,16 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
             for seat in range(4):
                 assert [f["t"] for f in frames_h3[seat]] == expected_types_3
 
-            hand_end_3 = frames_h3[0][1]["d"]
+            hand_end_3 = frames_h3[0][0]["d"]
             assert hand_end_3["outcome"] == "exhaustive_draw"
             assert hand_end_3["hand_no"] == 3
-            hand_start_4 = frames_h3[0][3]["d"]
+            hand_start_4 = frames_h3[0][2]["d"]
             assert hand_start_4["hand_no"] == 4
             assert hand_start_4["dealer"] == 3
-            assert frames_h3[0][5]["d"]["seat"] == 3
+            assert frames_h3[0][4]["d"]["seat"] == 3
             assert table.state.hand_seed == derive_hand_seed(seed, 4)
 
-            score_after_h3 = frames_h3[0][2]["d"]["totals"]
+            score_after_h3 = frames_h3[0][1]["d"]["totals"]
 
             # hand 4 rig: final hand of EAST_ONLY (dealer 3) -- one uncontested discard drives
             # straight to Phase.GAME_OVER.

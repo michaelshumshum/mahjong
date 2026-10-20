@@ -296,7 +296,8 @@ Win (食糊)  >  Kong (槓) / Pung (碰)  >  Chow (上)
 ```
 on DISCARD(seat, tile):
   legal = {s: legal_claims(state, s, tile) for s in others if legal_claims(...) non-empty}
-  if legal is empty:            -> advance to next player's draw immediately
+  if legal is empty:            -> advance to next player's draw immediately (engine);
+                                   Table still holds it back (claim hold, below)
   window_id = next_window_id()
   for s in legal:  send CLAIM_OFFER(window_id, options, deadline_ts)
   open window:
@@ -305,6 +306,7 @@ on DISCARD(seat, tile):
     EARLY EXIT: close as soon as the best outstanding possible claim cannot beat
                 the best claim already received.
   resolve by priority -> emit exactly one CLAIM_RESOLVED event
+                         (Table: a no-claim one only to the seats offered, below)
 ```
 
 `claims.can_close_early`/`resolve_claims` are pure and reason only over responses already
@@ -325,11 +327,25 @@ Rules:
   `legal_actions` returns `()` for it, so a second answer (Pass then Pung) fails authorization
   and is dropped. Otherwise a seat could pass, watch the window stay open, and change its mind.
 - **Early exit is a UX requirement, kept deliberately.** If the only eligible chow passes, the game
-  must continue instantly; waiting out a 5s timer every discard feels dead. **Accepted
-  information leak:** an attentive opponent can read (1) how long the window stays open — someone
-  had a claim; (2) after passing immediately, whether the window stays open — another seat still
-  holds a live claim. Timing obfuscation (padding `claim_offer` delivery) is incompatible with
-  instant early exit, so it is not done.
+  must continue instantly; waiting out a 5s timer every discard feels dead.
+- **Claim hold.** Without it, a seat with no offer could tell whether a window existed: no window
+  meant `discard` → `draw` in the same tick, a window meant a pause (a human's decision, or the
+  bot think delay, [bots.md §1](bots.md)) and a `claim_resolved{seat:null}`. Since chow offers go
+  only to the next seat, that pointed at that player's tiles. So, in `app/table.py` (the engine
+  and its trajectories are untouched):
+
+  | Part | Rule |
+  | --- | --- |
+  | No-claim resolution | `ClaimResolved` with no winner goes only to the seats the window offered (`_publish_claim_resolved`); it is never broadcast or sent to spectators |
+  | Uniform pause | every `Discarded` starts a hold (`_begin_hold`): for `claim_hold_seconds` every outbound frame queues per recipient, except `ack`/`error`/`server_shutdown`/`claim_offer` and an offered seat's `claim_resolved`, whether or not a window opened. Release (`_release_hold`, one `TimerHeap` entry) flushes the queues in order |
+  | Next turn | held too: `_authorize` drops commands in `AWAIT_ACTION`, `_poke_bots` submits no turn job, and `turn` (with its `turn_seconds` timer) is published only on the release tick |
+  | `state_sync` mid-hold | rebuilt at release, so a reconnect or new spectator can't probe the held state |
+  | Duration | `CLAIM_HOLD_SECONDS`, default `BOT_THINK_MAX_SECONDS` + 0.2s (1.6s), so a window only bots are offered always closes inside it. `0` turns it off: the showcase (open hands, nothing to hide) and the test suite (`tests/conftest.py`) |
+
+  **Residual leak, accepted:** a window still open when the hold ends (a human thinking longer
+  than it) shows, as does, after passing immediately, a window staying open — another seat still
+  holds a live claim. Padding every discard to `claim_seconds` would hide it, at 5s a discard.
+  A claim that wins is public anyway.
 - **Pre-declared intent.** Clients pre-arm "auto-pass on chow" / "no calls" toggles; the server
   treats a pre-arm as an instant PASS. A win offer is never auto-resolved by a pre-arm
   ([protocol.md §2](protocol.md) "Declining a claim on purpose").
@@ -579,4 +595,5 @@ On expiry (`_handle_abandon_timeout`), all inside the table's own task:
    ([ADR 0005](decisions/0005-client-entropy-fairness.md)).
 5. **Collusion** (two humans sharing a screen) is unsolvable technically. Mitigate socially: random
    seating for rated play, statistical review of suspicious deal-in patterns.
-6. **Claim-window timing leak — accepted (§4).** Don't "fix" it locally without re-reading §4.
+6. **Claim-window timing leak — masked up to the claim hold, the rest accepted (§4).** Don't
+   change either without re-reading §4.

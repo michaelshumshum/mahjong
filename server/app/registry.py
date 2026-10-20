@@ -175,6 +175,8 @@ class TableRegistry:
             seat_bot_tiers={seat: tier_rng.choice(bot_tiers) for seat in range(4)},
             all_bots=True,
             settings=TableSettings(spectators_see_hands=True),
+            # open hands: spectators already see every claim, nothing for a hold to hide
+            claim_hold_seconds=0,
         )
         self._tables[table_id] = table
         if previous is not None:

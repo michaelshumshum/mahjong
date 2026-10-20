@@ -45,6 +45,10 @@ window ready. This module's own job is what `reduce()` can't do without a clock:
 deadline when a window opens, and turning an unanswered deadline into synthesized `Pass`
 responses fed back through the same path -- see `_handle_claim_timeout`.
 
+Claim hold (architecture.md §4). Every discard holds outbound frames for `claim_hold_seconds`
+(`_begin_hold`/`_release_hold`), and a no-claim `ClaimResolved` reaches only the seats offered
+(`_publish_claim_resolved`), so an observer can't tell whether a window opened.
+
 Session/WS integration. `join`/`mark_ready`/`set_auto`/`publish_to_seat`/`state_sync_wire`
 are this Table's half of the wire protocol -- `app/ws.py`'s `Session` is the other half.
 `SeatBinding` holds the live per-seat state that has no home in the pure `GameState`. Several
@@ -126,11 +130,18 @@ from bots.worker import compute_action
 from mahjong_core.actions import Action, Discard, Pass, action_to_dict, legal_actions
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
-from mahjong_core.events import Discarded, Drawn, Event, HandEnded, KongReplacementDrawn
+from mahjong_core.events import (
+    ClaimResolved,
+    Discarded,
+    Drawn,
+    Event,
+    HandEnded,
+    KongReplacementDrawn,
+)
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import preset_id_for
-from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
+from mahjong_core.state import ClaimKind, ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
 __all__ = [
@@ -149,6 +160,14 @@ _DISCONNECT_HANDOVER_BOT_TIER: Final = BotTier.T2
 # turn/claim deadline math -- a real tier answers in single-digit ms otherwise. Env-overridable.
 _BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
 _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
+# claim hold (architecture.md §4): every discard holds the next draw back this long, window or
+# not. above the bot think delay so a window only bots are offered closes inside it.
+_CLAIM_HOLD_MARGIN_SECONDS = 0.2
+_CLAIM_HOLD_SECONDS = float(
+    os.environ.get("CLAIM_HOLD_SECONDS", _BOT_THINK_MAX_SECONDS + _CLAIM_HOLD_MARGIN_SECONDS)
+)
+# frames a claim hold never delays: an offered seat's own window traffic, connection notices
+_HOLD_EXEMPT_FRAMES: Final = frozenset({"ack", "error", "server_shutdown", "claim_offer"})
 
 _MAX_NAME_LENGTH = 24  # guest display name cap (docs/protocol.md §2 `join.name`)
 
@@ -308,6 +327,7 @@ class Table:
         all_bots: bool = False,
         settings: TableSettings | None = None,
         abandon_grace_seconds: float | None = None,
+        claim_hold_seconds: float | None = None,
     ) -> None:
         if bot_tier not in BOT_TIERS:
             raise ValueError(
@@ -370,6 +390,14 @@ class Table:
         self.abandon_grace_seconds = abandon_grace_seconds
         self._abandon_timer_id: int | None = None
         self.closed = False  # ended early as abandoned; run() has returned, never persisted
+        # claim hold: while _hold_timer_id is live, frames queue per recipient -- see _begin_hold
+        self.claim_hold_seconds = (
+            _CLAIM_HOLD_SECONDS if claim_hold_seconds is None else claim_hold_seconds
+        )
+        self._hold_timer_id: int | None = None
+        self._held: dict[int | str, list[dict[str, Any]]] = {}
+        self._held_sync: set[int | str] = set()
+        self._turn_publish_due = False
         # per-seat AWAIT_ACTION turn deadlines -- same lazy-deletion staleness discipline as claims.
         self._turn_timer_seat: dict[int, int] = {}
         self._active_turn_timer: dict[int, int] = {}
@@ -668,10 +696,15 @@ class Table:
         if rearmed:
             self._send_seat_claim_offer(seat)
 
-    def publish_to_seat(self, seat: int, wire: dict[str, Any]) -> None:
+    def publish_to_seat(
+        self, seat: int, wire: dict[str, Any], *, bypass_hold: bool = False
+    ) -> None:
         """Stamp `wire` with this seat's next `seq`, append it to the seat's ring buffer, and
         push it out over that seat's live connection if one is bound -- the only path any
-        seat-facing frame leaves this Table through."""
+        seat-facing frame leaves this Table through. During a claim hold the frame is queued
+        unstamped instead (`_hold_frame`), so `seq` stays gapless in send order."""
+        if not bypass_hold and self._hold_frame(seat, wire):
+            return
         seq = self.seat_seq[seat]
         self.seat_seq[seat] = seq + 1
         self.ring[seat].append(Envelope(seq=seq, event=wire))
@@ -755,6 +788,8 @@ class Table:
         seq = self.spectator_seq.get(session_id)
         if seq is None:
             return
+        if self._hold_frame(session_id, wire):
+            return
         self.spectator_seq[session_id] = seq + 1
         self.ring[session_id].append(Envelope(seq=seq, event=wire))
         send = self.spectators.get(session_id)
@@ -764,6 +799,49 @@ class Table:
     def _broadcast_to_spectators(self, wire: dict[str, Any]) -> None:
         for session_id in list(self.spectators):
             self.publish_to_spectator(session_id, dict(wire))
+
+    def _hold_frame(self, key: int | str, wire: dict[str, Any]) -> bool:
+        """Queue `wire` for `key` (a seat or spectator session) if a claim hold is live; returns
+        whether it was queued. A `state_sync` replaces that recipient's queue and is rebuilt at
+        release, since one built now would show the held draw; later frames are covered by it."""
+        if self._hold_timer_id is None or wire["t"] in _HOLD_EXEMPT_FRAMES:
+            return False
+        if wire["t"] == "state_sync":
+            self._held.pop(key, None)
+            self._held_sync.add(key)
+        elif key not in self._held_sync:
+            self._held.setdefault(key, []).append(wire)
+        return True
+
+    def _begin_hold(self) -> None:
+        """Start a claim hold (architecture.md §4 "Claim hold"): every frame not in
+        `_HOLD_EXEMPT_FRAMES` queues until `claim_hold_seconds` from now, whether or not a
+        window opened. `_authorize`/`_poke_bots`/`process_one` also keep the next turn from
+        starting until release. Always runs inside this table's own tick, so needs no `_wake()`."""
+        if self.claim_hold_seconds <= 0 or self._hold_timer_id is not None:
+            return
+        loop = asyncio.get_running_loop()
+        timer_id = next(self._timer_seq)
+        self.deadlines.add(loop.time() + self.claim_hold_seconds, timer_id)
+        self._hold_timer_id = timer_id
+
+    def _release_hold(self) -> None:
+        """Flush every queued frame in order and send each deferred `state_sync` built against
+        the state as of now. The deferred `turn` follows from `process_one()`'s tail."""
+        self._hold_timer_id = None
+        held, synced = self._held, self._held_sync
+        self._held, self._held_sync = {}, set()
+        for key, frames in held.items():
+            for wire in frames:
+                if isinstance(key, int):
+                    self.publish_to_seat(key, wire)
+                else:
+                    self.publish_to_spectator(key, wire)
+        for key in synced:
+            if isinstance(key, int):
+                self.publish_to_seat(key, self.state_sync_wire(key))
+            else:
+                self.publish_to_spectator(key, self.state_sync_wire(None))
 
     def broadcast_server_shutdown(self, deadline_ts: int) -> None:
         """Tell every seat a drain has started -- clients show a "reconnect shortly" banner
@@ -892,6 +970,10 @@ class Table:
             return
         self._arm_claim_timer()
         if not isinstance(event, _WakeUp) and self.state is not pre_state:
+            self._turn_publish_due = True
+        # a claim hold defers the turn (and its timer) to the tick that releases it
+        if self._turn_publish_due and self._hold_timer_id is None:
+            self._turn_publish_due = False
             self._publish_turn_if_active()
         self._poke_bots()
         self._update_abandon_timer()
@@ -961,6 +1043,8 @@ class Table:
         """
         if not self.started:
             return None
+        if self._hold_timer_id is not None and self.state.phase == Phase.AWAIT_ACTION:
+            return None  # that seat's draw/turn is still held back (_begin_hold)
         if cmd.action in legal_actions(self.state, cmd.seat):
             return cmd.action
         return None
@@ -1009,6 +1093,8 @@ class Table:
             self._handle_hand_end_timeout(timer_id)
         elif timer_id == self._abandon_timer_id:
             self._handle_abandon_timeout()
+        elif timer_id == self._hold_timer_id:
+            self._release_hold()
         else:
             self._handle_disconnect_timeout(timer_id)
 
@@ -1209,7 +1295,11 @@ class Table:
                 and any(o.seat == seat for o in window.offers)
             ):
                 tag = BotJobTag(kind="claim", key=window.window_id, state_version=self.event_id)
-            elif self.state.phase == Phase.AWAIT_ACTION and self.state.turn == seat:
+            elif (
+                self._hold_timer_id is None
+                and self.state.phase == Phase.AWAIT_ACTION
+                and self.state.turn == seat
+            ):
                 tag = BotJobTag(kind="turn", key=seat, state_version=self.event_id)
             if tag is None or self._pending_bot.get(seat) == tag:
                 continue
@@ -1382,12 +1472,14 @@ class Table:
         which the just-produced `hand_end` frame needs to carry), but the actual advance must
         not run until after `events` is on the wire, or `hand_start`/`deal` would leapfrog it."""
         self.actions.append(action)  # full-game log -- reduce()-bound only
+        window = self.state.claim_window
+        offered = frozenset(o.seat for o in window.offers) if window is not None else frozenset()
         self.state, events = reduce(self.state, action)
         self.event_id += 1
         advance_immediately = False
         if self.state.phase == Phase.HAND_OVER:
             advance_immediately = self._open_hand_end_window()
-        self._publish(events)
+        self._publish(events, offered=offered)
         if advance_immediately:
             self._advance_to_next_hand()
         else:
@@ -1674,12 +1766,21 @@ class Table:
         assert self._fairness_nonce is not None
         return fairness_reveal(self.state.hand_seed, self._fairness_nonce[1])
 
-    def _publish(self, events: list[Event]) -> None:
+    def _publish(self, events: list[Event], *, offered: frozenset[int] = frozenset()) -> None:
         """`redact_event()` per recipient seat, published via `publish_to_seat`, plus one more
         spectator-redacted pass fanned out to every registered spectator session -- skipped
         entirely when there are no spectators. A `HandEnded` also gets a broadcast `score`
-        alongside it."""
+        alongside it.
+
+        `offered` is the seats the window this tick resolved had offered a claim to. A
+        `ClaimResolved` reaches them unheld (it closes their prompt); a no-claim one reaches
+        nobody else, which would otherwise learn a window existed. A `Discarded` starts a
+        claim hold after its own frames, so the draw behind it is held whether or not a window
+        opened (`_begin_hold`)."""
         for event in events:
+            if isinstance(event, ClaimResolved):
+                self._publish_claim_resolved(event, offered)
+                continue
             for seat in range(4):
                 wire = redact_event(self.state, seat, event)
                 self._augment_event_wire(wire, event)
@@ -1695,6 +1796,18 @@ class Table:
                 self._broadcast_wire(
                     {"t": "score", "totals": {s: self.state.seats[s].score for s in range(4)}}
                 )
+            if isinstance(event, Discarded):
+                self._begin_hold()
+
+    def _publish_claim_resolved(self, event: ClaimResolved, offered: frozenset[int]) -> None:
+        private = event.winning_seat is None and event.claim_kind == ClaimKind.DISCARD
+        for seat in range(4):
+            if seat in offered or not private:
+                self.publish_to_seat(
+                    seat, redact_event(self.state, seat, event), bypass_hold=seat in offered
+                )
+        if not private and self.spectators:
+            self._broadcast_to_spectators(redact_event(self.state, None, event))
 
     def _record_hand_history(self, event: HandEnded) -> None:
         """Snapshot this just-ended hand into `self._hand_history`. Called from `_publish` while

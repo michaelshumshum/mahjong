@@ -130,7 +130,9 @@ No implementation-level gotchas beyond root `AGENTS.md`'s Testing section and `s
 Commands table. Add them here as they turn up.
 
 - `server/tests/conftest.py` pins `SHUTDOWN_GRACE_SECONDS=0`: every `TestClient(app)` exit runs the
-  real shutdown drain ([architecture.md §8.1](architecture.md)).
+  real shutdown drain ([architecture.md §8.1](architecture.md)). It also zeroes
+  `BOT_THINK_*_SECONDS` and `CLAIM_HOLD_SECONDS` ([architecture.md §4](architecture.md) "Claim
+  hold"); `tests/test_claim_window_privacy.py` passes `claim_hold_seconds` explicitly to test it.
 - CI has no Postgres; DB tests run against SQLite via the JSON/JSONB column variant
   ([infra.md §6](infra.md)).
 - A helper used by more than one test module lives in a plain module under `server/tests/`,
