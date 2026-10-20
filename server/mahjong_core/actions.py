@@ -254,6 +254,11 @@ def can_declare_win(state: GameState, seat: int) -> bool:
     return result.clears_min_faan
 
 
+# one-entry memo on state identity: a table tick asks for the same frozen state's turn actions
+# ~4 times (mask, authorize, reduce, publish). only state.turn reaches it, so seat isn't keyed.
+_last_turn_actions: tuple[GameState, tuple[Action, ...]] | None = None
+
+
 def legal_actions(state: GameState, seat: int) -> tuple[Action, ...]:
     """Every action `seat` may legally take right now. Returns `()` for a seat not currently
     expected to decide anything (see module docstring)."""
@@ -265,7 +270,13 @@ def legal_actions(state: GameState, seat: int) -> tuple[Action, ...]:
     if state.phase != Phase.AWAIT_ACTION or state.turn != seat:
         return ()
 
-    return _turn_actions(state, seat)
+    global _last_turn_actions
+    last = _last_turn_actions
+    if last is not None and last[0] is state:
+        return last[1]
+    actions = _turn_actions(state, seat)
+    _last_turn_actions = (state, actions)
+    return actions
 
 
 def _claim_actions(window: ClaimWindow | None, seat: int) -> tuple[Action, ...]:
