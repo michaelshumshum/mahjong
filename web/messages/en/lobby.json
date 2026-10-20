@@ -6,7 +6,6 @@
 	"lobby_playOnlineButton": "Play online",
 	"lobby_playOnlineGlyph": "打",
 	"createTableDialog_title": "Create a table",
-	"createTableDialog_visibilityLegend": "Visibility",
 	"createTableDialog_privateLabel": "Private table",
 	"createTableDialog_rulesLegend": "Rules",
 	"createTableDialog_customLabel": "Custom",

@@ -6,7 +6,6 @@
 	"lobby_playOnlineButton": "網上對戰",
 	"lobby_playOnlineGlyph": "打",
 	"createTableDialog_title": "開枱",
-	"createTableDialog_visibilityLegend": "公開程度",
 	"createTableDialog_privateLabel": "私人枱",
 	"createTableDialog_rulesLegend": "規則",
 	"createTableDialog_customLabel": "自訂",
