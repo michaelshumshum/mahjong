@@ -392,6 +392,21 @@ def test_await_claims_offered_seat_never_empty() -> None:
     assert legal_actions(state, 1) != ()
 
 
+@pytest.mark.parametrize(
+    ("phase", "kind"),
+    [(Phase.AWAIT_CLAIMS, ClaimKind.DISCARD), (Phase.AWAIT_KONG_ROB, ClaimKind.KONG_ROB)],
+)
+def test_claim_actions_empty_once_seat_has_responded(phase: Phase, kind: ClaimKind) -> None:
+    window = _claim_window((ClaimOffer(seat=1, can_win=True), ClaimOffer(seat=2, can_win=True)))
+    window = dataclasses.replace(
+        window, kind=kind, responses={1: Pass(window_id=window.window_id, seat=1)}
+    )
+    state = _base_state(phase=phase, claim_window=window, turn=0)
+
+    assert legal_actions(state, 1) == ()
+    assert legal_actions(state, 2) != ()
+
+
 # --- AWAIT_KONG_ROB ---------------------------------------------------------------------------
 
 

@@ -200,6 +200,27 @@ async def test_claim_timeout_only_defaults_seats_that_never_responded() -> None:
     assert not any(m.kind == MeldKind.PUNG for m in table.state.seats[2].melds)
 
 
+async def test_second_answer_from_a_seat_that_already_responded_is_dropped() -> None:
+    """Seat 2 passes, then submits a pung against the same window: one response per seat per
+    window, so `_authorize` drops the pung and seat 2's Pass stands."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=999)
+    table = await _open_claim_window(ruleset)
+
+    pung_action = next(a for a in legal_actions(table.state, 2) if isinstance(a, ClaimPung))
+    pass_action = next(a for a in legal_actions(table.state, 2) if isinstance(a, Pass))
+    table.submit(2, pass_action)
+    await table.process_one()
+    assert table.state.claim_window is not None  # seat 1's chow still outstanding
+    open_state = table.state
+
+    table.submit(2, pung_action)
+    await table.process_one()
+
+    assert table.state is open_state
+    assert table.state.claim_window is not None
+    assert table.state.claim_window.responses == {2: pass_action}
+
+
 # --- stale timer: a window resolved early must ignore its own leftover deadline ----------------
 
 

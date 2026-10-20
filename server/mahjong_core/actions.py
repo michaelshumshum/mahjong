@@ -280,7 +280,8 @@ def legal_actions(state: GameState, seat: int) -> tuple[Action, ...]:
 
 
 def _claim_actions(window: ClaimWindow | None, seat: int) -> tuple[Action, ...]:
-    if window is None:
+    # one response per seat per window
+    if window is None or seat in window.responses:
         return ()
     offer = next((o for o in window.offers if o.seat == seat), None)
     if offer is None:

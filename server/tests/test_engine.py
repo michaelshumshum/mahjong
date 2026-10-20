@@ -1033,6 +1033,30 @@ def test_reduce_rejects_claim_from_a_seat_with_no_offer() -> None:
         reduce(state, pass_action)
 
 
+def test_reduce_rejects_a_second_response_from_a_seat_that_already_answered() -> None:
+    """One response per seat per window: seat 2 passes while seat 1's chow keeps the window
+    open, then tries to pung the same tile -- the pung must be illegal, and the window must
+    still resolve on seat 2's original Pass."""
+    state = _claims_window_state()
+    pass_action = next(a for a in legal_actions(state, 2) if isinstance(a, Pass))
+    pung_action = next(a for a in legal_actions(state, 2) if isinstance(a, ClaimPung))
+    state, _ = reduce(state, pass_action)
+    assert state.claim_window is not None
+    assert state.claim_window.responses == {2: pass_action}
+
+    assert legal_actions(state, 2) == ()
+    with pytest.raises(IllegalActionError):
+        reduce(state, pung_action)
+    with pytest.raises(IllegalActionError):
+        reduce(state, pass_action)
+
+    chow_action = next(a for a in legal_actions(state, 1) if isinstance(a, ClaimChow))
+    state, events = reduce(state, chow_action)
+    resolved = next(e for e in events if isinstance(e, ClaimResolved))
+    assert resolved.winning_seat == 1
+    assert not any(m.kind == MeldKind.PUNG for m in state.seats[2].melds)
+
+
 # --- start_next_hand: dealer repeat / rotation -------------------------------------------------
 
 

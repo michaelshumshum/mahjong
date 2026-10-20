@@ -295,7 +295,7 @@ on DISCARD(seat, tile):
   window_id = next_window_id()
   for s in legal:  send CLAIM_OFFER(window_id, options, deadline_ts)
   open window:
-    collect CLAIM(window_id, choice) from legal seats only
+    collect CLAIM(window_id, choice) from legal seats only, one per seat
     close when  (all legal seats responded)  OR  (deadline reached -> absentees = PASS)
     EARLY EXIT: close as soon as the best outstanding possible claim cannot beat
                 the best claim already received.
@@ -316,6 +316,9 @@ Rules:
   information and trusts the client.
 - **`window_id` on every claim.** Claims tagged with a stale window are dropped silently; without
   it a laggy click from the previous discard fires on the current one.
+- **One response per seat per window.** Once a seat's answer is in `ClaimWindow.responses`,
+  `legal_actions` returns `()` for it, so a second answer (Pass then Pung) fails authorization
+  and is dropped. Otherwise a seat could pass, watch the window stay open, and change its mind.
 - **Early exit is a UX requirement, kept deliberately.** If the only eligible chow passes, the game
   must continue instantly; waiting out a 5s timer every discard feels dead. **Accepted
   information leak:** an attentive opponent can read (1) how long the window stays open — someone
