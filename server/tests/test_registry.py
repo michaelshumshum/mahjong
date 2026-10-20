@@ -136,6 +136,24 @@ async def test_disconnect_pre_start_frees_seat_after_grace_period() -> None:
     assert registry.list_tables() == []
 
 
+async def test_list_tables_skips_private_tables() -> None:
+    registry = TableRegistry()
+    hidden = registry.get_or_create("hidden", DEFAULT_RULESET, seed=1, private=True)
+    hidden.join("s-alice", _noop_send, seat=0, name="Alice")
+    shown = registry.get_or_create("shown", DEFAULT_RULESET, seed=1)
+    shown.join("s-bob", _noop_send, seat=0, name="Bob")
+    assert [t.table_id for t in registry.list_tables()] == ["shown"]
+    assert registry.get("hidden") is hidden
+
+
+async def test_private_only_applies_on_first_creation() -> None:
+    registry = TableRegistry()
+    table = registry.get_or_create("first", DEFAULT_RULESET, seed=1)
+    table.join("s-alice", _noop_send, seat=0, name="Alice")
+    registry.get_or_create("first", DEFAULT_RULESET, seed=1, private=True)
+    assert [t.table_id for t in registry.list_tables()] == ["first"]
+
+
 async def test_list_tables_drops_finished_games() -> None:
     registry = TableRegistry()
     table = registry.get_or_create("lobby-done", DEFAULT_RULESET, seed=1, require_ready=False)

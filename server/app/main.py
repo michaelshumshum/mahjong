@@ -162,6 +162,7 @@ async def create_table(body: CreateTableRequest) -> CreateTableResponse:
         resolved,
         practice=body.practice,
         seat_bot_tiers=_resolve_seat_bot_tiers(body.practice, body.bot_tiers),
+        private=body.private,
     )
     return CreateTableResponse(
         table_id=table_id,

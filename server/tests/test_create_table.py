@@ -167,3 +167,16 @@ def test_generated_id_exhausting_attempts_raises() -> None:
                 pass
             else:
                 raise AssertionError("expected RuntimeError once every attempt collides")
+
+
+def test_private_table_is_left_out_of_listing() -> None:
+    with TestClient(app) as client:
+        private_id = client.post("/tables", json={"private": True}).json()["table_id"]
+        public_id = client.post("/tables", json={}).json()["table_id"]
+        for table_id in (private_id, public_id):
+            table = get_table(table_id)
+            assert table is not None
+            table.join(f"s-{table_id}", lambda _seq, _frame: None, seat=0, name="Alice")
+        listed = {t["id"] for t in client.get("/tables").json()["tables"]}
+    assert public_id in listed
+    assert private_id not in listed

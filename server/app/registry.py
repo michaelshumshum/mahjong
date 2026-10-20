@@ -85,6 +85,8 @@ class TableRegistry:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         # ids of evicted abandoned tables; a bare id each, never pruned
         self._closed: set[str] = set()
+        # unlisted by `list_tables`; reachable by id only
+        self._private: set[str] = set()
         # read by ws.py's connection accept and main.py's /healthz once a drain starts
         self.draining = False
         self._showcase_id: str | None = None
@@ -104,10 +106,11 @@ class TableRegistry:
         practice: bool = False,
         bot_tier: str = DEFAULT_BOT_TIER,
         seat_bot_tiers: Mapping[int, str] | None = None,
+        private: bool = False,
     ) -> Table:
         """Return the existing table for `table_id`, or construct and start one -- a table id
         names one particular game, never recycled, even after it finishes. `practice`/`bot_tier`/
-        `seat_bot_tiers` only apply the first time a given `table_id` is created."""
+        `seat_bot_tiers`/`private` only apply the first time a given `table_id` is created."""
         table = self._tables.get(table_id)
         if table is not None:
             return table
@@ -124,6 +127,8 @@ class TableRegistry:
             abandon_grace_seconds=self._abandon_grace_seconds,
         )
         self._tables[table_id] = table
+        if private:
+            self._private.add(table_id)
         self._tasks[table_id] = asyncio.create_task(self._run(table_id, table))
         return table
 
@@ -134,6 +139,7 @@ class TableRegistry:
             self._tasks.pop(table_id, None)
             if table.closed and self._tables.get(table_id) is table:
                 del self._tables[table_id]
+                self._private.discard(table_id)
                 self._closed.add(table_id)
 
     def start_showcase(
@@ -205,13 +211,14 @@ class TableRegistry:
 
     def list_tables(self) -> list[TableSummary]:
         """Every still-running table with at least one human seat, plus the showcase table.
-        Skips finished games (never evicted from `_tables`) and tables nobody has joined yet
-        (a practice table is bot-only until its owner joins)."""
+        Skips finished games (never evicted from `_tables`), tables nobody has joined yet
+        (a practice table is bot-only until its owner joins) and private tables."""
         summaries: list[TableSummary] = []
         for table_id, table in self._tables.items():
             bindings = table.seat_bindings
             if table_id != self._showcase_id and (
-                not self.is_running(table_id)
+                table_id in self._private
+                or not self.is_running(table_id)
                 or not any(b is not None and b.status != "bot" for b in bindings)
             ):
                 continue

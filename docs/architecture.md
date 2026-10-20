@@ -197,7 +197,7 @@ change it mid-game.
 
 | Path | Notes |
 | --- | --- |
-| `POST /tables` (`app/main.py`'s `create_table`) | primary: `{ruleset, rules?, practice?, bot_tiers?}` → server-generated table id + resolved ruleset ([protocol.md §10](protocol.md)) |
+| `POST /tables` (`app/main.py`'s `create_table`) | primary: `{ruleset, rules?, practice?, bot_tiers?, private?}` → server-generated table id + resolved ruleset ([protocol.md §10](protocol.md)) |
 | `?ruleset=<preset_id>` / `?ruleset=custom&rules=<json>` on `/ws` (`app/ws.py`'s `_resolve_ruleset_query`) | fallback for a direct WS connect to an unclaimed table id |
 
 Both call `mahjong_core.presets.resolve_ruleset`. `TableRegistry.get_or_create` is "first creation

@@ -429,6 +429,7 @@ GET /tables
 | Only still-running tables (`TableRegistry.is_running`) | finished `Table`s are never evicted from the registry; abandoned ones are, but their id is kept so it's never reused ([architecture.md §8.2](architecture.md)) |
 | Only tables with at least one non-bot seat bound | every `/table/<id>` visit creates a table, and a practice table is bot-only until its owner joins |
 | …except the showcase table (`BOTS`), always listed | it's bot-only by design ([architecture.md §3](architecture.md)) |
+| Never a table created with `private: true` | reachable only by id (table URL or join-by-code); the random six-character id is the only secret, there is no password |
 | `open` = not started and some seat `empty`; otherwise `in_progress` | an `in_progress` table can only be spectated |
 
 `seats[i].status` uses the `state_sync.seat_status` vocabulary.
@@ -436,7 +437,7 @@ GET /tables
 ```
 POST /tables
 {"ruleset"?: "hk_classic", "rules"?: {…RuleSet.to_dict() shape…}, "practice"?: false,
- "bot_tiers"?: {"1": "T1"|"T2"|"T4"|"ORACLE", "2": …, "3": …}}
+ "bot_tiers"?: {"1": "T1"|"T2"|"T4"|"ORACLE", "2": …, "3": …}, "private"?: false}
 ->
 {"table_id": "ABC123", "ruleset_preset": "hk_classic" | null, "ruleset": {…RuleSet.to_dict()…}}
 ```
@@ -452,5 +453,7 @@ POST /tables
   also types `state_sync.bot_levels`, so adding a tier needs `make proto` (it regenerates
   `protocol.d.ts`'s `BotTier` union, which `lobby.ts` types this field with). An out-of-range seat or unknown tier is dropped and that seat falls back to
   `DEFAULT_BOT_TIER` (`T2`). Ignored when `practice` is false.
+- `private` keeps the table out of `GET /tables` (`TableRegistry._private`). Joining, seating and
+  spectating by id are unchanged.
 - A table created via `POST /tables` and one auto-created by a direct WS connect behave
-  identically; whichever happens first for an id sticks.
+  identically (a WS-created table is always listed); whichever happens first for an id sticks.

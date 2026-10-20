@@ -44,6 +44,8 @@ class CreateTableRequest(BaseModel):
     # practice mode's per-seat difficulty picker: {1: "T1", 2: "T4", 3: "ORACLE"}-shaped, seat 0
     # excluded (the human seat) -- only meaningful when practice=True, see _resolve_seat_bot_tiers.
     bot_tiers: dict[int, str] | None = None
+    # left out of GET /tables; joinable by id/url only
+    private: bool = False
 
 
 class CreateTableResponse(BaseModel):
