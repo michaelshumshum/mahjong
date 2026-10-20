@@ -49,4 +49,42 @@ describe('LobbyPage', () => {
 		await Promise.resolve();
 		expect(target.querySelector('dialog')?.open).toBe(true);
 	});
+
+	it('opens Settings from the button beside the language toggle, with stored prefs', async () => {
+		localStorage.setItem(
+			'mahjong:clientPrefs:v1',
+			JSON.stringify({ soundEnabled: true, motion: 'system', sfxVolume: 35 })
+		);
+		component = mount(LobbyPage, { target });
+		const settingsButton = target.querySelector<HTMLButtonElement>(
+			'[data-testid="lobby-settings"]'
+		)!;
+		expect(settingsButton.previousElementSibling?.getAttribute('data-testid')).toBe(
+			'lobby-language'
+		);
+		settingsButton.click();
+		await Promise.resolve();
+		expect(target.querySelector('dialog')?.open).toBe(true);
+		const volume = target.querySelector<HTMLInputElement>('[data-testid="settings-sfx-volume"]')!;
+		expect(volume.valueAsNumber).toBe(35);
+		localStorage.clear();
+	});
+
+	it('shows the language toggle as a shorthand, named in full for assistive tech', () => {
+		component = mount(LobbyPage, { target });
+		const language = target.querySelector<HTMLButtonElement>('[data-testid="lobby-language"]')!;
+		expect(language.textContent?.trim()).toBe('lobby_languageShort');
+		expect(language.getAttribute('aria-label')).toBe('lobby_languageButton');
+		expect(language.querySelector('svg')).not.toBeNull();
+		expect(
+			target.querySelector('[data-testid="lobby-settings"] svg'),
+			'settings button carries an icon'
+		).not.toBeNull();
+	});
+
+	it('marks the play-online link for the button click sound', () => {
+		component = mount(LobbyPage, { target });
+		const play = target.querySelector('[data-testid="lobby-play-online"]')!;
+		expect(play.getAttribute('data-sfx')).toBe('on');
+	});
 });

@@ -617,7 +617,7 @@ Rules:
 
 ### Settings dialog
 
-`lib/ui/Settings.svelte`, opened from the table header (`DismissablePanel`). Three tabs
+`lib/ui/Settings.svelte`, opened from the table header and the lobby (§7) (`DismissablePanel`). Three tabs
 (`TabBar.svelte`, shared with the custom rules editor: `role="tablist"`, roving focus, `←`/`→`
 wrap, `Home`/`End`):
 
@@ -842,8 +842,13 @@ are peers by design. "Play online" is a link to `/tables`, the one multiplayer h
 by code, browse): invitees arrive by table URL, not through the lobby, so separate create/join
 entries here split one intent across two controls. The other two are `<button>`s opening dialogs.
 Each card's control holds only the title (its accessible name, which e2e matches exactly), and its
-`::after` stretches the hit area over the whole card. Below the cards, a quiet underlined language
-toggle. A muted "Source code" link (GitHub mark + label, new tab) sits in the page's
+`::after` stretches the hit area over the whole card. Below the cards, two secondary-tier buttons
+(`btn-secondary`, brass lucide icon): a language toggle and Settings. The toggle shows a shorthand
+of the other locale (`中文` / `EN`, `lobby_languageShort`), with the full name
+(`lobby_languageButton`) as its `aria-label` and the target locale as its `lang`. Settings opens
+the same `Settings.svelte` panel as the table (§6), loading prefs and `autoArm` from storage on
+open (the lobby is SSR'd). Changes are saved and applied immediately; `autoArm` is only saved,
+and the table re-sends it on its next connection. A muted "Source code" link (GitHub mark + label, new tab) sits in the page's
 bottom-right corner. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
 middle (a radial gradient) so this copy reads over the tiles.
 

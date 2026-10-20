@@ -5,14 +5,43 @@
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
+	import Languages from '@lucide/svelte/icons/languages';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
+	import Settings from '$lib/ui/Settings.svelte';
+	import type { AutoArm, ClientPrefs } from '$lib/ui/client-prefs';
+	import { applyClientPrefs } from '$lib/ui/apply-client-prefs';
+	import {
+		DEFAULT_AUTO_ARM,
+		DEFAULT_CLIENT_PREFS,
+		loadAutoArm,
+		loadClientPrefs,
+		saveAutoArm,
+		saveClientPrefs
+	} from '$lib/ui/settings-storage';
 
 	claimMuralVisible();
+
+	const ICON = { size: 18, strokeWidth: 1.8 };
+	const otherLocale = getLocale() === 'en' ? 'zh-Hant' : 'en';
 
 	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a difficulty-picker
 	// dialog first since bot tier is fixed at construction; `?practice=1` here is unrelated in spelling to the wire's `&practice=true`.
 	let showPracticeDialog = $state(false);
 
 	let showGuide = $state(false);
+
+	// read on open, not at init: the lobby is server-rendered, where storage is unavailable.
+	// autoArm only persists here; the table page re-sends it on its next connection.
+	let showSettings = $state(false);
+	let autoArm: AutoArm = $state({ ...DEFAULT_AUTO_ARM });
+	let clientPrefs: ClientPrefs = $state({ ...DEFAULT_CLIENT_PREFS });
+
+	function openSettings(): void {
+		autoArm = loadAutoArm() ?? { ...DEFAULT_AUTO_ARM };
+		clientPrefs = loadClientPrefs() ?? { ...DEFAULT_CLIENT_PREFS };
+		showSettings = true;
+	}
 
 	function handlePracticeCreated(tableId: string): void {
 		showPracticeDialog = false;
@@ -39,7 +68,7 @@
 		<ul class="actions">
 			<li class="action-card">
 				<span class="action-glyph" aria-hidden="true">{m.lobby_playOnlineGlyph()}</span>
-				<a class="action-title" data-testid="lobby-play-online" href="/tables"
+				<a class="action-title" data-testid="lobby-play-online" data-sfx="on" href="/tables"
 					>{m.lobby_playOnlineButton()}</a
 				>
 			</li>
@@ -63,16 +92,30 @@
 			</li>
 		</ul>
 
-		<nav class="quiet-links">
+		<div class="utility-bar">
+			<!-- shorthand label, full target-language name as the accessible name -->
 			<button
 				type="button"
-				class="quiet-link"
+				class="utility-btn"
 				data-testid="lobby-language"
-				onclick={() => setLocale(getLocale() === 'en' ? 'zh-Hant' : 'en')}
+				lang={otherLocale}
+				aria-label={m.lobby_languageButton()}
+				onclick={() => setLocale(otherLocale)}
 			>
-				{m.lobby_languageButton()}
+				<Languages {...ICON} />
+				<span>{m.lobby_languageShort()}</span>
 			</button>
-		</nav>
+			<button
+				type="button"
+				class="utility-btn"
+				data-testid="lobby-settings"
+				aria-haspopup="dialog"
+				onclick={openSettings}
+			>
+				<SettingsIcon {...ICON} />
+				<span>{m.settings_title()}</span>
+			</button>
+		</div>
 	</div>
 
 	<a
@@ -95,6 +138,24 @@
 	<GuideDialog onClose={() => (showGuide = false)} />
 {/if}
 
+{#if showSettings}
+	<DismissablePanel onClose={() => (showSettings = false)} label={m.settings_title()}>
+		<Settings
+			{autoArm}
+			prefs={clientPrefs}
+			onAutoArmChange={(next) => {
+				autoArm = next;
+				saveAutoArm(next);
+			}}
+			onPrefsChange={(next) => {
+				clientPrefs = next;
+				saveClientPrefs(next);
+				applyClientPrefs(next);
+			}}
+		/>
+	</DismissablePanel>
+{/if}
+
 {#if showPracticeDialog}
 	<PracticeSetupDialog
 		onCreated={handlePracticeCreated}
@@ -104,6 +165,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
+	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 
 	.lobby {
@@ -260,32 +322,29 @@
 		}
 	}
 
-	.quiet-links {
+	.utility-bar {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		justify-content: center;
-		gap: var(--space-2) var(--space-5);
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
+		gap: var(--space-3);
 	}
 
-	.quiet-link {
+	.utility-btn {
+		@include buttons.btn-base(var(--space-3));
+		@include buttons.btn-secondary;
 		display: inline-flex;
 		align-items: center;
-		min-height: var(--tap-target-min);
-		padding: 0 var(--space-1);
-		border: none;
-		background: none;
-		color: var(--color-text);
-		font: inherit;
-		text-decoration: underline;
-		text-decoration-color: color-mix(in srgb, var(--color-brass) 60%, transparent);
-		text-underline-offset: 0.2em;
-		cursor: pointer;
+		gap: var(--space-2);
+		font-size: var(--font-size-sm);
 
-		&:hover {
+		:global(svg) {
+			flex-shrink: 0;
 			color: var(--color-brass);
+		}
+
+		&:focus-visible {
+			@include a11y.focus-ring;
 		}
 	}
 
