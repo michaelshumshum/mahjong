@@ -331,13 +331,15 @@ Rules:
 - **Claim hold.** Without it, a seat with no offer could tell whether a window existed: no window
   meant `discard` → `draw` in the same tick, a window meant a pause (a human's decision, or the
   bot think delay, [bots.md §1](bots.md)) and a `claim_resolved{seat:null}`. Since chow offers go
-  only to the next seat, that pointed at that player's tiles. So, in `app/table.py` (the engine
-  and its trajectories are untouched):
+  only to the next seat, that pointed at that player's tiles. A kong-rob window leaked the same
+  way and worse: a `claim_resolved{claim_kind:"kong_rob"}` after an added kong said some opponent
+  waits on exactly that tile, even if they passed. So, in `app/table.py` (the engine and its
+  trajectories are untouched), for both window kinds:
 
   | Part | Rule |
   | --- | --- |
   | No-claim resolution | `ClaimResolved` with no winner goes only to the seats the window offered (`_publish_claim_resolved`); it is never broadcast or sent to spectators |
-  | Uniform pause | every `Discarded` starts a hold (`_begin_hold`): for `claim_hold_seconds` every outbound frame queues per recipient, except `ack`/`error`/`server_shutdown`/`claim_offer` and an offered seat's `claim_resolved`, whether or not a window opened. Release (`_release_hold`, one `TimerHeap` entry) flushes the queues in order |
+  | Uniform pause | every `Discarded`, and every self-declared kong's `MeldFormed` when the ruleset lets it be robbed (`_kong_may_be_robbed`: added kong under `kong_rob_enabled`, concealed kong only with `concealed_kong_robbable` too), starts a hold (`_begin_hold`): for `claim_hold_seconds` every outbound frame queues per recipient, except `ack`/`error`/`server_shutdown`/`claim_offer` and an offered seat's `claim_resolved`, whether or not a window opened. Release (`_release_hold`, one `TimerHeap` entry) flushes the queues in order |
   | Next turn | held too: `_authorize` drops commands in `AWAIT_ACTION`, `_poke_bots` submits no turn job, and `turn` (with its `turn_seconds` timer) is published only on the release tick |
   | `state_sync` mid-hold | rebuilt at release, so a reconnect or new spectator can't probe the held state |
   | Duration | `CLAIM_HOLD_SECONDS`, default `BOT_THINK_MAX_SECONDS` + 0.2s (1.6s), so a window only bots are offered always closes inside it. `0` turns it off: the showcase (open hands, nothing to hide) and the test suite (`tests/conftest.py`) |
@@ -350,7 +352,7 @@ Rules:
   treats a pre-arm as an instant PASS. A win offer is never auto-resolved by a pre-arm
   ([protocol.md §2](protocol.md) "Declining a claim on purpose").
 - **Robbing the kong (搶槓)** opens a claim window on a *kong declaration*, not a discard. Same
-  machinery, different trigger.
+  machinery, different trigger, same claim hold.
 
 ## 5. Redaction
 

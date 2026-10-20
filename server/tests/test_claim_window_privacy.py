@@ -1,5 +1,6 @@
 """A seat or spectator without a claim offer must not learn, from messages or timing, whether
-anyone could claim a discard (docs/architecture.md §4 "Claim hold", docs/protocol.md §3)."""
+anyone could claim a discard or rob an added kong (docs/architecture.md §4 "Claim hold",
+docs/protocol.md §3)."""
 
 from __future__ import annotations
 
@@ -8,16 +9,27 @@ import dataclasses
 from typing import Any
 
 from app.table import Table
-from mahjong_core.actions import Discard, Pass
+from mahjong_core.actions import DeclareAddedKong, Discard, Pass
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
+from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
 
+_MAN_1 = tile_ids_for_type(TileType.MAN_1)
+_MAN_2 = tile_ids_for_type(TileType.MAN_2)
+_MAN_3 = tile_ids_for_type(TileType.MAN_3)
 _MAN_4 = tile_ids_for_type(TileType.MAN_4)
 _MAN_5 = tile_ids_for_type(TileType.MAN_5)
 _MAN_6 = tile_ids_for_type(TileType.MAN_6)
+_MAN_7 = tile_ids_for_type(TileType.MAN_7)
+_MAN_8 = tile_ids_for_type(TileType.MAN_8)
+_MAN_9 = tile_ids_for_type(TileType.MAN_9)
+_PIN_1 = tile_ids_for_type(TileType.PIN_1)
+_PIN_2 = tile_ids_for_type(TileType.PIN_2)
+_PIN_3 = tile_ids_for_type(TileType.PIN_3)
+_PIN_9 = tile_ids_for_type(TileType.PIN_9)
 _SOU_2 = tile_ids_for_type(TileType.SOU_2)
 _SOU_4 = tile_ids_for_type(TileType.SOU_4)
 _SOU_6 = tile_ids_for_type(TileType.SOU_6)
@@ -156,6 +168,95 @@ async def test_next_seat_cannot_act_before_its_held_draw_is_published() -> None:
     await _run_until_turn(table, frames)
     types = [w["t"] for _, w in frames]
     assert types[0] == "discard" and "draw" in types and types[-1] == "turn"
+
+
+def _tenpai_on_man1() -> tuple[int, ...]:
+    """Waiting only on the 1m that completes 123m -- robbable, since the declarer holds all
+    four copies (same shape as tests/test_engine.py's)."""
+    return (
+        _MAN_2[0],
+        _MAN_3[0],
+        _MAN_4[0],
+        _MAN_5[0],
+        _MAN_6[0],
+        _MAN_7[0],
+        _MAN_8[0],
+        _MAN_9[0],
+        _PIN_1[0],
+        _PIN_2[0],
+        _PIN_3[0],
+        _PIN_9[0],
+        _PIN_9[1],
+    )
+
+
+def _added_kong_table(*, robbable: bool, hold: float) -> tuple[Table, list[Frame], Meld]:
+    """Seat 0 holds a 1m pung plus the fourth 1m and is about to add it. `robbable`: seat 2
+    is waiting on exactly that tile; otherwise nobody is. Seat 3 is never offered anything."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, min_faan=1)
+    table = Table("t-privacy-kong", ruleset, game_seed=1, claim_hold_seconds=hold)
+    pung = Meld(MeldKind.PUNG, (_MAN_1[0], _MAN_1[1], _MAN_1[2]), from_seat=1)
+    state = new_game(ruleset, game_seed=1)
+    state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
+    state = with_seat(state, 0, concealed=(_MAN_1[3], *_JUNK_HAND[:10]), melds=(pung,))
+    for seat in (1, 2, 3):
+        state = with_seat(state, seat, concealed=_JUNK_HAND)
+    if robbable:
+        state = with_seat(state, 2, concealed=_tenpai_on_man1())
+    table.state = state
+
+    frames: list[Frame] = []
+    loop = asyncio.get_running_loop()
+    table.register_spectator(_SPECTATOR, lambda _seq, wire: frames.append((loop.time(), wire)))
+    frames.clear()
+    return table, frames, Meld(MeldKind.ADDED_KONG, tuple(_MAN_1), from_seat=1)
+
+
+async def _play_added_kong(*, robbable: bool, hold: float) -> tuple[Table, list[Frame], int]:
+    table, frames, kong = _added_kong_table(robbable=robbable, hold=hold)
+    seat3_head = table.seat_seq[3]
+    table.submit(0, DeclareAddedKong(meld=kong))
+    await table.process_one()
+    window = table.state.claim_window
+    assert (window is not None) == robbable
+    if window is not None:
+        assert table.state.phase == Phase.AWAIT_KONG_ROB
+        table.submit(2, Pass(window_id=window.window_id, seat=2))
+    await _run_until_turn(table, frames)
+    return table, frames, seat3_head
+
+
+async def test_passed_kong_rob_window_is_not_broadcast_to_non_offered_recipients() -> None:
+    table, frames, seat3_head = await _play_added_kong(robbable=True, hold=0)
+
+    assert "claim_resolved" not in _seat_types(table, 3, after=seat3_head)
+    for seat in (0, 1):
+        assert "claim_resolved" not in _seat_types(table, seat, after=0)
+    assert not any(w["t"] == "claim_resolved" for _, w in frames)
+    resolved = [e.event for e in table.ring[2] if e.event["t"] == "claim_resolved"]
+    assert len(resolved) == 1
+    assert resolved[0]["claim_kind"] == "kong_rob" and resolved[0]["seat"] is None
+
+
+async def test_non_offered_stream_is_identical_with_or_without_a_kong_rob_window() -> None:
+    open_table, open_frames, open_head = await _play_added_kong(robbable=True, hold=0)
+    none_table, none_frames, none_head = await _play_added_kong(robbable=False, hold=0)
+
+    assert _seat_types(open_table, 3, after=open_head) == _seat_types(
+        none_table, 3, after=none_head
+    )
+    assert [w["t"] for _, w in open_frames] == [w["t"] for _, w in none_frames]
+
+
+async def test_added_kong_to_replacement_gap_is_the_same_hold_with_or_without_a_window() -> None:
+    _, open_frames, _ = await _play_added_kong(robbable=True, hold=_HOLD)
+    _, none_frames, _ = await _play_added_kong(robbable=False, hold=_HOLD)
+
+    open_gap = _gap(open_frames, "meld", "kong_replace")
+    none_gap = _gap(none_frames, "meld", "kong_replace")
+    assert open_gap >= _HOLD
+    assert none_gap >= _HOLD
+    assert abs(open_gap - none_gap) < _HOLD / 2
 
 
 async def test_state_sync_during_a_hold_is_deferred_to_its_release() -> None:

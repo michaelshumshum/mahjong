@@ -132,7 +132,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `draw` | `{seat, tile_id?}` | `tile_id` **only** for the drawing player |
 | `discard` | `{seat, tile_id, tile, pool_index}` | `pool_index` is computed by `Table` against its own post-event state — `redact_event` alone can't, since a discard claimed in the same `reduce()` call is already gone from the pool |
 | `claim_offer` | `{window_id, options: [{kind, tiles?}...], deadline_ts}` | **unicast**, only to eligible seats. `options` always ends with `{kind:"pass"}`. Sent when the window's deadline is armed, so it always carries a real `deadline_ts` |
-| `claim_resolved` | `{window_id, claim_kind, seat?, action_kind?}` | `claim_kind` is the window kind (`discard`\|`kong_rob`); `action_kind` is the winner's action (`claim_chow`\|`claim_pung`\|`claim_kong`\|`claim_win`\|`pass`). `seat`/`action_kind` are `null` when nobody's claim beat a Pass. **Recipients:** one naming a claimer is broadcast; a `seat:null` one for a `discard` window goes only to the seats that window offered a claim to (it closes their prompt) — anyone else would learn from it that a window existed. Paired with the claim hold (below) |
+| `claim_resolved` | `{window_id, claim_kind, seat?, action_kind?}` | `claim_kind` is the window kind (`discard`\|`kong_rob`); `action_kind` is the winner's action (`claim_chow`\|`claim_pung`\|`claim_kong`\|`claim_win`\|`pass`). `seat`/`action_kind` are `null` when nobody's claim beat a Pass. **Recipients:** one naming a claimer is broadcast; a `seat:null` one, `discard` or `kong_rob`, goes only to the seats that window offered a claim to (it closes their prompt) — anyone else would learn from it that a window existed (for `kong_rob`: that an opponent waits on exactly that tile). Paired with the claim hold (below) |
 | `meld` | `{seat, meld_kind, tiles, from_seat?}` | every kind, `concealed_kong` included, carries real `tiles` to everyone (Redaction, below) |
 | `kong_replace` | `{seat, tile_id?}` | `tile_id` only for the drawing player |
 | `turn` | `{seat, phase, deadline_ts, legal?: [...]}` | `legal` unicast to the acting seat, one entry per legal `Action` (`mahjong_core.actions.action_to_dict`). `deadline_ts` is an enforced `TimerHeap` entry ([architecture.md §8](architecture.md) "Turn timeout") |
@@ -217,10 +217,11 @@ The server is the only clock that matters.
   (`web/src/lib/ui/timer-ring.ts`'s `computeRingTiming`).
 - On expiry the server acts: tsumogiri on turn timeout, PASS on claim timeout, and emits the
   resulting events normally.
-- **Claim hold.** After every `discard`, everything but `ack`/`error`/`server_shutdown`/
+- **Claim hold.** After every `discard`, and every `meld` of a self-declared kong the ruleset
+  lets be robbed (`added_kong`; `concealed_kong` too under `concealed_kong_robbable`), everything but `ack`/`error`/`server_shutdown`/
   `claim_offer` and an offered seat's own `claim_resolved` is held back for
-  `CLAIM_HOLD_SECONDS`, window or not, so the next `draw`/`turn` lands the same time after the
-  discard either way ([architecture.md §4](architecture.md) "Claim hold"). The next `turn`'s
+  `CLAIM_HOLD_SECONDS`, window or not, so the next `draw`/`kong_replace`/`turn` lands the same
+  time after it either way ([architecture.md §4](architecture.md) "Claim hold"). The next `turn`'s
   `deadline_ts` is armed at release, not at the discard. A `state_sync` due mid-hold is built at
   release.
 - **No clock-offset correction.** `ping`/`pong` exists, but the client never measures an offset,

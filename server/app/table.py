@@ -45,7 +45,8 @@ window ready. This module's own job is what `reduce()` can't do without a clock:
 deadline when a window opens, and turning an unanswered deadline into synthesized `Pass`
 responses fed back through the same path -- see `_handle_claim_timeout`.
 
-Claim hold (architecture.md §4). Every discard holds outbound frames for `claim_hold_seconds`
+Claim hold (architecture.md §4). Every discard, and every self-declared kong that could be
+robbed, holds outbound frames for `claim_hold_seconds`
 (`_begin_hold`/`_release_hold`), and a no-claim `ClaimResolved` reaches only the seats offered
 (`_publish_claim_resolved`), so an observer can't tell whether a window opened.
 
@@ -137,11 +138,12 @@ from mahjong_core.events import (
     Event,
     HandEnded,
     KongReplacementDrawn,
+    MeldFormed,
 )
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import preset_id_for
-from mahjong_core.state import ClaimKind, ClaimOffer, ClaimWindow, GameState, Phase
+from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
 __all__ = [
@@ -160,8 +162,8 @@ _DISCONNECT_HANDOVER_BOT_TIER: Final = BotTier.T2
 # turn/claim deadline math -- a real tier answers in single-digit ms otherwise. Env-overridable.
 _BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
 _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
-# claim hold (architecture.md §4): every discard holds the next draw back this long, window or
-# not. above the bot think delay so a window only bots are offered closes inside it.
+# claim hold (architecture.md §4): every discard / robbable kong holds the next draw this long.
+# above the bot think delay so a window only bots are offered closes inside it.
 _CLAIM_HOLD_MARGIN_SECONDS = 0.2
 _CLAIM_HOLD_SECONDS = float(
     os.environ.get("CLAIM_HOLD_SECONDS", _BOT_THINK_MAX_SECONDS + _CLAIM_HOLD_MARGIN_SECONDS)
@@ -1774,9 +1776,9 @@ class Table:
 
         `offered` is the seats the window this tick resolved had offered a claim to. A
         `ClaimResolved` reaches them unheld (it closes their prompt); a no-claim one reaches
-        nobody else, which would otherwise learn a window existed. A `Discarded` starts a
-        claim hold after its own frames, so the draw behind it is held whether or not a window
-        opened (`_begin_hold`)."""
+        nobody else, which would otherwise learn a window existed. A `Discarded`, or a kong
+        that could be robbed (`_kong_may_be_robbed`), starts a claim hold after its own frames,
+        so the draw behind it is held whether or not a window opened (`_begin_hold`)."""
         for event in events:
             if isinstance(event, ClaimResolved):
                 self._publish_claim_resolved(event, offered)
@@ -1796,11 +1798,23 @@ class Table:
                 self._broadcast_wire(
                     {"t": "score", "totals": {s: self.state.seats[s].score for s in range(4)}}
                 )
-            if isinstance(event, Discarded):
+            if isinstance(event, Discarded) or (
+                isinstance(event, MeldFormed) and self._kong_may_be_robbed(event.meld.kind)
+            ):
                 self._begin_hold()
 
+    def _kong_may_be_robbed(self, kind: MeldKind) -> bool:
+        """Whether a self-declared kong of `kind` could open a rob window under this ruleset
+        (`mahjong_core.engine._kong_rob_offers`) -- the kongs a claim hold has to cover."""
+        ruleset = self.state.ruleset
+        if not ruleset.kong_rob_enabled:
+            return False
+        if kind == MeldKind.ADDED_KONG:
+            return True
+        return kind == MeldKind.CONCEALED_KONG and ruleset.concealed_kong_robbable
+
     def _publish_claim_resolved(self, event: ClaimResolved, offered: frozenset[int]) -> None:
-        private = event.winning_seat is None and event.claim_kind == ClaimKind.DISCARD
+        private = event.winning_seat is None
         for seat in range(4):
             if seat in offered or not private:
                 self.publish_to_seat(
