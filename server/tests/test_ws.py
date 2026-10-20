@@ -2,6 +2,20 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.main import app
+from app.ws import get_table
+
+
+def test_client_cannot_choose_game_seed() -> None:
+    # a client-chosen seed reveals every wall and hand via a local new_game(ruleset, seed)
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws?table=seed-probe&seed=42") as ws,
+    ):
+        ws.send_json({"v": 1, "t": "ping", "ts": 1000, "d": {"t0": 1}})
+        assert ws.receive_json()["t"] == "pong"
+        table = get_table("seed-probe")
+        assert table is not None
+        assert table.state.game_seed != 42
 
 
 def test_hello_then_ping_pong() -> None:

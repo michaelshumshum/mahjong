@@ -5,8 +5,9 @@ the per-seat `seq` stream everything else uses (see `Session.handle`).
 Table lookup is `app/registry.py`'s `TableRegistry`, one process-wide singleton (`_registry`).
 `?ruleset=`/`?rules=` and `?practice=` are a fallback for a direct WS connect to an unclaimed
 table id -- the primary path is `POST /tables` (`app/main.py`'s `create_table`), which resolves
-the same way. Both are only meaningful the first time a given `table` id is created. `?seed=`
-exists only so tests can pin a table's deal. `?spectate=true` registers this connection as a
+the same way. Both are only meaningful the first time a given `table` id is created. There is
+no seed param: a client-chosen `game_seed` would reveal every wall (tests seed through
+`TableRegistry.get_or_create` or `Table(...)`). `?spectate=true` registers this connection as a
 spectator at accept time -- an explicit opt-in rather than a passive default, since the latter
 would race every real client's own hello-before-join handshake.
 
@@ -117,13 +118,10 @@ def _resolve_ruleset_query(ruleset: str, rules: str | None) -> RuleSet:
     return resolve_ruleset(ruleset, parsed)
 
 
-def _get_or_create_table(
-    table_id: str, seed: int | None, practice: bool, ruleset: str, rules: str | None
-) -> Table:
+def _get_or_create_table(table_id: str, practice: bool, ruleset: str, rules: str | None) -> Table:
     return _registry.get_or_create(
         table_id,
         _resolve_ruleset_query(ruleset, rules),
-        seed=seed,
         require_ready=True,
         practice=practice,
     )
@@ -458,7 +456,6 @@ class Session:
 async def ws_endpoint(
     websocket: WebSocket,
     table: str = "default",
-    seed: int | None = None,
     practice: bool = False,
     spectate: bool = False,
     ruleset: str = DEFAULT_PRESET_ID,
@@ -477,7 +474,7 @@ async def ws_endpoint(
         await websocket.send_text(json.dumps(frame))
         await websocket.close()
         return
-    table_obj = _get_or_create_table(table, seed, practice, ruleset, rules)
+    table_obj = _get_or_create_table(table, practice, ruleset, rules)
     session = Session(websocket, table_obj)
     if spectate:
         # explicit connect-time opt-in, not a passive default -- would race the real

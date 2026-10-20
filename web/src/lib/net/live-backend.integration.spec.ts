@@ -89,7 +89,7 @@ describe.skipIf(!process.env.RUN_LIVE_BACKEND_TESTS)('live backend (opt-in)', ()
 		}[] = [];
 
 		for (let seat = 0; seat < 4; seat++) {
-			const socket = new MahjongSocket(`${wsUrl}?table=${tableId}&seed=42`);
+			const socket = new MahjongSocket(`${wsUrl}?table=${tableId}`);
 			const entry = { socket, state: initialClientGameState() };
 			socket.onEvent((event: ServerEvent) => {
 				entry.state = reduce(entry.state, event);

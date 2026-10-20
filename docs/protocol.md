@@ -95,6 +95,11 @@ choices.
 | `?practice=true` | seats 1-3 are bound to bots at construction |
 | `?spectate=true` | connect as a spectator (below) |
 
+There is no seed parameter, here or on `POST /tables`: the server always draws `game_seed`
+(`new_game_seed`). The repo is public, so a client-chosen seed lets anyone run
+`new_game(ruleset, seed)` locally and see every wall and hand, while Fairness (§5) still verifies.
+Tests that need a fixed deal seed through `TableRegistry.get_or_create(seed=…)` or `Table(...)`.
+
 Ruleset input is never rejected: an unknown preset id, malformed JSON, or a body failing
 `RuleSet` validation falls back to `hk_classic` (`app/ws.py`'s `_resolve_ruleset`). The resolved
 ruleset comes back on every `state_sync` as `ruleset` (full `RuleSet.to_dict()`) and

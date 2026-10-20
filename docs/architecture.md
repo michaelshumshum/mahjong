@@ -206,7 +206,7 @@ change it mid-game.
 | `?ruleset=<preset_id>` / `?ruleset=custom&rules=<json>` on `/ws` (`app/ws.py`'s `_resolve_ruleset_query`) | fallback for a direct WS connect to an unclaimed table id |
 
 Both call `mahjong_core.presets.resolve_ruleset`. `TableRegistry.get_or_create` is "first creation
-wins" for a given id, same as `?practice=`/`?seed=`. `state_sync.ruleset`/`ruleset_preset` surface
+wins" for a given id, same as `?practice=`. `state_sync.ruleset`/`ruleset_preset` surface
 the resolved value to late joiners, reconnects and spectators.
 
 **Showcase table.** `TableRegistry.start_showcase` (`app/registry.py`, started from `lifespan` for
