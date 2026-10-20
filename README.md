@@ -122,10 +122,36 @@ evaluation opponents only ([ml §3, §6](docs/ml.md)).
 | Curriculum | a cold start against passive opponents with oracle information that is annealed away, then self-play, then a league of past and persona snapshots ([ml §10, §11](docs/ml.md)) |
 | Serving | exported to numpy (no PyTorch at runtime), with p99 under 5 ms per decision including encoding; weights committed as `server/bots/weights/learned.npz` ([bots §2](docs/bots.md)) |
 
-The shipped policy scores **+10.75 points/hand [+9.64, +11.86]** against three `FaanBot`
-(Normal) opponents over 1,000 fresh sets ([ml §14](docs/ml.md)). The Impossible tier runs the same
-policy and adds vetoes that use full information ([bots §9](docs/bots.md)). Training code lives in
-`server/ml/` and needs the `ml` extra (`uv sync --extra ml`).
+### Results
+
+Shipped policy (Expert, `LearnedBot`) in one seat against three copies of each opponent,
+`hk_classic`, fresh seeds. Points are per hand, with a 95% CI; win rate, deal-in rate and average
+winning faan are given as agent / opponent ([ml §14](docs/ml.md),
+[rl-learnings §4](docs/rl-learnings.md)):
+
+| Opponent ×3 | Sets | Points/hand [95% CI] | Win rate | Deal-in rate | Avg winning faan |
+| --- | --- | --- | --- | --- | --- |
+| `FaanBot` (Normal) | 1,000 | **+10.75** [+9.64, +11.86] | 0.267 / 0.160 | 0.076 / 0.105 | 5.26 / 3.37 |
+| `EfficiencyBot` (Easy) | 700 | **+15.19** [+13.74, +16.64] | 0.329 / 0.143 | 0.027 / 0.112 | 5.44 / 3.26 |
+| `FaanBotAggressive` | 700 | **+11.62** [+10.34, +12.90] | 0.284 / 0.168 | 0.074 / 0.119 | 5.28 / 3.37 |
+| `FaanBotDefensive` | 700 | **+10.85** [+9.52, +12.19] | 0.251 / 0.146 | 0.067 / 0.092 | 5.28 / 3.35 |
+| `FaanBotFlushChasing` | 700 | **+11.72** [+10.43, +13.01] | 0.285 / 0.154 | 0.072 / 0.109 | 5.22 / 3.37 |
+
+The agent wins more often, deals in less, and wins with larger hands (about 5.3 faan against
+about 3.4) than every heuristic bot. Other measurements:
+
+| Measurement | Result |
+| --- | --- |
+| vs `FaanBot`, other presets | `hk_strict` +25.04, `hk_casual` +18.98 points/hand |
+| vs `FaanBot` with perfect information (`OracleFaanBot` ×3) | +2.88 [+1.75, +4.01] points/hand, without seeing hidden tiles |
+| Impossible (`ORACLE`) vs Expert ×3 | +3.60 [+3.15, +4.06] points/hand; deals in on 0.3% of hands ([bots §9](docs/bots.md)) |
+| Training to ship | 464.3M decisions of curriculum and self-play, then 274.3M in the league, on one RTX 2060 |
+| Decision latency | p50 1.8 ms, p99 2.0–3.4 ms per decision including encoding, on CPU |
+| Cost compared with Normal | 1.8 ms mean per decision against `FaanBot`'s 3.6 ms |
+
+The Impossible tier runs the same policy and adds vetoes that use full information
+([bots §9](docs/bots.md)). Training code lives in `server/ml/` and needs the `ml` extra
+(`uv sync --extra ml`).
 
 ## Getting started
 
