@@ -109,7 +109,8 @@ docker compose up -d postgres
 export DATABASE_URL=postgresql+asyncpg://mahjong:mahjong@localhost:5432/mahjong
 export CORS_ORIGINS=http://localhost:5173
 (cd server && uv run alembic upgrade head)
-(cd server && uv run uvicorn app.main:app --reload --workers 1)
+(cd server && uv run uvicorn app.main:app --reload --workers 1 \
+  --ws-max-size 65536 --ws-per-message-deflate false)   # protocol.md §1
 pnpm --dir web dev
 ```
 

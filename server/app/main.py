@@ -210,4 +210,11 @@ async def list_tables() -> TableList:
 
 if __name__ == "__main__":
     # workers=1: tables are in-memory, owned by one process
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, workers=1)
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        workers=1,
+        ws_max_size=ws.MAX_FRAME_BYTES,
+        ws_per_message_deflate=False,
+    )

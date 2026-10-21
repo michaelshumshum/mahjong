@@ -67,6 +67,11 @@ _adapter: TypeAdapter[object] = TypeAdapter(proto.AnyMessage)
 
 _OUTBOX_MAXSIZE = 64  # docs/architecture.md "Outbound backpressure" / protocol.md §9
 
+# inbound frame cap, docs/protocol.md §1. uvicorn's --ws-max-size enforces it at the transport;
+# this re-check covers any launch path that omits the flag. 1009 = "Message Too Big" (RFC 6455)
+MAX_FRAME_BYTES = 64 * 1024
+_CLOSE_TOO_BIG = 1009
+
 _registry = TableRegistry()
 
 _CLAIM_WIRE_TO_MELD_KIND = {wire: kind for kind, wire in CLAIM_KIND_WIRE.items()}
@@ -486,6 +491,10 @@ async def ws_endpoint(
             try:
                 raw = await websocket.receive_text()
             except WebSocketDisconnect:
+                break
+            if len(raw.encode()) > MAX_FRAME_BYTES:
+                with contextlib.suppress(Exception):
+                    await websocket.close(code=_CLOSE_TOO_BIG)
                 break
             try:
                 message = _adapter.validate_json(raw)

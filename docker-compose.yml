@@ -25,9 +25,11 @@ services:
       context: ./server
       target: dev
     # one worker only: tables are in-memory, owned by one process. docs/infra.md §3
+    # ws frame cap and no permessage-deflate: docs/protocol.md §1
     command: >
       uv run uvicorn app.main:app
       --host 0.0.0.0 --port 8000 --workers 1
+      --ws-max-size 65536 --ws-per-message-deflate false
       --reload --reload-dir /app/app --reload-dir /app/mahjong_core
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mahjong}:${POSTGRES_PASSWORD:-mahjong}@postgres:5432/${POSTGRES_DB:-mahjong}

@@ -5,6 +5,19 @@ Transport: one WebSocket per client at `wss://…/ws?table={id}`. Plain JSON fra
 per-frame CPU to every connection. Plain HTTP handles what isn't live play: table listing and
 creation (§10) and `/healthz`.
 
+**Inbound frame cap: 64 KiB.** A larger client frame closes the socket with `1009` ("Message Too
+Big").
+
+| Where | How |
+| --- | --- |
+| uvicorn (every launch path: both Dockerfile stages, both Compose files, `main.py`'s `uvicorn.run`) | `--ws-max-size 65536 --ws-per-message-deflate false` |
+| `app/ws.py` (`MAX_FRAME_BYTES`) | re-checks each received text frame, for a launch path missing the flag |
+
+Both are load-bearing. uvicorn's defaults are a 16 MiB frame limit with `permessage-deflate`
+negotiated, so one ~20 KB compressed frame could inflate to 16 MiB of JSON and ~64 MB of Python
+objects; disabling deflate keeps wire size equal to parsed size. Field-level bounds on what a
+frame may carry are in §2 "Size limits".
+
 **Auth:** guest-only ([architecture.md §2.1](architecture.md),
 [ADR 0001](decisions/0001-guest-only-identity.md)). A player picks a display name client-side,
 persisted in `localStorage`, and sends it once on `join` (§2). `hello.seat` only ever means
@@ -41,6 +54,9 @@ Every frame, both directions:
 - **Scope:** per seat binding, not per socket — a new socket resuming a seat via `hello{last_seq}`
   inherits the seat's id history (§5).
 - **Retention:** the last 256 ids per seat, LRU-evicted. Not persisted across a server restart.
+  Each entry keeps the id, a SHA-256 of the canonical (sorted-key) JSON payload, and the
+  outcome — never the payload itself, so a seat's cache stays a fixed size whatever it sends
+  (`app/idempotency.py`).
 - **Same `id`, identical payload** (a genuine retry): not reapplied; the original `ack` is re-sent.
 - **Same `id`, different payload** (client bug): rejected — `ack{id, ok:false,
   error:"id_conflict"}` — and neither payload is applied as the other.
@@ -55,7 +71,7 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 | `t` | payload | notes |
 | --- | --- | --- |
 | `hello` | `{last_seq?, client_version, seat?, secret?}` | first frame after connect. `seat` present + already bound → reconnect (§5), authenticated by `secret`; a missing or wrong one refuses the reclaim (`error{code:'bad_secret'}`). Omitted `seat` → no-op ahead of `join`. Never carries a name |
-| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` is the guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty; never rejected (`app/table.py`'s `_normalize_name`) |
+| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` is the guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty (`app/table.py`'s `_normalize_name`). Never rejected once it passes the raw 64-char bound (Size limits, below) |
 | `ready` | `{}` | lobby → start; only valid once seated |
 | `start_with_bots` | `{}` | host only, before the table starts: bind every empty seat to a bot and deal once all seats are bound and ready. `error{code:'not_host'}` / `error{code:'already_started'}` otherwise |
 | `hand_end_ack` | `{}` | dismiss the hand-end hold early ([architecture.md §3](architecture.md) "Hand-end hold") |
@@ -67,6 +83,19 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 
 The server rejects anything outside the legal-action set it computed itself. Client-side legality
 is a UI hint only.
+
+### Size limits
+
+Every free-length client→server field is bounded in `app/protocol.py`; a frame over a bound fails
+validation → `error{code:"bad_frame"}`, and the socket closes as for any malformed frame. Integers
+and booleans are bounded by the 64 KiB frame cap (§1) alone.
+
+| Field | Max |
+| --- | --- |
+| envelope `id` | 64 chars |
+| `hello.client_version`, `hello.secret` | 64 chars (`reconnect_secret` is 22) |
+| `join.name` | 64 chars raw, before the 24-char normalization above |
+| `claim.tiles`, `declare.tiles` | 4 items (a kong, `COPIES_PER_TYPE`) |
 
 ### Seat assignment
 

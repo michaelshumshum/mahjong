@@ -45,7 +45,8 @@ uv run pytest -q -m fast -n auto
 uv run pytest -q -m slow -n auto --games=1000
 uv run ruff check . && uv run ruff format --check .
 uv run alembic upgrade head            # needs DATABASE_URL
-uv run uvicorn app.main:app --reload --workers 1   # needs CORS_ORIGINS for the web dev server
+uv run uvicorn app.main:app --reload --workers 1 --ws-max-size 65536 --ws-per-message-deflate false
+                                       # needs CORS_ORIGINS for the web dev server; ws flags: docs/protocol.md §1
 ```
 
 Env vars and the full native/Docker split: `docs/infra.md §2`.

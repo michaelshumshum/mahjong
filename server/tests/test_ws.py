@@ -1,8 +1,11 @@
+import json
+
+import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.main import app
-from app.ws import get_table
+from app.ws import MAX_FRAME_BYTES, get_table
 
 
 def test_client_cannot_choose_game_seed() -> None:
@@ -33,6 +36,21 @@ def test_hello_then_ping_pong() -> None:
         assert second["t"] == "pong"
         assert second["d"]["t0"] == 1234
         assert second["seq"] == 2
+
+
+def test_oversized_frame_closes_with_1009() -> None:
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        ws.send_text("x" * (MAX_FRAME_BYTES + 1))
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_json()
+        assert exc.value.code == 1009
+
+
+def test_frame_at_the_size_limit_is_parsed() -> None:
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        frame = json.dumps({"v": 1, "t": "ping", "ts": 1000, "d": {"t0": 1}})
+        ws.send_text(frame + " " * (MAX_FRAME_BYTES - len(frame)))
+        assert ws.receive_json()["t"] == "pong"
 
 
 def test_malformed_frame_returns_error_and_does_not_crash_server() -> None:

@@ -20,10 +20,18 @@ from bots.tiers import BotTier
 from mahjong_core.actions import ActionKind
 from mahjong_core.melds import MeldKind
 from mahjong_core.state import ClaimKind, HandOutcome, Phase, WinType
+from mahjong_core.tiles import COPIES_PER_TYPE
 
 # client->server seat fields stay `int`: narrowing them would change how an out-of-range seat
 # is rejected.
 type Seat = Literal[0, 1, 2, 3]
+
+# client->server size bounds (docs/protocol.md §2 "Size limits"). name is the raw length, before
+# table.py's trim-and-cap; a kong is the largest meld
+_MAX_ID_LENGTH = 64
+_MAX_TOKEN_LENGTH = 64
+_MAX_RAW_NAME_LENGTH = 64
+_MAX_MELD_TILES = COPIES_PER_TYPE
 
 
 class Envelope(BaseModel):
@@ -33,7 +41,8 @@ class Envelope(BaseModel):
 
     v: Literal[1] = 1
     seq: int | None = None
-    id: str | None = None  # client->server only: idempotency key
+    # client->server only: idempotency key
+    id: str | None = Field(default=None, max_length=_MAX_ID_LENGTH)
     ts: int  # server clock, ms
 
 
@@ -41,13 +50,13 @@ class HelloPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     last_seq: int | None = None
-    client_version: str
+    client_version: str = Field(max_length=_MAX_TOKEN_LENGTH)
     # reconnect target on an already-bound seat; client-asserted, verified via secret below.
     # Omit for a fresh connection awaiting `join`.
     seat: int | None = None
     # reconnect_secret from join's ack (AckPayload) -- required to reclaim seat; wrong or
     # missing -> bad_secret.
-    secret: str | None = None
+    secret: str | None = Field(default=None, max_length=_MAX_TOKEN_LENGTH)
     # no name field here -- a reconnect never resends it; JoinPayload.name is the only place
     # a guest display name is ever set.
 
@@ -96,8 +105,8 @@ class JoinPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seat: int | None = None  # omit for "first open seat"
-    # guest display name, sent once at first join; normalized server-side, never rejected.
-    name: str | None = None
+    # guest display name, sent once at first join; normalized server-side.
+    name: str | None = Field(default=None, max_length=_MAX_RAW_NAME_LENGTH)
 
 
 class ReadyPayload(BaseModel):
@@ -128,14 +137,16 @@ class ClaimPayload(BaseModel):
 
     window_id: int
     choice: ClaimChoice
-    tiles: list[int] | None = None  # disambiguates a chow; unused otherwise
+    # disambiguates a chow; unused otherwise
+    tiles: list[int] | None = Field(default=None, max_length=_MAX_MELD_TILES)
 
 
 class DeclarePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["concealed_kong", "added_kong", "win"]
-    tiles: list[int] | None = None  # meld tiles; unused for "win"
+    # meld tiles; unused for "win"
+    tiles: list[int] | None = Field(default=None, max_length=_MAX_MELD_TILES)
 
 
 class AutoPayload(BaseModel):

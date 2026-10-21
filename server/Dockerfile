@@ -35,8 +35,9 @@ COPY pyproject.toml uv.lock* ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
 COPY . .
 EXPOSE 8000
+# ws frame cap and no permessage-deflate: docs/protocol.md §1
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--workers", "1", "--reload"]
+     "--workers", "1", "--ws-max-size", "65536", "--ws-per-message-deflate", "false", "--reload"]
 
 FROM base AS prod
 COPY --from=deps /app/.venv /app/.venv
@@ -46,7 +47,9 @@ RUN useradd --system --uid 1001 --no-create-home app && chown -R app:app /app
 USER app
 EXPOSE 8000
 # one worker only: tables are in-memory, owned by one process. docs/infra.md §3
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# ws frame cap and no permessage-deflate: docs/protocol.md §1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", \
+     "--ws-max-size", "65536", "--ws-per-message-deflate", "false"]
 
 # torch only in this target
 FROM base AS ml
