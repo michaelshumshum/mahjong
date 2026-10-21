@@ -137,7 +137,8 @@ ruleset comes back on every `state_sync` as `ruleset` (full `RuleSet.to_dict()`)
 **Spectating.** `?spectate=true` (`app/ws.py`'s `ws_endpoint`) gets a spectator-redacted
 `state_sync` (`seat_view(state, None)`, [architecture.md §5](architecture.md)) on registration,
 then every broadcast event and the public half of `turn`. A `join`/`hello{seat}` on the same
-connection promotes it to a seat. A spectator session is never reconnectable (§5).
+connection promotes it to a seat. A spectator session is never reconnectable (§5). Capped per
+table, `error{code:"spectators_full"}` past it (§11).
 
 On a table with `spectators_see_hands` (all-bot tables only, never client-settable;
 [architecture.md §3](architecture.md)), spectators get the
@@ -176,7 +177,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `seat_state` | `{seat, status, name?}` | `status`: `connected\|disconnected\|autoplay\|bot`. Sent for every status change of a bound seat, including the empty→`connected` transition `join` causes. `name` is carried on every broadcast for that seat |
 | `server_shutdown` | `{deadline_ts}` | broadcast once to every seat ever bound when a graceful-shutdown drain starts ([architecture.md §8.1](architecture.md)) |
 | `ack` | `{id, ok, error?, reconnect_secret?}` | **sender-only**, never broadcast — it would leak another player's `id`. Acknowledges receipt/idempotency, not legality: `Table` still silently drops a well-formed but illegal command. `reconnect_secret` only on a successful `join` (§5). A `claim` `pass` naming a closed/superseded window is acked `ok:true` as a no-op (the client's auto-pass races the server's own timeout); any other choice on a stale window gets `ok:false, error:"illegal"` |
-| `error` | `{code, message}` | `code: "table_closed"` is also sent to every seat and spectator when an abandoned table ends ([architecture.md §8.2](architecture.md)); spectator sockets are then closed |
+| `error` | `{code, message}` | `code: "table_closed"` is also sent to every seat and spectator when an abandoned table ends ([architecture.md §8.2](architecture.md)); spectator sockets are then closed. `spectators_full`: §11 |
 | `pong` | `{t0, t1}` | |
 
 **`state_sync` fields** beyond `SeatView`'s ([architecture.md §5](architecture.md)):
@@ -499,3 +500,34 @@ POST /tables
   spectating by id are unchanged.
 - A table created via `POST /tables` and one auto-created by a direct WS connect behave
   identically (a WS-created table is always listed); whichever happens first for an id sticks.
+
+## 11. Connection and rate limits
+
+Per-process caps on `/ws` (`app/limits.py`, wired in `app/ws.py`), so one client can't multiply
+the table's fan-out or the server's memory. Configured by env var ([infra.md §2](infra.md)),
+read on ASGI startup.
+
+| Cap | Default | Env var | Past it |
+| --- | --- | --- | --- |
+| open connections per client IP | 16 | `WS_MAX_CONNECTIONS_PER_IP` | closed before accept, code 1008 (HTTP 403 on the upgrade) |
+| spectators per table | 50 | `WS_MAX_SPECTATORS_PER_TABLE` | `error{code:"spectators_full"}`, then closed with 1013 (try again later); the client's normal reconnect backoff (§8) retries |
+| inbound frames per connection | 20/s, burst 40 (token bucket) | `WS_MSG_RATE`, `WS_MSG_BURST` | socket closed with 1008 |
+| queued table inbox items | 64 (`app/table.py`'s `INBOX_COMMAND_LIMIT`) | — | the new client command is dropped |
+| connections + tasks, whole process | 1000 | uvicorn `--limit-concurrency` ([infra.md §3](infra.md)) | uvicorn answers 503 |
+
+- **Client IP.** The ASGI client host, which uvicorn's `--proxy-headers` already rewrites from
+  `X-Forwarded-For` for a `TRUSTED_PROXY_IPS` peer. `CF-Connecting-IP` (Cloudflare Tunnel) is used
+  only when that host is itself in `TRUSTED_PROXY_IPS`; from any other peer it is ignored, so a
+  direct client can't spoof it. Without `TRUSTED_PROXY_IPS` no header is trusted. 16 leaves room
+  for a household or CGNAT range sharing one address.
+- **Rate limit: close, not drop.** Every frame counts, `ping` included. An honest client sends a
+  few frames per second at most; silently dropping an intent would desync it with no feedback,
+  while closing hands a seated player the normal disconnect/reconnect path (§5) and frees the
+  parse cost of a flood.
+- **Inbox: drop, not backpressure.** The inbox also carries bot results, disconnect notices and
+  wake-ups, which must never block or be lost, so the cap applies to client commands only
+  (`Table.submit`). A full inbox already means the table is far behind; the dropped command is
+  treated like any other silently-dropped illegal one (§3 `ack`), and the client's next
+  `turn`/`state_sync` reflects whatever actually happened.
+- The spectator cap also bounds per-table fan-out: each broadcast is redacted and copied once per
+  spectator, into a 512-frame ring each (§5).

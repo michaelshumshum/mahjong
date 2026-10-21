@@ -215,6 +215,7 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         workers=1,
+        limit_concurrency=1000,
         ws_max_size=ws.MAX_FRAME_BYTES,
         ws_per_message_deflate=False,
     )

@@ -10,7 +10,8 @@ const SERVER_ERROR_MESSAGE: Record<ErrorCode, () => string> = {
 	seat_taken: m.serverError_seatTaken,
 	bad_secret: m.serverError_badSecret,
 	not_joined: m.serverError_notJoined,
-	table_closed: m.serverError_tableClosed
+	table_closed: m.serverError_tableClosed,
+	spectators_full: m.serverError_spectatorsFull
 };
 
 export function serverErrorToastMessage(code: string, rawMessage: string): string {

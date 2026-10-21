@@ -25,7 +25,8 @@ export type ErrorCode =
 	| 'seat_taken'
 	| 'bad_secret'
 	| 'not_joined'
-	| 'table_closed';
+	| 'table_closed'
+	| 'spectators_full';
 
 export type HandOutcome = 'win' | 'exhaustive_draw';
 

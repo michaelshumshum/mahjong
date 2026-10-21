@@ -12,6 +12,7 @@
 	"serverError_badSecret": "Couldn't reconnect to your seat -- it may have been taken over.",
 	"serverError_notJoined": "Join a seat first.",
 	"serverError_tableClosed": "This table has closed -- every player left.",
+	"serverError_spectatorsFull": "This table has too many spectators right now -- retrying.",
 	"connectionBanner_title": "Reconnecting…",
 	"connectionBanner_body": "The table will pick up right where it left off.",
 	"rank_first": "1st",

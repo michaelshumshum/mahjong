@@ -29,6 +29,7 @@ class ErrorCode(StrEnum):
     BAD_SECRET = "bad_secret"
     NOT_JOINED = "not_joined"
     TABLE_CLOSED = "table_closed"
+    SPECTATORS_FULL = "spectators_full"
 
 
 # error payload for every socket on (or later connecting to) an abandoned table; the client stops

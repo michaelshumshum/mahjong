@@ -16,7 +16,8 @@ describe('serverErrorToastMessage', () => {
 			'seat_taken',
 			'bad_secret',
 			'not_joined',
-			'table_closed'
+			'table_closed',
+			'spectators_full'
 		]) {
 			expect(serverErrorToastMessage(code, 'x')).not.toContain('Server error');
 		}

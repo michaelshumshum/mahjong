@@ -28,7 +28,7 @@ services:
     # ws frame cap and no permessage-deflate: docs/protocol.md §1
     command: >
       uv run uvicorn app.main:app
-      --host 0.0.0.0 --port 8000 --workers 1
+      --host 0.0.0.0 --port 8000 --workers 1 --limit-concurrency 1000
       --ws-max-size 65536 --ws-per-message-deflate false
       --reload --reload-dir /app/app --reload-dir /app/mahjong_core
     environment:

@@ -46,6 +46,7 @@ mahjong/
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
+│   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
@@ -125,7 +126,10 @@ pnpm --dir web dev
 | `CLAIM_HOLD_SECONDS` | `BOT_THINK_MAX_SECONDS` + 0.2 (1.6) | the pause after every discard and robbable kong that hides whether a claim window opened; `0` disables ([architecture.md §4](architecture.md) "Claim hold") |
 | `LOG_LEVEL` | `info` | |
 | `API_DOCS` | on; `0` disables | `/docs`, `/redoc`, `/openapi.json`; the prod overlay sets `0` |
-| `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7) |
+| `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7). Also read by `app/limits.py` to trust `CF-Connecting-IP` ([protocol.md §11](protocol.md)) |
+| `WS_MAX_CONNECTIONS_PER_IP` | 16 | open `/ws` connections per client IP ([protocol.md §11](protocol.md)) |
+| `WS_MAX_SPECTATORS_PER_TABLE` | 50 | ([protocol.md §11](protocol.md)) |
+| `WS_MSG_RATE` / `WS_MSG_BURST` | 20 / 40 | inbound frames per second / bucket size, per connection ([protocol.md §11](protocol.md)) |
 | `JWT_SECRET` | — | passed by both Compose files but read by nothing — vestigial from the cut auth design ([ADR 0001](decisions/0001-guest-only-identity.md)) |
 
 Native equivalents of the Docker targets:
@@ -150,6 +154,11 @@ The API runs uvicorn with **one worker**.
 `--workers 1` is pinned, with a comment, in both Compose files, the server Dockerfile, and
 `main.py`'s `uvicorn.run` entry point. Nothing asserts it at startup. Multi-node is out of scope
 ([ADR 0006](decisions/0006-multi-node-and-durability.md)).
+
+**Concurrency cap.** The same launch sites pass `--limit-concurrency 1000` (`limit_concurrency` in
+`main.py`): past 1000 open connections plus in-flight tasks, uvicorn answers 503 instead of
+accepting more. A process-wide backstop under the per-IP and per-table `/ws` caps
+([protocol.md §11](protocol.md)), sized well inside the prod box's ~2 GiB.
 
 **Shutdown.** `TableRegistry.begin_shutdown` drains on SIGTERM, letting a mid-hand table finish
 within `SHUTDOWN_GRACE_SECONDS` (default 90s) ([architecture.md §8.1](architecture.md)). The prod
@@ -254,7 +263,8 @@ reload.
 - A reverse proxy (Caddy or nginx) in front of `api` and `web` terminates TLS and forwards
   `X-Forwarded-*`. The overlay requires `TRUSTED_PROXY_IPS` (passed to uvicorn's
   `--forwarded-allow-ips`) to be that proxy's address — never `*`, which lets any client spoof
-  `X-Forwarded-For`.
+  `X-Forwarded-For`. The overlay also passes it into the `api` environment, plus the `WS_*`
+  limits (§2; empty keeps the default).
 - The overlay uses `!override`/`!reset` YAML tags on `ports:` — Compose concatenates `ports:` lists
   across `-f` files, so a bare `ports: []` for `postgres` would leave the dev file's `5432:5432`
   mapping in place.

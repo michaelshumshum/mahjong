@@ -40,6 +40,7 @@ from app.errors import (
     TableAlreadyStartedError,
     TableFullError,
 )
+from app.limits import IpConnectionCounter, TokenBucket, WsLimits, client_ip
 from app.outbox import BoundedOutbox
 from app.registry import TableRegistry
 from app.table import Table
@@ -73,6 +74,12 @@ MAX_FRAME_BYTES = 64 * 1024
 _CLOSE_TOO_BIG = 1009
 
 _registry = TableRegistry()
+_limits = WsLimits.from_env()
+_ip_connections = IpConnectionCounter(_limits.max_connections_per_ip)
+
+# rfc 6455 close codes
+_CLOSE_POLICY_VIOLATION = 1008
+_CLOSE_TRY_AGAIN_LATER = 1013
 
 _CLAIM_WIRE_TO_MELD_KIND = {wire: kind for kind, wire in CLAIM_KIND_WIRE.items()}
 _DECLARE_WIRE_TO_MELD_KIND = {
@@ -99,8 +106,11 @@ def reset_registry(
 ) -> TableRegistry:
     """Install a fresh `TableRegistry` as this module's singleton -- called on every ASGI
     startup (including a `TestClient(app)` context) so a previous lifetime's tables/draining
-    flag never leak into this one."""
-    global _registry
+    flag never leak into this one. Re-reads `WsLimits` from the environment and resets the
+    per-IP connection counts too."""
+    global _registry, _limits, _ip_connections
+    _limits = WsLimits.from_env()
+    _ip_connections = IpConnectionCounter(_limits.max_connections_per_ip)
     _registry = TableRegistry(
         bot_pool=bot_pool,
         session_factory=session_factory,
@@ -181,6 +191,8 @@ class Session:
         self.seat: int | None = None
         self._local_seq = 0
         self.outbox = BoundedOutbox(maxsize=_OUTBOX_MAXSIZE, resync=self._resync)
+        self.inbound = TokenBucket(_limits.msg_rate, _limits.msg_burst)
+        self.close_code = 1000
 
     def _resync(self) -> None:
         """`BoundedOutbox`'s overflow callback -- re-publishes a fresh `state_sync` through
@@ -454,7 +466,7 @@ class Session:
                 if self.outbox.dead:
                     break
         with contextlib.suppress(Exception):
-            await self.ws.close()
+            await self.ws.close(code=self.close_code)
 
 
 @router.websocket("/ws")
@@ -466,12 +478,33 @@ async def ws_endpoint(
     ruleset: str = DEFAULT_PRESET_ID,
     rules: str | None = None,
 ) -> None:
+    """Per-IP connection cap around `_serve` (docs/protocol.md §11)."""
+    peer = websocket.client.host if websocket.client is not None else None
+    ip = client_ip(peer, websocket.headers, _limits.trusted_proxies)
+    counter = _ip_connections  # reset_registry may swap it while this connection is open
+    if not counter.acquire(ip):
+        await websocket.close(code=_CLOSE_POLICY_VIOLATION)
+        return
+    try:
+        await _serve(websocket, table, practice, spectate, ruleset, rules)
+    finally:
+        counter.release(ip)
+
+
+async def _serve(
+    websocket: WebSocket,
+    table: str,
+    practice: bool,
+    spectate: bool,
+    ruleset: str,
+    rules: str | None,
+) -> None:
     if _registry.draining:
         # stop accepting new connections (reconnects included) once a drain has started.
         # 1013 = "Try Again Later" (RFC 6455).
-        await websocket.close(code=1013)
+        await websocket.close(code=_CLOSE_TRY_AGAIN_LATER)
         return
-    # no auth -- accept every other connection unconditionally.
+    # no auth -- accept every other connection, up to the docs/protocol.md §11 caps.
     await websocket.accept()
     if _registry.is_closed(table):
         # an abandoned table's id is never recycled (docs/architecture.md §8.2)
@@ -480,6 +513,12 @@ async def ws_endpoint(
         await websocket.close()
         return
     table_obj = _get_or_create_table(table, practice, ruleset, rules)
+    if spectate and len(table_obj.spectators) >= _limits.max_spectators_per_table:
+        error = {"code": ErrorCode.SPECTATORS_FULL, "message": "too many spectators"}
+        frame = {"v": 1, "t": "error", "seq": 1, "ts": now_ms(), "d": error}
+        await websocket.send_text(json.dumps(frame))
+        await websocket.close(code=_CLOSE_TRY_AGAIN_LATER)
+        return
     session = Session(websocket, table_obj)
     if spectate:
         # explicit connect-time opt-in, not a passive default -- would race the real
@@ -495,6 +534,10 @@ async def ws_endpoint(
             if len(raw.encode()) > MAX_FRAME_BYTES:
                 with contextlib.suppress(Exception):
                     await websocket.close(code=_CLOSE_TOO_BIG)
+                break
+            if not session.inbound.take():
+                # close, not drop: a dropped intent would silently desync an honest client
+                session.close_code = _CLOSE_POLICY_VIOLATION
                 break
             try:
                 message = _adapter.validate_json(raw)

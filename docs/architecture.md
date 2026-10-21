@@ -170,7 +170,9 @@ class Table:
 ```
 
 No locks. No `await` between read and write of shared state. Four simultaneous clicks are four
-items in a queue. In-table messages never leave the owning task; table state is never
+items in a queue. The queue is bounded for client commands only: `Table.submit` drops one once 64
+items are queued, while bot results, disconnects and wake-ups always enqueue
+([protocol.md §11](protocol.md)). In-table messages never leave the owning task; table state is never
 distributed (§7).
 
 **Sequencing.** `seq` is per-seat (and per-spectator-session): dense and gapless *within that

@@ -173,6 +173,9 @@ _HOLD_EXEMPT_FRAMES: Final = frozenset({"ack", "error", "server_shutdown", "clai
 
 _MAX_NAME_LENGTH = 24  # guest display name cap (docs/protocol.md §2 `join.name`)
 
+# client commands past this many queued inbox items are dropped (docs/protocol.md §11)
+INBOX_COMMAND_LIMIT: Final = 64
+
 # every bot seat gets a random HK mahjong-parlour nickname instead of a generic "Bot"
 # placeholder -- cosmetic only, `self._bot_tier` still governs actual strength.
 _BOT_NAME_POOL = (
@@ -447,6 +450,9 @@ class Table:
     def submit(self, seat: int, action: Action) -> None:
         """Push one command onto the inbox -- app/ws.py's envelope-parsing landing spot, also
         the test-facing entry point."""
+        if self.inbox.qsize() >= INBOX_COMMAND_LIMIT:
+            logger.warning("table %s: inbox full, dropping seat %d command", self.table_id, seat)
+            return
         self.inbox.put_nowait(Command(seat=seat, action=action))
 
     def join(

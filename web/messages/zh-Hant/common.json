@@ -12,6 +12,7 @@
 	"serverError_badSecret": "無法重新連接至你的座位 -- 可能已被接管。",
 	"serverError_notJoined": "請先加入座位。",
 	"serverError_tableClosed": "此牌枱已關閉 -- 所有玩家已離開。",
+	"serverError_spectatorsFull": "此牌枱觀戰人數已滿 -- 正在重試。",
 	"connectionBanner_title": "重新連線中…",
 	"connectionBanner_body": "牌局將從中斷之處繼續。",
 	"rank_first": "第一名",

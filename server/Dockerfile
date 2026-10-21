@@ -37,7 +37,8 @@ COPY . .
 EXPOSE 8000
 # ws frame cap and no permessage-deflate: docs/protocol.md §1
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--workers", "1", "--ws-max-size", "65536", "--ws-per-message-deflate", "false", "--reload"]
+     "--workers", "1", "--limit-concurrency", "1000", \
+     "--ws-max-size", "65536", "--ws-per-message-deflate", "false", "--reload"]
 
 FROM base AS prod
 COPY --from=deps /app/.venv /app/.venv
@@ -48,7 +49,9 @@ USER app
 EXPOSE 8000
 # one worker only: tables are in-memory, owned by one process. docs/infra.md §3
 # ws frame cap and no permessage-deflate: docs/protocol.md §1
+# --limit-concurrency: open connections + tasks before uvicorn answers 503. docs/infra.md §3
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", \
+     "--limit-concurrency", "1000", \
      "--ws-max-size", "65536", "--ws-per-message-deflate", "false"]
 
 # torch only in this target
