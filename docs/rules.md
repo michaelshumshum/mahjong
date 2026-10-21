@@ -411,8 +411,8 @@ The floors live only in the client layer because the test suite drives timers wi
 0-second values on directly built rulesets, and stored game records must keep loading through
 `from_dict`. Without the floors, 0-second timers plus dealer repeat ran hundreds of hands a second
 on one table. `POST /tables` bodies can carry non-finite constants (`NaN`, `Infinity`); the
-structural layer rejects them. The web editor
-mirrors the client ranges (`NUMERIC_RULE_BOUNDS`, frontend.md §7).
+structural layer rejects them. `make proto` emits `CLIENT_RULE_BOUNDS` to the web editor
+(`protocol.constants.ts`, frontend.md §7).
 
 ## 11. Edge cases
 

@@ -812,8 +812,9 @@ views in one dialog:
   are integers `0..13`; 0 turns the pattern off.
 - **Validation is client-side**, because `resolve_ruleset` silently falls back to `hk_classic` on
   an invalid custom body ([rules.md §10](rules.md)). `invalidRuleFields` checks integer steppers
-  against `NUMERIC_RULE_BOUNDS` (a hand copy of the server's `CLIENT_RULE_BOUNDS`; update both
-  together), at least one hand set, and override range. `sanitizeRuleSet` reverts a stored
+  against `NUMERIC_RULE_BOUNDS` (the server's `CLIENT_RULE_BOUNDS`, generated into
+  `protocol.constants.ts` by `make proto`, minus the inert `self_draw_multiplier`), at least one
+  hand set, and override range (`FAAN_OVERRIDE_MAX`, the generated `LIMIT_FAAN`). `sanitizeRuleSet` reverts a stored
   out-of-range number to its default. Steppers clamp to the same bounds. Create with errors stays
   open, switches to the first tab with an error (each such tab carries a red dot plus
   screen-reader text), and focuses the offending field.

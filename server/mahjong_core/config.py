@@ -74,7 +74,7 @@ _CORE_BOUNDS: dict[str, tuple[float, float]] = {
 }
 
 # inclusive bounds for a client-supplied custom ruleset (presets.resolve_ruleset).
-# docs/rules.md §10; web/src/lib/net/ruleset.ts NUMERIC_RULE_BOUNDS mirrors the steppers.
+# docs/rules.md §10; `make proto` emits it to web/src/lib/net/protocol.constants.ts.
 CLIENT_RULE_BOUNDS: dict[str, tuple[float, float]] = {
     "wall_reserve": (0, 30),
     "turn_seconds": (5, 60),

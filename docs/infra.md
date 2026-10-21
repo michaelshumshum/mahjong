@@ -68,7 +68,8 @@ mahjong/
 
 `uv` owns Python, `pnpm` owns JS, the `Makefile` is the Docker-based seam. Generated files
 (`shared/protocol.schema.json`, `web/src/lib/net/protocol.d.ts`,
-`web/src/lib/net/protocol.assertNever.ts`) are never hand-edited — `make proto`
+`web/src/lib/net/protocol.assertNever.ts`, `web/src/lib/net/protocol.constants.ts`) are never
+hand-edited — `make proto`
 ([protocol.md §6](protocol.md)); CI enforces it (§9).
 
 ## 2. Toolchain and local development
@@ -146,7 +147,7 @@ Native equivalents of the Docker targets:
 | `make bench-latency` | `cd server && LATENCY_BUDGET_MS=5 uv run pytest -q -s -m latency -p no:xdist` |
 | `make test-web` | `pnpm --dir web test` |
 | `make migrate` | `cd server && uv run alembic upgrade head` (with `DATABASE_URL`) |
-| `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts` |
+| `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts` |
 
 ## 3. Process model
 

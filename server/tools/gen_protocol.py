@@ -22,6 +22,8 @@ from typing import Any
 from pydantic import BaseModel, TypeAdapter
 
 from app.protocol import AnyMessage, ClientMessage, Envelope, ServerMessage
+from mahjong_core.config import CLIENT_RULE_BOUNDS
+from mahjong_core.scoring.patterns import LIMIT_FAAN
 
 # pydantic class name -> TS name. `Error` would shadow the global `Error`
 # constructor if imported as-is in TS.
@@ -260,6 +262,27 @@ def render_assert_never_fixture(*, server_message: Any) -> str:
     )
 
 
+def _number_ts(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else repr(float(value))
+
+
+def render_constants() -> str:
+    """Runtime values the client validates against before the server does (docs/protocol.md
+    §6). A `.d.ts` can't carry values, so they get their own module."""
+    bounds = "\n".join(
+        f"\t{name}: {{ min: {_number_ts(lo)}, max: {_number_ts(hi)} }},"
+        for name, (lo, hi) in CLIENT_RULE_BOUNDS.items()
+    )
+    return (
+        "// GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.\n"
+        "// Source of truth: server/mahjong_core/config.py, server/mahjong_core/scoring/patterns.py.\n\n"
+        "/** Inclusive ranges for a client-supplied custom ruleset (docs/rules.md §10). */\n"
+        f"export const CLIENT_RULE_BOUNDS = {{\n{bounds}\n}} as const;\n\n"
+        "/** The largest faan a pattern can score, and so the largest faan override. */\n"
+        f"export const LIMIT_FAAN = {LIMIT_FAAN};\n"
+    )
+
+
 def render_json_schema() -> dict[str, Any]:
     """Secondary, informational artifact only (docs/infra.md) — not what the
     TS above is generated from; see the module docstring for why."""
@@ -292,12 +315,16 @@ def main() -> None:
     fixture_path = args.ts_out.parent / "protocol.assertNever.ts"
     fixture_path.write_text(render_assert_never_fixture(server_message=ServerMessage))
 
+    constants_path = args.ts_out.parent / "protocol.constants.ts"
+    constants_path.write_text(render_constants())
+
     if args.schema_out is not None:
         args.schema_out.parent.mkdir(parents=True, exist_ok=True)
         args.schema_out.write_text(json.dumps(render_json_schema(), indent=2) + "\n")
 
     print(f"wrote {args.ts_out}")
     print(f"wrote {fixture_path}")
+    print(f"wrote {constants_path}")
     if args.schema_out is not None:
         print(f"wrote {args.schema_out}")
 

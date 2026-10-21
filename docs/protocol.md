@@ -339,6 +339,9 @@ one guarantee this pipeline exists for — TypeScript flagging an unhandled even
   Being regenerated alongside the types, it can only fail to compile if `ServerEvent` stopped
   being a narrowable union (e.g. `t` regressed from a literal to `string`).
   `web/src/lib/net/reducer.ts` uses the same pattern in production code.
+- It also emits `web/src/lib/net/protocol.constants.ts`: runtime values the client validates
+  against before the server does, which a `.d.ts` can't carry. Today `CLIENT_RULE_BOUNDS`
+  (`mahjong_core/config.py`, [rules.md §10](rules.md)) and `LIMIT_FAAN`.
 - `shared/protocol.schema.json` is still emitted (`TypeAdapter(AnyMessage).json_schema()`) as an
   informational artifact; nothing generates TS from it.
 

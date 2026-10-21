@@ -30,7 +30,10 @@ jobs:
           --ts-out ../web/src/lib/net/protocol.d.ts
           --schema-out ../shared/protocol.schema.json
       - working-directory: web
-        run: pnpm exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts
+        run: >
+          pnpm exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts
+          src/lib/net/protocol.constants.ts
       - run: >
           git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts
+          web/src/lib/net/protocol.constants.ts
           || (echo "Protocol types changed — run 'make proto' and commit them." && exit 1)

@@ -2,6 +2,7 @@
 // field names/enum values must match RuleSet.to_dict() exactly -- a mismatch silently falls back to hk_classic server-side.
 
 import { m } from '$lib/paraglide/messages.js';
+import { CLIENT_RULE_BOUNDS, LIMIT_FAAN } from './protocol.constants';
 
 export type ScoreTable = 'full_spicy' | 'half_spicy';
 export type HandSet = 'CLASSIC' | 'NEW_6' | 'NEW_18';
@@ -140,26 +141,14 @@ export const INERT_RULE_FIELDS = [
 	'pao_rules'
 ] as const satisfies readonly (keyof RuleSet)[];
 
-type NumericRuleField =
-	| 'wall_reserve'
-	| 'turn_seconds'
-	| 'claim_seconds'
-	| 'hand_end_seconds'
-	| 'turn_timeout_strikes'
-	| 'disconnect_grace_seconds';
+// a custom body outside the server's bounds silently becomes hk_classic, so the editor blocks
+// submit instead. self_draw_multiplier is inert (always sent as its default) and fractional.
+const { self_draw_multiplier: _inert, ...EDITABLE_RULE_BOUNDS } = CLIENT_RULE_BOUNDS;
+export const NUMERIC_RULE_BOUNDS = EDITABLE_RULE_BOUNDS;
 
-// inclusive; mirrors server mahjong_core/config.py CLIENT_RULE_BOUNDS. a custom body outside them
-// silently becomes hk_classic, so the editor blocks submit instead.
-export const NUMERIC_RULE_BOUNDS: Record<NumericRuleField, { min: number; max: number }> = {
-	wall_reserve: { min: 0, max: 30 },
-	turn_seconds: { min: 5, max: 60 },
-	claim_seconds: { min: 2, max: 30 },
-	hand_end_seconds: { min: 3, max: 60 },
-	turn_timeout_strikes: { min: 1, max: 10 },
-	disconnect_grace_seconds: { min: 5, max: 60 }
-};
+type NumericRuleField = keyof typeof NUMERIC_RULE_BOUNDS;
 
-export const FAAN_OVERRIDE_MAX = 13;
+export const FAAN_OVERRIDE_MAX = LIMIT_FAAN;
 
 export function isValidRuleNumber(field: NumericRuleField, value: unknown): boolean {
 	const { min, max } = NUMERIC_RULE_BOUNDS[field];
