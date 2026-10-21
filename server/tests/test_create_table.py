@@ -5,13 +5,17 @@ test_ruleset_selection.py`) is the lower-level fallback this endpoint's ruleset 
 (`mahjong_core.presets.resolve_ruleset`) is shared with."""
 
 import re
+from collections.abc import Iterator
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
+from app.body_limit import MAX_REQUEST_BODY_BYTES
 from app.main import _TABLE_CODE_ALPHABET, _TABLE_CODE_LENGTH, _generate_table_id, app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
+from mahjong_core.scoring.patterns import LIMIT_FAAN
 
 _TABLE_ID_RE = re.compile(f"^[{_TABLE_CODE_ALPHABET}]{{{_TABLE_CODE_LENGTH}}}$")
 
@@ -60,6 +64,64 @@ def test_invalid_custom_rules_fall_back_to_default() -> None:
     with TestClient(app) as client:
         response = client.post("/tables", json={"ruleset": "custom", "rules": bad})
     assert response.json()["ruleset_preset"] == "hk_classic"
+
+
+def test_valid_faan_overrides_are_kept() -> None:
+    custom = RuleSet(faan_overrides={"雞糊": 0, "清一色": LIMIT_FAAN, "平糊": 2})
+    with TestClient(app) as client:
+        response = client.post("/tables", json={"ruleset": "custom", "rules": custom.to_dict()})
+    assert response.status_code == 200
+    assert response.json()["ruleset"]["faan_overrides"] == custom.faan_overrides
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"not_a_pattern": 1},
+        {"x" * 10_000: 1},
+        {"平糊": LIMIT_FAAN + 1},
+        {"平糊": -1},
+        {"平糊": True},
+        {"平糊": "3"},
+        {"平糊": 1.5},
+        [["平糊", 1]],
+    ],
+)
+def test_invalid_faan_overrides_are_rejected(overrides: object) -> None:
+    rules = {**DEFAULT_RULESET.to_dict(), "faan_overrides": overrides}
+    with TestClient(app) as client:
+        response = client.post("/tables", json={"ruleset": "custom", "rules": rules})
+    assert response.status_code == 422
+
+
+def test_oversized_body_is_rejected_before_parsing() -> None:
+    rules = {**DEFAULT_RULESET.to_dict(), "padding": "x" * MAX_REQUEST_BODY_BYTES}
+    with TestClient(app) as client:
+        response = client.post("/tables", json={"ruleset": "custom", "rules": rules})
+    assert response.status_code == 413
+
+
+def test_oversized_body_rejection_keeps_cors_headers() -> None:
+    origin = "http://localhost:5173"
+    body = b"x" * (MAX_REQUEST_BODY_BYTES + 1)
+    with TestClient(app) as client:
+        response = client.post("/tables", content=body, headers={"Origin": origin})
+    assert response.status_code == 413
+    assert response.headers["access-control-allow-origin"] == origin
+
+
+def test_oversized_chunked_body_without_content_length_is_rejected() -> None:
+    def chunks() -> Iterator[bytes]:
+        yield b'{"ruleset": "custom", "rules": {"padding": "'
+        for _ in range(MAX_REQUEST_BODY_BYTES // 1024 + 1):
+            yield b"x" * 1024
+        yield b'"}}'
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/tables", content=chunks(), headers={"Content-Type": "application/json"}
+        )
+    assert response.status_code == 413
 
 
 def test_practice_binds_bots_to_seats_one_through_three() -> None:

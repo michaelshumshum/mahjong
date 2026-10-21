@@ -490,6 +490,17 @@ POST /tables
   configuring custom rules navigates straight to `/table/<table_id>`.
 - `ruleset`/`rules`/`practice` have the same semantics as the WS query params (§2) — both call
   `mahjong_core.presets.resolve_ruleset` and fall back to `hk_classic` on bad input.
+- **Except `rules.faan_overrides`**, which is rejected with `422` here (`CreateTableRequest`'s
+  validator) rather than folded into the fallback: keys must be `OVERRIDABLE_PATTERN_NAMES`
+  (`mahjong_core/scoring/faan.py`: every `PATTERNS` name plus 雞糊), values ints in
+  `0..LIMIT_FAAN` (13). The table keeps and echoes the dict on every `state_sync`, so an
+  unbounded one is a per-table memory and bandwidth cost. On the WS `?rules=` path the same
+  check (`validate_faan_overrides`, run by `resolve_ruleset`) falls back to `hk_classic` instead.
+- **Body cap:** every HTTP request body is capped at 16 KB (`app/body_limit.py`'s
+  `MAX_REQUEST_BODY_BYTES`; a full custom ruleset is ~1-2 KB). An over-cap `Content-Length` gets
+  `413` before anything is read; a chunked body is counted as it streams and gets the same `413`
+  once it crosses the cap. The middleware sits inside CORS, so the `413` keeps the allow-origin
+  header.
 - `bot_tiers` is practice mode's per-seat difficulty ([bots.md §6](bots.md)): seat keys `1`-`3`
   only (seat `0` is the human), values `T1`/`T2`/`T4`/`ORACLE` (`_PRACTICE_BOT_TIERS`; `T0` is
   never selectable). The HTTP field itself is a plain string, but `bots/tiers.py`'s `BotTier`

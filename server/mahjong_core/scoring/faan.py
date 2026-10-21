@@ -16,12 +16,13 @@ as `value // pattern.faan`.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, decompose
 from mahjong_core.scoring.patterns import (
+    LIMIT_FAAN,
     PATTERNS,
     Pattern,
     ScoringContext,
@@ -37,6 +38,24 @@ CHICKEN_HAND_FAAN = 0
 """Chicken Hand (雞糊): a win with every other pattern scoring zero, worth 0 faan. Not a
 `Pattern` -- its condition needs this module's own maximisation loop to already have run, so
 it can't be a `DetectorFn`."""
+
+OVERRIDABLE_PATTERN_NAMES: frozenset[str] = frozenset(_PATTERNS_BY_NAME) | {CHICKEN_HAND_NAME}
+"""Every name `RuleSet.faan_overrides` may key: each registered pattern plus 雞糊."""
+
+
+def validate_faan_overrides(overrides: object) -> None:
+    """Raises `ValueError` unless `overrides` maps `OVERRIDABLE_PATTERN_NAMES` to ints in
+    `0..LIMIT_FAAN` (docs/rules.md §10). Client-supplied rules pass through this before a table
+    keeps and echoes them."""
+    if not isinstance(overrides, Mapping):
+        # ValueError, not TypeError: pydantic only turns ValueError into a 422
+        raise ValueError("faan_overrides must be an object")  # noqa: TRY004
+    for name, value in overrides.items():
+        if name not in OVERRIDABLE_PATTERN_NAMES:
+            raise ValueError("faan_overrides has an unknown pattern name")
+        # bool is an int subclass
+        if type(value) is not int or not 0 <= value <= LIMIT_FAAN:
+            raise ValueError(f"faan_overrides values must be ints in 0..{LIMIT_FAAN}")
 
 
 @dataclass(frozen=True)

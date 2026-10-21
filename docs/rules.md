@@ -382,7 +382,10 @@ setting them has no effect. The create-table editor hides them (`INERT_RULE_FIEL
 **Presets** (`mahjong_core.presets.RULESET_PRESETS`): `hk_classic` (the defaults above),
 `hk_casual` (`min_faan=1`, `faan_cap=13`, `score_table=FULL_SPICY`, `NEW_18` on), `hk_strict` (`min_faan=5`, `discard_payment=HALF`). `custom` takes a full
 `RuleSet.from_dict` body. `resolve_ruleset` never hard-rejects: an unknown preset or invalid custom
-body falls back to `hk_classic`.
+body falls back to `hk_classic`. "Invalid" includes `faan_overrides` failing
+`scoring/faan.py`'s `validate_faan_overrides` (a key outside the §7 pattern names plus 雞糊, or a
+value that isn't an int in `0..13`); `POST /tables` rejects that case with `422` instead
+([protocol.md §10](protocol.md)).
 
 ## 11. Edge cases
 

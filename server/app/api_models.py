@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.table_types import WireSeatStatus
 from mahjong_core.presets import DEFAULT_PRESET_ID
+from mahjong_core.scoring.faan import validate_faan_overrides
 
 __all__ = [
     "CreateTableRequest",
@@ -46,6 +47,15 @@ class CreateTableRequest(BaseModel):
     bot_tiers: dict[int, str] | None = None
     # left out of GET /tables; joinable by id/url only
     private: bool = False
+
+    @field_validator("rules")
+    @classmethod
+    def _check_faan_overrides(cls, rules: dict[str, Any] | None) -> dict[str, Any] | None:
+        # the one rules field rejected rather than folded into resolve_ruleset's fallback: the
+        # table keeps and echoes it on every state_sync
+        if rules is not None and "faan_overrides" in rules:
+            validate_faan_overrides(rules["faan_overrides"])
+        return rules
 
 
 class CreateTableResponse(BaseModel):

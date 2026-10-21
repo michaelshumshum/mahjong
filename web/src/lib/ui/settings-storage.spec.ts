@@ -316,6 +316,18 @@ describe('settings-storage', () => {
 				min_faan: 1
 			});
 		});
+
+		it('drops a stored faan override for a pattern the server no longer scores', () => {
+			localStorage.setItem(
+				CREATE_TABLE_SETUP_STORAGE_KEY,
+				JSON.stringify({
+					presetId: 'custom',
+					customBase: 'hk_classic',
+					custom: { ...DEFAULT_RULESET, faan_overrides: { 混么九: 4, 平糊: 2 } }
+				})
+			);
+			expect(loadCreateTableSetup()?.custom.faan_overrides).toEqual({ 平糊: 2 });
+		});
 	});
 
 	describe('onboarding', () => {

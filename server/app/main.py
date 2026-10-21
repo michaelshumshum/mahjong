@@ -30,6 +30,7 @@ from app.api_models import (
     TableList,
     TableSummaryOut,
 )
+from app.body_limit import BodySizeLimitMiddleware
 from app.db.session import make_engine, make_session_factory
 from bots.learned import weights_problem
 from bots.tiers import LEARNED_TIERS, BotTier
@@ -96,6 +97,8 @@ def _openapi_url(api_docs: str | None) -> str | None:
 # API_DOCS=0 (prod overlay) hides the schema and docs UIs
 app = FastAPI(lifespan=lifespan, openapi_url=_openapi_url(os.environ.get("API_DOCS")))
 app.include_router(ws.router)
+# added before CORS so CORS wraps it and a 413 still carries the allow-origin header
+app.add_middleware(BodySizeLimitMiddleware)
 # comma-separated CORS_ORIGINS; unset -> no cross-origin reads.
 app.add_middleware(
     CORSMiddleware,

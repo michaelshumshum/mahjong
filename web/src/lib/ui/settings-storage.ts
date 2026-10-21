@@ -13,6 +13,7 @@ import {
 	sanitizeRuleSet,
 	type RuleSet
 } from '$lib/net/ruleset';
+import { OVERRIDABLE_PATTERNS } from './faan-guide';
 
 // Namespaced, versioned keys -- `v1` lets a future shape change fail closed (treated as
 // missing, below) instead of crashing on an old stored shape.
@@ -358,10 +359,17 @@ export function loadCreateTableSetup(): CreateTableSetup | null {
 		const known = (id: unknown): id is string =>
 			typeof id === 'string' && id in RULESET_PRESET_RULES;
 		if (!(known(presetId) || presetId === CUSTOM_PRESET_ID) || !known(customBase)) return null;
+		const rules = sanitizeRuleSet(custom);
+		// the server 422s an unknown pattern name, e.g. one renamed since this was saved
+		rules.faan_overrides = Object.fromEntries(
+			Object.entries(rules.faan_overrides).filter(([pattern]) =>
+				OVERRIDABLE_PATTERNS.some((p) => p.pattern === pattern)
+			)
+		);
 		return {
 			presetId,
 			customBase,
-			custom: sanitizeRuleSet(custom),
+			custom: rules,
 			private: isPrivate === true
 		};
 	} catch {

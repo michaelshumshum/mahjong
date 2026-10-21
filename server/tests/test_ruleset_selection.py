@@ -5,6 +5,7 @@ resolver's never-hard-reject posture and `state_sync`'s `ruleset`/`ruleset_prese
 import json
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -16,6 +17,7 @@ from mahjong_core.presets import (
     preset_id_for,
     resolve_ruleset,
 )
+from mahjong_core.scoring.patterns import LIMIT_FAAN
 
 
 def test_default_preset_id_is_hk_classic() -> None:
@@ -56,6 +58,21 @@ def test_resolve_ruleset_custom_with_invalid_rules_falls_back_to_default() -> No
 
 def test_resolve_ruleset_custom_with_missing_keys_falls_back_to_default() -> None:
     assert resolve_ruleset("custom", {"min_faan": 1}) == DEFAULT_RULESET
+
+
+@pytest.mark.parametrize(
+    "overrides", [{"not_a_pattern": 1}, {"平糊": LIMIT_FAAN + 1}, {"平糊": -1}, {"平糊": True}]
+)
+def test_resolve_ruleset_custom_with_invalid_faan_overrides_falls_back_to_default(
+    overrides: dict[str, object],
+) -> None:
+    bad = {**DEFAULT_RULESET.to_dict(), "faan_overrides": overrides}
+    assert resolve_ruleset("custom", bad) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_keeps_valid_faan_overrides() -> None:
+    custom = RuleSet(faan_overrides={"雞糊": 0, "七對子": LIMIT_FAAN})
+    assert resolve_ruleset("custom", custom.to_dict()) == custom
 
 
 def _connect_and_join(client: TestClient, table_id: str, query: str) -> dict:
@@ -122,6 +139,15 @@ def test_custom_with_invalid_ruleset_fields_falls_back_to_default() -> None:
     with TestClient(app) as client:
         state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
         assert state_sync["d"]["ruleset_preset"] == "hk_classic"
+
+
+def test_custom_with_unknown_faan_override_falls_back_to_default() -> None:
+    table_id = f"ruleset-override-{uuid.uuid4()}"
+    rules = json.dumps({**DEFAULT_RULESET.to_dict(), "faan_overrides": {"not_a_pattern": 1}})
+    with TestClient(app) as client:
+        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
+        assert state_sync["d"]["ruleset_preset"] == "hk_classic"
+        assert state_sync["d"]["ruleset"]["faan_overrides"] == {}
 
 
 def test_ruleset_only_meaningful_on_first_connect() -> None:

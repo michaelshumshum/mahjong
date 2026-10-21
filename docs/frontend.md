@@ -821,7 +821,9 @@ views in one dialog:
 - **Remembered.** A successful create stores `{presetId, customBase, custom, private}` under
   `mahjong:createTableSetup:v1`; the next open restores the selection and the custom draft.
   `loadCreateTableSetup` drops an unknown preset id and repairs a stale ruleset field-by-field
-  (`sanitizeRuleSet`) instead of discarding it.
+  (`sanitizeRuleSet`) instead of discarding it. It also drops any faan override whose key isn't in
+  `OVERRIDABLE_PATTERNS`: `POST /tables` answers an unknown pattern name with `422`
+  ([protocol.md §10](protocol.md)), unlike the rest of the body.
 - The custom view has a fixed height (`min(44rem, 100dvh - 2rem)`) so switching tabs never resizes
   it; Cancel/Create stay pinned below the scroll region.
 
