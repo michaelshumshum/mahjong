@@ -50,7 +50,7 @@ from app.table_types import TableSettings, WireSeatStatus
 from bots.tiers import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
 
-__all__ = ["TableLimitError", "TableRegistry", "TableSummary"]
+__all__ = ["TableLimitError", "TableLoad", "TableRegistry", "TableSummary"]
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,19 @@ class TableSummary:
     hand_no: int
     seat_status: tuple[WireSeatStatus, WireSeatStatus, WireSeatStatus, WireSeatStatus]
     names: tuple[str | None, str | None, str | None, str | None]
+
+
+@dataclass(frozen=True, slots=True)
+class TableLoad:
+    """`TableRegistry.load`: aggregate counts only, private tables included -- `GET /status` is
+    public, so nothing here may name a table."""
+
+    playing: int
+    waiting: int
+    players: int
+    spectators: int
+    live: int
+    max_tables: int | None
 
 
 class TableRegistry:
@@ -325,6 +338,35 @@ class TableRegistry:
                 )
             )
         return summaries
+
+    def load(self) -> TableLoad:
+        """Started tables still running (`playing`), unstarted ones with a seat `connected`
+        (`waiting`), `connected` seats on any table (`players`; a finished table's game-end
+        screen still counts) and spectators on any table. The showcase counts for spectators
+        only."""
+        playing = waiting = players = spectators = 0
+        for table_id, table in self._tables.items():
+            spectators += len(table.spectators)
+            if table_id == self._showcase_id:
+                continue
+            connected = sum(
+                1 for b in table.seat_bindings if b is not None and b.status == "connected"
+            )
+            players += connected
+            if not self.is_running(table_id):
+                continue
+            if table.started:
+                playing += 1
+            elif connected:
+                waiting += 1
+        return TableLoad(
+            playing=playing,
+            waiting=waiting,
+            players=players,
+            spectators=spectators,
+            live=self.live_count(),
+            max_tables=self._max_tables,
+        )
 
     async def begin_shutdown(
         self, *, grace_seconds: float = 90.0, deadline_ts: int | None = None

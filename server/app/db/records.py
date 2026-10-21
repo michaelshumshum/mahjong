@@ -4,9 +4,11 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from collections.abc import Sequence
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import GameRecord, HandRecord
@@ -15,6 +17,7 @@ from mahjong_core.engine import ENGINE_VERSION, game_outcome
 from mahjong_core.state import GameState, Phase
 
 __all__ = [
+    "count_games_since",
     "get_game_record",
     "get_hand_record",
     "hand_record_columns",
@@ -56,6 +59,14 @@ async def save_game_record(
 
 async def get_game_record(session: AsyncSession, record_id: int) -> GameRecord | None:
     return await session.get(GameRecord, record_id)
+
+
+async def count_games_since(session: AsyncSession, since: dt.datetime) -> int:
+    """Finished games recorded at or after `since` (`GET /status`)."""
+    count = await session.scalar(
+        select(func.count()).select_from(GameRecord).where(GameRecord.created_at >= since)
+    )
+    return count or 0
 
 
 def is_replayable(record: GameRecord | HandRecord, current_version: str = ENGINE_VERSION) -> bool:

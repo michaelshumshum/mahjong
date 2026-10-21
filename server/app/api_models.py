@@ -12,12 +12,19 @@ from mahjong_core.presets import DEFAULT_PRESET_ID
 from mahjong_core.scoring.faan import validate_faan_overrides
 
 __all__ = [
+    "BotLatencyOut",
     "CreateTableRequest",
     "CreateTableResponse",
+    "LoadPointOut",
     "SeatSummary",
+    "ServerStatus",
+    "StatusResponse",
     "TableList",
     "TableSummaryOut",
 ]
+
+# /healthz's and /status's "status"
+type ServerStatus = Literal["ok", "degraded", "draining"]
 
 
 class SeatSummary(BaseModel):
@@ -63,3 +70,33 @@ class CreateTableResponse(BaseModel):
     # same shape as state_sync.ruleset/ruleset_preset
     ruleset_preset: str | None
     ruleset: dict[str, Any]
+
+
+class BotLatencyOut(BaseModel):
+    p50_ms: float
+    p95_ms: float
+
+
+class LoadPointOut(BaseModel):
+    ts: int
+    players: int
+    tables: int
+    bot_p95_ms: float | None
+    loop_lag_ms: float
+
+
+class StatusResponse(BaseModel):
+    status: ServerStatus
+    uptime_seconds: int
+    players_online: int
+    spectators: int
+    tables_playing: int
+    tables_waiting: int
+    # live tables / MAX_TABLES; None when unlimited
+    capacity_pct: int | None
+    # None without a database
+    games_finished_24h: int | None
+    # None with no bot decision in the last 5 minutes
+    bot_decision_ms: BotLatencyOut | None
+    loop_lag_ms: float
+    history: list[LoadPointOut]

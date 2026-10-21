@@ -43,6 +43,7 @@ mahjong/
 │   │   ├── clock.py            # now_ms(): server epoch ms for every wire ts/deadline_ts
 │   │   ├── registry.py         # TableRegistry, reaper + table cap, showcase table, shutdown drain
 │   │   ├── rate_limit.py       # POST /tables per-IP RateLimiter
+│   │   ├── status.py           # ServerStats: bot latency, loop lag, history ring for GET /status (§8)
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
@@ -60,7 +61,7 @@ mahjong/
 │   ├── package.json, Dockerfile, vite.config.ts, playwright.config.ts
 │   ├── messages/               # i18n sources (frontend.md §9)
 │   └── src/
-│       ├── routes/             # /, /tables, /demo, /table/[id], /replay/[id], /profile
+│       ├── routes/             # /, /tables, /demo, /table/[id], /replay/[id], /profile, /status
 │       └── lib/                # net/ game/ table/ ui/ i18n/ styles/ (frontend.md §1)
 ├── shared/protocol.schema.json # GENERATED, informational
 └── docs/
@@ -297,7 +298,7 @@ reload.
 | --- | --- |
 | Logging | stdout, `LOG_LEVEL` via env, captured by Docker. Not structured, no shipping |
 | Health | process-level `/healthz` (the `api` healthcheck): `503` while draining; `200` with `"status": "degraded"` when the learned weights failed the startup check ([bots.md §2](bots.md)), which the Compose healthcheck treats as unhealthy (it requires `"ok"`). No per-table liveness |
-| Metrics | none |
+| Metrics | public `GET /status` ([protocol.md §10](protocol.md)), shown on the web's `/status` page ([frontend.md §7](frontend.md)). In-process only (`app/status.py`), reset on restart: players/spectators/tables from `TableRegistry.load`, bot decision latency p50/p95 over 5 min (submit to answer, queueing included, think delay excluded), event-loop lag (worst of the last 60 1-second sampler ticks), capacity against `MAX_TABLES`, uptime, finished games in the last 24h (a `games` count, cached 60s; `null` without a database), and a 24h history ring at 5-minute points. Aggregates only, never a table id or player name. No scraping endpoint, no alerting |
 | Error tracking | none — an uncaught exception in a table's task goes only to the log |
 | Tracing | not needed at one process |
 
@@ -307,7 +308,8 @@ before real users:
 - Structured (JSON) logs per table (`table_id`, `seq`, phase transitions), shipped off-box.
 - A per-table liveness check — a process can be up while one table's task loop is stuck.
 - An alert on "table hasn't advanced `seq` in N minutes while players are connected."
-- Metrics: table count, active connections, per-table hand duration.
+- Metrics: per-table hand duration (table count and connections are on `/status`), and an
+  external uptime probe — `/status` can't report its own process being down.
 
 ## 9. CI
 

@@ -108,6 +108,7 @@ from app.errors import (
     TableFullError,
 )
 from app.fairness import fairness_reveal, new_nonce, seed_commit
+from app.status import stats as server_stats
 from app.table_types import (
     BotJobTag,
     BotResult,
@@ -1409,8 +1410,10 @@ class Table:
         pending tag goes stale while asleep, the result lands anyway but `_handle_bot_result`
         drops it like any other stale answer.
         """
+        started = time.monotonic()
         try:
             aid = await asyncio.wait_for(future, timeout=_BOT_JOB_TIMEOUT_SECONDS)
+            server_stats().record_bot_decision(time.monotonic() - started)
             think_seconds = random.Random(seed ^ 0x5A5A5A5A).uniform(
                 _BOT_THINK_MIN_SECONDS, _BOT_THINK_MAX_SECONDS
             )

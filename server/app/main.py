@@ -11,9 +11,13 @@ generated six-character table id.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import datetime as dt
 import logging
 import os
 import secrets
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -21,20 +25,27 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import ws
 from app.api_models import (
+    BotLatencyOut,
     CreateTableRequest,
     CreateTableResponse,
+    LoadPointOut,
     SeatSummary,
+    ServerStatus,
+    StatusResponse,
     TableList,
     TableSummaryOut,
 )
 from app.body_limit import BodySizeLimitMiddleware
+from app.db.records import count_games_since
 from app.db.session import make_engine, make_session_factory
 from app.limits import IpNetwork, client_ip, parse_trusted_proxies
 from app.rate_limit import RateLimiter
 from app.registry import REAP_INTERVAL_SECONDS, TableLimitError
+from app.status import reset_stats, stats
 from bots.learned import weights_problem
 from bots.tiers import LEARNED_TIERS, BotTier
 from mahjong_core.config import DEFAULT_RULESET
@@ -54,6 +65,8 @@ _DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS = 60.0
 _TABLE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _TABLE_CODE_LENGTH = 6
 _TABLE_ID_GENERATION_ATTEMPTS = 10  # astronomically unlikely to ever retry once, let alone exhaust
+# GET /status is public and polled; one count query per this many seconds at most
+_GAMES_COUNT_CACHE_SECONDS = 60.0
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +75,9 @@ _learned_weights_problem: str | None = None
 # rebuilt per lifespan like the registry; None = POST /tables unlimited
 _create_limiter: RateLimiter | None = None
 _trusted_proxies: tuple[IpNetwork, ...] = ()
+_session_factory: async_sessionmaker[AsyncSession] | None = None
+# (monotonic time fetched, count)
+_games_24h_cache: tuple[float, int] | None = None
 
 
 def _optional_limit(raw: str) -> int | None:
@@ -74,7 +90,8 @@ def _optional_limit(raw: str) -> int | None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # degrade rather than refuse to start: a crash-looping api takes every table down, a missing
     # policy only Expert/Impossible (docs/bots.md §2 "Missing weights")
-    global _learned_weights_problem, _create_limiter, _trusted_proxies
+    global _learned_weights_problem, _create_limiter, _trusted_proxies, _session_factory
+    global _games_24h_cache
     _learned_weights_problem = weights_problem()
     if _learned_weights_problem is not None:
         logger.error(
@@ -85,6 +102,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     database_url = os.environ.get("DATABASE_URL")
     engine = make_engine(database_url) if database_url else None
     session_factory = make_session_factory(engine) if engine is not None else None
+    _session_factory = session_factory
+    _games_24h_cache = None
     abandon_grace = float(
         os.environ.get("ABANDONED_TABLE_GRACE_SECONDS", _DEFAULT_ABANDONED_TABLE_GRACE_SECONDS)
     )
@@ -119,9 +138,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
     if showcase_id:
         registry.start_showcase(showcase_id, DEFAULT_RULESET, bot_tiers=_available_bot_tiers())
+    sampler = asyncio.create_task(reset_stats().run_sampler(_history_load))
     try:
         yield
     finally:
+        sampler.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sampler
         grace_seconds = float(
             os.environ.get("SHUTDOWN_GRACE_SECONDS", _DEFAULT_SHUTDOWN_GRACE_SECONDS)
         )
@@ -237,14 +260,77 @@ async def create_table(body: CreateTableRequest, request: Request) -> CreateTabl
     )
 
 
+def _server_status() -> ServerStatus:
+    if ws.registry().draining:
+        return "draining"
+    return "degraded" if _learned_weights_problem is not None else "ok"
+
+
+def _history_load() -> tuple[int, int]:
+    load = ws.registry().load()
+    return load.players, load.playing
+
+
+async def _games_finished_24h() -> int | None:
+    global _games_24h_cache
+    if _session_factory is None:
+        return None
+    now = time.monotonic()
+    if _games_24h_cache is not None and now - _games_24h_cache[0] < _GAMES_COUNT_CACHE_SECONDS:
+        return _games_24h_cache[1]
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
+    try:
+        async with _session_factory() as session:
+            count = await count_games_since(session, since)
+    except Exception:
+        # the status page outlives a database outage; it just loses this one number
+        logger.exception("status: counting recent games failed")
+        return None
+    _games_24h_cache = (now, count)
+    return count
+
+
+@app.get("/status")
+async def server_status() -> StatusResponse:
+    """Public status page numbers (docs/infra.md §8). Aggregates only -- no table ids or names."""
+    load = ws.registry().load()
+    server = stats()
+    bot = server.bot_decision_ms()
+    return StatusResponse(
+        status=_server_status(),
+        uptime_seconds=server.uptime_seconds(),
+        players_online=load.players,
+        spectators=load.spectators,
+        tables_playing=load.playing,
+        tables_waiting=load.waiting,
+        capacity_pct=(
+            round(100 * load.live / load.max_tables) if load.max_tables is not None else None
+        ),
+        games_finished_24h=await _games_finished_24h(),
+        bot_decision_ms=BotLatencyOut(p50_ms=bot[0], p95_ms=bot[1]) if bot is not None else None,
+        loop_lag_ms=server.loop_lag_ms(),
+        history=[
+            LoadPointOut(
+                ts=p.ts,
+                players=p.players,
+                tables=p.tables,
+                bot_p95_ms=p.bot_p95_ms,
+                loop_lag_ms=p.loop_lag_ms,
+            )
+            for p in server.history
+        ],
+    )
+
+
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     # fails once a drain has begun, so a load balancer stops routing new traffic here.
-    if ws.registry().draining:
-        return JSONResponse({"status": "draining"}, status_code=503)
+    status = _server_status()
+    if status == "draining":
+        return JSONResponse({"status": status}, status_code=503)
     # 200, not 503: the web client's ApiConnectGate blocks every page on a non-2xx. the compose
     # healthcheck reads "status" instead (docs/infra.md §8)
-    if _learned_weights_problem is not None:
+    if status == "degraded":
         return JSONResponse(
             {
                 "status": "degraded",
@@ -252,7 +338,7 @@ async def healthz() -> JSONResponse:
                 "reason": _learned_weights_problem,
             }
         )
-    return JSONResponse({"status": "ok"})
+    return JSONResponse({"status": status})
 
 
 @app.get("/tables")
