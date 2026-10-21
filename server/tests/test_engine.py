@@ -15,7 +15,14 @@ from mahjong_core.actions import (
     legal_actions,
 )
 from mahjong_core.config import DEFAULT_RULESET, GameLength, RuleSet
-from mahjong_core.engine import IllegalActionError, new_game, reduce, start_next_hand
+from mahjong_core.engine import (
+    MAX_HANDS_PER_GAME,
+    IllegalActionError,
+    game_outcome,
+    new_game,
+    reduce,
+    start_next_hand,
+)
 from mahjong_core.events import (
     ClaimResolved,
     Discarded,
@@ -1122,6 +1129,35 @@ def test_dealer_repeats_on_draw_when_configured() -> None:
     state, _ = start_next_hand(state)
     assert state.dealer == 3
     assert state.hand_no == 9
+
+
+def test_game_ends_at_max_hands_even_when_the_dealer_repeats() -> None:
+    ruleset = RuleSet(dealer_repeat_on_win=True, dealer_repeat_on_draw=True)
+    state = _hand_over_state(
+        dealer=1,
+        prevailing=Wind.EAST,
+        hand_no=MAX_HANDS_PER_GAME,
+        ruleset=ruleset,
+        result=HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW),
+    )
+    state, events = start_next_hand(state)
+    assert state.phase == Phase.GAME_OVER
+    assert [type(e) for e in events] == [GameEnded]
+    assert game_outcome(state).hand_count == MAX_HANDS_PER_GAME
+
+
+def test_hand_before_max_hands_still_repeats() -> None:
+    ruleset = RuleSet(dealer_repeat_on_draw=True)
+    state = _hand_over_state(
+        dealer=1,
+        prevailing=Wind.EAST,
+        hand_no=MAX_HANDS_PER_GAME - 1,
+        ruleset=ruleset,
+        result=HandResult(outcome=HandOutcome.EXHAUSTIVE_DRAW),
+    )
+    state, _ = start_next_hand(state)
+    assert state.phase == Phase.AWAIT_ACTION
+    assert state.hand_no == MAX_HANDS_PER_GAME
 
 
 def test_start_next_hand_carries_forward_next_window_id() -> None:

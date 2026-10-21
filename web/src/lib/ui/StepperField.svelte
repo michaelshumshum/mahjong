@@ -9,6 +9,7 @@
 		description,
 		value,
 		min,
+		max,
 		unit,
 		error,
 		testid,
@@ -18,6 +19,7 @@
 		description?: string;
 		value: number | null;
 		min: number;
+		max: number;
 		unit?: string;
 		error?: string;
 		testid?: string;
@@ -32,7 +34,7 @@
 
 	function step(delta: number): void {
 		const base = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : min;
-		onChange(Math.max(min, base + delta));
+		onChange(Math.min(max, Math.max(min, base + delta)));
 	}
 
 	function handleInput(e: Event & { currentTarget: HTMLInputElement }): void {
@@ -63,6 +65,7 @@
 				inputmode="numeric"
 				step="1"
 				{min}
+				{max}
 				value={value ?? ''}
 				aria-invalid={error ? 'true' : undefined}
 				aria-describedby={describedby}
@@ -74,6 +77,7 @@
 				type="button"
 				class="step"
 				aria-label={m.stepper_increase({ label })}
+				disabled={typeof value === 'number' && value >= max}
 				onclick={() => step(1)}><Plus size={16} /></button
 			>
 		</span>

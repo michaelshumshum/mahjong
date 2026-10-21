@@ -184,7 +184,7 @@
 	"createTableDialog_botTakeoverLegend": "電腦代打",
 	"createTableDialog_turnTimeoutStrikesDesc": "超時咁多次之後，由電腦代打到完場。",
 	"createTableDialog_disconnectGraceSecondsDesc": "斷線之後電腦接手之前嘅等候時間。",
-	"createTableDialog_numberMinError": "請輸入{min}或以上嘅整數。",
+	"createTableDialog_numberRangeError": "請輸入{min}至{max}之間嘅整數。",
 	"createTableDialog_tabTable": "牌桌",
 	"createTableDialog_fairnessLegend": "公平性",
 	"createTableDialog_provableFairnessLabel": "可驗證公平",

@@ -15,7 +15,7 @@
 	import {
 		FAAN_OVERRIDE_MAX,
 		HAND_SET_OPTIONS,
-		NUMERIC_RULE_MIN,
+		NUMERIC_RULE_BOUNDS,
 		VALID_FAAN_CAP,
 		VALID_MIN_FAAN,
 		isValidFaanOverride,
@@ -50,7 +50,7 @@
 	};
 
 	// numeric fields per tab, for the error flag on each tab
-	const TAB_NUMBERS: Record<RulesTab, (keyof typeof NUMERIC_RULE_MIN)[]> = {
+	const TAB_NUMBERS: Record<RulesTab, (keyof typeof NUMERIC_RULE_BOUNDS)[]> = {
 		scoring: [],
 		hands: [],
 		play: ['wall_reserve'],
@@ -85,10 +85,10 @@
 		}))
 	);
 
-	function numberError(field: keyof typeof NUMERIC_RULE_MIN): string | undefined {
+	function numberError(field: keyof typeof NUMERIC_RULE_BOUNDS): string | undefined {
 		return isValidRuleNumber(field, rules[field])
 			? undefined
-			: m.createTableDialog_numberMinError({ min: NUMERIC_RULE_MIN[field] });
+			: m.createTableDialog_numberRangeError(NUMERIC_RULE_BOUNDS[field]);
 	}
 
 	function toggleHandSet(value: HandSet, checked: boolean): void {
@@ -415,7 +415,8 @@
 						label={m.createTableDialog_wallReserveLabel()}
 						description={m.createTableDialog_wallReserveDesc()}
 						value={rules.wall_reserve}
-						min={NUMERIC_RULE_MIN.wall_reserve}
+						min={NUMERIC_RULE_BOUNDS.wall_reserve.min}
+						max={NUMERIC_RULE_BOUNDS.wall_reserve.max}
 						unit={m.createTableDialog_tilesUnit()}
 						error={numberError('wall_reserve')}
 						testid="rule-wall_reserve"
@@ -439,7 +440,8 @@
 						label={m.createTableDialog_turnSecondsLabel()}
 						description={m.createTableDialog_turnSecondsDesc()}
 						value={rules.turn_seconds}
-						min={NUMERIC_RULE_MIN.turn_seconds}
+						min={NUMERIC_RULE_BOUNDS.turn_seconds.min}
+						max={NUMERIC_RULE_BOUNDS.turn_seconds.max}
 						unit={m.createTableDialog_secondsUnit()}
 						error={numberError('turn_seconds')}
 						testid="rule-turn_seconds"
@@ -449,7 +451,8 @@
 						label={m.createTableDialog_claimSecondsLabel()}
 						description={m.createTableDialog_claimSecondsDesc()}
 						value={rules.claim_seconds}
-						min={NUMERIC_RULE_MIN.claim_seconds}
+						min={NUMERIC_RULE_BOUNDS.claim_seconds.min}
+						max={NUMERIC_RULE_BOUNDS.claim_seconds.max}
 						unit={m.createTableDialog_secondsUnit()}
 						error={numberError('claim_seconds')}
 						testid="rule-claim_seconds"
@@ -459,7 +462,8 @@
 						label={m.createTableDialog_handEndSecondsLabel()}
 						description={m.createTableDialog_handEndSecondsDesc()}
 						value={rules.hand_end_seconds}
-						min={NUMERIC_RULE_MIN.hand_end_seconds}
+						min={NUMERIC_RULE_BOUNDS.hand_end_seconds.min}
+						max={NUMERIC_RULE_BOUNDS.hand_end_seconds.max}
 						unit={m.createTableDialog_secondsUnit()}
 						error={numberError('hand_end_seconds')}
 						testid="rule-hand_end_seconds"
@@ -475,7 +479,8 @@
 						label={m.createTableDialog_turnTimeoutStrikesLabel()}
 						description={m.createTableDialog_turnTimeoutStrikesDesc()}
 						value={rules.turn_timeout_strikes}
-						min={NUMERIC_RULE_MIN.turn_timeout_strikes}
+						min={NUMERIC_RULE_BOUNDS.turn_timeout_strikes.min}
+						max={NUMERIC_RULE_BOUNDS.turn_timeout_strikes.max}
 						error={numberError('turn_timeout_strikes')}
 						testid="rule-turn_timeout_strikes"
 						onChange={(v) => (rules.turn_timeout_strikes = v as number)}
@@ -484,7 +489,8 @@
 						label={m.createTableDialog_disconnectGraceSecondsLabel()}
 						description={m.createTableDialog_disconnectGraceSecondsDesc()}
 						value={rules.disconnect_grace_seconds}
-						min={NUMERIC_RULE_MIN.disconnect_grace_seconds}
+						min={NUMERIC_RULE_BOUNDS.disconnect_grace_seconds.min}
+						max={NUMERIC_RULE_BOUNDS.disconnect_grace_seconds.max}
 						unit={m.createTableDialog_secondsUnit()}
 						error={numberError('disconnect_grace_seconds')}
 						testid="rule-disconnect_grace_seconds"

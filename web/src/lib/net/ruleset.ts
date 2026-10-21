@@ -148,21 +148,22 @@ type NumericRuleField =
 	| 'turn_timeout_strikes'
 	| 'disconnect_grace_seconds';
 
-// lower bounds match what the server can run; it validates almost none of them and an invalid
-// custom body silently becomes hk_classic, so the editor blocks submit instead.
-export const NUMERIC_RULE_MIN: Record<NumericRuleField, number> = {
-	wall_reserve: 0,
-	turn_seconds: 1,
-	claim_seconds: 1,
-	hand_end_seconds: 0,
-	turn_timeout_strikes: 1,
-	disconnect_grace_seconds: 0
+// inclusive; mirrors server mahjong_core/config.py CLIENT_RULE_BOUNDS. a custom body outside them
+// silently becomes hk_classic, so the editor blocks submit instead.
+export const NUMERIC_RULE_BOUNDS: Record<NumericRuleField, { min: number; max: number }> = {
+	wall_reserve: { min: 0, max: 30 },
+	turn_seconds: { min: 5, max: 60 },
+	claim_seconds: { min: 2, max: 30 },
+	hand_end_seconds: { min: 3, max: 60 },
+	turn_timeout_strikes: { min: 1, max: 10 },
+	disconnect_grace_seconds: { min: 5, max: 60 }
 };
 
 export const FAAN_OVERRIDE_MAX = 13;
 
 export function isValidRuleNumber(field: NumericRuleField, value: unknown): boolean {
-	return typeof value === 'number' && Number.isInteger(value) && value >= NUMERIC_RULE_MIN[field];
+	const { min, max } = NUMERIC_RULE_BOUNDS[field];
+	return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
 }
 
 export function isValidFaanOverride(value: unknown): boolean {
@@ -172,7 +173,7 @@ export function isValidFaanOverride(value: unknown): boolean {
 }
 
 export function invalidRuleFields(rules: RuleSet): string[] {
-	const invalid: string[] = (Object.keys(NUMERIC_RULE_MIN) as NumericRuleField[]).filter(
+	const invalid: string[] = (Object.keys(NUMERIC_RULE_BOUNDS) as NumericRuleField[]).filter(
 		(field) => !isValidRuleNumber(field, rules[field])
 	);
 	if (rules.hand_sets.length === 0) invalid.push('hand_sets');
@@ -238,6 +239,10 @@ export function sanitizeRuleSet(value: unknown): RuleSet {
 				out.faan_overrides = Object.fromEntries(
 					Object.entries(candidate).filter(([, n]) => isValidFaanOverride(n))
 				) as Record<string, number>;
+			}
+		} else if (key in NUMERIC_RULE_BOUNDS) {
+			if (isValidRuleNumber(key as NumericRuleField, candidate)) {
+				(out as unknown as Record<string, unknown>)[key] = candidate;
 			}
 		} else if (typeof candidate === typeof fallback) {
 			const allowed = ENUM_VALUES[key];

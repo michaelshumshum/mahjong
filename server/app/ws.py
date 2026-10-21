@@ -127,10 +127,14 @@ def _resolve_ruleset_query(ruleset: str, rules: str | None) -> RuleSet:
     parsed: dict[str, Any] | None = None
     if rules is not None:
         try:
-            parsed = json.loads(rules)
-        except json.JSONDecodeError:
+            parsed = json.loads(rules, parse_constant=_reject_json_constant)
+        except ValueError:
             parsed = None
     return resolve_ruleset(ruleset, parsed)
+
+
+def _reject_json_constant(name: str) -> Any:
+    raise ValueError(f"non-finite JSON constant {name} in rules")
 
 
 def _get_or_create_table(table_id: str, practice: bool, ruleset: str, rules: str | None) -> Table:

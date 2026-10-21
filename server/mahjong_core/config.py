@@ -6,10 +6,13 @@ app/protocol.py uses pydantic elsewhere.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
+
+from .tiles import TOTAL_PHYSICAL_TILES
 
 
 class ScoreTable(StrEnum):
@@ -44,6 +47,50 @@ class GameLength(StrEnum):
 
 _VALID_MIN_FAAN = frozenset({0, 1, 3, 5})
 _VALID_FAAN_CAP = frozenset({8, 10, 13})
+MAX_FAAN_CAP = max(_VALID_FAAN_CAP)
+
+_INT_FIELDS = (
+    "min_faan",
+    "faan_cap",
+    "wall_reserve",
+    "turn_seconds",
+    "claim_seconds",
+    "hand_end_seconds",
+    "turn_timeout_strikes",
+)
+_REAL_FIELDS = ("self_draw_multiplier", "disconnect_grace_seconds")
+
+_MAX_TIMER_SECONDS = 3600
+
+# structural bounds, enforced on every RuleSet (tests and stored records included).
+# lower ends stay at 0 on purpose: 0-second timers are the tests' time-control knob.
+_CORE_BOUNDS: dict[str, tuple[float, float]] = {
+    "wall_reserve": (0, TOTAL_PHYSICAL_TILES),
+    "turn_seconds": (0, _MAX_TIMER_SECONDS),
+    "claim_seconds": (0, _MAX_TIMER_SECONDS),
+    "hand_end_seconds": (0, _MAX_TIMER_SECONDS),
+    "turn_timeout_strikes": (1, 100),
+    "disconnect_grace_seconds": (0, _MAX_TIMER_SECONDS),
+    "self_draw_multiplier": (1, 10),
+}
+
+# inclusive bounds for a client-supplied custom ruleset (presets.resolve_ruleset).
+# docs/rules.md §10; web/src/lib/net/ruleset.ts NUMERIC_RULE_BOUNDS mirrors the steppers.
+CLIENT_RULE_BOUNDS: dict[str, tuple[float, float]] = {
+    "wall_reserve": (0, 30),
+    "turn_seconds": (5, 60),
+    "claim_seconds": (2, 30),
+    "hand_end_seconds": (3, 60),
+    "turn_timeout_strikes": (1, 10),
+    "disconnect_grace_seconds": (5, 60),
+    "self_draw_multiplier": (1, 2),
+}
+
+
+def _check_range(name: str, value: float, bounds: tuple[float, float]) -> None:
+    lo, hi = bounds
+    if not lo <= value <= hi:
+        raise ValueError(f"{name} must be in [{lo}, {hi}], got {value}")
 
 
 @dataclass(frozen=True)
@@ -91,6 +138,25 @@ class RuleSet:
     disconnect_grace_seconds: float = 20.0
 
     def __post_init__(self) -> None:
+        for name in _INT_FIELDS:
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{name} must be an int, got {value!r}")
+        for name in _REAL_FIELDS:
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"{name} must be a number, got {value!r}")
+            if not math.isfinite(value):
+                raise ValueError(f"{name} must be finite, got {value!r}")
+        for name, bounds in _CORE_BOUNDS.items():
+            _check_range(name, getattr(self, name), bounds)
+        if not isinstance(self.faan_overrides, Mapping):
+            raise TypeError(f"faan_overrides must be a mapping, got {self.faan_overrides!r}")
+        for pattern, faan in self.faan_overrides.items():
+            if not isinstance(pattern, str) or isinstance(faan, bool) or not isinstance(faan, int):
+                raise TypeError(f"faan_overrides must map str -> int, got {pattern!r}: {faan!r}")
+            if faan < 0:
+                raise ValueError(f"faan_overrides[{pattern!r}] must be >= 0, got {faan}")
         if self.min_faan not in _VALID_MIN_FAAN:
             raise ValueError(
                 f"min_faan must be one of {sorted(_VALID_MIN_FAAN)}, got {self.min_faan}"
@@ -99,12 +165,22 @@ class RuleSet:
             raise ValueError(
                 f"faan_cap must be one of {sorted(_VALID_FAAN_CAP)}, got {self.faan_cap}"
             )
-        if self.wall_reserve < 0:
-            raise ValueError(f"wall_reserve must be >= 0, got {self.wall_reserve}")
         if self.multi_win:
             raise ValueError(
                 "multi_win is reserved and must be False in v1 (see docs/decisions/0007-multi-win-and-pao.md)"
             )
+
+    def check_client_bounds(self) -> None:
+        """Raise `ValueError` unless this ruleset is one a client may create a table with:
+        `CLIENT_RULE_BOUNDS` plus faan overrides capped at `MAX_FAAN_CAP`. Not part of
+        `__post_init__` so tests and stored records keep their 0-second timers."""
+        for name, bounds in CLIENT_RULE_BOUNDS.items():
+            _check_range(name, getattr(self, name), bounds)
+        for pattern, faan in self.faan_overrides.items():
+            if faan > MAX_FAAN_CAP:
+                raise ValueError(
+                    f"faan_overrides[{pattern!r}] must be <= {MAX_FAAN_CAP}, got {faan}"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe representation. Round-trips via `RuleSet.from_dict`."""

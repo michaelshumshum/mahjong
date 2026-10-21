@@ -75,6 +75,37 @@ def test_resolve_ruleset_custom_keeps_valid_faan_overrides() -> None:
     assert resolve_ruleset("custom", custom.to_dict()) == custom
 
 
+# H3: zero timers + huge strikes/grace + dealer repeat looped hundreds of hands a second
+_RUNAWAY_RULES = {
+    **DEFAULT_RULESET.to_dict(),
+    "turn_seconds": 0,
+    "claim_seconds": 0,
+    "hand_end_seconds": 0,
+    "turn_timeout_strikes": 10**9,
+    "disconnect_grace_seconds": 1e9,
+}
+
+
+def test_resolve_ruleset_custom_with_runaway_timing_falls_back_to_default() -> None:
+    assert resolve_ruleset("custom", _RUNAWAY_RULES) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_below_client_floor_falls_back_to_default() -> None:
+    # valid for a directly-built RuleSet (tests use 0-second timers), not for a client
+    zero_timers = RuleSet(turn_seconds=0, claim_seconds=0, hand_end_seconds=0)
+    assert resolve_ruleset("custom", zero_timers.to_dict()) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_with_non_finite_falls_back_to_default() -> None:
+    bad = {**DEFAULT_RULESET.to_dict(), "disconnect_grace_seconds": float("nan")}
+    assert resolve_ruleset("custom", bad) == DEFAULT_RULESET
+
+
+def test_resolve_ruleset_custom_with_bool_as_int_falls_back_to_default() -> None:
+    bad = {**DEFAULT_RULESET.to_dict(), "min_faan": True}
+    assert resolve_ruleset("custom", bad) == DEFAULT_RULESET
+
+
 def _connect_and_join(client: TestClient, table_id: str, query: str) -> dict:
     with client.websocket_connect(f"/ws?table={table_id}{query}") as ws:
         ws.send_json({"v": 1, "t": "hello", "ts": 1000, "d": {"client_version": "test"}})
@@ -148,6 +179,27 @@ def test_custom_with_unknown_faan_override_falls_back_to_default() -> None:
         state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
         assert state_sync["d"]["ruleset_preset"] == "hk_classic"
         assert state_sync["d"]["ruleset"]["faan_overrides"] == {}
+
+
+def test_custom_with_runaway_timing_falls_back_to_default() -> None:
+    table_id = f"ruleset-runaway-{uuid.uuid4()}"
+    rules = json.dumps(_RUNAWAY_RULES)
+    with TestClient(app) as client:
+        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
+        assert state_sync["d"]["ruleset_preset"] == "hk_classic"
+
+
+def test_custom_with_non_finite_json_constant_falls_back_to_default() -> None:
+    # stdlib json.loads accepts NaN/Infinity by default
+    table_id = f"ruleset-nan-{uuid.uuid4()}"
+    rules = json.dumps({**DEFAULT_RULESET.to_dict(), "disconnect_grace_seconds": float("inf")})
+    assert "Infinity" in rules
+    with TestClient(app) as client:
+        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
+        assert state_sync["d"]["ruleset_preset"] == "hk_classic"
+        table = get_table(table_id)
+        assert table is not None
+        assert table.state.ruleset == DEFAULT_RULESET
 
 
 def test_ruleset_only_meaningful_on_first_connect() -> None:

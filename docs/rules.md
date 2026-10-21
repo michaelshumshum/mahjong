@@ -46,6 +46,9 @@ cross-validated against them.
   Otherwise the deal passes counter-clockwise; after a full rotation the prevailing wind advances.
 - `game_length`: `EAST_ONLY` (一圈, default), `EAST_SOUTH` (半莊 — a riichi convention, offered
   but not the HK norm), `FULL` (四圈 — the traditional long-session HK length).
+- **Hand cap:** the game ends after hand `MAX_HANDS_PER_GAME` (200, `mahjong_core/engine.py`)
+  whatever `game_length` and dealer repeats say, so every game terminates. Far above any real
+  game; it changes no game shorter than that, so it needed no `ENGINE_VERSION` bump.
 
 ## 3. Deal
 
@@ -386,6 +389,30 @@ body falls back to `hk_classic`. "Invalid" includes `faan_overrides` failing
 `scoring/faan.py`'s `validate_faan_overrides` (a key outside the §7 pattern names plus 雞糊, or a
 value that isn't an int in `0..13`); `POST /tables` rejects that case with `422` instead
 ([protocol.md §10](protocol.md)).
+
+**Numeric validation** — two layers, both raising `ValueError`:
+
+| Layer | Where | Checks | Applies to |
+| --- | --- | --- | --- |
+| structural | `RuleSet.__post_init__` | int fields are `int` (a `bool` is rejected); `self_draw_multiplier`/`disconnect_grace_seconds` are finite `int`/`float`; `faan_overrides` maps `str` → `int ≥ 0`; wide `_CORE_BOUNDS` (timers 0–3600 s, strikes 1–100, `wall_reserve` 0–144, `self_draw_multiplier` 1–10) | every `RuleSet`: presets, tests, bots, stored records |
+| client | `RuleSet.check_client_bounds`, called only by `resolve_ruleset` | `CLIENT_RULE_BOUNDS`, below; faan overrides ≤ 13 (`MAX_FAAN_CAP`) | `custom` bodies from `POST /tables` and `/ws?rules=` |
+
+| Field | Client range |
+| --- | --- |
+| `turn_seconds` | 5–60 |
+| `claim_seconds` | 2–30 |
+| `hand_end_seconds` | 3–60 |
+| `turn_timeout_strikes` | 1–10 |
+| `disconnect_grace_seconds` | 5–60 (stays well under the 120 s abandoned-table grace, architecture.md §8.2) |
+| `wall_reserve` | 0–30 |
+| `self_draw_multiplier` | 1–2 (inert) |
+
+The floors live only in the client layer because the test suite drives timers with
+0-second values on directly built rulesets, and stored game records must keep loading through
+`from_dict`. Without the floors, 0-second timers plus dealer repeat ran hundreds of hands a second
+on one table. `/ws?rules=` is parsed with non-finite constants (`NaN`, `Infinity`) rejected;
+`POST /tables` bodies can still carry them, and the structural layer rejects them. The web editor
+mirrors the client ranges (`NUMERIC_RULE_BOUNDS`, frontend.md §7).
 
 ## 11. Edge cases
 

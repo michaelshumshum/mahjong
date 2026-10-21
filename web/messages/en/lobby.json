@@ -184,7 +184,7 @@
 	"createTableDialog_botTakeoverLegend": "Bot takeover",
 	"createTableDialog_turnTimeoutStrikesDesc": "Missed turns before a bot plays the seat for the rest of the game.",
 	"createTableDialog_disconnectGraceSecondsDesc": "How long a disconnected player has before a bot takes over.",
-	"createTableDialog_numberMinError": "Use a whole number, {min} or more.",
+	"createTableDialog_numberRangeError": "Use a whole number from {min} to {max}.",
 	"createTableDialog_tabTable": "Table",
 	"createTableDialog_fairnessLegend": "Fairness",
 	"createTableDialog_provableFairnessLabel": "Provable fairness",

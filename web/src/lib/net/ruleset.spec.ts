@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	DEFAULT_RULESET,
 	INERT_RULE_FIELDS,
+	NUMERIC_RULE_BOUNDS,
 	RULESET_PRESET_OPTIONS,
 	RULESET_PRESET_RULES,
 	countRuleChanges,
@@ -66,6 +67,36 @@ describe('invalidRuleFields', () => {
 		);
 	});
 
+	it('flags numbers outside the server client bounds', () => {
+		const rules = {
+			...classic(),
+			turn_seconds: 4,
+			claim_seconds: 31,
+			hand_end_seconds: 0,
+			turn_timeout_strikes: 1_000_000_000,
+			disconnect_grace_seconds: 0,
+			wall_reserve: 31
+		};
+		expect(invalidRuleFields(rules).sort()).toEqual(
+			[
+				'claim_seconds',
+				'disconnect_grace_seconds',
+				'hand_end_seconds',
+				'turn_seconds',
+				'turn_timeout_strikes',
+				'wall_reserve'
+			].sort()
+		);
+	});
+
+	it('accepts every bound endpoint', () => {
+		for (const [field, { min, max }] of Object.entries(NUMERIC_RULE_BOUNDS)) {
+			for (const value of [min, max]) {
+				expect(invalidRuleFields({ ...classic(), [field]: value })).toEqual([]);
+			}
+		}
+	});
+
 	it('flags no hand sets and out-of-range overrides', () => {
 		const rules = { ...classic(), hand_sets: [], faan_overrides: { 平糊: 14, 自摸: 2 } };
 		expect(invalidRuleFields(rules)).toEqual(['hand_sets', 'faan_overrides.平糊']);
@@ -100,6 +131,13 @@ describe('sanitizeRuleSet', () => {
 		expect(rules.hand_sets).toEqual(DEFAULT_RULESET.hand_sets);
 		expect(rules.faan_overrides).toEqual({ 自摸: 3 });
 		expect(rules.multi_win).toBe(false);
+	});
+
+	it('reverts out-of-range numbers to defaults', () => {
+		const rules = sanitizeRuleSet({ turn_seconds: 1, claim_seconds: 30, hand_end_seconds: 0 });
+		expect(rules.turn_seconds).toBe(DEFAULT_RULESET.turn_seconds);
+		expect(rules.claim_seconds).toBe(30);
+		expect(rules.hand_end_seconds).toBe(DEFAULT_RULESET.hand_end_seconds);
 	});
 
 	it('falls back to the defaults for a non-object', () => {

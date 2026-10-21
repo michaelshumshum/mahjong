@@ -4,6 +4,7 @@ import json
 import pytest
 
 from mahjong_core.config import (
+    CLIENT_RULE_BOUNDS,
     DEFAULT_RULESET,
     DiscardPayment,
     GameLength,
@@ -11,6 +12,7 @@ from mahjong_core.config import (
     RuleSet,
     ScoreTable,
 )
+from mahjong_core.presets import RULESET_PRESETS
 
 
 def test_default_min_faan() -> None:
@@ -144,6 +146,119 @@ def test_negative_wall_reserve_rejected() -> None:
 def test_multi_win_true_rejected() -> None:
     with pytest.raises(ValueError, match="multi_win"):
         RuleSet(multi_win=True)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("turn_seconds", -1),
+        ("claim_seconds", -5),
+        ("hand_end_seconds", -1),
+        ("turn_timeout_strikes", 0),
+        ("disconnect_grace_seconds", -0.5),
+        ("turn_seconds", 10**9),
+        ("turn_timeout_strikes", 10**9),
+        ("disconnect_grace_seconds", 1e9),
+        ("wall_reserve", 10**9),
+        ("self_draw_multiplier", 0.0),
+    ],
+)
+def test_out_of_range_numeric_field_rejected(field: str, value: float) -> None:
+    with pytest.raises(ValueError, match=field):
+        RuleSet(**{field: value})
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "min_faan",
+        "faan_cap",
+        "wall_reserve",
+        "turn_seconds",
+        "claim_seconds",
+        "hand_end_seconds",
+        "turn_timeout_strikes",
+    ],
+)
+@pytest.mark.parametrize("value", [True, 3.0, "3", None])
+def test_integer_field_rejects_non_int(field: str, value: object) -> None:
+    with pytest.raises(TypeError, match=field):
+        RuleSet(**{field: value})
+
+
+@pytest.mark.parametrize("field", ["disconnect_grace_seconds", "self_draw_multiplier"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_real_field_rejects_non_finite(field: str, value: float) -> None:
+    with pytest.raises(ValueError, match=field):
+        RuleSet(**{field: value})
+
+
+@pytest.mark.parametrize("field", ["disconnect_grace_seconds", "self_draw_multiplier"])
+@pytest.mark.parametrize("value", [True, "1.5", None])
+def test_real_field_rejects_non_number(field: str, value: object) -> None:
+    with pytest.raises(TypeError, match=field):
+        RuleSet(**{field: value})
+
+
+def test_real_field_accepts_int() -> None:
+    assert RuleSet(disconnect_grace_seconds=20).disconnect_grace_seconds == 20
+
+
+def test_negative_faan_override_rejected() -> None:
+    with pytest.raises(ValueError, match="faan_overrides"):
+        RuleSet(faan_overrides={"雞糊": -1})
+
+
+@pytest.mark.parametrize("overrides", [{"雞糊": True}, {"雞糊": 1.5}, {1: 0}, [("雞糊", 0)]])
+def test_non_int_faan_override_rejected(overrides: object) -> None:
+    with pytest.raises(TypeError, match="faan_overrides"):
+        RuleSet(faan_overrides=overrides)  # type: ignore[arg-type]
+
+
+def test_zero_second_timers_allowed_on_a_directly_built_ruleset() -> None:
+    # the tests' time-control knob; only the client-facing path floors timers
+    rules = RuleSet(turn_seconds=0, claim_seconds=0, hand_end_seconds=0, disconnect_grace_seconds=0)
+    assert rules.turn_seconds == 0
+
+
+def test_shipped_presets_pass_client_bounds() -> None:
+    for preset in RULESET_PRESETS.values():
+        preset.check_client_bounds()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("turn_seconds", 0),
+        ("turn_seconds", 4),
+        ("turn_seconds", 61),
+        ("claim_seconds", 1),
+        ("claim_seconds", 31),
+        ("hand_end_seconds", 0),
+        ("hand_end_seconds", 61),
+        ("turn_timeout_strikes", 11),
+        ("disconnect_grace_seconds", 0),
+        ("disconnect_grace_seconds", 4.9),
+        ("disconnect_grace_seconds", 61),
+        ("wall_reserve", 31),
+        ("self_draw_multiplier", 3.0),
+    ],
+)
+def test_client_bounds_reject_out_of_range(field: str, value: float) -> None:
+    with pytest.raises(ValueError, match=field):
+        RuleSet(**{field: value}).check_client_bounds()
+
+
+@pytest.mark.parametrize(("field", "bounds"), sorted(CLIENT_RULE_BOUNDS.items()))
+def test_client_bounds_accept_their_endpoints(field: str, bounds: tuple[float, float]) -> None:
+    for value in bounds:
+        RuleSet(**{field: value}).check_client_bounds()
+
+
+def test_client_bounds_reject_faan_override_above_the_largest_cap() -> None:
+    RuleSet(faan_overrides={"雞糊": 13}).check_client_bounds()
+    with pytest.raises(ValueError, match="faan_overrides"):
+        RuleSet(faan_overrides={"雞糊": 14}).check_client_bounds()
 
 
 def test_round_trip_default() -> None:

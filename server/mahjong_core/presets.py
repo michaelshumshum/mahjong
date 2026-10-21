@@ -40,12 +40,14 @@ def resolve_ruleset(ruleset: str, rules: Mapping[str, Any] | None) -> RuleSet:
     """A table-creation ruleset choice -> the `RuleSet` to construct the table with. `ruleset`
     is a `RULESET_PRESETS` key, or `"custom"` to build from `rules`. Never raises: an unknown
     preset id or a `rules` mapping that fails validation (`validate_faan_overrides` included)
-    silently falls back to the default preset rather than rejecting the request."""
+    silently falls back to the default preset rather than rejecting the request. A custom body
+    must also pass `RuleSet.check_client_bounds` (docs/rules.md §10)."""
     if ruleset == "custom" and rules is not None:
         try:
-            resolved = RuleSet.from_dict(rules)
-            validate_faan_overrides(resolved.faan_overrides)
-            return resolved
+            custom = RuleSet.from_dict(rules)
+            validate_faan_overrides(custom.faan_overrides)
+            custom.check_client_bounds()
+            return custom
         except (KeyError, TypeError, ValueError):
             pass
     return RULESET_PRESETS.get(ruleset, DEFAULT_RULESET)

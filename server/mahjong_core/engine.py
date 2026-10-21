@@ -14,7 +14,8 @@ decision, so it can't go through `reduce()`'s `(state, action)` shape.
 
 Hang-safety: the only loop in this module is the flower-replacement cascade, bounded by the
 fixed 8-physical-flower count (`tiles.N_FLOWERS`) with an assertion. Hand-to-hand bookkeeping
-(`start_next_hand`) is straight-line arithmetic and cannot loop.
+(`start_next_hand`) is straight-line arithmetic and cannot loop; `MAX_HANDS_PER_GAME` bounds
+how many hands a dealer-repeat chain can add.
 
 `Phase.SCORING` never actually appears in `GameState.phase`: `_finish_win` folds that
 zero-duration step directly into the `HAND_OVER` transition rather than returning a state a
@@ -85,6 +86,7 @@ from mahjong_core.wall import WallTile, deal_hands, draw_back, draw_front, new_w
 
 __all__ = [
     "ENGINE_VERSION",
+    "MAX_HANDS_PER_GAME",
     "Action",
     "IllegalActionError",
     "game_outcome",
@@ -111,6 +113,10 @@ _ALLOWED_ROUNDS: dict[GameLength, int] = {
     GameLength.EAST_SOUTH: 2,
     GameLength.FULL: 4,
 }
+
+# hard stop for dealer-repeat chains (docs/rules.md §2). no ENGINE_VERSION bump: every game
+# shorter than this replays unchanged.
+MAX_HANDS_PER_GAME = 200
 
 
 def reduce(state: GameState, action: Action) -> tuple[GameState, list[Event]]:
@@ -147,7 +153,7 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
     the deal passes to `(dealer + 1) % 4`, and once that wraps back to seat 0 a full round has
     completed -- the prevailing wind advances, or the game ends if `ruleset.game_length` has
     no round left. `hand_no` increments unconditionally either way, so this can never re-deal
-    the same hand number twice.
+    the same hand number twice. The game also ends after hand `MAX_HANDS_PER_GAME`, repeat or not.
     """
     if state.phase != Phase.HAND_OVER:
         raise IllegalActionError(f"start_next_hand requires HAND_OVER, got {state.phase}")
@@ -174,6 +180,8 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
                 game_over = True
             else:
                 next_prevailing = Wind(int(state.prevailing) + 1)
+    if state.hand_no >= MAX_HANDS_PER_GAME:
+        game_over = True
 
     if game_over:
         final = dataclasses.replace(

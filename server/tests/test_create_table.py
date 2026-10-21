@@ -4,6 +4,7 @@ resolves a ruleset and mints a table id together, replacing client-side id gener
 test_ruleset_selection.py`) is the lower-level fallback this endpoint's ruleset resolution
 (`mahjong_core.presets.resolve_ruleset`) is shared with."""
 
+import json
 import re
 from collections.abc import Iterator
 from unittest.mock import patch
@@ -122,6 +123,35 @@ def test_oversized_chunked_body_without_content_length_is_rejected() -> None:
             "/tables", content=chunks(), headers={"Content-Type": "application/json"}
         )
     assert response.status_code == 413
+
+
+def test_custom_rules_with_nan_fall_back_instead_of_a_500() -> None:
+    # starlette's request json parse accepts NaN; echoing it back used to fail serialization
+    rules = json.dumps({**DEFAULT_RULESET.to_dict(), "turn_seconds": float("nan")})
+    body = f'{{"ruleset": "custom", "rules": {rules}}}'
+    with TestClient(app) as client:
+        response = client.post(
+            "/tables", content=body, headers={"content-type": "application/json"}
+        )
+    assert response.status_code == 200
+    assert response.json()["ruleset_preset"] == "hk_classic"
+
+
+def test_custom_rules_with_runaway_timing_fall_back_to_default() -> None:
+    bad = {
+        **DEFAULT_RULESET.to_dict(),
+        "turn_seconds": 0,
+        "claim_seconds": 0,
+        "hand_end_seconds": 0,
+        "turn_timeout_strikes": 10**9,
+        "disconnect_grace_seconds": 1e9,
+    }
+    with TestClient(app) as client:
+        response = client.post("/tables", json={"ruleset": "custom", "rules": bad})
+        table = get_table(response.json()["table_id"])
+    assert response.json()["ruleset_preset"] == "hk_classic"
+    assert table is not None
+    assert table.state.ruleset == DEFAULT_RULESET
 
 
 def test_practice_binds_bots_to_seats_one_through_three() -> None:

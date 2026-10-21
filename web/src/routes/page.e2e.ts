@@ -180,7 +180,7 @@ test('an invalid custom rule blocks create and jumps to its tab', async ({ page 
 	await dialog.getByTestId('create-table-submit').click();
 	await expect(page).toHaveURL('/table/CUSTOM1');
 	expect((sent.body as { rules: Record<string, unknown> }).rules).toMatchObject({
-		turn_seconds: 2
+		turn_seconds: 6
 	});
 });
 
