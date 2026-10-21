@@ -10,9 +10,13 @@
 
 	const MIN_DISPLAY_MS = 1000;
 
-	// mock scenarios and /demo are built to run with no backend at all (screenshot pipeline, mock
-	// e2e specs -- docs/frontend.md's "/table/[id] wiring") -- the gate never applies there.
-	let skip = $derived(page.url.searchParams.has('mock') || page.url.pathname.startsWith('/demo'));
+	// ?mock and /demo run with no backend (screenshots, mock e2e: docs/frontend.md "/table/[id]
+	// wiring"); /status reports an unreachable api itself, which the gate would hide.
+	let skip = $derived(
+		page.url.searchParams.has('mock') ||
+			page.url.pathname.startsWith('/demo') ||
+			page.url.pathname.startsWith('/status')
+	);
 
 	let status = $state<'connecting' | 'ready' | 'error'>('connecting');
 	let attempt = $state(0);

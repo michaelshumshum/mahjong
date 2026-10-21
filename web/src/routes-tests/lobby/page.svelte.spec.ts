@@ -40,6 +40,13 @@ describe('LobbyPage', () => {
 		expect(playLink?.getAttribute('href')).toBe('/tables');
 	});
 
+	it('links the status page beside the source code link', () => {
+		component = mount(LobbyPage, { target });
+		const status = target.querySelector('[data-testid="lobby-status-link"]');
+		expect(status?.getAttribute('href')).toBe('/status');
+		expect(status?.nextElementSibling?.getAttribute('data-testid')).toBe('lobby-source-link');
+	});
+
 	it('opens the practice dialog when the practice button is clicked', async () => {
 		component = mount(LobbyPage, { target });
 		const practiceButton = target.querySelector(

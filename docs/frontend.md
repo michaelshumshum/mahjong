@@ -754,6 +754,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
 | `/profile` | on | placeholder heading only |
+| `/status` | on | public server status (below); fetches `GET /status` client-side |
 | `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
 The web image builds with adapter-node (`pnpm build`, `node build`), so SSR is on unless a route
@@ -769,7 +770,7 @@ own title would keep the previous page's, e.g. a stale "Your turn · Hoi Toi" af
 
 ### API health gate (`ApiConnectGate`)
 
-Every route except `?mock=`/`/demo` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
+Every route except `?mock=`/`/demo`/`/status` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
 the root `+layout.svelte`), which polls `GET /healthz` (`lib/net/lobby.ts`'s `waitForApiHealthy`)
 before rendering the page. Without it a page looks interactive before the backend is reachable.
 
@@ -853,9 +854,28 @@ of the other locale (`中文` / `EN`, `lobby_languageShort`), with the full name
 (`lobby_languageButton`) as its `aria-label` and the target locale as its `lang`. Settings opens
 the same `Settings.svelte` panel as the table (§6), loading prefs and `autoArm` from storage on
 open (the lobby is SSR'd). Changes are saved and applied immediately; `autoArm` is only saved,
-and the table re-sends it on its next connection. A muted "Source code" link (GitHub mark + label, new tab) sits in the page's
-bottom-right corner. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
+and the table re-sends it on its next connection. Two muted links sit in the page's bottom-right
+corner (centred below 768px): "Status" (lucide `activity`, to `/status`) and "Source code" (GitHub
+mark + label, new tab). Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
 middle (a radial gradient) so this copy reads over the tiles.
+
+### Server status (`/status`)
+
+Public load and performance, from `GET /status` ([protocol.md §10](protocol.md); what each number
+measures: [infra.md §8](infra.md)), polled every 15s with a static "Updated" stamp like `/tables`.
+
+- **Ungated.** Skips `ApiConnectGate`: its job includes saying the API is down, which the gate
+  would hide behind its own panel. A failed poll shows "Can't reach the server" and dims the last
+  good numbers rather than clearing them.
+- **Banner:** `ok` / `degraded` (learned tiers off) / `draining` (restart for a deploy) /
+  unreachable, each an icon plus text, never colour alone.
+- **Tiles:** players online (+ spectators), games in play (+ waiting), games finished in 24h, bot
+  response p50 (+ p95), server responsiveness (event-loop lag), capacity used, uptime. Two per row
+  on phones.
+- **Charts:** `_components/Sparkline.svelte`, one series each (players, bot p95), inline SVG, 2px
+  brass line over a faint area, zero baseline, a crosshair + tooltip on hover. A `null` point breaks
+  the line instead of dropping to zero. Fewer than two points reads "Not enough history yet" —
+  history starts empty after every restart.
 
 ### Faan guide and language toggle
 
@@ -1243,7 +1263,7 @@ spread. Files group key prefixes by app area:
 | File | Key prefixes |
 | --- | --- |
 | `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
-| `lobby.json` | `/`, `/tables`, `/profile`, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage` |
+| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `statusPage` |
 | `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
 | `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
 | `tiles.json` | `tileName`, `tileFace` |
