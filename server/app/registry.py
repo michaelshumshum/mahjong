@@ -4,14 +4,17 @@ finished ones.
 
 `Table.run()` returns once `state.phase == Phase.GAME_OVER`, and `get_or_create` wraps each
 table's task so `_tasks` drops its entry the moment that happens, freeing the `asyncio.Task`
-promptly. The `Table` object itself is not evicted from `_tables` -- reconnecting after the game
-ends is still a supported path, and there's no session-expiry/TTL policy to drive a real
-eviction decision from; full table eviction is a tracked gap, not an oversight.
+promptly. The finished `Table` stays in `_tables` for `finished_ttl_seconds`, so reconnecting
+after the game ends still works, then `reap` evicts it.
 
-Abandoned tables (docs/architecture.md §8.2) are the exception: `abandon_grace_seconds` is
-threaded into every non-showcase `Table`, and one that ends early (`Table.closed`) is evicted
-from `_tables` and its id kept in `_closed`, so a late connect to it is refused (`is_closed`)
-instead of recreating a fresh table under a dead id.
+Abandoned tables (docs/architecture.md §8.2): `abandon_grace_seconds` is threaded into every
+non-showcase `Table`, and one that ends early (`Table.closed`) is evicted from `_tables` and its
+id kept in `_closed`, so `POST /tables` never mints it again.
+
+Limits (docs/architecture.md §8.3): `reap` (every `REAP_INTERVAL_SECONDS` once `start_reaper`
+runs) also ends a never-started table idle past `unstarted_ttl_seconds`; `max_tables` caps how
+many live at once (`TableLimitError`); `_closed` keeps at most `closed_ids_cap` ids, oldest
+dropped first. `clock` is injectable so tests drive the TTLs.
 
 `session_factory`, if given, is threaded into every `Table` so it can persist a `GameRecord` on
 `Phase.GAME_OVER`. `app/ws.py`'s module-level registry gets a fresh one per ASGI startup
@@ -30,7 +33,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from collections.abc import Mapping, Sequence
+import time
+from collections import OrderedDict
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import Literal
@@ -38,18 +43,25 @@ from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.clock import now_ms
+from app.errors import TABLE_GONE_ERROR
 from app.fairness import new_game_seed
 from app.table import Table
 from app.table_types import TableSettings, WireSeatStatus
 from bots.tiers import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
 
-__all__ = ["TableRegistry", "TableSummary"]
+__all__ = ["TableLimitError", "TableRegistry", "TableSummary"]
 
 logger = logging.getLogger(__name__)
 
 
 SHOWCASE_RESTART_SECONDS = 30.0
+REAP_INTERVAL_SECONDS = 30.0
+DEFAULT_CLOSED_IDS_CAP = 10_000
+
+
+class TableLimitError(Exception):
+    """`get_or_create` would exceed `max_tables` (`POST /tables` answers 503)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,14 +89,28 @@ class TableRegistry:
         bot_pool: Executor | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         abandon_grace_seconds: float | None = None,
+        max_tables: int | None = None,
+        unstarted_ttl_seconds: float | None = None,
+        finished_ttl_seconds: float | None = None,
+        closed_ids_cap: int = DEFAULT_CLOSED_IDS_CAP,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._bot_pool = bot_pool
         self._abandon_grace_seconds = abandon_grace_seconds
         self._session_factory = session_factory
+        # None disables that limit (bare test registries)
+        self._max_tables = max_tables
+        self._unstarted_ttl = unstarted_ttl_seconds
+        self._finished_ttl = finished_ttl_seconds
+        self._closed_ids_cap = closed_ids_cap
+        self._clock = clock
         self._tables: dict[str, Table] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
-        # ids of evicted abandoned tables; a bare id each, never pruned
-        self._closed: set[str] = set()
+        self._created_at: dict[str, float] = {}
+        self._finished_at: dict[str, float] = {}
+        # ids of evicted tables, insertion-ordered so the oldest go first past the cap
+        self._closed: OrderedDict[str, None] = OrderedDict()
+        self._reaper_task: asyncio.Task[None] | None = None
         # unlisted by `list_tables`; reachable by id only
         self._private: set[str] = set()
         # read by ws.py's connection accept and main.py's /healthz once a drain starts
@@ -110,10 +136,13 @@ class TableRegistry:
     ) -> Table:
         """Return the existing table for `table_id`, or construct and start one -- a table id
         names one particular game, never recycled, even after it finishes. `practice`/`bot_tier`/
-        `seat_bot_tiers`/`private` only apply the first time a given `table_id` is created."""
+        `seat_bot_tiers`/`private` only apply the first time a given `table_id` is created.
+        Raises `TableLimitError` instead of creating a table past `max_tables`."""
         table = self._tables.get(table_id)
         if table is not None:
             return table
+        if self._max_tables is not None and self.live_count() >= self._max_tables:
+            raise TableLimitError(f"{self._max_tables} tables already live")
         table = Table(
             table_id,
             ruleset,
@@ -127,20 +156,80 @@ class TableRegistry:
             abandon_grace_seconds=self._abandon_grace_seconds,
         )
         self._tables[table_id] = table
+        self._created_at[table_id] = self._clock()
         if private:
             self._private.add(table_id)
         self._tasks[table_id] = asyncio.create_task(self._run(table_id, table))
         return table
+
+    def live_count(self) -> int:
+        """Tables counted against `max_tables` -- every one in `_tables` but the showcase."""
+        return len(self._tables) - (self._showcase_id in self._tables)
 
     async def _run(self, table_id: str, table: Table) -> None:
         try:
             await table.run()
         finally:
             self._tasks.pop(table_id, None)
-            if table.closed and self._tables.get(table_id) is table:
-                del self._tables[table_id]
-                self._private.discard(table_id)
-                self._closed.add(table_id)
+            if self._tables.get(table_id) is table:
+                if table.closed:
+                    self._evict(table_id)
+                else:
+                    self._finished_at[table_id] = self._clock()
+
+    def _evict(self, table_id: str) -> None:
+        del self._tables[table_id]
+        self._private.discard(table_id)
+        self._created_at.pop(table_id, None)
+        self._finished_at.pop(table_id, None)
+        self._closed[table_id] = None
+        while len(self._closed) > self._closed_ids_cap:
+            self._closed.popitem(last=False)
+
+    def reap(self) -> list[str]:
+        """Evict every table past its TTL and return their ids: finished `finished_ttl_seconds`
+        ago, or never started, `unstarted_ttl_seconds` old and with no human seat `connected`
+        (spectators don't count, same as `_is_abandoned`). Both get `end(TABLE_GONE_ERROR)`, so
+        a socket still open on one is told and stops reconnecting; an unstarted one's task is
+        cancelled. The showcase is never reaped."""
+        now = self._clock()
+        reaped: list[str] = []
+        for table_id, table in list(self._tables.items()):
+            if table_id == self._showcase_id:
+                continue
+            finished_at = self._finished_at.get(table_id)
+            if finished_at is not None:
+                expired = self._finished_ttl is not None and now - finished_at >= self._finished_ttl
+            else:
+                expired = (
+                    self._unstarted_ttl is not None
+                    and not table.started
+                    and now - self._created_at[table_id] >= self._unstarted_ttl
+                    and not any(
+                        b is not None and b.status == "connected" for b in table.seat_bindings
+                    )
+                )
+            if not expired:
+                continue
+            table.end(TABLE_GONE_ERROR)
+            task = self._tasks.pop(table_id, None)
+            if task is not None:
+                task.cancel()
+            self._evict(table_id)
+            reaped.append(table_id)
+        if reaped:
+            logger.info("reaped %d idle table(s): %s", len(reaped), ", ".join(reaped))
+        return reaped
+
+    def start_reaper(self, interval: float = REAP_INTERVAL_SECONDS) -> None:
+        """Run `reap` every `interval` seconds until `begin_shutdown`."""
+
+        async def _loop() -> None:
+            while True:
+                await asyncio.sleep(interval)
+                self.reap()
+
+        self._reaper_task = asyncio.create_task(_loop())
 
     def start_showcase(
         self,
@@ -202,7 +291,8 @@ class TableRegistry:
             task = self._start_showcase_game(table_id, ruleset, bot_tiers)
 
     def is_closed(self, table_id: str) -> bool:
-        """Whether `table_id` named a table ended early as abandoned."""
+        """Whether `table_id` named a table since evicted (abandoned or reaped), among the last
+        `closed_ids_cap`."""
         return table_id in self._closed
 
     def is_running(self, table_id: str) -> bool:
@@ -213,7 +303,7 @@ class TableRegistry:
 
     def list_tables(self) -> list[TableSummary]:
         """Every still-running table with at least one human seat, plus the showcase table.
-        Skips finished games (never evicted from `_tables`), tables nobody has joined yet
+        Skips finished games (kept until reaped), tables nobody has joined yet
         (a practice table is bot-only until its owner joins) and private tables."""
         summaries: list[TableSummary] = []
         for table_id, table in self._tables.items():
@@ -245,6 +335,8 @@ class TableRegistry:
         not torn down here -- the process exiting is what ends it.
         """
         self.draining = True
+        if self._reaper_task is not None:
+            self._reaper_task.cancel()
         if self._showcase_task is not None:
             self._showcase_task.cancel()  # also cancels the game task it's awaiting
         ts = deadline_ts if deadline_ts is not None else now_ms() + round(grace_seconds * 1000)

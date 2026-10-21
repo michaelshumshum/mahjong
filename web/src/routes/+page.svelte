@@ -26,7 +26,7 @@
 	const otherLocale = getLocale() === 'en' ? 'zh-Hant' : 'en';
 
 	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a difficulty-picker
-	// dialog first since bot tier is fixed at construction; `?practice=1` here is unrelated in spelling to the wire's `&practice=true`.
+	// dialog first since bot tier is fixed at construction; `?practice=1` only tags the table page.
 	let showPracticeDialog = $state(false);
 
 	let showGuide = $state(false);

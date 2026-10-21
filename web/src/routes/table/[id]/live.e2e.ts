@@ -94,9 +94,20 @@ test.afterAll(async () => {
 	}
 });
 
+// the WS never creates a table (architecture.md §8.3), so every flow starts from POST /tables
+async function createLiveTable(): Promise<string> {
+	const res = await fetch(`http://127.0.0.1:${BACKEND_PORT}/tables`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: '{}'
+	});
+	if (!res.ok) throw new Error(`POST /tables failed: ${res.status}`);
+	return ((await res.json()) as { table_id: string }).table_id;
+}
+
 test('four real seats join, ready, and play real discards/claims through the live table UI', async () => {
 	test.setTimeout(60_000);
-	const table = `e2e-live-${Date.now()}`;
+	const table = await createLiveTable();
 	const browser = await chromium.launch();
 	try {
 		const pages = await Promise.all(
@@ -186,8 +197,8 @@ test('four real seats join, ready, and play real discards/claims through the liv
 });
 
 test('practice mode is reachable from the lobby and reaches real gameplay with bot seats marked', async () => {
-	// "Practice vs Bots" tags the table `?practice=1`, which /table/[id] turns into `&practice=true`
-	// on the WS URL, binding seats 1-3 to real bots at creation -- proves lobby button -> bot table -> badge.
+	// "Practice vs Bots" sends POST /tables `practice: true`, binding seats 1-3 to real bots at
+	// creation -- proves lobby button -> bot table -> badge.
 	test.setTimeout(60_000);
 	const browser = await chromium.launch();
 	try {
@@ -309,7 +320,7 @@ test('completing more than one real hand accumulates multi-hand history in the S
 	// HK ruleset has no dead wall (`wall_reserve = 0`) -- absent an earlier win, a hand runs until
 	// the wall's dry (~80 discards); two hands is hundreds of round trips, hence the generous budget.
 	test.setTimeout(300_000);
-	const table = `e2e-history-${Date.now()}`;
+	const table = await createLiveTable();
 	const browser = await chromium.launch();
 	try {
 		const pages = await Promise.all(

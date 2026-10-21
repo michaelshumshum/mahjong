@@ -146,5 +146,6 @@ Commands table. Add them here as they turn up.
 | `hands.py` | `tile_ids(*types)` (one physical copy per occurrence), `pung`, `concealed_kong` |
 | `decisions.py` | `decision_points(seed, ruleset)` (seeded random self-play, every live decision), `discard_mask` |
 | `ws_frames.py` | client frame builders: `msg`, `next_id`, `hello`, `first_tile_ids(*types, count=)` |
+| `tables.py` | `create_table(client, table_id, …)` / `table_client(table_id, …)`: a table under a test-chosen id, since `/ws` never creates one and `POST /tables` mints random ids |
 | `game_records.py` | `fetch_latest_record(database_url)` |
 | `latency.py` / `ml_synthetic.py` | `check_latency` (§1) / synthetic packed ML datasets |

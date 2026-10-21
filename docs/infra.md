@@ -41,7 +41,8 @@ mahjong/
 │   │   ├── table_types.py      # SeatBinding, Command, BotJobTag/BotResult, TableSettings
 │   │   ├── errors.py           # Table exceptions (one per wire error code), TABLE_CLOSED_ERROR
 │   │   ├── clock.py            # now_ms(): server epoch ms for every wire ts/deadline_ts
-│   │   ├── registry.py         # TableRegistry, showcase table, graceful-shutdown drain
+│   │   ├── registry.py         # TableRegistry, reaper + table cap, showcase table, shutdown drain
+│   │   ├── rate_limit.py       # POST /tables per-IP RateLimiter, client_ip (CF-Connecting-IP rule)
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
@@ -122,11 +123,15 @@ pnpm --dir web dev
 | `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:8000` / `ws://localhost:8000/ws` (`lib/net/lobby.ts`, `lib/net/socket.ts`) | web, read at runtime via `$env/dynamic/public` |
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
+| `MAX_TABLES` | 500; `0` disables | live tables (showcase excluded) past which `POST /tables` answers 503 ([architecture.md §8.3](architecture.md)) |
+| `UNSTARTED_TABLE_TTL_SECONDS` | 600 | a never-started table with no seat connected is reaped at this age (§8.3) |
+| `FINISHED_TABLE_TTL_SECONDS` | 600 | how long a finished game stays reconnectable before it's reaped (§8.3) |
+| `TABLE_CREATE_RATE_LIMIT` / `TABLE_CREATE_RATE_WINDOW_SECONDS` | 10 / 60; limit `0` disables | `POST /tables` per client IP (§8.3) |
 | `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
 | `CLAIM_HOLD_SECONDS` | `BOT_THINK_MAX_SECONDS` + 0.2 (1.6) | the pause after every discard and robbable kong that hides whether a claim window opened; `0` disables ([architecture.md §4](architecture.md) "Claim hold") |
 | `LOG_LEVEL` | `info` | |
 | `API_DOCS` | on; `0` disables | `/docs`, `/redoc`, `/openapi.json`; the prod overlay sets `0` |
-| `TRUSTED_PROXY_IPS` | — | prod overlay only, required there (§7). Also read by `app/limits.py` to trust `CF-Connecting-IP` ([protocol.md §11](protocol.md)) |
+| `TRUSTED_PROXY_IPS` | unset → no proxy trusted | comma-separated IPs/CIDRs; required by the prod overlay (§7). uvicorn's `--forwarded-allow-ips`, and the peers whose `CF-Connecting-IP` the per-IP limits believe (`app/limits.py`; [protocol.md §11](protocol.md), [architecture.md §8.3](architecture.md)) |
 | `WS_MAX_CONNECTIONS_PER_IP` | 16 | open `/ws` connections per client IP ([protocol.md §11](protocol.md)) |
 | `WS_MAX_SPECTATORS_PER_TABLE` | 50 | ([protocol.md §11](protocol.md)) |
 | `WS_MSG_RATE` / `WS_MSG_BURST` | 20 / 40 | inbound frames per second / bucket size, per connection ([protocol.md §11](protocol.md)) |
@@ -263,8 +268,9 @@ reload.
 - A reverse proxy (Caddy or nginx) in front of `api` and `web` terminates TLS and forwards
   `X-Forwarded-*`. The overlay requires `TRUSTED_PROXY_IPS` (passed to uvicorn's
   `--forwarded-allow-ips`) to be that proxy's address — never `*`, which lets any client spoof
-  `X-Forwarded-For`. The overlay also passes it into the `api` environment, plus the `WS_*`
-  limits (§2; empty keeps the default).
+  `X-Forwarded-For` (the app itself skips `*`). The overlay also passes it into the `api`
+  environment for the per-IP limits' `CF-Connecting-IP` check, plus the `WS_*` limits (§2; empty
+  keeps the default).
 - The overlay uses `!override`/`!reset` YAML tags on `ports:` — Compose concatenates `ports:` lists
   across `-f` files, so a bare `ports: []` for `postgres` would leave the dev file's `5432:5432`
   mapping in place.

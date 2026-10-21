@@ -895,15 +895,17 @@ Practice only: in a multiplayer game nobody should be reading tips while three p
 **In-game guide.** The header rail carries a "Guide" button opening the same `GuideDialog` as the
 lobby, so the faan library is reachable mid-hand.
 
-`?practice=1` is this route's own param; the live-connect effect appends `&practice=true` to the
-WS URL, which binds seats 1-3 at construction (`server/app/ws.py`'s `ws_endpoint`,
-`Table.__init__(practice=..., seat_bot_tiers=...)`). The human still goes through the seat picker
+`?practice=1` is this route's own param, never sent on the WS URL: `POST /tables`'s
+`practice: true` already bound seats 1-3 at construction (`Table.__init__(practice=...,
+seat_bot_tiers=...)`). The human still goes through the seat picker
 (seat 0 is the only open slot). The header rail shows a "Practice" tag beside the table code.
 
 ### `/table/[id]` wiring
 
-`[id]` is a table id. A direct visit to an unknown id auto-creates the table on first WS connect
-(`server/app/ws.py`'s `_get_or_create_table`).
+`[id]` is a table id, minted by `POST /tables`. The WS never creates a table: an unknown, ended or
+reaped id (a wrong join code, a stale link) gets `error{code:"table_closed"}`, which toasts
+`serverError_tableClosed` and stops the socket reconnecting
+([architecture.md §8.3](architecture.md)).
 
 | Query | Renders |
 | --- | --- |

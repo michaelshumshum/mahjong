@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app import main, ws
 from app.main import app
+from tests.tables import table_client
 
 
 def test_healthz() -> None:
@@ -56,8 +57,8 @@ def _msg(t: str, d: dict[str, object], *, id_: str | None = None) -> dict[str, o
 
 def test_tables_lists_a_joined_table() -> None:
     table_id = f"browse-{uuid.uuid4()}"
-    with TestClient(app) as client:
-        assert client.get("/tables").json() == {"tables": []}
+    with table_client(table_id) as client:
+        assert client.get("/tables").json() == {"tables": []}  # unjoined tables aren't listed
         with client.websocket_connect(f"/ws?table={table_id}") as ws:
             ws.send_json(_msg("hello", {"client_version": "test"}))
             ws.send_json(_msg("join", {"seat": 1, "name": "Alice"}, id_="c-1"))

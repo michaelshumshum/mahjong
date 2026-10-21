@@ -18,15 +18,13 @@ import dataclasses
 import itertools
 import uuid
 
-from fastapi.testclient import TestClient
-
-from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
+from tests.tables import table_client
 from tests.ws_frames import first_tile_ids, msg, next_id
 
 _MAN_5 = tile_ids_for_type(TileType.MAN_5)
@@ -57,7 +55,7 @@ def _rig_state(seed: int) -> GameState:
 def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
     table_id = f"spectator-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
         table.state = _rig_state(seed=20260920)
@@ -217,7 +215,7 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
 def test_multiple_spectators_have_independent_dense_seq_streams() -> None:
     table_id = f"spectator-multi-{uuid.uuid4()}"
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spec_a,
         client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spec_b,
     ):
@@ -248,7 +246,7 @@ def test_multiple_spectators_have_independent_dense_seq_streams() -> None:
 def test_join_from_spectating_connection_promotes_and_stops_duplicate_stream() -> None:
     table_id = f"spectator-promote-{uuid.uuid4()}"
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}&spectate=true") as ws,
     ):
         table = get_table(table_id)
@@ -282,7 +280,7 @@ def test_join_from_spectating_connection_promotes_and_stops_duplicate_stream() -
 
 def test_spectator_bookkeeping_removed_on_disconnect() -> None:
     table_id = f"spectator-cleanup-{uuid.uuid4()}"
-    with TestClient(app) as client:
+    with table_client(table_id) as client:
         with client.websocket_connect(f"/ws?table={table_id}&spectate=true") as spectator:
             table = get_table(table_id)
             assert table is not None

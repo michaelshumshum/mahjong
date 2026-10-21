@@ -45,16 +45,15 @@ import dataclasses
 import uuid
 from collections import deque
 
-from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
+from tests.tables import table_client
 from tests.ws_frames import first_tile_ids, hello, msg, next_id
 
 
@@ -191,7 +190,7 @@ def _rig_claim_window_state(seed: int) -> GameState:
 
 def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupes() -> None:
     table_id = f"reconnect-replay-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
         table.state = _rig_uncontested_state(seed=1)
@@ -252,7 +251,7 @@ def test_reconnect_within_ring_replays_exactly_the_missed_frames_no_more_no_dupe
 
 def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
     table_id = f"reconnect-stale-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
         table.state = _rig_uncontested_state(seed=2)
@@ -295,7 +294,7 @@ def test_reconnect_too_old_falls_back_to_full_state_sync() -> None:
 
 def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
     table_id = f"reconnect-live-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
         table.state = _rig_uncontested_state(seed=3)
@@ -355,7 +354,7 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
     all (it's offline). Seeing the window resolve regardless is only possible if seat 1's offer
     was already forfeited -- there's no other way its response could exist."""
     table_id = f"reconnect-claim-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
         table.state = _rig_claim_window_state(seed=4)
@@ -435,7 +434,7 @@ def test_reconnect_preserves_chosen_name_without_resending_it() -> None:
     for the rest of the game -- a `hello` reconnect carries only `seat`/`last_seq`, never
     `name`, and the server must still know it (and broadcast it) without a resend."""
     table_id = f"reconnect-name-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
 
@@ -495,7 +494,7 @@ def test_hello_wrong_or_missing_secret_refuses_the_reclaim() -> None:
     `error{code:'bad_secret'}` -- rather than silently handing the seat to whoever asks. Covers
     both a wrong secret and an altogether missing one (a stale/never-had-one client)."""
     table_id = f"reconnect-bad-secret-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
 

@@ -35,15 +35,14 @@ import uuid
 from typing import Any, cast
 
 import pytest
-from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from app.main import app
 from app.table import _BOT_NAME_POOL
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import Phase
+from tests.tables import table_client
 from tests.ws_frames import msg, next_id
 
 # same rationale as test_full_game_e2e.py's _GAME_RULESET: dealer-repeat off bounds EAST_ONLY
@@ -91,8 +90,8 @@ def test_practice_mode_full_game_against_real_faanbots() -> None:
     seed = 20260918001
 
     with (
-        TestClient(app) as client,
-        client.websocket_connect(f"/ws?table={table_id}&practice=true") as ws0,
+        table_client(table_id, practice=True) as client,
+        client.websocket_connect(f"/ws?table={table_id}") as ws0,
     ):
         table = get_table(table_id)
         assert table is not None

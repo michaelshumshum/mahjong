@@ -25,15 +25,13 @@ from __future__ import annotations
 import dataclasses
 import uuid
 
-from fastapi.testclient import TestClient
-
-from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
+from tests.tables import table_client
 from tests.ws_frames import first_tile_ids, msg, next_id
 
 _MAN_4 = tile_ids_for_type(TileType.MAN_4)
@@ -75,7 +73,7 @@ def _rig_state(seed: int) -> GameState:
 def test_full_hand_over_real_ws_multi_client() -> None:
     table_id = f"gameplay-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
         assert table is not None
         table.state = _rig_state(seed=20260916)
@@ -283,7 +281,7 @@ def test_full_hand_over_real_ws_multi_client() -> None:
 def test_duplicate_id_same_payload_resends_ack_different_payload_is_rejected() -> None:
     table_id = f"idempotency-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
         ws.send_json(msg("hello", {"client_version": "test"}))
         ws.send_json(msg("join", {"seat": 0}, id_=next_id()))
         assert ws.receive_json()["t"] == "seat_state"
@@ -329,7 +327,7 @@ def test_pass_on_a_closed_claim_window_is_acked_ok() -> None:
     way, so it must not come back as `illegal`."""
     table_id = f"stale-pass-{uuid.uuid4()}"
 
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
         ws.send_json(msg("hello", {"client_version": "test"}))
         ws.send_json(msg("join", {"seat": 0}, id_=next_id()))
         assert ws.receive_json()["t"] == "seat_state"
@@ -348,7 +346,7 @@ def test_join_seat_status_distinguishes_never_joined_from_connected() -> None:
     table_id = f"seat-status-{uuid.uuid4()}"
 
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
         client.websocket_connect(f"/ws?table={table_id}") as ws1,
     ):
@@ -394,7 +392,7 @@ def test_host_is_first_joiner_and_start_with_bots_fills_and_starts() -> None:
     table_id = f"start-with-bots-{uuid.uuid4()}"
 
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}") as ws2,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
     ):

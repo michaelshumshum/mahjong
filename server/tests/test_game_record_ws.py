@@ -25,11 +25,9 @@ import uuid
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.db.models import Base
 from app.db.session import make_engine
-from app.main import app
 from app.ws import get_table
 from mahjong_core.actions import action_from_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
@@ -38,6 +36,7 @@ from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_records import fetch_latest_record
 from tests.game_state import with_seat
+from tests.tables import table_client
 from tests.ws_frames import msg, next_id
 
 _SEAT0_JUNK = tile_ids_for_type(TileType.PIN_2)[:4] + tile_ids_for_type(TileType.PIN_4)[:4]
@@ -100,7 +99,7 @@ def test_full_game_via_ws_persists_a_game_record(
     seed = 20260917
 
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
         client.websocket_connect(f"/ws?table={table_id}") as ws1,
         client.websocket_connect(f"/ws?table={table_id}") as ws2,

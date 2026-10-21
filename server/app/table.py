@@ -24,8 +24,9 @@ and dropped if the tag no longer matches `_pending_bot[seat]` by the time it lan
 
 Abandonment (architecture.md §8.2). Once a started table has no human seat `connected`,
 `_update_abandon_timer` arms `abandon_grace_seconds` on the same heap; on expiry
-`_handle_abandon_timeout` sets `closed`, drops every bot job, sends `table_closed` and `run()`
-returns without persisting. `TableRegistry` then evicts it.
+`_handle_abandon_timeout` calls `end()` (sets `closed`, drops every bot job, sends
+`table_closed`) and `run()` returns without persisting. `TableRegistry` then evicts it; its
+reaper (architecture.md §8.3) calls `end()` the same way on an idle unstarted table.
 
 Bot-filled seats from table creation (practice mode). `practice=True` binds seats 1-3 to
 their resolved tier immediately, before seat 0's human ever `join`s -- a `bot` status, distinct
@@ -394,7 +395,7 @@ class Table:
         # None never ends the table early (showcase, bare test tables)
         self.abandon_grace_seconds = abandon_grace_seconds
         self._abandon_timer_id: int | None = None
-        self.closed = False  # ended early as abandoned; run() has returned, never persisted
+        self.closed = False  # ended early by end(); never persisted
         # claim hold: while _hold_timer_id is live, frames queue per recipient -- see _begin_hold
         self.claim_hold_seconds = (
             _CLAIM_HOLD_SECONDS if claim_hold_seconds is None else claim_hold_seconds
@@ -1246,22 +1247,29 @@ class Table:
         self._abandon_timer_id = None
         if not self._is_abandoned():
             return
-        self.closed = True
-        self._pending_bot.clear()
-        for task in list(self._bot_tasks):
-            task.cancel()
-        self._broadcast_wire({"t": "error", **TABLE_CLOSED_ERROR})
-        self.close_spectators()
-        if self._getter is not None:
-            # the never-cancel rule guards against losing an item; nothing is read after this
-            self._getter.cancel()
-            self._getter = None
+        self.end(TABLE_CLOSED_ERROR)
         logger.warning(
             "table %s: ended at hand %d, reason: abandoned (no human connected for %.0fs)",
             self.table_id,
             self.state.hand_no,
             self.abandon_grace_seconds,
         )
+
+    def end(self, error: Mapping[str, str]) -> None:
+        """Stop this table for good: no further bot jobs, every in-flight one dropped, every
+        seat stream and spectator sent `error` (spectators also closed), never persisted. Called
+        from the table's own loop (abandonment) or by `TableRegistry.reap`, which then cancels
+        the task; synchronous either way, so it never interleaves with a tick."""
+        self.closed = True
+        self._pending_bot.clear()
+        for task in list(self._bot_tasks):
+            task.cancel()
+        self._broadcast_wire({"t": "error", **error})
+        self.close_spectators()
+        if self._getter is not None:
+            # the never-cancel rule guards against losing an item; nothing is read after this
+            self._getter.cancel()
+            self._getter = None
 
     def _arm_turn_timer(self, seat: int) -> int:
         """Give `seat` a fresh `TimerHeap` entry, `ruleset.turn_seconds` from right now. Only

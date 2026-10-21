@@ -18,7 +18,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -32,6 +32,8 @@ from app.api_models import (
 )
 from app.body_limit import BodySizeLimitMiddleware
 from app.db.session import make_engine, make_session_factory
+from app.rate_limit import ProxyNetwork, RateLimiter, client_ip, parse_trusted_proxies
+from app.registry import REAP_INTERVAL_SECONDS, TableLimitError
 from bots.learned import weights_problem
 from bots.tiers import LEARNED_TIERS, BotTier
 from mahjong_core.config import DEFAULT_RULESET
@@ -41,6 +43,12 @@ _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # tunable via env
 # must stay well above RuleSet.disconnect_grace_seconds (20s) so a refresh never ends a game
 _DEFAULT_ABANDONED_TABLE_GRACE_SECONDS = 120.0
 _DEFAULT_SHOWCASE_TABLE_ID = "BOTS"
+# docs/architecture.md §8.3: ~20 KB idle, a few hundred KB mid-game, on a 1.9 GiB box
+_DEFAULT_MAX_TABLES = 500
+_DEFAULT_UNSTARTED_TABLE_TTL_SECONDS = 600.0
+_DEFAULT_FINISHED_TABLE_TTL_SECONDS = 600.0
+_DEFAULT_TABLE_CREATE_RATE_LIMIT = 10
+_DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS = 60.0
 # matches web/src/lib/table/table-code.ts's TABLE_CODE_ALPHABET -- no 0/O/1/I look-alikes.
 _TABLE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _TABLE_CODE_LENGTH = 6
@@ -50,13 +58,22 @@ _TABLE_ID_GENERATION_ATTEMPTS = 10  # astronomically unlikely to ever retry once
 logger = logging.getLogger(__name__)
 
 _learned_weights_problem: str | None = None
+# rebuilt per lifespan like the registry; None = POST /tables unlimited
+_create_limiter: RateLimiter | None = None
+_trusted_proxies: tuple[ProxyNetwork, ...] = ()
+
+
+def _optional_limit(raw: str) -> int | None:
+    """`0` (or below) turns a count limit off."""
+    value = int(raw)
+    return value if value > 0 else None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # degrade rather than refuse to start: a crash-looping api takes every table down, a missing
     # policy only Expert/Impossible (docs/bots.md §2 "Missing weights")
-    global _learned_weights_problem
+    global _learned_weights_problem, _create_limiter, _trusted_proxies
     _learned_weights_problem = weights_problem()
     if _learned_weights_problem is not None:
         logger.error(
@@ -71,8 +88,33 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         os.environ.get("ABANDONED_TABLE_GRACE_SECONDS", _DEFAULT_ABANDONED_TABLE_GRACE_SECONDS)
     )
     registry = ws.reset_registry(
-        session_factory=session_factory, abandon_grace_seconds=abandon_grace
+        session_factory=session_factory,
+        abandon_grace_seconds=abandon_grace,
+        max_tables=_optional_limit(os.environ.get("MAX_TABLES", str(_DEFAULT_MAX_TABLES))),
+        unstarted_ttl_seconds=float(
+            os.environ.get("UNSTARTED_TABLE_TTL_SECONDS", _DEFAULT_UNSTARTED_TABLE_TTL_SECONDS)
+        ),
+        finished_ttl_seconds=float(
+            os.environ.get("FINISHED_TABLE_TTL_SECONDS", _DEFAULT_FINISHED_TABLE_TTL_SECONDS)
+        ),
     )
+    registry.start_reaper()
+    rate_limit = _optional_limit(
+        os.environ.get("TABLE_CREATE_RATE_LIMIT", str(_DEFAULT_TABLE_CREATE_RATE_LIMIT))
+    )
+    _create_limiter = (
+        RateLimiter(
+            limit=rate_limit,
+            window_seconds=float(
+                os.environ.get(
+                    "TABLE_CREATE_RATE_WINDOW_SECONDS", _DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS
+                )
+            ),
+        )
+        if rate_limit is not None
+        else None
+    )
+    _trusted_proxies = parse_trusted_proxies(os.environ.get("TRUSTED_PROXY_IPS", ""))
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
     if showcase_id:
         registry.start_showcase(showcase_id, DEFAULT_RULESET, bot_tiers=_available_bot_tiers())
@@ -138,7 +180,7 @@ def _resolve_seat_bot_tiers(
     practice: bool, bot_tiers: dict[int, str] | None
 ) -> dict[int, str] | None:
     """`CreateTableRequest.bot_tiers` -> `Table(seat_bot_tiers=...)`. Same lenient-fallback
-    posture as `_resolve_ruleset_query`/`resolve_ruleset` (never hard-reject bad input): a seat
+    posture as `resolve_ruleset` (never hard-reject bad input): a seat
     outside 1..3 (seat 0 is the human seat in practice mode) or a tier outside
     `_PRACTICE_BOT_TIERS` is silently dropped rather than raising -- a malformed entry just falls
     back to that seat's `DEFAULT_BOT_TIER` instead of failing the whole request. So is a
@@ -155,18 +197,38 @@ def _resolve_seat_bot_tiers(
 
 
 @app.post("/tables")
-async def create_table(body: CreateTableRequest) -> CreateTableResponse:
-    """Resolves the ruleset and mints the table id together in one request. `?ruleset=`/
-    `?rules=` on `/ws` remain a fallback for a direct WS connect to an unclaimed table id."""
+async def create_table(body: CreateTableRequest, request: Request) -> CreateTableResponse:
+    """Resolves the ruleset and mints the table id together in one request -- the only way a
+    table is created (`/ws` attaches to existing ones only). 429 past the per-IP rate limit,
+    503 past `MAX_TABLES` (docs/architecture.md §8.3)."""
+    if _create_limiter is not None:
+        ip = client_ip(
+            request.client.host if request.client is not None else None,
+            request.headers.get("cf-connecting-ip"),
+            _trusted_proxies,
+        )
+        if not _create_limiter.allow(ip):
+            raise HTTPException(
+                status_code=429,
+                detail="too many tables created, try again shortly",
+                headers={"Retry-After": str(_create_limiter.retry_after(ip))},
+            )
     resolved = resolve_ruleset(body.ruleset, body.rules)
     table_id = _generate_table_id()
-    ws.registry().get_or_create(
-        table_id,
-        resolved,
-        practice=body.practice,
-        seat_bot_tiers=_resolve_seat_bot_tiers(body.practice, body.bot_tiers),
-        private=body.private,
-    )
+    try:
+        ws.registry().get_or_create(
+            table_id,
+            resolved,
+            practice=body.practice,
+            seat_bot_tiers=_resolve_seat_bot_tiers(body.practice, body.bot_tiers),
+            private=body.private,
+        )
+    except TableLimitError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="server is at its table limit, try again later",
+            headers={"Retry-After": str(round(REAP_INTERVAL_SECONDS))},
+        ) from exc
     return CreateTableResponse(
         table_id=table_id,
         ruleset_preset=preset_id_for(resolved),

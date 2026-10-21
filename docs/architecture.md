@@ -202,14 +202,11 @@ occupancy, so it holds for the table's whole life without re-checking on each jo
 **Ruleset selection.** `RuleSet` is fixed at table construction — `mahjong_core` has no path to
 change it mid-game.
 
-| Path | Notes |
-| --- | --- |
-| `POST /tables` (`app/main.py`'s `create_table`) | primary: `{ruleset, rules?, practice?, bot_tiers?, private?}` → server-generated table id + resolved ruleset ([protocol.md §10](protocol.md)) |
-| `?ruleset=<preset_id>` / `?ruleset=custom&rules=<json>` on `/ws` (`app/ws.py`'s `_resolve_ruleset_query`) | fallback for a direct WS connect to an unclaimed table id |
-
-Both call `mahjong_core.presets.resolve_ruleset`. `TableRegistry.get_or_create` is "first creation
-wins" for a given id, same as `?practice=`. `state_sync.ruleset`/`ruleset_preset` surface
-the resolved value to late joiners, reconnects and spectators.
+`POST /tables` (`app/main.py`'s `create_table`) is the only way to create a table:
+`{ruleset, rules?, practice?, bot_tiers?, private?}` → server-generated table id + resolved ruleset
+via `mahjong_core.presets.resolve_ruleset` ([protocol.md §10](protocol.md)). `/ws` only attaches
+to an existing table (§8.3). `state_sync.ruleset`/`ruleset_preset` surface the resolved value to
+late joiners, reconnects and spectators.
 
 **Showcase table.** `TableRegistry.start_showcase` (`app/registry.py`, started from `lifespan` for
 `SHOWCASE_TABLE_ID`, default `BOTS`, empty disables) keeps one all-bot, open-hands table running.
@@ -480,16 +477,17 @@ cheat, and any bot can run as a client against a real server for integration tes
 
 **Postgres** holds finished games as `(ruleset, game_seed, action_log)` with `action_log` as JSONB.
 Session and table state are **in-process structures in the API process** — no
-`KV`/`Queue`/`Bus` abstraction. (Matchmaking and rate limiting don't exist.) A Protocol-per-backend split earns its keep only
+`KV`/`Queue`/`Bus` abstraction. (Matchmaking doesn't exist; the one rate limit, on `POST /tables`,
+is an in-process dict too, §8.3.) A Protocol-per-backend split earns its keep only
 once a second backend exists; with one (in-process memory) it would invite `async def` on a plain
 dict lookup, violating `server/AGENTS.md`'s "`async def` only where there is real I/O" rule
 ([ADR 0006](decisions/0006-multi-node-and-durability.md)).
 
 `TableRegistry` (`server/app/registry.py`) is an in-process `dict[str, Table]` plus the bookkeeping
 to run each table's `asyncio.Task`. `Table.run()` returns on `GAME_OVER` and `TableRegistry` drops
-its task entry; the `Table` object itself stays, so reconnecting after the game ends still works
-(`Table.reconnect`/`resume`). Finished tables are never evicted — there is no TTL policy. An
-abandoned table is the exception: evicted and its id tombstoned (§8.2).
+its task entry; the `Table` object itself stays for `FINISHED_TABLE_TTL_SECONDS`, so reconnecting
+after the game ends still works (`Table.reconnect`/`resume`), then is reaped (§8.3). An abandoned
+table is evicted at once and its id tombstoned (§8.2).
 
 `Table` records a real game's full action log (`self.actions`, every `Action` that ran through
 `reduce()` — never a `start_next_hand()` transition, which replay reconstructs off
@@ -555,8 +553,8 @@ Compose's default `stop_grace_period` (10s) is shorter than the drain; see
 ### 8.2 Abandoned tables
 
 A table nobody is watching still costs a bot job per decision for the rest of the game, and
-creating tables is free and unthrottled, so a table with no human left is ended rather than played
-out ([ADR 0024](decisions/0024-end-abandoned-tables.md)).
+creating tables is free (throttled only per IP, §8.3), so a table with no human left is ended
+rather than played out ([ADR 0024](decisions/0024-end-abandoned-tables.md)).
 
 | Condition | Rule |
 | --- | --- |
@@ -567,21 +565,42 @@ out ([ADR 0024](decisions/0024-end-abandoned-tables.md)).
 
 On expiry (`_handle_abandon_timeout`), all inside the table's own task:
 
-1. `Table.closed` is set; `_poke_bots` and `_handle_bot_result` refuse from then on, `_pending_bot`
-   is cleared and every in-flight `_await_bot_job` task cancelled, so a late worker answer is
-   dropped harmlessly.
+1. `Table.end` sets `Table.closed`; `_poke_bots` and `_handle_bot_result` refuse from then on,
+   `_pending_bot` is cleared and every in-flight `_await_bot_job` task cancelled, so a late worker
+   answer is dropped harmlessly.
 2. `error{code:"table_closed"}` goes to every seat stream and spectator; spectator sockets are
    closed. The long-lived inbox getter is cancelled — nothing will read the inbox again.
 3. One `WARNING` log line: table id, `hand_no`, reason.
 4. `run()` returns. The game never reached `GAME_OVER`, so nothing is persisted — same as a
    crash-abandoned table.
-5. `TableRegistry._run` evicts the `Table` from `_tables` and keeps the id in `_closed`. Eviction
-   is safe because the id is tombstoned: without it, a late `/ws?table=<id>` would
-   `get_or_create` a fresh, empty table under a dead game's id. Instead `ws_endpoint` answers any
-   connection to a closed id with `error{code:"table_closed"}` and closes it, and `POST /tables`
-   never mints a closed id. A connection that grabbed the `Table` in the instant before it ended
-   gets the same error from `Session.handle`. The tombstone is a bare string per ended table,
-   never pruned.
+5. `TableRegistry._run` evicts the `Table` from `_tables` and keeps the id in `_closed`, so
+   `POST /tables` never mints it again. A late `/ws?table=<id>` finds no table and gets
+   `error{code:"table_closed"}`, then the socket closes, the same as any unknown id (§8.3). A
+   connection that grabbed the `Table` in the instant before it ended gets the same error from
+   `Session.handle`. The tombstone is a bare string per evicted table, capped (§8.3).
+
+### 8.3 Table creation and retention limits
+
+Every table costs memory (~20 KB idle; ring buffers and history take a live one to a few hundred
+KB) and a task, on a 1.9 GiB box. Creation is anonymous, so each way of creating or keeping one
+is bounded:
+
+| Limit | Rule | Default (env, [infra.md §2](infra.md)) |
+| --- | --- | --- |
+| Only `POST /tables` creates | `ws_endpoint` looks the id up (`TableRegistry.get`); an unknown, abandoned or reaped id gets `error{code:"table_closed"}` (`TABLE_GONE_ERROR`) and the socket closes. A wrong join code or a stale link never makes a table | — |
+| Unstarted TTL | a table that never started, is `UNSTARTED_TABLE_TTL_SECONDS` old, and has no seat `connected` (spectators don't count, as in §8.2) is reaped: `Table.end(TABLE_GONE_ERROR)`, its task cancelled, evicted. A waiting room someone is sitting in is kept; once they leave (pre-start seats free after the 20s disconnect grace, §8) it goes at the next sweep | 600s |
+| Finished TTL | `FINISHED_TABLE_TTL_SECONDS` after `run()` returns at `GAME_OVER`, the table is evicted, sockets still on it told `table_closed` | 600s |
+| Sweep | `TableRegistry.reap`, every `REAP_INTERVAL_SECONDS` (30s) from `start_reaper` (`lifespan`); cancelled by the shutdown drain. The showcase is exempt. `clock` is injectable, which is how the TTL tests drive it | — |
+| Tombstones | `_closed` keeps the last `DEFAULT_CLOSED_IDS_CAP` (10,000) evicted ids, oldest dropped first. Only id reuse depends on it, and a fresh id colliding with a forgotten one is a 1 in 32⁶ draw | — |
+| Global cap | `get_or_create` raises `TableLimitError` once `MAX_TABLES` non-showcase tables are in the registry (finished ones awaiting reaping included); `POST /tables` answers `503` with `Retry-After`. `0` disables. This also bounds `GET /tables`, which walks every table | 500 |
+| Per-IP rate | `POST /tables` allows `TABLE_CREATE_RATE_LIMIT` creations per `TABLE_CREATE_RATE_WINDOW_SECONDS` per client IP (`app/rate_limit.py`'s sliding-window `RateLimiter`, in-process, no dependency); past it `429` with `Retry-After`. Idle IPs are pruned once 4,096 are tracked. `0` disables | 10 per 60s |
+
+**Client IP.** `client_ip` trusts `CF-Connecting-IP` (Cloudflare Tunnel's client address) only when
+the TCP peer is in `TRUSTED_PROXY_IPS`; from any other peer the header is client-controlled and
+ignored. Under the prod overlay's `--proxy-headers`, uvicorn has already replaced a trusted peer
+with the forwarded client address, which is untrusted, so that address is the key and the header
+is ignored. Without it, the peer is the proxy and the header is used. Either way a direct client
+can't pick its own key.
 
 ## 9. Anti-cheat
 

@@ -7,16 +7,15 @@ import uuid
 from collections.abc import Iterator
 
 import pytest
-from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.limits import TokenBucket, WsLimits, client_ip, parse_trusted_proxies
-from app.main import app
 from app.table import INBOX_COMMAND_LIMIT, Table
 from app.ws import get_table
 from mahjong_core.actions import Discard
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.tiles import TileId
+from tests.tables import table_client
 from tests.ws_frames import msg
 
 
@@ -85,7 +84,7 @@ def tight_limits(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 @pytest.mark.usefixtures("tight_limits")
 def test_per_ip_connection_cap_refuses_then_frees_slot() -> None:
     table_id = f"limits-{uuid.uuid4()}"
-    with TestClient(app) as client:
+    with table_client(table_id) as client:
         with (
             client.websocket_connect(f"/ws?table={table_id}"),
             client.websocket_connect(f"/ws?table={table_id}"),
@@ -106,7 +105,7 @@ def test_per_ip_connection_cap_refuses_then_frees_slot() -> None:
 def test_spectator_cap_refuses_with_spectators_full() -> None:
     table_id = f"limits-{uuid.uuid4()}"
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}&spectate=true") as first,
     ):
         assert first.receive_json()["t"] == "state_sync"
@@ -125,7 +124,7 @@ def test_spectator_cap_refuses_with_spectators_full() -> None:
 @pytest.mark.usefixtures("tight_limits")
 def test_inbound_rate_limit_closes_socket() -> None:
     table_id = f"limits-{uuid.uuid4()}"
-    with TestClient(app) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
+    with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws:
         for t0 in range(5):
             ws.send_json(msg("ping", {"t0": t0}))
         # burst of 3 answered, the 4th frame closes the socket

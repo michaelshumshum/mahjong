@@ -44,12 +44,10 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
 from app.db.models import Base
 from app.db.session import make_engine
-from app.main import app
 from app.ws import get_table
 from mahjong_core.actions import action_from_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
@@ -58,6 +56,7 @@ from mahjong_core.state import GameState, Phase, derive_hand_seed
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_records import fetch_latest_record
 from tests.game_state import with_seat
+from tests.tables import table_client
 from tests.ws_frames import first_tile_ids, msg, next_id
 
 # both repeat flags off + EAST_ONLY rotates dealer 0->1->2->3 unconditionally and ends the game
@@ -159,7 +158,7 @@ def test_full_game_four_ws_clients_east_only_with_mid_game_reconnect(
     seed = 20260916001
 
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
         client.websocket_connect(f"/ws?table={table_id}") as ws1,
         client.websocket_connect(f"/ws?table={table_id}") as ws2,

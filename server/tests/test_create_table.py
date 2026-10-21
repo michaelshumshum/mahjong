@@ -1,8 +1,7 @@
-"""`POST /tables` (`app/main.py`'s `create_table`) -- the one-request table-creation path that
-resolves a ruleset and mints a table id together, replacing client-side id generation
-(`web/src/lib/table/table-code.ts`). `?ruleset=`/`?rules=` on `/ws` (`server/tests/
-test_ruleset_selection.py`) is the lower-level fallback this endpoint's ruleset resolution
-(`mahjong_core.presets.resolve_ruleset`) is shared with."""
+"""`POST /tables` (`app/main.py`'s `create_table`) -- the only table-creation path: resolves a
+ruleset and mints a table id together, replacing client-side id generation
+(`web/src/lib/table/table-code.ts`). Ruleset resolution itself (`mahjong_core.presets.
+resolve_ruleset`) is covered by `server/tests/test_ruleset_selection.py`."""
 
 import json
 import re
@@ -17,6 +16,7 @@ from app.main import _TABLE_CODE_ALPHABET, _TABLE_CODE_LENGTH, _generate_table_i
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.scoring.patterns import LIMIT_FAAN
+from tests.tables import create_table
 
 _TABLE_ID_RE = re.compile(f"^[{_TABLE_CODE_ALPHABET}]{{{_TABLE_CODE_LENGTH}}}$")
 
@@ -218,10 +218,7 @@ def test_bot_tiers_without_practice_is_a_no_op() -> None:
 
 def test_a_later_ws_connect_to_the_created_id_joins_the_same_table() -> None:
     """The id/ruleset are fixed at `POST /tables` time -- a subsequent `/ws` connect to that id
-    (with, deliberately, a *different* `?ruleset=` to prove it's ignored) must join the table
-    already created, not construct a second one under a different ruleset
-    (`TableRegistry.get_or_create`'s "never creates a second Table for an id that already has
-    one")."""
+    joins the table already created (a stray `?ruleset=` is ignored: `/ws` never creates)."""
     with TestClient(app) as client:
         created = client.post("/tables", json={"ruleset": "hk_casual"}).json()
         table_id = created["table_id"]
@@ -240,8 +237,7 @@ def test_a_later_ws_connect_to_the_created_id_joins_the_same_table() -> None:
 def test_generated_ids_retry_past_a_collision() -> None:
     with TestClient(app) as client:
         occupied = "AAAAAA"
-        with client.websocket_connect(f"/ws?table={occupied}"):
-            pass  # the connect alone is enough to auto-create the table under this id
+        create_table(client, occupied)
         # first attempt collides with the table just created above, second is free
         with patch("app.main.secrets.choice", side_effect=list(occupied) + list("BBBBBB")):
             assert _generate_table_id() == "BBBBBB"
@@ -250,8 +246,7 @@ def test_generated_ids_retry_past_a_collision() -> None:
 def test_generated_id_exhausting_attempts_raises() -> None:
     with TestClient(app) as client:
         occupied = "CCCCCC"
-        with client.websocket_connect(f"/ws?table={occupied}"):
-            pass
+        create_table(client, occupied)
         with patch("app.main.secrets.choice", side_effect=list(occupied) * 10):
             try:
                 _generate_table_id()

@@ -315,8 +315,8 @@ export class MahjongSocket {
 		}
 		if (!isServerEvent(parsed)) return;
 		this.#ingest(parsed);
-		// the table ended as abandoned; a reconnect would only be refused again (architecture.md
-		// §8.2). closed after ingest so the page still gets the frame to toast
+		// the table ended, was reaped or never existed; a reconnect would only be refused again
+		// (architecture.md §8.2-8.3). closed after ingest so the page still gets the frame to toast
 		if (parsed.t === 'error' && parsed.d.code === 'table_closed') {
 			this.#closedByUser = true;
 			this.#ws?.close();

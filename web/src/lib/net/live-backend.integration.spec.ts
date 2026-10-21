@@ -82,7 +82,14 @@ describe.skipIf(!process.env.RUN_LIVE_BACKEND_TESTS)('live backend (opt-in)', ()
 	}, 10_000);
 
 	it('four real seats join, deal, and exchange one real discard, redacted correctly per seat', async () => {
-		const tableId = `it-${Date.now()}`;
+		// the WS never creates a table (architecture.md §8.3)
+		const created = await fetch(`http://127.0.0.1:${port}/tables`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: '{}'
+		});
+		expect(created.ok).toBe(true);
+		const { table_id: tableId } = (await created.json()) as { table_id: string };
 		const seats: {
 			socket: MahjongSocket;
 			state: ClientGameState;

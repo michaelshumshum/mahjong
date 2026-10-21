@@ -8,6 +8,7 @@ from typing import Final
 
 __all__ = [
     "TABLE_CLOSED_ERROR",
+    "TABLE_GONE_ERROR",
     "ErrorCode",
     "NotHostError",
     "SeatAuthError",
@@ -37,6 +38,13 @@ class ErrorCode(StrEnum):
 TABLE_CLOSED_ERROR: Final = {
     "code": ErrorCode.TABLE_CLOSED,
     "message": "table closed: every player left",
+}
+
+# same code for an id with no live table (never created, or reaped, architecture.md §8.3), so the
+# client stops reconnecting there too
+TABLE_GONE_ERROR: Final = {
+    "code": ErrorCode.TABLE_CLOSED,
+    "message": "table closed or not found",
 }
 
 

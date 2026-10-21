@@ -1,9 +1,6 @@
-"""`?ruleset=`/`?rules=` on `/ws` -- table-creation ruleset selection (presets + custom).
-`mahjong_core.presets` itself (preset content, `preset_id_for` matching) plus the `app/ws.py`
-resolver's never-hard-reject posture and `state_sync`'s `ruleset`/`ruleset_preset` fields."""
-
-import json
-import uuid
+"""Table-creation ruleset selection (presets + custom) through `POST /tables`.
+`mahjong_core.presets` itself (preset content, `preset_id_for` matching) plus the resolver's
+never-hard-reject posture and `state_sync`'s `ruleset`/`ruleset_preset` fields."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -106,47 +103,45 @@ def test_resolve_ruleset_custom_with_bool_as_int_falls_back_to_default() -> None
     assert resolve_ruleset("custom", bad) == DEFAULT_RULESET
 
 
-def _connect_and_join(client: TestClient, table_id: str, query: str) -> dict:
-    with client.websocket_connect(f"/ws?table={table_id}{query}") as ws:
+def _create_and_join(client: TestClient, body: dict[str, object]) -> tuple[str, dict]:
+    table_id = client.post("/tables", json=body).json()["table_id"]
+    with client.websocket_connect(f"/ws?table={table_id}") as ws:
         ws.send_json({"v": 1, "t": "hello", "ts": 1000, "d": {"client_version": "test"}})
         ws.send_json({"v": 1, "t": "join", "ts": 1001, "id": "j-1", "d": {"seat": 0, "name": "P1"}})
         # join's own broadcast (seat_state) lands before the unicast state_sync/ack
         frame = ws.receive_json()
         while frame["t"] != "state_sync":
             frame = ws.receive_json()
-        return frame
+        return table_id, frame
 
 
-def test_no_query_params_defaults_to_hk_classic() -> None:
-    table_id = f"ruleset-default-{uuid.uuid4()}"
+def test_empty_body_defaults_to_hk_classic() -> None:
     with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, "")
+        _, state_sync = _create_and_join(client, {})
         assert state_sync["d"]["ruleset_preset"] == "hk_classic"
         assert state_sync["d"]["ruleset"] == DEFAULT_RULESET.to_dict()
 
 
 def test_named_preset_selected() -> None:
-    table_id = f"ruleset-casual-{uuid.uuid4()}"
     with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, "&ruleset=hk_casual")
+        _, state_sync = _create_and_join(client, {"ruleset": "hk_casual"})
         assert state_sync["d"]["ruleset_preset"] == "hk_casual"
         assert state_sync["d"]["ruleset"]["min_faan"] == 1
         assert state_sync["d"]["ruleset"]["faan_cap"] == 13
 
 
 def test_unknown_preset_falls_back_to_default() -> None:
-    table_id = f"ruleset-unknown-{uuid.uuid4()}"
     with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, "&ruleset=not_a_real_preset")
+        _, state_sync = _create_and_join(client, {"ruleset": "not_a_real_preset"})
         assert state_sync["d"]["ruleset_preset"] == "hk_classic"
 
 
 def test_custom_ruleset_round_trips() -> None:
-    table_id = f"ruleset-custom-{uuid.uuid4()}"
     custom = RuleSet(min_faan=0, faan_cap=13, turn_seconds=30, wall_reserve=16)
-    rules = json.dumps(custom.to_dict())
     with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
+        table_id, state_sync = _create_and_join(
+            client, {"ruleset": "custom", "rules": custom.to_dict()}
+        )
         assert state_sync["d"]["ruleset_preset"] is None
         assert state_sync["d"]["ruleset"] == custom.to_dict()
 
@@ -155,68 +150,15 @@ def test_custom_ruleset_round_trips() -> None:
         assert table.state.ruleset == custom
 
 
-def test_custom_with_malformed_rules_falls_back_to_default() -> None:
-    table_id = f"ruleset-malformed-{uuid.uuid4()}"
-    with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, "&ruleset=custom&rules=not-json")
-        assert state_sync["d"]["ruleset_preset"] == "hk_classic"
-
-
 def test_custom_with_invalid_ruleset_fields_falls_back_to_default() -> None:
-    table_id = f"ruleset-invalid-{uuid.uuid4()}"
     # min_faan=2 fails RuleSet.__post_init__'s own validation (not one of 0|1|3|5)
     bad = {**DEFAULT_RULESET.to_dict(), "min_faan": 2}
-    rules = json.dumps(bad)
     with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
+        _, state_sync = _create_and_join(client, {"ruleset": "custom", "rules": bad})
         assert state_sync["d"]["ruleset_preset"] == "hk_classic"
-
-
-def test_custom_with_unknown_faan_override_falls_back_to_default() -> None:
-    table_id = f"ruleset-override-{uuid.uuid4()}"
-    rules = json.dumps({**DEFAULT_RULESET.to_dict(), "faan_overrides": {"not_a_pattern": 1}})
-    with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
-        assert state_sync["d"]["ruleset_preset"] == "hk_classic"
-        assert state_sync["d"]["ruleset"]["faan_overrides"] == {}
 
 
 def test_custom_with_runaway_timing_falls_back_to_default() -> None:
-    table_id = f"ruleset-runaway-{uuid.uuid4()}"
-    rules = json.dumps(_RUNAWAY_RULES)
     with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
+        _, state_sync = _create_and_join(client, {"ruleset": "custom", "rules": _RUNAWAY_RULES})
         assert state_sync["d"]["ruleset_preset"] == "hk_classic"
-
-
-def test_custom_with_non_finite_json_constant_falls_back_to_default() -> None:
-    # stdlib json.loads accepts NaN/Infinity by default
-    table_id = f"ruleset-nan-{uuid.uuid4()}"
-    rules = json.dumps({**DEFAULT_RULESET.to_dict(), "disconnect_grace_seconds": float("inf")})
-    assert "Infinity" in rules
-    with TestClient(app) as client:
-        state_sync = _connect_and_join(client, table_id, f"&ruleset=custom&rules={rules}")
-        assert state_sync["d"]["ruleset_preset"] == "hk_classic"
-        table = get_table(table_id)
-        assert table is not None
-        assert table.state.ruleset == DEFAULT_RULESET
-
-
-def test_ruleset_only_meaningful_on_first_connect() -> None:
-    """Same "first connect wins" rule `?practice=` already has (`TableRegistry.get_or_create`) --
-    a table's ruleset is fixed at construction and a later connect can't change it."""
-    table_id = f"ruleset-fixed-{uuid.uuid4()}"
-    with TestClient(app) as client:
-        first = _connect_and_join(client, table_id, "&ruleset=hk_casual")
-        assert first["d"]["ruleset_preset"] == "hk_casual"
-
-        table_id_2 = table_id  # same id, second connection, different seat
-        with client.websocket_connect(f"/ws?table={table_id_2}&ruleset=hk_strict") as ws:
-            ws.send_json({"v": 1, "t": "hello", "ts": 1000, "d": {"client_version": "test"}})
-            ws.send_json(
-                {"v": 1, "t": "join", "ts": 1001, "id": "j-2", "d": {"seat": 1, "name": "P2"}}
-            )
-            frame = ws.receive_json()
-            while frame["t"] != "state_sync":
-                frame = ws.receive_json()
-            assert frame["d"]["ruleset_preset"] == "hk_casual"

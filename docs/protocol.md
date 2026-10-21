@@ -112,16 +112,9 @@ only seat that may send `start_with_bots`.
 
 ### Connect-time query parameters
 
-Table-*creation* choices are query parameters on the WS URL, not envelope messages. All are only
-meaningful the first time a table id is created ("first creation wins",
-[architecture.md §3](architecture.md)); `POST /tables` (§10) is the primary path for the same
-choices.
-
 | Param | Effect |
 | --- | --- |
-| `?ruleset=<preset_id>` | one of `mahjong_core.presets.RULESET_PRESETS` (default `hk_classic`) |
-| `?ruleset=custom&rules=<json>` | a full `RuleSet.from_dict` body |
-| `?practice=true` | seats 1-3 are bound to bots at construction |
+| `?table=<id>` | the table to attach to. It must already exist: tables are created only by `POST /tables` (§10). An unknown id (never created, abandoned, or reaped, [architecture.md §8.3](architecture.md)) gets `error{code:"table_closed"}` as the first frame and the socket closes |
 | `?spectate=true` | connect as a spectator (below) |
 
 There is no seed parameter, here or on `POST /tables`: the server always draws `game_seed`
@@ -129,11 +122,9 @@ There is no seed parameter, here or on `POST /tables`: the server always draws `
 `new_game(ruleset, seed)` locally and see every wall and hand, while Fairness (§5) still verifies.
 Tests that need a fixed deal seed through `TableRegistry.get_or_create(seed=…)` or `Table(...)`.
 
-Ruleset input is never rejected: an unknown preset id, malformed JSON (including `NaN`/`Infinity`
-constants), or a body failing `RuleSet` validation or the client ranges
-([rules.md §10](rules.md)) falls back to `hk_classic` (`app/ws.py`'s `_resolve_ruleset_query`). The resolved
-ruleset comes back on every `state_sync` as `ruleset` (full `RuleSet.to_dict()`) and
-`ruleset_preset` (the matching preset id, or `null`).
+Table-*creation* choices (ruleset, practice, bot tiers, private) are `POST /tables` body fields,
+never WS parameters. The resolved ruleset comes back on every `state_sync` as `ruleset` (full
+`RuleSet.to_dict()`) and `ruleset_preset` (the matching preset id, or `null`).
 
 **Spectating.** `?spectate=true` (`app/ws.py`'s `ws_endpoint`) gets a spectator-redacted
 `state_sync` (`seat_view(state, None)`, [architecture.md §5](architecture.md)) on registration,
@@ -178,7 +169,7 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `seat_state` | `{seat, status, name?}` | `status`: `connected\|disconnected\|autoplay\|bot`. Sent for every status change of a bound seat, including the empty→`connected` transition `join` causes. `name` is carried on every broadcast for that seat |
 | `server_shutdown` | `{deadline_ts}` | broadcast once to every seat ever bound when a graceful-shutdown drain starts ([architecture.md §8.1](architecture.md)) |
 | `ack` | `{id, ok, error?, reconnect_secret?}` | **sender-only**, never broadcast — it would leak another player's `id`. Acknowledges receipt/idempotency, not legality: `Table` still silently drops a well-formed but illegal command. `reconnect_secret` only on a successful `join` (§5). A `claim` `pass` naming a closed/superseded window is acked `ok:true` as a no-op (the client's auto-pass races the server's own timeout); any other choice on a stale window gets `ok:false, error:"illegal"` |
-| `error` | `{code, message}` | `code: "table_closed"` is also sent to every seat and spectator when an abandoned table ends ([architecture.md §8.2](architecture.md)); spectator sockets are then closed. `spectators_full`: §11 |
+| `error` | `{code, message}` | `code: "table_closed"` is also sent to every seat and spectator when a table is ended: abandoned ([architecture.md §8.2](architecture.md)) or reaped (§8.3); spectator sockets are then closed. `spectators_full`: §11 |
 | `pong` | `{t0, t1}` | |
 
 **`state_sync` fields** beyond `SeatView`'s ([architecture.md §5](architecture.md)):
@@ -295,7 +286,7 @@ above.
 | `seat` never joined | `error{code:"no_such_seat"}` |
 | bound seat, missing or wrong `secret` | `error{code:"bad_secret"}`; the current holder keeps the seat |
 | bound seat, correct `secret` | rebind, then resume |
-| table ended as abandoned ([architecture.md §8.2](architecture.md)) | `error{code:"table_closed"}`, then the server closes the socket — sent on connect, before any `hello`. The client stops reconnecting on this code |
+| no such table: ended as abandoned, reaped, or never created ([architecture.md §8.2–8.3](architecture.md)) | `error{code:"table_closed"}`, then the server closes the socket — sent on connect, before any `hello`. The client stops reconnecting on this code |
 
 **Spectators are never reconnectable.** There is no `hello{seat}` equivalent for "the same
 spectator again" — no seat, no `SeatBinding`, and a spectator's `session_id` isn't something a
@@ -470,8 +461,8 @@ GET /tables
 
 | Rule | Why |
 | --- | --- |
-| Only still-running tables (`TableRegistry.is_running`) | finished `Table`s are never evicted from the registry; abandoned ones are, but their id is kept so it's never reused ([architecture.md §8.2](architecture.md)) |
-| Only tables with at least one non-bot seat bound | every `/table/<id>` visit creates a table, and a practice table is bot-only until its owner joins |
+| Only still-running tables (`TableRegistry.is_running`) | a finished `Table` stays in the registry until reaped ([architecture.md §8.3](architecture.md)) |
+| Only tables with at least one non-bot seat bound | a freshly created table has nobody in it, and a practice table is bot-only until its owner joins |
 | …except the showcase table (`BOTS`), always listed | it's bot-only by design ([architecture.md §3](architecture.md)) |
 | Never a table created with `private: true` | reachable only by id (table URL or join-by-code); the random six-character id is the only secret, there is no password |
 | `open` = not started and some seat `empty`; otherwise `in_progress` | an `in_progress` table can only be spectated |
@@ -489,14 +480,17 @@ POST /tables
 - Resolves the ruleset and mints a fresh six-character id together (`_generate_table_id`:
   look-alike-free alphabet, `secrets.choice`, collision-checked against the registry), so a client
   configuring custom rules navigates straight to `/table/<table_id>`.
-- `ruleset`/`rules`/`practice` have the same semantics as the WS query params (§2) — both call
-  `mahjong_core.presets.resolve_ruleset` and fall back to `hk_classic` on bad input.
-- **Except `rules.faan_overrides`**, which is rejected with `422` here (`CreateTableRequest`'s
+- The only way to create a table; `/ws` attaches to existing ones only (§2).
+- `ruleset` is a `mahjong_core.presets.RULESET_PRESETS` id (default `hk_classic`), or `custom`
+  with a full `RuleSet.from_dict` body in `rules`. An unknown preset id, a body failing `RuleSet`
+  validation (including `NaN`/`Infinity`), or one outside the client ranges
+  ([rules.md §10](rules.md)) falls back to `hk_classic` (`resolve_ruleset`). `practice` binds
+  seats 1-3 to bots at construction.
+- **Except `rules.faan_overrides`**, which is rejected with `422` (`CreateTableRequest`'s
   validator) rather than folded into the fallback: keys must be `OVERRIDABLE_PATTERN_NAMES`
   (`mahjong_core/scoring/faan.py`: every `PATTERNS` name plus 雞糊), values ints in
   `0..LIMIT_FAAN` (13). The table keeps and echoes the dict on every `state_sync`, so an
-  unbounded one is a per-table memory and bandwidth cost. On the WS `?rules=` path the same
-  check (`validate_faan_overrides`, run by `resolve_ruleset`) falls back to `hk_classic` instead.
+  unbounded one is a per-table memory and bandwidth cost.
 - **Body cap:** every HTTP request body is capped at 16 KB (`app/body_limit.py`'s
   `MAX_REQUEST_BODY_BYTES`; a full custom ruleset is ~1-2 KB). An over-cap `Content-Length` gets
   `413` before anything is read; a chunked body is counted as it streams and gets the same `413`
@@ -510,8 +504,9 @@ POST /tables
   `DEFAULT_BOT_TIER` (`T2`). Ignored when `practice` is false.
 - `private` keeps the table out of `GET /tables` (`TableRegistry._private`). Joining, seating and
   spectating by id are unchanged.
-- A table created via `POST /tables` and one auto-created by a direct WS connect behave
-  identically (a WS-created table is always listed); whichever happens first for an id sticks.
+- `429` (with `Retry-After`) past the per-IP rate limit, `503` (with `Retry-After`) once
+  `MAX_TABLES` tables are live ([architecture.md §8.3](architecture.md)). Both carry FastAPI's
+  `{"detail": "…"}` body.
 
 ## 11. Connection and rate limits
 

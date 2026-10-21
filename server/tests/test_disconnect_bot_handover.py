@@ -25,15 +25,13 @@ from __future__ import annotations
 import dataclasses
 import uuid
 
-from fastapi.testclient import TestClient
-
-from app.main import app
 from app.ws import get_table
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
+from tests.tables import table_client
 from tests.ws_frames import first_tile_ids, hello, msg, next_id
 
 
@@ -128,7 +126,7 @@ def test_disconnect_grace_expiry_bot_moves_game_then_reconnect_returns_control()
     table_id = f"disconnect-handover-{uuid.uuid4()}"
 
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
         client.websocket_connect(f"/ws?table={table_id}") as ws2,
         client.websocket_connect(f"/ws?table={table_id}") as ws3,
@@ -277,7 +275,7 @@ def test_disconnect_bot_runs_faanbot_not_random() -> None:
     table_id = f"disconnect-handover-faanbot-{uuid.uuid4()}"
 
     with (
-        TestClient(app) as client,
+        table_client(table_id) as client,
         client.websocket_connect(f"/ws?table={table_id}") as ws0,
         client.websocket_connect(f"/ws?table={table_id}") as ws2,
         client.websocket_connect(f"/ws?table={table_id}") as ws3,

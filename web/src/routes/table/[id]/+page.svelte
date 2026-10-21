@@ -88,8 +88,8 @@
 	let isMock = $derived(page.url.searchParams.has('mock'));
 	let tableId = $derived(page.params.id ?? '');
 
-	// `?practice=1` (unrelated in spelling to the wire's own `&practice=true`) opens the live
-	// socket in practice mode: seats 1-3 are already bot-bound at table creation.
+	// `?practice=1` marks a practice table (POST /tables `practice: true`, seats 1-3 already
+	// bot-bound) for the header tag and coach marks; the socket url doesn't carry it.
 	let isPractice = $derived(page.url.searchParams.has('practice'));
 	// phone landscape: the hub moves into the header rail, freeing a felt row (frontend.md §3).
 	const phoneLandscape = new MediaQuery(PHONE_LANDSCAPE_QUERY);
@@ -153,12 +153,11 @@
 		// the seat-picker's `join`, which fails with `table_full` once all seats are bound.
 		const persistedSeat = loadSeatForTable(tableId);
 		const persistedSecret = loadSecretForTable(tableId);
-		const practiceParam = isPractice ? '&practice=true' : '';
 		// no persisted seat yet -- connect as a spectator so the seat picker shows real occupancy
 		// instead of four identical "Open" slots; `join` promotes off spectator status on pick.
 		const spectateParam = persistedSeat === null ? '&spectate=true' : '';
 		const socket = new MahjongSocket(
-			`${defaultWsUrl()}?table=${encodeURIComponent(tableId)}${practiceParam}${spectateParam}`
+			`${defaultWsUrl()}?table=${encodeURIComponent(tableId)}${spectateParam}`
 		);
 		const store = new GameStore(socket);
 		handEverStarted = false;

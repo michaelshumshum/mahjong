@@ -22,6 +22,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       API_DOCS: "0"
+      # also read by the app: CF-Connecting-IP counts for the POST /tables rate limit only from these
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS}
     # !override: base file publishes 0.0.0.0; only the host-side tunnel connector should reach it
     ports: !override ["127.0.0.1:${API_PORT:-8000}:8000"]
     stop_grace_period: 100s   # > SHUTDOWN_GRACE_SECONDS (90)

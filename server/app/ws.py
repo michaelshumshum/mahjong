@@ -3,11 +3,11 @@ connection, joined to a `Table`. `hello`/`ping` stay on a local per-connection c
 the per-seat `seq` stream everything else uses (see `Session.handle`).
 
 Table lookup is `app/registry.py`'s `TableRegistry`, one process-wide singleton (`_registry`).
-`?ruleset=`/`?rules=` and `?practice=` are a fallback for a direct WS connect to an unclaimed
-table id -- the primary path is `POST /tables` (`app/main.py`'s `create_table`), which resolves
-the same way. Both are only meaningful the first time a given `table` id is created. There is
-no seed param: a client-chosen `game_seed` would reveal every wall (tests seed through
-`TableRegistry.get_or_create` or `Table(...)`). `?spectate=true` registers this connection as a
+A connect only ever attaches to an existing table: `POST /tables` (`app/main.py`'s
+`create_table`) is the one way to create one, so a connect can't be used to fill memory with
+tables (docs/architecture.md §8.3). There is no seed param: a client-chosen `game_seed` would
+reveal every wall (tests seed through `TableRegistry.get_or_create` or `Table(...)`).
+`?spectate=true` registers this connection as a
 spectator at accept time -- an explicit opt-in rather than a passive default, since the latter
 would race every real client's own hello-before-join handshake.
 
@@ -32,6 +32,7 @@ from app import protocol as proto
 from app.clock import now_ms
 from app.errors import (
     TABLE_CLOSED_ERROR,
+    TABLE_GONE_ERROR,
     ErrorCode,
     NotHostError,
     SeatAuthError,
@@ -57,9 +58,7 @@ from mahjong_core.actions import (
     Pass,
 )
 from mahjong_core.actions import Discard as DiscardAction
-from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld, MeldKind, legal_self_melds
-from mahjong_core.presets import DEFAULT_PRESET_ID, resolve_ruleset
 from mahjong_core.tiles import TileId
 
 router = APIRouter()
@@ -103,6 +102,9 @@ def reset_registry(
     bot_pool: Executor | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
     abandon_grace_seconds: float | None = None,
+    max_tables: int | None = None,
+    unstarted_ttl_seconds: float | None = None,
+    finished_ttl_seconds: float | None = None,
 ) -> TableRegistry:
     """Install a fresh `TableRegistry` as this module's singleton -- called on every ASGI
     startup (including a `TestClient(app)` context) so a previous lifetime's tables/draining
@@ -115,35 +117,11 @@ def reset_registry(
         bot_pool=bot_pool,
         session_factory=session_factory,
         abandon_grace_seconds=abandon_grace_seconds,
+        max_tables=max_tables,
+        unstarted_ttl_seconds=unstarted_ttl_seconds,
+        finished_ttl_seconds=finished_ttl_seconds,
     )
     return _registry
-
-
-def _resolve_ruleset_query(ruleset: str, rules: str | None) -> RuleSet:
-    """`?ruleset=`/`?rules=` on `/ws` -> the `RuleSet` to construct with -- the WS-connect
-    fallback to `POST /tables`'s primary path. `rules` arrives as raw query-string JSON here, so
-    a malformed value just folds into `resolve_ruleset`'s existing lenient fallback rather than
-    being handled separately."""
-    parsed: dict[str, Any] | None = None
-    if rules is not None:
-        try:
-            parsed = json.loads(rules, parse_constant=_reject_json_constant)
-        except ValueError:
-            parsed = None
-    return resolve_ruleset(ruleset, parsed)
-
-
-def _reject_json_constant(name: str) -> Any:
-    raise ValueError(f"non-finite JSON constant {name} in rules")
-
-
-def _get_or_create_table(table_id: str, practice: bool, ruleset: str, rules: str | None) -> Table:
-    return _registry.get_or_create(
-        table_id,
-        _resolve_ruleset_query(ruleset, rules),
-        require_ready=True,
-        practice=practice,
-    )
 
 
 class _IdempotentMessage(Protocol):
@@ -476,11 +454,8 @@ class Session:
 @router.websocket("/ws")
 async def ws_endpoint(
     websocket: WebSocket,
-    table: str = "default",
-    practice: bool = False,
+    table: str = "",
     spectate: bool = False,
-    ruleset: str = DEFAULT_PRESET_ID,
-    rules: str | None = None,
 ) -> None:
     """Per-IP connection cap around `_serve` (docs/protocol.md §11)."""
     peer = websocket.client.host if websocket.client is not None else None
@@ -490,19 +465,12 @@ async def ws_endpoint(
         await websocket.close(code=_CLOSE_POLICY_VIOLATION)
         return
     try:
-        await _serve(websocket, table, practice, spectate, ruleset, rules)
+        await _serve(websocket, table, spectate)
     finally:
         counter.release(ip)
 
 
-async def _serve(
-    websocket: WebSocket,
-    table: str,
-    practice: bool,
-    spectate: bool,
-    ruleset: str,
-    rules: str | None,
-) -> None:
+async def _serve(websocket: WebSocket, table: str, spectate: bool) -> None:
     if _registry.draining:
         # stop accepting new connections (reconnects included) once a drain has started.
         # 1013 = "Try Again Later" (RFC 6455).
@@ -510,13 +478,14 @@ async def _serve(
         return
     # no auth -- accept every other connection, up to the docs/protocol.md §11 caps.
     await websocket.accept()
-    if _registry.is_closed(table):
-        # an abandoned table's id is never recycled (docs/architecture.md §8.2)
-        frame = {"v": 1, "t": "error", "seq": 1, "ts": now_ms(), "d": dict(TABLE_CLOSED_ERROR)}
+    table_obj = _registry.get(table)
+    if table_obj is None:
+        # only POST /tables creates a table; unknown, abandoned and reaped ids are refused alike
+        # (docs/architecture.md §8.3)
+        frame = {"v": 1, "t": "error", "seq": 1, "ts": now_ms(), "d": dict(TABLE_GONE_ERROR)}
         await websocket.send_text(json.dumps(frame))
         await websocket.close()
         return
-    table_obj = _get_or_create_table(table, practice, ruleset, rules)
     if spectate and len(table_obj.spectators) >= _limits.max_spectators_per_table:
         error = {"code": ErrorCode.SPECTATORS_FULL, "message": "too many spectators"}
         frame = {"v": 1, "t": "error", "seq": 1, "ts": now_ms(), "d": error}
