@@ -13,7 +13,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app import ws
 from app.main import app
-from app.rate_limit import RateLimiter, client_ip, parse_trusted_proxies
+from app.rate_limit import RateLimiter
 from app.registry import TableLimitError, TableRegistry
 from mahjong_core.actions import Pass
 from mahjong_core.config import DEFAULT_RULESET
@@ -173,13 +173,3 @@ def test_rate_limiter_forgets_idle_clients() -> None:
     clock.now += 61
     assert limiter.allow("d")
     assert len(limiter) <= 2
-
-
-def test_client_ip_ignores_header_from_untrusted_peer() -> None:
-    trusted = parse_trusted_proxies("10.0.0.1, 172.17.0.0/16, not-an-ip")
-    assert client_ip("10.0.0.1", "198.51.100.7", trusted) == "198.51.100.7"
-    assert client_ip("172.17.3.4", "198.51.100.7", trusted) == "198.51.100.7"
-    assert client_ip("203.0.113.5", "198.51.100.7", trusted) == "203.0.113.5"
-    assert client_ip("10.0.0.1", None, trusted) == "10.0.0.1"
-    assert client_ip("10.0.0.1", "garbage", trusted) == "10.0.0.1"
-    assert client_ip(None, "198.51.100.7", trusted) == "unknown"

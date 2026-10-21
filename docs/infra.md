@@ -42,12 +42,12 @@ mahjong/
 │   │   ├── errors.py           # Table exceptions (one per wire error code), TABLE_CLOSED_ERROR
 │   │   ├── clock.py            # now_ms(): server epoch ms for every wire ts/deadline_ts
 │   │   ├── registry.py         # TableRegistry, reaper + table cap, showcase table, shutdown drain
-│   │   ├── rate_limit.py       # POST /tables per-IP RateLimiter, client_ip (CF-Connecting-IP rule)
+│   │   ├── rate_limit.py       # POST /tables per-IP RateLimiter
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
-│   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11)
+│   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11); client_ip (CF-Connecting-IP rule)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)

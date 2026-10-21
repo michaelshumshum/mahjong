@@ -32,7 +32,8 @@ from app.api_models import (
 )
 from app.body_limit import BodySizeLimitMiddleware
 from app.db.session import make_engine, make_session_factory
-from app.rate_limit import ProxyNetwork, RateLimiter, client_ip, parse_trusted_proxies
+from app.limits import IpNetwork, client_ip, parse_trusted_proxies
+from app.rate_limit import RateLimiter
 from app.registry import REAP_INTERVAL_SECONDS, TableLimitError
 from bots.learned import weights_problem
 from bots.tiers import LEARNED_TIERS, BotTier
@@ -60,7 +61,7 @@ logger = logging.getLogger(__name__)
 _learned_weights_problem: str | None = None
 # rebuilt per lifespan like the registry; None = POST /tables unlimited
 _create_limiter: RateLimiter | None = None
-_trusted_proxies: tuple[ProxyNetwork, ...] = ()
+_trusted_proxies: tuple[IpNetwork, ...] = ()
 
 
 def _optional_limit(raw: str) -> int | None:
@@ -114,7 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if rate_limit is not None
         else None
     )
-    _trusted_proxies = parse_trusted_proxies(os.environ.get("TRUSTED_PROXY_IPS", ""))
+    _trusted_proxies = parse_trusted_proxies(os.environ.get("TRUSTED_PROXY_IPS"))
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
     if showcase_id:
         registry.start_showcase(showcase_id, DEFAULT_RULESET, bot_tiers=_available_bot_tiers())
@@ -204,7 +205,7 @@ async def create_table(body: CreateTableRequest, request: Request) -> CreateTabl
     if _create_limiter is not None:
         ip = client_ip(
             request.client.host if request.client is not None else None,
-            request.headers.get("cf-connecting-ip"),
+            request.headers,
             _trusted_proxies,
         )
         if not _create_limiter.allow(ip):

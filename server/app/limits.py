@@ -12,12 +12,6 @@ from dataclasses import dataclass
 
 type IpNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
-# trust-all, mirroring uvicorn's `--forwarded-allow-ips '*'`
-_TRUST_ALL: tuple[IpNetwork, ...] = (
-    ipaddress.ip_network("0.0.0.0/0"),
-    ipaddress.ip_network("::/0"),
-)
-
 
 @dataclass(frozen=True)
 class WsLimits:
@@ -50,15 +44,13 @@ class WsLimits:
 
 
 def parse_trusted_proxies(raw: str | None) -> tuple[IpNetwork, ...]:
-    """`TRUSTED_PROXY_IPS` (uvicorn's `--forwarded-allow-ips` format): comma-separated IPs/CIDRs
-    or `*`. Entries that aren't an IP/CIDR (uvicorn also accepts unix socket paths) are
-    skipped."""
+    """`TRUSTED_PROXY_IPS` (uvicorn's `--forwarded-allow-ips` format): comma-separated IPs/CIDRs.
+    Entries that aren't an IP/CIDR are skipped, `*` included: trusting every peer would let any
+    client set `CF-Connecting-IP` (docs/infra.md §7)."""
     if raw is None:
         return ()
     nets: list[IpNetwork] = []
     for entry in (e.strip() for e in raw.split(",")):
-        if entry == "*":
-            return _TRUST_ALL
         try:
             nets.append(ipaddress.ip_network(entry, strict=False))
         except ValueError:

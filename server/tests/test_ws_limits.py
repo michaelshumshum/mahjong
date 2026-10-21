@@ -54,7 +54,7 @@ def test_client_ip_trusts_cf_header_only_from_trusted_proxy() -> None:
 
 
 def test_parse_trusted_proxies_wildcard_and_junk() -> None:
-    assert client_ip("8.8.8.8", {"cf-connecting-ip": "203.0.113.7"}, parse_trusted_proxies("*"))
+    assert parse_trusted_proxies("*") == ()
     assert parse_trusted_proxies("") == ()
     assert parse_trusted_proxies("not-an-ip, 127.0.0.1") == parse_trusted_proxies("127.0.0.1")
 
