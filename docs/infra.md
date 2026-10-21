@@ -320,6 +320,12 @@ before real users:
 | `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` |
 | `proto-check.yml` | `proto-check` | regenerates protocol types natively (§2's `make proto` equivalent), then `git diff --exit-code` |
 
+It also runs `compose-config` inline: `docker compose -f docker-compose.yml -f
+docker-compose.prod.yml config --quiet` with placeholder values for the prod overlay's required
+vars. The prod box deploys any `main` commit this workflow passes (§7), and an overlay Compose
+can't parse (e.g. a duplicate `environment:` key) otherwise only fails at deploy time; unlike
+`docker-build.yml` it runs on every push.
+
 All jobs run in parallel with no `needs:` — they share no artifacts. `server-slow` is its own job
 so it stays off the fast job's critical path. Within a job, lint/typecheck/test are sequential
 steps so dependencies install once.

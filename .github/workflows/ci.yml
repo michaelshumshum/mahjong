@@ -32,6 +32,21 @@ jobs:
     name: proto-check
     uses: ./.github/workflows/proto-check.yml
 
+  # the prod box deploys whatever passes this workflow; an unparseable overlay only fails there
+  compose-config:
+    name: compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: parse the prod compose stack
+        env:
+          TRUSTED_PROXY_IPS: 127.0.0.1
+          JWT_SECRET: ci
+          CORS_ORIGINS: http://localhost
+          PUBLIC_API_URL: http://localhost:8000
+          PUBLIC_WS_URL: ws://localhost:8000/ws
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+
   # badges live on an orphan `badges` branch, force-pushed as one commit, so main never gets
   # bot commits; self-rendered because shields.io can't fetch from a private repo.
   coverage-badge:

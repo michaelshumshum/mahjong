@@ -12,7 +12,8 @@ services:
       --ws-max-size 65536 --ws-per-message-deflate false
       --proxy-headers --forwarded-allow-ips ${TRUSTED_PROXY_IPS:?TRUSTED_PROXY_IPS must be set to the reverse proxy's IP/CIDR}
     environment:
-      # app/limits.py reads it too, to trust CF-Connecting-IP (docs/protocol.md §11)
+      # app/limits.py reads it too, to trust CF-Connecting-IP for the per-IP limits
+      # (docs/protocol.md §11, docs/architecture.md §8.3)
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS}
       WS_MAX_CONNECTIONS_PER_IP: ${WS_MAX_CONNECTIONS_PER_IP:-}
       WS_MAX_SPECTATORS_PER_TABLE: ${WS_MAX_SPECTATORS_PER_TABLE:-}
@@ -22,8 +23,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       API_DOCS: "0"
-      # also read by the app: CF-Connecting-IP counts for the POST /tables rate limit only from these
-      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS}
     # !override: base file publishes 0.0.0.0; only the host-side tunnel connector should reach it
     ports: !override ["127.0.0.1:${API_PORT:-8000}:8000"]
     stop_grace_period: 100s   # > SHUTDOWN_GRACE_SECONDS (90)
