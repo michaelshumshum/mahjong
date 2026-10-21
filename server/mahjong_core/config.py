@@ -47,7 +47,6 @@ class GameLength(StrEnum):
 
 _VALID_MIN_FAAN = frozenset({0, 1, 3, 5})
 _VALID_FAAN_CAP = frozenset({8, 10, 13})
-MAX_FAAN_CAP = max(_VALID_FAAN_CAP)
 
 _INT_FIELDS = (
     "min_faan",
@@ -171,16 +170,12 @@ class RuleSet:
             )
 
     def check_client_bounds(self) -> None:
-        """Raise `ValueError` unless this ruleset is one a client may create a table with:
-        `CLIENT_RULE_BOUNDS` plus faan overrides capped at `MAX_FAAN_CAP`. Not part of
-        `__post_init__` so tests and stored records keep their 0-second timers."""
+        """Raise `ValueError` unless this ruleset's numeric fields are within
+        `CLIENT_RULE_BOUNDS`. `faan_overrides` is checked separately by
+        `scoring.faan.validate_faan_overrides`. Not part of `__post_init__` so tests and stored
+        records keep their 0-second timers."""
         for name, bounds in CLIENT_RULE_BOUNDS.items():
             _check_range(name, getattr(self, name), bounds)
-        for pattern, faan in self.faan_overrides.items():
-            if faan > MAX_FAAN_CAP:
-                raise ValueError(
-                    f"faan_overrides[{pattern!r}] must be <= {MAX_FAAN_CAP}, got {faan}"
-                )
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe representation. Round-trips via `RuleSet.from_dict`."""

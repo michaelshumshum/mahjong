@@ -395,7 +395,7 @@ value that isn't an int in `0..13`); `POST /tables` rejects that case with `422`
 | Layer | Where | Checks | Applies to |
 | --- | --- | --- | --- |
 | structural | `RuleSet.__post_init__` | int fields are `int` (a `bool` is rejected); `self_draw_multiplier`/`disconnect_grace_seconds` are finite `int`/`float`; `faan_overrides` maps `str` → `int ≥ 0`; wide `_CORE_BOUNDS` (timers 0–3600 s, strikes 1–100, `wall_reserve` 0–144, `self_draw_multiplier` 1–10) | every `RuleSet`: presets, tests, bots, stored records |
-| client | `RuleSet.check_client_bounds`, called only by `resolve_ruleset` | `CLIENT_RULE_BOUNDS`, below; faan overrides ≤ 13 (`MAX_FAAN_CAP`) | `custom` bodies from `POST /tables` |
+| client | `RuleSet.check_client_bounds`, called only by `resolve_ruleset` | `CLIENT_RULE_BOUNDS`, below (faan overrides: `validate_faan_overrides`, above) | `custom` bodies from `POST /tables` |
 
 | Field | Client range |
 | --- | --- |

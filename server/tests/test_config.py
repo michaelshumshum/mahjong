@@ -255,12 +255,6 @@ def test_client_bounds_accept_their_endpoints(field: str, bounds: tuple[float, f
         RuleSet(**{field: value}).check_client_bounds()
 
 
-def test_client_bounds_reject_faan_override_above_the_largest_cap() -> None:
-    RuleSet(faan_overrides={"雞糊": 13}).check_client_bounds()
-    with pytest.raises(ValueError, match="faan_overrides"):
-        RuleSet(faan_overrides={"雞糊": 14}).check_client_bounds()
-
-
 def test_round_trip_default() -> None:
     raw = json.dumps(DEFAULT_RULESET.to_dict())
     restored = RuleSet.from_dict(json.loads(raw))
