@@ -128,7 +128,7 @@ pnpm --dir web dev
 | `FINISHED_TABLE_TTL_SECONDS` | 600 | how long a finished game stays reconnectable before it's reaped (§8.3) |
 | `TABLE_CREATE_RATE_LIMIT` / `TABLE_CREATE_RATE_WINDOW_SECONDS` | 10 / 60; limit `0` disables | `POST /tables` per client IP (§8.3) |
 | `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
-| `CLAIM_HOLD_SECONDS` | `BOT_THINK_MAX_SECONDS` + 0.2 (1.6) | the pause after every discard and robbable kong that hides whether a claim window opened; `0` disables ([architecture.md §4](architecture.md) "Claim hold") |
+| `CLAIM_HOLD_SECONDS` | 1.0 | the pause after every discard and robbable kong that hides whether a claim window opened; `0` disables ([architecture.md §4](architecture.md) "Claim hold") |
 | `LOG_LEVEL` | `info` | |
 | `API_DOCS` | on; `0` disables | `/docs`, `/redoc`, `/openapi.json`; the prod overlay sets `0` |
 | `TRUSTED_PROXY_IPS` | unset → no proxy trusted | comma-separated IPs/CIDRs; required by the prod overlay (§7). uvicorn's `--forwarded-allow-ips`, and the peers whose `CF-Connecting-IP` the per-IP limits believe (`app/limits.py`; [protocol.md §11](protocol.md), [architecture.md §8.3](architecture.md)) |

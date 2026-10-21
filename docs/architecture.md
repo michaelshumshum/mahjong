@@ -341,11 +341,13 @@ Rules:
   | Uniform pause | every `Discarded`, and every self-declared kong's `MeldFormed` when the ruleset lets it be robbed (`_kong_may_be_robbed`: added kong under `kong_rob_enabled`, concealed kong only with `concealed_kong_robbable` too), starts a hold (`_begin_hold`): for `claim_hold_seconds` every outbound frame queues per recipient, except `ack`/`error`/`server_shutdown`/`claim_offer` and an offered seat's `claim_resolved`, whether or not a window opened. Release (`_release_hold`, one `TimerHeap` entry) flushes the queues in order |
   | Next turn | held too: `_authorize` drops commands in `AWAIT_ACTION`, `_poke_bots` submits no turn job, and `turn` (with its `turn_seconds` timer) is published only on the release tick |
   | `state_sync` mid-hold | rebuilt at release, so a reconnect or new spectator can't probe the held state |
-  | Duration | `CLAIM_HOLD_SECONDS`, default `BOT_THINK_MAX_SECONDS` + 0.2s (1.6s), so a window only bots are offered always closes inside it. `0` turns it off: the showcase (open hands, nothing to hide) and the test suite (`tests/conftest.py`) |
+  | Duration | `CLAIM_HOLD_SECONDS`, default 1s. `0` turns it off: the showcase (open hands, nothing to hide) and the test suite (`tests/conftest.py`) |
 
-  **Residual leak, accepted:** a window still open when the hold ends (a human thinking longer
-  than it) shows, as does, after passing immediately, a window staying open — another seat still
-  holds a live claim. Padding every discard to `claim_seconds` would hide it, at 5s a discard.
+  **Residual leak, accepted:** a window still open when the hold ends shows. That covers a human
+  thinking longer than the hold, and a bot whose think delay (0.4–1.4s, [bots.md §1](bots.md))
+  lands past 1s: the hold sits below `BOT_THINK_MAX_SECONDS` on purpose, trading those slow bot
+  windows for a shorter pause after every discard. After passing immediately, a window staying
+  open also shows — another seat still holds a live claim. Padding every discard to `claim_seconds` would hide it, at 5s a discard.
   A claim that wins is public anyway.
 - **Pre-declared intent.** Clients pre-arm "auto-pass on chow" / "no calls" toggles; the server
   treats a pre-arm as an instant PASS. A win offer is never auto-resolved by a pre-arm

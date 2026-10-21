@@ -41,8 +41,8 @@ touches `_BOT_JOB_TIMEOUT_SECONDS`/`turn_seconds`/`claim_seconds` deadline math.
 resolve faster than a human can follow. Seeded off the per-decision seed `_submit_bot_job` derives
 (reproducible), and slept in that job's own task so it delays only that seat. The delay does not
 vary with decision difficulty — no tier returns a confidence signal to scale it by. The claim
-hold's default sits just above its maximum, so a bot's claim decision never shows in the
-discard-to-draw gap ([architecture.md §4](architecture.md) "Claim hold").
+hold's default (1s) sits below its maximum, so a bot claim decision that takes longer than 1s
+shows in the discard-to-draw gap ([architecture.md §4](architecture.md) "Claim hold").
 
 ## 2. Tiers
 

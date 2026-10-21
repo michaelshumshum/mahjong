@@ -164,11 +164,8 @@ _DISCONNECT_HANDOVER_BOT_TIER: Final = BotTier.T2
 _BOT_THINK_MIN_SECONDS = float(os.environ.get("BOT_THINK_MIN_SECONDS", "0.4"))
 _BOT_THINK_MAX_SECONDS = float(os.environ.get("BOT_THINK_MAX_SECONDS", "1.4"))
 # claim hold (architecture.md §4): every discard / robbable kong holds the next draw this long.
-# above the bot think delay so a window only bots are offered closes inside it.
-_CLAIM_HOLD_MARGIN_SECONDS = 0.2
-_CLAIM_HOLD_SECONDS = float(
-    os.environ.get("CLAIM_HOLD_SECONDS", _BOT_THINK_MAX_SECONDS + _CLAIM_HOLD_MARGIN_SECONDS)
-)
+# below the bot think max on purpose (pace over hiding slow bot windows); see the residual leak.
+_CLAIM_HOLD_SECONDS = float(os.environ.get("CLAIM_HOLD_SECONDS", "1.0"))
 # frames a claim hold never delays: an offered seat's own window traffic, connection notices
 _HOLD_EXEMPT_FRAMES: Final = frozenset({"ack", "error", "server_shutdown", "claim_offer"})
 
