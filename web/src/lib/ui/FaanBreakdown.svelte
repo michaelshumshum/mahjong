@@ -3,7 +3,7 @@
 	import { meldTileFace, sortMelds } from '../table/meld-face';
 	import { sortTiles, type TileCode } from '../table/tile-code';
 	import { m } from '$lib/paraglide/messages.js';
-	import { faanPatternLabel } from './faan-pattern-labels';
+	import FaanPatternName from './FaanPatternName.svelte';
 	import type { FaanPattern, Payments, Seat, WinningMeld } from '$lib/game/types';
 
 	const ALL_SEATS: Seat[] = [0, 1, 2, 3];
@@ -15,7 +15,8 @@
 		melds = [],
 		patterns,
 		totalFaan,
-		payments
+		payments,
+		onPatternSelect
 	}: {
 		winner: Seat;
 		// player names, not seat direction -- the win screen is about who won/lost.
@@ -25,6 +26,8 @@
 		patterns: FaanPattern[];
 		totalFaan: number;
 		payments: Payments;
+		// given: pattern names open the faan guide on that pattern
+		onPatternSelect?: (pattern: string) => void;
 	} = $props();
 
 	let sortedMelds = $derived(sortMelds(melds));
@@ -86,7 +89,9 @@
 	<ul class="patterns">
 		{#each patterns as pattern, index (`${index}:${pattern.name}`)}
 			<li class="pattern-row" style:--i={index}>
-				<span class="pattern-name">{faanPatternLabel(pattern.name)}</span>
+				<span class="pattern-name"
+					><FaanPatternName name={pattern.name} onSelect={onPatternSelect} /></span
+				>
 				<span class="pattern-faan">{m.faanBreakdown_faanCountLabel({ faan: pattern.faan })}</span>
 			</li>
 		{/each}

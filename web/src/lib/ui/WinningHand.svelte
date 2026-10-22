@@ -4,17 +4,20 @@
 	import { sortTiles, type TileCode } from '../table/tile-code';
 	import type { FaanPattern, WinningMeld } from '$lib/game/types';
 	import { m } from '$lib/paraglide/messages.js';
+	import FaanPatternName from './FaanPatternName.svelte';
 
 	let {
 		winningHand,
 		melds = [],
 		patterns,
-		totalFaan
+		totalFaan,
+		onPatternSelect
 	}: {
 		winningHand: TileCode[];
 		melds?: WinningMeld[];
 		patterns: FaanPattern[];
 		totalFaan: number;
+		onPatternSelect?: (pattern: string) => void;
 	} = $props();
 
 	let sortedMelds = $derived(sortMelds(melds));
@@ -53,7 +56,9 @@
 	<ul class="patterns">
 		{#each patterns as pattern, index (`${index}:${pattern.name}`)}
 			<li class="pattern-row">
-				<span class="pattern-name">{pattern.name}</span>
+				<span class="pattern-name"
+					><FaanPatternName name={pattern.name} onSelect={onPatternSelect} /></span
+				>
 				<span class="pattern-faan">{m.winningHand_faanCountLabel({ faan: pattern.faan })}</span>
 			</li>
 		{/each}

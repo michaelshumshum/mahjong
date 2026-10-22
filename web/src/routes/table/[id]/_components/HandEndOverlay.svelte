@@ -13,7 +13,8 @@
 		handEndHoldMs,
 		seatNames,
 		winnerMelds,
-		onDismiss
+		onDismiss,
+		onPatternSelect
 	}: {
 		handResult: HandResultView;
 		handNo: number;
@@ -21,6 +22,7 @@
 		seatNames: Record<0 | 1 | 2 | 3, string>;
 		winnerMelds: MeldView[];
 		onDismiss: () => void;
+		onPatternSelect?: (pattern: string) => void;
 	} = $props();
 
 	let stamp = $derived(
@@ -65,6 +67,7 @@
 				patterns={handResult.patterns ?? []}
 				totalFaan={handResult.totalFaan ?? 0}
 				payments={handResult.payments ?? {}}
+				{onPatternSelect}
 			/>
 		{:else}
 			<section

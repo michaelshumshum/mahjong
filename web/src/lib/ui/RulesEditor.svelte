@@ -105,10 +105,6 @@
 			: m.createTableDialog_overrideGroupFaan({ count: tier });
 	}
 
-	function defaultFaan(tier: number | 'limit'): number {
-		return tier === 'limit' ? rules.faan_cap : tier;
-	}
-
 	// patterns scored under the current hand sets, grouped by default tier, minus ones already
 	// overridden by another row
 	function patternGroups(current: string | null): { tier: number | 'limit'; patterns: string[] }[] {
@@ -128,8 +124,8 @@
 	async function addOverride(): Promise<void> {
 		const pattern = addable[0];
 		if (!pattern) return;
-		const tier = OVERRIDABLE_PATTERNS.find((p) => p.pattern === pattern)?.tier ?? 1;
-		overrides = [...overrides, { pattern, value: defaultFaan(tier) }];
+		const faan = OVERRIDABLE_PATTERNS.find((p) => p.pattern === pattern)?.faan ?? 1;
+		overrides = [...overrides, { pattern, value: Math.min(faan, rules.faan_cap) }];
 		await tick();
 		const selects = overridesEl?.querySelectorAll<HTMLSelectElement>('select');
 		selects?.[selects.length - 1]?.focus();

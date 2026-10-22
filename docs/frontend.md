@@ -884,16 +884,44 @@ measures: [infra.md §8](infra.md)), polled every 15s with a static "Updated" st
 
 The language link calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
-stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: one tab per faan count (0-8)
-plus Limit, each a list of patterns with a description and a tile example. The dialog is a fixed
-`90dvh` tall and the tab panel scrolls, so switching to a shorter tab doesn't resize it. The data lives in
-`lib/ui/faan-guide.ts` (`GUIDE`, keyed by faan value; examples are strings of concatenated tile
-codes, one group each); a spec pins it to `FAAN_PATTERN_LABEL` so a new pattern can't be left out.
-Situational patterns (self-draw, last tile, ...) show the description only. A ruleset select (All or
-one of the `RULESET_PRESET_OPTIONS`) hides patterns whose hand set the preset disables and tabs left
-empty; `GUIDE_PRESET_RULES` mirrors the server presets' `hand_sets`/`min_faan`, and 雞糊 only
-shows under All since every preset has `min_faan > 0` ([rules.md §7](rules.md)); it sits on its
-own 0 tab, the faan it actually scores.
+stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`, a fixed `90dvh` tall (each
+view scrolls inside it, so switching doesn't resize it) with a ruleset select over three views
+(`TabBar`):
+
+| View | Component | Shows |
+| --- | --- | --- |
+| Patterns | `GuidePatterns.svelte` | search box (English name, Chinese name, description; searches every faan count), faan filter chips (All, one per faan value present, Limit), patterns grouped under sticky faan headings. Each entry: names, a faan badge, tags, description, tile example, "Compare:" links |
+| Scoring | `GuideScoring.svelte` | how faan add up (stacking, wind double-count, inclusive patterns, limit tiers, cap, minimum), the faan → points table for both score tables, and who pays, worked at the table's minimum (floored at 3) |
+| Check hand | `HandChecker.svelte` | a 14-tile picker (plus flowers), win by discard/self-draw, seat and prevailing wind, scored by `POST /score` ([protocol.md §10](protocol.md)) |
+
+**Data.** `lib/ui/faan-guide.ts`'s `GUIDE_ENTRIES` holds only presentation: description, example,
+tags (`situational` / `concealed` / `flowers`) and `related` look-alikes. Each pattern's faan,
+hand set and limit flag come from the generated `FAAN_PATTERNS`/`CHICKEN_HAND`
+(`protocol.constants.ts`, [protocol.md §6](protocol.md)), so tabs are derived, not hand-placed.
+`scoredEntries(rules)` scores every entry under a `RuleSet` (or the defaults, for `null`): it drops
+patterns whose hand set is off, patterns overridden to 0, and 雞糊 unless `min_faan` is 0
+([rules.md §7](rules.md)). A `faan_overrides` value moves the pattern to its overridden tab, with a
+"default N" note. A limit hand's badge shows what it pays, `min(tier, faan_cap)`. Specs pin
+`GUIDE_ENTRIES` to `FAAN_PATTERN_LABEL` (no pattern left out) and to `FAAN_PATTERNS` (every value
+the server's).
+
+**Examples.** Each string is one group of concatenated tile codes. A leading `*` marks the group
+the pattern is about (a brass outline, with the rest of the hand dimmed). Where a pattern is a
+hand shape, the example is a whole 14-tile hand; 十八羅漢 has more for its kongs. Situational
+patterns (self-draw, last tile, ...) have no tile example.
+
+**Ruleset select.** All (defaults, no cap), or a `RULESET_PRESET_OPTIONS` preset via
+`RULESET_PRESET_RULES`. Opened from a table, it also offers "This table" and starts on it, scored
+under the table's own `state_sync` ruleset, overrides included. Any choice other than All shows a
+"Min · cap · score table" summary. The checker sends the table's preset id, or `custom` with
+its rules. Under All, it scores with `hk_classic` and says so.
+
+**Pattern links.** `FaanPatternName.svelte` renders a known pattern key as a dotted-underline
+button when given `onSelect`. `FaanBreakdown` (win screen), `WinningHand` (score sheet rows) and
+the checker's result use it, and `/table/[id]` opens the guide with `focusPattern`, which scrolls
+the entry into view, outlines it and focuses it. "Compare:" links do the same inside the guide.
+`MOCK_SCENARIOS` hand results use the canonical Chinese keys, as `hand_end` does, so the links
+render under `?mock=` too.
 
 ### Practice mode
 
@@ -917,7 +945,9 @@ on phone, where they sit under their seats) — gets a brass outline via `.table
 Practice only: in a multiplayer game nobody should be reading tips while three people wait.
 
 **In-game guide.** The header rail carries a "Guide" button opening the same `GuideDialog` as the
-lobby, so the faan library is reachable mid-hand.
+lobby, so the faan library is reachable mid-hand. It opens on "This table": the table's own
+ruleset, overrides included. Pattern names on the win screen and in score-sheet rows open it on
+that pattern.
 
 `?practice=1` is this route's own param, never sent on the WS URL: `POST /tables`'s
 `practice: true` already bound seats 1-3 at construction (`Table.__init__(practice=...,

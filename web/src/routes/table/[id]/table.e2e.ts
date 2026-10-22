@@ -710,6 +710,15 @@ test('the toolbar Guide button opens the faan guide in-game', async ({ page }) =
 	await expect(page.getByTestId('guide-panel')).toHaveCount(0);
 });
 
+test('a pattern on the win screen opens the faan guide on it', async ({ page }) => {
+	await page.goto('/table/abc123?mock=hand-ended');
+	await page.waitForLoadState('networkidle');
+	const overlay = page.getByTestId('faan-overlay');
+	await overlay.getByTestId('faan-pattern-link').filter({ hasText: 'Half Flush' }).click();
+	await expect(page.getByTestId('guide-dialog')).toBeVisible();
+	await expect(page.locator('[data-pattern="混一色"]')).toBeFocused();
+});
+
 test('native modal dialogs: Escape closes a panel and returns focus to its opener', async ({
 	page
 }) => {

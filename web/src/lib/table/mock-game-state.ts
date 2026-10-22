@@ -152,11 +152,12 @@ export const handJustEnded: TableView = {
 		winType: 'self_draw',
 		// concealed portion only -- the 2s-3s-4s chow meld was already claimed earlier.
 		winningHand: ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', 'z5', 'z5'],
+		// canonical keys, as hand_end sends them; labels render through faanPatternLabel
 		patterns: [
-			{ name: 'All Sequences', faan: 1 },
-			{ name: 'No Flowers', faan: 1 },
-			{ name: 'Self-Draw', faan: 1 },
-			{ name: 'Half Flush', faan: 3 }
+			{ name: '平糊', faan: 1 },
+			{ name: '無花', faan: 1 },
+			{ name: '自摸', faan: 1 },
+			{ name: '混一色', faan: 3 }
 		],
 		totalFaan: 6,
 		payments: { 0: -16, 1: -16, 2: 48, 3: -16 }
@@ -227,7 +228,7 @@ export const gameJustEnded: TableView = {
 					winner: 2,
 					winningHand: ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', 'z5', 'z5'],
 					melds: [{ kind: 'chow', tiles: ['2s', '3s', '4s'] }],
-					patterns: [{ name: 'Half Flush', faan: 3 }],
+					patterns: [{ name: '混一色', faan: 3 }],
 					totalFaan: 3,
 					payments: { 0: -24, 2: 24 }
 				}
@@ -256,8 +257,8 @@ export const gameJustEnded: TableView = {
 						'z6'
 					],
 					patterns: [
-						{ name: 'Self-Draw', faan: 1 },
-						{ name: 'All Pungs', faan: 3 }
+						{ name: '自摸', faan: 1 },
+						{ name: '對對糊', faan: 3 }
 					],
 					totalFaan: 4,
 					payments: { 0: -16, 1: 48, 2: -16, 3: -16 }
@@ -279,7 +280,7 @@ export const gameJustEnded: TableView = {
 					outcome: 'win',
 					winner: 3,
 					winningHand: ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', 'z7', 'z7'],
-					patterns: [{ name: 'Chicken Hand', faan: 1 }],
+					patterns: [{ name: '雞糊', faan: 1 }],
 					totalFaan: 1,
 					payments: { 1: -8, 2: -8, 3: 16 }
 				}

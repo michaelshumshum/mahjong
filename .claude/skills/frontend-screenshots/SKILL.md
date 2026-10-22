@@ -58,11 +58,13 @@ referenced from `README.md`; phone variants use a `-phone` suffix.
 
 ## Current notable pages
 
-Desktop: `lobby`, `lobby-create-dialog`, `tables`, `table-your-turn`, `table-claim-window`,
+Desktop: `lobby`, `lobby-create-dialog`, `lobby-guide`, `lobby-guide-scoring`,
+`lobby-guide-checker` (stubs `POST /score` with `page.route`), `tables`, `table-your-turn`, `table-claim-window`,
 `table-hand-ended`, `table-hand-ended-draw`, `table-game-ended`, `table-settings`,
 `table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting`.
 
-Phone (390×844): `lobby-phone`, `table-your-turn-phone`, `table-claim-window-phone`,
+Phone (390×844): `lobby-phone`, `lobby-guide-phone`, `lobby-guide-checker-phone`,
+`table-your-turn-phone`, `table-claim-window-phone`,
 `table-hand-ended-phone`, `table-game-ended-phone`, `table-late-hand-phone` (full pools, heavy
 melds); landscape (844×390): `table-your-turn-phone-landscape`, `table-late-hand-phone-landscape` — the
 phone layout (docs/frontend.md §3) differs enough that a desktop capture says nothing about it.

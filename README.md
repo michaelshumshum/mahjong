@@ -61,7 +61,8 @@ friends by sharing a table link.
 | ![Table, claim window](docs/screenshots/table-claim-window.png) Table — claim window open | ![Table, hand ended in a draw](docs/screenshots/table-hand-ended-draw.png) Table — hand ended, exhaustive draw, with the provable-fairness check |
 | ![Table, game ended](docs/screenshots/table-game-ended.png) Table — game ended: placement, final standings with ties, play again | ![Table, settings](docs/screenshots/table-settings.png) Table — settings: calls, gameplay and display tabs |
 | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
-| ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | |
+| ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | ![Faan guide](docs/screenshots/lobby-guide.png) Faan guide — patterns by faan, searchable, with highlighted tile examples and compare links |
+| ![Faan guide, scoring](docs/screenshots/lobby-guide-scoring.png) Faan guide — how faan add up, faan → points table, who pays | ![Faan guide, hand checker](docs/screenshots/lobby-guide-checker.png) Faan guide — check a hand: pick 14 tiles, scored by `POST /score` |
 
 </details>
 
@@ -71,7 +72,8 @@ friends by sharing a table link.
 | | | |
 | --- | --- | --- |
 | ![Lobby, phone](docs/screenshots/lobby-phone.png) Lobby | ![Table, claim window, phone](docs/screenshots/table-claim-window-phone.png) Table — claim window | ![Table, hand ended, phone](docs/screenshots/table-hand-ended-phone.png) Table — hand ended |
-| ![Table, game ended, phone](docs/screenshots/table-game-ended-phone.png) Table — game ended | ![Table, late hand, phone](docs/screenshots/table-late-hand-phone.png) Table — late hand, crowded | |
+| ![Table, game ended, phone](docs/screenshots/table-game-ended-phone.png) Table — game ended | ![Table, late hand, phone](docs/screenshots/table-late-hand-phone.png) Table — late hand, crowded | ![Faan guide, phone](docs/screenshots/lobby-guide-phone.png) Faan guide |
+| ![Faan guide, hand checker, phone](docs/screenshots/lobby-guide-checker-phone.png) Faan guide — check hand | | |
 
 In landscape, opponents are stacked beside the centre of the table and the page does not scroll:
 

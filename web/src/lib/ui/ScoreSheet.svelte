@@ -21,12 +21,14 @@
 		seats,
 		totals,
 		hands,
-		standings
+		standings,
+		onPatternSelect
 	}: {
 		seats: SeatInfo[];
 		totals: Totals;
 		hands: HandRecord[];
 		standings?: Standing[];
+		onPatternSelect?: (pattern: string) => void;
 	} = $props();
 
 	// tied totals share a place ("1224"), matching GameEndScreen.
@@ -152,6 +154,7 @@
 										melds={hand.result.melds ?? []}
 										patterns={hand.result.patterns ?? []}
 										totalFaan={hand.result.totalFaan ?? 0}
+										{onPatternSelect}
 									/>
 								{:else}
 									<p class="draw-note">{m.scoreSheet_exhaustiveDrawNote()}</p>

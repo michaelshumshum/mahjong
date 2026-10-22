@@ -1,38 +1,71 @@
 <script lang="ts">
 	import ModalDialog from './ModalDialog.svelte';
-	import { getLocale } from '$lib/paraglide/runtime.js';
 	import { m } from '$lib/paraglide/messages.js';
-	import TileFace from '$lib/table/TileFace.svelte';
 	import CloseButton from './CloseButton.svelte';
-	import { faanPatternLabel } from './faan-pattern-labels';
-	import { GUIDE_TABS, guideEntries, parseGroup, type GuideTab } from './faan-guide';
-	import { RULESET_PRESET_OPTIONS } from '$lib/net/ruleset';
 	import PanelHeader from './PanelHeader.svelte';
+	import TabBar from './TabBar.svelte';
+	import GuidePatterns from './GuidePatterns.svelte';
+	import GuideScoring from './GuideScoring.svelte';
+	import HandChecker from './HandChecker.svelte';
+	import { presetRules, scoredEntries } from './faan-guide';
+	import {
+		CUSTOM_PRESET_ID,
+		DEFAULT_PRESET_ID,
+		RULESET_PRESET_OPTIONS,
+		type RuleSet
+	} from '$lib/net/ruleset';
 
-	let { onClose }: { onClose: () => void } = $props();
+	type View = 'patterns' | 'scoring' | 'checker';
+	const TABLE_CHOICE = 'table';
+	const ALL_CHOICE = '';
 
-	let active = $state<GuideTab>(1);
-	let presetId = $state<string | null>(null);
-	let tabs = $derived(GUIDE_TABS.filter((t) => guideEntries(t, presetId).length > 0));
-	let entries = $derived(guideEntries(active, presetId));
-	let showChinese = $derived(getLocale() !== 'zh-Hant');
+	let {
+		onClose,
+		tableRules = null,
+		tablePreset = null,
+		focusPattern = null
+	}: {
+		onClose: () => void;
+		// the table's own ruleset, when opened from a table
+		tableRules?: RuleSet | null;
+		tablePreset?: string | null;
+		// open on this pattern
+		focusPattern?: string | null;
+	} = $props();
 
-	function tabLabel(tab: GuideTab): string {
-		return tab === 'limit' ? m.guide_tabLimit() : m.guide_tabFaan({ count: tab });
-	}
+	let view = $state<View>('patterns');
+	// seeded from props once: the dialog mounts per open
+	// svelte-ignore state_referenced_locally
+	let choice = $state(tableRules ? TABLE_CHOICE : ALL_CHOICE);
+	// svelte-ignore state_referenced_locally
+	let focus = $state<string | null>(focusPattern);
 
-	function onPresetChange(event: Event): void {
-		presetId = (event.currentTarget as HTMLSelectElement).value || null;
-		if (!tabs.includes(active)) active = tabs[0];
-	}
+	let rules = $derived(choice === TABLE_CHOICE ? tableRules : presetRules(choice || null));
+	let entries = $derived(scoredEntries(rules));
 
-	function onTabKeydown(event: KeyboardEvent, index: number): void {
-		const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-		if (step === 0) return;
-		event.preventDefault();
-		const next = (index + step + tabs.length) % tabs.length;
-		active = tabs[next];
-		document.getElementById(`guide-tab-${next}`)?.focus();
+	// what POST /score resolves; "all rulesets" has no rules of its own, so it checks the default
+	let checkerRuleset = $derived(
+		choice === TABLE_CHOICE && tableRules
+			? tablePreset
+				? { ruleset: tablePreset }
+				: { ruleset: CUSTOM_PRESET_ID, rules: tableRules }
+			: { ruleset: choice || DEFAULT_PRESET_ID }
+	);
+	let checkerPresetLabel = $derived(
+		choice === ALL_CHOICE
+			? (RULESET_PRESET_OPTIONS.find((o) => o.id === DEFAULT_PRESET_ID)?.label() ?? '')
+			: null
+	);
+
+	let views = $derived([
+		{ id: 'patterns' as const, label: m.guide_viewPatterns() },
+		{ id: 'scoring' as const, label: m.guide_viewScoring() },
+		{ id: 'checker' as const, label: m.guide_viewChecker() }
+	]);
+
+	function openPattern(pattern: string): void {
+		view = 'patterns';
+		focus = pattern;
 	}
 </script>
 
@@ -41,61 +74,55 @@
 		<CloseButton onclick={onClose} />
 		<PanelHeader title={m.guide_title()} titleId="guide-heading" />
 
-		<label class="filter">
-			<span>{m.guide_rulesetLabel()}</span>
-			<select data-testid="guide-ruleset" value={presetId ?? ''} onchange={onPresetChange}>
-				<option value="">{m.guide_rulesetAll()}</option>
-				{#each RULESET_PRESET_OPTIONS as option (option.id)}
-					<option value={option.id}>{option.label()}</option>
-				{/each}
-			</select>
-		</label>
-
-		<div class="tabs" role="tablist" aria-label={m.guide_tabsLabel()}>
-			{#each tabs as tab, i (tab)}
-				<button
-					type="button"
-					role="tab"
-					id={`guide-tab-${i}`}
-					class="tab"
-					class:tab--active={active === tab}
-					aria-selected={active === tab}
-					aria-controls="guide-panel"
-					tabindex={active === tab ? 0 : -1}
-					data-testid={`guide-tab-${tab}`}
-					onclick={() => (active = tab)}
-					onkeydown={(e) => onTabKeydown(e, i)}
-				>
-					{tabLabel(tab)}
-				</button>
-			{/each}
+		<div class="context">
+			<label class="filter">
+				<span>{m.guide_rulesetLabel()}</span>
+				<select data-testid="guide-ruleset" bind:value={choice}>
+					{#if tableRules}
+						<option value={TABLE_CHOICE}>{m.guide_rulesetTable()}</option>
+					{/if}
+					<option value={ALL_CHOICE}>{m.guide_rulesetAll()}</option>
+					{#each RULESET_PRESET_OPTIONS as option (option.id)}
+						<option value={option.id}>{option.label()}</option>
+					{/each}
+				</select>
+			</label>
+			{#if rules}
+				<p class="summary" data-testid="guide-rules-summary">
+					{m.guide_rulesSummary({
+						min: rules.min_faan,
+						cap: rules.faan_cap,
+						table:
+							rules.score_table === 'full_spicy'
+								? m.createTableDialog_scoreTableFullSpicy()
+								: m.createTableDialog_scoreTableHalfSpicy()
+					})}
+				</p>
+			{/if}
 		</div>
 
-		<div class="panel" id="guide-panel" role="tabpanel" data-testid="guide-panel">
-			<ul class="entries">
-				{#each entries as entry (entry.pattern)}
-					<li class="entry" data-testid="guide-entry">
-						<div class="entry-head">
-							<span class="entry-name">{faanPatternLabel(entry.pattern)}</span>
-							{#if showChinese}
-								<span class="entry-zh">{entry.pattern}</span>
-							{/if}
-						</div>
-						<p class="entry-desc">{entry.description()}</p>
-						{#if entry.example.length > 0}
-							<div class="example">
-								{#each entry.example as group, g (g)}
-									<div class="group">
-										{#each parseGroup(group) as code, t (t)}
-											<span class="tile"><TileFace {code} /></span>
-										{/each}
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</li>
-				{/each}
-			</ul>
+		<TabBar
+			tabs={views}
+			active={view}
+			idPrefix="guide"
+			label={m.guide_viewsLabel()}
+			testidPrefix="guide-view"
+			onChange={(next) => (view = next)}
+		/>
+
+		<div class="view" id="guide-panel-{view}" role="tabpanel" aria-labelledby="guide-tab-{view}">
+			{#if view === 'patterns'}
+				<GuidePatterns {entries} {rules} bind:focus />
+			{:else if view === 'scoring'}
+				<GuideScoring {rules} />
+			{:else}
+				{#if checkerPresetLabel}
+					<p class="checker-preset">
+						{m.guide_checkerScoredUnder({ ruleset: checkerPresetLabel })}
+					</p>
+				{/if}
+				<HandChecker ruleset={checkerRuleset} onPatternSelect={openPattern} />
+			{/if}
 		</div>
 	</div>
 </ModalDialog>
@@ -116,11 +143,18 @@
 		@include buttons.panel-elevated;
 	}
 
+	.context {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: var(--space-2) var(--space-4);
+		flex-shrink: 0;
+	}
+
 	.filter {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		flex-shrink: 0;
 		font-size: var(--font-size-sm);
 
 		select {
@@ -132,79 +166,22 @@
 		}
 	}
 
-	.tabs {
+	.summary,
+	.checker-preset {
+		margin: 0;
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+	}
+
+	.summary {
+		padding-block: var(--space-2);
+	}
+
+	.view {
 		display: flex;
+		flex-direction: column;
 		gap: var(--space-2);
-		overflow-x: auto;
-		flex-shrink: 0;
-	}
-
-	.tab {
-		flex-shrink: 0;
-		@include buttons.btn-base(var(--space-3));
-		@include buttons.btn-secondary;
-	}
-
-	.tab--active {
-		border-color: var(--color-accent);
-		color: var(--color-text);
-	}
-
-	.panel {
 		flex: 1;
 		min-height: 0;
-		overflow-y: auto;
-	}
-
-	.entries {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	.entry {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-	}
-
-	.entry-head {
-		display: flex;
-		align-items: baseline;
-		gap: var(--space-2);
-	}
-
-	.entry-name {
-		font-weight: 600;
-	}
-
-	.entry-zh {
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
-	.entry-desc {
-		margin: 0;
-		font-size: var(--font-size-sm);
-		color: var(--color-text-muted);
-	}
-
-	.example {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-3);
-	}
-
-	.group {
-		display: flex;
-		gap: 2px;
-	}
-
-	.tile {
-		display: inline-block;
-		height: 2.75rem;
 	}
 </style>

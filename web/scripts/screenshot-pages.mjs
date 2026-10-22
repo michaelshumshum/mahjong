@@ -96,6 +96,67 @@ const PAGES = [
 			await page.getByRole('button', { name: 'Practice vs Bots' }).click();
 		}
 	},
+	// the faan guide (docs/frontend.md's "Faan guide"): patterns by faan with tile examples, the
+	// scoring explainer, and the hand checker over a stubbed POST /score.
+	{
+		name: 'lobby-guide',
+		url: '/',
+		async before(page) {
+			await page.getByTestId('lobby-guide').click();
+			await page.getByTestId('guide-ruleset').selectOption('hk_classic');
+			await page.getByTestId('guide-tab-3').click();
+			// off the chip, and past its border transition
+			await page.mouse.move(0, 0);
+			await page.waitForTimeout(300);
+		}
+	},
+	{
+		name: 'lobby-guide-scoring',
+		url: '/',
+		async before(page) {
+			await page.getByTestId('lobby-guide').click();
+			await page.getByTestId('guide-ruleset').selectOption('hk_classic');
+			await page.getByTestId('guide-view-scoring').click();
+		}
+	},
+	{
+		name: 'lobby-guide-checker',
+		url: '/',
+		async before(page) {
+			await page.route('**/score', (route) =>
+				route.fulfill({
+					json: {
+						winning: true,
+						total_faan: 9,
+						breakdown: { 清一色: 7, 無花: 1, 門前清: 1 },
+						clears_min_faan: true,
+						points: 96,
+						min_faan: 3
+					}
+				})
+			);
+			await page.getByTestId('lobby-guide').click();
+			await page.getByTestId('guide-view-checker').click();
+			for (const code of [
+				'1s',
+				'2s',
+				'3s',
+				'4s',
+				'5s',
+				'6s',
+				'7s',
+				'8s',
+				'9s',
+				'2s',
+				'2s',
+				'2s',
+				'5s',
+				'5s'
+			])
+				await page.getByTestId(`checker-add-${code}`).click();
+			await page.getByTestId('checker-result').getByText('96 points').waitFor();
+		}
+	},
 	{ name: 'tables', url: '/tables' },
 	// `?mock=<scenarioId>` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
@@ -160,6 +221,25 @@ const PAGES = [
 	// phone captures (portrait and landscape) are viewport-only (not fullPage): what fits on one screen is the point,
 	// including the sticky hand footer.
 	{ name: 'lobby-phone', url: '/', viewport: PHONE },
+	{
+		name: 'lobby-guide-phone',
+		url: '/',
+		viewport: PHONE,
+		async before(page) {
+			await page.getByTestId('lobby-guide').click();
+		}
+	},
+	{
+		name: 'lobby-guide-checker-phone',
+		url: '/',
+		viewport: PHONE,
+		async before(page) {
+			await page.getByTestId('lobby-guide').click();
+			await page.getByTestId('guide-view-checker').click();
+			for (const code of ['1m', '2m', '3m', 'z1', 'z1', 'z1'])
+				await page.getByTestId(`checker-add-${code}`).click();
+		}
+	},
 	{ name: 'table-your-turn-phone', url: '/table/demo123?mock=1', viewport: PHONE },
 	{
 		name: 'table-your-turn-phone-landscape',

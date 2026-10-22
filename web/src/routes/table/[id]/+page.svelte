@@ -771,6 +771,11 @@
 	}
 
 	let showGuide = $state(false);
+	let guideFocus = $state<string | null>(null);
+	function openGuide(pattern: string | null = null): void {
+		guideFocus = pattern;
+		showGuide = true;
+	}
 
 	// persisted to localStorage. `autoArm` is "last known intent," not verified truth -- re-sent
 	// on each fresh connection instead of read back. Display name persists the same way but is sent once on `join`.
@@ -834,7 +839,7 @@
 			onLeaveClick={handleLeaveClick}
 			onToggleScoreSheet={() => (showScoreSheet = !showScoreSheet)}
 			onToggleSettings={() => (showSettings = !showSettings)}
-			onOpenGuide={() => (showGuide = true)}
+			onOpenGuide={() => openGuide()}
 		/>
 
 		<div class="table-wrap" data-coach={showCoachMarks ? coachTarget : undefined}>
@@ -955,6 +960,7 @@
 				{seatNames}
 				winnerMelds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
 				onDismiss={dismissHandEnd}
+				onPatternSelect={openGuide}
 			/>
 		{/if}
 
@@ -985,6 +991,7 @@
 					totals={scoreTotals}
 					hands={scoreHands}
 					standings={scoreStandings}
+					onPatternSelect={openGuide}
 				/>
 			</DismissablePanel>
 		{/if}
@@ -1014,7 +1021,12 @@
 		{/if}
 
 		{#if showGuide}
-			<GuideDialog onClose={() => (showGuide = false)} />
+			<GuideDialog
+				onClose={() => (showGuide = false)}
+				tableRules={isMock ? null : (liveStore?.state.ruleset ?? null)}
+				tablePreset={liveStore?.state.rulesetPreset ?? null}
+				focusPattern={guideFocus}
+			/>
 		{/if}
 
 		<ToastStack queue={toastQueue} onDismiss={dismissToast} />

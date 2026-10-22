@@ -478,11 +478,74 @@ test('guide button opens a faan library with a tab per faan count', async ({ pag
 	await page.goto('/');
 	await page.getByTestId('lobby-guide').click();
 	await expect(page.getByTestId('guide-dialog')).toBeVisible();
-	await expect(page.getByTestId('guide-entry').first()).toContainText('All Sequences');
-	await page.getByTestId('guide-tab-6').click();
+	await expect(page.getByTestId('guide-panel')).toContainText('All Sequences');
+	await page.getByTestId('guide-tab-7').click();
+	await expect(page.getByTestId('guide-tab-7')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('guide-tab-all')).toHaveAttribute('aria-pressed', 'false');
 	await expect(page.getByTestId('guide-panel')).toContainText('Full Flush');
+	await expect(page.getByTestId('guide-panel')).not.toContainText('All Sequences');
 	await page.getByTestId('guide-tab-limit').click();
 	await expect(page.getByTestId('guide-panel')).toContainText('Thirteen Orphans');
+});
+
+test('guide search finds patterns across faan counts', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await page.getByTestId('guide-search').fill('dragon');
+	await expect(page.locator('[data-pattern="小三元"]')).toBeVisible();
+	await expect(page.locator('[data-pattern="大三元"]')).toBeVisible();
+	await expect(page.locator('[data-pattern="平糊"]')).toHaveCount(0);
+});
+
+test('a compare link jumps to the look-alike pattern', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await page.getByTestId('guide-tab-3').click();
+	const halfFlush = page.locator('[data-pattern="混一色"]');
+	await halfFlush.getByTestId('guide-related').filter({ hasText: 'Full Flush' }).click();
+	await expect(page.locator('[data-pattern="清一色"]')).toBeFocused();
+	await expect(page.locator('[data-pattern="清一色"]')).toBeInViewport();
+});
+
+test('guide scoring view shows the points table', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await page.getByTestId('guide-view-scoring').click();
+	const table = page.getByTestId('guide-points-table');
+	await expect(table.locator('tbody tr')).toHaveCount(14);
+	await page.getByTestId('guide-ruleset').selectOption('hk_classic');
+	await expect(table.locator('tbody tr')).toHaveCount(11);
+	await expect(page.getByTestId('guide-rules-summary')).toContainText('cap 10');
+});
+
+test('hand checker scores a picked hand through POST /score', async ({ page }) => {
+	let sent: Record<string, unknown> | null = null;
+	await page.route('**/score', (route) => {
+		sent = route.request().postDataJSON();
+		return route.fulfill({
+			json: {
+				winning: true,
+				total_faan: 9,
+				breakdown: { 清一色: 7, 無花: 1, 門前清: 1 },
+				clears_min_faan: true,
+				points: 96,
+				min_faan: 3
+			}
+		});
+	});
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await page.getByTestId('guide-view-checker').click();
+	for (const code of ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '2s', '2s', '2s', '5s'])
+		await page.getByTestId(`checker-add-${code}`).click();
+	await expect(page.getByTestId('checker-result')).toContainText('Pick 1 more tile');
+	await page.getByTestId('checker-add-5s').click();
+	const result = page.getByTestId('checker-result');
+	await expect(result).toContainText('Total 9 faan, worth 96 points');
+	expect(sent).toMatchObject({ ruleset: 'hk_classic', self_drawn: false });
+	expect((sent as { tiles: string[] } | null)?.tiles.at(-1)).toBe('5s');
+	await result.getByTestId('faan-pattern-link').filter({ hasText: 'Full Flush' }).click();
+	await expect(page.locator('[data-pattern="清一色"]')).toBeFocused();
 });
 
 test('guide dialog keeps its height across tabs', async ({ page }) => {
@@ -499,7 +562,6 @@ test('guide dialog keeps its height across tabs', async ({ page }) => {
 test('guide ruleset filter hides patterns a preset disables', async ({ page }) => {
 	await page.goto('/');
 	await page.getByTestId('lobby-guide').click();
-	await page.getByTestId('guide-tab-4').click();
 	await expect(page.getByTestId('guide-panel')).toContainText('Seven Pairs');
 	await page.getByTestId('guide-ruleset').selectOption('hk_strict');
 	await expect(page.getByTestId('guide-panel')).toContainText('Mixed Terminals');
