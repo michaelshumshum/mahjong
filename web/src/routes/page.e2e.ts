@@ -27,6 +27,40 @@ test('shows a connecting screen until the API health check succeeds, then the lo
 	await expect(page.getByText('Connecting…')).not.toBeVisible();
 });
 
+// the gate holds for at least 1s (MIN_DISPLAY_MS), so a lobby link visible within 500ms of the
+// navigation means the gate never showed.
+const GATE_ABSENT_MS = 500;
+
+test('a client-side navigation from /status to the lobby skips the connecting screen', async ({
+	page
+}) => {
+	await page.goto('/status');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('link', { name: 'Lobby' }).click();
+
+	await expect(page).toHaveURL('/');
+	await expect(page.getByRole('link', { name: 'Play online' })).toBeVisible({
+		timeout: GATE_ABSENT_MS
+	});
+});
+
+test('returning to the lobby from /status after a gated load skips the connecting screen', async ({
+	page
+}) => {
+	await page.goto('/');
+	await expect(page.getByRole('link', { name: 'Play online' })).toBeVisible();
+	await page.waitForLoadState('networkidle');
+	await page.getByTestId('lobby-status-link').click();
+	await expect(page).toHaveURL('/status');
+	await page.waitForLoadState('networkidle');
+	await page.getByRole('link', { name: 'Lobby' }).click();
+
+	await expect(page).toHaveURL('/');
+	await expect(page.getByRole('link', { name: 'Play online' })).toBeVisible({
+		timeout: GATE_ABSENT_MS
+	});
+});
+
 // Exhausting all 10 attempts (511s total) isn't feasible in e2e -- unit-tested with fake timers
 // in lobby.spec.ts instead. This only exercises the first real retry cycle in a live browser.
 test('retries after a failed attempt, showing the attempt count and next-retry countdown', async ({

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import { waitForApiHealthy } from '$lib/net/lobby';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
@@ -12,13 +12,12 @@
 
 	// ?mock and /demo run with no backend (screenshots, mock e2e: docs/frontend.md "/table/[id]
 	// wiring"); /status reports an unreachable api itself, which the gate would hide.
-	let skip = $derived(
+	const skip =
 		page.url.searchParams.has('mock') ||
-			page.url.pathname.startsWith('/demo') ||
-			page.url.pathname.startsWith('/status')
-	);
+		page.url.pathname.startsWith('/demo') ||
+		page.url.pathname.startsWith('/status');
 
-	let status = $state<'connecting' | 'ready' | 'error'>('connecting');
+	let status = $state<'connecting' | 'ready' | 'error'>(skip ? 'ready' : 'connecting');
 	let attempt = $state(0);
 	// set while waiting out a backoff delay; cleared when the next attempt starts. Static "next
 	// attempt in Ns" text, not a ticking countdown (web/AGENTS.md's "never a JS ticker" rule).
@@ -26,7 +25,7 @@
 
 	// claims mural visibility until `ready` (docs/frontend.md §2's "Shared across routes"),
 	// releasing the instant children mount so the underlying page's own claim takes over.
-	claimMuralVisible(() => !skip && status !== 'ready');
+	claimMuralVisible(() => status !== 'ready');
 
 	async function connect(): Promise<void> {
 		status = 'connecting';
@@ -47,20 +46,21 @@
 		status = healthy ? 'ready' : 'error';
 	}
 
-	$effect(() => {
-		if (skip) return;
-		connect();
+	// fresh page loads only: a client-side navigation must not re-run the check (docs/frontend.md
+	// "API health gate").
+	onMount(() => {
+		if (!skip) connect();
 	});
 </script>
 
 <!-- the gated page's own title takes over once it mounts. -->
 <svelte:head>
-	{#if !skip && status !== 'ready'}
+	{#if status !== 'ready'}
 		<title>{m.lobby_title()}</title>
 	{/if}
 </svelte:head>
 
-{#if skip || status === 'ready'}
+{#if status === 'ready'}
 	{@render children()}
 {:else}
 	<div class="connect-gate">

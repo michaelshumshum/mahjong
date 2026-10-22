@@ -774,6 +774,9 @@ Every route except `?mock=`/`/demo`/`/status` is wrapped in `lib/ui/ApiConnectGa
 the root `+layout.svelte`), which polls `GET /healthz` (`lib/net/lobby.ts`'s `waitForApiHealthy`)
 before rendering the page. Without it a page looks interactive before the backend is reachable.
 
+- Fresh page loads only. Whether to skip is read once from the first URL, and the check runs once
+  on mount. A client-side navigation (e.g. `/status` back to the lobby) never brings the panel
+  back; the app is already loaded, and the panel would just flash over the next page.
 - Up to 5 attempts, backoff 1s, 2s, 4s, 8s (capped at 30s, unreachable at these defaults).
 - Held at least 1s even if the first ping succeeds, so it never flashes for one frame.
 - After a failure the panel shows the attempt count and a static "next attempt in Ns" line
