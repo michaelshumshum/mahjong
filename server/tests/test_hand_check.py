@@ -21,6 +21,7 @@ def _check(
     self_drawn: bool = False,
     flowers: tuple[Flower, ...] = (),
     ruleset: RuleSet = CLASSIC,
+    fully_concealed: bool = True,
 ) -> HandCheck:
     return check_hand(
         _tiles(codes),
@@ -29,6 +30,7 @@ def _check(
         seat_wind=Wind.EAST,
         prevailing_wind=Wind.SOUTH,
         ruleset=ruleset,
+        fully_concealed=fully_concealed,
     )
 
 
@@ -72,6 +74,20 @@ def test_flowers_are_ignored_with_flowers_off() -> None:
     breakdown = _breakdown("1m2m3m4p5p6p7p8p9p2s3s4sz1z1", flowers=(Flower(0),), ruleset=no_flowers)
     assert "正花" not in breakdown
     assert "無花" in breakdown
+
+
+def test_an_open_hand_loses_the_concealed_patterns() -> None:
+    flush = "1s2s3s4s5s6s7s8s9s2s2s2s5s5s"
+    assert _breakdown(flush, fully_concealed=False) == {"清一色": 7, "無花": 1}
+    pungs = "2m2m2m5p5p5p8s8s8s4m4mz5z5z5"
+    open_pungs = _breakdown(pungs, self_drawn=True, fully_concealed=False)
+    assert "四暗刻" not in open_pungs
+    assert "對對糊" in open_pungs
+
+
+def test_an_open_hand_cant_be_a_concealed_only_shape() -> None:
+    assert not _check("2m2m5m5m3p3p8p8p1s1s6s6sz6z6", ruleset=CASUAL, fully_concealed=False).winning
+    assert not _check("1m9m1p9p1s9sz1z2z3z4z5z6z7z7", fully_concealed=False).winning
 
 
 def test_seven_pairs_wins_only_where_it_scores() -> None:

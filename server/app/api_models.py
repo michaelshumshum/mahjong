@@ -115,6 +115,8 @@ class ScoreHandRequest(BaseModel):
     # 'f1'..'f8'
     flowers: list[str] = Field(default=[], max_length=N_FLOWERS)
     self_drawn: bool = False
+    # False: one set was claimed from another seat (which one is maximised over)
+    fully_concealed: bool = True
     # mahjong_core.state.Wind: 0 = East .. 3 = North
     seat_wind: int = Field(default=0, ge=0, le=3)
     prevailing_wind: int = Field(default=0, ge=0, le=3)

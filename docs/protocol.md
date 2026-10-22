@@ -536,8 +536,9 @@ GET /status
 ```
 POST /score
 {"ruleset"?: "hk_classic", "rules"?: {…RuleSet.to_dict() shape…},
- "tiles": ["1s", "2s", …],            // 14 concealed codes, the last is the winning tile
- "flowers"?: ["f1", …], "self_drawn"?: false, "seat_wind"?: 0, "prevailing_wind"?: 0}
+ "tiles": ["1s", "2s", …],            // 14 codes, the last is the winning tile
+ "flowers"?: ["f1", …], "self_drawn"?: false, "fully_concealed"?: true,
+ "seat_wind"?: 0, "prevailing_wind"?: 0}
 ->
 {"winning": true, "total_faan": 9, "breakdown": {"清一色": 7, "無花": 1, "門前清": 1},
  "clears_min_faan": true, "points": 96, "min_faan": 3}
@@ -548,10 +549,13 @@ POST /score
   no table, no state.
 - `ruleset`/`rules` resolve exactly as on `POST /tables`, including the silent fallback to
   `hk_classic`. Winds are `Wind` values, `0` = East.
-- The hand is fully concealed (no claimed melds, so no kongs): only `self_drawn`, winds and
-  flowers are settable, so win-timing patterns (海底撈月, 槓上開花, 搶槓, 天糊, 地糊) never
-  score. Flowers are dropped when the ruleset has `flowers_enabled` off, as no deal would hold
-  any.
+- No kongs, and only `self_drawn`, `fully_concealed`, winds and flowers are settable, so
+  win-timing patterns (海底撈月, 槓上開花, 搶槓, 天糊, 地糊) never score. Flowers are dropped
+  when the ruleset has `flowers_enabled` off, as no deal would hold any.
+- `fully_concealed: false` means one set was claimed from another seat. The request doesn't say
+  which, so every set but the winning tile's is tried as the claimed one and the best total
+  kept, the same maximisation `score_winning_hand` does over decompositions. Only a standard
+  shape can win then (no 七對子/十三么), and 門前清/四暗刻 never score.
 - `winning: false` (not a winning shape under the ruleset, e.g. seven pairs without `NEW_18`)
   comes with `total_faan`/`clears_min_faan`/`points` `null` and an empty `breakdown`.
 - `422` for a hand no deal could produce: not exactly 14 tiles, an unknown code, a flower among

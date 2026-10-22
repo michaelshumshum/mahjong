@@ -31,6 +31,13 @@ def test_a_custom_ruleset_scores_its_overrides() -> None:
     assert body["breakdown"]["清一色"] == 2
 
 
+def test_an_open_hand_drops_fully_concealed() -> None:
+    concealed = _post({"tiles": FLUSH}).json()["breakdown"]
+    claimed = _post({"tiles": FLUSH, "fully_concealed": False}).json()["breakdown"]
+    assert "門前清" in concealed
+    assert "門前清" not in claimed
+
+
 def test_a_non_winning_hand_has_no_score() -> None:
     tiles = [*FLUSH[:-1], "z1"]
     body = _post({"tiles": tiles}).json()

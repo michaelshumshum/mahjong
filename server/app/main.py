@@ -342,7 +342,7 @@ def _parse_codes[T: (TileType, Flower)](codes: list[str], kind: type[T]) -> list
 
 @app.post("/score")
 async def score_hand(body: ScoreHandRequest) -> ScoreHandResponse:
-    """The faan guide's hand checker (docs/protocol.md §10): scores a concealed 14-tile hand.
+    """The faan guide's hand checker (docs/protocol.md §10): scores a 14-tile hand.
     Pure computation, no table involved; `422` on a hand no deal could produce."""
     ruleset = resolve_ruleset(body.ruleset, body.rules)
     try:
@@ -353,6 +353,7 @@ async def score_hand(body: ScoreHandRequest) -> ScoreHandResponse:
             seat_wind=Wind(body.seat_wind),
             prevailing_wind=Wind(body.prevailing_wind),
             ruleset=ruleset,
+            fully_concealed=body.fully_concealed,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
