@@ -23,7 +23,9 @@ from pydantic import BaseModel, TypeAdapter
 
 from app.protocol import AnyMessage, ClientMessage, Envelope, ServerMessage
 from mahjong_core.config import CLIENT_RULE_BOUNDS
-from mahjong_core.scoring.patterns import LIMIT_FAAN
+from mahjong_core.scoring.faan import CHICKEN_HAND_FAAN, CHICKEN_HAND_NAME
+from mahjong_core.scoring.patterns import LIMIT_FAAN, PATTERNS
+from mahjong_core.scoring.payout import POINTS_TABLES
 
 # pydantic class name -> TS name. `Error` would shadow the global `Error`
 # constructor if imported as-is in TS.
@@ -273,13 +275,28 @@ def render_constants() -> str:
         f"\t{name}: {{ min: {_number_ts(lo)}, max: {_number_ts(hi)} }},"
         for name, (lo, hi) in CLIENT_RULE_BOUNDS.items()
     )
+    patterns = "\n".join(
+        f"\t{{ name: '{p.name}', handSet: '{p.hand_set.value}', faan: {p.faan}, "
+        f"limit: {'true' if p.is_limit else 'false'} }},"
+        for p in PATTERNS
+    )
+    points = "\n".join(
+        f"\t{table.value}: [{', '.join(str(v) for v in values)}],"
+        for table, values in POINTS_TABLES.items()
+    )
     return (
         "// GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.\n"
-        "// Source of truth: server/mahjong_core/config.py, server/mahjong_core/scoring/patterns.py.\n\n"
+        "// Source of truth: server/mahjong_core/config.py, server/mahjong_core/scoring/.\n\n"
         "/** Inclusive ranges for a client-supplied custom ruleset (docs/rules.md §10). */\n"
         f"export const CLIENT_RULE_BOUNDS = {{\n{bounds}\n}} as const;\n\n"
         "/** The largest faan a pattern can score, and so the largest faan override. */\n"
-        f"export const LIMIT_FAAN = {LIMIT_FAAN};\n"
+        f"export const LIMIT_FAAN = {LIMIT_FAAN};\n\n"
+        "/** Every scored pattern at its default value, in registry order (docs/rules.md §7). */\n"
+        f"export const FAAN_PATTERNS = [\n{patterns}\n] as const;\n\n"
+        "/** 雞糊: not a registry pattern, scored by faan.py's own fallback. */\n"
+        f"export const CHICKEN_HAND = {{ name: '{CHICKEN_HAND_NAME}', faan: {CHICKEN_HAND_FAAN} }} as const;\n\n"
+        "/** Points per faan, indexed 0..LIMIT_FAAN (docs/rules.md §8). */\n"
+        f"export const POINTS_TABLES = {{\n{points}\n}} as const;\n"
     )
 
 

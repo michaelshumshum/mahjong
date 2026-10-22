@@ -33,6 +33,8 @@ from app.api_models import (
     CreateTableRequest,
     CreateTableResponse,
     LoadPointOut,
+    ScoreHandRequest,
+    ScoreHandResponse,
     SeatSummary,
     ServerStatus,
     StatusResponse,
@@ -49,7 +51,10 @@ from app.status import reset_stats, stats
 from bots.learned import weights_problem
 from bots.tiers import LEARNED_TIERS, BotTier
 from mahjong_core.config import DEFAULT_RULESET
+from mahjong_core.hand_check import check_hand
 from mahjong_core.presets import preset_id_for, resolve_ruleset
+from mahjong_core.state import Wind
+from mahjong_core.tiles import Flower, TileType, parse_tile
 
 _DEFAULT_SHUTDOWN_GRACE_SECONDS = 90.0  # tunable via env
 # must stay well above RuleSet.disconnect_grace_seconds (20s) so a refresh never ends a game
@@ -319,6 +324,46 @@ async def server_status() -> StatusResponse:
             )
             for p in server.history
         ],
+    )
+
+
+def _parse_codes[T: (TileType, Flower)](codes: list[str], kind: type[T]) -> list[T]:
+    parsed = []
+    for code in codes:
+        try:
+            tile = parse_tile(code)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if not isinstance(tile, kind):
+            raise HTTPException(status_code=422, detail=f"unexpected tile here: {code!r}")
+        parsed.append(tile)
+    return parsed
+
+
+@app.post("/score")
+async def score_hand(body: ScoreHandRequest) -> ScoreHandResponse:
+    """The faan guide's hand checker (docs/protocol.md §10): scores a concealed 14-tile hand.
+    Pure computation, no table involved; `422` on a hand no deal could produce."""
+    ruleset = resolve_ruleset(body.ruleset, body.rules)
+    try:
+        checked = check_hand(
+            _parse_codes(body.tiles, TileType),
+            _parse_codes(body.flowers, Flower),
+            self_drawn=body.self_drawn,
+            seat_wind=Wind(body.seat_wind),
+            prevailing_wind=Wind(body.prevailing_wind),
+            ruleset=ruleset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = checked.result
+    return ScoreHandResponse(
+        winning=checked.winning,
+        total_faan=result.total_faan if result else None,
+        breakdown=result.breakdown if result else {},
+        clears_min_faan=result.clears_min_faan if result else None,
+        points=checked.points,
+        min_faan=ruleset.min_faan,
     )
 
 

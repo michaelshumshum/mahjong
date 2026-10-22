@@ -5,17 +5,21 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.table_types import WireSeatStatus
+from mahjong_core.hand_check import HAND_SIZE
 from mahjong_core.presets import DEFAULT_PRESET_ID
 from mahjong_core.scoring.faan import validate_faan_overrides
+from mahjong_core.tiles import N_FLOWERS
 
 __all__ = [
     "BotLatencyOut",
     "CreateTableRequest",
     "CreateTableResponse",
     "LoadPointOut",
+    "ScoreHandRequest",
+    "ScoreHandResponse",
     "SeatSummary",
     "ServerStatus",
     "StatusResponse",
@@ -100,3 +104,28 @@ class StatusResponse(BaseModel):
     bot_decision_ms: BotLatencyOut | None
     loop_lag_ms: float
     history: list[LoadPointOut]
+
+
+class ScoreHandRequest(BaseModel):
+    # same ruleset choice as CreateTableRequest, resolved the same way
+    ruleset: str = DEFAULT_PRESET_ID
+    rules: dict[str, Any] | None = None
+    # concealed tile codes ('1m'..'z7'); the last one is the winning tile
+    tiles: list[str] = Field(max_length=HAND_SIZE)
+    # 'f1'..'f8'
+    flowers: list[str] = Field(default=[], max_length=N_FLOWERS)
+    self_drawn: bool = False
+    # mahjong_core.state.Wind: 0 = East .. 3 = North
+    seat_wind: int = Field(default=0, ge=0, le=3)
+    prevailing_wind: int = Field(default=0, ge=0, le=3)
+
+
+class ScoreHandResponse(BaseModel):
+    winning: bool
+    # the rest is None/empty when the tiles aren't a winning shape
+    total_faan: int | None
+    breakdown: dict[str, int]
+    clears_min_faan: bool | None
+    points: int | None
+    # the resolved ruleset's, so the client can explain a hand below the minimum
+    min_faan: int

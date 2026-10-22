@@ -19,13 +19,19 @@ _HALF_SPICY: tuple[int, ...] = (1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 192, 25
 between at 1.5x the preceding even faan's value. Written out as a literal table rather than
 re-derived at call time."""
 
+POINTS_TABLES: dict[ScoreTable, tuple[int, ...]] = {
+    ScoreTable.FULL_SPICY: _FULL_SPICY,
+    ScoreTable.HALF_SPICY: _HALF_SPICY,
+}
+"""Indexed by faan 0..13. Also emitted to the web client by `make proto` (the faan guide's
+points table)."""
+
 
 def points(faan: int, ruleset: RuleSet) -> int:
     """Faan -> points lookup, table selected by `ruleset.score_table`."""
     if not 0 <= faan <= _MAX_FAAN:
         raise ValueError(f"faan must be 0..{_MAX_FAAN}, got {faan}")
-    table = _FULL_SPICY if ruleset.score_table == ScoreTable.FULL_SPICY else _HALF_SPICY
-    return table[faan]
+    return POINTS_TABLES[ruleset.score_table][faan]
 
 
 @dataclass(frozen=True)
