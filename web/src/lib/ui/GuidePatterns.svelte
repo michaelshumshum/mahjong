@@ -388,4 +388,21 @@
 		margin: 0;
 		color: var(--color-text-muted);
 	}
+
+	// two columns of cards; examples shrink so a 14-tile hand still fits one column
+	@container guide-view (min-width: 46rem) {
+		.entries {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: var(--space-4) var(--space-6);
+		}
+
+		.tile {
+			height: 2.25rem;
+		}
+
+		.example {
+			gap: var(--space-2);
+		}
+	}
 </style>

@@ -884,15 +884,25 @@ measures: [infra.md §8](infra.md)), polled every 15s with a static "Updated" st
 
 The language link calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
-stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`, a fixed `90dvh` tall (each
-view scrolls inside it, so switching doesn't resize it) with a ruleset select over three views
-(`TabBar`):
+stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: up to `68rem` wide and a
+fixed `90dvh` tall (each view scrolls inside it, so switching doesn't resize it); on phone it is
+a `sheet` placement filling the screen edge to edge, with no frame. A ruleset select sits over
+three views (`TabBar`). Each view goes two-column through a `guide-view` container query at
+`46rem` of the view's own width, not the viewport's:
+
+| View | Two columns |
+| --- | --- |
+| Patterns | a grid of pattern cards, example tiles shrunk to `2.25rem` so a 14-tile hand fits one card |
+| Scoring | how faan add up and who pays on the left, the points table on the right |
+| Check hand | palette and options on the left, the hand and a taller fixed result on the right. Below the breakpoint the column wrappers are `display: contents` and `order` puts the hand above the palette |
+
+One column, the views are:
 
 | View | Component | Shows |
 | --- | --- | --- |
 | Patterns | `GuidePatterns.svelte` | search box (English name, Chinese name, description; searches every faan count), faan filter chips (All, one per faan value present, Limit), patterns grouped under sticky faan headings. Each entry: names, a faan badge, tags, description, tile example, "Compare:" links |
 | Scoring | `GuideScoring.svelte` | how faan add up (stacking, wind double-count, inclusive patterns, limit tiers, cap, minimum), the faan → points table for both score tables, and who pays, worked at the table's minimum (floored at 3) |
-| Check hand | `HandChecker.svelte` | a 14-tile picker (plus flowers), win by discard/self-draw, seat and prevailing wind, scored by `POST /score` ([protocol.md §10](protocol.md)) |
+| Check hand | `HandChecker.svelte` | a 14-tile picker (plus flowers), win by discard/self-draw, seat and prevailing wind, a "Fully concealed" switch, scored by `POST /score` ([protocol.md §10](protocol.md)). Fixed layout: the hand stays one row at any width (tiles shrink to fit 14 via container units), flowers sit in the meta row, and the result box has a fixed height and scrolls inside, so picking and scoring never shift the controls. A re-score keeps the last result, dimmed, until the answer lands |
 
 **Data.** `lib/ui/faan-guide.ts`'s `GUIDE_ENTRIES` holds only presentation: description, example,
 tags (`situational` / `concealed` / `flowers`) and `related` look-alikes. Each pattern's faan,

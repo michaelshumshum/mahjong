@@ -117,6 +117,9 @@ const PAGES = [
 			await page.getByTestId('lobby-guide').click();
 			await page.getByTestId('guide-ruleset').selectOption('hk_classic');
 			await page.getByTestId('guide-view-scoring').click();
+			// off the tab, and past its colour transition
+			await page.mouse.move(0, 0);
+			await page.waitForTimeout(300);
 		}
 	},
 	{

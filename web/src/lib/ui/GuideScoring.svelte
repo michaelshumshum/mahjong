@@ -27,7 +27,7 @@
 </script>
 
 <div class="scoring-view" data-testid="guide-scoring">
-	<section aria-labelledby="guide-stack-heading">
+	<section class="stack" aria-labelledby="guide-stack-heading">
 		<h3 id="guide-stack-heading">{m.guide_scoringStackHeading()}</h3>
 		<ul class="rules">
 			<li>
@@ -51,7 +51,7 @@
 		</ul>
 	</section>
 
-	<section aria-labelledby="guide-points-heading">
+	<section class="points-section" aria-labelledby="guide-points-heading">
 		<h3 id="guide-points-heading">{m.guide_pointsHeading()}</h3>
 		<p class="note">{m.guide_pointsNote()}</p>
 		<table class="points" data-testid="guide-points-table">
@@ -86,7 +86,7 @@
 		{/if}
 	</section>
 
-	<section aria-labelledby="guide-payment-heading">
+	<section class="payment" aria-labelledby="guide-payment-heading">
 		<h3 id="guide-payment-heading">{m.guide_paymentHeading()}</h3>
 		<p class="note">{m.guide_paymentExample({ faan: exampleFaan, points: examplePoints })}</p>
 		<dl class="payments">
@@ -202,6 +202,31 @@
 		dd {
 			margin: 0;
 			color: var(--color-text-muted);
+		}
+	}
+
+	// rules and payments beside the points table, so the whole view fits without scrolling
+	@container guide-view (min-width: 46rem) {
+		.scoring-view {
+			display: grid;
+			grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+			grid-template-areas:
+				'stack points'
+				'payment points';
+			align-content: start;
+			gap: var(--space-5) var(--space-6);
+		}
+
+		.stack {
+			grid-area: stack;
+		}
+
+		.points-section {
+			grid-area: points;
+		}
+
+		.payment {
+			grid-area: payment;
 		}
 	}
 </style>

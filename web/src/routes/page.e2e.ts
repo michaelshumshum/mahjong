@@ -511,6 +511,7 @@ test('guide scoring view shows the points table', async ({ page }) => {
 	await page.goto('/');
 	await page.getByTestId('lobby-guide').click();
 	await page.getByTestId('guide-view-scoring').click();
+	await expect(page.getByTestId('guide-view-scoring')).toHaveAttribute('aria-selected', 'true');
 	const table = page.getByTestId('guide-points-table');
 	await expect(table.locator('tbody tr')).toHaveCount(14);
 	await page.getByTestId('guide-ruleset').selectOption('hk_classic');
@@ -542,10 +543,59 @@ test('hand checker scores a picked hand through POST /score', async ({ page }) =
 	await page.getByTestId('checker-add-5s').click();
 	const result = page.getByTestId('checker-result');
 	await expect(result).toContainText('Total 9 faan, worth 96 points');
-	expect(sent).toMatchObject({ ruleset: 'hk_classic', self_drawn: false });
+	expect(sent).toMatchObject({ ruleset: 'hk_classic', self_drawn: false, fully_concealed: true });
 	expect((sent as { tiles: string[] } | null)?.tiles.at(-1)).toBe('5s');
+	await page.getByTestId('checker-fully-concealed').getByRole('switch').click({ force: true });
+	await expect.poll(() => sent?.fully_concealed).toBe(false);
 	await result.getByTestId('faan-pattern-link').filter({ hasText: 'Full Flush' }).click();
 	await expect(page.locator('[data-pattern="清一色"]')).toBeFocused();
+});
+
+test('hand checker layout stays put while a hand is picked and scored', async ({ page }) => {
+	await page.route('**/score', (route) =>
+		route.fulfill({
+			json: {
+				winning: true,
+				total_faan: 13,
+				breakdown: { 清一色: 7, 對對糊: 3, 自摸: 1, 門前清: 1, 無花: 1, 正花: 1 },
+				clears_min_faan: true,
+				points: 384,
+				min_faan: 3
+			}
+		})
+	);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	await page.getByTestId('guide-view-checker').click();
+	const options = page.getByTestId('checker-fully-concealed');
+	const result = page.getByTestId('checker-result');
+	const top = async () => (await options.boundingBox())!.y;
+	const height = async () => (await result.boundingBox())!.height;
+	const [optionsTop, resultHeight] = [await top(), await height()];
+	for (const code of ['1s', '1s', '1s', '2s', '2s', '2s', '3s', '3s', '3s', '9s', '9s', '9s', '5s'])
+		await page.getByTestId(`checker-add-${code}`).click();
+	await page.getByTestId('checker-add-f1').click();
+	expect(await top()).toBe(optionsTop);
+	await page.getByTestId('checker-add-5s').click();
+	await expect(result).toContainText('384 points');
+	expect(await top()).toBe(optionsTop);
+	expect(await height()).toBe(resultHeight);
+});
+
+test('guide uses two columns when wide and one on phone', async ({ page }) => {
+	await page.goto('/');
+	await page.getByTestId('lobby-guide').click();
+	const columns = () =>
+		page
+			.locator('.entries')
+			.first()
+			.evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+	expect((await columns()).split(' ')).toHaveLength(2);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect.poll(columns).toBe('none');
+	const box = (await page.getByTestId('guide-dialog').boundingBox())!;
+	expect([box.x, box.y, box.width, box.height]).toEqual([0, 0, 390, 844]);
 });
 
 test('guide dialog keeps its height across tabs', async ({ page }) => {

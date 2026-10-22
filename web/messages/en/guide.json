@@ -97,6 +97,8 @@
 	"guide_checkerSelfDraw": "Self-draw",
 	"guide_checkerSeatWind": "Seat wind",
 	"guide_checkerPrevailingWind": "Prevailing wind",
+	"guide_checkerFullyConcealed": "Fully concealed",
+	"guide_checkerFlowersLabel": "Flowers in hand",
 	"guide_checkerPickMore": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],
@@ -121,7 +123,6 @@
 		}
 	],
 	"guide_checkerBelowMin": "Below the {min} faan minimum: this hand can't be declared a win.",
-	"guide_checkerLimits": "The hand is checked as fully concealed. Win-timing patterns (last tile, kong replacement, robbing a kong, Heavenly and Earthly Hand) aren't checked.",
 	"guide_checkerScoredUnder": "Scored with {ruleset} rules.",
 	"coachMarks_regionLabel": "Tips for your first hand",
 	"coachMarks_stepCounter": "Tip {n} of {total}",

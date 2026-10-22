@@ -97,6 +97,8 @@
 	"guide_checkerSelfDraw": "自摸",
 	"guide_checkerSeatWind": "門風",
 	"guide_checkerPrevailingWind": "圈風",
+	"guide_checkerFullyConcealed": "門前清（全暗）",
+	"guide_checkerFlowersLabel": "手上的花牌",
 	"guide_checkerPickMore": [
 		{
 			"declarations": ["input count", "local countPlural = count: plural"],
@@ -121,7 +123,6 @@
 		}
 	],
 	"guide_checkerBelowMin": "未達 {min} 番起糊：這手牌不能糊。",
-	"guide_checkerLimits": "手牌以全門前計算。糊牌時機的番種（海底撈月、槓上開花、搶槓、天糊、地糊）不在計算之列。",
 	"guide_checkerScoredUnder": "以{ruleset}規則計算。",
 	"coachMarks_regionLabel": "第一局小貼士",
 	"coachMarks_stepCounter": "貼士 {n}/{total}",

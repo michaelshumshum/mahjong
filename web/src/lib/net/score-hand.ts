@@ -6,10 +6,12 @@ import type { RuleSet } from './ruleset';
 export interface ScoreHandRequest {
 	ruleset: string;
 	rules?: RuleSet;
-	// 14 concealed tile codes; the last is the winning tile
+	// 14 tile codes; the last is the winning tile
 	tiles: string[];
 	flowers: string[];
 	self_drawn: boolean;
+	// false: one set was claimed from another player
+	fully_concealed: boolean;
 	// 0 = East .. 3 = North
 	seat_wind: number;
 	prevailing_wind: number;

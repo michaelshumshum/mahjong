@@ -69,7 +69,8 @@
 	}
 </script>
 
-<ModalDialog labelledby="guide-heading" onCancel={onClose}>
+<!-- sheet: edge to edge on phone, centered elsewhere -->
+<ModalDialog labelledby="guide-heading" placement="sheet" onCancel={onClose}>
 	<div class="guide-dialog" data-testid="guide-dialog">
 		<CloseButton onclick={onClose} />
 		<PanelHeader title={m.guide_title()} titleId="guide-heading" />
@@ -129,18 +130,29 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/layout';
 
+	// wide enough for the views' two-column layouts (`guide-view` container queries below and in
+	// each view); full screen on phone, where the frame only cost space
 	.guide-dialog {
 		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
 		width: 100%;
-		max-width: 40rem;
+		max-width: 68rem;
 		height: 90dvh;
 		padding: var(--space-5);
 		background: var(--color-surface-raised);
 		@include buttons.panel-elevated;
+
+		@include layout.phone-only {
+			max-width: none;
+			height: 100dvh;
+			padding: var(--space-4);
+			border: 0;
+			border-radius: 0;
+		}
 	}
 
 	.context {
@@ -178,6 +190,7 @@
 	}
 
 	.view {
+		container: guide-view / inline-size;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
