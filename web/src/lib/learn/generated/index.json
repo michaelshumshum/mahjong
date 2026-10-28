@@ -1,1 +1,614 @@
-[]
+[
+	{
+		"band": "beginner",
+		"id": "basics-isolated-honour",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 1,
+		"text": "basicsIsolatedHonour",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-two-sided-wait",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 2,
+		"text": "basicsTwoSidedWait",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-keep-two-sided",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 3,
+		"text": "basicsKeepTwoSided",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-pair-wait",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 4,
+		"text": "basicsPairWait",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-simple-hand",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 5,
+		"text": "basicsSimpleHand",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-discard-win",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 6,
+		"text": "basicsDiscardWin",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-all-copies-visible",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 7,
+		"text": "basicsAllCopiesVisible",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "basics-no-chance",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 8,
+		"text": "basicsNoChance",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
+		"id": "waits-01",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 1,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "beginner",
+		"id": "waits-02",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 2,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "beginner",
+		"id": "waits-03",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 3,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "beginner",
+		"id": "waits-04",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 4,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "beginner",
+		"id": "waits-05",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 5,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "intermediate",
+		"id": "waits-06",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 6,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "intermediate",
+		"id": "waits-07",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 7,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "intermediate",
+		"id": "waits-08",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 8,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "intermediate",
+		"id": "waits-09",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 9,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "intermediate",
+		"id": "waits-10",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 10,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "advanced",
+		"id": "waits-11",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 11,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "advanced",
+		"id": "waits-12",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 12,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "advanced",
+		"id": "waits-13",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 13,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "advanced",
+		"id": "waits-14",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 14,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "advanced",
+		"id": "waits-15",
+		"kind": "winning_tiles",
+		"lesson_kind": "puzzle",
+		"n": 15,
+		"text": "minedWaits",
+		"track": "waits"
+	},
+	{
+		"band": "beginner",
+		"id": "efficiency-01",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 1,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "beginner",
+		"id": "efficiency-02",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 2,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "beginner",
+		"id": "efficiency-03",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 3,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "beginner",
+		"id": "efficiency-04",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 4,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "beginner",
+		"id": "efficiency-05",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 5,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "intermediate",
+		"id": "efficiency-06",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 6,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "intermediate",
+		"id": "efficiency-07",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 7,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "intermediate",
+		"id": "efficiency-08",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 8,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "intermediate",
+		"id": "efficiency-09",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 9,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "intermediate",
+		"id": "efficiency-10",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 10,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "advanced",
+		"id": "efficiency-11",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 11,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "advanced",
+		"id": "efficiency-12",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 12,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "advanced",
+		"id": "efficiency-13",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 13,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "advanced",
+		"id": "efficiency-14",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 14,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "advanced",
+		"id": "efficiency-15",
+		"kind": "best_discard",
+		"lesson_kind": "puzzle",
+		"n": 15,
+		"text": "minedEfficiency",
+		"track": "efficiency"
+	},
+	{
+		"band": "beginner",
+		"id": "defence-01",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 1,
+		"text": "minedDefenceAllCopiesVisible",
+		"track": "defence"
+	},
+	{
+		"band": "beginner",
+		"id": "defence-02",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 2,
+		"text": "minedDefenceGenbutsu",
+		"track": "defence"
+	},
+	{
+		"band": "beginner",
+		"id": "defence-03",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 3,
+		"text": "minedDefenceNoChance",
+		"track": "defence"
+	},
+	{
+		"band": "beginner",
+		"id": "defence-04",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 4,
+		"text": "minedDefenceAllCopiesVisible",
+		"track": "defence"
+	},
+	{
+		"band": "beginner",
+		"id": "defence-05",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 5,
+		"text": "minedDefenceGenbutsu",
+		"track": "defence"
+	},
+	{
+		"band": "intermediate",
+		"id": "defence-06",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 6,
+		"text": "minedDefenceAllCopiesVisible",
+		"track": "defence"
+	},
+	{
+		"band": "intermediate",
+		"id": "defence-07",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 7,
+		"text": "minedDefenceGenbutsu",
+		"track": "defence"
+	},
+	{
+		"band": "intermediate",
+		"id": "defence-08",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 8,
+		"text": "minedDefenceNoChance",
+		"track": "defence"
+	},
+	{
+		"band": "intermediate",
+		"id": "defence-09",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 9,
+		"text": "minedDefenceAllCopiesVisible",
+		"track": "defence"
+	},
+	{
+		"band": "intermediate",
+		"id": "defence-10",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 10,
+		"text": "minedDefenceGenbutsu",
+		"track": "defence"
+	},
+	{
+		"band": "advanced",
+		"id": "defence-11",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 11,
+		"text": "minedDefenceAllCopiesVisible",
+		"track": "defence"
+	},
+	{
+		"band": "advanced",
+		"id": "defence-12",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 12,
+		"text": "minedDefenceGenbutsu",
+		"track": "defence"
+	},
+	{
+		"band": "advanced",
+		"id": "defence-13",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 13,
+		"text": "minedDefenceNoChance",
+		"track": "defence"
+	},
+	{
+		"band": "advanced",
+		"id": "defence-14",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 14,
+		"text": "minedDefenceAllCopiesVisible",
+		"track": "defence"
+	},
+	{
+		"band": "advanced",
+		"id": "defence-15",
+		"kind": "safe_discard",
+		"lesson_kind": "puzzle",
+		"n": 15,
+		"text": "minedDefenceGenbutsu",
+		"track": "defence"
+	},
+	{
+		"band": "beginner",
+		"id": "faan-01",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 1,
+		"text": "minedFaanSelfDraw",
+		"track": "faan"
+	},
+	{
+		"band": "beginner",
+		"id": "faan-02",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 2,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "beginner",
+		"id": "faan-03",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 3,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "beginner",
+		"id": "faan-04",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 4,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "beginner",
+		"id": "faan-05",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 5,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "intermediate",
+		"id": "faan-06",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 6,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "intermediate",
+		"id": "faan-07",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 7,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "intermediate",
+		"id": "faan-08",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 8,
+		"text": "minedFaanSelfDraw",
+		"track": "faan"
+	},
+	{
+		"band": "intermediate",
+		"id": "faan-09",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 9,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "intermediate",
+		"id": "faan-10",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 10,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "advanced",
+		"id": "faan-11",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 11,
+		"text": "minedFaanSelfDraw",
+		"track": "faan"
+	},
+	{
+		"band": "advanced",
+		"id": "faan-12",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 12,
+		"text": "minedFaanSelfDraw",
+		"track": "faan"
+	},
+	{
+		"band": "advanced",
+		"id": "faan-13",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 13,
+		"text": "minedFaanDiscard",
+		"track": "faan"
+	},
+	{
+		"band": "advanced",
+		"id": "faan-14",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 14,
+		"text": "minedFaanSelfDraw",
+		"track": "faan"
+	},
+	{
+		"band": "advanced",
+		"id": "faan-15",
+		"kind": "count_faan",
+		"lesson_kind": "puzzle",
+		"n": 15,
+		"text": "minedFaanSelfDraw",
+		"track": "faan"
+	}
+]

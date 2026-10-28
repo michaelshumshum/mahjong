@@ -1,0 +1,149 @@
+{
+	"band": "beginner",
+	"engine_version": "1.3.0",
+	"id": "waits-05",
+	"key": {
+		"below_minimum": [],
+		"correct": ["7p", "8p"],
+		"dead": [],
+		"options": [
+			{
+				"discard_faan": 9,
+				"discard_wins": true,
+				"live": 1,
+				"self_draw_faan": 10,
+				"self_draw_wins": true,
+				"tile": "7p"
+			},
+			{
+				"discard_faan": 8,
+				"discard_wins": true,
+				"live": 1,
+				"self_draw_faan": 9,
+				"self_draw_wins": true,
+				"tile": "8p"
+			}
+		]
+	},
+	"kind": "winning_tiles",
+	"lesson_kind": "puzzle",
+	"n": 5,
+	"snapshot": {
+		"d": {
+			"bot_levels": [null, null, null, null],
+			"claim_options": [],
+			"concealed_counts": [4, 11, 4, 10],
+			"deadline_ts": null,
+			"dealer": 1,
+			"discard_pools": [
+				[0, 8, 112, 96, 84, 85, 97, 1, 86, 100, 116, 80, 108, 120, 72, 132, 42, 4, 16, 37],
+				[81, 24, 5, 73, 20, 92, 88, 104, 28, 62, 9, 133, 70, 124, 29, 6, 125, 93],
+				[71, 25, 59, 46, 32, 54, 33, 113, 109, 121, 34, 35, 110, 114, 83, 95, 126, 122, 102],
+				[90, 75, 47, 67, 103, 77, 115, 78, 111, 123, 99, 134, 63, 79, 43, 2, 11]
+			],
+			"flowers": [["f8"], [], ["f1", "f3", "f5", "f2"], ["f7"]],
+			"hand_history": [],
+			"hand_no": 1,
+			"hands": null,
+			"host_seat": null,
+			"legal_actions": [],
+			"melds": [
+				[
+					{
+						"from_seat": 3,
+						"kind": "chow",
+						"tiles": [36, 40, 44]
+					},
+					{
+						"from_seat": 3,
+						"kind": "chow",
+						"tiles": [60, 65, 68]
+					},
+					{
+						"from_seat": 3,
+						"kind": "chow",
+						"tiles": [41, 45, 48]
+					}
+				],
+				[
+					{
+						"from_seat": 2,
+						"kind": "pung",
+						"tiles": [117, 118, 119]
+					}
+				],
+				[
+					{
+						"from_seat": 1,
+						"kind": "chow",
+						"tiles": [87, 89, 94]
+					},
+					{
+						"from_seat": 1,
+						"kind": "chow",
+						"tiles": [74, 76, 82]
+					},
+					{
+						"from_seat": 1,
+						"kind": "chow",
+						"tiles": [98, 101, 105]
+					}
+				],
+				[
+					{
+						"from_seat": 2,
+						"kind": "chow",
+						"tiles": [7, 10, 15]
+					}
+				]
+			],
+			"names": [null, null, null, null],
+			"own_hand": [56, 57, 58, 64],
+			"phase": "AWAIT_ACTION",
+			"prevailing": "EAST",
+			"ruleset": {
+				"claim_seconds": 5,
+				"concealed_kong_robbable": false,
+				"dealer_repeat_on_draw": true,
+				"dealer_repeat_on_win": true,
+				"discard_payment": "all",
+				"disconnect_grace_seconds": 20.0,
+				"eight_flowers_instant_win": false,
+				"faan_cap": 10,
+				"faan_overrides": {},
+				"flowers_enabled": true,
+				"flowers_score": true,
+				"four_kong_abort": false,
+				"game_length": "EAST_ONLY",
+				"hand_end_seconds": 10,
+				"hand_sets": ["CLASSIC", "NEW_6"],
+				"kong_rob_enabled": true,
+				"min_faan": 3,
+				"multi_win": false,
+				"nine_terminals_abort": false,
+				"pao_rules": false,
+				"provable_fairness": false,
+				"score_table": "half_spicy",
+				"self_draw_multiplier": 1.5,
+				"seven_flowers_instant_win": false,
+				"tenpai_payments": false,
+				"thirteen_orphans_wait_bonus": false,
+				"turn_seconds": 15,
+				"turn_timeout_strikes": 3,
+				"wall_reserve": 0
+			},
+			"ruleset_preset": "hk_classic",
+			"scores": [0, 0, 0, 0],
+			"seat": 0,
+			"seat_status": ["connected", "connected", "connected", "connected"],
+			"turn": 1,
+			"wall_remaining": 11
+		},
+		"seq": 0,
+		"t": "state_sync",
+		"ts": 0,
+		"v": 1
+	},
+	"text": "minedWaits",
+	"track": "waits"
+}

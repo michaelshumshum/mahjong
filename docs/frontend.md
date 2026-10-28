@@ -1338,6 +1338,7 @@ spread. Files group key prefixes by app area:
 | `tiles.json` | `tileName`, `tileFace` |
 | `settings.json` | `settings`, `localeSwitcher` |
 | `guide.json` | `guide`, `coachMarks` |
+| `learn.json` | `/learn`: `learn` (page chrome, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
 | `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
 
 **Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the
@@ -1350,6 +1351,14 @@ keys in the same order in both locales.
 
 `lib/i18n/messages.spec.ts` enforces this: each locale has exactly the registered files, every
 file has the base locale's keys in the same order, and no prefix spans two files.
+`lib/learn/lessons.spec.ts` checks every generated lesson's `text` stem has its three `lesson_*`
+keys, and every track and band its `learn_*` label, in each locale.
+
+**Lesson text.** Hand-written lessons get their own stem (`basicsIsolatedHonour`). The mined
+shortlist shares one stem per kind (`minedWaits`, `minedEfficiency`; `minedDefence*` per
+`SafeReason`, `minedFaanSelfDraw`/`minedFaanDiscard`), so re-mining never needs new prose:
+titles take `{n}` (the place in the track), explanations take the key's numbers (`{tiles}`,
+`{count}`, `{faan}`).
 
 **Plurals:** the inlang plugin (`@inlang/plugin-message-format@4`) does *not* support flat ICU
 strings like `"{count, plural, one {...} other {...}}"` — it compiles but mangles the braces into

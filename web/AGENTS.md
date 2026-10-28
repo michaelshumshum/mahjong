@@ -107,6 +107,7 @@ model, two sources".
 | Concept | Home |
 | --- | --- |
 | Wire types and vocabularies (`BotTier`, `Seat`, `Phase`, `MeldKind`, `WireSeatStatus`, `ErrorCode`, `WindName`, …; generated, never hand-edited) | `lib/net/protocol.d.ts` |
+| Lesson types and vocabularies (`Lesson`, `LessonIndexEntry`, `PuzzleKind`, `SafeReason`, `Band`, `Track`, answer keys) and the lesson JSON (generated, never hand-edited) | `lib/learn/generated/` |
 | Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
 | Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`) | `lib/table/view-types.ts` |

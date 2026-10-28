@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from app.lessons.catalog.mined import SHORTLIST_PATH
 from app.lessons.grade import (
     BestDiscardKey,
     CountFaanKey,
@@ -16,7 +17,7 @@ from app.lessons.grade import (
     safe_options,
     winning_tiles,
 )
-from app.lessons.model import PuzzleKind, SafeReason, SeatSetup
+from app.lessons.model import Band, PuzzleKind, SafeReason, SeatSetup
 from bots.tiers import BotTier
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import GameState, WinType
@@ -26,8 +27,6 @@ from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
 from tools.mine_puzzles import (
     POLICY_RATE,
-    SHORTLIST_PATH,
-    Band,
     band_for,
     best_discard_ok,
     count_faan_ok,

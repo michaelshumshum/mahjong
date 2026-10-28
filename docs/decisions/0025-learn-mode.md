@@ -76,10 +76,11 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 
 Closed so far: the position builder and answer keys (`app/lessons/`), public `can_win_on`,
 `TableScene`/`legal-actions.ts` and `TilePalette` out of their pages, mined positions (phase 4
-below), and the generated lesson bundle ([protocol.md §6](../protocol.md)). Still open:
+below), the generated lesson bundle ([protocol.md §6](../protocol.md)) and the first catalog
+(`catalog/basics.py`, eight hand-written puzzles; `catalog/mined.py`, the 60-puzzle shortlist as
+the `waits`/`efficiency`/`defence`/`faan` tracks). Still open:
 
 1. Frame builders exist only on `Table`.
-2. No curated content (`catalog/`).
 
 ## Design
 
@@ -90,7 +91,7 @@ below), and the generated lesson bundle ([protocol.md §6](../protocol.md)). Sti
 | `model.py` | frozen `Position`, `SeatSetup`, `Puzzle` (`TutorialStep`, `Lesson` in phase 3); `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`, `Band`, `Track`. Wire vocabulary, emitted to TS by `gen_lessons` |
 | `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `discard_on(state, tile)` (claim positions), `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
 | `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`; runtime-safe |
-| `catalog/*.py` | content, one module per track: `basics`, `efficiency`, `defence`, `faan` |
+| `catalog/*.py` | content: `basics` (hand-written, one teaching point each) and `mined` (the shortlist, one `Track` per kind: `waits`, `efficiency`, `defence`, `faan`); `CATALOG` is `/learn`'s order |
 | `frames.py` | (phase 3) tutorial frame stream |
 | `tools/gen_lessons.py` | emits `web/src/lib/learn/generated/index.json`, `<id>.json` per lesson, `lessons.d.ts` |
 
@@ -126,8 +127,10 @@ before it, so the engine opens the window.
 ### Text
 
 The server holds structure and answers only. All prose lives in `messages/{en,zh-Hant}/learn.json`
-as `learn_*` and `lesson_<id>_title|prompt|explain` keys, with numbers from the key interpolated.
-A spec asserts every generated id has its keys.
+as `learn_*` and `lesson_<text>_title|prompt|explain` keys, with numbers from the key interpolated.
+`text` is a stem per hand-written lesson, and per kind for mined ones, which share templated prose
+([frontend.md §9](../frontend.md) "Lesson text"). A spec asserts every generated lesson has its
+keys.
 
 ### Puzzle kinds
 
@@ -294,8 +297,9 @@ For every lesson, `test_lessons_catalog.py` checks:
 5. `feat(server): lessons package with position builder and validation`
 6. `feat(server): answer keys for winning_tiles, best_discard, count_faan`
 7. `feat(server): exact safe_discard answer key with stated reasons`
-8. `feat(server): generate lesson bundle in make proto and proto-check`
-9. `feat(server): first puzzle set and catalog validity tests` (about 3 per kind)
+8. `feat(server): generate lesson bundle in make proto and proto-check` (done)
+9. `feat(server): first puzzle set and catalog validity tests` (done: two hand-written per kind,
+   plus the mined shortlist)
 
 ### 2. Web puzzles
 
