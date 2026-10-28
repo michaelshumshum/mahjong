@@ -18,6 +18,7 @@ from app.lessons.grade import (
 )
 from app.lessons.model import PuzzleKind, SafeReason, SeatSetup
 from bots.tiers import BotTier
+from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import GameState, WinType
 from mahjong_core.tiles import TileType, parse_tiles, tile_code, tile_id_type
 from tests.lesson_positions import PIN as _PIN
@@ -25,6 +26,7 @@ from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
 from tools.mine_puzzles import (
     POLICY_RATE,
+    SHORTLIST_PATH,
     Band,
     band_for,
     best_discard_ok,
@@ -183,6 +185,16 @@ def test_mining_is_deterministic_and_every_record_regrades() -> None:
     assert stats["turns_scanned"] and first
     assert {r["kind"] for r in first} == set(PuzzleKind)
     for record in first:
+        assert_regrades(record)
+
+
+def test_committed_shortlist_regrades() -> None:
+    payload = json.loads(SHORTLIST_PATH.read_text())
+    assert payload["engine_version"] == ENGINE_VERSION
+    puzzles = payload["puzzles"]
+    assert {p["kind"] for p in puzzles} == set(PuzzleKind)
+    for record in puzzles:
+        assert record["engine_version"] == ENGINE_VERSION
         assert_regrades(record)
 
 

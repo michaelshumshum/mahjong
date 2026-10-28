@@ -70,6 +70,9 @@ from mahjong_core.tiles import (
     tile_id_type,
 )
 
+SHORTLIST_PATH = Path(__file__).resolve().parents[1] / "app" / "lessons" / "mined_puzzles.json"
+"""The committed shortlist (ADR 0025 "Mined puzzles")."""
+
 MINER_TIER = BotTier.T4
 FALLBACK_TIER = BotTier.T2
 """Strongest tier that needs no weights, played when `learned.npz` doesn't load."""

@@ -234,6 +234,23 @@ beat, so the shortlist keeps a `best_discard` only where `T4` also played a corr
 `tests/test_mine_puzzles.py` regrades every shortlisted record and fails when an engine change
 moves one.
 
+**Current run** (laptop, i7-1265U, 8 workers, ~63 min wall, engine 1.3.0): 6,000 games, seeds
+20,000,000–20,005,999; 3,655,016 decisions, 2,993,369 turns scanned; 56,413 candidate positions
+skipped as unrepresentable; 460,328 duplicates dropped. A first run graded `best_discard` with
+exposed meld tiles regroupable (the bots' whole-hand shanten, [bots.md §3](../bots.md)), which
+picked wrong answers for melded hands; this run uses `melds=n` and replaced its shortlist.
+
+| Kind | Kept | Beginner | Intermediate | Advanced |
+| --- | --- | --- | --- | --- |
+| `best_discard` | 56,586 | 10,864 | 16,413 | 29,309 |
+| `safe_discard` | 36,856 | 8,611 | 11,721 | 16,524 |
+| `winning_tiles` | 57,488 | 44,032 | 13,076 | 380 |
+| `count_faan` | 30,029 (17,521 discard wins) | 9,325 | 13,944 | 6,760 |
+
+15,574 of the `best_discard` candidates (28%) are ones where `T4` played something else, nearly
+all scored advanced; the shortlist leaves them out. `safe_discard` reasons: all copies visible
+30,907, no-chance 5,880, genbutsu 69 (needs the tile in every opponent's pool).
+
 ## Tests
 
 ### Server (pytest)

@@ -1,0 +1,7536 @@
+{
+ "engine_version": "1.3.0",
+ "miner_tier": "T4",
+ "puzzles": [
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 1
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "1p",
+     "4p"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "1p"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "4p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1s457m4s3z7s73m7s8m9s52z9m4z3s",
+      "flowers": "2f",
+      "hand": "2367899p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "111p"
+       }
+      ]
+     },
+     {
+      "discards": "63p3s24p1s3p996m256z",
+      "flowers": "8f",
+      "hand": "1344458m466s1277z",
+      "melds": []
+     },
+     {
+      "discards": "6m94p2m8p3z6m1z6p4z5m5z8p2m4s",
+      "flowers": "564f",
+      "hand": "1267s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "678s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "345s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "999s"
+       }
+      ]
+     },
+     {
+      "discards": "13m15s93m8s8m2s3z2m8s45z2s",
+      "flowers": "713f",
+      "hand": "255577p1177z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000078,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 78,
+    "game_seed": 20000000,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 2
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "6p"
+    ],
+    "dead": [
+     "9p"
+    ],
+    "options": [
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "6p"
+     },
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 0,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "9p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "2s52m65s2z1m1z8p",
+      "flowers": "5f",
+      "hand": "7899p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "456p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     },
+     {
+      "discards": "2p18s7p9s187p6m",
+      "flowers": "1f",
+      "hand": "37799m6p44z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     },
+     {
+      "discards": "12p5m479p2z1p313z",
+      "flowers": "346f",
+      "hand": "1134s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "666s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "39p52s5p9s3p6m",
+      "flowers": "7f",
+      "hand": "78889m23p47s1z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "345m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000008116,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 116,
+    "game_seed": 20000001,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 4
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [
+     "3s"
+    ],
+    "correct": [
+     "2s"
+    ],
+    "dead": [
+     "5s"
+    ],
+    "options": [
+     {
+      "discard_faan": 2,
+      "discard_wins": false,
+      "live": 2,
+      "self_draw_faan": 3,
+      "self_draw_wins": true,
+      "tile": "2s"
+     },
+     {
+      "discard_faan": 1,
+      "discard_wins": false,
+      "live": 2,
+      "self_draw_faan": 2,
+      "self_draw_wins": false,
+      "tile": "3s"
+     },
+     {
+      "discard_faan": 2,
+      "discard_wins": false,
+      "live": 0,
+      "self_draw_faan": 3,
+      "self_draw_wins": true,
+      "tile": "5s"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "4z2p1z637p2s8m8p7m9s95m8s7m8s3m1s",
+      "flowers": "8f",
+      "hand": "123456m456p3444s",
+      "melds": []
+     },
+     {
+      "discards": "1s521m6s6m8s9m5z7s3z3p3m3z1p11s42m",
+      "flowers": "163f",
+      "hand": "55p3s77z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "123p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "72p422z5s4p8m2s7m7s5m4z958s4m3z",
+      "flowers": "574f",
+      "hand": "237889m9p22367s7z",
+      "melds": []
+     },
+     {
+      "discards": "6m5s1m6s69m93s2z4m4623z4s2417p5s",
+      "flowers": "",
+      "hand": "456699p7z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "555z"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111z"
+       }
+      ]
+     }
+    ],
+    "seed": 160002096154,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 154,
+    "game_seed": 20000262,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 1
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "5s",
+     "8s"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "5s"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "8s"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "6m94p2m8p3z6m1z6p4z5m5z8p2m41s",
+      "flowers": "564f",
+      "hand": "2267s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999s"
+       }
+      ]
+     },
+     {
+      "discards": "13m15s93m8s8m2s3z2m8s45z2s",
+      "flowers": "713f",
+      "hand": "6m255577p1177z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "1s457m4s3z7s73m7s8m9s52z9m4z3s",
+      "flowers": "2f",
+      "hand": "2367899p",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111p"
+       }
+      ]
+     },
+     {
+      "discards": "63p3s24p1s3p996m256z3m",
+      "flowers": "8f",
+      "hand": "144458m466s1277z",
+      "melds": []
+     }
+    ],
+    "seed": 160000000080,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 80,
+    "game_seed": 20000000,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "5p",
+     "6p"
+    ],
+    "dead": [
+     "3p"
+    ],
+    "options": [
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 0,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "3p"
+     },
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "5p"
+     },
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "6p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "3s72m1s6m659s8m7p3m",
+      "flowers": "",
+      "hand": "4445789p666z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "9p7m63p9m5p9m214z99m",
+      "flowers": "1f",
+      "hand": "368s5z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "456s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789s"
+       }
+      ]
+     },
+     {
+      "discards": "51s38p82s2z2s14z",
+      "flowers": "7f",
+      "hand": "13445668m67z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     },
+     {
+      "discards": "13m2z7447s1m48s3z3s",
+      "flowers": "8f",
+      "hand": "66p147z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "234p"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000280,
+    "turn": 3,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 280,
+    "game_seed": 20000000,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 5
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [
+     "2p",
+     "5p"
+    ],
+    "correct": [
+     "1p",
+     "7p"
+    ],
+    "dead": [
+     "4p"
+    ],
+    "options": [
+     {
+      "discard_faan": 2,
+      "discard_wins": false,
+      "live": 2,
+      "self_draw_faan": 3,
+      "self_draw_wins": true,
+      "tile": "1p"
+     },
+     {
+      "discard_faan": 1,
+      "discard_wins": false,
+      "live": 1,
+      "self_draw_faan": 2,
+      "self_draw_wins": false,
+      "tile": "2p"
+     },
+     {
+      "discard_faan": 2,
+      "discard_wins": false,
+      "live": 0,
+      "self_draw_faan": 3,
+      "self_draw_wins": true,
+      "tile": "4p"
+     },
+     {
+      "discard_faan": 1,
+      "discard_wins": false,
+      "live": 1,
+      "self_draw_faan": 2,
+      "self_draw_wins": false,
+      "tile": "5p"
+     },
+     {
+      "discard_faan": 2,
+      "discard_wins": false,
+      "live": 2,
+      "self_draw_faan": 3,
+      "self_draw_wins": true,
+      "tile": "7p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "18m56z4s4m4s5m9p5s",
+      "flowers": "7341f",
+      "hand": "567m2345666p678s",
+      "melds": []
+     },
+     {
+      "discards": "8p46257s63484p",
+      "flowers": "5f",
+      "hand": "23567m12567z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "17p1s4p162z5p1z",
+      "flowers": "",
+      "hand": "1334579m789p578s6z",
+      "melds": []
+     },
+     {
+      "discards": "7m12872p2m59p9m3p2z",
+      "flowers": "",
+      "hand": "1234578s",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "444z"
+       }
+      ]
+     }
+    ],
+    "seed": 160018208705,
+    "turn": 2,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 705,
+    "game_seed": 20002276,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 1
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "1p",
+     "z6"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "1p"
+     },
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "z6"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "23m6p2z5s8p5z7m1z",
+      "flowers": "35f",
+      "hand": "11777p999s66z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "added_kong",
+        "tiles": "2222s"
+       }
+      ]
+     },
+     {
+      "discards": "5s2m71s9996m",
+      "flowers": "6f",
+      "hand": "1223338p8s247z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "444p"
+       }
+      ]
+     },
+     {
+      "discards": "51m5p6m65p7s",
+      "flowers": "147f",
+      "hand": "89m2p468s3445z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333s"
+       }
+      ]
+     },
+     {
+      "discards": "4p85s568p5582m3z",
+      "flowers": "",
+      "hand": "3m",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "678m"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "444m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "678m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000208,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 208,
+    "game_seed": 20000000,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 2
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "3p",
+     "5p",
+     "6p"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "3p"
+     },
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "5p"
+     },
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "6p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "3s72m1s6m659s8m7p",
+      "flowers": "",
+      "hand": "4445789p666z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "9p7m63p9m5p9m214z",
+      "flowers": "1f",
+      "hand": "9m368s5z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "456s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789s"
+       }
+      ]
+     },
+     {
+      "discards": "51s38p82s2z2s1z",
+      "flowers": "7f",
+      "hand": "1344568m467z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     },
+     {
+      "discards": "13m2z7447s1m48s3z",
+      "flowers": "8f",
+      "hand": "3466p3s14z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "789p"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000273,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 273,
+    "game_seed": 20000000,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 4
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "1p",
+     "3p",
+     "6p"
+    ],
+    "dead": [
+     "4p"
+    ],
+    "options": [
+     {
+      "discard_faan": 7,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 8,
+      "self_draw_wins": true,
+      "tile": "1p"
+     },
+     {
+      "discard_faan": 7,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 8,
+      "self_draw_wins": true,
+      "tile": "3p"
+     },
+     {
+      "discard_faan": 7,
+      "discard_wins": true,
+      "live": 0,
+      "self_draw_faan": 8,
+      "self_draw_wins": true,
+      "tile": "4p"
+     },
+     {
+      "discard_faan": 7,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 8,
+      "self_draw_wins": true,
+      "tile": "6p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "189m3s3m1s457m2197s4z9s25z6s8p",
+      "flowers": "613f",
+      "hand": "1234555666p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345p"
+       }
+      ]
+     },
+     {
+      "discards": "4s6m7225s8m95s7496m3s345z2p15z",
+      "flowers": "4f",
+      "hand": "2355m13778p17z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "999p"
+       }
+      ]
+     },
+     {
+      "discards": "16z9m7z4p2z2s12p2z4p9881165s",
+      "flowers": "7f",
+      "hand": "123467m367789p7s",
+      "melds": []
+     },
+     {
+      "discards": "5s81p34674s24z8s35z36s34z4m",
+      "flowers": "8f",
+      "hand": "12689m8s6677z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000313010,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 1010,
+    "game_seed": 20000039,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 1
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "1p",
+     "z6"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "1p"
+     },
+     {
+      "discard_faan": 5,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 6,
+      "self_draw_wins": true,
+      "tile": "z6"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "23m6p2z5s8p5z7m1z5p",
+      "flowers": "358f",
+      "hand": "11p999s66z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "added_kong",
+        "tiles": "2222s"
+       },
+       {
+        "from_seat": null,
+        "kind": "concealed_kong",
+        "tiles": "7777p"
+       }
+      ]
+     },
+     {
+      "discards": "5s2m71s9996m2z",
+      "flowers": "6f",
+      "hand": "11223338p8s47z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "444p"
+       }
+      ]
+     },
+     {
+      "discards": "51m5p6m65p7s3z",
+      "flowers": "147f",
+      "hand": "89m2p468s1445z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333s"
+       }
+      ]
+     },
+     {
+      "discards": "4p85s568p5582m3z8s",
+      "flowers": "",
+      "hand": "3m",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "678m"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "444m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "678m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000213,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 213,
+    "game_seed": 20000000,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "5m",
+     "6m",
+     "7m",
+     "8m"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "5m"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "6m"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "7m"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "8m"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "17p45s64p7468s173z29m",
+      "flowers": "",
+      "hand": "6777888m",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "444m"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "123m"
+       }
+      ]
+     },
+     {
+      "discards": "6s2z89s6z3m1p23m6z6p36z",
+      "flowers": "3f",
+      "hand": "115m3335p4s",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "444p"
+       }
+      ]
+     },
+     {
+      "discards": "3p69m1p69m7p9m8p2z8p4z7s9p3z56s",
+      "flowers": "18f",
+      "hand": "13s77z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     },
+     {
+      "discards": "4z5m2s8p1s2p2z9s2p6z9p4z7s5z8s4z",
+      "flowers": "654f",
+      "hand": "123456m1255p345s",
+      "melds": []
+     }
+    ],
+    "seed": 160000016218,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 218,
+    "game_seed": 20000002,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 5
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "1m",
+     "2m",
+     "4m",
+     "7m"
+    ],
+    "dead": [
+     "5m"
+    ],
+    "options": [
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "1m"
+     },
+     {
+      "discard_faan": 9,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 10,
+      "self_draw_wins": true,
+      "tile": "2m"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "4m"
+     },
+     {
+      "discard_faan": 9,
+      "discard_wins": true,
+      "live": 0,
+      "self_draw_faan": 10,
+      "self_draw_wins": true,
+      "tile": "5m"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "7m"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "5s4p7s1p851s43p4s6p6s31z4p",
+      "flowers": "5f",
+      "hand": "1233334456789m",
+      "melds": []
+     },
+     {
+      "discards": "2p2m5p5s15p1s1z1p4z1s3z98p7z3s",
+      "flowers": "8f",
+      "hand": "1177m27p269s6z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "888s"
+       }
+      ]
+     },
+     {
+      "discards": "8m1p5656m7p7z6p5s4m4s47p81m2z",
+      "flowers": "34f",
+      "hand": "23499s55z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "444z"
+       }
+      ]
+     },
+     {
+      "discards": "6s598p3s38p1z34s3z9p7z6p1s9p5m",
+      "flowers": "176f",
+      "hand": "2278m5z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "999m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000040172,
+    "turn": 3,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 172,
+    "game_seed": 20000005,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 1
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "7p",
+     "8p"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 9,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 10,
+      "self_draw_wins": true,
+      "tile": "7p"
+     },
+     {
+      "discard_faan": 8,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 9,
+      "self_draw_wins": true,
+      "tile": "8p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "13m2z7447s1m48s3z3s14z1s7z2p25m1p",
+      "flowers": "8f",
+      "hand": "6668p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "123p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "234p"
+       }
+      ]
+     },
+     {
+      "discards": "3s72m1s6m659s8m7p3m7z9p5z82m5z6s",
+      "flowers": "",
+      "hand": "14445789p666z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "9p7m63p9m5p9m214z99m12z36s54z8s",
+      "flowers": "1352f",
+      "hand": "56m15p",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "456s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       }
+      ]
+     },
+     {
+      "discards": "51s38p82s2z2s14z7s7z7p2s2p13m",
+      "flowers": "7f",
+      "hand": "444556678m6z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000310,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 310,
+    "game_seed": 20000000,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 2
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "6p"
+    ],
+    "dead": [
+     "9p"
+    ],
+    "options": [
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "6p"
+     },
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 0,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "9p"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "2s52m65s2z1m1z81p",
+      "flowers": "5f",
+      "hand": "7899p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "456p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "added_kong",
+        "tiles": "5555z"
+       }
+      ]
+     },
+     {
+      "discards": "2p18s7p9s187p63m",
+      "flowers": "1f",
+      "hand": "7799m6p344z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     },
+     {
+      "discards": "12p5m479p2z1p3131z",
+      "flowers": "346f",
+      "hand": "1134s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "666s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "39p52s5p9s3p6m1z",
+      "flowers": "7f",
+      "hand": "778889m23p47s",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "345m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000008121,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 121,
+    "game_seed": 20000001,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 4
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "below_minimum": [],
+    "correct": [
+     "1m",
+     "4m",
+     "6m",
+     "7m",
+     "9m"
+    ],
+    "dead": [],
+    "options": [
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "1m"
+     },
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 3,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "4m"
+     },
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 1,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "6m"
+     },
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "7m"
+     },
+     {
+      "discard_faan": 4,
+      "discard_wins": true,
+      "live": 2,
+      "self_draw_faan": 5,
+      "self_draw_wins": true,
+      "tile": "9m"
+     }
+    ]
+   },
+   "kind": "winning_tiles",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "7s56887p569s9p3s6z",
+      "flowers": "",
+      "hand": "2345556789m",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "added_kong",
+        "tiles": "2222z"
+       }
+      ]
+     },
+     {
+      "discards": "267m5p2s39p2s8m4z5m9s4z3p",
+      "flowers": "34f",
+      "hand": "5p7z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "111m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "111p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "888s"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     },
+     {
+      "discards": "42p8m3p9m9p2s63m4p9s6p4z6p",
+      "flowers": "27156f",
+      "hand": "57s13336z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "444s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "333s"
+       }
+      ]
+     },
+     {
+      "discards": "2m2836p75s8p7s94p",
+      "flowers": "8f",
+      "hand": "777p111666s1377z",
+      "melds": []
+     }
+    ],
+    "seed": 160000824473,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 473,
+    "game_seed": 20000103,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.2857142857142857,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9999995015435604
+    },
+    "score": 0.23809540424738462
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "4m",
+     "7m"
+    ],
+    "naive": "z5",
+    "options": [
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "4m",
+      "tiles": 4
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "5m",
+      "tiles": 8
+     },
+     {
+      "kinds": 6,
+      "shanten": 1,
+      "tile": "6m",
+      "tiles": 12
+     },
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "7m",
+      "tiles": 4
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "8m",
+      "tiles": 10
+     },
+     {
+      "kinds": 10,
+      "shanten": 1,
+      "tile": "z5",
+      "tiles": 19
+     },
+     {
+      "kinds": 10,
+      "shanten": 1,
+      "tile": "z6",
+      "tiles": 19
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "2s4282p53s3322z8s",
+      "flowers": "",
+      "hand": "4566778m5566z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "123m"
+       }
+      ]
+     },
+     {
+      "discards": "48m1s56m21z526s2m797s",
+      "flowers": "",
+      "hand": "234556p9s",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "678p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "777z"
+       }
+      ]
+     },
+     {
+      "discards": "34z78s11z8p211s1m4s",
+      "flowers": "37f",
+      "hand": "445789m11456p46s",
+      "melds": []
+     },
+     {
+      "discards": "1m6134s9m8s1z32s7p2m7z3m",
+      "flowers": "81f",
+      "hand": "459p2444z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "333p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "789p"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000392,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 392,
+    "game_seed": 20000000,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.08333333333333333,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9961079591400358
+    },
+    "score": 0.3068529025088769
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5s"
+    ],
+    "naive": "9p",
+    "options": [
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "4m",
+      "tiles": 21
+     },
+     {
+      "kinds": 6,
+      "shanten": 1,
+      "tile": "5m",
+      "tiles": 18
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "6m",
+      "tiles": 22
+     },
+     {
+      "kinds": 12,
+      "shanten": 1,
+      "tile": "8m",
+      "tiles": 39
+     },
+     {
+      "kinds": 6,
+      "shanten": 1,
+      "tile": "7p",
+      "tiles": 17
+     },
+     {
+      "kinds": 6,
+      "shanten": 1,
+      "tile": "8p",
+      "tiles": 18
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "9p",
+      "tiles": 22
+     },
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "4s",
+      "tiles": 4
+     },
+     {
+      "kinds": 3,
+      "shanten": 0,
+      "tile": "5s",
+      "tiles": 11
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "6s",
+      "tiles": 15
+     },
+     {
+      "kinds": 8,
+      "shanten": 1,
+      "tile": "7s",
+      "tiles": 24
+     },
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "8s",
+      "tiles": 7
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "5z75p",
+      "flowers": "",
+      "hand": "45688m789p455678s",
+      "melds": []
+     },
+     {
+      "discards": "51p4m",
+      "flowers": "",
+      "hand": "1389m79p356889s5z",
+      "melds": []
+     },
+     {
+      "discards": "2m13p",
+      "flowers": "74f",
+      "hand": "9p2237s11123677z",
+      "melds": []
+     },
+     {
+      "discards": "192m",
+      "flowers": "2f",
+      "hand": "4m1346p34479s334z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008142,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 142,
+    "game_seed": 20000001,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.25,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 1.0,
+     "T4_policy": 0.999999998350596
+    },
+    "score": 0.5833333338831347
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "1s"
+    ],
+    "naive": "7s",
+    "options": [
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "1s",
+      "tiles": 3
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "2s",
+      "tiles": 6
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "6s",
+      "tiles": 6
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "7s",
+      "tiles": 7
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "6m94p2m8p3z6m1z6p4z5m5z8p2m4s",
+      "flowers": "564f",
+      "hand": "12267s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999s"
+       }
+      ]
+     },
+     {
+      "discards": "13m15s93m8s8m2s3z2m8s45z2s",
+      "flowers": "713f",
+      "hand": "255577p1177z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "1s457m4s3z7s73m7s8m9s52z9m4z3s",
+      "flowers": "2f",
+      "hand": "2367899p",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111p"
+       }
+      ]
+     },
+     {
+      "discards": "63p3s24p1s3p996m256z3m",
+      "flowers": "8f",
+      "hand": "144458m466s1277z",
+      "melds": []
+     }
+    ],
+    "seed": 160000000079,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 79,
+    "game_seed": 20000000,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.18181818181818182,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.980844615830871
+    },
+    "score": 0.279112400783649
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "9p",
+     "4s"
+    ],
+    "naive": "2p",
+    "options": [
+     {
+      "kinds": 4,
+      "shanten": 2,
+      "tile": "1m",
+      "tiles": 13
+     },
+     {
+      "kinds": 4,
+      "shanten": 2,
+      "tile": "2m",
+      "tiles": 12
+     },
+     {
+      "kinds": 16,
+      "shanten": 2,
+      "tile": "3m",
+      "tiles": 41
+     },
+     {
+      "kinds": 16,
+      "shanten": 2,
+      "tile": "5m",
+      "tiles": 39
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "2p",
+      "tiles": 41
+     },
+     {
+      "kinds": 14,
+      "shanten": 2,
+      "tile": "3p",
+      "tiles": 37
+     },
+     {
+      "kinds": 12,
+      "shanten": 2,
+      "tile": "8p",
+      "tiles": 31
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "9p",
+      "tiles": 10
+     },
+     {
+      "kinds": 8,
+      "shanten": 2,
+      "tile": "2s",
+      "tiles": 22
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "3s",
+      "tiles": 21
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "4s",
+      "tiles": 10
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "13z6p",
+      "flowers": "3f",
+      "hand": "12335m23889p2344s",
+      "melds": []
+     },
+     {
+      "discards": "21p45m",
+      "flowers": "",
+      "hand": "189m5p12779s3z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "666s"
+       }
+      ]
+     },
+     {
+      "discards": "9m552s",
+      "flowers": "2f",
+      "hand": "788m245779p4s567z",
+      "melds": []
+     },
+     {
+      "discards": "5236m1s",
+      "flowers": "8f",
+      "hand": "167889p1s366z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000144527,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 527,
+    "game_seed": 20000018,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.18181818181818182,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9203962176581727
+    },
+    "score": 0.29926186684121514
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5m",
+     "8m"
+    ],
+    "naive": "4s",
+    "options": [
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "5m",
+      "tiles": 12
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "7m",
+      "tiles": 17
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "8m",
+      "tiles": 12
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "9m",
+      "tiles": 21
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "2p",
+      "tiles": 18
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "3p",
+      "tiles": 15
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "4p",
+      "tiles": 18
+     },
+     {
+      "kinds": 16,
+      "shanten": 2,
+      "tile": "6p",
+      "tiles": 52
+     },
+     {
+      "kinds": 14,
+      "shanten": 2,
+      "tile": "4s",
+      "tiles": 44
+     },
+     {
+      "kinds": 14,
+      "shanten": 2,
+      "tile": "5s",
+      "tiles": 44
+     },
+     {
+      "kinds": 11,
+      "shanten": 2,
+      "tile": "z1",
+      "tiles": 35
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "8s",
+      "flowers": "",
+      "hand": "57889m23466p45s11z",
+      "melds": []
+     },
+     {
+      "discards": "5p",
+      "flowers": "87f",
+      "hand": "249m79p2389s1246z",
+      "melds": []
+     },
+     {
+      "discards": "7s2m",
+      "flowers": "5f",
+      "hand": "569m1245p34s3567z",
+      "melds": []
+     },
+     {
+      "discards": "2s4p",
+      "flowers": "34f",
+      "hand": "1135668m18p4s367z",
+      "melds": []
+     }
+    ],
+    "seed": 160000072256,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 256,
+    "game_seed": 20000009,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.16666666666666666,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.804694053597893
+    },
+    "score": 0.3428797599118134
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "1p",
+     "4p"
+    ],
+    "naive": "8m",
+    "options": [
+     {
+      "kinds": 12,
+      "shanten": 2,
+      "tile": "2m",
+      "tiles": 38
+     },
+     {
+      "kinds": 11,
+      "shanten": 2,
+      "tile": "3m",
+      "tiles": 35
+     },
+     {
+      "kinds": 12,
+      "shanten": 2,
+      "tile": "4m",
+      "tiles": 38
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "7m",
+      "tiles": 10
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "8m",
+      "tiles": 9
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "1p",
+      "tiles": 23
+     },
+     {
+      "kinds": 11,
+      "shanten": 2,
+      "tile": "2p",
+      "tiles": 36
+     },
+     {
+      "kinds": 10,
+      "shanten": 2,
+      "tile": "3p",
+      "tiles": 32
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "4p",
+      "tiles": 23
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "7p",
+      "tiles": 12
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "3s",
+      "tiles": 14
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "5s",
+      "tiles": 14
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "81s",
+      "flowers": "1f",
+      "hand": "23478m1234777p35s",
+      "melds": []
+     },
+     {
+      "discards": "5m1s",
+      "flowers": "46f",
+      "hand": "68m1557p277s4557z",
+      "melds": []
+     },
+     {
+      "discards": "71m1s",
+      "flowers": "8f",
+      "hand": "4m2558p558s13z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "444p"
+       }
+      ]
+     },
+     {
+      "discards": "86p",
+      "flowers": "5f",
+      "hand": "12367m34668s456z",
+      "melds": []
+     }
+    ],
+    "seed": 160000040297,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 297,
+    "game_seed": 20000005,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.25,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9282285212604977
+    },
+    "score": 0.27392382624650075
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "7p",
+     "2s"
+    ],
+    "naive": "8m",
+    "options": [
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "8m",
+      "tiles": 29
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "1p",
+      "tiles": 27
+     },
+     {
+      "kinds": 19,
+      "shanten": 3,
+      "tile": "2p",
+      "tiles": 37
+     },
+     {
+      "kinds": 19,
+      "shanten": 3,
+      "tile": "3p",
+      "tiles": 37
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "4p",
+      "tiles": 27
+     },
+     {
+      "kinds": 17,
+      "shanten": 2,
+      "tile": "7p",
+      "tiles": 35
+     },
+     {
+      "kinds": 17,
+      "shanten": 2,
+      "tile": "2s",
+      "tiles": 35
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "6s",
+      "tiles": 30
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "5131m8s87m4z4s68m",
+      "flowers": "24f",
+      "hand": "8m12347p26s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "456p"
+       }
+      ]
+     },
+     {
+      "discards": "1s435m635s8p5s99m8s",
+      "flowers": "",
+      "hand": "112355p9s267z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "444z"
+       }
+      ]
+     },
+     {
+      "discards": "371s61m74s4m3z2s2p",
+      "flowers": "8f",
+      "hand": "678p1156677z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999p"
+       }
+      ]
+     },
+     {
+      "discards": "8p26399s7p21s5z",
+      "flowers": "67f",
+      "hand": "789m2227z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "345m"
+       }
+      ]
+     }
+    ],
+    "seed": 160003048166,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 166,
+    "game_seed": 20000381,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.14285714285714285,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9097462053721913
+    },
+    "score": 0.3157988839235553
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "2m",
+     "4s"
+    ],
+    "naive": "9m",
+    "options": [
+     {
+      "kinds": 11,
+      "shanten": 2,
+      "tile": "2m",
+      "tiles": 37
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "4m",
+      "tiles": 17
+     },
+     {
+      "kinds": 10,
+      "shanten": 2,
+      "tile": "5m",
+      "tiles": 33
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "8m",
+      "tiles": 24
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "9m",
+      "tiles": 24
+     },
+     {
+      "kinds": 16,
+      "shanten": 3,
+      "tile": "2p",
+      "tiles": 53
+     },
+     {
+      "kinds": 15,
+      "shanten": 3,
+      "tile": "3p",
+      "tiles": 49
+     },
+     {
+      "kinds": 16,
+      "shanten": 3,
+      "tile": "4p",
+      "tiles": 53
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "7p",
+      "tiles": 24
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "9p",
+      "tiles": 24
+     },
+     {
+      "kinds": 11,
+      "shanten": 2,
+      "tile": "4s",
+      "tiles": 37
+     },
+     {
+      "kinds": 16,
+      "shanten": 3,
+      "tile": "6s",
+      "tiles": 53
+     },
+     {
+      "kinds": 16,
+      "shanten": 3,
+      "tile": "7s",
+      "tiles": 53
+     },
+     {
+      "kinds": 16,
+      "shanten": 3,
+      "tile": "8s",
+      "tiles": 53
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "",
+      "flowers": "",
+      "hand": "24589m23479p4678s",
+      "melds": []
+     },
+     {
+      "discards": "",
+      "flowers": "",
+      "hand": "79m12345p489s357z",
+      "melds": []
+     },
+     {
+      "discards": "",
+      "flowers": "8f",
+      "hand": "12379m56p13567s4z",
+      "melds": []
+     },
+     {
+      "discards": "",
+      "flowers": "",
+      "hand": "14466m3689p379s2z",
+      "melds": []
+     }
+    ],
+    "seed": 160000376062,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 62,
+    "game_seed": 20000047,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.09090909090909091,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.7281581078312694
+    },
+    "score": 0.39364426708654654
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5p"
+    ],
+    "naive": "9p",
+    "options": [
+     {
+      "kinds": 17,
+      "shanten": 3,
+      "tile": "1m",
+      "tiles": 52
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "7m",
+      "tiles": 19
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "8m",
+      "tiles": 19
+     },
+     {
+      "kinds": 10,
+      "shanten": 3,
+      "tile": "9m",
+      "tiles": 32
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "2p",
+      "tiles": 22
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "3p",
+      "tiles": 18
+     },
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "5p",
+      "tiles": 26
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "8p",
+      "tiles": 22
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "9p",
+      "tiles": 22
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "3s",
+      "tiles": 19
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "4s",
+      "tiles": 19
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "",
+      "flowers": "3f",
+      "hand": "1177889m23589p34s",
+      "melds": []
+     },
+     {
+      "discards": "",
+      "flowers": "",
+      "hand": "1368m19p228s2667z",
+      "melds": []
+     },
+     {
+      "discards": "2p",
+      "flowers": "",
+      "hand": "367m6p466789s125z",
+      "melds": []
+     },
+     {
+      "discards": "5s",
+      "flowers": "6f",
+      "hand": "1236m78p18s23467z",
+      "melds": []
+     }
+    ],
+    "seed": 160000048257,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 257,
+    "game_seed": 20000006,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.2,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9996083838121879
+    },
+    "score": 0.2667972053959374
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5s"
+    ],
+    "naive": "z3",
+    "options": [
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "5s",
+      "tiles": 4
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "6s",
+      "tiles": 8
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "7s",
+      "tiles": 8
+     },
+     {
+      "kinds": 8,
+      "shanten": 1,
+      "tile": "z3",
+      "tiles": 15
+     },
+     {
+      "kinds": 8,
+      "shanten": 1,
+      "tile": "z5",
+      "tiles": 15
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "26p1117m7p9m",
+      "flowers": "87f",
+      "hand": "5567s3355z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "999s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "123s"
+       }
+      ]
+     },
+     {
+      "discards": "58m35s8m37s",
+      "flowers": "63f",
+      "hand": "9m1234567p9s1467z",
+      "melds": []
+     },
+     {
+      "discards": "1s33p2s4p74s9p",
+      "flowers": "",
+      "hand": "124446m6p246z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "678m"
+       }
+      ]
+     },
+     {
+      "discards": "48s527188p",
+      "flowers": "2f",
+      "hand": "36m11234677z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "222m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000008265,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 265,
+    "game_seed": 20000001,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.08333333333333333,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.999326947254745
+    },
+    "score": 0.3057799064706405
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "6m"
+    ],
+    "naive": "9p",
+    "options": [
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "4m",
+      "tiles": 20
+     },
+     {
+      "kinds": 6,
+      "shanten": 1,
+      "tile": "5m",
+      "tiles": 18
+     },
+     {
+      "kinds": 3,
+      "shanten": 0,
+      "tile": "6m",
+      "tiles": 11
+     },
+     {
+      "kinds": 11,
+      "shanten": 1,
+      "tile": "8m",
+      "tiles": 34
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "7p",
+      "tiles": 13
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "8p",
+      "tiles": 14
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "9p",
+      "tiles": 16
+     },
+     {
+      "kinds": 13,
+      "shanten": 1,
+      "tile": "4s",
+      "tiles": 38
+     },
+     {
+      "kinds": 12,
+      "shanten": 1,
+      "tile": "5s",
+      "tiles": 36
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "6s",
+      "tiles": 11
+     },
+     {
+      "kinds": 11,
+      "shanten": 1,
+      "tile": "7s",
+      "tiles": 33
+     },
+     {
+      "kinds": 14,
+      "shanten": 1,
+      "tile": "8s",
+      "tiles": 42
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "5z75p5s",
+      "flowers": "",
+      "hand": "456688m789p45678s",
+      "melds": []
+     },
+     {
+      "discards": "51p4m9p",
+      "flowers": "",
+      "hand": "1389m57p356889s5z",
+      "melds": []
+     },
+     {
+      "discards": "2m139p",
+      "flowers": "74f",
+      "hand": "2237s111236777z",
+      "melds": []
+     },
+     {
+      "discards": "1924m",
+      "flowers": "2f",
+      "hand": "1346p34479s3346z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008147,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 147,
+    "game_seed": 20000001,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.3333333333333333,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 1.0,
+     "T4_policy": 0.9999996801414559
+    },
+    "score": 0.5555556621750702
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "6p",
+     "9p"
+    ],
+    "naive": "2p",
+    "options": [
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "2p",
+      "tiles": 12
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "3p",
+      "tiles": 12
+     },
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "6p",
+      "tiles": 2
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "7p",
+      "tiles": 6
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "8p",
+      "tiles": 7
+     },
+     {
+      "kinds": 2,
+      "shanten": 0,
+      "tile": "9p",
+      "tiles": 2
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1s457m4s3z7s73m7s8m9s52z9m4z3s",
+      "flowers": "2f",
+      "hand": "23667899p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "111p"
+       }
+      ]
+     },
+     {
+      "discards": "63p3s24p1s3p996m256z3m",
+      "flowers": "8f",
+      "hand": "144458m466s1277z",
+      "melds": []
+     },
+     {
+      "discards": "6m94p2m8p3z6m1z6p4z5m5z8p2m41s",
+      "flowers": "564f",
+      "hand": "2267s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "678s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "345s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "999s"
+       }
+      ]
+     },
+     {
+      "discards": "13m15s93m8s8m2s3z2m8s45z2s6m",
+      "flowers": "713f",
+      "hand": "255577p1177z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000081,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 81,
+    "game_seed": 20000000,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.2,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9631671719956131
+    },
+    "score": 0.2789442760014623
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "9p",
+     "9s"
+    ],
+    "naive": "1s",
+    "options": [
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "6m",
+      "tiles": 39
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "7m",
+      "tiles": 40
+     },
+     {
+      "kinds": 11,
+      "shanten": 2,
+      "tile": "7p",
+      "tiles": 29
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "9p",
+      "tiles": 10
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "1s",
+      "tiles": 37
+     },
+     {
+      "kinds": 12,
+      "shanten": 2,
+      "tile": "3s",
+      "tiles": 35
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "5s",
+      "tiles": 16
+     },
+     {
+      "kinds": 6,
+      "shanten": 2,
+      "tile": "6s",
+      "tiles": 21
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "7s",
+      "tiles": 17
+     },
+     {
+      "kinds": 3,
+      "shanten": 1,
+      "tile": "9s",
+      "tiles": 10
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "3m137z",
+      "flowers": "374f",
+      "hand": "67m779p135679s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "234p"
+       }
+      ]
+     },
+     {
+      "discards": "19p2z2s",
+      "flowers": "12f",
+      "hand": "2346m45p4688s",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789m"
+       }
+      ]
+     },
+     {
+      "discards": "5393s4z",
+      "flowers": "658f",
+      "hand": "235889m156889p6z",
+      "melds": []
+     },
+     {
+      "discards": "54161p",
+      "flowers": "",
+      "hand": "155m8p115578s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000296102,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 102,
+    "game_seed": 20000037,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.18181818181818182,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.9403886192690387
+    },
+    "score": 0.29259773297092645
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5p",
+     "9s"
+    ],
+    "naive": "2p",
+    "options": [
+     {
+      "kinds": 7,
+      "shanten": 2,
+      "tile": "5m",
+      "tiles": 14
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "2p",
+      "tiles": 8
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "3p",
+      "tiles": 30
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "5p",
+      "tiles": 12
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "2s",
+      "tiles": 36
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "3s",
+      "tiles": 31
+     },
+     {
+      "kinds": 5,
+      "shanten": 2,
+      "tile": "4s",
+      "tiles": 12
+     },
+     {
+      "kinds": 14,
+      "shanten": 2,
+      "tile": "5s",
+      "tiles": 33
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "6s",
+      "tiles": 36
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "8s",
+      "tiles": 29
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "9s",
+      "tiles": 12
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "58p2z7m5z1s24m",
+      "flowers": "268f",
+      "hand": "555m235p23456889s",
+      "melds": []
+     },
+     {
+      "discards": "4169m95p8m6p9m",
+      "flowers": "",
+      "hand": "145678s2356z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789s"
+       }
+      ]
+     },
+     {
+      "discards": "4175s933m53z2m",
+      "flowers": "4f",
+      "hand": "223449p4467z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "111z"
+       }
+      ]
+     },
+     {
+      "discards": "43p2637428m53z1s",
+      "flowers": "",
+      "hand": "333466s4677z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "222s"
+       }
+      ]
+     }
+    ],
+    "seed": 160000072412,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 412,
+    "game_seed": 20000009,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.15384615384615385,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.5964277903801192
+    },
+    "score": 0.4165753519245756
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5p",
+     "8p"
+    ],
+    "naive": "9m",
+    "options": [
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "2m",
+      "tiles": 10
+     },
+     {
+      "kinds": 4,
+      "shanten": 1,
+      "tile": "3m",
+      "tiles": 11
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "7m",
+      "tiles": 15
+     },
+     {
+      "kinds": 5,
+      "shanten": 1,
+      "tile": "9m",
+      "tiles": 15
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "5p",
+      "tiles": 21
+     },
+     {
+      "kinds": 12,
+      "shanten": 2,
+      "tile": "6p",
+      "tiles": 36
+     },
+     {
+      "kinds": 12,
+      "shanten": 2,
+      "tile": "7p",
+      "tiles": 35
+     },
+     {
+      "kinds": 7,
+      "shanten": 1,
+      "tile": "8p",
+      "tiles": 21
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "4s",
+      "tiles": 42
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "5s",
+      "tiles": 36
+     },
+     {
+      "kinds": 16,
+      "shanten": 2,
+      "tile": "6s",
+      "tiles": 45
+     },
+     {
+      "kinds": 13,
+      "shanten": 2,
+      "tile": "7s",
+      "tiles": 36
+     },
+     {
+      "kinds": 15,
+      "shanten": 2,
+      "tile": "8s",
+      "tiles": 41
+     }
+    ]
+   },
+   "kind": "best_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "37z4m",
+      "flowers": "",
+      "hand": "2379m5678p456678s",
+      "melds": []
+     },
+     {
+      "discards": "6s8m",
+      "flowers": "63f",
+      "hand": "39m1138p9s222356z",
+      "melds": []
+     },
+     {
+      "discards": "4p2s5p3s3p",
+      "flowers": "",
+      "hand": "34m8p49s26z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "666m"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "555m"
+       }
+      ]
+     },
+     {
+      "discards": "3m152s",
+      "flowers": "7f",
+      "hand": "79m1223679p29s44z",
+      "melds": []
+     }
+    ],
+    "seed": 160000048687,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 687,
+    "game_seed": 20000006,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 2
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 1,
+      "pattern": "\u81ea\u6478"
+     },
+     {
+      "faan": 2,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 3,
+    "points": 8,
+    "win_type": "self_draw"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "7m3z1m182s5z",
+      "flowers": "562f",
+      "hand": "345m11234p444s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678p"
+       }
+      ]
+     },
+     {
+      "discards": "1p64m64p3m8p",
+      "flowers": "3f",
+      "hand": "4m334556799s356z",
+      "melds": []
+     },
+     {
+      "discards": "6s3m8s11m2s51m",
+      "flowers": "7f",
+      "hand": "2789p2s44467z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "333p"
+       }
+      ]
+     },
+     {
+      "discards": "5186p12s4p",
+      "flowers": "81f",
+      "hand": "2277m77s1122346z",
+      "melds": []
+     }
+    ],
+    "seed": 160000168346,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 346,
+    "game_seed": 20000021,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": "3s",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 1,
+      "pattern": "\u5e73\u7cca"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u524d\u6e05"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 3,
+    "points": 8,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "5z75p5s67m",
+      "flowers": "1f",
+      "hand": "45688m789p45678s",
+      "melds": []
+     },
+     {
+      "discards": "51p4m9p39m",
+      "flowers": "",
+      "hand": "168m57p356889s56z",
+      "melds": []
+     },
+     {
+      "discards": "2m139p7m",
+      "flowers": "74f",
+      "hand": "22367s111236777z",
+      "melds": []
+     },
+     {
+      "discards": "1924m4p",
+      "flowers": "23f",
+      "hand": "136p344799s3346z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008154,
+    "turn": 2,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 154,
+    "game_seed": 20000001,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 4
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 1,
+      "pattern": "\u5e73\u7cca"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u81ea\u6478"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u524d\u6e05"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 4,
+    "points": 16,
+    "win_type": "self_draw"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1m3z6m4z2s2z5s318m8s",
+      "flowers": "56f",
+      "hand": "234m12333p123678s",
+      "melds": []
+     },
+     {
+      "discards": "41p9s2z42p4z6p76z2m",
+      "flowers": "42f",
+      "hand": "1233459m",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777m"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "7m54488p8m5p82m1z589p",
+      "flowers": "31f",
+      "hand": "133s5z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "444s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "666s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       }
+      ]
+     },
+     {
+      "discards": "6m5s9m975s2z4s44m169p",
+      "flowers": "8f",
+      "hand": "59m2777p11s15z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "777z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000048451,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 451,
+    "game_seed": 20000006,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 2
+   },
+   "discard": "2s",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u6df7\u4e00\u8272"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u7bad\u523b"
+     }
+    ],
+    "correct": 4,
+    "points": 16,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "12p5m479p2z1p3131z7s",
+      "flowers": "346f",
+      "hand": "1134s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "666s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "789s"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "39p52s5p9s3p6m1z2p7s",
+      "flowers": "7f",
+      "hand": "27789m3p4s",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "345m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "888m"
+       }
+      ]
+     },
+     {
+      "discards": "2s52m65s2z1m1z81p",
+      "flowers": "52f",
+      "hand": "7899p2s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "456p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "added_kong",
+        "tiles": "5555z"
+       }
+      ]
+     },
+     {
+      "discards": "2p18s7p9s187p63m3z",
+      "flowers": "1f",
+      "hand": "7799m6p44z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "777z"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000008127,
+    "turn": 2,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 127,
+    "game_seed": 20000001,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": "6s",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 1,
+      "pattern": "\u5e73\u7cca"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u524d\u6e05"
+     },
+     {
+      "faan": 2,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 4,
+    "points": 16,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "2s4z829s2z7p2z2p6m",
+      "flowers": "2654f",
+      "hand": "345789m789p45s66z",
+      "melds": []
+     },
+     {
+      "discards": "4671s34p243m2z",
+      "flowers": "8f",
+      "hand": "166p5568s6z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "111m"
+       }
+      ]
+     },
+     {
+      "discards": "1s28479m1z4m96s8m",
+      "flowers": "",
+      "hand": "5m2345568p9s5z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789p"
+       }
+      ]
+     },
+     {
+      "discards": "24157z7s49p7s7z8p2m",
+      "flowers": "7f",
+      "hand": "3789m13456p3459s",
+      "melds": []
+     }
+    ],
+    "seed": 160000168557,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 557,
+    "game_seed": 20000021,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 4
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 1,
+      "pattern": "\u5e73\u7cca"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u81ea\u6478"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u524d\u6e05"
+     },
+     {
+      "faan": 2,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 5,
+    "points": 24,
+    "win_type": "self_draw"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "13z69p1z4s1z19m2z2s7m",
+      "flowers": "347f",
+      "hand": "123345m23488p234s",
+      "melds": []
+     },
+     {
+      "discards": "21p4518m51p9m32z5p42z",
+      "flowers": "",
+      "hand": "124589s7z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "666s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777s"
+       }
+      ]
+     },
+     {
+      "discards": "9m55234s78m3z85m514z",
+      "flowers": "2f",
+      "hand": "7m224456779p7s67z",
+      "melds": []
+     },
+     {
+      "discards": "5236m161s2769m3z18p",
+      "flowers": "85f",
+      "hand": "46789p589s66z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000144573,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 573,
+    "game_seed": 20000018,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 2
+   },
+   "discard": "9p",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u5c0d\u5c0d\u7cca"
+     },
+     {
+      "faan": 2,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 5,
+    "points": 24,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "72m4p6s6p92s26m5z6m3z",
+      "flowers": "652f",
+      "hand": "2299p888s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "444m"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "555p"
+       }
+      ]
+     },
+     {
+      "discards": "3p837m4p2m8p84m5p9m",
+      "flowers": "178f",
+      "hand": "333456779s2777z",
+      "melds": []
+     },
+     {
+      "discards": "25s359m9s5m3z16p9m3p",
+      "flowers": "",
+      "hand": "2244p112246z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "777p"
+       }
+      ]
+     },
+     {
+      "discards": "7m361p38691m3z1m9s",
+      "flowers": "3f",
+      "hand": "9p1246s144456z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "111s"
+       }
+      ]
+     }
+    ],
+    "seed": 160000240425,
+    "turn": 3,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 425,
+    "game_seed": 20000030,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u5c0d\u5c0d\u7cca"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u81ea\u6478"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u7bad\u523b"
+     }
+    ],
+    "correct": 5,
+    "points": 24,
+    "win_type": "self_draw"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "6m6p7m5s3z4p6s6m1z6m1p4s2z7m6z",
+      "flowers": "78f",
+      "hand": "888m77p",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "444z"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "111s"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     },
+     {
+      "discards": "384p2372m8p453z548p6z",
+      "flowers": "2f",
+      "hand": "3m9p356799s77z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "123s"
+       }
+      ]
+     },
+     {
+      "discards": "2z36p2z38p4s11p7s",
+      "flowers": "4153f",
+      "hand": "34789m22578899s",
+      "melds": []
+     },
+     {
+      "discards": "8s6p2m3z4p9m67s1z9p4s6z92m",
+      "flowers": "",
+      "hand": "7z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "555p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "111m"
+       },
+       {
+        "from_seat": 1,
+        "kind": "added_kong",
+        "tiles": "5555m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000008444,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 444,
+    "game_seed": 20000001,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 4
+   },
+   "discard": "8s",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u6df7\u4e00\u8272"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u7121\u82b1"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u98a8"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u7bad\u523b"
+     }
+    ],
+    "correct": 6,
+    "points": 32,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "3169m164p7m27z",
+      "flowers": "",
+      "hand": "2346679s666z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "15p78s33p85m4s3z8p",
+      "flowers": "31f",
+      "hand": "139m11s47z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222m"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "888p"
+       }
+      ]
+     },
+     {
+      "discards": "47p552m21p548m",
+      "flowers": "2f",
+      "hand": "12367s11455z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "555s"
+       }
+      ]
+     },
+     {
+      "discards": "6s6m5s8m24z4p24s6m",
+      "flowers": "768f",
+      "hand": "5599p338s7z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "444m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "777p"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000150,
+    "turn": 3,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 150,
+    "game_seed": 20000000,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 2
+   },
+   "discard": "5m",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u5c0d\u5c0d\u7cca"
+     },
+     {
+      "faan": 3,
+      "pattern": "\u6df7\u4e00\u8272"
+     }
+    ],
+    "correct": 6,
+    "points": 32,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "7s34p62738s6z97m6z",
+      "flowers": "7f",
+      "hand": "22255m33377z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "111m"
+       }
+      ]
+     },
+     {
+      "discards": "422617s2m5s4z47m6z8m1p",
+      "flowers": "65f",
+      "hand": "5m456p1157z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789p"
+       }
+      ]
+     },
+     {
+      "discards": "4z94s7m119s8555p6z",
+      "flowers": "",
+      "hand": "666m12369p358s25z",
+      "melds": []
+     },
+     {
+      "discards": "2p136s4p8s4z6p3s1p5s7p2s",
+      "flowers": "321f",
+      "hand": "467m2257z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "333m"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "999m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000528652,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 652,
+    "game_seed": 20000066,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": "9m",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u5c0d\u5c0d\u7cca"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u5708\u98a8"
+     },
+     {
+      "faan": 2,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 6,
+    "points": 32,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "42p57s2p58m5z6m6z7s38m",
+      "flowers": "1537f",
+      "hand": "4499m333p",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "888s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111z"
+       }
+      ]
+     },
+     {
+      "discards": "526m9p8m888p986s21m",
+      "flowers": "4f",
+      "hand": "2244z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "345s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "777z"
+       }
+      ]
+     },
+     {
+      "discards": "76m371s3m4s12p2m15z11m",
+      "flowers": "6f",
+      "hand": "36m457p12s234z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "666p"
+       }
+      ]
+     },
+     {
+      "discards": "6s5m7s71m39p9s19p5z5s5m9p6z",
+      "flowers": "",
+      "hand": "449m22s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "555p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "777p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000064762,
+    "turn": 3,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 762,
+    "game_seed": 20000008,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 5
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u6df7\u4e00\u8272"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u81ea\u6478"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u98a8"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u5708\u98a8"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u7bad\u523b"
+     }
+    ],
+    "correct": 7,
+    "points": 48,
+    "win_type": "self_draw"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "4p5m5p6m7p6m3p8m1s8p",
+      "flowers": "7f",
+      "hand": "22345789s111z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "555z"
+       }
+      ]
+     },
+     {
+      "discards": "7s54p48s951p3z2p1z",
+      "flowers": "6f",
+      "hand": "334558m2277z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "123m"
+       }
+      ]
+     },
+     {
+      "discards": "1p6s3z3p97s4p9m",
+      "flowers": "3f",
+      "hand": "2344789m67p567s7z",
+      "melds": []
+     },
+     {
+      "discards": "297m22p6m6p3z9p6m",
+      "flowers": "48f",
+      "hand": "9p4568s46z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "456s"
+       }
+      ]
+     }
+    ],
+    "seed": 160000016059,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 59,
+    "game_seed": 20000002,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "score": 2
+   },
+   "discard": "8s",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 7,
+      "pattern": "\u6e05\u4e00\u8272"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 8,
+    "points": 64,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "6m94p2m8p3z6m1z6p4z5m5z8p2m41s9p",
+      "flowers": "564f",
+      "hand": "2267s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999s"
+       }
+      ]
+     },
+     {
+      "discards": "13m15s93m8s8m2s3z2m8s45z2s6m",
+      "flowers": "713f",
+      "hand": "255577p8s1177z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "1s457m4s3z7s73m7s8m9s52z9m4z3s6p",
+      "flowers": "2f",
+      "hand": "2367899p",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111p"
+       }
+      ]
+     },
+     {
+      "discards": "63p3s24p1s3p996m256z34m",
+      "flowers": "8f",
+      "hand": "114458m466s1277z",
+      "melds": []
+     }
+    ],
+    "seed": 160000000085,
+    "turn": 1,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 85,
+    "game_seed": 20000000,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "score": 3
+   },
+   "discard": "2p",
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u5c0d\u5c0d\u7cca"
+     },
+     {
+      "faan": 3,
+      "pattern": "\u6df7\u4e00\u8272"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u6b63\u82b1"
+     }
+    ],
+    "correct": 7,
+    "points": 48,
+    "win_type": "discard"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "4m3s75m22s8p3m6z7m",
+      "flowers": "16f",
+      "hand": "1112266p",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "222z"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "444z"
+       }
+      ]
+     },
+     {
+      "discards": "7s87m2s9m6z8s7z",
+      "flowers": "54f",
+      "hand": "23457p55z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "567p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "999p"
+       }
+      ]
+     },
+     {
+      "discards": "4m7p61m48p8m4p3z4m",
+      "flowers": "",
+      "hand": "8p555679s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123s"
+       }
+      ]
+     },
+     {
+      "discards": "5s5p16s38p63s2z8s",
+      "flowers": "82f",
+      "hand": "122239m2p7z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "555m"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000040903,
+    "turn": 3,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 903,
+    "game_seed": 20000005,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "score": 5
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "breakdown": [
+     {
+      "faan": 3,
+      "pattern": "\u6df7\u4e00\u8272"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u81ea\u6478"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u9580\u524d\u6e05"
+     },
+     {
+      "faan": 1,
+      "pattern": "\u6b63\u82b1"
+     },
+     {
+      "faan": 2,
+      "pattern": "\u4e00\u53f0\u82b1"
+     }
+    ],
+    "correct": 8,
+    "points": 64,
+    "win_type": "self_draw"
+   },
+   "kind": "count_faan",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "4m5p6172m74p3m7p415m9p798m",
+      "flowers": "87256f",
+      "hand": "111234456789s22z",
+      "melds": []
+     },
+     {
+      "discards": "6s4m82s2m99s9m5s13z6s367z11m26s",
+      "flowers": "",
+      "hand": "34666p55z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "888p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "222p"
+       }
+      ]
+     },
+     {
+      "discards": "1p4m73p6m55s579m8s88m1p27m67z",
+      "flowers": "134f",
+      "hand": "899p144s1122457z",
+      "melds": []
+     },
+     {
+      "discards": "4527115p5m4p3m3z36m676z6m3z",
+      "flowers": "",
+      "hand": "5m2337789s14445z",
+      "melds": []
+     }
+    ],
+    "seed": 160000208084,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 84,
+    "game_seed": 20000026,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.3333333333333333,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 0.0,
+     "T4_policy": 0.5182935823082767
+    },
+    "score": 0.5370932710895975
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "1m",
+     "2m",
+     "6m"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible",
+       "no_chance"
+      ],
+      "tile": "1m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "2m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "6m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z2"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z4"
+     },
+     {
+      "deals_in_to": [
+       2
+      ],
+      "reasons": [],
+      "tile": "z5"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z6"
+     }
+    ],
+    "reason": "all_copies_visible",
+    "safe": [
+     "1m",
+     "2m",
+     "4m",
+     "6m",
+     "7s",
+     "z2",
+     "z4",
+     "z6"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1s33p2s4p74s964p86s96m",
+      "flowers": "",
+      "hand": "124446m7s2456z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678m"
+       }
+      ]
+     },
+     {
+      "discards": "48s5271886p54s9p6m8p",
+      "flowers": "2f",
+      "hand": "3m112234677z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222m"
+       }
+      ]
+     },
+     {
+      "discards": "26p1117m7p9m5s19p1s7m2s7m",
+      "flowers": "87f",
+      "hand": "567s3355z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123s"
+       }
+      ]
+     },
+     {
+      "discards": "58m35s8m37s9m3s51226p",
+      "flowers": "63f",
+      "hand": "355m3479p29s1467z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008294,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 294,
+    "game_seed": 20000001,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.14285714285714285,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 0.0,
+     "T4_policy": 0.1364924573937571
+    },
+    "score": 0.680162599937275
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "z4"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "2s"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "3s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4s"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "6s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7s"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "9s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "z4"
+     }
+    ],
+    "reason": "all_copies_visible",
+    "safe": [
+     "2s",
+     "4s",
+     "7s",
+     "z4"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1924m4213p7m6p9m6z8p4s2m1p5z",
+      "flowers": "236f",
+      "hand": "23467999s444z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "5z75p5s6723m1z3m5s4z15m4p11s",
+      "flowers": "1f",
+      "hand": "45688m789p45678s",
+      "melds": []
+     },
+     {
+      "discards": "51p4m9p39m5p518m57p6m5z96p6z4p",
+      "flowers": "",
+      "hand": "3m3p1334569s7z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "888s"
+       }
+      ]
+     },
+     {
+      "discards": "2m139p7m3s824p4m7p6z87m8p3z1s",
+      "flowers": "74f",
+      "hand": "2267s111222777z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008214,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 214,
+    "game_seed": 20000001,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.2,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 0.0,
+     "T4_policy": 0.3286626547719928
+    },
+    "score": 0.8678343363070018
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "8s"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5m"
+     },
+     {
+      "deals_in_to": [
+       3
+      ],
+      "reasons": [],
+      "tile": "5p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "6s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible",
+       "no_chance"
+      ],
+      "tile": "8s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z5"
+     }
+    ],
+    "reason": "all_copies_visible",
+    "safe": [
+     "5m",
+     "6s",
+     "8s",
+     "z5"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "9p7m63p9m5p9m214z99m12z3s",
+      "flowers": "13f",
+      "hand": "5m5p68s5z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "456s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "123s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "789s"
+       }
+      ]
+     },
+     {
+      "discards": "51s38p82s2z2s14z7s7z7p",
+      "flowers": "7f",
+      "hand": "134455668m6z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     },
+     {
+      "discards": "13m2z7447s1m48s3z3s14z1s7z",
+      "flowers": "8f",
+      "hand": "5m266p",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "234p"
+       }
+      ]
+     },
+     {
+      "discards": "3s72m1s6m659s8m7p3m7z9p5z8m",
+      "flowers": "",
+      "hand": "4445789p666z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000294,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 294,
+    "game_seed": 20000000,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.07692307692307693,
+     "T1": 1.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.26812441852260166
+    },
+    "score": 0.41373812613858035
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "9s"
+    ],
+    "options": [
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "5m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7m"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "8m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "8p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "9p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "3s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "6s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "genbutsu",
+       "all_copies_visible"
+      ],
+      "tile": "9s"
+     }
+    ],
+    "reason": "genbutsu",
+    "safe": [
+     "7m",
+     "4p",
+     "7p",
+     "8p",
+     "9p",
+     "3s",
+     "4s",
+     "5s",
+     "6s",
+     "7s",
+     "9s"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "4m5z9m61z6255m6p8m4z13s6p3s47z",
+      "flowers": "5f",
+      "hand": "578m44789p345679s",
+      "melds": []
+     },
+     {
+      "discards": "19s32z11p2s46z32s2z9m5s8p94m8s",
+      "flowers": "6f",
+      "hand": "23467m34577p456s",
+      "melds": []
+     },
+     {
+      "discards": "719s1577z65s3m5p3m7s2m4s9m6p1m",
+      "flowers": "17f",
+      "hand": "1168m223345678p",
+      "melds": []
+     },
+     {
+      "discards": "5m4s6m2z9s51z6s4m8s4z7m7z8m3z8p63z",
+      "flowers": "3f",
+      "hand": "13m1122399p1s126z",
+      "melds": []
+     }
+    ],
+    "seed": 160001568180,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 180,
+    "game_seed": 20000196,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.08333333333333333,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 0.0,
+     "T4_policy": 0.17010548663082817
+    },
+    "score": 0.6866402950089596
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "z5"
+    ],
+    "options": [
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "4p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5p"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "7p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "1s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "6s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "8s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "9s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z4"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "genbutsu",
+       "all_copies_visible"
+      ],
+      "tile": "z5"
+     }
+    ],
+    "reason": "genbutsu",
+    "safe": [
+     "5p",
+     "1s",
+     "3s",
+     "5s",
+     "6s",
+     "7s",
+     "8s",
+     "9s",
+     "z4",
+     "z5"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "2p4m36p58m8p38m3p",
+      "flowers": "3f",
+      "hand": "457p135678899s45z",
+      "melds": []
+     },
+     {
+      "discards": "63177s21z1p5z3s82p",
+      "flowers": "28f",
+      "hand": "56p33444z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "777z"
+       }
+      ]
+     },
+     {
+      "discards": "52p51s4481p5z6p1m8p",
+      "flowers": "564f",
+      "hand": "2267899m",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "222z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "777m"
+       }
+      ]
+     },
+     {
+      "discards": "44m764p5533m57z",
+      "flowers": "7f",
+      "hand": "222678s1666z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "444s"
+       }
+      ]
+     }
+    ],
+    "seed": 160002104057,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 57,
+    "game_seed": 20000263,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.16666666666666666,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 0.0,
+     "T4_policy": 0.0026858890985471348
+    },
+    "score": 0.9576618610586966
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "9m"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "2m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "genbutsu",
+       "all_copies_visible"
+      ],
+      "tile": "9m"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "3p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z4"
+     }
+    ],
+    "reason": "genbutsu",
+    "safe": [
+     "2m",
+     "3m",
+     "7m",
+     "9m",
+     "z4"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "52s3p5s5p261s2z4p99s37z8s5z",
+      "flowers": "35f",
+      "hand": "23379m3p44z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "111m"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "4m1s8m637s2z9m4s7z84m471s",
+      "flowers": "712f",
+      "hand": "4556667p",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "111p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "789p"
+       }
+      ]
+     },
+     {
+      "discards": "2z8p7z12p3z3997p3s985m42s",
+      "flowers": "6f",
+      "hand": "2345566m348s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "567s"
+       }
+      ]
+     },
+     {
+      "discards": "23p642m52p9m72z6791s5z",
+      "flowers": "8f",
+      "hand": "2678m68p35s11346z",
+      "melds": []
+     }
+    ],
+    "seed": 160000952585,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 585,
+    "game_seed": 20000119,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.16666666666666666,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.999996000469078
+    },
+    "score": 0.45833433321606387
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "5p"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "5p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "2s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "8s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z4"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z5"
+     },
+     {
+      "deals_in_to": [
+       3
+      ],
+      "reasons": [],
+      "tile": "z7"
+     }
+    ],
+    "reason": "no_chance",
+    "safe": [
+     "5p",
+     "2s",
+     "8s",
+     "z4",
+     "z5"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "15m1p2m3p182m2z53s7p9m7s",
+      "flowers": "6f",
+      "hand": "5p22288s44557z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "444s"
+       }
+      ]
+     },
+     {
+      "discards": "15s3m3z319s9m8p1z2m9s45p",
+      "flowers": "21f",
+      "hand": "1145678m789p67s2z",
+      "melds": []
+     },
+     {
+      "discards": "52m5438p74m1963p63s",
+      "flowers": "",
+      "hand": "4m2p1345s2456z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "678s"
+       }
+      ]
+     },
+     {
+      "discards": "9s449p576s6662p1z5m33z1p",
+      "flowers": "87f",
+      "hand": "66m77z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "789m"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000088085,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 85,
+    "game_seed": 20000011,
+    "seat": 3
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.09090909090909091,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 1.0,
+     "T4_policy": 0.4215249573473367
+    },
+    "score": 0.6218914879358931
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "9m"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "1m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "2m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "9m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "1p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "9p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7s"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "z5"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z6"
+     }
+    ],
+    "reason": "no_chance",
+    "safe": [
+     "1m",
+     "2m",
+     "3m",
+     "4m",
+     "9m",
+     "1p",
+     "3p",
+     "9p",
+     "7s",
+     "z6"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "9p32z6p813548s8m",
+      "flowers": "1f",
+      "hand": "12349m139p7s56z",
+      "melds": [
+       {
+        "from_seat": null,
+        "kind": "concealed_kong",
+        "tiles": "7777m"
+       }
+      ]
+     },
+     {
+      "discards": "5s2m12s8596m683s9m7z",
+      "flowers": "8f",
+      "hand": "123789p5z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "456p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "234p"
+       }
+      ]
+     },
+     {
+      "discards": "577p94s5m3z62s88p7z8m",
+      "flowers": "52f",
+      "hand": "1236m1145p67s146z",
+      "melds": []
+     },
+     {
+      "discards": "26s623p8s68p9s3457z45p",
+      "flowers": "76f",
+      "hand": "1234489m111z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "222z"
+       }
+      ]
+     }
+    ],
+    "seed": 160000032244,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 244,
+    "game_seed": 20000004,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.2,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 0.0,
+     "T4_policy": 9.595335840624589e-07
+    },
+    "score": 0.949999760116604
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "9p"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "9p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3s"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "8s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z7"
+     }
+    ],
+    "reason": "no_chance",
+    "safe": [
+     "5p",
+     "9p",
+     "3s",
+     "z7"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "6s6m5s8m24z4p24s6m",
+      "flowers": "768f",
+      "hand": "5599p338s7z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "444m"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777p"
+       }
+      ]
+     },
+     {
+      "discards": "3169m164p7m27z",
+      "flowers": "",
+      "hand": "2346679s666z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "333z"
+       }
+      ]
+     },
+     {
+      "discards": "15p78s33p85m4s3z8p",
+      "flowers": "31f",
+      "hand": "139m11s47z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "222m"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "888p"
+       }
+      ]
+     },
+     {
+      "discards": "47p552m21p548m",
+      "flowers": "2f",
+      "hand": "12367s11455z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "555s"
+       }
+      ]
+     }
+    ],
+    "seed": 160000000150,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 150,
+    "game_seed": 20000000,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.3333333333333333,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 0.0,
+     "T4_policy": 0.6014320337346046
+    },
+    "score": 0.5163086582330155
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "1m",
+     "2m",
+     "6m"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible",
+       "no_chance"
+      ],
+      "tile": "1m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "2m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "6m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z2"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z4"
+     },
+     {
+      "deals_in_to": [
+       2
+      ],
+      "reasons": [],
+      "tile": "z5"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z6"
+     }
+    ],
+    "reason": "all_copies_visible",
+    "safe": [
+     "1m",
+     "2m",
+     "4m",
+     "6m",
+     "5p",
+     "z2",
+     "z4",
+     "z6"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1s33p2s4p74s964p86s96m7s",
+      "flowers": "",
+      "hand": "124446m5p2456z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678m"
+       }
+      ]
+     },
+     {
+      "discards": "48s5271886p54s9p6m81p",
+      "flowers": "2f",
+      "hand": "3m112234677z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222m"
+       }
+      ]
+     },
+     {
+      "discards": "26p1117m7p9m5s19p1s7m2s7m8s",
+      "flowers": "87f",
+      "hand": "567s3355z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123s"
+       }
+      ]
+     },
+     {
+      "discards": "58m35s8m37s9m3s51226p1s",
+      "flowers": "631f",
+      "hand": "355m3479p29s1467z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008298,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 298,
+    "game_seed": 20000001,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.375,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 1.0,
+     "T4_policy": 0.5795702230352403
+    },
+    "score": 0.7613574442411899
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "1m",
+     "2m",
+     "6m"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible",
+       "no_chance"
+      ],
+      "tile": "1m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "2m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "6m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z2"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z4"
+     },
+     {
+      "deals_in_to": [
+       2
+      ],
+      "reasons": [],
+      "tile": "z5"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z6"
+     }
+    ],
+    "reason": "all_copies_visible",
+    "safe": [
+     "1m",
+     "2m",
+     "4m",
+     "6m",
+     "z2",
+     "z4",
+     "z6"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "1s33p2s4p74s964p86s9m",
+      "flowers": "",
+      "hand": "1244466m2456z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "678m"
+       }
+      ]
+     },
+     {
+      "discards": "48s5271886p54s9p6m",
+      "flowers": "2f",
+      "hand": "3m112234677z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "222m"
+       }
+      ]
+     },
+     {
+      "discards": "26p1117m7p9m5s19p1s7m2s",
+      "flowers": "87f",
+      "hand": "567s3355z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "999s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "123s"
+       }
+      ]
+     },
+     {
+      "discards": "58m35s8m37s9m3s5122p",
+      "flowers": "63f",
+      "hand": "355m34679p9s1467z",
+      "melds": []
+     }
+    ],
+    "seed": 160000008290,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 290,
+    "game_seed": 20000001,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.5,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 0.0,
+     "T4_policy": 1.4760455506833415e-06
+    },
+    "score": 0.8749996309886123
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "7p",
+     "9p"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "7p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "8p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible",
+       "no_chance"
+      ],
+      "tile": "9p"
+     },
+     {
+      "deals_in_to": [
+       2
+      ],
+      "reasons": [],
+      "tile": "2s"
+     }
+    ],
+    "reason": "all_copies_visible",
+    "safe": [
+     "7p",
+     "8p",
+     "9p"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 2,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "2s52m65s2z1m1z81p",
+      "flowers": "52f",
+      "hand": "7899p2s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 3,
+        "kind": "chow",
+        "tiles": "456p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "added_kong",
+        "tiles": "5555z"
+       }
+      ]
+     },
+     {
+      "discards": "2p18s7p9s187p63m3z",
+      "flowers": "1f",
+      "hand": "7799m6p44z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777z"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "234m"
+       }
+      ]
+     },
+     {
+      "discards": "12p5m479p2z1p3131z7s",
+      "flowers": "346f",
+      "hand": "1134s",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "666s"
+       },
+       {
+        "from_seat": 1,
+        "kind": "chow",
+        "tiles": "789s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "39p52s5p9s3p6m1z2p7s",
+      "flowers": "7f",
+      "hand": "27789m3p4s",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "345m"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "888m"
+       }
+      ]
+     }
+    ],
+    "seed": 160000008127,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 127,
+    "game_seed": 20000001,
+    "seat": 2
+   }
+  },
+  {
+   "difficulty": {
+    "band": "beginner",
+    "rates": {
+     "T0": 0.125,
+     "T1": 1.0,
+     "T2": 0.0,
+     "T4": 1.0,
+     "T4_policy": 0.7743905242810168
+    },
+    "score": 0.5251523689297458
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "z3"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "5m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "6m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "8m"
+     },
+     {
+      "deals_in_to": [
+       3
+      ],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "5p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z1"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "genbutsu",
+       "all_copies_visible"
+      ],
+      "tile": "z3"
+     }
+    ],
+    "reason": "genbutsu",
+    "safe": [
+     "3m",
+     "4m",
+     "5m",
+     "6m",
+     "8m",
+     "z1",
+     "z3"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 1,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "5p564s1p429s2z6p",
+      "flowers": "43f",
+      "hand": "3455668m5p113z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "444z"
+       }
+      ]
+     },
+     {
+      "discards": "62s2m2s42m4s87m3z18s",
+      "flowers": "78f",
+      "hand": "34788p17z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "111p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "222p"
+       }
+      ]
+     },
+     {
+      "discards": "5p6m27p967m4s3z4p1s2z",
+      "flowers": "2f",
+      "hand": "677s1566z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "333s"
+       },
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "777z"
+       }
+      ]
+     },
+     {
+      "discards": "21m51s38m9s9m6s32z1m",
+      "flowers": "61f",
+      "hand": "6677899p555z",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "345p"
+       }
+      ]
+     }
+    ],
+    "seed": 160010144257,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 257,
+    "game_seed": 20001268,
+    "seat": 0
+   }
+  },
+  {
+   "difficulty": {
+    "band": "intermediate",
+    "rates": {
+     "T0": 0.1,
+     "T1": 0.0,
+     "T2": 1.0,
+     "T4": 0.0,
+     "T4_policy": 0.1744826068448963
+    },
+    "score": 0.6813793482887759
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "3s"
+    ],
+    "options": [
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [],
+      "tile": "1m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "4m"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "6m"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "7m"
+     },
+     {
+      "deals_in_to": [
+       3
+      ],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "8p"
+     },
+     {
+      "deals_in_to": [
+       2
+      ],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "2s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "genbutsu",
+       "all_copies_visible"
+      ],
+      "tile": "3s"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "no_chance"
+      ],
+      "tile": "9s"
+     },
+     {
+      "deals_in_to": [
+       2
+      ],
+      "reasons": [],
+      "tile": "z1"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "z3"
+     }
+    ],
+    "reason": "genbutsu",
+    "safe": [
+     "4m",
+     "7m",
+     "3s",
+     "9s",
+     "z3"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 3,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "25m9p9m85s22p2z594s66z",
+      "flowers": "5f",
+      "hand": "146677m888p239s13z",
+      "melds": []
+     },
+     {
+      "discards": "5713s149p856s2z7p89m",
+      "flowers": "2f",
+      "hand": "1133345m777z",
+      "melds": [
+       {
+        "from_seat": 3,
+        "kind": "pung",
+        "tiles": "444z"
+       }
+      ]
+     },
+     {
+      "discards": "41p3s9p6m1s4m49s4m6z2m6p",
+      "flowers": "647f",
+      "hand": "22s11z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "888m"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "777p"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666s"
+       }
+      ]
+     },
+     {
+      "discards": "67m7s5m3s2m4s3m88s2z3p3z15p5m1s",
+      "flowers": "18f",
+      "hand": "8p",
+      "melds": [
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "123p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "555z"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "345p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "chow",
+        "tiles": "456p"
+       }
+      ]
+     }
+    ],
+    "seed": 160002296186,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 186,
+    "game_seed": 20000287,
+    "seat": 1
+   }
+  },
+  {
+   "difficulty": {
+    "band": "advanced",
+    "rates": {
+     "T0": 0.2,
+     "T1": 0.0,
+     "T2": 0.0,
+     "T4": 0.0,
+     "T4_policy": 1.850571074606471e-14
+    },
+    "score": 0.9499999999999954
+   },
+   "discard": null,
+   "engine_version": "1.3.0",
+   "key": {
+    "correct": [
+     "1p"
+    ],
+    "options": [
+     {
+      "deals_in_to": [],
+      "reasons": [
+       "genbutsu",
+       "all_copies_visible"
+      ],
+      "tile": "1p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "2p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "3p"
+     },
+     {
+      "deals_in_to": [],
+      "reasons": [],
+      "tile": "7p"
+     },
+     {
+      "deals_in_to": [
+       1
+      ],
+      "reasons": [
+       "all_copies_visible"
+      ],
+      "tile": "3s"
+     }
+    ],
+    "reason": "genbutsu",
+    "safe": [
+     "1p",
+     "2p",
+     "3p",
+     "7p"
+    ]
+   },
+   "kind": "safe_discard",
+   "miner_tier": "T4",
+   "position": {
+    "dealer": 0,
+    "prevailing": "EAST",
+    "seats": [
+     {
+      "discards": "15s4m9s9m214z28s7z63m",
+      "flowers": "",
+      "hand": "1237p3s",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "999p"
+       },
+       {
+        "from_seat": 2,
+        "kind": "pung",
+        "tiles": "888p"
+       },
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "666p"
+       }
+      ]
+     },
+     {
+      "discards": "425m1p1m5p1z8s1m9s1m2z2m",
+      "flowers": "1f",
+      "hand": "45s33z",
+      "melds": [
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "678s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "chow",
+        "tiles": "234s"
+       },
+       {
+        "from_seat": 0,
+        "kind": "pung",
+        "tiles": "666z"
+       }
+      ]
+     },
+     {
+      "discards": "6331s71p5s4267z6m7z",
+      "flowers": "36f",
+      "hand": "1459m345p17s5z",
+      "melds": [
+       {
+        "from_seat": 1,
+        "kind": "pung",
+        "tiles": "777m"
+       }
+      ]
+     },
+     {
+      "discards": "3z8s53m729s1p12z264m",
+      "flowers": "27f",
+      "hand": "388m24467p4569s3z",
+      "melds": []
+     }
+    ],
+    "seed": 160001400417,
+    "turn": 0,
+    "wall_front": ""
+   },
+   "source": {
+    "decision": 417,
+    "game_seed": 20000175,
+    "seat": 2
+   }
+  }
+ ],
+ "seeds": [
+  20000000,
+  20005999
+ ]
+}
