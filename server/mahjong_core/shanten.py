@@ -105,15 +105,16 @@ def _frontier(counts: tuple[int, ...], sequences: bool) -> tuple[tuple[int, int,
     return _pareto(results)
 
 
-def standard_shanten(tiles34: Sequence[int]) -> int:
-    """Standard-shape shanten (4 melds + 1 pair) -- min over every way to split man/pin/sou/
-    honors into complete melds, partial sets, and (at most one) pair, block-cap applied."""
+def standard_shanten(tiles34: Sequence[int], *, sets: int = _CAP) -> int:
+    """Standard-shape shanten (`sets` melds + 1 pair) -- min over every way to split man/pin/sou/
+    honors into complete melds, partial sets, and (at most one) pair, block-cap applied.
+    `sets < 4` scores concealed tiles alone beside exposed melds, which can't be regrouped."""
     man, pin, sou = (
         _frontier(tuple(tiles34[base : base + RANKS_PER_SUIT]), True)
         for base in range(0, N_SUITED_TYPES, RANKS_PER_SUIT)
     )
     honors = _frontier(tuple(tiles34[N_SUITED_TYPES:N_TILE_TYPES]), False)
-    return _best_standard(_merge(man, pin), _merge(sou, honors))
+    return _best_standard(_merge(man, pin), _merge(sou, honors), sets)
 
 
 @lru_cache(maxsize=_MERGE_CACHE_SIZE)
@@ -126,15 +127,17 @@ def _merge(
 
 
 @lru_cache(maxsize=_MERGE_CACHE_SIZE)
-def _best_standard(a: tuple[tuple[int, int, int], ...], b: tuple[tuple[int, int, int], ...]) -> int:
-    best = 8
+def _best_standard(
+    a: tuple[tuple[int, int, int], ...], b: tuple[tuple[int, int, int], ...], sets: int
+) -> int:
+    best = 2 * sets
     for am, at, ap in a:
         for bm, bt, bp in b:
             melds, tatsu, pairs = am + bm, at + bt, ap + bp
-            result = 8 - 2 * melds - tatsu - pairs
+            result = 2 * sets - 2 * melds - tatsu - pairs
             blocks = melds + tatsu + (pairs - 1 if pairs > 0 else 0)
-            if blocks > _CAP:
-                result += blocks - _CAP
+            if blocks > sets:
+                result += blocks - sets
             best = min(best, result)
     return best
 
@@ -160,6 +163,7 @@ def shanten(
     *,
     closed: bool = True,
     hand_sets: frozenset[HandSet] = _ALL_HAND_SETS,
+    melds: int = 0,
 ) -> int:
     """Overall shanten: the minimum of all parses legal under `hand_sets` (default: every
     hand_set, i.e. identical to the pre-`hand_sets`-param behavior). `closed=False` (any exposed
@@ -167,14 +171,18 @@ def shanten(
     fully concealed hand by construction, so evaluating them against a hand with an exposed meld
     would produce a meaningless number.
 
+    `melds=0` reads `tiles34` as the whole hand, exposed meld tiles included (the bots'
+    convention: cheap, but lets a parse regroup tiles locked in a meld). `melds=n` reads it as
+    the concealed tiles only, beside `n` exposed melds -- exact, for grading.
+
     Thirteen Orphans (十三么) is `HandSet.CLASSIC` (`scoring/patterns.py`), which every ruleset
     is assumed to carry -- unlike Seven Pairs it isn't gated here. Seven Pairs (七對子) is
     `HandSet.NEW_18` and is only mandatory-parsed when `NEW_18` is in `hand_sets`; a ruleset with
     it off (e.g. `hk_strict`) must not have bots chase a shape they can never legally complete
     (docs/rules.md "New 18", docs/bots.md §8).
     """
-    best = standard_shanten(tiles34)
-    if closed:
+    best = standard_shanten(tiles34, sets=_CAP - melds)
+    if closed and not melds:
         best = min(best, thirteen_orphans_shanten(tiles34))
         if HandSet.NEW_18 in hand_sets:
             best = min(best, seven_pairs_shanten(tiles34))
@@ -187,11 +195,12 @@ def ukeire(
     *,
     closed: bool = True,
     hand_sets: frozenset[HandSet] = _ALL_HAND_SETS,
+    melds: int = 0,
 ) -> dict[int, tuple[int, int]]:
     """For each tile type actually held, how many unseen tiles reduce shanten if drawn after
     discarding it. `-> {tile_type_value: (kinds_accepted, tiles_accepted)}`. `seen34` counts
-    everything publicly visible plus the hand itself; never the wall. `hand_sets` forwards to
-    `shanten` unchanged (see there).
+    everything publicly visible plus the hand itself; never the wall. `hand_sets` and `melds`
+    forward to `shanten` unchanged (see there).
     """
     result: dict[int, tuple[int, int]] = {}
     after = list(hand34)
@@ -199,14 +208,14 @@ def ukeire(
         if hand34[d] == 0:
             continue
         after[d] -= 1
-        base = shanten(after, closed=closed, hand_sets=hand_sets)
+        base = shanten(after, closed=closed, hand_sets=hand_sets, melds=melds)
         kinds = tiles = 0
         for t in range(N_TILE_TYPES):
             live = 4 - seen34[t]
             if live <= 0:
                 continue
             after[t] += 1
-            if shanten(after, closed=closed, hand_sets=hand_sets) < base:
+            if shanten(after, closed=closed, hand_sets=hand_sets, melds=melds) < base:
                 kinds += 1
                 tiles += live
             after[t] -= 1

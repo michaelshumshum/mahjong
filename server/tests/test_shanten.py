@@ -349,6 +349,53 @@ def test_frontier_cache_warms_and_stays_fast() -> None:
     assert elapsed < 10.0, f"warm ukeire scans took {elapsed:.2f}s -- cache not doing its job"
 
 
+def _counts(spec: dict[int, int]) -> list[int]:
+    counts = new_count_array()
+    for t, n in spec.items():
+        counts[t] = n
+    return counts
+
+
+def test_melds_cannot_be_regrouped() -> None:
+    # concealed 1666p beside three chows (123p 789p 234p): only 1p completes it. read as one
+    # 14-tile hand, the chow tiles regroup and 4p/5p look like waits too
+    concealed = _counts({9: 1, 14: 3})
+    assert shanten(concealed, closed=False, melds=3) == 0
+    seen = _counts({4: 1, 9: 2, 10: 2, 11: 2, 12: 1, 14: 3, 15: 1, 16: 1, 17: 1})
+    hand = _counts({4: 1, 9: 1, 14: 3})
+    accepts = ukeire(hand, seen, closed=False, melds=3)
+    assert accepts[4] == (1, 2)  # discard 5m: waits on 1p alone, 2 live
+    assert accepts[9] == (1, 3)  # discard 1p: waits on 5m alone
+    whole = _counts({4: 1, 9: 2, 10: 2, 11: 2, 12: 1, 14: 3, 15: 1, 16: 1, 17: 1})
+    assert ukeire(whole, seen, closed=False)[4][0] > 1
+
+
+def test_melds_count_partial_sets_against_fewer_slots() -> None:
+    # 12p 45p beside three melds: two partial sets for one slot, so 1-shanten, not tenpai
+    assert shanten(_counts({9: 1, 10: 1, 12: 1, 13: 1}), closed=False, melds=3) == 1
+    assert shanten(_counts({9: 2, 14: 3}), closed=False, melds=3) == AGARI
+    assert shanten(_counts({27: 1}), closed=False, melds=4) == 0
+
+
+@pytest.mark.parametrize("melds", [1, 2, 3, 4])
+def test_melds_match_padding_with_honour_pungs(melds: int) -> None:
+    """`melds=n` equals the whole-hand shanten with n pungs of absent honours added: an honour
+    pung can't join a run, so it stands in for a meld that can't be regrouped."""
+    rng = random.Random(20261028 + melds)
+    checked = 0
+    for _ in range(1500):
+        concealed = _random_hand(rng, rng.choice((13, 14)) - 3 * melds, quad_bias=True)
+        absent = [t for t in range(27, 34) if concealed[t] == 0]
+        if len(absent) < melds:
+            continue
+        padded = list(concealed)
+        for t in absent[:melds]:
+            padded[t] = 3
+        assert shanten(concealed, closed=False, melds=melds) == standard_shanten(padded)
+        checked += 1
+    assert checked > 1000
+
+
 def test_importing_module_does_no_eager_table_build() -> None:
     """`_frontier`'s cache must start empty -- see the module docstring's eager-vs-lazy
     tradeoff. A regression here (e.g. someone adding an eager warmup loop at import) would

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from app.lessons.model import SafeReason
 from app.views import SeatView, seat_view
-from bots.features import is_closed, own_hand34, seen34
+from bots.features import is_closed, seen34
 from bots.safety import is_genbutsu, no_chance
 from mahjong_core.actions import (
     Discard,
@@ -203,15 +203,18 @@ def best_discard(state: GameState, seat: int) -> BestDiscardKey:
     Live means not visible to `seat`."""
     _require_to_act(state, seat)
     view = seat_view(state, seat)
-    hand34 = own_hand34(view)
+    hand34 = [0] * N_TILE_TYPES
+    for tile in view.own_hand:
+        hand34[int(tile_id_type(tile))] += 1
+    melds = len(view.melds[seat])
     closed = is_closed(view)
     hand_sets = state.ruleset.hand_sets
-    accepts = ukeire(hand34, _visible34(view), closed=closed, hand_sets=hand_sets)
+    accepts = ukeire(hand34, _visible34(view), closed=closed, hand_sets=hand_sets, melds=melds)
 
     options: list[DiscardOption] = []
     for t in sorted({int(tile_id_type(tile)) for tile in view.own_hand}):
         hand34[t] -= 1
-        after = shanten(hand34, closed=closed, hand_sets=hand_sets)
+        after = shanten(hand34, closed=closed, hand_sets=hand_sets, melds=melds)
         hand34[t] += 1
         kinds, tiles = accepts[t]
         options.append(DiscardOption(tile=_code(t), shanten=after, kinds=kinds, tiles=tiles))

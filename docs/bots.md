@@ -145,6 +145,13 @@ as the minimum of three parses (`mahjong_core/shanten.py`):
    `HandSet.NEW_18` is in `hand_sets` (§8).
 3. **Thirteen Orphans** (十三么) — `13 - distinct_terminals_honors - (1 if has_pair else 0)`.
 
+**Exposed melds.** Bots pass the whole hand, exposed meld tiles included (`own_hand34`), and score
+it as 4 melds + 1 pair. That lets a parse regroup tiles locked in a meld, so ukeire can count waits
+the hand doesn't have (concealed `1666p` beside chows `123p 234p 789p` reads 4p/5p as waits). Learn
+mode grades exactly instead: `shanten(..., melds=n)` / `ukeire(..., melds=n)` take the concealed
+tiles only and need `4 - n` melds + 1 pair (ADR 0025). The bots keep the cheap form; switching them
+is a behaviour change needing an arena run.
+
 Validated against [MahjongRepository/mahjong](https://github.com/MahjongRepository/mahjong)'s
 `Shanten` class (same 34-index layout, checked against 26M Tenhou hands) as a test oracle.
 [arXiv:2108.06832](https://arxiv.org/pdf/2108.06832) describes a faster deficiency-number

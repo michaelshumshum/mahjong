@@ -3,6 +3,7 @@ import pytest
 from app.lessons.grade import (
     BestDiscardKey,
     CountFaanKey,
+    DiscardOption,
     FaanLine,
     SafeOption,
     WaitOption,
@@ -131,6 +132,19 @@ def test_best_discard(others: dict[str, SeatSetup], correct: tuple[str, ...]) ->
     by_tile = {o.tile: o for o in key.options}
     assert by_tile["1p"].shanten == 1
     assert by_tile["1m"].shanten > 1
+
+
+def test_best_discard_keeps_exposed_melds_fixed() -> None:
+    """Mined position (seed 20000000, decision 304): regrouping the chows read 5m as the better
+    discard (8 tiles); 1666p really waits on 1p alone."""
+    chows = tuple(MeldSetup(MeldKind.CHOW, t, from_seat=3) for t in ("123p", "789p", "234p"))
+    seat0 = SeatSetup(hand="5m1666p", melds=chows)
+    state = _position(seat0, turn=0, seat2=SeatSetup(hand="2233445566778m"))
+    key = best_discard(state, 0)
+    by_tile = {o.tile: o for o in key.options}
+    assert key.correct == ("1p",)
+    assert by_tile["5m"] == DiscardOption("5m", shanten=0, kinds=1, tiles=2)
+    assert by_tile["1p"] == DiscardOption("1p", shanten=0, kinds=1, tiles=3)
 
 
 def test_best_discard_ignores_hidden_tiles() -> None:
