@@ -755,6 +755,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
 | `/profile` | on | placeholder heading only |
+| `/learn` | on | placeholder heading and lobby link until the learn index lands ([ADR 0025](decisions/0025-learn-mode.md)); skips `ApiConnectGate` |
 | `/status` | on | public server status (below); fetches `GET /status` client-side |
 | `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
@@ -771,7 +772,7 @@ own title would keep the previous page's, e.g. a stale "Your turn · Hoi Toi" af
 
 ### API health gate (`ApiConnectGate`)
 
-Every route except `?mock=`/`/demo`/`/status` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
+Every route except `?mock=`/`/demo`/`/status`/`/learn` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
 the root `+layout.svelte`), which polls `GET /healthz` (`lib/net/lobby.ts`'s `waitForApiHealthy`)
 before rendering the page. Without it a page looks interactive before the backend is reachable.
 
@@ -784,6 +785,8 @@ before rendering the page. Without it a page looks interactive before the backen
   (`onRetryScheduled`) — static, per `web/AGENTS.md`'s no-JS-ticker rule.
 - Exhausted: a "Can't reach the server" panel with a manual Retry.
 - Claims mural visibility (§2) while up, releasing it as the page mounts.
+- Skipped: `?mock=` and `/demo` run with no backend; `/status` reports an unreachable API itself
+  (below); `/learn` ships its lessons as static JSON ([ADR 0025](decisions/0025-learn-mode.md)).
 
 ### Create a table
 
@@ -847,13 +850,15 @@ Submitting calls `POST /tables` ([protocol.md §10](protocol.md)) and navigates 
 A brand lockup: a seal mark beside a visible `--font-size-display` `h1`. en pairs a 開枱 seal with
 "Hoi Toi"; zh-Hant pairs a 麻雀 seal with 開枱, so the seal never repeats the heading. Then
 three **equal-weight** action cards — "Play online", "Practice vs Bots",
-"Faan guide" — each a tile-glyph icon and a title. No hero card: the three
+學 "Learn" (zh-Hant 學打牌) — each a tile-glyph icon and a title. No hero card: the three
 are peers by design. "Play online" is a link to `/tables`, the one multiplayer hub (create, join
 by code, browse): invitees arrive by table URL, not through the lobby, so separate create/join
-entries here split one intent across two controls. The other two are `<button>`s opening dialogs.
+entries here split one intent across two controls. "Learn" is a link to `/learn`
+([ADR 0025](decisions/0025-learn-mode.md)); "Practice vs Bots" is a `<button>` opening its dialog.
 Each card's control holds only the title (its accessible name, which e2e matches exactly), and its
-`::after` stretches the hit area over the whole card. Below the cards, two secondary-tier buttons
-(`btn-secondary`, brass lucide icon): a language toggle and Settings. The toggle shows a shorthand
+`::after` stretches the hit area over the whole card. Below the cards, three secondary-tier buttons
+(`btn-secondary`, brass lucide icon): "Faan guide" (`book-open`, opens `GuideDialog`, below), a
+language toggle and Settings. The toggle shows a shorthand
 of the other locale (`中文` / `EN`, `lobby_languageShort`), with the full name
 (`lobby_languageButton`) as its `aria-label` and the target locale as its `lang`. Settings opens
 the same `Settings.svelte` panel as the table (§6), loading prefs and `autoArm` from storage on
@@ -885,7 +890,8 @@ measures: [infra.md §8](infra.md)), polled every 15s with a static "Updated" st
 
 The language link calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
-stays in `Settings`. "Faan guide" opens `lib/ui/GuideDialog.svelte`: up to `68rem` wide and a
+stays in `Settings`. The lobby's secondary "Faan guide" button and the table rail's Guide button
+open `lib/ui/GuideDialog.svelte`: up to `68rem` wide and a
 fixed `90dvh` tall (each view scrolls inside it, so switching doesn't resize it); on phone it is
 a `sheet` placement filling the screen edge to edge, with no frame. A ruleset select sits over
 three views (`TabBar`). Each view goes two-column through a `guide-view` container query at
@@ -1326,7 +1332,7 @@ spread. Files group key prefixes by app area:
 | File | Key prefixes |
 | --- | --- |
 | `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
-| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `statusPage` |
+| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, the `/learn` placeholder, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `learnPage`, `statusPage` |
 | `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
 | `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
 | `tiles.json` | `tileName`, `tileFace` |

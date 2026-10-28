@@ -6,6 +6,7 @@
 	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import Activity from '@lucide/svelte/icons/activity';
+	import BookOpen from '@lucide/svelte/icons/book-open';
 	import Languages from '@lucide/svelte/icons/languages';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
@@ -65,7 +66,7 @@
 			</div>
 		</header>
 
-		<!-- the button's ::after stretches the hit area over the whole card. -->
+		<!-- the control's ::after stretches the hit area over the whole card. -->
 		<ul class="actions">
 			<li class="action-card">
 				<span class="action-glyph" aria-hidden="true">{m.lobby_playOnlineGlyph()}</span>
@@ -83,17 +84,24 @@
 				>
 			</li>
 			<li class="action-card">
-				<span class="action-glyph" aria-hidden="true">{m.lobby_guideGlyph()}</span>
-				<button
-					type="button"
-					class="action-title"
-					data-testid="lobby-guide"
-					onclick={() => (showGuide = true)}>{m.lobby_guideButton()}</button
+				<span class="action-glyph" aria-hidden="true">{m.lobby_learnGlyph()}</span>
+				<a class="action-title" data-testid="lobby-learn" data-sfx="on" href="/learn"
+					>{m.lobby_learnButton()}</a
 				>
 			</li>
 		</ul>
 
 		<div class="utility-bar">
+			<button
+				type="button"
+				class="utility-btn"
+				data-testid="lobby-guide"
+				aria-haspopup="dialog"
+				onclick={() => (showGuide = true)}
+			>
+				<BookOpen {...ICON} />
+				<span>{m.lobby_guideButton()}</span>
+			</button>
 			<!-- shorthand label, full target-language name as the accessible name -->
 			<button
 				type="button"

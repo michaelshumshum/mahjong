@@ -10,12 +10,13 @@
 
 	const MIN_DISPLAY_MS = 1000;
 
-	// ?mock and /demo run with no backend (screenshots, mock e2e: docs/frontend.md "/table/[id]
-	// wiring"); /status reports an unreachable api itself, which the gate would hide.
+	// ?mock, /demo and /learn need no backend; /status reports an unreachable api itself, which the
+	// gate would hide (docs/frontend.md "API health gate").
 	const skip =
 		page.url.searchParams.has('mock') ||
 		page.url.pathname.startsWith('/demo') ||
-		page.url.pathname.startsWith('/status');
+		page.url.pathname.startsWith('/status') ||
+		page.url.pathname.startsWith('/learn');
 
 	let status = $state<'connecting' | 'ready' | 'error'>(skip ? 'ready' : 'connecting');
 	let attempt = $state(0);

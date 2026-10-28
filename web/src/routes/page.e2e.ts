@@ -321,6 +321,50 @@ test('replay route renders', async ({ page }) => {
 	await expect(page).toHaveTitle('Replay · Hoi Toi');
 });
 
+test('lobby learn card opens the learn page', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('link', { name: 'Learn', exact: true }).click();
+	await expect(page).toHaveURL('/learn');
+	await expect(page.locator('h1')).toHaveText('Learn');
+	await expect(page).toHaveTitle('Learn · Hoi Toi');
+});
+
+test('learn route renders without waiting on the api', async ({ page }) => {
+	await page.unroute('**/healthz');
+	await page.route('**/healthz', (route) => route.abort());
+	const response = await page.goto('/learn');
+	expect(response?.status()).toBe(200);
+	await expect(page.locator('h1')).toHaveText('Learn', { timeout: GATE_ABSENT_MS });
+});
+
+test('lobby shows three equal action cards in a row, stacked on phone', async ({ page }) => {
+	await page.setViewportSize({ width: 1024, height: 768 });
+	await page.goto('/');
+	const cards = page.locator('.action-card');
+	await expect(cards).toHaveCount(3);
+	const boxes = () => Promise.all([0, 1, 2].map(async (i) => (await cards.nth(i).boundingBox())!));
+	const [a, b, c] = await boxes();
+	expect([b.y, c.y]).toEqual([a.y, a.y]);
+	expect([b.width, c.width]).toEqual([a.width, a.width]);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect.poll(async () => new Set((await boxes()).map((box) => box.x)).size).toBe(1);
+	const [pa, pb, pc] = await boxes();
+	expect(pb.y).toBeGreaterThan(pa.y);
+	expect(pc.y).toBeGreaterThan(pb.y);
+});
+
+test('the faan guide button sits with the language toggle and settings', async ({ page }) => {
+	await page.goto('/');
+	const guide = page.getByTestId('lobby-guide');
+	await expect(guide).toHaveText('Faan guide');
+	await expect(page.locator('.action-card').getByTestId('lobby-guide')).toHaveCount(0);
+	const [guideBox, settingsBox] = await Promise.all([
+		guide.boundingBox(),
+		page.getByTestId('lobby-settings').boundingBox()
+	]);
+	expect(guideBox!.y).toBe(settingsBox!.y);
+});
+
 test('profile route renders', async ({ page }) => {
 	const response = await page.goto('/profile');
 	expect(response?.status()).toBe(200);

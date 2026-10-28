@@ -48,7 +48,7 @@ friends by sharing a table link.
 
 | | |
 | --- | --- |
-| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — play online, practice vs bots, or open the faan guide, over a scrolling tile-mural canvas background | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard |
+| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — play online, practice vs bots, or learn (學); the faan guide sits with language and settings, over a scrolling tile-mural canvas background | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard |
 | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended: result stamp, winning hand, faan rows, payments | ![Table, your turn, phone](docs/screenshots/table-your-turn-phone.png) Table — your turn, phone |
 
 <details>

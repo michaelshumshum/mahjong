@@ -31,13 +31,32 @@ describe('LobbyPage', () => {
 		component = mount(LobbyPage, { target });
 		expect(target.querySelector('[data-testid="lobby-play-online"]')).not.toBeNull();
 		expect(target.querySelector('[data-testid="lobby-practice-bots"]')).not.toBeNull();
-		expect(target.querySelector('[data-testid="lobby-guide"]')).not.toBeNull();
+		expect(target.querySelector('[data-testid="lobby-learn"]')).not.toBeNull();
+		expect(target.querySelectorAll('.action-card')).toHaveLength(3);
 	});
 
 	it('links play online to the tables page', () => {
 		component = mount(LobbyPage, { target });
 		const playLink = target.querySelector('[data-testid="lobby-play-online"]') as HTMLAnchorElement;
 		expect(playLink?.getAttribute('href')).toBe('/tables');
+	});
+
+	it('links the learn card to /learn', () => {
+		component = mount(LobbyPage, { target });
+		const learn = target.querySelector('[data-testid="lobby-learn"]')!;
+		expect(learn.getAttribute('href')).toBe('/learn');
+		expect(learn.textContent?.trim()).toBe('lobby_learnButton');
+	});
+
+	it('opens the faan guide from a secondary button before the language toggle', async () => {
+		component = mount(LobbyPage, { target });
+		const guide = target.querySelector<HTMLButtonElement>('[data-testid="lobby-guide"]')!;
+		expect(guide.closest('.action-card')).toBeNull();
+		expect(guide.nextElementSibling?.getAttribute('data-testid')).toBe('lobby-language');
+		expect(guide.querySelector('svg')).not.toBeNull();
+		guide.click();
+		await Promise.resolve();
+		expect(target.querySelector('dialog')?.open).toBe(true);
 	});
 
 	it('links the status page beside the source code link', () => {
