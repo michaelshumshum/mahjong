@@ -1,0 +1,263 @@
+# 0025. Learn mode (學): engine-generated puzzles and a guided tutorial
+
+- **Status:** Accepted (in progress)
+- **Date:** 2026-10-28
+
+## Context
+
+Solo play is a complete product on its own ([ADR 0003](0003-product-scope.md)), but nothing in the app
+teaches the game: the faan guide and hand checker explain scoring, and practice mode drops a
+beginner straight into a full game against bots. Learn mode adds short, deterministic puzzles and a
+guided tutorial.
+
+[ADR 0010](0010-client-scope-cuts.md) set the constraint that shapes this: no TypeScript
+reimplementation of the engine. Every answer must come from `mahjong_core`.
+
+## Decision
+
+Puzzle content is written once in Python under `server/app/lessons/`. The engine computes each
+answer key, and `make proto` emits the result as committed static JSON. The web plays a puzzle
+through the existing client reducer and table components on `/learn`, and grades it by looking the
+answer up in the precomputed key. Curated puzzles need no new HTTP or WebSocket endpoint. Random
+endless puzzles (phase 4) use the same grading module behind `GET /lessons/random`.
+
+| Option | Verdict |
+| --- | --- |
+| **A. Generated static lessons** | **chosen**: answers come from the real engine; works offline with no `ApiConnectGate` dependency; proto-check fails CI if an engine change moves an answer |
+| B. Server endpoints for every lesson and answer | only for random puzzles (phase 4); hiding answers isn't worth new API surface while stakes are cosmetic |
+| C. Tutorial as a real `Table` with a stacked wall | rejected: puts tutorial logic in the table actor and needs a client-chosen seed, which `69c1a9f` removed from `/ws` |
+| D. Lessons and answers hand-written in TypeScript | rejected: answers drift from the engine; a second copy of the rules |
+
+### Settled choices
+
+| Question | Answer |
+| --- | --- |
+| Lobby entry | The third lobby card becomes **學** (Learn). The faan guide moves to a secondary-tier button, next to the language toggle and Settings. |
+| Ruleset | Every puzzle uses `hk_classic`. |
+| Tutorial and coach marks | Finishing the tutorial sets `coachMarksDone`. Practice mode points first-timers to the tutorial. |
+| Package home | `server/app/lessons/` |
+| Order | Puzzles (phases 0–2), then the tutorial (phase 3), then random puzzles (phase 4) |
+| Random endless puzzles | Wanted, so `lessons/grade.py` is built for runtime from the start: pure, no import-time catalog work, cheap per call |
+
+## Reusable building blocks
+
+### Server
+
+| Building block | Where | Use |
+| --- | --- | --- |
+| `GameState`/`SeatState`/`Wall` are frozen dataclasses | `mahjong_core/state.py`, `wall.py` | build any position directly (`tests/game_state.py` already does) |
+| `new_game` + `reduce` | `state.py`, `engine.py` | positions from `(ruleset, seed, actions)` |
+| `legal_actions` | `actions.py` | check scripted and expected actions |
+| `shanten`, `ukeire` | `shanten.py` | grade best discard |
+| `winning_tile_types` | `bots/labels.py` | find waits (shape only; ignores `min_faan`) |
+| `_can_win_with` | `engine.py` | exact shape + `min_faan` check; private today |
+| `build_scoring_context` + `score_winning_hand` | `actions.py`, `scoring/faan.py` | count faan, melds included |
+| `check_hand` / `POST /score` | `hand_check.py`, `app/main.py` | precedent for a stateless evaluator; too narrow for melded hands |
+| `seat_view` → `seat_view_wire` | `app/views.py` | a `state_sync` payload redacted for seat 0 |
+| `redact_event` | `app/views.py` | wire frames for tutorial steps |
+| `turn`/`claim_offer`/`deal` frame builders | `app/table.py` (methods on `Table`) | not reusable until pulled out (phase 3; also unblocks [ADR 0011](0011-replay-viewer.md)) |
+| `seen34`, `no_chance`, `is_genbutsu` | `bots/features.py`, `bots/safety.py` | explain why a discard is safe. `tile_risk` is a heuristic and never grades |
+| `make proto` generator + proto-check | `tools/gen_protocol.py`, `Makefile`, `.github/workflows/proto-check.yml` | precedent for server-owned data emitted to the web |
+
+### Web
+
+| Building block | Where | Use |
+| --- | --- | --- |
+| Pure `reduce(state, event)` | `lib/net/reducer.ts` | feed it puzzle snapshots, no socket |
+| `viewFromClientState` | `lib/table/live-view.ts` | same view model as `/table` |
+| Prop-driven table components | `lib/table/*`, `lib/ui/*` (`YourSeatRegion`, `ClaimDialog`, `FaanBreakdown`, …) | render puzzles with the real table |
+| `CoachMarks` + `data-coach` highlight | `lib/ui/CoachMarks.svelte` | tutorial tips |
+| Hand checker tile palette | `lib/ui/HandChecker.svelte` (inline) | answer input |
+| localStorage conventions | `lib/ui/settings-storage.ts` | progress |
+| Paraglide area files + parity spec | `messages/{en,zh-Hant}/`, `lib/i18n/messages.spec.ts` | lesson text |
+
+### Gaps
+
+1. No builder from a hand-written position to a valid `GameState`.
+2. `_can_win_with` is private.
+3. The table scene markup, its SCSS and the legal-action logic (`discardableTileIds`, `declareOptions`, `claimOptions`) are inline in `routes/table/[id]/+page.svelte`.
+4. Frame builders exist only on `Table`.
+5. No puzzle vocabulary and no content.
+
+## Design
+
+### Server: `server/app/lessons/`
+
+| Module | Holds |
+| --- | --- |
+| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`, `TutorialStep`, `Lesson`; `PuzzleKind(StrEnum)`, `LessonKind`. Wire vocabulary, emitted to TS like `BotTier` |
+| `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)` |
+| `grade.py` | `answer_key(kind, state) -> AnswerKey`, one per kind; runtime-safe |
+| `catalog/*.py` | content, one module per track: `basics`, `efficiency`, `defence`, `faan` |
+| `frames.py` | (phase 3) tutorial frame stream |
+| `tools/gen_lessons.py` | emits `web/src/lib/learn/generated/index.json`, `<id>.json` per lesson, `lessons.d.ts` |
+
+**Position spec:** tile-code strings, the same codes as `parse_tile`. Fields:
+
+- `hand="123m456p789s1122z"`
+- `melds=[("pung", "555s", from_seat=2)]`
+- `discards`, `flowers`
+- `dealer`, `prevailing`, `turn`
+- optional `wall_front`, the stacked next draws
+
+A position can instead be `FromSeed(seed, actions)`, pinned to `ENGINE_VERSION`.
+
+**`build_position` must:**
+
+- assign physical tile ids across all seats, sharing `hand_check`'s logic; a fifth copy fails;
+- fill the rest of the wall: `wall_front` first, then the remaining tiles shuffled by the lesson seed;
+- set `total_discards`;
+- set `hand_seed = derive_hand_seed(lesson_seed, 1)`;
+- validate hand sizes: 13 − 3·melds, +1 for the seat that has just drawn.
+
+**Claim positions:** never build a `ClaimWindow` by hand. Reduce a `Discard` from the state just
+before it, so the engine opens the window.
+
+**Generated puzzle payload:**
+
+```json
+{"id": "eff-01", "kind": "best_discard", "engine_version": "…",
+ "snapshot": { "t": "state_sync", "…": "seat_view_wire(seat_view(state, 0))" },
+ "key": { "correct": ["…"], "options": { "<choice>": { "…": "numbers for feedback" } } }}
+```
+
+### Text
+
+The server holds structure and answers only. All prose lives in `messages/{en,zh-Hant}/learn.json`
+as `learn_*` and `lesson_<id>_title|prompt|explain` keys, with numbers from the key interpolated.
+A spec asserts every generated id has its keys.
+
+### Puzzle kinds
+
+| Kind | Engine truth | Graded |
+| --- | --- | --- |
+| `winning_tiles` | for each of the 34 types: does it complete the hand, its faan, does it clear `min_faan` (`can_win_on`); both discard and self-draw | multi-select must equal the waits that clear the minimum. Feedback names waits that complete the hand but score too low |
+| `best_discard` | per discard: shanten after, then `ukeire` over what seat 0 can see only | lowest shanten, then most tiles accepted; ties all count |
+| `count_faan` | `score_winning_hand` + `points()` | number entry; feedback shows `FaanBreakdown` |
+| `safe_discard` | `can_win_on` against the real hidden hands, plus the author's accepted set and reason | in the accepted set. A tile that is safe but can't be deduced gets "safe this time, but you couldn't know" |
+| `claim` (later) | shanten/ukeire after the best follow-up discard, plus value vs `min_faan` | author-stated, engine-checked |
+
+### Guided tutorial vs one-shot puzzle
+
+| | Puzzle | Tutorial |
+| --- | --- | --- |
+| Source | one position | position + stacked wall + a full script for all four seats |
+| Steps | one question | `narrate` (tip + highlight target), `expect` (seat 0 must take a given action), `auto` (opponents play) |
+| Payload | `state_sync` + answer key | seat-0 redacted frames per step, with a `state_sync` at each `expect` |
+| Client | `PuzzleBoard` + `AnswerPanel` | `LessonPlayer`: a `$state<ClientGameState>` stepped by `reduce`, no socket |
+
+Basics tutorial: draw/discard → pung → chow → kong → self-draw win. Flowers are off, or kept out of
+every scripted draw. The script runs through `reduce()` at generation time, so an illegal script
+fails `make proto`.
+
+### Web
+
+| Item | Detail |
+| --- | --- |
+| Lobby | 3rd card becomes **學** (Learn) and links to `/learn`. The faan guide becomes a `btn-secondary` beside the language toggle and Settings |
+| Refactors | `lib/table/TableScene.svelte` and `lib/table/legal-actions.ts` out of the table page; `lib/ui/TilePalette.svelte` out of `HandChecker` |
+| Routes | `/learn` (tracks, lesson cards, solved state) and `/learn/[id]`. Both skip `ApiConnectGate` |
+| Modules (`lib/learn/`) | `lessons.ts` (index, lazy import per lesson), `grade.ts` (lookup only), `lesson-player.svelte.ts`, `PuzzleBoard.svelte`, `AnswerPanel.svelte`, `TutorialCoach.svelte`, `types.ts` |
+| Persistence | `mahjong:learnProgress:v1`: `{ [id]: { solved, attempts, solvedAt?, step? } }`, local only ([ADR 0001](0001-guest-only-identity.md)); unknown ids dropped |
+| Other entry points | faan guide links to a faan puzzle; practice points first-timers to the tutorial; the tutorial ends with "Practice vs Easy bots" |
+
+### Random endless puzzles (phase 4)
+
+| Piece | Detail |
+| --- | --- |
+| `tools/mine_puzzles.py` | finds decision points in seeded FaanBot self-play where the best discard is unique and differs from a naive pick |
+| `GET /lessons/random?kind=` | builds and grades on the server with `lessons/grade.py`, rate-limited like other per-IP endpoints |
+| Grading | the answer key is returned with the puzzle; the client grades it the same way as curated ones |
+| Shared with | the ADR 0010 `hint` request can reuse `grade.py` |
+
+## Tests
+
+### Server (pytest)
+
+| Test file | Covers |
+| --- | --- |
+| `test_lessons_position.py` | tile conservation; invariants; fifth copy and bad hand sizes rejected; deterministic |
+| `test_lessons_grade.py` | per kind: known waits; a wait below the minimum is excluded; tied discards; safe discard against a known hidden hand; `count_faan` agrees with `check_hand` |
+| `test_lessons_catalog.py` | parametrized over every lesson (below) |
+| `test_gen_lessons.py` | generator output is deterministic |
+| `test_lessons_frames.py` | (phase 3) the pulled-out frame builders match what `Table` sends |
+
+For every lesson, `test_lessons_catalog.py` checks:
+
+- the position builds;
+- the author's `answer=` equals `answer_key()`;
+- for safe discard, the stated reason holds;
+- for `FromSeed` positions, `ENGINE_VERSION` matches;
+- for tutorials, every scripted action is legal and every `expect` step is seat 0's.
+
+### Web and e2e
+
+| Where | Covers |
+| --- | --- |
+| Vitest | `grade.spec.ts`; `lesson-player.svelte.spec.ts`; `lessons.spec.ts` (message keys); `settings-storage.spec.ts` (progress); `legal-actions.spec.ts` |
+| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, progress survives a reload, and the tutorial in phase 3 |
+| Screenshots | `/learn`, one puzzle, and later one tutorial state |
+
+## Phases
+
+### 0. Groundwork (refactors only)
+
+1. `refactor(core): public can_win_on for a claimed win check`
+2. `refactor(core): move winning_tile_types into mahjong_core.shanten`
+3. `refactor(web): extract TableScene and legal-action derivations from the table page`
+4. `refactor(web): extract TilePalette from the hand checker`
+
+### 1. Server lessons and generator
+
+5. `feat(server): lessons package with position builder and validation`
+6. `feat(server): answer keys for winning_tiles, best_discard, count_faan`
+7. `feat(server): exact safe_discard answer key with stated reasons`
+8. `feat(server): generate lesson bundle in make proto and proto-check`
+9. `feat(server): first puzzle set and catalog validity tests` (about 3 per kind)
+
+### 2. Web puzzles
+
+10. `feat(web): learn progress storage`
+11. `feat(web): 學 lobby card, faan guide as a secondary button`
+12. `feat(web): /learn index and puzzle page over TableScene`
+13. `feat(web): answer panels and feedback per puzzle kind`
+14. `test(web): learn e2e and screenshots`
+
+### 3. Guided tutorial
+
+15. `refactor(server): pure turn, claim_offer and deal frame builders shared with Table`
+16. `feat(server): tutorial scripts with stacked wall and expect steps`
+17. `feat(web): lesson player and tutorial coach`
+18. `feat(server): basics tutorial content`
+19. `feat(web): tutorial completion sets coach marks and links to easy practice`
+
+### 4. Random endless puzzles
+
+20. `feat(server): mine puzzle positions from seeded self-play`
+21. `feat(server): GET /lessons/random`
+22. `feat(web): endless mode on /learn`
+
+## Docs to update alongside
+
+| Doc | Change |
+| --- | --- |
+| `frontend.md §7` | routes, a "Learn" subsection, the lobby (學 card, faan guide button), `TableScene` |
+| `frontend.md §6` | persistence row |
+| `frontend.md §9` | `learn.json` |
+| `infra.md §1, §2, §9` | file map; `make proto`; proto-check |
+| `protocol.md §6` | generated lesson bundle; `GET /lessons/random` in phase 4 |
+| `architecture.md §2` | `app/lessons/` |
+| `testing.md §1` | lessons strategy row |
+| `bots.md §5` | puzzles grade safety exactly, never with `tile_risk` |
+| ADRs 0010, 0011 | cross-links |
+
+## Consequences and risks
+
+| Risk | Notes |
+| --- | --- |
+| Answers ship in the bundle | fine for cosmetic stakes; revisit if puzzles ever feed a leaderboard |
+| Coupling to `ENGINE_VERSION` and the ruleset | a scoring change moves `count_faan` answers. The catalog test and proto-check diff make that loud, but the prose explanations need re-checking by hand |
+| `FromSeed` positions | break on any change to dealing; prefer explicit positions |
+| `safe_discard` | safe is not the same as deducibly safe; content needs care |
+| `TableScene` extraction | touches the most complex page; keep it a pure move, verified by screenshots and the table e2e |
+| Translation | every lesson needs en and zh-Hant text, enforced by the parity spec |

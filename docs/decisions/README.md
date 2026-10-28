@@ -39,6 +39,7 @@ moved on.
 | [0022](0022-oracle-learned-tier.md) | `ORACLE` serves `OracleLearned`: the Expert policy plus exact vetoes | Accepted |
 | [0023](0023-concealed-kong-public.md) | Concealed kongs are public (HK display: end tiles face-down) | Accepted |
 | [0024](0024-end-abandoned-tables.md) | End a started table once every human has left | Accepted |
+| [0025](0025-learn-mode.md) | Learn mode (學): engine-generated puzzles and a guided tutorial | Accepted (in progress) |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).
