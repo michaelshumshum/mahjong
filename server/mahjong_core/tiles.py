@@ -129,6 +129,43 @@ def parse_tile(code: str) -> Tile:
     raise ValueError(f"invalid tile code: {code!r}")
 
 
+def parse_tiles(spec: str) -> list[Tile]:
+    """Parse compact notation, runs of ranks closed by a suit letter: `"123m11z5f"` is
+    1m 2m 3m z1 z1 f5. Each tile goes through `parse_tile`, so `z`/`f` take the same ranks
+    their codes do. Raises `ValueError` on anything else."""
+    tiles: list[Tile] = []
+    ranks = ""
+    for ch in spec:
+        if ch.isdigit():
+            ranks += ch
+            continue
+        if not ranks:
+            raise ValueError(f"suit {ch!r} with no ranks in {spec!r}")
+        for rank in ranks:
+            tiles.append(parse_tile(rank + ch if ch in _SUITS else ch + rank))
+        ranks = ""
+    if ranks:
+        raise ValueError(f"ranks {ranks!r} with no suit in {spec!r}")
+    return tiles
+
+
+def assign_tile_ids(groups: Iterable[Iterable[TileType]]) -> list[list[TileId]]:
+    """Give every tile a distinct physical `TileId`, copy numbers shared across all `groups`
+    (one per seat, wall, ...). Raises `ValueError` on a fifth copy."""
+    used = [0] * N_TILE_TYPES
+    out: list[list[TileId]] = []
+    for group in groups:
+        ids: list[TileId] = []
+        for tile in group:
+            n = used[tile]
+            if n >= COPIES_PER_TYPE:
+                raise ValueError(f"more than {COPIES_PER_TYPE} copies of {tile_code(tile)}")
+            used[tile] = n + 1
+            ids.append(tile_ids_for_type(tile)[n])
+        out.append(ids)
+    return out
+
+
 def tile_id_type(tile_id: TileId) -> TileType:
     """The `TileType` a physical `TileId` belongs to, under the canonical pre-shuffle
     numbering (4 consecutive ids per type, in `TileType` order)."""

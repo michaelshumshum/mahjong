@@ -65,6 +65,8 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      │                         ▲                    │
                      │  bots/ ─────────────────┘ (same seat_view,   │
                      │                       worker pool, §3)       │
+                     │  app/lessons/ ──────────┘ (positions built   │
+                     │                       and graded offline)    │
                      └──────────────────────────────────────────────┘
                                 │
                            Postgres

@@ -49,6 +49,8 @@ mahjong/
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
 │   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11); client_ip (CF-Connecting-IP rule)
+│   │   ├── lessons/            # learn mode (ADR 0025): model.py (position specs, kinds),
+│   │   │                       # position.py (build_position, from_seed)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)

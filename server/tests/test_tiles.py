@@ -9,9 +9,11 @@ from mahjong_core.tiles import (
     TileType,
     all_flowers,
     all_tile_ids,
+    assign_tile_ids,
     count_array_from_types,
     new_count_array,
     parse_tile,
+    parse_tiles,
     tile_code,
     tile_id_type,
     tile_ids_for_type,
@@ -216,3 +218,30 @@ def test_count_array_from_types_counts_occurrences() -> None:
 
 def test_count_array_from_types_empty_is_all_zero() -> None:
     assert count_array_from_types([]) == new_count_array()
+
+
+def test_parse_tiles_compact_notation() -> None:
+    assert parse_tiles("12m9p5s17z28f") == [
+        TileType.MAN_1,
+        TileType.MAN_2,
+        TileType.PIN_9,
+        TileType.SOU_5,
+        TileType.WIND_EAST,
+        TileType.DRAGON_WHITE,
+        Flower.FLOWER_2,
+        Flower.SEASON_4,
+    ]
+    assert parse_tiles("") == []
+
+
+@pytest.mark.parametrize("spec", ["12", "m", "1x", "8z", "9f", "1 m"])
+def test_parse_tiles_rejects_malformed(spec: str) -> None:
+    with pytest.raises(ValueError):
+        parse_tiles(spec)
+
+
+def test_assign_tile_ids_shares_copies_across_groups() -> None:
+    a, b = assign_tile_ids([[TileType.MAN_1, TileType.MAN_1], [TileType.MAN_1]])
+    assert a + b == list(tile_ids_for_type(TileType.MAN_1)[:3])
+    with pytest.raises(ValueError):
+        assign_tile_ids([[TileType.MAN_1] * 3, [TileType.MAN_1] * 2])

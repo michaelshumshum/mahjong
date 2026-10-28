@@ -47,7 +47,7 @@ _SeatFlowers = tuple[Flower, ...]
 SetAsideFlowers = tuple[_SeatFlowers, _SeatFlowers, _SeatFlowers, _SeatFlowers]
 
 _SEATS = 4
-_HAND_SIZE = 13
+DEALT_HAND_SIZE = 13
 
 
 def _physical_tiles(ruleset: RuleSet) -> list[WallTile]:
@@ -92,7 +92,7 @@ def deal_hands(wall: Wall, dealer_seat: int) -> tuple[Hands, Wall]:
     draws one further tile. All from the front of the wall."""
     if not 0 <= dealer_seat < _SEATS:
         raise ValueError(f"dealer_seat must be 0..{_SEATS - 1}, got {dealer_seat}")
-    needed = _HAND_SIZE * _SEATS + 1
+    needed = DEALT_HAND_SIZE * _SEATS + 1
     if len(wall.tiles) < needed:
         raise ValueError(f"wall has {len(wall.tiles)} tiles, need at least {needed} to deal")
 
@@ -179,6 +179,6 @@ def max_turns_per_seat(ruleset: RuleSet) -> int:
     `RuleSet` rather than a simulation.
     """
     total = TOTAL_PHYSICAL_TILES - (0 if ruleset.flowers_enabled else N_FLOWERS)
-    dealt = _HAND_SIZE * _SEATS + 1
+    dealt = DEALT_HAND_SIZE * _SEATS + 1
     available = total - dealt - ruleset.wall_reserve
     return max(available, 0) // _SEATS

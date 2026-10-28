@@ -19,7 +19,7 @@ from mahjong_core.scoring.faan import FaanResult, score_winning_hand, seven_pair
 from mahjong_core.scoring.patterns import ScoringContext
 from mahjong_core.scoring.payout import points
 from mahjong_core.state import Wind
-from mahjong_core.tiles import COPIES_PER_TYPE, Flower, TileId, TileType, tile_ids_for_type
+from mahjong_core.tiles import Flower, TileId, TileType, assign_tile_ids
 
 HAND_SIZE = 14
 
@@ -34,18 +34,6 @@ class HandCheck:
     winning: bool
     result: FaanResult | None
     points: int | None
-
-
-def _tile_ids(tiles: Sequence[TileType]) -> list[TileId]:
-    used: dict[TileType, int] = {}
-    ids = []
-    for tile in tiles:
-        n = used.get(tile, 0)
-        if n >= COPIES_PER_TYPE:
-            raise ValueError(f"more than {COPIES_PER_TYPE} copies of {tile.name}")
-        used[tile] = n + 1
-        ids.append(tile_ids_for_type(tile)[n])
-    return ids
 
 
 def _score_with_one_claimed(
@@ -84,7 +72,7 @@ def check_hand(
         raise ValueError(f"a hand to check is {HAND_SIZE} tiles, got {len(tiles)}")
     if len(set(flowers)) != len(flowers):
         raise ValueError("each flower is a single tile")
-    concealed = _tile_ids(tiles)
+    [concealed] = assign_tile_ids([tiles])
     if not _is_winning_shape(
         concealed, closed=fully_concealed, seven_pairs=seven_pairs_enabled(ruleset)
     ):
