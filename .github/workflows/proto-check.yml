@@ -29,11 +29,15 @@ jobs:
           uv run python -m tools.gen_protocol
           --ts-out ../web/src/lib/net/protocol.d.ts
           --schema-out ../shared/protocol.schema.json
+      - working-directory: server
+        run: uv run python -m tools.gen_lessons
       - working-directory: web
         run: >
           pnpm exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts
-          src/lib/net/protocol.constants.ts
+          src/lib/net/protocol.constants.ts src/lib/learn/generated
+      # status, not just diff: a new lesson is an untracked file
       - run: >
-          git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts
-          web/src/lib/net/protocol.constants.ts
-          || (echo "Protocol types changed — run 'make proto' and commit them." && exit 1)
+          (git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts
+          web/src/lib/net/protocol.constants.ts web/src/lib/learn/generated
+          && test -z "$(git status --porcelain web/src/lib/learn/generated)")
+          || (echo "Generated output changed — run 'make proto' and commit it." && exit 1)

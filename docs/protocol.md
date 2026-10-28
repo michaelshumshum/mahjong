@@ -369,8 +369,35 @@ still inlined.
 client sending a wrong-direction frame with an out-of-vocabulary value gets `bad_frame` rather than
 being ignored.
 
-`make proto` regenerates both; the `proto-check` CI job fails if the committed output is stale
-([infra.md §9](infra.md)). §10's HTTP payloads are typed by hand, not generated.
+### Generated lesson bundle
+
+`server/tools/gen_lessons.py` emits learn mode's curated puzzles ([ADR 0025](decisions/0025-learn-mode.md))
+as static files in `web/src/lib/learn/generated/`. No endpoint serves them: the web imports them.
+
+| File | Holds |
+| --- | --- |
+| `index.json` | one `LessonIndexEntry` per catalog puzzle, in `/learn` display order: `id`, `lesson_kind`, `kind` (`PuzzleKind`), `track`, `band`, `text`, `n` |
+| `<id>.json` | one `Lesson`: the index entry, `engine_version`, `snapshot`, and `key` (`grade.py`'s answer key for the kind, `dataclasses.asdict`) |
+| `lessons.d.ts` | `PuzzleKind`, `SafeReason`, `Band`, `Track`, `LessonKind`, the key interfaces, `LessonIndexEntry` and `Lesson` (a union discriminated on `kind`). `StateSync`/`WinType` are imported from `protocol.d.ts`, not re-emitted |
+
+- **`snapshot`** is a full `state_sync` frame (`{v, t: "state_sync", seq: 0, ts: 0, d}`) for seat 0:
+  `seat_view_wire(seat_view(state, 0))` plus the fields `Table.state_sync_wire` adds (`hand_history:
+  []`, `ruleset_preset`, `ruleset`, `bot_levels`), with no deadlines. It validates as
+  `app.protocol.StateSync`, so the client's `reduce()` takes it as the same full replace a live
+  resync is.
+- **Discard wins** (`count_faan` with a `discard`): the snapshot is the claim window the engine
+  opens once the seat to act discards that tile. Seat 0's `claim_options` holds its `can_win`
+  offer and `turn` names the discarder, the same state a live player answers 食糊 from.
+- **`text`** is the message stem: the web reads `lesson_<text>_title|prompt|explain` from
+  `messages/<locale>/learn.json` ([frontend.md §9](frontend.md)). Mined puzzles share one stem per
+  kind, with `n` and the key's numbers interpolated.
+- The generator refuses a puzzle whose author-stated `answer` differs from the engine's key, and a
+  duplicate or non-kebab-case `id`. Each run replaces every `.json` in the directory, so a dropped
+  lesson's file is deleted.
+
+`make proto` regenerates all of these; the `proto-check` CI job fails if the committed output is
+stale or a generated lesson file is untracked ([infra.md §9](infra.md)). §10's HTTP payloads are
+typed by hand, not generated.
 
 ## 7. Example exchange
 

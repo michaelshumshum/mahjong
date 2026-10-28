@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 from app.lessons.model import LESSON_RULESET, FromSeed, MeldSetup, Position, SeatSetup
-from mahjong_core.actions import Action, hand_is_winning_shape
+from mahjong_core.actions import Action, Discard, hand_is_winning_shape
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import reduce
 from mahjong_core.melds import Meld, MeldKind
@@ -20,6 +20,7 @@ from mahjong_core.tiles import (
     all_tile_ids,
     assign_tile_ids,
     format_tiles,
+    parse_tile,
     parse_tiles,
     tile_id_type,
 )
@@ -131,6 +132,17 @@ def build_position(spec: Position | FromSeed) -> GameState:
         hand_no=1,
         total_discards=total_discards,
     )
+
+
+def discard_on(state: GameState, code: str) -> GameState:
+    """The seat to act discards a `code` tile, so the engine opens the claim window (ADR 0025
+    "Claim positions")."""
+    want = parse_tile(code)
+    tile = next((t for t in state.seats[state.turn].concealed if tile_id_type(t) == want), None)
+    if tile is None:
+        raise ValueError(f"seat {state.turn} holds no {code}")
+    after, _ = reduce(state, Discard(tile_id=tile))
+    return after
 
 
 def from_seed(ruleset: RuleSet, seed: int, actions: Iterable[Action]) -> GameState:

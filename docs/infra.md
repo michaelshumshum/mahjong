@@ -51,13 +51,15 @@ mahjong/
 │   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11); client_ip (CF-Connecting-IP rule)
 │   │   ├── lessons/            # learn mode (ADR 0025): model.py (position specs, kinds),
 │   │   │                       # position.py (build_position, from_seed, position_from_state),
-│   │   │                       # grade.py (answer keys), mined_puzzles.json (mined shortlist, committed)
+│   │   │                       # grade.py (answer keys), catalog/ (curated puzzles, one module per
+│   │   │                       # track), mined_puzzles.json (mined shortlist, committed)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
 │   │   └── weights/learned.npz # T4's exported policy, committed (bots.md §2)
 │   ├── ml/                     # RL + supervised training (ml.md); stop_signal.py (SIGINT/SIGTERM flag)
 │   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6
+│   ├── tools/gen_lessons.py    # lesson catalog → web/src/lib/learn/generated/ (protocol.md §6)
 │   ├── tools/mine_puzzles.py   # learn-mode puzzles from Expert self-play, bot-rated difficulty (ADR 0025)
 │   └── tests/                  # pytest; pins/ holds pinned fixtures; shared helper modules
 │                               # (game_state, hands, decisions, ws_frames, game_records; testing.md §3)
@@ -73,9 +75,10 @@ mahjong/
 
 `uv` owns Python, `pnpm` owns JS, the `Makefile` is the Docker-based seam. Generated files
 (`shared/protocol.schema.json`, `web/src/lib/net/protocol.d.ts`,
-`web/src/lib/net/protocol.assertNever.ts`, `web/src/lib/net/protocol.constants.ts`) are never
-hand-edited — `make proto`
-([protocol.md §6](protocol.md)); CI enforces it (§9).
+`web/src/lib/net/protocol.assertNever.ts`, `web/src/lib/net/protocol.constants.ts`, the lesson
+bundle in `web/src/lib/learn/generated/`) are never hand-edited — `make proto`
+([protocol.md §6](protocol.md)); CI enforces it (§9). The `api` service mounts that directory at
+`/web-learn` for `make proto` to write into, as it mounts `web/src/lib/net` at `/web-net`.
 
 ## 2. Toolchain and local development
 
@@ -152,7 +155,7 @@ Native equivalents of the Docker targets:
 | `make bench-latency` | `cd server && LATENCY_BUDGET_MS=5 uv run pytest -q -s -m latency -p no:xdist` |
 | `make test-web` | `pnpm --dir web test` |
 | `make migrate` | `cd server && uv run alembic upgrade head` (with `DATABASE_URL`) |
-| `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts` |
+| `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json && uv run python -m tools.gen_lessons`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts src/lib/learn/generated` |
 
 ## 3. Process model
 
@@ -324,7 +327,7 @@ before real users:
 | --- | --- | --- |
 | `server.yml` | `server`, `server-slow` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs, and the latency tests, which gate on ratios and write absolute p50/p99 to the job summary ([testing.md §1](testing.md)) |
 | `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` |
-| `proto-check.yml` | `proto-check` | regenerates protocol types natively (§2's `make proto` equivalent), then `git diff --exit-code` |
+| `proto-check.yml` | `proto-check` | regenerates protocol types and the lesson bundle natively (§2's `make proto` equivalent), then `git diff --exit-code`, plus `git status --porcelain` on `web/src/lib/learn/generated/` (a new lesson is an untracked file `git diff` can't see) |
 
 It also runs `compose-config` inline: `docker compose -f docker-compose.yml -f
 docker-compose.prod.yml config --quiet` with placeholder values for the prod overlay's required

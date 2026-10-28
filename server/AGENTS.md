@@ -10,7 +10,7 @@ mahjong_core/   pure rules engine — no asyncio, no I/O, no unseeded randomness
 app/            FastAPI, table actors, WebSocket, redaction, protocol models, db/
 bots/           bot tiers + arena harness
 ml/             RL + supervised training (torch via the `ml` extra)
-tools/          gen_protocol.py (make proto), mine_puzzles.py (learn-mode puzzles, ADR 0025)
+tools/          gen_protocol.py, gen_lessons.py (make proto), mine_puzzles.py (learn-mode puzzles, ADR 0025)
 tests/          pytest
 ```
 

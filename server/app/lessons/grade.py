@@ -11,7 +11,8 @@ import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from app.lessons.model import SafeReason
+from app.lessons.model import Puzzle, PuzzleKind, SafeReason
+from app.lessons.position import build_position, discard_on
 from app.views import SeatView, seat_view
 from bots.features import is_closed, seen34
 from bots.safety import is_genbutsu, no_chance
@@ -333,3 +334,41 @@ def safe_discard(
         safe=tuple(o.tile for o in options if not o.deals_in_to),
         options=tuple(options),
     )
+
+
+type AnswerKey = WinningTilesKey | BestDiscardKey | CountFaanKey | SafeDiscardKey
+
+
+def puzzle_state(puzzle: Puzzle) -> GameState:
+    """The state `puzzle` is posed on: its position, plus the feeding discard of a discard win."""
+    state = build_position(puzzle.position)
+    return state if puzzle.discard is None else discard_on(state, puzzle.discard)
+
+
+def answer_key(puzzle: Puzzle, state: GameState | None = None) -> AnswerKey:
+    """The engine's key for seat 0 on `puzzle_state(puzzle)` (pass `state` if already built).
+    `safe_discard` grades the puzzle's own `answer` and `reason`."""
+    if state is None:
+        state = puzzle_state(puzzle)
+    if puzzle.discard is not None and puzzle.kind != PuzzleKind.COUNT_FAAN:
+        raise ValueError(f"{puzzle.id}: only count_faan poses a discard win")
+    match puzzle.kind:
+        case PuzzleKind.WINNING_TILES:
+            return winning_tiles(state, 0)
+        case PuzzleKind.BEST_DISCARD:
+            return best_discard(state, 0)
+        case PuzzleKind.COUNT_FAAN:
+            return count_faan(state, 0)
+        case PuzzleKind.SAFE_DISCARD:
+            if puzzle.reason is None or isinstance(puzzle.answer, int):
+                raise ValueError(f"{puzzle.id}: safe_discard states accepted tiles and a reason")
+            return safe_discard(state, 0, puzzle.answer, puzzle.reason)
+
+
+def stated_answer_holds(puzzle: Puzzle, key: AnswerKey) -> bool:
+    """The author's `answer` is exactly the key's `correct`, tile order aside."""
+    if isinstance(key, CountFaanKey):
+        return puzzle.answer == key.correct
+    if isinstance(puzzle.answer, int):
+        return False
+    return sorted(tile_code(parse_tile(c)) for c in puzzle.answer) == sorted(key.correct)

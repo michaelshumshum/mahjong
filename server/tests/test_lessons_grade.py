@@ -13,7 +13,7 @@ from app.lessons.grade import (
     safe_discard,
     winning_tiles,
 )
-from app.lessons.model import LESSON_RULESET, MeldSetup, Position, SafeReason, SeatSetup
+from app.lessons.model import LESSON_RULESET, MeldSetup, SafeReason, SeatSetup
 from app.lessons.position import build_position
 from mahjong_core.actions import ClaimWin, DeclareWin, Discard, Pass
 from mahjong_core.engine import reduce
@@ -22,6 +22,7 @@ from mahjong_core.melds import MeldKind
 from mahjong_core.scoring.patterns import seat_wind_for
 from mahjong_core.state import Phase, WinType
 from mahjong_core.tiles import TileType, parse_tile, parse_tiles, tile_id_type
+from tests.lesson_positions import DEFENCE
 from tests.lesson_positions import PIN as _PIN
 from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
@@ -205,23 +206,7 @@ def test_count_faan_needs_a_legal_win() -> None:
         count_faan(_position(_ISOLATED, turn=0), 0)
 
 
-# seat 1 is tenpai on 4m/7m (3 faan) and has discarded a 4m: no furiten, so it still wins on
-# one. every 4m, 9p and z1 is visible to seat 0; seat 3's pung and seat 1's pool hold every 2s
-_DEFENCE = build_position(
-    Position(
-        seats=(
-            SeatSetup(hand="12347789m9p1s1155z"),
-            SeatSetup(hand="56m234678p34599s", discards="4m9p1z2s"),
-            SeatSetup(hand="19m135p19s234567z", discards="4m9p1z"),
-            SeatSetup(
-                hand="19m15p78s3467z",
-                melds=(MeldSetup(MeldKind.PUNG, "222s", from_seat=2),),
-                discards="4m9p",
-            ),
-        ),
-        turn=0,
-    )
-)
+_DEFENCE = build_position(DEFENCE)
 
 
 def test_safe_discard_is_exact_against_the_hidden_hands() -> None:

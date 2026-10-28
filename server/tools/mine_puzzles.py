@@ -25,7 +25,6 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from enum import StrEnum
 from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
@@ -41,9 +40,10 @@ from app.lessons.grade import (
     safe_options,
     winning_tiles,
 )
-from app.lessons.model import LESSON_RULESET, PuzzleKind, SafeReason
+from app.lessons.model import LESSON_RULESET, Band, PuzzleKind, SafeReason
 from app.lessons.position import (
     build_position,
+    discard_on,
     position_from_dict,
     position_from_state,
     position_to_dict,
@@ -54,7 +54,7 @@ from bots.features import seen34
 from bots.labels import is_tenpai, seat_hand34
 from bots.tiers import BOT_TIERS, BotTier
 from bots.worker import compute_action
-from mahjong_core.actions import Discard, can_declare_win
+from mahjong_core.actions import can_declare_win
 from mahjong_core.engine import ENGINE_VERSION, new_game, reduce, start_next_hand
 from mahjong_core.ml import DISCARD_BASE, decode_action, legal_mask
 from mahjong_core.shanten import shanten
@@ -108,12 +108,6 @@ DECISION_BANDS: Mapping[PuzzleKind, tuple[float, float]] = {
 # structural points; see winning_tiles_points / count_faan_points
 WINNING_TILES_BANDS = (2, 4)
 COUNT_FAAN_BANDS = (3, 4)
-
-
-class Band(StrEnum):
-    BEGINNER = "beginner"
-    INTERMEDIATE = "intermediate"
-    ADVANCED = "advanced"
 
 
 def band_for(score: float, bounds: tuple[float, float]) -> Band:
@@ -231,18 +225,10 @@ def tier_rates(
     return rates
 
 
-def _discard_on(state: GameState, code: str) -> GameState:
-    """The seat to act discards a `code` tile, opening the claim window (ADR 0025 "Claim
-    positions")."""
-    tile = next(t for t in state.seats[state.turn].concealed if tile_code(tile_id_type(t)) == code)
-    after, _ = reduce(state, Discard(tile_id=tile))
-    return after
-
-
 def puzzle_state(record: Mapping[str, Any]) -> GameState:
     """The state a mined record poses its question on, seat 0 answering."""
     state = build_position(position_from_dict(record["position"]))
-    return state if record["discard"] is None else _discard_on(state, record["discard"])
+    return state if record["discard"] is None else discard_on(state, record["discard"])
 
 
 @dataclass(frozen=True)
@@ -380,7 +366,7 @@ class _Miner:
         if rebuilt is None:
             return
         if code is not None:
-            rebuilt = _discard_on(rebuilt, code)
+            rebuilt = discard_on(rebuilt, code)
         key = count_faan(rebuilt, 0)
         if count_faan_ok(key):
             points = count_faan_points(key)

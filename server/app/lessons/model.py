@@ -39,6 +39,22 @@ class LessonKind(StrEnum):
     TUTORIAL = "tutorial"
 
 
+class Band(StrEnum):
+    BEGINNER = "beginner"
+    INTERMEDIATE = "intermediate"
+    ADVANCED = "advanced"
+
+
+class Track(StrEnum):
+    """`/learn`'s sections, in display order: hand-written basics, then one per puzzle kind."""
+
+    BASICS = "basics"
+    WAITS = "waits"
+    EFFICIENCY = "efficiency"
+    DEFENCE = "defence"
+    FAAN = "faan"
+
+
 @dataclass(frozen=True)
 class MeldSetup:
     kind: MeldKind
@@ -78,3 +94,22 @@ class FromSeed:
 
     seed: int
     actions: tuple[Action, ...] = ()
+
+
+@dataclass(frozen=True)
+class Puzzle:
+    """A catalog entry, posed to seat 0. `answer` is the author's, checked against the engine's
+    key: tile codes for the tile kinds (`safe_discard`: the accepted tiles, `reason` saying why),
+    the total faan for `count_faan`. `discard` (`count_faan` only): the tile the seat to act
+    discards into seat 0's win; `None` is a self-draw. `text` is the message stem, read as
+    `lesson_<text>_title|prompt|explain`."""
+
+    id: str
+    kind: PuzzleKind
+    track: Track
+    band: Band
+    position: Position | FromSeed
+    answer: tuple[str, ...] | int
+    text: str
+    reason: SafeReason | None = None
+    discard: str | None = None

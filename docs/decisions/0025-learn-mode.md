@@ -75,11 +75,11 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 ### Gaps
 
 Closed so far: the position builder and answer keys (`app/lessons/`), public `can_win_on`,
-`TableScene`/`legal-actions.ts` and `TilePalette` out of their pages, and mined positions (phase 4
-below). Still open:
+`TableScene`/`legal-actions.ts` and `TilePalette` out of their pages, mined positions (phase 4
+below), and the generated lesson bundle ([protocol.md §6](../protocol.md)). Still open:
 
 1. Frame builders exist only on `Table`.
-2. No curated content (`catalog/`) and no generated lesson bundle.
+2. No curated content (`catalog/`).
 
 ## Design
 
@@ -87,9 +87,9 @@ below). Still open:
 
 | Module | Holds |
 | --- | --- |
-| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`, `TutorialStep`, `Lesson`; `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`. Wire vocabulary, emitted to TS like `BotTier` |
-| `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
-| `grade.py` | `answer_key(kind, state) -> AnswerKey`, one per kind; runtime-safe |
+| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle` (`TutorialStep`, `Lesson` in phase 3); `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`, `Band`, `Track`. Wire vocabulary, emitted to TS by `gen_lessons` |
+| `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `discard_on(state, tile)` (claim positions), `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
+| `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`; runtime-safe |
 | `catalog/*.py` | content, one module per track: `basics`, `efficiency`, `defence`, `faan` |
 | `frames.py` | (phase 3) tutorial frame stream |
 | `tools/gen_lessons.py` | emits `web/src/lib/learn/generated/index.json`, `<id>.json` per lesson, `lessons.d.ts` |

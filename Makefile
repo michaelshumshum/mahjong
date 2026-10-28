@@ -71,16 +71,19 @@ train: ## Training run: make train CONFIG=ml/configs/danger.yaml
 		uv run python -m ml.train --config $${CONFIG:-ml/configs/danger.yaml}
 
 # ── codegen / db ──────────────────────────────────────────────────────────────
-proto: ## Regenerate web protocol types (+ shared/protocol.schema.json, informational)
+proto: ## Regenerate web protocol types and the learn-mode lesson bundle (+ shared/protocol.schema.json)
 	$(COMPOSE) run --rm --no-deps api uv run python -m tools.gen_protocol \
 		--ts-out /web-net/protocol.d.ts --schema-out /shared/protocol.schema.json
+	$(COMPOSE) run --rm --no-deps api uv run python -m tools.gen_lessons --out /web-learn
 	$(COMPOSE) run --rm --no-deps web pnpm exec oxfmt \
-		src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts
+		src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts \
+		src/lib/learn/generated
 
 proto-check: proto ## Fail if regenerating changes the committed output (CI gate; see docs/infra.md)
-	@git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts \
-		web/src/lib/net/protocol.constants.ts \
-		|| (echo "\n  Protocol types changed — run 'make proto' and commit them.\n" && exit 1)
+	@(git diff --exit-code shared/ web/src/lib/net/protocol.d.ts web/src/lib/net/protocol.assertNever.ts \
+		web/src/lib/net/protocol.constants.ts web/src/lib/learn/generated \
+		&& test -z "$$(git status --porcelain web/src/lib/learn/generated)") \
+		|| (echo "\n  Generated output changed — run 'make proto' and commit it.\n" && exit 1)
 
 migrate: ## Apply database migrations
 	$(COMPOSE) exec api uv run alembic upgrade head
