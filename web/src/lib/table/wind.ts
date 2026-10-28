@@ -1,5 +1,6 @@
 import type { Seat, Wind } from '$lib/game/types';
 import { getLocale } from '$lib/paraglide/runtime.js';
+import type { SeatView } from './view-types';
 
 export const SEAT_WINDS = ['E', 'S', 'W', 'N'] as const satisfies readonly Wind[];
 
@@ -22,6 +23,14 @@ export const WIND_CHAR: Record<Wind, string> = {
 // (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left.
 export function relativeSeat(seat: Seat, you: Seat): 0 | 1 | 2 | 3 {
 	return ((seat - you + 4) % 4) as 0 | 1 | 2 | 3;
+}
+
+export function seatAtPosition(
+	seats: readonly SeatView[],
+	you: Seat,
+	position: 0 | 1 | 2 | 3
+): SeatView {
+	return seats.find((s) => relativeSeat(s.seat, you) === position)!;
 }
 
 // dealer holds East for the current hand, remaining seats follow clockwise in seat-index space.

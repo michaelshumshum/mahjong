@@ -3,7 +3,6 @@
 	import { MediaQuery } from 'svelte/reactivity';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import TileFace from '$lib/table/TileFace.svelte';
 	import type {
 		ClaimOption,
 		HandRecord,
@@ -13,8 +12,14 @@
 		Standing,
 		Totals
 	} from '$lib/game/types';
-	import type { DeclareOption, SeatView, OwnHandTile } from '$lib/table/view-types';
-	import { relativeSeat } from '$lib/table/wind';
+	import type { DeclareOption, OwnHandTile } from '$lib/table/view-types';
+	import { seatAtPosition } from '$lib/table/wind';
+	import {
+		findRawClaimOption,
+		legalClaimOptions,
+		legalDeclareOptions,
+		legalDiscardIds
+	} from '$lib/table/legal-actions';
 	import { MOCK_SCENARIOS } from '$lib/table/mock-game-state';
 	import { MELD_SEAL_GLYPH } from '$lib/table/meld-face';
 	import { PREGAME_PREVIEWS, type PregamePreview } from '$lib/table/pregame-preview';
@@ -61,7 +66,6 @@
 		announcementsBetween,
 		type AnnounceSnapshot
 	} from '$lib/ui/announcements';
-	import SealStamp from '$lib/table/SealStamp.svelte';
 	import ConnectionBanner from '$lib/ui/ConnectionBanner.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
@@ -70,10 +74,8 @@
 	import { createTable } from '$lib/net/lobby';
 	import { PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/practice-difficulty';
 	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
-	import OpponentRegion from '$lib/table/OpponentRegion.svelte';
-	import CenterDiscardPool from '$lib/table/CenterDiscardPool.svelte';
 	import CenterHub from '$lib/table/CenterHub.svelte';
-	import YourSeatRegion from '$lib/table/YourSeatRegion.svelte';
+	import TableScene from '$lib/table/TableScene.svelte';
 	import HandEndOverlay from './_components/HandEndOverlay.svelte';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
@@ -338,15 +340,6 @@
 
 	$effect(() => () => cancelCopiedReset?.());
 
-	function seatAt(position: 0 | 1 | 2 | 3): SeatView {
-		return gameState.seats.find((s) => relativeSeat(s.seat, gameState.you) === position)!;
-	}
-
-	function lastDiscardIndexFor(seat: Seat): number | null {
-		const d = gameState.lastDiscard;
-		return d && d.seat === seat ? d.index : null;
-	}
-
 	// CenterHub's min-faan chip: the mock fixtures carry no ruleset, so they fall back to the
 	// server default; live reads the real per-table ruleset once state_sync has landed.
 	let minFaan = $derived(
@@ -377,7 +370,7 @@
 	// keyed by tile_id when live, so a reorder (or the drawn tile joining the hand) animates the
 	// same element; mock fixtures have no ids, so they key by position.
 	let ownHandTiles = $derived.by((): OwnHandTile[] => {
-		const seat0 = seatAt(0);
+		const seat0 = seatAtPosition(gameState.seats, gameState.you, 0);
 		const drawnId = live?.ownHand.drawnId ?? null;
 		const tiles: OwnHandTile[] = live
 			? arrangedConcealedIds.map((id) => ({
@@ -404,13 +397,7 @@
 	});
 
 	let discardableTileIds = $derived(
-		new Set(
-			!isMock && liveStore
-				? liveStore.state.legalActions
-						.filter((a) => a.kind === 'discard')
-						.map((a) => a.tile_id as number)
-				: []
-		)
+		!isMock && liveStore ? legalDiscardIds(liveStore.state.legalActions) : new Set<number>()
 	);
 
 	function discardTile(tileId: number | null): void {
@@ -418,51 +405,17 @@
 		liveStore.socket.discard(tileId);
 	}
 
-	// legal_actions' own kind tags are the longer declare_*/claim_* forms; the wire declare{kind}
-	// intent takes the shorter concealed_kong|added_kong|win -- two vocabularies, one concept.
 	let declareOptions = $derived.by((): DeclareOption[] => {
 		if (isMock || !liveStore) return [];
-		const options: DeclareOption[] = [];
-		for (const action of liveStore.state.legalActions) {
-			const meld = action.meld as { tiles?: number[] } | undefined;
-			if (action.kind === 'declare_win') {
-				const store = liveStore;
-				// a declare{win} option only ever appears after this seat's own draw (a discard/
-				// kong-rob win goes through the claim window, not here) -- always a self-draw.
-				options.push({
-					key: 'win',
-					label: m.tablePage_declareWinLabel(),
-					onClick: () => store.socket.declareWin(),
-					hero: true
-				});
-			} else if (action.kind === 'declare_concealed_kong' && meld?.tiles) {
-				const store = liveStore;
-				const tiles = meld.tiles;
-				options.push({
-					key: `ck-${tiles.join(',')}`,
-					label: m.tablePage_declareConcealedKongLabel(),
-					tiles: tiles.map(tileIdToCode),
-					onClick: () => store.socket.declareConcealedKong(tiles)
-				});
-			} else if (action.kind === 'declare_added_kong' && meld?.tiles) {
-				const store = liveStore;
-				const tiles = meld.tiles;
-				options.push({
-					key: `ak-${tiles.join(',')}`,
-					label: m.tablePage_declareAddedKongLabel(),
-					tiles: tiles.map(tileIdToCode),
-					onClick: () => store.socket.declareAddedKong(tiles)
-				});
-			}
-		}
-		return options;
+		const store = liveStore;
+		return legalDeclareOptions(store.state.legalActions, {
+			win: () => store.socket.declareWin(),
+			concealedKong: (tiles) => store.socket.declareConcealedKong(tiles),
+			addedKong: (tiles) => store.socket.declareAddedKong(tiles)
+		});
 	});
 
-	let claimOptions: ClaimOption[] | null = $derived(
-		gameState.claimWindow?.yourOptions
-			? gameState.claimWindow.yourOptions.map((o) => ({ kind: o.kind, tiles: o.tiles }))
-			: null
-	);
+	let claimOptions: ClaimOption[] | null = $derived(legalClaimOptions(gameState.claimWindow));
 	let lastClaimChoice: ClaimOption | null = $state(null);
 
 	// P3.3 haptics: a short pulse on your turn starting or a claim offer landing -- mobile
@@ -530,13 +483,6 @@
 		};
 	});
 
-	// table-relative side of the claimer: the badge sits just inside the centre box on that side.
-	let sealStampPosition = $derived.by(() => {
-		if (!sealStamp) return null;
-		const sides = ['self', 'right', 'across', 'left'] as const;
-		return sides[relativeSeat(sealStamp.seat as Seat, gameState.you)];
-	});
-
 	// P3.1(e) score-delta chips: same transient-signal pattern, off `handResult.payments` once
 	// per hand end, cleared after a few seconds -- just a glance near the plate.
 	let scoreDeltaSignals = $state<Record<number, { value: number; key: number }>>({});
@@ -569,10 +515,6 @@
 		};
 	});
 
-	function scoreDeltaFor(seat: number): { value: number; key: number } | null {
-		return scoreDeltaSignals[seat] ?? null;
-	}
-
 	// hand-end hold: dismissing is per-seat, tracked locally and sent once via `hand_end_ack` --
 	// reset per hand, mirroring `readySent`'s one-shot pattern but keyed on `handNo`.
 	let handEndAckSent = $state(false);
@@ -599,31 +541,14 @@
 		liveStore.socket.handEndAck();
 	}
 
-	// the view model's `yourOptions` are display-only (TileCode, no id) -- recover the raw,
-	// real-tile_id option `live-view.ts` built them from to submit the actual `claim` intent.
 	let liveRawClaimOptions = $derived(
 		!isMock ? (liveStore?.state.claimOffer?.options ?? null) : null
 	);
 
-	function findRawClaimOption(option: ClaimOption): Record<string, unknown> | undefined {
-		const raw = liveRawClaimOptions;
-		if (!raw) return undefined;
-		const candidates = raw.filter((o) => o.kind === option.kind);
-		if (candidates.length <= 1) return candidates[0];
-		// only a chow claim can have more than one candidate for the same discard -- disambiguate
-		// by which tile codes the option actually names.
-		const wanted = new Set(option.tiles ?? []);
-		return candidates.find((o) => {
-			const ids = (o.tiles as number[] | undefined) ?? [];
-			const codes = new Set(ids.map(tileIdToCode));
-			return codes.size === wanted.size && [...codes].every((c) => wanted.has(c));
-		});
-	}
-
 	function chooseClaim(option: ClaimOption): void {
 		lastClaimChoice = option;
 		if (isMock || !liveStore || !gameState.claimWindow) return;
-		const raw = findRawClaimOption(option);
+		const raw = findRawClaimOption(liveRawClaimOptions, option);
 		const tiles = raw?.tiles as number[] | undefined;
 		liveStore.socket.claim(gameState.claimWindow.windowId, option.kind, tiles);
 	}
@@ -846,82 +771,22 @@
 			{#if !isMock}
 				<ConnectionBanner connection={liveStore?.connection} />
 			{/if}
-			<div class="table-surface" data-testid="table-scene">
-				<OpponentRegion
-					seat={seatAt(2)}
-					position="across"
-					dealer={gameState.dealer as Seat}
-					turn={haloTurn}
-					scoreDelta={scoreDeltaFor(seatAt(2).seat)}
-				/>
-				<OpponentRegion
-					seat={seatAt(3)}
-					position="left"
-					dealer={gameState.dealer as Seat}
-					turn={haloTurn}
-					scoreDelta={scoreDeltaFor(seatAt(3).seat)}
-				/>
-				<OpponentRegion
-					seat={seatAt(1)}
-					position="right"
-					dealer={gameState.dealer as Seat}
-					turn={haloTurn}
-					scoreDelta={scoreDeltaFor(seatAt(1).seat)}
-				/>
-
-				<div class="table-center">
-					{#if !phoneLandscape.current}
-						{@render hub()}
-					{/if}
-					<CenterDiscardPool
-						seat={seatAt(2)}
-						position="across"
-						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(2).name })}
-						lastDiscardIndex={lastDiscardIndexFor(seatAt(2).seat)}
-					/>
-					<CenterDiscardPool
-						seat={seatAt(3)}
-						position="left"
-						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(3).name })}
-						lastDiscardIndex={lastDiscardIndexFor(seatAt(3).seat)}
-					/>
-					<CenterDiscardPool
-						seat={seatAt(1)}
-						position="right"
-						ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(1).name })}
-						lastDiscardIndex={lastDiscardIndexFor(seatAt(1).seat)}
-					/>
-					<CenterDiscardPool
-						seat={seatAt(0)}
-						position="self"
-						ariaLabel={spectating
-							? m.tablePage_discardsAriaLabel({ name: seatAt(0).name })
-							: m.tablePage_yourDiscardsAriaLabel()}
-						lastDiscardIndex={lastDiscardIndexFor(seatAt(0).seat)}
-					/>
-					{#if sealStamp && sealStampPosition}
-						{#key sealStamp.key}
-							<SealStamp glyph={sealStamp.glyph} position={sealStampPosition} />
-						{/key}
-					{/if}
-				</div>
-
-				<YourSeatRegion
-					seat={seatAt(0)}
-					{spectating}
-					dealer={gameState.dealer as Seat}
-					turn={haloTurn}
-					{isMock}
-					{ownHandTiles}
-					{discardableTileIds}
-					discardMode={clientPrefs.discardMode}
-					onDiscard={discardTile}
-					arrangeable={!isMock && clientPrefs.handOrder === 'manual'}
-					onReorder={reorderHand}
-					{declareOptions}
-					scoreDelta={scoreDeltaFor(seatAt(0).seat)}
-				/>
-			</div>
+			<TableScene
+				view={gameState}
+				{spectating}
+				{isMock}
+				turn={haloTurn}
+				hub={phoneLandscape.current ? undefined : hub}
+				{ownHandTiles}
+				{discardableTileIds}
+				{declareOptions}
+				discardMode={clientPrefs.discardMode}
+				onDiscard={discardTile}
+				arrangeable={!isMock && clientPrefs.handOrder === 'manual'}
+				onReorder={reorderHand}
+				scoreDeltas={scoreDeltaSignals}
+				{sealStamp}
+			/>
 			{#if showCoachMarks}
 				<div class="coach-anchor">
 					<CoachMarks
@@ -1114,97 +979,6 @@
 		}
 	}
 
-	.table-surface {
-		@include layout.seat-region-grid;
-		// tiles, pools and the hub size off the table's own width (cqi), not the viewport's:
-		// the toolbar, page padding and rim make the two differ.
-		container: table / inline-size;
-		position: relative;
-		height: 100%;
-		min-height: 420px;
-		padding: var(--space-3);
-		// clip, not hidden: hidden makes this a scroll container, which traps the phone self
-		// row's `position: sticky` inside the surface instead of the viewport.
-		overflow: clip;
-		// the top edge is TableToolbar's rail, same walnut, so the two read as one frame.
-		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-		// local override: --color-text-muted (walnut chrome) fails contrast on felt green;
-		// every descendant using it (seat-wind, seat-score, …) gets the felt-safe value for free.
-		--color-text-muted: var(--color-felt-muted);
-		// walnut rim: a solid border plus an inner highlight ring (the lip catching light) and an
-		// outer shadow (the rim sitting above the room, not flush with it).
-		border: 10px solid var(--color-rim);
-		border-top-width: 4px;
-		box-shadow:
-			inset 0 0 0 2px var(--color-rim-hi),
-			0 10px 28px rgb(0 0 0 / 0.5);
-		// felt: lit from above-centre, falling off to a deeper green at the rails.
-		background: radial-gradient(
-			ellipse 120% 85% at 50% 35%,
-			var(--color-felt-lit),
-			var(--color-felt) 55%,
-			var(--color-felt-deep) 100%
-		);
-	}
-
-	// static woven-felt grain (inline SVG feTurbulence, ~4% opacity), not a texture asset.
-	// position: absolute keeps it out of the surface's own grid; pointer-events: none below it.
-	.table-surface::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		opacity: 0.04;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-		background-size: 180px 180px;
-	}
-
-	// all four discard pools live in the centre, forming a box instead of each sitting at its own
-	// seat's edge. below tablet-up the box dissolves: hub and pools become surface grid items.
-	.table-center {
-		grid-area: center;
-		display: contents;
-
-		@include layout.tablet-up {
-			display: grid;
-			align-items: center;
-			grid-template-areas:
-				'.    across .'
-				'left hub    right'
-				'.    self   .';
-			grid-template-columns: clamp(26px, 4cqi, 36px) 1fr clamp(26px, 4cqi, 36px);
-			grid-template-rows: clamp(26px, 4cqi, 36px) 1fr clamp(26px, 4cqi, 36px);
-		}
-	}
-
-	// the compass hub owns the grid's centre cell; the pools form the box around it (frontend.md §2/§3).
-	.table-center :global(.center-hub) {
-		grid-area: center;
-		align-self: center;
-
-		@include layout.tablet-up {
-			grid-area: hub;
-			align-self: center;
-			justify-self: center;
-		}
-	}
-
-	// zone guide: a faint felt-line box around the discard area, reading as a dealt-in-the-centre
-	// marking on the felt (like a real table's rail line), not a UI chrome border.
-	.table-center {
-		@include layout.tablet-up {
-			outline: 1px solid var(--color-felt-line);
-			outline-offset: var(--space-2);
-			border-radius: var(--radius-sm);
-		}
-	}
-
-	.table-center {
-		@include layout.tablet-up {
-			position: relative;
-		}
-	}
-
 	// game-end content can be tall (podium + full score sheet + standings): the dialog scrolls
 	// (placement="scroll") rather than clipping inside a fixed-height panel.
 	.panel--scrollable {
@@ -1226,25 +1000,16 @@
 			display: flex;
 			flex-direction: column;
 		}
-
-		.table-surface {
-			flex: 1 0 auto;
-			height: auto;
-		}
 	}
 
 	@include layout.desktop-up {
 		.table-page {
 			padding: var(--space-4) var(--space-5);
 		}
-
-		.table-surface {
-			padding: var(--space-4);
-		}
 	}
 
-	// a phone held sideways: no page scroll -- the surface takes what the toolbar leaves and
-	// scrolls inside itself, the hand bar sticky at its bottom (layout.seat-region-grid).
+	// a phone held sideways: no page scroll -- the surface (TableScene) takes what the toolbar
+	// leaves and scrolls inside itself.
 	@include layout.phone-landscape {
 		.table-page {
 			height: 100dvh;
@@ -1257,29 +1022,13 @@
 			flex: 1;
 			min-height: 0;
 		}
-
-		.table-surface {
-			flex: 1 1 auto;
-			height: 100%;
-			min-height: 0;
-			// no bottom padding: content scrolling under the sticky hand bar would show through it.
-			padding: var(--space-1) var(--space-1) 0;
-			border-width: 4px 6px 6px;
-			overflow-y: auto;
-			overscroll-behavior: contain;
-		}
 	}
 
-	// portrait phone: page padding, rim and felt padding cost ~22% of a 390px width; the hand
-	// gets it back (two rows of ~46px tiles instead of ~40px).
+	// portrait phone: page padding, rim and felt padding (TableScene) cost ~22% of a 390px width;
+	// the hand gets it back (two rows of ~46px tiles instead of ~40px).
 	@include layout.phone-portrait {
 		.table-page {
 			padding: var(--space-1);
-		}
-
-		.table-surface {
-			padding: var(--space-1);
-			border-width: 4px 6px 6px;
 		}
 	}
 </style>

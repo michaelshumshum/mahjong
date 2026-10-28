@@ -23,7 +23,8 @@ with no tick loop don't need a canvas renderer.
 │                                                                │
 │  lib/net/     ws client, seq tracking, reconnect, reducer     │
 │  lib/game/    client state store ($state runes)                │
-│  lib/table/   table-surface Svelte components (DOM)            │
+│  lib/table/   table-surface Svelte components (DOM): TableScene│
+│               and its parts, legal-actions.ts derivations      │
 │  lib/ui/      dialogs, overlays, shared widgets                │
 │  lib/i18n/    locale switcher                                  │
 │  lib/styles/  SCSS tokens and mixins (§8)                      │
@@ -103,7 +104,7 @@ No fixed logical canvas, no letterbox — a 16:10 letterboxed scene on a 390×84
 table at ~35% of the screen. Each region sizes to its own content via `clamp()`; there is no
 global scale factor.
 
-**Table surface material.** `.table-surface` (`routes/table/[id]/+page.svelte`) is a radial felt
+**Table surface material.** `.table-surface` (`lib/table/TableScene.svelte`) is a radial felt
 gradient (`--color-felt-lit` at 50% 35% fading to `--color-felt`, then `--color-felt-deep` at the
 rails) inside a 10px `--color-rim` walnut border, with an inset `--color-rim-hi` highlight ring and
 an outer drop shadow. A `::before` layer adds a static inline-SVG `feTurbulence` grain at ~4%
@@ -988,12 +989,23 @@ one render tree (`TileFace`/`ClaimButtons`/`TimerRing`/`FaanBreakdown`/`ScoreShe
 visually drift. Mock tiles are bare `TileCode`s; `LiveTableView.ownHand` carries the real
 `tile_id`s index-aligned with `concealedHand`/`drawn`, so a clicked tile maps to a real intent.
 
+The page splits into a prop-driven scene and the wiring around it, so a page with no socket or
+`GameStore` (a static `state_sync` snapshot through `reduce` + `viewFromClientState`) renders the
+same table:
+
+| Piece | Holds |
+| --- | --- |
+| `lib/table/TableScene.svelte` | `.table-surface` and its SCSS: the three `OpponentRegion`s, `.table-center` (hub, four `CenterDiscardPool`s, `SealStamp`), `YourSeatRegion`. Props only: the `TableView`, own hand tiles, legal-action data, the halo seat, transient signals (score deltas, seal stamp) and intent callbacks (`onDiscard`, `onReorder`, each `DeclareOption.onClick`). The hub is a snippet prop, omitted when the page renders it in the header rail (§3) |
+| `lib/table/legal-actions.ts` | pure derivations: `legalDiscardIds` and `legalDeclareOptions` off `legalActions` (declares wired to caller-supplied intents), `legalClaimOptions` off the view's `claimWindow`, `findRawClaimOption` (a display option back to its real-`tile_id` raw offer) |
+| `routes/table/[id]/+page.svelte` | socket/store wiring, mock/pregame selection, hand order state, haptics/announcements, the seal-stamp and score-delta signals, `.table-wrap` (connection banner, coach marks and their `data-coach` outline), dialogs and overlays |
+
 Types and shared constants live apart from the components and the fixture:
 
 | Module | Holds |
 | --- | --- |
 | `lib/game/types.ts` | domain types (`Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`/`ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`) and the score-sheet shapes (`HandRecord`, `RoundResult`, `SeatInfo`, `Totals`, `Standing`). Wire vocabularies are aliases of `protocol.d.ts` (`Seat`, `Phase`, `HandOutcome`, `WinType`; `ClaimKind` = `ClaimChoice`; `MeldKind` = the wire `MeldKind` minus `pair`); `Wind` is the client's own `'E'…'N'` code |
 | `lib/table/view-types.ts` | the view model (`TableView`, `SeatView`, `MeldView`, …, plus `OwnHandTile`/`DeclareOption`) |
+| `lib/table/legal-actions.ts` | `DeclareIntents` and the legal-action derivations (above) |
 | `lib/table/mock-game-state.ts` | the frozen `MOCK_SCENARIOS` fixtures only |
 | `lib/ui/client-prefs.ts` | `ClientPrefs`/`AutoArm` and their field types (`settings-storage.ts` holds the defaults) |
 | `lib/net/practice-difficulty.ts` | `PRACTICE_DIFFICULTIES` (cycle order), `PracticeDifficulty`, the difficulty → `BotTier` map and both label maps; free of `lobby.ts`'s `$env` import |
@@ -1216,7 +1228,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | Group | Tokens | Use |
 | --- | --- | --- |
 | chrome | `--color-bg/surface/surface-raised/border/text/text-muted` | walnut app chrome |
-| table materials | `--color-rim`, `--color-rim-hi`, `--color-felt`, `--color-felt-deep`, `--color-felt-lit`, `--color-felt-line`, `--color-text-on-felt`, `--color-felt-muted` | dark green felt inside a walnut rim, applied to `.table-surface` (`routes/table/[id]/+page.svelte`) |
+| table materials | `--color-rim`, `--color-rim-hi`, `--color-felt`, `--color-felt-deep`, `--color-felt-lit`, `--color-felt-line`, `--color-text-on-felt`, `--color-felt-muted` | dark green felt inside a walnut rim, applied to `.table-surface` (`lib/table/TableScene.svelte`) |
 | tile body | `--color-tile`, `--color-tile-ink`, `--color-tile-edge`, `--color-tile-side`, `--color-tile-back`, `--color-tile-back-edge` | face, edge/side layers, jade back |
 | signal | `--color-accent`, `--color-accent-glow`, `--color-accent-on-dark` | the one urgent signal (turn, claim window, win marker); never decorative. `-on-dark` is the same signal as text/icon on dark chrome or felt, where the accent itself is under 3:1 |
 | highlight | `--color-brass` | selection, focus ring, your own seat, dealer; never a signal |

@@ -110,6 +110,7 @@ model, two sources".
 | Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
 | Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`) | `lib/table/view-types.ts` |
+| Legal-action derivations (`legalDiscardIds`, `legalDeclareOptions`, `legalClaimOptions`, `DeclareIntents`) | `lib/table/legal-actions.ts` |
 | Mock fixtures (`MOCK_SCENARIOS`) — fixtures only; live code never imports types from here | `lib/table/mock-game-state.ts` |
 | Tile codes, suit order, `sortTiles` / meld order, `MELD_SEAL_GLYPH` / seat-wind helpers | `lib/table/tile-code.ts` / `meld-face.ts` / `wind.ts` |
 | Practice difficulties, difficulty → `BotTier` map, difficulty/tier labels | `lib/net/practice-difficulty.ts` (free of `lobby.ts`'s `$env` import) |

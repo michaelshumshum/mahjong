@@ -2,9 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$lib/paraglide/runtime.js', () => ({ getLocale: vi.fn(() => 'en') }));
 
-import { relativeSeat, seatWind, windWord, WIND_LABEL, WIND_CHAR } from './wind';
+import { relativeSeat, seatAtPosition, seatWind, windWord, WIND_LABEL, WIND_CHAR } from './wind';
 import { getLocale } from '$lib/paraglide/runtime.js';
 import type { Seat } from '$lib/game/types';
+import type { SeatView } from './view-types';
 
 describe('seatWind', () => {
 	it('gives the dealer East', () => {
@@ -60,5 +61,16 @@ describe('relativeSeat', () => {
 		expect(relativeSeat(0, 1)).toBe(3);
 		expect(relativeSeat(0, 3)).toBe(1);
 		expect(relativeSeat(2, 3)).toBe(3);
+	});
+});
+
+describe('seatAtPosition', () => {
+	const seats = ([0, 1, 2, 3] as const).map((seat) => ({ seat }) as SeatView);
+
+	it('finds the seat at a table position relative to you', () => {
+		expect(seatAtPosition(seats, 2, 0).seat).toBe(2);
+		expect(seatAtPosition(seats, 2, 1).seat).toBe(3);
+		expect(seatAtPosition(seats, 2, 2).seat).toBe(0);
+		expect(seatAtPosition(seats, 2, 3).seat).toBe(1);
 	});
 });
