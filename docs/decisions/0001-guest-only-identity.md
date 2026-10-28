@@ -31,4 +31,5 @@ endpoint.
 - No `users` table; a leaderboard, if built, aggregates by name.
 - Losing `localStorage` (new device, private tab) loses the seat. Accepted for a no-stakes game.
 - `JWT_SECRET` remains in `.env.example` and both Compose files but nothing reads it.
-- Revisit only if real accounts become a goal.
+- Revisit only if real accounts become a goal. The parked design for that is
+  [ADR 0026](0026-optional-oauth-accounts.md): optional, OAuth-only sign-in, no email.
