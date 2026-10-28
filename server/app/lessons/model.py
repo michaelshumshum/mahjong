@@ -22,6 +22,18 @@ class PuzzleKind(StrEnum):
     SAFE_DISCARD = "safe_discard"
 
 
+class SafeReason(StrEnum):
+    """Why a `safe_discard` answer is safe, judged on what seat 0 can see. A stated fact, not a
+    proof: the answer key also checks every accepted tile against the real hands."""
+
+    # in every opponent's own pool. weak in hk: no furiten
+    GENBUTSU = "genbutsu"
+    # every copy visible: nobody holds one, so no pair or pung wait on it
+    ALL_COPIES_VISIBLE = "all_copies_visible"
+    # suited, and every run through it has another member with every copy visible: no run wait
+    NO_CHANCE = "no_chance"
+
+
 class LessonKind(StrEnum):
     PUZZLE = "puzzle"
     TUTORIAL = "tutorial"

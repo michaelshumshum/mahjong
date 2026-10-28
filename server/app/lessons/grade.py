@@ -8,25 +8,38 @@ hand. Whether a win actually happens reads the real hands, as the engine does.""
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
 
+from app.lessons.model import SafeReason
 from app.views import SeatView, seat_view
 from bots.features import is_closed, own_hand34, seen34
-from mahjong_core.actions import build_scoring_context, can_declare_win, hand_is_winning_shape
-from mahjong_core.engine import can_win_on
+from bots.safety import is_genbutsu, no_chance
+from mahjong_core.actions import (
+    Discard,
+    build_scoring_context,
+    can_declare_win,
+    hand_is_winning_shape,
+)
+from mahjong_core.engine import can_win_on, reduce
 from mahjong_core.scoring.faan import FaanResult, score_winning_hand, seven_pairs_enabled
 from mahjong_core.scoring.payout import points
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import ClaimKind, GameState, Phase, SeatState, WinType
 from mahjong_core.tiles import (
     COPIES_PER_TYPE,
+    N_SUITED_TYPES,
     N_TILE_TYPES,
+    RANKS_PER_SUIT,
     TileId,
     TileType,
+    parse_tile,
     tile_code,
     tile_id_type,
     tile_ids_for_type,
 )
+
+_RUN_LENGTH = 3
 
 
 @dataclass(frozen=True)
@@ -84,6 +97,27 @@ class CountFaanKey:
     win_type: WinType
     breakdown: tuple[FaanLine, ...]
     points: int
+
+
+@dataclass(frozen=True)
+class SafeOption:
+    """`deals_in_to`: seats whose real hand wins on this discard. `reasons`: the reasons that
+    hold for it from the seat's own view."""
+
+    tile: str
+    deals_in_to: tuple[int, ...]
+    reasons: tuple[SafeReason, ...]
+
+
+@dataclass(frozen=True)
+class SafeDiscardKey:
+    """`correct`: the author's accepted tiles, each checked. `safe`: every discard no one can win
+    on, deducible or not."""
+
+    correct: tuple[str, ...]
+    reason: SafeReason
+    safe: tuple[str, ...]
+    options: tuple[SafeOption, ...]
 
 
 def _code(tile_type: int) -> str:
@@ -221,4 +255,73 @@ def count_faan(state: GameState, seat: int) -> CountFaanKey:
         win_type=win_type,
         breakdown=tuple(FaanLine(name, faan) for name, faan in result.breakdown.items()),
         points=points(result.total_faan, state.ruleset),
+    )
+
+
+def _walls_every_run(tile_type: int, visible: list[int]) -> bool:
+    if tile_type >= N_SUITED_TYPES:
+        return False
+    rank = tile_type % RANKS_PER_SUIT
+    suit = tile_type - rank
+    for start in range(max(0, rank - _RUN_LENGTH + 1), min(rank, RANKS_PER_SUIT - _RUN_LENGTH) + 1):
+        others = (suit + start + i for i in range(_RUN_LENGTH) if start + i != rank)
+        if not any(no_chance(other, visible) for other in others):
+            return False
+    return True
+
+
+def _reasons(
+    view: SeatView, visible: list[int], seat: int, tile_type: int
+) -> tuple[SafeReason, ...]:
+    holds = {
+        SafeReason.GENBUTSU: all(
+            is_genbutsu(view, opp, tile_type)
+            for opp in range(len(view.discard_pools))
+            if opp != seat
+        ),
+        # bots.safety.no_chance is the plain every-copy-visible count
+        SafeReason.ALL_COPIES_VISIBLE: no_chance(tile_type, visible),
+        SafeReason.NO_CHANCE: _walls_every_run(tile_type, visible),
+    }
+    return tuple(r for r in SafeReason if holds[r])
+
+
+def safe_discard(
+    state: GameState, seat: int, accepted: Iterable[str], reason: SafeReason
+) -> SafeDiscardKey:
+    """Each discard is reduced through the engine, so its claim window's `can_win` offers
+    (`can_win_on` per opponent) decide exactly who deals in, against the real hands. Never
+    `tile_risk`: that is a heuristic. Raises `ValueError` unless every `accepted` tile is in
+    hand, deals in to nobody, and `reason` holds for it."""
+    _require_to_act(state, seat)
+    view = seat_view(state, seat)
+    visible = _visible34(view)
+    held: dict[int, TileId] = {}
+    for tile in view.own_hand:
+        held.setdefault(int(tile_id_type(tile)), tile)
+
+    options: list[SafeOption] = []
+    for t in sorted(held):
+        after, _ = reduce(state, Discard(tile_id=held[t]))
+        window = after.claim_window if after.phase == Phase.AWAIT_CLAIMS else None
+        deals_in = tuple(o.seat for o in window.offers if o.can_win) if window else ()
+        options.append(SafeOption(_code(t), deals_in, _reasons(view, visible, seat, t)))
+
+    by_tile = {o.tile: o for o in options}
+    wanted = {tile_code(parse_tile(code)) for code in accepted}
+    if not wanted:
+        raise ValueError("a safe discard puzzle accepts at least one tile")
+    for code in sorted(wanted):
+        option = by_tile.get(code)
+        if option is None:
+            raise ValueError(f"{code} is not in seat {seat}'s hand")
+        if option.deals_in_to:
+            raise ValueError(f"{code} deals in to seats {option.deals_in_to}")
+        if reason not in option.reasons:
+            raise ValueError(f"{reason} does not hold for {code}")
+    return SafeDiscardKey(
+        correct=tuple(o.tile for o in options if o.tile in wanted),
+        reason=reason,
+        safe=tuple(o.tile for o in options if not o.deals_in_to),
+        options=tuple(options),
     )

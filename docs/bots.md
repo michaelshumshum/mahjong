@@ -263,6 +263,10 @@ features, fit on labelled self-play logs, is the better model — and matters mo
 because signals 1–2 are structurally weaker — but needs a labelled corpus first
 ([ml.md](ml.md)). `tests/test_safety.py` pins each signal's *direction*, not its calibration.
 
+Learn-mode puzzles grade safety exactly, never with `tile_risk`: `app/lessons/grade.py`'s
+`safe_discard` reduces each discard against the real hands, and uses `is_genbutsu`/`no_chance`
+only to check the author's stated reason ([ADR 0025](decisions/0025-learn-mode.md)).
+
 `opponent_threat_level` (meld count × 0.3 + a tempo bump, against `_THREAT_THRESHOLD = 0.3`) feeds
 §4's fold gate.
 

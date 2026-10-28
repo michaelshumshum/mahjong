@@ -85,7 +85,7 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 
 | Module | Holds |
 | --- | --- |
-| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`, `TutorialStep`, `Lesson`; `PuzzleKind(StrEnum)`, `LessonKind`. Wire vocabulary, emitted to TS like `BotTier` |
+| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`, `TutorialStep`, `Lesson`; `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`. Wire vocabulary, emitted to TS like `BotTier` |
 | `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)` |
 | `grade.py` | `answer_key(kind, state) -> AnswerKey`, one per kind; runtime-safe |
 | `catalog/*.py` | content, one module per track: `basics`, `efficiency`, `defence`, `faan` |

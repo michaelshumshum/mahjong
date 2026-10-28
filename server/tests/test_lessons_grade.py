@@ -4,13 +4,15 @@ from app.lessons.grade import (
     BestDiscardKey,
     CountFaanKey,
     FaanLine,
+    SafeOption,
     WaitOption,
     WinningTilesKey,
     best_discard,
     count_faan,
+    safe_discard,
     winning_tiles,
 )
-from app.lessons.model import LESSON_RULESET, MeldSetup, Position, SeatSetup
+from app.lessons.model import LESSON_RULESET, MeldSetup, Position, SafeReason, SeatSetup
 from app.lessons.position import build_position
 from mahjong_core.actions import ClaimWin, DeclareWin, Discard, Pass
 from mahjong_core.engine import reduce
@@ -204,3 +206,62 @@ def test_count_faan_on_a_claimed_discard_with_a_meld() -> None:
 def test_count_faan_needs_a_legal_win() -> None:
     with pytest.raises(ValueError):
         count_faan(_position(_ISOLATED, turn=0), 0)
+
+
+# seat 1 is tenpai on 4m/7m (3 faan) and has discarded a 4m: no furiten, so it still wins on
+# one. every 4m, 9p and z1 is visible to seat 0; seat 3's pung and seat 1's pool hold every 2s
+_DEFENCE = build_position(
+    Position(
+        seats=(
+            SeatSetup(hand="12347789m9p1s1155z"),
+            SeatSetup(hand="56m234678p34599s", discards="4m9p1z2s"),
+            SeatSetup(hand="19m135p19s234567z", discards="4m9p1z"),
+            SeatSetup(
+                hand="19m15p78s3467z",
+                melds=(MeldSetup(MeldKind.PUNG, "222s", from_seat=2),),
+                discards="4m9p",
+            ),
+        ),
+        turn=0,
+    )
+)
+
+
+def test_safe_discard_is_exact_against_the_hidden_hands() -> None:
+    key = safe_discard(_DEFENCE, 0, ["9p"], SafeReason.GENBUTSU)
+    assert key.correct == ("9p",)
+    assert key.safe == ("1m", "2m", "3m", "8m", "9m", "9p", "1s", "z1", "z5")
+    by_tile = {o.tile: o for o in key.options}
+    both = (SafeReason.GENBUTSU, SafeReason.ALL_COPIES_VISIBLE)
+    assert by_tile["4m"] == SafeOption("4m", deals_in_to=(1,), reasons=both)
+    assert by_tile["7m"] == SafeOption("7m", deals_in_to=(1,), reasons=())
+    assert by_tile["z1"].reasons == (SafeReason.ALL_COPIES_VISIBLE,)
+    assert by_tile["1s"].reasons == (SafeReason.NO_CHANCE,)
+
+
+@pytest.mark.parametrize(
+    ("accepted", "reason"),
+    [
+        pytest.param(["z1"], SafeReason.ALL_COPIES_VISIBLE, id="fourth-honor"),
+        pytest.param(["1s"], SafeReason.NO_CHANCE, id="walled-terminal"),
+        pytest.param(["9p", "z1"], SafeReason.ALL_COPIES_VISIBLE, id="several"),
+    ],
+)
+def test_safe_discard_accepts_a_stated_reason(accepted: list[str], reason: SafeReason) -> None:
+    assert safe_discard(_DEFENCE, 0, accepted, reason).correct == tuple(accepted)
+
+
+@pytest.mark.parametrize(
+    ("accepted", "reason"),
+    [
+        pytest.param(["4m"], SafeReason.GENBUTSU, id="genbutsu-deals-in-without-furiten"),
+        pytest.param(["4m"], SafeReason.ALL_COPIES_VISIBLE, id="last-copy-deals-in-to-a-run"),
+        pytest.param(["z1"], SafeReason.GENBUTSU, id="reason-does-not-hold"),
+        pytest.param(["2m"], SafeReason.NO_CHANCE, id="safe-but-not-deducible"),
+        pytest.param(["5p"], SafeReason.GENBUTSU, id="not-in-hand"),
+        pytest.param([], SafeReason.GENBUTSU, id="nothing-accepted"),
+    ],
+)
+def test_safe_discard_rejects(accepted: list[str], reason: SafeReason) -> None:
+    with pytest.raises(ValueError):
+        safe_discard(_DEFENCE, 0, accepted, reason)
