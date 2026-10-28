@@ -347,7 +347,7 @@ Equivalence, all in the fast suite:
 | Test | Proves |
 | --- | --- |
 | `tests/test_engine_trajectory_pin.py` | sha256 over every action, event, hand result and final `GameState` of seeded games/hands (6 rulesets × uniform-random and greedy min-shanten policies, ~250 wins), committed before any engine change |
-| `tests/test_winning_shape.py` | `_SUIT_SHAPES` = `decompose` on all ~273k suit vectors; `_is_winning_shape` = the old `_is_seven_pairs`/`_is_thirteen_orphans`/`decompose` form (hypothesis, near-winning/seven-pairs/orphans/random hands); `_can_win_with` = the old `replace`-then-check form at every turn of seeded hands |
+| `tests/test_winning_shape.py` | `_SUIT_SHAPES` = `decompose` on all ~273k suit vectors; `_is_winning_shape` = the old `_is_seven_pairs`/`_is_thirteen_orphans`/`decompose` form (hypothesis, near-winning/seven-pairs/orphans/random hands); `can_win_on` = the old `replace`-then-check form at every turn of seeded hands |
 | `tests/test_tiles.py` | `tile_id_type` = `TileType(id // 4)` with the same error on every id in −8..143 |
 
 Remaining profile (engine-only, cProfile): `dataclasses.replace` for state transitions ~20%,

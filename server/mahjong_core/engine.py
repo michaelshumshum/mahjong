@@ -236,13 +236,13 @@ def game_outcome(state: GameState) -> GameOutcome:
     return GameOutcome(hand_count=state.hand_no, final_scores=_scores(state))
 
 
-def _can_win_with(
+def can_win_on(
     state: GameState,
     seat: int,
     tile: TileId,
     *,
-    is_robbing_kong: bool,
     discarder: int,
+    is_robbing_kong: bool = False,
 ) -> bool:
     """Whether `seat` could legally claim a win on `tile` right now -- structural shape plus
     `min_faan`, mirroring `actions.can_declare_win` for the claimed-win path. `tile` is not
@@ -370,7 +370,7 @@ def _discard_claim_offers(state: GameState, discarder: int, tile: TileId) -> tup
             continue
         seat_state = state.seats[seat]
         melds = legal_claims(seat_state.concealed, tile, discarder, seat)
-        can_win = _can_win_with(state, seat, tile, is_robbing_kong=False, discarder=discarder)
+        can_win = can_win_on(state, seat, tile, discarder=discarder)
         if can_win or melds:
             offers.append(ClaimOffer(seat=seat, can_win=can_win, melds=melds))
     return tuple(offers)
@@ -432,7 +432,7 @@ def _kong_rob_offers(
             candidate = (*state.seats[seat].concealed, rob_tile)
             if not _is_thirteen_orphans(candidate):
                 continue
-        if _can_win_with(state, seat, rob_tile, is_robbing_kong=True, discarder=declarer):
+        if can_win_on(state, seat, rob_tile, is_robbing_kong=True, discarder=declarer):
             offers.append(ClaimOffer(seat=seat, can_win=True))
     return tuple(offers)
 

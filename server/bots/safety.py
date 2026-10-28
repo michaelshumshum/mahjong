@@ -13,7 +13,7 @@ never to exactly zero (HK has no furiten).
 view, `app.views._omniscient_seat_view`, docs/bots.md §9) every opponent's real hand is
 known, so "does this exact tile complete seat X's exact hand right now" is a direct, cheap, exact
 check -- no rollout, no sampling, and no need for the statistical signals above at all for that
-tier. `_exact_deal_in_faan` replicates `mahjong_core.engine._can_win_with`'s candidate-hand
+tier. `_exact_deal_in_faan` replicates `mahjong_core.engine.can_win_on`'s candidate-hand
 pattern outside a live `GameState`/claim window. This is a strict superset: `view.hands is None`
 (every other tier) is untouched, byte-for-byte (`tests/test_safety.py::
 test_tile_risk_hands_none_matches_the_original_probabilistic_behavior` pins it).
@@ -245,7 +245,7 @@ def _exact_deal_in_faan(view: SeatView, opponent_seat: int, tile_type: int) -> f
     populated): the real faan `opponent_seat` would score by winning on `tile_type` right now,
     or `0.0` if their real hand provably can't -- either not a complete shape, or a complete
     shape that doesn't clear `view.ruleset.min_faan` (a sub-minimum structural win is not a
-    deal-in, docs/bots.md §4). Mirrors `mahjong_core.engine._can_win_with`'s candidate-hand
+    deal-in, docs/bots.md §4). Mirrors `mahjong_core.engine.can_win_on`'s candidate-hand
     pattern (append the tile, check shape, score, check `clears_min_faan`) but built directly
     from `view` rather than a live `GameState`/claim window, since this is a hypothetical
     "what if this seat discards this tile" check, not resolving a real claim."""

@@ -21,7 +21,7 @@ from mahjong_core.actions import (
     legal_actions,
 )
 from mahjong_core.config import DEFAULT_RULESET
-from mahjong_core.engine import _can_win_with, new_hand, reduce
+from mahjong_core.engine import can_win_on, new_hand, reduce
 from mahjong_core.melds import _SUIT_SHAPES, Meld, MeldKind, _is_standard_shape, decompose
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.state import GameState, Phase, SeatState, Wind
@@ -133,10 +133,10 @@ def test_hand_is_winning_shape_reads_melds_for_closed() -> None:
     assert not hand_is_winning_shape(SeatState(concealed=tuple(pairs), melds=(pung,)))
 
 
-def _reference_can_win_with(
+def _reference_can_win_on(
     state: GameState, seat: int, tile: TileId, *, is_robbing_kong: bool, discarder: int
 ) -> bool:
-    """`engine._can_win_with` as it was before the speed-up."""
+    """`engine.can_win_on` as it was before the speed-up."""
     seat_state = state.seats[seat]
     candidate = dataclasses.replace(seat_state, concealed=(*seat_state.concealed, tile))
     if not hand_is_winning_shape(candidate):
@@ -149,7 +149,7 @@ def _reference_can_win_with(
 
 
 @pytest.mark.parametrize("min_faan", [0, 3])
-def test_can_win_with_equals_reference(min_faan: int) -> None:
+def test_can_win_on_equals_reference(min_faan: int) -> None:
     """every (other seat, tile in the mover's hand, rob flag) at every turn of seeded hands."""
     ruleset = dataclasses.replace(DEFAULT_RULESET, min_faan=min_faan)
     wins = 0
@@ -165,10 +165,8 @@ def test_can_win_with_equals_reference(min_faan: int) -> None:
                     for tile in state.seats[mover].concealed:
                         for rob in (False, True):
                             args = (state, seat, tile)
-                            got = _can_win_with(*args, is_robbing_kong=rob, discarder=mover)
-                            ref = _reference_can_win_with(
-                                *args, is_robbing_kong=rob, discarder=mover
-                            )
+                            got = can_win_on(*args, is_robbing_kong=rob, discarder=mover)
+                            ref = _reference_can_win_on(*args, is_robbing_kong=rob, discarder=mover)
                             assert got == ref
                             wins += got
                 seat = mover

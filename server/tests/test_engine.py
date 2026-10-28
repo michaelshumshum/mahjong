@@ -546,7 +546,7 @@ def test_claim_win_off_discard_removes_the_tile_from_the_discarder_pool() -> Non
 
 
 def test_claim_win_gated_by_min_faan_even_when_window_opens_for_another_seat() -> None:
-    """The engine-level half of the min_faan gate (`_can_win_with`/`_discard_claim_offers`,
+    """The engine-level half of the min_faan gate (`can_win_on`/`_discard_claim_offers`,
     distinct from `actions.can_declare_win`'s own-turn path -- see test_actions.py's
     `test_declare_win_not_offered_below_min_faan` for that one). Seat 2 holds a legitimate
     pung claim on the same discard so the claim window genuinely opens; seat 3's hand is
