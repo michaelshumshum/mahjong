@@ -20,28 +20,11 @@ from mahjong_core.engine import reduce
 from mahjong_core.hand_check import check_hand
 from mahjong_core.melds import MeldKind
 from mahjong_core.scoring.patterns import seat_wind_for
-from mahjong_core.state import GameState, Phase, WinType
+from mahjong_core.state import Phase, WinType
 from mahjong_core.tiles import TileType, parse_tile, parse_tiles, tile_id_type
-
-# hidden filler hands: two copies each of 2-8, so test hands keep every man, honor and 1/9
-_SOU = "22334455667788s"
-_PIN = "22334455667788p"
-
-
-def _filler(spec: str, to_act: bool) -> SeatSetup:
-    return SeatSetup(hand=spec if to_act else spec[:-2] + spec[-1])
-
-
-def _position(seat0: SeatSetup, *, turn: int, dealer: int = 0, **others: SeatSetup) -> GameState:
-    """Seat 0 as given; seats 1-3 are hidden fillers unless passed as `seat1=` etc."""
-    fillers = {1: _SOU, 2: _PIN, 3: _SOU}
-    seats = [seat0] + [
-        others.get(f"seat{n}", _filler(fillers[n], to_act=n == turn)) for n in (1, 2, 3)
-    ]
-    return build_position(
-        Position(seats=(seats[0], seats[1], seats[2], seats[3]), turn=turn, dealer=dealer)
-    )
-
+from tests.lesson_positions import PIN as _PIN
+from tests.lesson_positions import SOU as _SOU
+from tests.lesson_positions import position as _position
 
 # 2 faan by discard (seat and prevailing east pung), 3 by self-draw; white pung is 1 / 2
 _EAST_OR_WHITE = SeatSetup(

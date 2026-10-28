@@ -50,13 +50,15 @@ mahjong/
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
 │   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11); client_ip (CF-Connecting-IP rule)
 │   │   ├── lessons/            # learn mode (ADR 0025): model.py (position specs, kinds),
-│   │   │                       # position.py (build_position, from_seed)
+│   │   │                       # position.py (build_position, from_seed, position_from_state),
+│   │   │                       # grade.py (answer keys), mined_puzzles.json (mined shortlist, committed)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
 │   │   └── weights/learned.npz # T4's exported policy, committed (bots.md §2)
 │   ├── ml/                     # RL + supervised training (ml.md); stop_signal.py (SIGINT/SIGTERM flag)
 │   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6
+│   ├── tools/mine_puzzles.py   # learn-mode puzzles from Expert self-play, bot-rated difficulty (ADR 0025)
 │   └── tests/                  # pytest; pins/ holds pinned fixtures; shared helper modules
 │                               # (game_state, hands, decisions, ws_frames, game_records; testing.md §3)
 ├── web/

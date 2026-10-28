@@ -10,7 +10,7 @@ mahjong_core/   pure rules engine — no asyncio, no I/O, no unseeded randomness
 app/            FastAPI, table actors, WebSocket, redaction, protocol models, db/
 bots/           bot tiers + arena harness
 ml/             RL + supervised training (torch via the `ml` extra)
-tools/          gen_protocol.py (make proto)
+tools/          gen_protocol.py (make proto), mine_puzzles.py (learn-mode puzzles, ADR 0025)
 tests/          pytest
 ```
 
@@ -75,7 +75,7 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Dataset splits (`SPLITS`) | `ml/splits.py` |
 | Channel/head layout → slices (`layout_slices`) | `ml/encode_v2.py` (torch-free; `policy_net.py` imports it) |
 | SIGINT/SIGTERM stop flag for long jobs (`StopSignal`) | `ml/stop_signal.py` |
-| Shared test helpers (plain modules; fixtures only in `conftest.py`) | `tests/game_state.py`, `hands.py`, `decisions.py`, `ws_frames.py`, `game_records.py` (`docs/testing.md §3`) |
+| Shared test helpers (plain modules; fixtures only in `conftest.py`) | `tests/game_state.py`, `hands.py`, `decisions.py`, `ws_frames.py`, `game_records.py`, `lesson_positions.py` (`docs/testing.md §3`) |
 | Table exceptions, wire `ErrorCode`, `TABLE_CLOSED_ERROR` / table dataclasses (`Command`, `Envelope`, `SeatBinding`, `TableSettings`, …) and seat-status aliases (`SeatStatus`, `WireSeatStatus`) | `app/errors.py` / `app/table_types.py` |
 | REST request/response models | `app/api_models.py` |
 | WS wire models (source of `protocol.d.ts`), wire `Seat` alias. Wire field types reuse the owning enum/alias (`docs/protocol.md §6`) | `app/protocol.py` |

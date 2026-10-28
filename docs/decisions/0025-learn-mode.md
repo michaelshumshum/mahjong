@@ -50,7 +50,7 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 | `legal_actions` | `actions.py` | check scripted and expected actions |
 | `shanten`, `ukeire` | `shanten.py` | grade best discard |
 | `winning_tile_types` | `bots/labels.py` | find waits (shape only; ignores `min_faan`) |
-| `_can_win_with` | `engine.py` | exact shape + `min_faan` check; private today |
+| `can_win_on` | `engine.py` | exact shape + `min_faan` check for a claimed win |
 | `build_scoring_context` + `score_winning_hand` | `actions.py`, `scoring/faan.py` | count faan, melds included |
 | `check_hand` / `POST /score` | `hand_check.py`, `app/main.py` | precedent for a stateless evaluator; too narrow for melded hands |
 | `seat_view` → `seat_view_wire` | `app/views.py` | a `state_sync` payload redacted for seat 0 |
@@ -67,17 +67,19 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 | `viewFromClientState` | `lib/table/live-view.ts` | same view model as `/table` |
 | Prop-driven table components | `lib/table/*`, `lib/ui/*` (`YourSeatRegion`, `ClaimDialog`, `FaanBreakdown`, …) | render puzzles with the real table |
 | `CoachMarks` + `data-coach` highlight | `lib/ui/CoachMarks.svelte` | tutorial tips |
-| Hand checker tile palette | `lib/ui/HandChecker.svelte` (inline) | answer input |
+| Table scene + legal-action derivations | `lib/table/TableScene.svelte`, `lib/table/legal-actions.ts` | render a puzzle position with the real table |
+| Tile palette | `lib/ui/TilePalette.svelte` | answer input |
 | localStorage conventions | `lib/ui/settings-storage.ts` | progress |
 | Paraglide area files + parity spec | `messages/{en,zh-Hant}/`, `lib/i18n/messages.spec.ts` | lesson text |
 
 ### Gaps
 
-1. No builder from a hand-written position to a valid `GameState`.
-2. `_can_win_with` is private.
-3. The table scene markup, its SCSS and the legal-action logic (`discardableTileIds`, `declareOptions`, `claimOptions`) are inline in `routes/table/[id]/+page.svelte`.
-4. Frame builders exist only on `Table`.
-5. No puzzle vocabulary and no content.
+Closed so far: the position builder and answer keys (`app/lessons/`), public `can_win_on`,
+`TableScene`/`legal-actions.ts` and `TilePalette` out of their pages, and mined positions (phase 4
+below). Still open:
+
+1. Frame builders exist only on `Table`.
+2. No curated content (`catalog/`) and no generated lesson bundle.
 
 ## Design
 
@@ -86,7 +88,7 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 | Module | Holds |
 | --- | --- |
 | `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`, `TutorialStep`, `Lesson`; `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`. Wire vocabulary, emitted to TS like `BotTier` |
-| `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)` |
+| `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
 | `grade.py` | `answer_key(kind, state) -> AnswerKey`, one per kind; runtime-safe |
 | `catalog/*.py` | content, one module per track: `basics`, `efficiency`, `defence`, `faan` |
 | `frames.py` | (phase 3) tutorial frame stream |
@@ -165,10 +167,72 @@ fails `make proto`.
 
 | Piece | Detail |
 | --- | --- |
-| `tools/mine_puzzles.py` | finds decision points in seeded FaanBot self-play where the best discard is unique and differs from a naive pick |
+| `tools/mine_puzzles.py` | mines candidates of all four kinds from seeded Expert (`T4`) self-play and rates each one's difficulty with the bot tiers (below) |
+| `app/lessons/mined_puzzles.json` | the committed shortlist the miner curates: up to 15 per kind, spread across difficulty bands |
 | `GET /lessons/random?kind=` | builds and grades on the server with `lessons/grade.py`, rate-limited like other per-IP endpoints |
 | Grading | the answer key is returned with the puzzle; the client grades it the same way as curated ones |
 | Shared with | the ADR 0010 `hint` request can reuse `grade.py` |
+
+### Mined puzzles
+
+`uv run python -m tools.mine_puzzles --games N --seed S --workers W --out all.jsonl --shortlist
+app/lessons/mined_puzzles.json`, from `server/`.
+
+**Source.** Four `T4` seats play `LESSON_RULESET` games, seeds `S … S+N−1`, one game per pool task.
+Expert rather than `FaanBot`, so the positions are ones strong play reaches. Without loadable
+`learned.npz` the tool says so and plays `T2`, rating without `T4`. Every seat's decisions are
+scanned, each rotated into a seat-0 position by `position_from_state`: seat winds follow the
+dealer, so a rotation grades the same, and one game yields puzzles from four hands. States a
+`Position` can't carry (a kong-replacement or last-tile draw, a complete hand just claimed into)
+are skipped. Each candidate is rebuilt from its spec and graded there, on the position a player
+would see. A record keeps its explicit `Position`, never `FromSeed`, so it survives changes to
+dealing; `source` (`game_seed`, `decision` = step index, `seat`) replays the live game, and
+`engine_version` pins the rules it was graded under.
+
+**Filters.**
+
+| Kind | Kept when | Why |
+| --- | --- | --- |
+| `best_discard` | best shanten after the discard ≤ 2; 1–2 correct tiles; a naive pick (the most isolated tile: fewest extra copies and same-suit neighbours within two ranks, honours then terminals first, blind to shanten) is not correct; and the answer accepts ≥ 4 more live tiles than the best wrong discard at the same shanten | far from tenpai there is rarely one answer; ties of 3+ stop being about a shape; a pick the naive heuristic finds teaches nothing; a lead under one tile type's four copies is noise |
+| `safe_discard` | some discard the efficient answer (`best_discard`'s) would make deals in; the first reason of all-copies-visible, no-chance, genbutsu that covers 1–3 hand tiles, every one of them safe; `accepted` = those tiles | a real fold: the natural discard loses; a reason that also covers a tile that deals in would teach a false rule; one that clears half the hand isn't a deduction |
+| `winning_tiles` | at least one live winning tile, and ≥ 2 of them, or a wait below `min_faan`, or a dead wait | a single clean wait is a lookup |
+| `count_faan` | a self-draw, or a discard win (the record's `discard` is reduced on the rebuilt position, "Claim positions"), scoring ≥ 2 patterns | one pattern is a lookup |
+
+Duplicates (same kind, seat-0 hand and melds, and the same visible tiles; for `winning_tiles` the
+same waits, for `count_faan` the same breakdown) keep their first sighting in seed order.
+
+**Difficulty, decision kinds** (`best_discard`, `safe_discard`). Each tier that plays on a plain
+`seat_view` answers the rebuilt position from seat 0; `ORACLE` sees every hand, so it is not
+asked. Rates per tier:
+
+| Rate | Meaning |
+| --- | --- |
+| `T0` | correct legal ids / legal ids: the exact rate a uniform-random seat scores |
+| `T1`, `T2`, `T4` | 1 or 0: these tiers are greedy, so `compute_action` with any seed returns the same action and sampling N seeds would repeat it N times |
+| `T4_policy` | the Expert policy's softmax mass on the correct ids: the rate it would score sampled at temperature 1, computed exactly instead of sampled |
+
+`score` = mean miss rate (1 − rate) over the informative rates: argmax `T4` is left out since
+`T4_policy` carries it graded, and on `best_discard` `T1` is left out too, because its rule
+(min shanten, then ukeire) is the key's own grading rule.
+
+| Kind | Beginner | Intermediate | Advanced | Reading |
+| --- | --- | --- | --- | --- |
+| `safe_discard` | < 0.55 | < 0.85 | ≥ 0.85 | about: `T2` and `T4` both right / one misses / both miss |
+| `best_discard` | < 0.28 | < 0.32 | ≥ 0.32 | terciles of an 80-game calibration run: after the filters `T2` and `T4` solve nearly every kept puzzle, so the spread comes from the option count (`T0`) and the policy's confidence |
+
+**Difficulty, structural kinds.** No decision to ask a bot about, so a proxy:
+
+| Kind | Points | Beginner | Intermediate | Advanced |
+| --- | --- | --- | --- | --- |
+| `winning_tiles` | one per live winning tile past the first, +2 for a wait below `min_faan`, +2 for a dead wait | < 2 | < 4 | ≥ 4 |
+| `count_faan` | patterns in the breakdown | 2 | 3 | ≥ 4 |
+
+**Shortlist.** Per kind up to 15, round-robin across bands, and within a band round-robin across
+best shanten (`best_discard`), reason (`safe_discard`), wait count (`winning_tiles`) or faan total
+(`count_faan`). The `best_discard` key is pure efficiency, which a value play under `min_faan` can
+beat, so the shortlist keeps a `best_discard` only where `T4` also played a correct answer.
+`tests/test_mine_puzzles.py` regrades every shortlisted record and fails when an engine change
+moves one.
 
 ## Tests
 
@@ -180,6 +244,7 @@ fails `make proto`.
 | `test_lessons_grade.py` | per kind: known waits; a wait below the minimum is excluded; tied discards; safe discard against a known hidden hand; `count_faan` agrees with `check_hand` |
 | `test_lessons_catalog.py` | parametrized over every lesson (below) |
 | `test_gen_lessons.py` | generator output is deterministic |
+| `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; one mined game is deterministic and every record regrades; the committed shortlist regrades |
 | `test_lessons_frames.py` | (phase 3) the pulled-out frame builders match what `Table` sends |
 
 For every lesson, `test_lessons_catalog.py` checks:
@@ -233,7 +298,7 @@ For every lesson, `test_lessons_catalog.py` checks:
 
 ### 4. Random endless puzzles
 
-20. `feat(server): mine puzzle positions from seeded self-play`
+20. `feat(server): mine puzzles from expert self-play with bot difficulty` (done, with `position_from_state` and the first shortlist; "Mined puzzles")
 21. `feat(server): GET /lessons/random`
 22. `feat(web): endless mode on /learn`
 
