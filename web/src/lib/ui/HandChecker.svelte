@@ -8,16 +8,10 @@
 	import SegmentedControl from './SegmentedControl.svelte';
 	import SwitchRow from './SwitchRow.svelte';
 	import FaanPatternName from './FaanPatternName.svelte';
+	import TilePalette from './TilePalette.svelte';
 
 	const HAND_SIZE = 14;
 	const COPIES = 4;
-	const SUITS = ['m', 'p', 's'] as const;
-	const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
-	const PALETTE: TileCode[][] = [
-		...SUITS.map((suit) => RANKS.map((rank) => `${rank}${suit}` as TileCode)),
-		['z1', 'z2', 'z3', 'z4', 'z5', 'z6', 'z7'],
-		['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8']
-	];
 
 	let {
 		ruleset,
@@ -194,21 +188,14 @@
 	</div>
 
 	<div class="col col--pick">
-		<div class="palette" role="group" aria-label={m.guide_checkerPaletteLabel()}>
-			{#each PALETTE as row, r (r)}
-				<div class="palette-row">
-					{#each row as code (code)}
-						<button
-							type="button"
-							class="tile-btn"
-							disabled={!canAdd(code)}
-							aria-label={m.guide_checkerAddTile({ tile: tileName(code) })}
-							data-testid={`checker-add-${code}`}
-							onclick={() => add(code)}><TileFace {code} /></button
-						>
-					{/each}
-				</div>
-			{/each}
+		<div class="palette">
+			<TilePalette
+				label={m.guide_checkerPaletteLabel()}
+				tileLabel={(code) => m.guide_checkerAddTile({ tile: tileName(code) })}
+				onPick={add}
+				canPick={canAdd}
+				testidPrefix="checker-add-"
+			/>
 		</div>
 
 		<div class="options">
@@ -387,20 +374,8 @@
 		box-shadow: 0 0 0 2px var(--color-brass);
 	}
 
-	.palette {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-	}
-
-	.palette-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 2px;
-
-		.tile-btn {
-			height: 2.25rem;
-		}
+	.col--pick {
+		--palette-tile-h: 2.25rem;
 	}
 
 	.options {
@@ -483,14 +458,11 @@
 
 		.col--pick {
 			grid-area: pick;
+			--palette-tile-h: 2.75rem;
 		}
 
 		.col--hand {
 			grid-area: hand;
-		}
-
-		.palette-row .tile-btn {
-			height: 2.75rem;
 		}
 
 		.result {

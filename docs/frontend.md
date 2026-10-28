@@ -903,7 +903,15 @@ One column, the views are:
 | --- | --- | --- |
 | Patterns | `GuidePatterns.svelte` | search box (English name, Chinese name, description; searches every faan count), faan filter chips (All, one per faan value present, Limit), patterns grouped under sticky faan headings. Each entry: names, a faan badge, tags, description, tile example, "Compare:" links |
 | Scoring | `GuideScoring.svelte` | how faan add up (stacking, wind double-count, inclusive patterns, limit tiers, cap, minimum), the faan → points table for both score tables, and who pays, worked at the table's minimum (floored at 3) |
-| Check hand | `HandChecker.svelte` | a 14-tile picker (plus flowers), win by discard/self-draw, seat and prevailing wind, a "Fully concealed" switch, scored by `POST /score` ([protocol.md §10](protocol.md)). Fixed layout: the hand stays one row at any width (tiles shrink to fit 14 via container units), flowers sit in the meta row, and the result box has a fixed height and scrolls inside, so picking and scoring never shift the controls. A re-score keeps the last result, dimmed, until the answer lands |
+| Check hand | `HandChecker.svelte` | a 14-tile picker (plus flowers; the palette is `TilePalette.svelte`, below), win by discard/self-draw, seat and prevailing wind, a "Fully concealed" switch, scored by `POST /score` ([protocol.md §10](protocol.md)). Fixed layout: the hand stays one row at any width (tiles shrink to fit 14 via container units), flowers sit in the meta row, and the result box has a fixed height and scrolls inside, so picking and scoring never shift the controls. A re-score keeps the last result, dimmed, until the answer lands |
+
+**Tile palette.** `lib/ui/TilePalette.svelte` is the checker's picker, kept generic for other
+tile-answer inputs: one row per suit, honors, then flowers (`flowers={false}` drops them). The
+caller supplies the group label, each tile's accessible name (`tileLabel`), `onPick`, `canPick`
+(refused tiles render disabled) and an optional `testidPrefix` (`checker-add-` here). Given a
+`selected` set, every tile becomes a toggle (`aria-pressed`, a brass outline when on) for a
+multi-select answer. Tile height is the caller's `--palette-tile-h` (2.25rem, 2.75rem in the
+checker's two-column layout).
 
 **Data.** `lib/ui/faan-guide.ts`'s `GUIDE_ENTRIES` holds only presentation: description, example,
 tags (`situational` / `concealed` / `flowers`) and `related` look-alikes. Each pattern's faan,
