@@ -23,6 +23,7 @@ export const DISPLAY_NAME_STORAGE_KEY = 'mahjong:displayName:v1';
 export const PRACTICE_SETUP_STORAGE_KEY = 'mahjong:practiceSetup:v1';
 export const ONBOARDING_STORAGE_KEY = 'mahjong:onboarding:v1';
 export const CREATE_TABLE_SETUP_STORAGE_KEY = 'mahjong:createTableSetup:v1';
+export const LEARN_PROGRESS_STORAGE_KEY = 'mahjong:learnProgress:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
@@ -379,4 +380,49 @@ export function loadCreateTableSetup(): CreateTableSetup | null {
 
 export function saveCreateTableSetup(setup: CreateTableSetup): void {
 	writeRaw(CREATE_TABLE_SETUP_STORAGE_KEY, JSON.stringify(setup));
+}
+
+/** One lesson's progress. `step` is a tutorial's resume point. */
+export interface LessonProgress {
+	solved: boolean;
+	attempts: number;
+	solvedAt?: number;
+	step?: number;
+}
+
+export type LearnProgress = Record<string, LessonProgress>;
+
+function isCount(value: unknown): value is number {
+	return Number.isInteger(value) && (value as number) >= 0;
+}
+
+export function isLessonProgress(value: unknown): value is LessonProgress {
+	if (typeof value !== 'object' || value === null) return false;
+	const v = value as Record<string, unknown>;
+	return (
+		typeof v.solved === 'boolean' &&
+		isCount(v.attempts) &&
+		(v.solvedAt === undefined || (typeof v.solvedAt === 'number' && Number.isFinite(v.solvedAt))) &&
+		(v.step === undefined || isCount(v.step))
+	);
+}
+
+/** Per-lesson progress for `knownIds`. Entries for other ids (a lesson removed or re-mined since)
+ * and malformed entries are dropped one by one, not the whole record. */
+export function loadLearnProgress(knownIds: ReadonlySet<string>): LearnProgress {
+	const raw = readRaw(LEARN_PROGRESS_STORAGE_KEY);
+	if (raw === null) return {};
+	try {
+		const v: unknown = JSON.parse(raw);
+		if (typeof v !== 'object' || v === null || Array.isArray(v)) return {};
+		return Object.fromEntries(
+			Object.entries(v).filter(([id, entry]) => knownIds.has(id) && isLessonProgress(entry))
+		);
+	} catch {
+		return {};
+	}
+}
+
+export function saveLearnProgress(progress: LearnProgress): void {
+	writeRaw(LEARN_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
 }

@@ -7,6 +7,10 @@ import {
 	PRACTICE_SETUP_STORAGE_KEY,
 	ONBOARDING_STORAGE_KEY,
 	CREATE_TABLE_SETUP_STORAGE_KEY,
+	LEARN_PROGRESS_STORAGE_KEY,
+	isLessonProgress,
+	loadLearnProgress,
+	saveLearnProgress,
 	loadCreateTableSetup,
 	saveCreateTableSetup,
 	loadOnboarding,
@@ -339,6 +343,46 @@ describe('settings-storage', () => {
 		it('falls back to null on a wrong-shaped value', () => {
 			localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ coachMarksDone: 'yes' }));
 			expect(loadOnboarding()).toBeNull();
+		});
+	});
+
+	describe('learnProgress', () => {
+		const ids = new Set(['a', 'b']);
+
+		it('round-trips saved progress', () => {
+			const progress = {
+				a: { solved: true, attempts: 2, solvedAt: 1000 },
+				b: { solved: false, attempts: 0, step: 3 }
+			};
+			saveLearnProgress(progress);
+			expect(loadLearnProgress(ids)).toEqual(progress);
+		});
+
+		it('is empty when nothing has been stored, or the JSON is malformed', () => {
+			expect(loadLearnProgress(ids)).toEqual({});
+			localStorage.setItem(LEARN_PROGRESS_STORAGE_KEY, '{not json');
+			expect(loadLearnProgress(ids)).toEqual({});
+			localStorage.setItem(LEARN_PROGRESS_STORAGE_KEY, JSON.stringify([1, 2]));
+			expect(loadLearnProgress(ids)).toEqual({});
+		});
+
+		it('drops unknown ids and malformed entries one by one', () => {
+			localStorage.setItem(
+				LEARN_PROGRESS_STORAGE_KEY,
+				JSON.stringify({
+					a: { solved: true, attempts: 1 },
+					b: { solved: 'yes', attempts: 1 },
+					gone: { solved: true, attempts: 1 }
+				})
+			);
+			expect(loadLearnProgress(ids)).toEqual({ a: { solved: true, attempts: 1 } });
+		});
+
+		it('rejects negative or fractional counts', () => {
+			expect(isLessonProgress({ solved: false, attempts: -1 })).toBe(false);
+			expect(isLessonProgress({ solved: false, attempts: 1.5 })).toBe(false);
+			expect(isLessonProgress({ solved: false, attempts: 0, step: -2 })).toBe(false);
+			expect(isLessonProgress({ solved: true, attempts: 1, solvedAt: 'now' })).toBe(false);
 		});
 	});
 

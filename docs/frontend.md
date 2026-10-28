@@ -659,6 +659,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
 | `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
+| `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point. Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
 
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
 full `state_sync`.
