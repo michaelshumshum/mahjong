@@ -149,6 +149,20 @@ def parse_tiles(spec: str) -> list[Tile]:
     return tiles
 
 
+def format_tiles(tiles: Iterable[Tile]) -> str:
+    """Inverse of `parse_tiles`, order kept: consecutive tiles of one suit share a run."""
+    out = ""
+    suit = ""
+    for tile in tiles:
+        code = tile_code(tile)
+        rank, letter = (code[1], code[0]) if code[0] in "zf" else (code[0], code[1])
+        if suit and letter != suit:
+            out += suit
+        out += rank
+        suit = letter
+    return out + suit
+
+
 def assign_tile_ids(groups: Iterable[Iterable[TileType]]) -> list[list[TileId]]:
     """Give every tile a distinct physical `TileId`, copy numbers shared across all `groups`
     (one per seat, wall, ...). Raises `ValueError` on a fifth copy."""

@@ -289,13 +289,10 @@ def _reasons(
     return tuple(r for r in SafeReason if holds[r])
 
 
-def safe_discard(
-    state: GameState, seat: int, accepted: Iterable[str], reason: SafeReason
-) -> SafeDiscardKey:
+def safe_options(state: GameState, seat: int) -> tuple[SafeOption, ...]:
     """Each discard is reduced through the engine, so its claim window's `can_win` offers
     (`can_win_on` per opponent) decide exactly who deals in, against the real hands. Never
-    `tile_risk`: that is a heuristic. Raises `ValueError` unless every `accepted` tile is in
-    hand, deals in to nobody, and `reason` holds for it."""
+    `tile_risk`: that is a heuristic."""
     _require_to_act(state, seat)
     view = seat_view(state, seat)
     visible = _visible34(view)
@@ -309,7 +306,15 @@ def safe_discard(
         window = after.claim_window if after.phase == Phase.AWAIT_CLAIMS else None
         deals_in = tuple(o.seat for o in window.offers if o.can_win) if window else ()
         options.append(SafeOption(_code(t), deals_in, _reasons(view, visible, seat, t)))
+    return tuple(options)
 
+
+def safe_discard(
+    state: GameState, seat: int, accepted: Iterable[str], reason: SafeReason
+) -> SafeDiscardKey:
+    """`safe_options`, graded against the author's `accepted` tiles. Raises `ValueError` unless
+    every `accepted` tile is in hand, deals in to nobody, and `reason` holds for it."""
+    options = safe_options(state, seat)
     by_tile = {o.tile: o for o in options}
     wanted = {tile_code(parse_tile(code)) for code in accepted}
     if not wanted:

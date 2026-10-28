@@ -11,6 +11,7 @@ from mahjong_core.tiles import (
     all_tile_ids,
     assign_tile_ids,
     count_array_from_types,
+    format_tiles,
     new_count_array,
     parse_tile,
     parse_tiles,
@@ -232,6 +233,17 @@ def test_parse_tiles_compact_notation() -> None:
         Flower.SEASON_4,
     ]
     assert parse_tiles("") == []
+
+
+def test_format_tiles_keeps_order() -> None:
+    assert format_tiles(parse_tiles("12m9p5s17z28f")) == "12m9p5s17z28f"
+    assert format_tiles(parse_tiles("1m5p2m")) == "1m5p2m"
+    assert format_tiles([]) == ""
+
+
+@given(st.lists(st.sampled_from([*TileType, *Flower]), max_size=20))
+def test_format_tiles_inverts_parse_tiles(tiles: list[TileType | Flower]) -> None:
+    assert parse_tiles(format_tiles(tiles)) == tiles
 
 
 @pytest.mark.parametrize("spec", ["12", "m", "1x", "8z", "9f", "1 m"])

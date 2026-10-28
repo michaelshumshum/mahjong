@@ -3,21 +3,25 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any
 
-from app.lessons.model import LESSON_RULESET, FromSeed, Position, SeatSetup
-from mahjong_core.actions import Action
+from app.lessons.model import LESSON_RULESET, FromSeed, MeldSetup, Position, SeatSetup
+from mahjong_core.actions import Action, hand_is_winning_shape
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import reduce
-from mahjong_core.melds import Meld
-from mahjong_core.state import GameState, Phase, SeatState, derive_hand_seed, new_game
+from mahjong_core.melds import Meld, MeldKind
+from mahjong_core.scoring.faan import seven_pairs_enabled
+from mahjong_core.state import GameState, Phase, SeatState, Wind, derive_hand_seed, new_game
 from mahjong_core.tiles import (
     Flower,
     TileType,
     all_flowers,
     all_tile_ids,
     assign_tile_ids,
+    format_tiles,
     parse_tiles,
+    tile_id_type,
 )
 from mahjong_core.wall import DEALT_HAND_SIZE, Wall, WallTile
 
@@ -134,3 +138,101 @@ def from_seed(ruleset: RuleSet, seed: int, actions: Iterable[Action]) -> GameSta
     for action in actions:
         state, _ = reduce(state, action)
     return state
+
+
+def _seat_setup(seat_state: SeatState, rotate: Callable[[int], int]) -> SeatSetup:
+    return SeatSetup(
+        hand=format_tiles(sorted(tile_id_type(t) for t in seat_state.concealed)),
+        melds=tuple(
+            MeldSetup(
+                kind=m.kind,
+                tiles=format_tiles(tile_id_type(t) for t in m.tiles),
+                from_seat=None if m.from_seat is None else rotate(m.from_seat),
+            )
+            for m in seat_state.melds
+        ),
+        discards=format_tiles(tile_id_type(t) for t in seat_state.discards),
+        flowers=format_tiles(seat_state.flowers),
+    )
+
+
+def position_from_state(state: GameState, *, seed: int, seat: int = 0) -> Position:
+    """A live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` sits at seat 0: seat
+    winds follow the dealer, so the rotation scores and grades the same. `seed` reshuffles only
+    the hidden wall. Scores, `hand_no` and wall order are dropped; no answer key reads them.
+
+    Raises `ValueError` on what a `Position` can't carry: another ruleset or phase, a
+    kong-replacement or last-tile draw (their timing faan), or a complete hand that may not
+    self-draw because it was just claimed into."""
+    if state.ruleset != LESSON_RULESET:
+        raise ValueError("lesson positions use LESSON_RULESET")
+    if state.phase != Phase.AWAIT_ACTION:
+        raise ValueError(f"a position is an AWAIT_ACTION state, not {state.phase}")
+    if (
+        state.wall_exhausted_at_last_draw
+        or state.last_draw_was_kong_replacement
+        or state.kong_replacement_streak
+    ):
+        raise ValueError("a last-tile or kong-replacement draw has no Position field")
+    to_act = state.seats[state.turn]
+    if not state.self_draw_win_allowed and hand_is_winning_shape(
+        to_act, seven_pairs=seven_pairs_enabled(state.ruleset)
+    ):
+        raise ValueError("a complete hand after a claim would rebuild as a self-draw win")
+
+    def rotate(n: int) -> int:
+        return (n - seat) % 4
+
+    seats = [_seat_setup(state.seats[(n + seat) % 4], rotate) for n in range(4)]
+    return Position(
+        seats=(seats[0], seats[1], seats[2], seats[3]),
+        turn=rotate(state.turn),
+        dealer=rotate(state.dealer),
+        prevailing=state.prevailing,
+        seed=seed,
+    )
+
+
+def position_to_dict(spec: Position) -> dict[str, Any]:
+    """JSON-ready; `position_from_dict` reads it back."""
+    return {
+        "seats": [
+            {
+                "hand": s.hand,
+                "melds": [
+                    {"kind": str(m.kind), "tiles": m.tiles, "from_seat": m.from_seat}
+                    for m in s.melds
+                ],
+                "discards": s.discards,
+                "flowers": s.flowers,
+            }
+            for s in spec.seats
+        ],
+        "turn": spec.turn,
+        "dealer": spec.dealer,
+        "prevailing": spec.prevailing.name,
+        "wall_front": spec.wall_front,
+        "seed": spec.seed,
+    }
+
+
+def position_from_dict(data: Mapping[str, Any]) -> Position:
+    s0, s1, s2, s3 = (
+        SeatSetup(
+            hand=s["hand"],
+            melds=tuple(
+                MeldSetup(MeldKind(m["kind"]), m["tiles"], m["from_seat"]) for m in s["melds"]
+            ),
+            discards=s["discards"],
+            flowers=s["flowers"],
+        )
+        for s in data["seats"]
+    )
+    return Position(
+        seats=(s0, s1, s2, s3),
+        turn=data["turn"],
+        dealer=data["dealer"],
+        prevailing=Wind[data["prevailing"]],
+        wall_front=data["wall_front"],
+        seed=data["seed"],
+    )

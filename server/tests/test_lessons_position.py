@@ -1,12 +1,34 @@
+import asyncio
 import dataclasses
+import json
+from collections import Counter
+from collections.abc import Callable, Iterator
 
 import pytest
 
+from app.lessons.grade import (
+    SafeOption,
+    best_discard,
+    count_faan,
+    safe_options,
+    winning_tiles,
+)
 from app.lessons.model import LESSON_RULESET, FromSeed, MeldSetup, Position, SeatSetup
-from app.lessons.position import build_position, from_seed
-from mahjong_core.actions import Action, Discard, Pass, legal_actions
-from mahjong_core.engine import reduce
+from app.lessons.position import (
+    build_position,
+    from_seed,
+    position_from_dict,
+    position_from_state,
+    position_to_dict,
+)
+from app.views import seat_view
+from bots.base import NO_DEADLINE
+from bots.faanbot import FaanBot
+from mahjong_core.actions import Action, Discard, Pass, can_declare_win, legal_actions
+from mahjong_core.engine import reduce, start_next_hand
 from mahjong_core.melds import MeldKind
+from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.presets import RULESET_PRESETS
 from mahjong_core.state import GameState, Phase, Wind, derive_hand_seed, new_game
 from mahjong_core.tiles import (
     TOTAL_PHYSICAL_TILES,
@@ -139,6 +161,115 @@ def _script(seed: int, steps: int) -> tuple[Action, ...]:
         actions.append(pick)
         state, _ = reduce(state, pick)
     return tuple(actions)
+
+
+def _faanbot_turns(seed: int) -> Iterator[tuple[GameState, Action, GameState]]:
+    """A seeded 4 x `FaanBot` game: every `AWAIT_ACTION` state, the action taken, and the
+    state it led to."""
+    bot = FaanBot()
+    state = new_game(LESSON_RULESET, seed)
+    while state.phase != Phase.GAME_OVER:
+        if state.phase == Phase.HAND_OVER:
+            state, _ = start_next_hand(state)
+            continue
+        window = state.claim_window
+        if window is not None:
+            seat = min(o.seat for o in window.offers if o.seat not in window.responses)
+        else:
+            seat = state.turn
+        aid = asyncio.run(bot.act(seat_view(state, seat), legal_mask(state, seat), NO_DEADLINE))
+        action = decode_action(aid, state, seat)
+        after, _ = reduce(state, action)
+        if window is None:
+            yield state, action, after
+        state = after
+
+
+def _safe(state: GameState, seat: int, rotate: Callable[[int], int]) -> list[SafeOption]:
+    return [
+        dataclasses.replace(o, deals_in_to=tuple(sorted(rotate(s) for s in o.deals_in_to)))
+        for o in safe_options(state, seat)
+    ]
+
+
+@pytest.mark.parametrize("seed", [3, 4])
+def test_answer_keys_survive_position_from_state(seed: int) -> None:
+    """Every kind's key on a live state equals the key on its rebuilt spec, from every seat's
+    perspective in turn."""
+    kinds: Counter[str] = Counter()
+    for n, (state, action, after) in enumerate(_faanbot_turns(seed)):
+        perspective = n % 4
+
+        def rotate(s: int, p: int = perspective) -> int:
+            return (s - p) % 4
+
+        try:
+            spec = position_from_state(state, seed=n, seat=perspective)
+        except ValueError:
+            kinds["unrepresentable"] += 1
+            continue
+        rebuilt = build_position(spec)
+        turn = state.turn
+        assert best_discard(rebuilt, rotate(turn)) == best_discard(state, turn)
+        assert _safe(rebuilt, rotate(turn), lambda s: s) == _safe(state, turn, rotate)
+        for seat in range(4):
+            if seat != turn:
+                assert winning_tiles(rebuilt, rotate(seat)) == winning_tiles(state, seat)
+                kinds["winning_tiles"] += 1
+        if can_declare_win(state, turn):
+            assert count_faan(rebuilt, rotate(turn)) == count_faan(state, turn)
+            kinds["self_draw"] += 1
+        if isinstance(action, Discard) and after.claim_window is not None:
+            tile = next(
+                t
+                for t in rebuilt.seats[rotate(turn)].concealed
+                if tile_id_type(t) == tile_id_type(action.tile_id)
+            )
+            claims, _ = reduce(rebuilt, Discard(tile_id=tile))
+            for offer in after.claim_window.offers:
+                if offer.can_win:
+                    want = count_faan(after, offer.seat)
+                    assert count_faan(claims, rotate(offer.seat)) == want
+                    kinds["discard_win"] += 1
+        kinds["checked"] += 1
+    assert kinds["checked"] >= 100
+    assert kinds["self_draw"] and kinds["discard_win"]
+    assert kinds["unrepresentable"] < kinds["checked"] // 10
+
+
+def test_position_from_state_rotates_the_perspective_to_seat_0() -> None:
+    state = build_position(SPEC)
+    spec = position_from_state(state, seed=11, seat=1)
+    assert spec.seats[0].hand == "2345678m999p"
+    assert spec.seats[0].melds == (MeldSetup(MeldKind.PUNG, "555s", from_seat=3),)
+    assert spec.seats[3].hand == "123m456p789s11223z"
+    assert spec.seats[3].discards == "7z"
+    assert (spec.turn, spec.dealer, spec.prevailing) == (3, 3, Wind.SOUTH)
+    assert position_from_state(state, seed=11) == dataclasses.replace(SPEC, wall_front="")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        pytest.param({"last_draw_was_kong_replacement": True}, id="kong-replacement"),
+        pytest.param({"wall_exhausted_at_last_draw": True}, id="last-tile"),
+        pytest.param({"ruleset": RULESET_PRESETS["hk_casual"]}, id="other-ruleset"),
+    ],
+)
+def test_position_from_state_rejects_what_a_spec_cannot_carry(change: dict[str, object]) -> None:
+    state = dataclasses.replace(build_position(SPEC), **change)  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        position_from_state(state, seed=0)
+
+
+def test_position_from_state_rejects_a_claim_window() -> None:
+    after = next(a for _, _, a in _faanbot_turns(3) if a.phase == Phase.AWAIT_CLAIMS)
+    with pytest.raises(ValueError):
+        position_from_state(after, seed=0)
+
+
+def test_position_dict_round_trip() -> None:
+    assert position_from_dict(json.loads(json.dumps(position_to_dict(SPEC)))) == SPEC
 
 
 def test_from_seed_matches_new_game_and_reduce() -> None:
