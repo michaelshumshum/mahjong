@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // learn ships its lessons as static JSON: with /healthz unreachable, nothing here may wait on it.
 test.beforeEach(async ({ page }) => {
@@ -162,6 +162,68 @@ test('the index and a puzzle fit a phone without sideways scroll', async ({ page
 		);
 		expect(overflow, url).toBe(0);
 	}
+});
+
+test('puzzles answer by tap at phone width', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/learn/basics-isolated-honour');
+	await discard(page, 124); // Red Dragon
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	await expect(page.getByTestId('puzzle-solved')).toBeVisible();
+
+	await page.goto('/learn/basics-two-sided-wait');
+	await page.getByTestId('answer-tile-3m').click();
+	await page.getByTestId('answer-tile-6m').click();
+	await page.getByTestId('answer-check').click();
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+});
+
+async function tabTo(page: Page, isTarget: () => Promise<boolean>): Promise<void> {
+	for (let i = 0; i < 80 && !(await isTarget()); i++) await page.keyboard.press('Tab');
+	expect(await isTarget()).toBe(true);
+}
+
+const focused = (locator: Locator) => () => locator.evaluate((el) => el === document.activeElement);
+
+test('puzzles answer by keyboard alone', async ({ page }) => {
+	await page.goto('/learn/basics-isolated-honour');
+	await expect(page.getByTestId('table-scene')).toBeVisible();
+	// the hand is one tab stop (roving tabindex); arrows move between its tiles.
+	await tabTo(page, () =>
+		page.evaluate(() => document.activeElement?.closest('.seat-region--self') !== null)
+	);
+	await page.keyboard.press('Home');
+	const redDragon = page.locator('.seat-region--self [data-tile-id="124"]');
+	for (let i = 0; i < 14 && !(await focused(redDragon)()); i++)
+		await page.keyboard.press('ArrowRight');
+	await page.keyboard.press('Enter');
+	await page.keyboard.press('Enter');
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+
+	await page.goto('/learn/basics-two-sided-wait');
+	await tabTo(page, focused(page.getByTestId('answer-tile-3m')));
+	await page.keyboard.press('Space');
+	await tabTo(page, focused(page.getByTestId('answer-tile-6m')));
+	await page.keyboard.press('Space');
+	await tabTo(page, focused(page.getByTestId('answer-check')));
+	await page.keyboard.press('Enter');
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+});
+
+test('learn renders in zh-Hant', async ({ page, context, baseURL }) => {
+	await context.addCookies([{ name: 'PARAGLIDE_LOCALE', value: 'zh-Hant', url: baseURL }]);
+	await page.goto('/learn');
+	await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
+	await expect(page.locator('h1')).toHaveText('學打牌');
+	await expect(page).toHaveTitle('學打牌 · 開枱');
+
+	await page.getByTestId('lesson-card-basics-isolated-honour').click();
+	await expect(page.locator('h1')).toHaveText('打走孤張');
+	await discard(page, 0); // 1 Characters
+	await expect(feedback(page)).toContainText('未啱，再試一次。');
+	await discard(page, 124); // Red Dragon
+	await expect(feedback(page)).toContainText('答對了！');
+	await expect(page.getByTestId('answer-explain')).toContainText('紅中');
 });
 
 test('an unknown lesson id is a 404', async ({ page }) => {

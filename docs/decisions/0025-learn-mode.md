@@ -280,8 +280,8 @@ For every lesson, `test_lessons_catalog.py` checks:
 | Where | Covers |
 | --- | --- |
 | Vitest | `grade.spec.ts`; `feedback.spec.ts` and `AnswerPanel.svelte.spec.ts` (feedback per kind); `lesson-player.svelte.spec.ts`; `lessons.spec.ts` (message keys); `settings-storage.spec.ts` (progress); `legal-actions.spec.ts` |
-| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, a safe pick that was only lucky, a discard win's breakdown, progress survives a reload, and the tutorial in phase 3 |
-| Screenshots | `/learn`, one puzzle, and later one tutorial state |
+| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, a safe pick that was only lucky, a discard win's breakdown, progress survives a reload, answering at phone width and by keyboard alone, a zh-Hant smoke, and the tutorial in phase 3 |
+| Screenshots | `/learn`, one puzzle, best-discard and safe-discard feedback, and later one tutorial state |
 
 ## Phases
 
@@ -311,7 +311,8 @@ For every lesson, `test_lessons_catalog.py` checks:
 13. `feat(web): answer panels and feedback per puzzle kind` (done: `feedback.ts` and
     `OptionTable` behind `AnswerPanel`; a lucky safe pick is not solved; discard wins hold the
     last-discard marker, [frontend.md §7](../frontend.md) "Learn")
-14. `test(web): learn e2e and screenshots`
+14. `test(web): learn e2e and screenshots` (done: most landed with 12 and 13; this added answering
+    at phone width and by keyboard alone, a zh-Hant smoke, and the safe-discard screenshot)
 
 ### 3. Guided tutorial
 

@@ -192,6 +192,20 @@ const PAGES = [
 			await page.waitForTimeout(800);
 		}
 	},
+	// safe-discard feedback: a pick that was only lucky (4 Characters, tile id 12), so each hand
+	// tile's verdict shows.
+	{
+		name: 'learn-puzzle-safe',
+		url: '/learn/defence-01',
+		async before(page) {
+			const tile = page.locator('.seat-region--self [data-tile-id="12"]');
+			await tile.click();
+			await tile.click();
+			await page.getByTestId('safe-table').waitFor();
+			await page.mouse.move(0, 0);
+			await page.waitForTimeout(800);
+		}
+	},
 	// `?mock=<scenarioId>` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly

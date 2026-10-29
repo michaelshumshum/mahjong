@@ -64,7 +64,7 @@ friends by sharing a table link.
 | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | ![Faan guide](docs/screenshots/lobby-guide.png) Faan guide — patterns by faan, searchable, with highlighted tile examples and compare links |
 | ![Faan guide, scoring](docs/screenshots/lobby-guide-scoring.png) Faan guide — how faan add up, faan → points table, who pays | ![Faan guide, hand checker](docs/screenshots/lobby-guide-checker.png) Faan guide — check a hand: pick 14 tiles, scored by `POST /score` |
 | ![Learn](docs/screenshots/learn.png) Learn (`/learn`) — puzzle tracks with solved counts, from the engine-generated lesson bundle | ![Learn, puzzle](docs/screenshots/learn-puzzle.png) Learn — a puzzle on the real table: pick the winning tiles, checked against the engine's answer |
-| ![Learn, discard feedback](docs/screenshots/learn-puzzle-feedback.png) Learn — feedback on a wrong discard: why it is worse, and every option from the engine's key | |
+| ![Learn, discard feedback](docs/screenshots/learn-puzzle-feedback.png) Learn — feedback on a wrong discard: why it is worse, and every option from the engine's key | ![Learn, safe-discard feedback](docs/screenshots/learn-puzzle-safe.png) Learn — a defence pick that was only lucky: each hand tile's verdict, and which one deals in |
 
 </details>
 
