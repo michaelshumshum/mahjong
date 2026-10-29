@@ -1,5 +1,5 @@
 import index from './generated/index.json';
-import type { Band, Lesson, LessonIndexEntry, Track } from './generated/lessons';
+import type { Band, Lesson, LessonIndexEntry, SafeReason, Track } from './generated/lessons';
 import { m } from '$lib/paraglide/messages.js';
 
 export const LESSONS: readonly LessonIndexEntry[] = index as LessonIndexEntry[];
@@ -24,6 +24,12 @@ export const BAND_LABEL: Record<Band, () => string> = {
 	beginner: m.learn_bandBeginner,
 	intermediate: m.learn_bandIntermediate,
 	advanced: m.learn_bandAdvanced
+};
+
+export const SAFE_REASON_LABEL: Record<SafeReason, () => string> = {
+	all_copies_visible: m.learn_reasonAllCopiesVisible,
+	no_chance: m.learn_reasonNoChance,
+	genbutsu: m.learn_reasonGenbutsu
 };
 
 export interface TrackGroup {

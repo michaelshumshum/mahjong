@@ -60,7 +60,8 @@ referenced from `README.md`; phone variants use a `-phone` suffix.
 
 Desktop: `lobby`, `lobby-create-dialog`, `lobby-guide`, `lobby-guide-scoring`,
 `lobby-guide-checker` (stubs `POST /score` with `page.route`), `tables`, `learn`, `learn-puzzle`
-(a winning-tiles puzzle answered correctly), `table-your-turn`, `table-claim-window`,
+(a winning-tiles puzzle answered correctly), `learn-puzzle-feedback` (a wrong best discard: the
+comparison and options table), `table-your-turn`, `table-claim-window`,
 `table-hand-ended`, `table-hand-ended-draw`, `table-game-ended`, `table-settings`,
 `table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting`.
 

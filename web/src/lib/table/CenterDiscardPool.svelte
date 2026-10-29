@@ -10,12 +10,15 @@
 		seat,
 		position,
 		ariaLabel,
-		lastDiscardIndex = null
+		lastDiscardIndex = null,
+		holdLastDiscard = false
 	}: {
 		seat: SeatView;
 		position: 'across' | 'left' | 'right' | 'self';
 		ariaLabel: string;
 		lastDiscardIndex?: number | null;
+		// a lasting outline on the last discard, not just the landing pulse (a learn discard win)
+		holdLastDiscard?: boolean;
 	} = $props();
 </script>
 
@@ -24,6 +27,8 @@
 		<div
 			class="discard-tile"
 			class:discard-tile--last={i === lastDiscardIndex}
+			class:discard-tile--held={holdLastDiscard && i === lastDiscardIndex}
+			data-testid={holdLastDiscard && i === lastDiscardIndex ? 'held-discard' : undefined}
 			role="listitem"
 			aria-label={m.centerDiscardPool_tileAriaLabel({ name: seat.name, tile: tileName(code) })}
 			title={i === lastDiscardIndex
@@ -65,6 +70,12 @@
 		@include a11y.motion-ok {
 			animation: discard-landing var(--dur-3) var(--ease-place);
 		}
+	}
+
+	.discard-tile--held {
+		outline: 2px solid var(--color-brass);
+		outline-offset: 1px;
+		border-radius: var(--radius-tile);
 	}
 
 	@keyframes discard-landing {

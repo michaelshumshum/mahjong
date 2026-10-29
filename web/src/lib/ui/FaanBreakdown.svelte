@@ -16,6 +16,7 @@
 		patterns,
 		totalFaan,
 		payments,
+		heading,
 		onPatternSelect
 	}: {
 		winner: Seat;
@@ -26,6 +27,8 @@
 		patterns: FaanPattern[];
 		totalFaan: number;
 		payments: Payments;
+		// replaces "<winner> wins"
+		heading?: string;
 		// given: pattern names open the faan guide on that pattern
 		onPatternSelect?: (pattern: string) => void;
 	} = $props();
@@ -59,7 +62,9 @@
 	style:--tile-count={tileCount}
 	style:--pattern-count={patterns.length}
 >
-	<h2 id="faan-breakdown-heading">{m.faanBreakdown_winsHeading({ name: seatNames[winner] })}</h2>
+	<h2 id="faan-breakdown-heading">
+		{heading ?? m.faanBreakdown_winsHeading({ name: seatNames[winner] })}
+	</h2>
 
 	{#if sortedMelds.length > 0 || sortedConcealedHand.length > 0}
 		<div class="winning-hand">
@@ -105,19 +110,21 @@
 		{/if}
 	</p>
 
-	<ul class="payments">
-		{#each seatPayments as { seat, amount } (seat)}
-			<li
-				class="payment-row"
-				class:payment-row--gain={amount > 0}
-				class:payment-row--loss={amount < 0}
-				class:payment-row--winner={seat === winner}
-			>
-				<span class="payment-seat">{seatNames[seat]}</span>
-				<span class="payment-amount">{amount > 0 ? '+' : ''}{amount}</span>
-			</li>
-		{/each}
-	</ul>
+	{#if seatPayments.length > 0}
+		<ul class="payments">
+			{#each seatPayments as { seat, amount } (seat)}
+				<li
+					class="payment-row"
+					class:payment-row--gain={amount > 0}
+					class:payment-row--loss={amount < 0}
+					class:payment-row--winner={seat === winner}
+				>
+					<span class="payment-seat">{seatNames[seat]}</span>
+					<span class="payment-amount">{amount > 0 ? '+' : ''}{amount}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </section>
 
 <style lang="scss">

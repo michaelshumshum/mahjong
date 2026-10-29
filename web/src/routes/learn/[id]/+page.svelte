@@ -17,6 +17,7 @@
 	import { tileIdToCode } from '$lib/table/tile-code';
 	import type { OwnHandTile } from '$lib/table/view-types';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import { loadClientPrefs, DEFAULT_CLIENT_PREFS } from '$lib/ui/settings-storage';
 	import type { PageProps } from './$types';
 
@@ -35,14 +36,25 @@
 	const discardMode = (loadClientPrefs() ?? DEFAULT_CLIENT_PREFS).discardMode;
 
 	let result = $state<GradeResult | null>(null);
+	let lastAnswer = $state<Answer | null>(null);
 	let attempts = $state(0);
 	let solvedBefore = $state(false);
+	let guideFocus = $state<string | null>(null);
 	$effect.pre(() => {
 		const id = lesson.id;
 		result = null;
+		lastAnswer = null;
 		attempts = 0;
+		guideFocus = null;
 		solvedBefore = loadProgress()[id]?.solved ?? false;
 	});
+
+	// a discard win: the claimed tile is the snapshot's last discard
+	let claimedTile = $derived(
+		lesson.kind === 'count_faan' && lesson.key.win_type === 'discard' && gameState.lastDiscard
+			? tileIdToCode(gameState.lastDiscard.tileId)
+			: null
+	);
 
 	let ownHandTiles = $derived.by((): OwnHandTile[] => {
 		const tiles: OwnHandTile[] = live.ownHand.concealedIds.map((id) => ({
@@ -70,6 +82,7 @@
 
 	function answer(given: Answer): void {
 		result = grade(lesson, given).result;
+		lastAnswer = given;
 		attempts += 1;
 		saveAttempt(lesson.id, result === 'correct');
 	}
@@ -151,6 +164,7 @@
 					declareOptions={[]}
 					{discardMode}
 					onDiscard={discard}
+					holdLastDiscard={claimedTile !== null}
 				/>
 			{/key}
 		</div>
@@ -159,10 +173,14 @@
 			<AnswerPanel
 				{lesson}
 				{discardMode}
+				answer={lastAnswer}
 				{result}
 				{attempts}
 				explanation={text.explain(params)}
+				seatNames={gameState.names}
+				{claimedTile}
 				onAnswer={answer}
+				onPatternSelect={(pattern) => (guideFocus = pattern)}
 			/>
 			{#if result === 'correct' && next}
 				<a class="next-button" href="/learn/{next.id}" data-sfx="on" data-testid="answer-next"
@@ -171,6 +189,15 @@
 			{/if}
 		</section>
 	</div>
+
+	{#if guideFocus !== null}
+		<GuideDialog
+			onClose={() => (guideFocus = null)}
+			tableRules={gameState.ruleset}
+			tablePreset={gameState.rulesetPreset}
+			focusPattern={guideFocus}
+		/>
+	{/if}
 {/key}
 
 <style lang="scss">

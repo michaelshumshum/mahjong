@@ -105,11 +105,14 @@ export function lessonTitle(entry: LessonIndexEntry): string {
 	return LESSON_TEXT[entry.text].title({ n: entry.n, tiles: '', count: 0, faan: 0 });
 }
 
+/** Words as a locale list ("East and South"). */
+export function localeList(words: readonly string[]): string {
+	return new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format(words);
+}
+
 /** Tile names as a locale list ("3 Characters and 6 Characters"). */
 export function tileList(codes: readonly string[]): string {
-	return new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format(
-		codes.map((code) => tileName(code as TileCode))
-	);
+	return localeList(codes.map((code) => tileName(code as TileCode)));
 }
 
 /** The numbers a lesson's messages interpolate, read off its answer key. */

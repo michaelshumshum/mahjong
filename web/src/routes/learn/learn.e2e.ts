@@ -69,6 +69,60 @@ test('a count faan puzzle takes a number', async ({ page }) => {
 	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
 });
 
+test('a best discard puzzle shows every option, with the pick against the best', async ({
+	page
+}) => {
+	await page.goto('/learn/basics-keep-two-sided');
+	await discard(page, 4); // 2 Characters: ready, but fewer tiles than 5 Characters
+	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
+	await expect(feedback(page).locator('[data-line="discard-compare"]')).toContainText('7 unseen');
+	const table = page.getByTestId('discard-table');
+	await expect(table.locator('tr[data-picked="true"]')).toHaveAttribute('data-tile', '2m');
+	await expect(table.locator('tr[data-answer="true"]')).toHaveAttribute('data-tile', '5m');
+});
+
+test("a safe discard that only luck made safe isn't solved", async ({ page }) => {
+	await page.goto('/learn/defence-01');
+	await discard(page, 12); // 4 Characters: nobody waits on it, but nothing shows that
+	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
+	await expect(feedback(page)).toHaveAttribute('data-lucky', 'true');
+	await expect(feedback(page)).toContainText("couldn't have known");
+	await expect(page.getByTestId('puzzle-solved')).toHaveCount(0);
+	const table = page.getByTestId('safe-table');
+	await expect(table.locator('tr[data-tile="z5"]')).toContainText('Deals in to North');
+
+	await discard(page, 0); // 1 Characters: every copy visible
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	await expect(feedback(page)).not.toHaveAttribute('data-lucky');
+	await expect(feedback(page).locator('[data-line="why"]')).toContainText('every copy is visible');
+	await expect(page.getByTestId('puzzle-solved')).toBeVisible();
+});
+
+test('a discard win: the claimed tile is marked, and the answer shows the faan breakdown', async ({
+	page
+}) => {
+	await page.goto('/learn/basics-discard-win');
+	await expect(page.getByTestId('held-discard')).toBeVisible();
+	await expect(page.getByTestId('claimed-tile')).toBeVisible();
+
+	await page.getByTestId('answer-faan').fill('5');
+	await page.getByTestId('answer-check').click();
+	await expect(feedback(page).locator('[data-line="faan-high"]')).toBeVisible();
+	await expect(page.getByTestId('faan-breakdown')).toHaveCount(0);
+
+	await page.getByTestId('answer-faan').fill('4');
+	await page.getByTestId('answer-check').click();
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	const breakdown = page.getByTestId('faan-breakdown');
+	await expect(breakdown.locator('.pattern-row')).toHaveCount(2);
+	await expect(feedback(page).locator('[data-line="points"]')).toHaveText('Worth 16 points.');
+
+	await breakdown.getByTestId('faan-pattern-link').first().click();
+	const guide = page.getByTestId('guide-dialog');
+	await expect(guide).toBeVisible();
+	await expect(guide.locator('[data-pattern="混一色"]')).toBeFocused();
+});
+
 test('progress shows on the index and survives a reload', async ({ page }) => {
 	await page.goto('/learn/basics-simple-hand');
 	await page.getByTestId('answer-faan').fill('3');

@@ -279,8 +279,8 @@ For every lesson, `test_lessons_catalog.py` checks:
 
 | Where | Covers |
 | --- | --- |
-| Vitest | `grade.spec.ts`; `lesson-player.svelte.spec.ts`; `lessons.spec.ts` (message keys); `settings-storage.spec.ts` (progress); `legal-actions.spec.ts` |
-| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, progress survives a reload, and the tutorial in phase 3 |
+| Vitest | `grade.spec.ts`; `feedback.spec.ts` and `AnswerPanel.svelte.spec.ts` (feedback per kind); `lesson-player.svelte.spec.ts`; `lessons.spec.ts` (message keys); `settings-storage.spec.ts` (progress); `legal-actions.spec.ts` |
+| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, a safe pick that was only lucky, a discard win's breakdown, progress survives a reload, and the tutorial in phase 3 |
 | Screenshots | `/learn`, one puzzle, and later one tutorial state |
 
 ## Phases
@@ -308,7 +308,9 @@ For every lesson, `test_lessons_catalog.py` checks:
 12. `feat(web): /learn index and puzzle page over TableScene` (done: the simplest input per kind
     behind `AnswerPanel`, a result line and the explanation; `PuzzleBoard` stayed inline in the
     route page)
-13. `feat(web): answer panels and feedback per puzzle kind`
+13. `feat(web): answer panels and feedback per puzzle kind` (done: `feedback.ts` and
+    `OptionTable` behind `AnswerPanel`; a lucky safe pick is not solved; discard wins hold the
+    last-discard marker, [frontend.md §7](../frontend.md) "Learn")
 14. `test(web): learn e2e and screenshots`
 
 ### 3. Guided tutorial

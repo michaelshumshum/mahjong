@@ -177,6 +177,21 @@ const PAGES = [
 			await solveTwoSidedWait(page);
 		}
 	},
+	// best-discard feedback: a wrong pick (6 Characters, tile id 20), so the comparison line shows
+	// above the options table.
+	{
+		name: 'learn-puzzle-feedback',
+		url: '/learn/efficiency-01',
+		async before(page) {
+			const tile = page.locator('.seat-region--self [data-tile-id="20"]');
+			await tile.click();
+			await tile.click();
+			await page.getByTestId('discard-table').waitFor();
+			// off the hand's hover lift, and past the remounted table's entrance
+			await page.mouse.move(0, 0);
+			await page.waitForTimeout(800);
+		}
+	},
 	// `?mock=<scenarioId>` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly

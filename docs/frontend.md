@@ -688,7 +688,8 @@ the pool or the turn moved on) and `hand_start`. `live-view.ts`'s `viewFromClien
 the real `tileId` to that seat's position in its own (unclaimed-filtered) `discards` array —
 `null` once claimed, since the tile no longer appears there. `CenterDiscardPool` gives that tile a
 brief landing pulse (`motion-ok`) and a `title` tooltip ("`<name>` discarded"); there is no
-persistent underline. The pulse animates the standalone `scale` property, not `transform`: a
+persistent underline on the live table. `/learn`'s discard wins pass `holdLastDiscard`, a lasting
+brass outline, since the claimed tile is the puzzle (§7 "Learn"). The pulse animates the standalone `scale` property, not `transform`: a
 `transform` keyframe replaces the side pools' rotation for its duration, so the tile flashed
 upright. A `state_sync` only derives `lastDiscard` for an embedded claim window (needed there
 for `ClaimDialog`'s `sourceSeat`/`tile`) — a resync outside an active claim window loses the
@@ -963,7 +964,9 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in (you, then each opponent by seat wind, as the prompts name them) |
 | `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |
-| `AnswerPanel.svelte` | one input per kind, the result line, and the explanation once correct |
+| `AnswerPanel.svelte` | one input per kind, the result line, per-kind feedback (below), and the explanation once correct |
+| `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
+| `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
 | `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount` over `mahjong:learnProgress:v1` (§6) |
 
 - **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title with
@@ -984,10 +987,22 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
   `TilePalette` multi-select, then Check. `count_faan`: a `StepperField` (0 to `LIMIT_FAAN`),
   then Check. Every graded answer is saved with `saveAttempt`; a correct one shows the
   explanation and a Next button.
-- **Not built yet** (phase 13): per-kind feedback beyond the result line: option tables,
-  `FaanBreakdown` for `count_faan`, waits below the minimum or dead, "safe this time, but you
-  couldn't know" (`learn_feedback*` keys exist for these). They go in `AnswerPanel`, off the
-  `result` and the lesson's key.
+- **Feedback.** Read off the last graded answer and the lesson's key, never the position
+  ([ADR 0010](decisions/0010-client-scope-cuts.md)). The result line and one-line notes sit in
+  the `role="status"` region; tables and the breakdown sit after it, so an answer doesn't read a
+  whole table aloud. Seats are named as `puzzleState` names them (East, 東家).
+
+  | Kind | After an answer |
+  | --- | --- |
+  | `best_discard` | every option best first (steps from ready, kinds and unseen tiles that help), answers and your pick marked; a wrong pick gets one line against the best: further from ready, or fewer tiles that help |
+  | `winning_tiles` | correct: the waits that complete the hand but score under the minimum (their discard and self-draw faan) and the dead ones (every copy visible). Partial: how many waits are missing. Wrong: the right picks, each wrong pick with why (no win, too cheap, dead), and how many are missing; missed waits are counted, not named |
+  | `safe_discard` | every hand tile: safe with its reasons, "safe this time, but you couldn't know", or who it deals in to. A pick in `safe` but not `correct` is not solved and gets that "couldn't have known" line instead of "try again" |
+  | `count_faan` | correct: `FaanBreakdown` (heading "Your hand", no payments; pattern names open `GuideDialog` on the pattern, under the lesson's ruleset as "This table") and the points. Wrong: too high or too low, breakdown hidden |
+
+- **Discard wins.** A `count_faan` with `win_type: 'discard'` holds a brass outline on the
+  snapshot's last discard (`TableScene`'s `holdLastDiscard`, through `CenterDiscardPool`; the
+  live table keeps the pulse only, §6 "Last-discard marker") and names the tile above the faan
+  input.
 
 ### Practice mode
 

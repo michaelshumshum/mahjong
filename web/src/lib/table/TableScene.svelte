@@ -25,7 +25,8 @@
 		arrangeable = false,
 		onReorder = () => {},
 		scoreDeltas = {},
-		sealStamp = null
+		sealStamp = null,
+		holdLastDiscard = false
 	}: {
 		view: TableView;
 		spectating: boolean;
@@ -43,6 +44,7 @@
 		onReorder?: (tileId: number, toIndex: number) => void;
 		scoreDeltas?: Record<number, { value: number; key: number }>;
 		sealStamp?: { seat: number; glyph: string; key: number } | null;
+		holdLastDiscard?: boolean;
 	} = $props();
 
 	function seatAt(position: 0 | 1 | 2 | 3) {
@@ -96,18 +98,21 @@
 			position="across"
 			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(2).name })}
 			lastDiscardIndex={lastDiscardIndexFor(seatAt(2).seat)}
+			{holdLastDiscard}
 		/>
 		<CenterDiscardPool
 			seat={seatAt(3)}
 			position="left"
 			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(3).name })}
 			lastDiscardIndex={lastDiscardIndexFor(seatAt(3).seat)}
+			{holdLastDiscard}
 		/>
 		<CenterDiscardPool
 			seat={seatAt(1)}
 			position="right"
 			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(1).name })}
 			lastDiscardIndex={lastDiscardIndexFor(seatAt(1).seat)}
+			{holdLastDiscard}
 		/>
 		<CenterDiscardPool
 			seat={seatAt(0)}
@@ -116,6 +121,7 @@
 				? m.tablePage_discardsAriaLabel({ name: seatAt(0).name })
 				: m.tablePage_yourDiscardsAriaLabel()}
 			lastDiscardIndex={lastDiscardIndexFor(seatAt(0).seat)}
+			{holdLastDiscard}
 		/>
 		{#if sealStamp && sealStampPosition}
 			{#key sealStamp.key}
