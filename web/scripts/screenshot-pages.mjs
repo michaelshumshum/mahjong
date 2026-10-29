@@ -30,6 +30,12 @@ const PHONE_LANDSCAPE = { width: 844, height: 390 };
 const HAND_END_REVEAL_MS = 2500;
 const GAME_END_REVEAL_MS = 1200;
 
+async function solveTwoSidedWait(page) {
+	for (const code of ['3m', '6m']) await page.getByTestId(`answer-tile-${code}`).click();
+	await page.getByTestId('answer-check').click();
+	await page.getByTestId('answer-explain').waitFor();
+}
+
 const LOBBY_TABLES = [
 	{
 		id: 'K7QM2P',
@@ -161,6 +167,16 @@ const PAGES = [
 		}
 	},
 	{ name: 'tables', url: '/tables' },
+	// learn mode (docs/frontend.md §7 "Learn"): the track index, and a puzzle on the real table
+	// answered correctly, so the explanation shows.
+	{ name: 'learn', url: '/learn' },
+	{
+		name: 'learn-puzzle',
+		url: '/learn/basics-two-sided-wait',
+		async before(page) {
+			await solveTwoSidedWait(page);
+		}
+	},
 	// `?mock=<scenarioId>` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
@@ -243,6 +259,8 @@ const PAGES = [
 				await page.getByTestId(`checker-add-${code}`).click();
 		}
 	},
+	{ name: 'learn-phone', url: '/learn', viewport: PHONE },
+	{ name: 'learn-puzzle-phone', url: '/learn/basics-isolated-honour', viewport: PHONE },
 	{ name: 'table-your-turn-phone', url: '/table/demo123?mock=1', viewport: PHONE },
 	{
 		name: 'table-your-turn-phone-landscape',

@@ -303,9 +303,11 @@ For every lesson, `test_lessons_catalog.py` checks:
 
 ### 2. Web puzzles
 
-10. `feat(web): learn progress storage`
-11. `feat(web): 學 lobby card, faan guide as a secondary button`
-12. `feat(web): /learn index and puzzle page over TableScene`
+10. `feat(web): learn progress storage` (done)
+11. `feat(web): 學 lobby card, faan guide as a secondary button` (done)
+12. `feat(web): /learn index and puzzle page over TableScene` (done: the simplest input per kind
+    behind `AnswerPanel`, a result line and the explanation; `PuzzleBoard` stayed inline in the
+    route page)
 13. `feat(web): answer panels and feedback per puzzle kind`
 14. `test(web): learn e2e and screenshots`
 

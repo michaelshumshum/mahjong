@@ -15,7 +15,7 @@ with no tick loop don't need a canvas renderer.
 │  /tables      browser  │  │ table surface (DOM/CSS)       │   │
 │  /demo        dev demos│  │   4 hands, melds, flowers,    │   │
 │  /table/[id]  game     │  │   discard pools               │   │
-│                        │  └──────────────────────────────┘   │
+│  /learn[/id]  puzzles  │  └──────────────────────────────┘   │
 │                        │  overlay (Svelte):                  │
 │                        │   claim buttons, timer ring,         │
 │                        │   faan breakdown, score sheet,       │
@@ -26,6 +26,7 @@ with no tick loop don't need a canvas renderer.
 │  lib/table/   table-surface Svelte components (DOM): TableScene│
 │               and its parts, legal-actions.ts derivations      │
 │  lib/ui/      dialogs, overlays, shared widgets                │
+│  lib/learn/   lesson bundle, loading, grading, answer panel    │
 │  lib/i18n/    locale switcher                                  │
 │  lib/styles/  SCSS tokens and mixins (§8)                      │
 └─────────────────────────────────────────────────────────────┘
@@ -756,7 +757,8 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
 | `/profile` | on | placeholder heading only |
-| `/learn` | on | placeholder heading and lobby link until the learn index lands ([ADR 0025](decisions/0025-learn-mode.md)); skips `ApiConnectGate` |
+| `/learn` | on | learn index: tracks, lesson cards, solved state (below); skips `ApiConnectGate` |
+| `/learn/[id]` | off | one puzzle on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/status` | on | public server status (below); fetches `GET /status` client-side |
 | `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
@@ -949,6 +951,44 @@ the entry into view, outlines it and focuses it. "Compare:" links do the same in
 `MOCK_SCENARIOS` hand results use the canonical Chinese keys, as `hand_end` does, so the links
 render under `?mock=` too.
 
+### Learn (`/learn`)
+
+Short puzzles with one right answer ([ADR 0025](decisions/0025-learn-mode.md)). No backend: the
+lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](protocol.md)
+"Generated lesson bundle"), so both routes skip `ApiConnectGate` and work with the API down.
+
+| Module (`lib/learn/`) | Holds |
+| --- | --- |
+| `lessons.ts` | the typed index (`LESSONS`), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
+| `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in (you, then each opponent by seat wind, as the prompts name them) |
+| `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |
+| `AnswerPanel.svelte` | one input per kind, the result line, and the explanation once correct |
+| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount` over `mahjong:learnProgress:v1` (§6) |
+
+- **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title with
+  `{n}`, band, a check once solved), each a link to `/learn/<id>`. Progress lives in
+  localStorage only, so the SSR'd page renders everything unsolved and an `$effect` reads it
+  after mount; reading it during render would make server and client markup differ.
+- **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and the
+  discard-mode pref are client-only, so a server render would be an empty felt to hydrate over.
+  `+page.ts` loads the lesson and answers an unknown id with SvelteKit's `error(404)`. The
+  snapshot renders through `puzzleState` → `viewFromClientState` → `TableScene` with no socket or
+  `GameStore`, and the page supplies the `CenterHub` snippet as `/table` does. A prompt card
+  (band, title, prompt), back/previous/next links, and the answer card sit beside the table from
+  `desktop-up`, stacked above and below it otherwise.
+- **Answering.** `best_discard` and `safe_discard`: tap a tile in your hand, through
+  `TableScene`'s `onDiscard` (discardable = the snapshot's legal discards, i.e. the concealed
+  hand; the player's discard mode applies). Each graded tap remounts the scene, which clears the
+  hand's pending-discard state, since no `discard` echo ever arrives. `winning_tiles`:
+  `TilePalette` multi-select, then Check. `count_faan`: a `StepperField` (0 to `LIMIT_FAAN`),
+  then Check. Every graded answer is saved with `saveAttempt`; a correct one shows the
+  explanation and a Next button.
+- **Not built yet** (phase 13): per-kind feedback beyond the result line: option tables,
+  `FaanBreakdown` for `count_faan`, waits below the minimum or dead, "safe this time, but you
+  couldn't know" (`learn_feedback*` keys exist for these). They go in `AnswerPanel`, off the
+  `result` and the lesson's key.
+
 ### Practice mode
 
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
@@ -998,9 +1038,9 @@ seat has a legal discard, "Claim? · Hoi Toi" while a claim offer is open, else 
 Hoi Toi". Mock scenarios are frozen snapshots, not live turn state, so they always show the
 generic table title regardless of which scenario is selected.
 
-**One view model, two sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a real
-`ClientGameState` into the same `TableView` shape the template renders, so mock and live share
-one render tree (`TileFace`/`ClaimButtons`/`TimerRing`/`FaanBreakdown`/`ScoreSheet`/…) and can't
+**One view model, three sources.** `lib/table/live-view.ts`'s `viewFromClientState()` projects a real
+`ClientGameState` into the same `TableView` shape the template renders, so mock, live and a learn
+puzzle's snapshot ("Learn", above) share one render tree (`TileFace`/`ClaimButtons`/`TimerRing`/`FaanBreakdown`/`ScoreSheet`/…) and can't
 visually drift. Mock tiles are bare `TileCode`s; `LiveTableView.ownHand` carries the real
 `tile_id`s index-aligned with `concealedHand`/`drawn`, so a clicked tile maps to a real intent.
 
@@ -1333,13 +1373,13 @@ spread. Files group key prefixes by app area:
 | File | Key prefixes |
 | --- | --- |
 | `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
-| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, the `/learn` placeholder, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `learnPage`, `statusPage` |
+| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `statusPage` |
 | `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
 | `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
 | `tiles.json` | `tileName`, `tileFace` |
 | `settings.json` | `settings`, `localeSwitcher` |
 | `guide.json` | `guide`, `coachMarks` |
-| `learn.json` | `/learn`: `learn` (page chrome, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
+| `learn.json` | `/learn` and `/learn/[id]`: `learn` (both pages' chrome, seat names, answer inputs, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
 | `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
 
 **Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the
@@ -1353,7 +1393,8 @@ keys in the same order in both locales.
 `lib/i18n/messages.spec.ts` enforces this: each locale has exactly the registered files, every
 file has the base locale's keys in the same order, and no prefix spans two files.
 `lib/learn/lessons.spec.ts` checks every generated lesson's `text` stem has its three `lesson_*`
-keys, and every track and band its `learn_*` label, in each locale.
+keys and a `LESSON_TEXT` entry (§7 "Learn"), and every track and band its `learn_*` label, in
+each locale.
 
 **Lesson text.** Hand-written lessons get their own stem (`basicsIsolatedHonour`). The mined
 shortlist shares one stem per kind (`minedWaits`, `minedEfficiency`; `minedDefence*` per

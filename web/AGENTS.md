@@ -26,7 +26,7 @@ messages/       <locale>/<area>.json — message source, edited directly (docs/f
   exception is a *pending* visual state on the tile you just discarded (`docs/frontend.md
   §5`), which is presentation only and reverts to nothing (the discard is never actually
   rejected).
-- `/table/[id]` and `/replay/[id]` disable SSR (`export const ssr = false`); other routes keep
+- `/table/[id]`, `/replay/[id]` and `/learn/[id]` disable SSR (`export const ssr = false`); other routes keep
   the default SSR that `web/Dockerfile`'s `node build` (adapter-node) turns on.
 - `src/lib/net/protocol.d.ts` is generated — edit `server/app/protocol.py`, run `make proto`.
 - The reducer is pure and exhaustively switched over the event union.
@@ -102,12 +102,13 @@ talks to `http://localhost:8000` / `ws://localhost:8000/ws` unless `PUBLIC_API_U
 ## Where things live
 
 Rule: root `AGENTS.md` "Types and constants". Module table: `docs/frontend.md §7` "One view
-model, two sources".
+model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 
 | Concept | Home |
 | --- | --- |
 | Wire types and vocabularies (`BotTier`, `Seat`, `Phase`, `MeldKind`, `WireSeatStatus`, `ErrorCode`, `WindName`, …; generated, never hand-edited) | `lib/net/protocol.d.ts` |
 | Lesson types and vocabularies (`Lesson`, `LessonIndexEntry`, `PuzzleKind`, `SafeReason`, `Band`, `Track`, answer keys) and the lesson JSON (generated, never hand-edited) | `lib/learn/generated/` |
+| Lesson loading and track order, lesson text, answer types and grading | `lib/learn/lessons.ts` / `lesson-text.ts` / `types.ts` / `grade.ts` |
 | Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
 | Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`) | `lib/table/view-types.ts` |
