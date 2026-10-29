@@ -222,6 +222,8 @@ Playwright ships no musl build. `deps`/`build`/`prod` stay alpine.
   dependencies (and its libc-specific native builds) indefinitely.
 - `make test-web` passes `CI=true`: vitest browser mode and Playwright default to *headed* off-CI,
   and the container has no X server.
+- Its e2e step builds into the bind-mounted `web/build` and `web/.svelte-kit` as root, which a
+  later native run can't overwrite (`EACCES`) until they're removed ([testing.md §4](testing.md)).
 - Browsers live in a `playwright-browsers` volume at `/root/.cache/ms-playwright`, seeded from the
   image, so a lockfile-triggered rebuild doesn't re-fetch ~170MB of chromium.
 
@@ -326,7 +328,7 @@ before real users:
 | File | Jobs | Runs |
 | --- | --- | --- |
 | `server.yml` | `server`, `server-slow` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs, and the latency tests, which gate on ratios and write absolute p50/p99 to the job summary ([testing.md §1](testing.md)) |
-| `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` |
+| `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` (Playwright against a `vite build` + `vite preview` server, not `vite dev`: [testing.md §4](testing.md)) |
 | `proto-check.yml` | `proto-check` | regenerates protocol types and the lesson bundle natively (§2's `make proto` equivalent), then `git diff --exit-code`, plus `git status --porcelain` on `web/src/lib/learn/generated/` (a new lesson is an untracked file `git diff` can't see) |
 
 It also runs `compose-config` inline: `docker compose -f docker-compose.yml -f

@@ -151,3 +151,27 @@ Commands table. Add them here as they turn up.
 | `game_records.py` | `fetch_latest_record(database_url)` |
 | `lesson_positions.py` | `position(seat0, turn=, **others)`: a lesson position with hidden filler hands (`SOU`, `PIN`) for seats 1–3 |
 | `latency.py` / `ml_synthetic.py` | `check_latency` (§1) / synthetic packed ML datasets |
+
+## 4. Web (Playwright e2e)
+
+`web/playwright.config.ts`'s `webServer` runs `vite build && vite preview` on its own port (4180,
+never reused), not `vite dev`. CI, `pnpm test` and `make test-web` all go through it. `live.e2e.ts`
+(opt-in) still spawns its own dev server, and the screenshot script (`pnpm run screenshots`)
+does too.
+
+Why not `vite dev`: Paraglide's `outputStructure: 'message-modules'` (pinned, `vite.config.ts`)
+emits one module per message, and dev serves them unbundled. A fresh page load was ~940 requests,
+~800 of them messages, ~5s on an idle laptop. Every test opens a fresh browser context with no
+HTTP cache, and six workers load pages at once, so loads landed on the 5s expect timeout. About
+half of full runs failed. The failures came in runs of consecutive tests in one file (one worker
+runs a file in order), which read like a stuck worker but were just a slow window. More CPU load
+made it worse (8 busy cores: 12 failures on dev, none on the preview). The
+`Failed to fetch dynamically imported module` / `The next HMR update will cause the page to
+reload` lines that Vite forwards from the browser are a symptom: a load cut off by the next
+`goto` or by the test ending. The preview serves bundled chunks (~90 requests, ~1.2s with the
+gate's 1s hold), and the full suite takes ~1.3 min instead of ~3 min.
+
+- A new e2e test runs against production code: nothing reached only through `import.meta.env.DEV`
+  or HMR.
+- `make test-web` writes `web/build` and `web/.svelte-kit/output` as root through the bind mount,
+  like `.svelte-kit` already; a later native run then fails with `EACCES` until they're removed.

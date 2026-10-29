@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // every route is gated behind ApiConnectGate's /healthz poll -- this suite has no real backend
-// (webServer is `pnpm dev` alone), so every test must mock it or the gate polls to its 10s timeout.
+// (webServer is the web preview alone), so every test must mock it or the gate polls to its 10s timeout.
 test.beforeEach(async ({ page }) => {
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 });
@@ -82,7 +82,7 @@ test('retries after a failed attempt, showing the attempt count and next-retry c
 	await expect(page.getByText('Attempt 3')).toBeVisible({ timeout: 4_000 });
 });
 
-// this suite has no real backend behind it (playwright.config.ts's webServer is `pnpm dev`
+// this suite has no real backend behind it (playwright.config.ts's webServer is the web preview
 // alone), so every test that creates a table mocks the POST /tables response.
 function mockCreateTable(page: import('@playwright/test').Page, tableId: string) {
 	return page.route('**/tables', (route) => {
