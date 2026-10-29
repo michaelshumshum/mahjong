@@ -188,7 +188,15 @@ Desktop/tablet (≥768px):
 prevailing wind glyph, "Hand N", the wall-remaining count (`.wall-count strong`, pinned by
 `table.e2e.ts`), a min-faan chip (this table's `RuleSet.min_faan`; mocks default to the server's own
 default of 3 since no fixture carries a ruleset), and one small wind marker per seat positioned
-toward that seat (top/left/right/bottom, matching the box above). The acting seat's marker gets the
+toward that seat (top/left/right/bottom, matching the box above). The hub is a pill sized to its
+content: the prevailing glyph beside three lines (hand, wall, min faan). Each marker straddles the
+rim, half inside it, and the hub's padding is that half-marker band, so no label in any locale runs
+under a marker. The earlier fixed circle (`clamp(84px, 11cqi, 128px)`, four stacked lines) put
+zh-Hant's 3番起糊 under the bottom marker, and en's lines touched the top and bottom markers below
+about 128px. The pill (~79px tall) is also shorter than that circle, since the centre box's free
+height between full pools is what runs out first at short tablet sizes. `table.e2e.ts` checks the
+text clears the markers and the hub clears the pools, in both locales, at 1440×900, 1024×768,
+800×600 and 768×1024. The acting seat's marker gets the
 same halo treatment as its `SeatPlate` and additionally carries `TimerRing`, for every seat's turn:
 `turn` is broadcast with the acting seat's `deadline_ts` to all seats and spectators
 ([protocol.md](protocol.md)), and the reducer stores it as `ClientGameState.deadlineTs` (§6). The
@@ -283,7 +291,7 @@ fit at 844×390/740×360/667×375, and melds beside a short hand.
 A phone held sideways (844×390) is wide enough for `tablet-up` but its vertical side strips (13
 backs ≈ 350px) can't fit, so short viewports count as phone. **Container queries:** `.table-surface`
 is a named inline-size container (`container: table / inline-size`); discard tiles, side-strip
-tiles, the hub circle and the centre box's side tracks size in `cqi` of the table rather than `vw`,
+tiles and the centre box's side tracks size in `cqi` of the table rather than `vw`,
 since the toolbar, page padding and rim make the two differ.
 
 **Side seats.** Left/right hand strips run vertically via `writing-mode` (`vertical-lr` on the

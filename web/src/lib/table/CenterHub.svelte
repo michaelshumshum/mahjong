@@ -84,17 +84,18 @@
 	@use '$lib/styles/a11y';
 	@use '$lib/styles/layout';
 
+	// markers straddle the rim half inside it; the padding is that band, so no label runs under one.
+	// a pill, not a stacked circle: the centre box's height is what runs out (docs/frontend.md §3).
 	.center-hub {
+		--hub-marker: 1.5rem;
 		position: relative;
 		display: flex;
-		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 2px;
-		width: clamp(84px, 11cqi, 128px);
-		height: clamp(84px, 11cqi, 128px);
+		width: max-content;
+		padding: calc(var(--hub-marker) / 2 + 2px) calc(var(--hub-marker) / 2 + var(--space-2));
 		margin: var(--space-2) auto;
-		border-radius: 50%;
+		border-radius: var(--radius-pill);
 		border: 1px solid var(--color-felt-line);
 		background: rgb(0 0 0 / 0.12);
 		text-align: center;
@@ -102,17 +103,23 @@
 	}
 
 	.hub-core {
-		display: flex;
-		flex-direction: column;
+		display: grid;
+		grid-auto-flow: column;
+		grid-template-rows: repeat(3, auto);
 		align-items: center;
-		gap: 1px;
+		justify-items: start;
+		gap: 1px var(--space-2);
 		font-size: var(--font-size-xs);
+		line-height: 1.25;
+		white-space: nowrap;
 		color: var(--color-text-muted);
 	}
 
 	.hub-prevailing {
-		font-size: var(--font-size-lg);
+		grid-row: span 3;
+		font-size: var(--font-size-xl);
 		font-weight: 700;
+		line-height: 1;
 		color: var(--color-text);
 	}
 
@@ -134,8 +141,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 1.5rem;
-		height: 1.5rem;
+		width: var(--hub-marker);
+		height: var(--hub-marker);
 		border-radius: 50%;
 		background: var(--color-surface-raised);
 		border: 1px solid var(--color-border);
@@ -144,25 +151,25 @@
 	}
 
 	.hub-marker--across {
-		top: -0.75rem;
+		top: calc(var(--hub-marker) / -2);
 		left: 50%;
 		translate: -50% 0;
 	}
 
 	.hub-marker--self {
-		bottom: -0.75rem;
+		bottom: calc(var(--hub-marker) / -2);
 		left: 50%;
 		translate: -50% 0;
 	}
 
 	.hub-marker--left {
-		left: -0.75rem;
+		left: calc(var(--hub-marker) / -2);
 		top: 50%;
 		translate: 0 -50%;
 	}
 
 	.hub-marker--right {
-		right: -0.75rem;
+		right: calc(var(--hub-marker) / -2);
 		top: 50%;
 		translate: 0 -50%;
 	}
@@ -189,21 +196,29 @@
 	}
 
 	// below tablet-up the pools stack instead of forming a box (§3): no room for markers outside
-	// the circle without overlapping one, so they drop and the hub becomes a summary row.
+	// the hub without overlapping one, so they drop and the hub becomes a summary row.
 	@include layout.phone-only {
 		.center-hub {
 			flex-direction: row;
 			justify-content: center;
 			gap: var(--space-3);
 			width: 100%;
-			height: auto;
 			padding: var(--space-1) var(--space-2);
 			border-radius: var(--radius-md);
 		}
 
 		.hub-core {
+			display: flex;
 			flex-direction: row;
+			align-items: center;
 			gap: var(--space-2);
+			line-height: inherit;
+			white-space: normal;
+		}
+
+		.hub-prevailing {
+			font-size: var(--font-size-lg);
+			line-height: inherit;
 		}
 
 		.hub-marker {

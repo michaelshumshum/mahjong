@@ -221,6 +221,46 @@ for (const [width, height] of VIEWPORTS) {
 	});
 }
 
+// zh-Hant's "3番起糊" once ran under the 北 marker; late-hand's full pools leave the hub the least room.
+for (const locale of ['en', 'zh-Hant'] as const) {
+	test(`the hub's text clears its wind markers, and the hub the pools, in ${locale}`, async ({
+		page
+	}) => {
+		await page.goto('/table/abc123?mock=your-turn');
+		await page.evaluate((value) => (document.cookie = `PARAGLIDE_LOCALE=${value}; path=/`), locale);
+		for (const [width, height] of [
+			[1440, 900],
+			[1024, 768],
+			[800, 600],
+			[768, 1024]
+		] as const) {
+			await page.setViewportSize({ width, height });
+			for (const url of [
+				'/table/abc123?mock=your-turn',
+				'/table/abc123?mock=late-hand',
+				'/learn/basics-two-sided-wait'
+			]) {
+				await page.goto(url);
+				await expect(page.locator('.hub-marker')).toHaveCount(4);
+				const overlaps = await page.evaluate(() => {
+					const rect = (el: Element) => el.getBoundingClientRect();
+					const meet = (a: DOMRect, b: DOMRect) =>
+						a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+					const hub = document.querySelector('.center-hub')!;
+					const text = [...hub.querySelectorAll('.hub-core > *')].map(rect);
+					const markers = [...hub.querySelectorAll('.hub-marker')].map(rect);
+					const pools = [...document.querySelectorAll('.discard-tile')].map(rect);
+					return {
+						text: text.flatMap((t) => markers.filter((mk) => meet(t, mk))).length,
+						pools: [rect(hub), ...markers].flatMap((h) => pools.filter((p) => meet(h, p))).length
+					};
+				});
+				expect(overlaps, `${url} at ${width}x${height}`).toEqual({ text: 0, pools: 0 });
+			}
+		}
+	});
+}
+
 test('a portrait phone wraps the hand into two rows of non-overlapping tiles', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/table/abc123?mock=your-turn');
