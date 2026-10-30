@@ -222,8 +222,14 @@ Playwright ships no musl build. `deps`/`build`/`prod` stay alpine.
   dependencies (and its libc-specific native builds) indefinitely.
 - `make test-web` passes `CI=true`: vitest browser mode and Playwright default to *headed* off-CI,
   and the container has no X server.
-- Its e2e step builds into the bind-mounted `web/build` and `web/.svelte-kit` as root, which a
-  later native run can't overwrite (`EACCES`) until they're removed ([testing.md §4](testing.md)).
+- Dev containers run as root, so whatever a `make` target writes through a bind mount is
+  root-owned (`web/build`, `web/.svelte-kit`, `web/test-results`, the compiled messages in
+  `web/src/lib/paraglide`, the server's `.pytest_cache`/
+  `.ruff_cache`/`.hypothesis`, new generated files), and a later native run fails with `EACCES`.
+  The Makefile's `handback` wraps each such `run`: it runs the command, `chown`s those paths to
+  the host user (`id -u`/`id -g`), and exits with the command's status. Running the containers as
+  the host user instead would break the root-owned anonymous `node_modules` volume, the
+  `/root/.cache/ms-playwright` browsers and the baked venv.
 - Browsers live in a `playwright-browsers` volume at `/root/.cache/ms-playwright`, seeded from the
   image, so a lockfile-triggered rebuild doesn't re-fetch ~170MB of chromium.
 

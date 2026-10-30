@@ -3,6 +3,13 @@
 COMPOSE := docker compose
 DC_PROD := docker compose -f docker-compose.yml -f docker-compose.prod.yml
 
+# dev containers run as root through the bind mounts; chown what a run wrote back to the host
+# user, keeping the command's exit status, or native tools hit EACCES (docs/infra.md §5)
+HOST_IDS := $(shell id -u):$(shell id -g)
+handback = sh -c '$(1); s=$$?; chown -R $(HOST_IDS) $(2) 2>/dev/null; exit $$s'
+API_CACHES := .pytest_cache .ruff_cache .hypothesis
+WEB_OUTPUTS := .svelte-kit src/lib/paraglide
+
 .DEFAULT_GOAL := help
 .PHONY: help up down restart logs build ps sh-api sh-web test test-server test-server-slow bench-latency test-web \
         selfplay arena train proto proto-check migrate revision fmt lint typecheck clean prod-build prod-up prod-migrate
@@ -41,10 +48,11 @@ sh-web: ## Shell into the web container
 test: test-server test-web ## Run all tests
 
 test-server: ## pytest (fast tests only; use `make test-server-slow` for the slow suite)
-	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m fast -n auto
+	$(COMPOSE) run --rm --no-deps api $(call handback,uv run pytest -q -m fast -n auto,$(API_CACHES))
 
 test-server-slow: ## pytest slow suite: soaks, real-bot e2e, hypothesis runs -- everything CI's server-slow job covers
-	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m slow -n auto --games=$${N:-10000}
+	$(COMPOSE) run --rm --no-deps api \
+		$(call handback,uv run pytest -q -m slow -n auto --games=$${N:-10000},$(API_CACHES))
 
 bench-latency: ## latency tests serially against the absolute budget (docs/testing.md §1); run on the target CPU
 	$(COMPOSE) run --rm --no-deps -e LATENCY_BUDGET_MS=$${BUDGET:-5} api uv run pytest -q -s -m latency -p no:xdist
@@ -54,7 +62,8 @@ bench-latency: ## latency tests serially against the absolute budget (docs/testi
 # isn't also told it's running in CI.
 test-web: ## vitest + Playwright e2e
 	$(COMPOSE) build web
-	$(COMPOSE) run --rm --no-deps -e CI=true web pnpm test
+	$(COMPOSE) run --rm --no-deps -e CI=true web \
+		$(call handback,pnpm test,$(WEB_OUTPUTS) build test-results)
 
 selfplay: ## Engine soak test: N complete games with random bots (default 10000)
 	$(COMPOSE) run --rm --no-deps api uv run pytest -q -m slow -k selfplay \
@@ -72,9 +81,10 @@ train: ## Training run: make train CONFIG=ml/configs/danger.yaml
 
 # ── codegen / db ──────────────────────────────────────────────────────────────
 proto: ## Regenerate web protocol types and the learn-mode lesson bundle (+ shared/protocol.schema.json)
-	$(COMPOSE) run --rm --no-deps api uv run python -m tools.gen_protocol \
-		--ts-out /web-net/protocol.d.ts --schema-out /shared/protocol.schema.json
-	$(COMPOSE) run --rm --no-deps api uv run python -m tools.gen_lessons --out /web-learn
+	$(COMPOSE) run --rm --no-deps api $(call handback,uv run python -m tools.gen_protocol \
+		--ts-out /web-net/protocol.d.ts --schema-out /shared/protocol.schema.json,/web-net /shared)
+	$(COMPOSE) run --rm --no-deps api \
+		$(call handback,uv run python -m tools.gen_lessons --out /web-learn,/web-learn)
 	$(COMPOSE) run --rm --no-deps web pnpm exec oxfmt \
 		src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts \
 		src/lib/learn/generated
@@ -93,15 +103,15 @@ revision: ## Create a migration: make revision M="add games table"
 
 # ── quality ───────────────────────────────────────────────────────────────────
 fmt: ## Format both sides
-	$(COMPOSE) run --rm --no-deps api uv run ruff format .
+	$(COMPOSE) run --rm --no-deps api $(call handback,uv run ruff format .,.ruff_cache)
 	$(COMPOSE) run --rm --no-deps web pnpm exec oxfmt .
 
 lint: ## Lint both sides
-	$(COMPOSE) run --rm --no-deps api uv run ruff check .
+	$(COMPOSE) run --rm --no-deps api $(call handback,uv run ruff check .,.ruff_cache)
 	$(COMPOSE) run --rm --no-deps web pnpm lint
 
 typecheck: ## svelte-check
-	$(COMPOSE) run --rm --no-deps web pnpm exec svelte-check
+	$(COMPOSE) run --rm --no-deps web $(call handback,pnpm exec svelte-check,$(WEB_OUTPUTS))
 
 # ── production shape ──────────────────────────────────────────────────────────
 prod-build: ## Build production images

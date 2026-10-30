@@ -173,5 +173,6 @@ gate's 1s hold), and the full suite takes ~1.3 min instead of ~3 min.
 
 - A new e2e test runs against production code: nothing reached only through `import.meta.env.DEV`
   or HMR.
-- `make test-web` writes `web/build` and `web/.svelte-kit/output` as root through the bind mount,
-  like `.svelte-kit` already; a later native run then fails with `EACCES` until they're removed.
+- `make test-web` builds `web/build` and `web/.svelte-kit/output` as root through the bind mount,
+  then hands them back to the host user ([infra.md §5](infra.md)), so native and Docker runs can
+  alternate.
