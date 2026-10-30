@@ -63,8 +63,9 @@ friends by sharing a table link.
 | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
 | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | ![Faan guide](docs/screenshots/lobby-guide.png) Faan guide — patterns by faan, searchable, with highlighted tile examples and compare links |
 | ![Faan guide, scoring](docs/screenshots/lobby-guide-scoring.png) Faan guide — how faan add up, faan → points table, who pays | ![Faan guide, hand checker](docs/screenshots/lobby-guide-checker.png) Faan guide — check a hand: pick 14 tiles, scored by `POST /score` |
-| ![Learn](docs/screenshots/learn.png) Learn (`/learn`) — puzzle tracks with solved counts, from the engine-generated lesson bundle | ![Learn, puzzle](docs/screenshots/learn-puzzle.png) Learn — a puzzle on the real table: pick the winning tiles, checked against the engine's answer |
+| ![Learn](docs/screenshots/learn.png) Learn (`/learn`) — a guided tutorial to start, then puzzle tracks with solved counts, from the engine-generated lesson bundle | ![Learn, puzzle](docs/screenshots/learn-puzzle.png) Learn — a puzzle on the real table: pick the winning tiles, checked against the engine's answer |
 | ![Learn, discard feedback](docs/screenshots/learn-puzzle-feedback.png) Learn — feedback on a wrong discard: why it is worse, and every option from the engine's key | ![Learn, safe-discard feedback](docs/screenshots/learn-puzzle-safe.png) Learn — a defence pick that was only lucky: each hand tile's verdict, and which one deals in |
+| ![Learn, tutorial](docs/screenshots/learn-tutorial.png) Learn — the guided tutorial: a tip with its part of the table outlined, played through the real table | |
 
 </details>
 
@@ -76,6 +77,7 @@ friends by sharing a table link.
 | ![Lobby, phone](docs/screenshots/lobby-phone.png) Lobby | ![Table, claim window, phone](docs/screenshots/table-claim-window-phone.png) Table — claim window | ![Table, hand ended, phone](docs/screenshots/table-hand-ended-phone.png) Table — hand ended |
 | ![Table, game ended, phone](docs/screenshots/table-game-ended-phone.png) Table — game ended | ![Table, late hand, phone](docs/screenshots/table-late-hand-phone.png) Table — late hand, crowded | ![Faan guide, phone](docs/screenshots/lobby-guide-phone.png) Faan guide |
 | ![Faan guide, hand checker, phone](docs/screenshots/lobby-guide-checker-phone.png) Faan guide — check hand | ![Learn, phone](docs/screenshots/learn-phone.png) Learn | ![Learn, puzzle, phone](docs/screenshots/learn-puzzle-phone.png) Learn — a discard puzzle |
+| ![Learn, tutorial, phone](docs/screenshots/learn-tutorial-phone.png) Learn — the tutorial | | |
 
 In landscape, opponents are stacked beside the centre of the table and the page does not scroll:
 

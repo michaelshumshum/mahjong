@@ -62,13 +62,14 @@ Desktop: `lobby`, `lobby-create-dialog`, `lobby-guide`, `lobby-guide-scoring`,
 `lobby-guide-checker` (stubs `POST /score` with `page.route`), `tables`, `learn`, `learn-puzzle`
 (a winning-tiles puzzle answered correctly), `learn-puzzle-feedback` (a wrong best discard: the
 comparison and options table), `learn-puzzle-safe` (a lucky safe-discard pick: each hand tile's
-verdict), `table-your-turn`, `table-claim-window`,
+verdict), `learn-tutorial` (the guided tutorial on a narrate tip with its melds outlined, reached
+through a seeded resume point), `table-your-turn`, `table-claim-window`,
 `table-hand-ended`, `table-hand-ended-draw`, `table-game-ended`, `table-settings`,
 `table-pregame-connecting`, `table-pregame-join`, `table-pregame-waiting`.
 
 Phone (390×844): `lobby-phone`, `lobby-guide-phone`, `lobby-guide-checker-phone`, `learn-phone`
 (shows the desktop puzzle's solve: one browser context runs the whole list), `learn-puzzle-phone`,
-`table-your-turn-phone`, `table-claim-window-phone`,
+`learn-tutorial-phone`, `table-your-turn-phone`, `table-claim-window-phone`,
 `table-hand-ended-phone`, `table-game-ended-phone`, `table-late-hand-phone` (full pools, heavy
 melds); landscape (844×390): `table-your-turn-phone-landscape`, `table-late-hand-phone-landscape` — the
 phone layout (docs/frontend.md §3) differs enough that a desktop capture says nothing about it.

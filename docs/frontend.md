@@ -495,8 +495,9 @@ assistive tech, and a purely visual number is a small enough win to defer rather
   is correct the instant the tab regains focus.
 - The ring is cosmetic. `DialogTimer.svelte` pairs it with a one-shot `setTimeout`
   (`auto-close.ts`'s `scheduleAutoDismiss`, also used by `Toast.svelte`) on the same
-  `durationMs`; the timeout, not the ring, calls `onClose`. Used by the claim dialog (auto-pass)
-  and the hand-end hold (auto-ack). The turn ring has no `DialogTimer` — the server alone handles
+  `durationMs`; the timeout, not the ring, calls `onClose`. Used by the claim dialog (auto-pass;
+  none with `durationMs: null`, the learn tutorial's clockless claims) and the hand-end hold
+  (auto-ack). The turn ring has no `DialogTimer` — the server alone handles
   tsumogiri on expiry.
 - **No clock-offset correction** ([protocol.md §4](protocol.md)): the ring reads early/late by the
   client clock's drift.
@@ -668,7 +669,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
 | `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
-| `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point. Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
+| `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point (saved at each waiting step after the first, cleared by Restart and at the end, §7 "Learn"). Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
 
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
 full `state_sync`.
@@ -767,7 +768,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
 | `/profile` | on | placeholder heading only |
 | `/learn` | on | learn index: tracks, lesson cards, solved state (below); skips `ApiConnectGate` |
-| `/learn/[id]` | off | one puzzle on the real table (below); unknown id → 404; skips `ApiConnectGate` |
+| `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/status` | on | public server status (below); fetches `GET /status` client-side |
 | `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
@@ -968,17 +969,20 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
-| `lessons.ts` | the typed index (`LESSONS`: puzzle entries only, so the generated tutorial stays unlisted until its player lands, ADR 0025 phase 3), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
-| `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
-| `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in (you, then each opponent by seat wind, as the prompts name them) |
+| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
+| `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them) |
+| `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
+| `TutorialCoach.svelte` | the tutorial's tip card on `lib/ui/CoachCard.svelte`, the card the practice coach marks use: step counter, tip, wrong-move line, Back/Next or the last step's buttons |
 | `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |
 | `AnswerPanel.svelte` | one input per kind, the result line, per-kind feedback (below), and the explanation once correct |
 | `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
 | `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
-| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount` over `mahjong:learnProgress:v1` (§6) |
+| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
 
 - **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title with
-  `{n}`, band, a check once solved), each a link to `/learn/<id>`. Progress lives in
+  `{n}`, band, a check once solved), each a link to `/learn/<id>`. A tutorial leads its track on a
+  full-width "Start here" card and counts toward the track's solved total. Progress lives in
   localStorage only, so the SSR'd page renders everything unsolved and an `$effect` reads it
   after mount; reading it during render would make server and client markup differ.
 - **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and the
@@ -1012,6 +1016,47 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
   live table keeps the pulse only, §6 "Last-discard marker") and names the tile above the faan
   input.
 
+**Tutorial.** `/learn/[id]` renders `_components/TutorialPage.svelte` for a `lesson_kind:
+"tutorial"` file and `_components/PuzzlePage.svelte` otherwise. The tutorial's frames
+([protocol.md §6](protocol.md) "Tutorials") drive a `LessonPlayer`, whose `$state<ClientGameState>`
+starts from `start` and goes through the same `viewFromClientState` → `TableScene` as a puzzle.
+
+| Step | Player |
+| --- | --- |
+| `narrate` | shows the tip and waits for Next (Back returns to the previous tip or move) |
+| `auto` | applies its frames after 700 ms (`motionMs`, so 0 under reduced motion); the last tip stays up with a "the other players are taking their turns" line |
+| `expect` | applies `snapshot`, then waits. The table's own controls make the move: a hand tile (`onDiscard`), the claim dialog, a declare button. The scripted move applies `frames` and moves on; any other is a wrong move: nothing changes and the tip card says so |
+
+- **Matching.** `intentMatches` compares a discard by tile type, never by id (the script names one
+  physical copy; the hand may hold another). A claim matches on `claim_<choice>` with the picked
+  option's tiles inside the scripted meld by type, so a pung where a kong is scripted is wrong;
+  `pass` matches only a scripted pass. A wrong discard remounts the scene, as a graded puzzle tap
+  does, to drop the pending tile.
+- **Snapshot vs stream.** A `state_sync` can't say which tile is held apart (it guesses the last
+  one, wrong after a claim), which discard is newest, or the open window's id and offer (its
+  `claim_options` are per seat, not `claim_offer`'s options). Applying a snapshot keeps those
+  from the stream before it.
+- **No clock.** Tutorial deadlines are 0, which would read as expired: every ring at once, and a
+  claim dialog that auto-passes the moment it opens. The player nulls `deadlineTs`,
+  `claimOffer.deadlineTs` and `handEndDeadlineTs` after every frame, so the hub has no turn ring
+  and `ClaimDialog` gets `durationMs: null` (no ring, no auto-pass).
+- **Claims.** In an `expect` claim step the real `ClaimDialog` opens from the offer, in its usual
+  `ModalDialog`, with the tip above it and the wrong-move line in a `role="status"` there (the
+  page behind is inert). Number keys and Esc work as on `/table`.
+- **Highlights.** A `narrate` step's `highlight` maps onto `TableScene`'s `coach` prop (the
+  `data-coach` outline the practice coach marks use): `hand`, `melds`, `discards`, `wall`
+  (the hub's wall count), `hub`; `claim` holds the claimable discard in brass instead
+  (`holdLastDiscard`).
+- **Focus.** The tip sits in a polite live region. When a move or Next removes the focused
+  control, focus lands on Next, else on the tip, so the hand is the next tab stop; a claim dialog
+  focuses Pass itself.
+- **End.** The self-drawn win's `hand_end` leaves the last tip up with `FaanBreakdown` (payments
+  included; pattern names open the guide) and a step counter of "18 of 18". Reaching it records
+  the tutorial solved (`saveTutorialDone`).
+- **Resume and restart.** Each waiting step after the first saves its index as `step`; reopening
+  the page offers "Resume" or "Start over" before step 1. Restart, in the nav, clears `step` and
+  replays from the start. Any step is rebuilt by replaying every step before it at once.
+
 ### Practice mode
 
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
@@ -1030,7 +1075,9 @@ they're done, `lib/ui/CoachMarks.svelte` shows one tip at a time in a card pinne
 table (above the felt, below every overlay; hidden while a claim or result dialog is up): how to
 discard (worded for the current discard mode), where the newest discard pulses, and that claims pop
 up over the table. The current tip's target — your seat region, or the centre pools (each pool
-on phone, where they sit under their seats) — gets a brass outline via `.table-wrap[data-coach]`. "Next"/"Got it" and "Skip tips" both end it for good.
+on phone, where they sit under their seats) — gets a brass outline through `TableScene`'s `coach`
+prop (`data-coach` on `.table-surface`, shared with the learn tutorial's highlights). The card is
+`lib/ui/CoachCard.svelte`, also the tutorial's. "Next"/"Got it" and "Skip tips" both end it for good.
 Practice only: in a multiplayer game nobody should be reading tips while three people wait.
 
 **In-game guide.** The header rail carries a "Guide" button opening the same `GuideDialog` as the
@@ -1073,9 +1120,9 @@ same table:
 
 | Piece | Holds |
 | --- | --- |
-| `lib/table/TableScene.svelte` | `.table-surface` and its SCSS: the three `OpponentRegion`s, `.table-center` (hub, four `CenterDiscardPool`s, `SealStamp`), `YourSeatRegion`. Props only: the `TableView`, own hand tiles, legal-action data, the halo seat, transient signals (score deltas, seal stamp) and intent callbacks (`onDiscard`, `onReorder`, each `DeclareOption.onClick`). The hub is a snippet prop, omitted when the page renders it in the header rail (§3) |
+| `lib/table/TableScene.svelte` | `.table-surface` and its SCSS: the three `OpponentRegion`s, `.table-center` (hub, four `CenterDiscardPool`s, `SealStamp`), `YourSeatRegion`. Props only: the `TableView`, own hand tiles, legal-action data, the halo seat, transient signals (score deltas, seal stamp), the coach-tip outline (`coach`: a `CoachTarget` from `view-types.ts`) and intent callbacks (`onDiscard`, `onReorder`, each `DeclareOption.onClick`). The hub is a snippet prop, omitted when the page renders it in the header rail (§3) |
 | `lib/table/legal-actions.ts` | pure derivations: `legalDiscardIds` and `legalDeclareOptions` off `legalActions` (declares wired to caller-supplied intents), `legalClaimOptions` off the view's `claimWindow`, `findRawClaimOption` (a display option back to its real-`tile_id` raw offer) |
-| `routes/table/[id]/+page.svelte` | socket/store wiring, mock/pregame selection, hand order state, haptics/announcements, the seal-stamp and score-delta signals, `.table-wrap` (connection banner, coach marks and their `data-coach` outline), dialogs and overlays |
+| `routes/table/[id]/+page.svelte` | socket/store wiring, mock/pregame selection, hand order state, haptics/announcements, the seal-stamp and score-delta signals, `.table-wrap` (connection banner, coach marks), dialogs and overlays |
 
 Types and shared constants live apart from the components and the fixture:
 

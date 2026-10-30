@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LESSON_IDS, recordAttempt, solvedCount } from './progress';
+import { LESSON_IDS, recordAttempt, recordTutorialStep, solvedCount } from './progress';
 
 describe('learn progress', () => {
 	it('knows every generated lesson id', () => {
@@ -34,5 +34,12 @@ describe('learn progress', () => {
 			c: { solved: true, attempts: 1 }
 		};
 		expect(solvedCount(progress, ['a', 'b', 'd'])).toBe(1);
+	});
+
+	it('keeps a tutorial step, and clears it with null', () => {
+		let progress = recordTutorialStep({}, 't', 4);
+		expect(progress).toEqual({ t: { solved: false, attempts: 0, step: 4 } });
+		progress = recordTutorialStep(recordAttempt(progress, 't', true, 100), 't', null);
+		expect(progress).toEqual({ t: { solved: true, attempts: 1, solvedAt: 100 } });
 	});
 });

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import settings from '../../../project.inlang/settings.json';
 import index from './generated/index.json';
-import type { IndexEntry, LessonIndexEntry, Tutorial } from './generated/lessons';
-import { LESSON_TEXT, lessonTextParams } from './lesson-text';
+import type { IndexEntry, Lesson, LessonIndexEntry, Tutorial } from './generated/lessons';
+import { LESSON_TEXT, TUTORIAL_TEXT, lessonTextParams, lessonTitle } from './lesson-text';
 import {
+	FIRST_TUTORIAL,
 	LESSONS,
 	TRACKS,
 	lessonEntry,
@@ -41,9 +42,23 @@ describe('generated lessons', () => {
 		expect(lessons.length).toBeGreaterThan(0);
 	});
 
-	it('lists only puzzles until tutorials have a player', () => {
-		expect(LESSONS).toEqual(lessons);
+	it('lists the tutorials, first, then the puzzles', () => {
+		expect(LESSONS).toEqual(entries);
 		expect(tutorials.length).toBeGreaterThan(0);
+		expect(FIRST_TUTORIAL.id).toBe(tutorials[0].id);
+		expect(lessonsByTrack()[0].lessons[0]).toEqual(FIRST_TUTORIAL);
+	});
+
+	it('maps every tutorial step to its message', () => {
+		const missing = tutorials.flatMap((tutorial) =>
+			tutorial.steps.flatMap((step) =>
+				step.kind !== 'auto' && !(step.text in (TUTORIAL_TEXT[tutorial.text]?.steps ?? {}))
+					? [`${tutorial.text}_${step.text}`]
+					: []
+			)
+		);
+		expect(missing).toEqual([]);
+		expect(lessonTitle(FIRST_TUTORIAL)).toBe('Your first hand');
 	});
 
 	it.each(settings.locales)('has every tutorial title and step key in %s', (locale) => {
@@ -113,10 +128,17 @@ describe('lesson loading', () => {
 	});
 
 	it('loads one lesson by id, matching its index entry', async () => {
-		const lesson = await loadLesson('basics-isolated-honour');
-		expect(lesson).not.toBeNull();
-		expect(lesson!.kind).toBe(lessonEntry('basics-isolated-honour')!.kind);
-		expect(lesson!.snapshot.t).toBe('state_sync');
+		const lesson = (await loadLesson('basics-isolated-honour')) as Lesson;
+		const entry = lessonEntry('basics-isolated-honour') as LessonIndexEntry;
+		expect(lesson.kind).toBe(entry.kind);
+		expect(lesson.snapshot.t).toBe('state_sync');
+	});
+
+	it('loads a tutorial with its start position and steps', async () => {
+		const tutorial = (await loadLesson(FIRST_TUTORIAL.id)) as Tutorial;
+		expect(tutorial.lesson_kind).toBe('tutorial');
+		expect(tutorial.start.t).toBe('state_sync');
+		expect(tutorial.steps.length).toBeGreaterThan(0);
 	});
 
 	it('loads every indexed lesson', async () => {
@@ -132,12 +154,12 @@ describe('lesson loading', () => {
 	});
 
 	it('interpolates key numbers into the lesson text', async () => {
-		const efficiency = (await loadLesson('efficiency-01'))!;
+		const efficiency = (await loadLesson('efficiency-01')) as Lesson;
 		const params = lessonTextParams(efficiency);
 		expect(params.n).toBe(1);
 		expect(params.count).toBeGreaterThan(0);
 		expect(LESSON_TEXT[efficiency.text].explain(params)).toContain(String(params.count));
-		const faan = (await loadLesson('basics-simple-hand'))!;
+		const faan = (await loadLesson('basics-simple-hand')) as Lesson;
 		expect(lessonTextParams(faan).faan).toBe(3);
 	});
 });

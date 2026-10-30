@@ -36,6 +36,25 @@ async function solveTwoSidedWait(page) {
 	await page.getByTestId('answer-explain').waitFor();
 }
 
+// the tutorial's "your pung is laid face up" tip, its melds outlined: reached through the saved
+// resume point rather than a dozen clicks.
+const TUTORIAL_PUNG_LAID_STEP = 8;
+
+async function resumeTutorialAt(page, step) {
+	// merged, not replaced: later captures still show the puzzle solved earlier in this context.
+	await page.evaluate((step) => {
+		const key = 'mahjong:learnProgress:v1';
+		const progress = JSON.parse(localStorage.getItem(key) ?? '{}');
+		progress['basics-tutorial'] = { solved: false, attempts: 0, step };
+		localStorage.setItem(key, JSON.stringify(progress));
+	}, step);
+	await page.reload();
+	await page.getByTestId('tutorial-resume-button').click();
+	await page.getByTestId('tutorial-next').waitFor();
+	await page.mouse.move(0, 0);
+	await page.waitForTimeout(800);
+}
+
 const LOBBY_TABLES = [
 	{
 		id: 'K7QM2P',
@@ -206,6 +225,14 @@ const PAGES = [
 			await page.waitForTimeout(800);
 		}
 	},
+	// the guided tutorial on a narrate tip with a highlight (docs/frontend.md §7 "Learn").
+	{
+		name: 'learn-tutorial',
+		url: '/learn/basics-tutorial',
+		async before(page) {
+			await resumeTutorialAt(page, TUTORIAL_PUNG_LAID_STEP);
+		}
+	},
 	// `?mock=<scenarioId>` is required now that `/table/[id]` defaults to opening a real WebSocket against
 	// `[id]` as a table id (docs/frontend.md §7) -- there's no backend running during a
 	// screenshot capture, so these opt into the frozen MOCK_SCENARIOS fixture path explicitly
@@ -290,6 +317,14 @@ const PAGES = [
 	},
 	{ name: 'learn-phone', url: '/learn', viewport: PHONE },
 	{ name: 'learn-puzzle-phone', url: '/learn/basics-isolated-honour', viewport: PHONE },
+	{
+		name: 'learn-tutorial-phone',
+		url: '/learn/basics-tutorial',
+		viewport: PHONE,
+		async before(page) {
+			await resumeTutorialAt(page, TUTORIAL_PUNG_LAID_STEP);
+		}
+	},
 	{ name: 'table-your-turn-phone', url: '/table/demo123?mock=1', viewport: PHONE },
 	{
 		name: 'table-your-turn-phone-landscape',

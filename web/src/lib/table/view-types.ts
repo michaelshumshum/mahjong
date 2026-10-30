@@ -132,6 +132,9 @@ export interface OwnHandTile {
 	drawn: boolean;
 }
 
+/** A table region a tip points at; `TableScene` outlines it (`data-coach`). */
+export type CoachTarget = 'hand' | 'melds' | 'discards' | 'wall' | 'hub';
+
 export interface DeclareOption {
 	key: string;
 	label: string;

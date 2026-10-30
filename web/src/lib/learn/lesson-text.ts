@@ -2,7 +2,7 @@ import { m } from '$lib/paraglide/messages.js';
 import { getLocale } from '$lib/paraglide/runtime.js';
 import type { TileCode } from '$lib/table/tile-code';
 import { tileName } from '$lib/table/tile-name';
-import type { Lesson, LessonIndexEntry } from './generated/lessons';
+import type { IndexEntry, Lesson } from './generated/lessons';
 
 /** Every value a lesson message may interpolate; each message reads the ones it names. */
 export interface LessonTextParams {
@@ -100,8 +100,43 @@ export const LESSON_TEXT: Record<string, LessonText> = {
 	}
 };
 
+export interface TutorialText {
+	title: () => string;
+	/** keyed by each `narrate`/`expect` step's `text`. */
+	steps: Record<string, () => string>;
+}
+
+// keyed by the tutorial's `text` stem, listed by hand like LESSON_TEXT; lessons.spec.ts pins it
+// to every generated tutorial's steps.
+export const TUTORIAL_TEXT: Record<string, TutorialText> = {
+	basicsTutorial: {
+		title: m.lesson_basicsTutorial_title,
+		steps: {
+			welcome: m.lesson_basicsTutorial_welcome,
+			yourHand: m.lesson_basicsTutorial_yourHand,
+			draw: m.lesson_basicsTutorial_draw,
+			discardFirst: m.lesson_basicsTutorial_discardFirst,
+			pungOffer: m.lesson_basicsTutorial_pungOffer,
+			claimPung: m.lesson_basicsTutorial_claimPung,
+			pungLaid: m.lesson_basicsTutorial_pungLaid,
+			discardAfterPung: m.lesson_basicsTutorial_discardAfterPung,
+			chowOffer: m.lesson_basicsTutorial_chowOffer,
+			claimChow: m.lesson_basicsTutorial_claimChow,
+			discardAfterChow: m.lesson_basicsTutorial_discardAfterChow,
+			kongOffer: m.lesson_basicsTutorial_kongOffer,
+			claimKong: m.lesson_basicsTutorial_claimKong,
+			replacement: m.lesson_basicsTutorial_replacement,
+			discardAfterKong: m.lesson_basicsTutorial_discardAfterKong,
+			selfDrawn: m.lesson_basicsTutorial_selfDrawn,
+			declareWin: m.lesson_basicsTutorial_declareWin,
+			result: m.lesson_basicsTutorial_result
+		}
+	}
+};
+
 /** A title needs only the entry's place in its track, so the index can render it unloaded. */
-export function lessonTitle(entry: LessonIndexEntry): string {
+export function lessonTitle(entry: IndexEntry): string {
+	if (entry.lesson_kind === 'tutorial') return TUTORIAL_TEXT[entry.text].title();
 	return LESSON_TEXT[entry.text].title({ n: entry.n, tiles: '', count: 0, faan: 0 });
 }
 

@@ -46,18 +46,25 @@
 			<ul class="lessons">
 				{#each group.lessons as lesson (lesson.id)}
 					{@const done = progress[lesson.id]?.solved ?? false}
-					<li>
+					{@const tutorial = lesson.lesson_kind === 'tutorial'}
+					<li class:tutorial-item={tutorial}>
 						<a
 							class="lesson-card"
 							class:lesson-card--solved={done}
+							class:lesson-card--tutorial={tutorial}
 							href="/learn/{lesson.id}"
 							data-sfx="on"
 							data-testid="lesson-card-{lesson.id}"
 							data-solved={done}
 						>
+							{#if tutorial}
+								<span class="start-here">{m.learn_tutorialStartHere()}</span>
+							{/if}
 							<span class="lesson-title">{lessonTitle(lesson)}</span>
 							<span class="lesson-meta">
-								<span class="band">{BAND_LABEL[lesson.band]()}</span>
+								<span class="band"
+									>{tutorial ? m.learn_tutorialLabel() : BAND_LABEL[lesson.band]()}</span
+								>
 								{#if done}
 									<span class="solved-mark" title={m.learn_solvedMark()}>
 										<CircleCheck size={16} aria-hidden="true" />
@@ -168,6 +175,29 @@
 
 	.lesson-card--solved {
 		border-color: color-mix(in srgb, var(--color-positive) 45%, var(--color-border) 55%);
+	}
+
+	// the tutorial leads its track on a row of its own.
+	.tutorial-item {
+		grid-column: 1 / -1;
+	}
+
+	.lesson-card--tutorial {
+		gap: var(--space-1);
+		border-color: color-mix(in srgb, var(--color-brass) 60%, var(--color-border));
+		background: color-mix(in srgb, var(--color-surface-raised) 96%, var(--color-brass));
+
+		.lesson-title {
+			font-size: var(--font-size-lg);
+		}
+	}
+
+	.start-here {
+		color: var(--color-brass);
+		font-size: var(--font-size-xs);
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
 	}
 
 	.lesson-title {

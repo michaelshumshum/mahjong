@@ -164,7 +164,7 @@ illegal script fails `make proto`.
 | Who `expect`s | always seat 0, so an `Expect` has no seat; one where seat 0 has no decision fails, as does an `Auto` for seat 0 |
 | Other seats' claim offers | none unplanned: an offer the script doesn't answer leaves its window open, so the next scripted move is illegal and generation fails. Opponents hold scattered suited tiles and throw honours nobody pairs |
 | Deadlines | 0 where a frame type needs one (`turn`, `claim_offer`, `hand_end`): the player keeps no clock |
-| Where it lists | the index carries the tutorial (`lesson_kind: "tutorial"`, first), but `/learn` lists puzzles only until the player (17) lands |
+| Where it lists | the index carries the tutorial (`lesson_kind: "tutorial"`, first); `/learn` shows it as the basics track's "Start here" card |
 
 ### Web
 
@@ -336,7 +336,11 @@ every `expect` step is seat 0's.
     `model.py`, `tutorial.py`, `Position.wall_back`, the generated tutorial shape, protocol.md §6
     "Tutorials"; the basics content landed here too, so 18 is folded in. `/learn` skips the
     tutorial entry until 17)
-17. `feat(web): lesson player and tutorial coach`
+17. `feat(web): lesson player and tutorial coach` (done: `LessonPlayer`, `TutorialCoach` on a
+    `CoachCard` shared with the practice coach marks, `TableScene`'s `coach` outline, the
+    tutorial leading `/learn`'s basics track; `PuzzleBoard` became the route's
+    `_components/PuzzlePage.svelte` beside `TutorialPage.svelte`, [frontend.md §7](../frontend.md)
+    "Learn")
 18. `feat(server): basics tutorial content` (done with 16)
 19. `feat(web): tutorial completion sets coach marks and links to easy practice`
 

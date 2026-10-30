@@ -12,7 +12,7 @@
 		Standing,
 		Totals
 	} from '$lib/game/types';
-	import type { DeclareOption, OwnHandTile } from '$lib/table/view-types';
+	import type { CoachTarget, DeclareOption, OwnHandTile } from '$lib/table/view-types';
 	import { seatAtPosition } from '$lib/table/wind';
 	import {
 		findRawClaimOption,
@@ -34,7 +34,7 @@
 	import ScoreSheet from '$lib/ui/ScoreSheet.svelte';
 	import GameEndScreen from '$lib/ui/GameEndScreen.svelte';
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
-	import CoachMarks, { type CoachTarget } from '$lib/ui/CoachMarks.svelte';
+	import CoachMarks from '$lib/ui/CoachMarks.svelte';
 	import Settings from '$lib/ui/Settings.svelte';
 	import type { AutoArm, ClientPrefs } from '$lib/ui/client-prefs';
 	import { isMotionReduced } from '$lib/ui/motion';
@@ -680,7 +680,7 @@
 
 	// first-hand coach marks: practice only (no other humans waiting on you), once per browser.
 	let onboarding = $state(loadOnboarding() ?? { coachMarksDone: false });
-	let coachTarget = $state<CoachTarget>(null);
+	let coachTarget = $state<CoachTarget | null>(null);
 	let showCoachMarks = $derived(
 		isPractice &&
 			!spectating &&
@@ -767,7 +767,7 @@
 			onOpenGuide={() => openGuide()}
 		/>
 
-		<div class="table-wrap" data-coach={showCoachMarks ? coachTarget : undefined}>
+		<div class="table-wrap">
 			{#if !isMock}
 				<ConnectionBanner connection={liveStore?.connection} />
 			{/if}
@@ -786,6 +786,7 @@
 				onReorder={reorderHand}
 				scoreDeltas={scoreDeltaSignals}
 				{sealStamp}
+				coach={showCoachMarks ? coachTarget : null}
 			/>
 			{#if showCoachMarks}
 				<div class="coach-anchor">
@@ -962,21 +963,6 @@
 		left: 50%;
 		z-index: var(--z-hud);
 		transform: translateX(-50%);
-	}
-
-	.table-wrap[data-coach='hand'] :global(.seat-region--self),
-	.table-wrap[data-coach='discards'] :global(.table-center) {
-		outline: 2px solid var(--color-brass);
-		outline-offset: 4px;
-		border-radius: var(--radius-md);
-	}
-
-	// phone: .table-center has no box, so the tip outlines each pool instead.
-	@include layout.phone-only {
-		.table-wrap[data-coach='discards'] :global(.discard-pool) {
-			outline: 2px solid var(--color-brass);
-			outline-offset: 2px;
-		}
 	}
 
 	// game-end content can be tall (podium + full score sheet + standings): the dialog scrolls

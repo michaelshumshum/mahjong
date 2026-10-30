@@ -3,7 +3,7 @@
 	import type { Seat } from '$lib/game/types';
 	import type { DiscardMode } from '$lib/ui/client-prefs';
 	import { m } from '$lib/paraglide/messages.js';
-	import type { DeclareOption, OwnHandTile, TableView } from './view-types';
+	import type { CoachTarget, DeclareOption, OwnHandTile, TableView } from './view-types';
 	import { relativeSeat, seatAtPosition } from './wind';
 	import OpponentRegion from './OpponentRegion.svelte';
 	import CenterDiscardPool from './CenterDiscardPool.svelte';
@@ -26,7 +26,8 @@
 		onReorder = () => {},
 		scoreDeltas = {},
 		sealStamp = null,
-		holdLastDiscard = false
+		holdLastDiscard = false,
+		coach = null
 	}: {
 		view: TableView;
 		spectating: boolean;
@@ -45,6 +46,8 @@
 		scoreDeltas?: Record<number, { value: number; key: number }>;
 		sealStamp?: { seat: number; glyph: string; key: number } | null;
 		holdLastDiscard?: boolean;
+		// the region a coach tip points at, outlined in brass.
+		coach?: CoachTarget | null;
 	} = $props();
 
 	function seatAt(position: 0 | 1 | 2 | 3) {
@@ -68,7 +71,7 @@
 	});
 </script>
 
-<div class="table-surface" data-testid="table-scene">
+<div class="table-surface" data-testid="table-scene" data-coach={coach ?? undefined}>
 	<OpponentRegion
 		seat={seatAt(2)}
 		position="across"
@@ -241,10 +244,26 @@
 		}
 	}
 
+	.table-surface[data-coach='hand'] :global(.seat-region--self),
+	.table-surface[data-coach='melds'] :global(.seat-region--self .meld-row),
+	.table-surface[data-coach='discards'] .table-center,
+	.table-surface[data-coach='wall'] :global(.wall-count),
+	.table-surface[data-coach='hub'] :global(.center-hub) {
+		outline: 2px solid var(--color-brass);
+		outline-offset: 4px;
+		border-radius: var(--radius-md);
+	}
+
 	@include layout.phone-only {
 		.table-surface {
 			flex: 1 0 auto;
 			height: auto;
+		}
+
+		// .table-center has no box here, so the tip outlines each pool instead.
+		.table-surface[data-coach='discards'] :global(.discard-pool) {
+			outline: 2px solid var(--color-brass);
+			outline-offset: 2px;
 		}
 	}
 

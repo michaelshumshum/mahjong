@@ -7,8 +7,12 @@ import type { Lesson } from './generated/lessons';
 
 /** The lesson's snapshot as the same full replace a live resync is, with no socket. */
 export function puzzleState(lesson: Lesson): ClientGameState {
-	const state = reduce(initialClientGameState(), lesson.snapshot);
-	// the snapshot has no players to name: you, and each opponent by seat wind, as the prompts do.
+	return withSeatNames(reduce(initialClientGameState(), lesson.snapshot));
+}
+
+/** A lesson snapshot has no players to name: you, and each opponent by seat wind, as the
+ * prompts and tips name them. */
+export function withSeatNames(state: ClientGameState): ClientGameState {
 	const names = state.names.map((name, seat) =>
 		seat === state.seat
 			? m.learn_seatYou()

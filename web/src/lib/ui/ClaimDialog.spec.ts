@@ -21,6 +21,17 @@ describe('ClaimDialog', () => {
 		expect(body).toContain('alt="Red Dragon"');
 	});
 
+	it('shows no timer ring without a clock', () => {
+		const options: ClaimOption[] = [{ kind: 'pung', tiles: ['z5', 'z5'] }, { kind: 'pass' }];
+		const props = { discardTile: 'z5' as const, discarderName: 'Bob', options, onChoose: noop };
+		expect(render(ClaimDialog, { props: { ...props, durationMs: 5000 } }).body).toContain(
+			'role="timer"'
+		);
+		expect(render(ClaimDialog, { props: { ...props, durationMs: null } }).body).not.toContain(
+			'role="timer"'
+		);
+	});
+
 	it('falls back to a generic subtitle when the discarder name is unknown', () => {
 		const options: ClaimOption[] = [{ kind: 'win' }];
 		const { body } = render(ClaimDialog, {

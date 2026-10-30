@@ -16,7 +16,8 @@
 		discardTile: TileCode | null;
 		discarderName: string | null;
 		options: ClaimOption[];
-		durationMs: number;
+		// null: no clock (a learn tutorial), so no ring and no auto-pass.
+		durationMs: number | null;
 		onChoose: (option: ClaimOption) => void;
 	} = $props();
 
@@ -65,9 +66,11 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="claim-dialog">
-	<div class="claim-dialog-timer">
-		<DialogTimer {durationMs} size={40} onClose={handleTimeout} />
-	</div>
+	{#if durationMs !== null}
+		<div class="claim-dialog-timer">
+			<DialogTimer {durationMs} size={40} onClose={handleTimeout} />
+		</div>
+	{/if}
 
 	<div class="claim-dialog-header">
 		<h2>{m.claimDialog_heading()}</h2>

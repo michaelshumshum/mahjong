@@ -111,7 +111,7 @@ model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 | Lesson loading and track order, lesson text, answer types and grading | `lib/learn/lessons.ts` / `lesson-text.ts` / `types.ts` / `grade.ts` |
 | Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
-| Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`) | `lib/table/view-types.ts` |
+| Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`, `CoachTarget`) | `lib/table/view-types.ts` |
 | Legal-action derivations (`legalDiscardIds`, `legalDeclareOptions`, `legalClaimOptions`, `DeclareIntents`) | `lib/table/legal-actions.ts` |
 | Mock fixtures (`MOCK_SCENARIOS`) — fixtures only; live code never imports types from here | `lib/table/mock-game-state.ts` |
 | Tile codes, suit order, `sortTiles` / meld order, `MELD_SEAL_GLYPH` / seat-wind helpers | `lib/table/tile-code.ts` / `meld-face.ts` / `wind.ts` |

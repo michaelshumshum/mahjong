@@ -20,7 +20,12 @@ test('the index lists every track and its lessons', async ({ page }) => {
 	for (const track of ['basics', 'waits', 'efficiency', 'defence', 'faan']) {
 		await expect(page.getByTestId(`track-${track}`)).toBeVisible();
 	}
-	await expect(page.getByTestId('track-solved-basics')).toHaveText('0 / 8');
+	// the tutorial leads basics, then its 8 puzzles
+	await expect(page.getByTestId('track-solved-basics')).toHaveText('0 / 9');
+	await expect(page.getByTestId('track-basics').locator('.lesson-card').first()).toHaveAttribute(
+		'data-testid',
+		'lesson-card-basics-tutorial'
+	);
 	await expect(page.getByTestId('track-waits').locator('.lesson-card')).toHaveCount(15);
 	await expect(page.getByTestId('lesson-card-basics-isolated-honour')).toContainText(
 		'Discard the loner'
@@ -131,7 +136,7 @@ test('progress shows on the index and survives a reload', async ({ page }) => {
 
 	await page.goto('/learn');
 	await page.reload();
-	await expect(page.getByTestId('track-solved-basics')).toHaveText('1 / 8');
+	await expect(page.getByTestId('track-solved-basics')).toHaveText('1 / 9');
 	await expect(page.getByTestId('lesson-card-basics-simple-hand')).toHaveAttribute(
 		'data-solved',
 		'true'
@@ -146,7 +151,9 @@ test('prev and next walk the index', async ({ page }) => {
 	await page.goto('/learn/basics-two-sided-wait');
 	await page.getByTestId('lesson-previous').click();
 	await expect(page).toHaveURL('/learn/basics-isolated-honour');
-	await expect(page.getByTestId('lesson-previous')).toHaveCount(0);
+	await page.getByTestId('lesson-previous').click();
+	await expect(page).toHaveURL('/learn/basics-tutorial');
+	await page.goto('/learn/basics-isolated-honour');
 	await page.getByTestId('lesson-next').click();
 	await expect(page).toHaveURL('/learn/basics-two-sided-wait');
 	await expect(page.locator('h1')).toHaveText('A two-sided wait');
@@ -154,7 +161,12 @@ test('prev and next walk the index', async ({ page }) => {
 
 test('the index and a puzzle fit a phone without sideways scroll', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
-	for (const url of ['/learn', '/learn/basics-two-sided-wait', '/learn/basics-simple-hand']) {
+	for (const url of [
+		'/learn',
+		'/learn/basics-two-sided-wait',
+		'/learn/basics-simple-hand',
+		'/learn/basics-tutorial'
+	]) {
 		await page.goto(url);
 		await expect(page.locator('h1')).toBeVisible();
 		const overflow = await page.evaluate(
@@ -224,6 +236,130 @@ test('learn renders in zh-Hant', async ({ page, context, baseURL }) => {
 	await discard(page, 124); // Red Dragon
 	await expect(feedback(page)).toContainText('答對了！');
 	await expect(page.getByTestId('answer-explain')).toContainText('紅中');
+});
+
+const tip = (page: Page) => page.getByTestId('tutorial-tip');
+const claimOverlay = (page: Page) => page.getByTestId('claim-overlay');
+
+async function next(page: Page, tipText: string): Promise<void> {
+	await expect(tip(page)).toContainText(tipText);
+	await page.getByTestId('tutorial-next').click();
+}
+
+async function claim(page: Page, kind: 'pung' | 'chow' | 'kong'): Promise<void> {
+	await claimOverlay(page).locator(`.claim-btn--${kind}`).click();
+	await expect(claimOverlay(page)).toHaveCount(0);
+}
+
+test('the basics tutorial plays end to end by clicks', async ({ page }) => {
+	await page.goto('/learn');
+	const card = page.getByTestId('lesson-card-basics-tutorial');
+	await expect(card).toContainText('Start here');
+	await expect(card).toContainText('Your first hand');
+	await card.click();
+	await expect(page).toHaveURL('/learn/basics-tutorial');
+	await expect(page.locator('h1')).toHaveText('Your first hand');
+	await expect(page.getByTestId('tutorial-coach')).toContainText('Step 1 of 18');
+	// the welcome tip points at the hub; no clock anywhere, so no timer ring
+	await expect(page.locator('.table-surface')).toHaveAttribute('data-coach', 'hub');
+	await expect(page.getByRole('timer')).toHaveCount(0);
+
+	await next(page, 'Welcome to the table');
+	await expect(page.locator('.table-surface')).toHaveAttribute('data-coach', 'hand');
+	await next(page, 'These are your 13 tiles');
+	await next(page, 'North discarded');
+
+	// a wrong discard shows the hint and stays put
+	await expect(tip(page)).toContainText('Discard the Green Dragon');
+	await discard(page, 8); // 3 Characters
+	await expect(page.getByTestId('tutorial-hint')).toBeVisible();
+	await expect(tip(page)).toContainText('Discard the Green Dragon');
+	await discard(page, 128); // Green Dragon
+
+	await next(page, 'South discarded an East Wind');
+	await expect(claimOverlay(page)).toBeVisible();
+	await expect(claimOverlay(page).getByRole('timer')).toHaveCount(0);
+	await claimOverlay(page).locator('.claim-btn--pass').click();
+	await expect(claimOverlay(page).getByTestId('tutorial-hint')).toBeVisible();
+	await claim(page, 'pung');
+	await expect(page.locator('.seat-region--self .meld')).toHaveCount(1);
+
+	await next(page, 'Your East pung is laid face up');
+	await discard(page, 32); // 9 Characters
+	await next(page, 'North, on your left, discarded the 4 Characters');
+	await claim(page, 'chow');
+	await expect(tip(page)).toContainText('Discard the Red Dragon');
+	await discard(page, 124);
+	await next(page, 'South discarded the 9 Dots');
+	await claim(page, 'kong');
+	await next(page, 'replacement tile');
+	await discard(page, 132); // White Dragon
+	await next(page, 'You drew the 2 Dots yourself');
+	await page.locator('.declare-btn--hero').click();
+
+	await expect(tip(page)).toContainText('The hand scores 4 faan');
+	await expect(page.getByTestId('faan-breakdown').locator('.pattern-row')).toHaveCount(4);
+	await expect(page.getByTestId('tutorial-solved')).toBeVisible();
+	await page.getByTestId('tutorial-to-puzzles').click();
+	await expect(page).toHaveURL('/learn');
+	await expect(page.getByTestId('lesson-card-basics-tutorial')).toHaveAttribute(
+		'data-solved',
+		'true'
+	);
+});
+
+test('the tutorial steps through its tips by keyboard alone', async ({ page }) => {
+	await page.goto('/learn/basics-tutorial');
+	const nextButton = page.getByTestId('tutorial-next');
+	// the tip card's own button takes focus, and keeps it from tip to tip
+	await expect(nextButton).toBeFocused();
+	await page.keyboard.press('Enter');
+	await expect(tip(page)).toContainText('These are your 13 tiles');
+	await expect(nextButton).toBeFocused();
+	await page.keyboard.press('Enter');
+	await expect(tip(page)).toContainText('North discarded');
+	await expect(nextButton).toBeFocused();
+	await page.keyboard.press('Enter');
+	// a move on the table: focus lands on the tip, so the hand is the next tab stop
+	await expect(tip(page)).toContainText('Discard the Green Dragon');
+	await expect(tip(page)).toBeFocused();
+	await tabTo(page, () =>
+		page.evaluate(() => document.activeElement?.closest('.seat-region--self') !== null)
+	);
+	await page.keyboard.press('Home');
+	const greenDragon = page.locator('.seat-region--self [data-tile-id="128"]');
+	for (let i = 0; i < 14 && !(await focused(greenDragon)()); i++)
+		await page.keyboard.press('ArrowRight');
+	await page.keyboard.press('Enter');
+	await page.keyboard.press('Enter');
+	await expect(tip(page)).toContainText('South discarded an East Wind');
+	await expect(nextButton).toBeFocused();
+	await page.keyboard.press('Enter');
+	// the claim dialog opens on Pass; its number keys claim
+	await expect(claimOverlay(page)).toBeVisible();
+	await page.keyboard.press('1');
+	await expect(tip(page)).toContainText('Your East pung is laid face up');
+});
+
+test('the tutorial resumes where it was left after a reload', async ({ page }) => {
+	await page.goto('/learn/basics-tutorial');
+	await next(page, 'Welcome to the table');
+	await next(page, 'These are your 13 tiles');
+	await next(page, 'North discarded');
+	await discard(page, 128);
+	await expect(tip(page)).toContainText('South discarded an East Wind');
+
+	await page.reload();
+	const resume = page.getByTestId('tutorial-resume');
+	await expect(resume).toContainText('step 5');
+	await resume.getByTestId('tutorial-resume-button').click();
+	await expect(tip(page)).toContainText('South discarded an East Wind');
+	await expect(page.locator('.seat-region--self [data-tile-id="128"]')).toHaveCount(0);
+
+	await page.getByTestId('tutorial-restart').click();
+	await expect(tip(page)).toContainText('Welcome to the table');
+	await page.reload();
+	await expect(page.getByTestId('tutorial-resume')).toHaveCount(0);
 });
 
 test('an unknown lesson id is a 404', async ({ page }) => {

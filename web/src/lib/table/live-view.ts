@@ -10,6 +10,7 @@ import type {
 	TableView,
 	HandResultView,
 	MeldView,
+	OwnHandTile,
 	SeatView,
 	Seats
 } from './view-types';
@@ -50,6 +51,25 @@ function splitOwnHand(state: ClientGameState): LiveOwnHand {
 		concealedIds: sortByTileType(state.ownHand.filter((id) => id !== state.drawnTileId)),
 		drawnId: state.drawnTileId
 	};
+}
+
+/** Your hand as `TableScene` takes it, keyed by tile_id, the held-apart draw last. */
+export function ownHandTiles(ownHand: LiveOwnHand): OwnHandTile[] {
+	const tiles: OwnHandTile[] = ownHand.concealedIds.map((id) => ({
+		key: `t-${id}`,
+		code: tileIdToCode(id),
+		tileId: id,
+		drawn: false
+	}));
+	if (ownHand.drawnId !== null) {
+		tiles.push({
+			key: `t-${ownHand.drawnId}`,
+			code: tileIdToCode(ownHand.drawnId),
+			tileId: ownHand.drawnId,
+			drawn: true
+		});
+	}
+	return tiles;
 }
 
 export function meldToView(m: MeldState): MeldView {

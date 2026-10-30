@@ -27,6 +27,18 @@ export function recordAttempt(
 	return { ...progress, [id]: next };
 }
 
+/** A tutorial's resume point; `null` clears it (a restart, or the end reached). */
+export function recordTutorialStep(
+	progress: LearnProgress,
+	id: string,
+	step: number | null
+): LearnProgress {
+	const next: LessonProgress = { ...(progress[id] ?? { solved: false, attempts: 0 }) };
+	if (step === null) delete next.step;
+	else next.step = step;
+	return { ...progress, [id]: next };
+}
+
 export function solvedCount(progress: LearnProgress, ids: Iterable<string>): number {
 	let n = 0;
 	for (const id of ids) if (progress[id]?.solved) n++;
@@ -39,6 +51,19 @@ export function loadProgress(): LearnProgress {
 
 export function saveAttempt(id: string, correct: boolean): LearnProgress {
 	const progress = recordAttempt(loadProgress(), id, correct);
+	saveLearnProgress(progress);
+	return progress;
+}
+
+export function saveTutorialStep(id: string, step: number | null): LearnProgress {
+	const progress = recordTutorialStep(loadProgress(), id, step);
+	saveLearnProgress(progress);
+	return progress;
+}
+
+/** The end of a tutorial: solved, with no resume point left. */
+export function saveTutorialDone(id: string): LearnProgress {
+	const progress = recordTutorialStep(recordAttempt(loadProgress(), id, true), id, null);
 	saveLearnProgress(progress);
 	return progress;
 }

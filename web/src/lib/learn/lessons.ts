@@ -3,16 +3,22 @@ import type {
 	Band,
 	IndexEntry,
 	Lesson,
-	LessonIndexEntry,
 	SafeReason,
-	Track
+	Track,
+	Tutorial,
+	TutorialIndexEntry
 } from './generated/lessons';
 import { m } from '$lib/paraglide/messages.js';
 
-// puzzles only: tutorials have no player yet (adr 0025 phase 3)
-export const LESSONS: readonly LessonIndexEntry[] = (index as IndexEntry[]).filter(
-	(entry): entry is LessonIndexEntry => entry.lesson_kind === 'puzzle'
-);
+/** Either generated lesson file: a puzzle or a guided tutorial. */
+export type LoadedLesson = Lesson | Tutorial;
+
+export const LESSONS: readonly IndexEntry[] = index as IndexEntry[];
+
+// the generator puts tutorials first, so this is the one a newcomer starts with.
+export const FIRST_TUTORIAL: TutorialIndexEntry = LESSONS.find(
+	(entry): entry is TutorialIndexEntry => entry.lesson_kind === 'tutorial'
+)!;
 
 export const TRACKS = [
 	'basics',
@@ -44,11 +50,11 @@ export const SAFE_REASON_LABEL: Record<SafeReason, () => string> = {
 
 export interface TrackGroup {
 	track: Track;
-	lessons: LessonIndexEntry[];
+	lessons: IndexEntry[];
 }
 
 /** Every track in `TRACKS` order, each with its lessons in index order; empty tracks dropped. */
-export function lessonsByTrack(lessons: readonly LessonIndexEntry[] = LESSONS): TrackGroup[] {
+export function lessonsByTrack(lessons: readonly IndexEntry[] = LESSONS): TrackGroup[] {
 	return TRACKS.map((track) => ({
 		track,
 		lessons: lessons.filter((lesson) => lesson.track === track)
@@ -56,18 +62,18 @@ export function lessonsByTrack(lessons: readonly LessonIndexEntry[] = LESSONS): 
 }
 
 // the order /learn lists them in, so prev/next walk the index top to bottom.
-const ORDERED: readonly LessonIndexEntry[] = lessonsByTrack().flatMap((group) => group.lessons);
+const ORDERED: readonly IndexEntry[] = lessonsByTrack().flatMap((group) => group.lessons);
 
-export function lessonEntry(id: string): LessonIndexEntry | null {
+export function lessonEntry(id: string): IndexEntry | null {
 	return LESSONS.find((lesson) => lesson.id === id) ?? null;
 }
 
-export function nextLesson(id: string): LessonIndexEntry | null {
+export function nextLesson(id: string): IndexEntry | null {
 	const i = ORDERED.findIndex((lesson) => lesson.id === id);
 	return i === -1 ? null : (ORDERED[i + 1] ?? null);
 }
 
-export function previousLesson(id: string): LessonIndexEntry | null {
+export function previousLesson(id: string): IndexEntry | null {
 	const i = ORDERED.findIndex((lesson) => lesson.id === id);
 	return i <= 0 ? null : ORDERED[i - 1];
 }
@@ -77,8 +83,8 @@ const LESSON_FILES = import.meta.glob<unknown>(['./generated/*.json', '!./genera
 	import: 'default'
 });
 
-export async function loadLesson(id: string): Promise<Lesson | null> {
+export async function loadLesson(id: string): Promise<LoadedLesson | null> {
 	const load = LESSON_FILES[`./generated/${id}.json`];
 	if (!load || lessonEntry(id) === null) return null;
-	return (await load()) as Lesson;
+	return (await load()) as LoadedLesson;
 }
