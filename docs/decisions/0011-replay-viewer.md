@@ -17,6 +17,10 @@ A server endpoint re-runs `reduce()` over the stored `(seed, action_log)` and re
 consumes. Client-side it's the same reducer ([frontend.md §6](../frontend.md)); only the source
 differs.
 
+Re-redaction can reuse `app/frames.py` ([architecture.md §5](../architecture.md) "Frame
+building"): the pure `turn`/`claim_offer`/`deal`/event builders `Table` sends from, so a replay
+stream is byte-identical to the live one but for deadlines and `seq`.
+
 ## Needs before reviving
 
 - Endpoint shape, and the default seat-of-view — most likely the spectator composite unless the

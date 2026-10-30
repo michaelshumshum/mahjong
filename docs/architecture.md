@@ -55,8 +55,10 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      │                    · timer heap (§3)         │
                      │                    · per-seat seq + per-seat │
                      │                      ring buffers (redacted) │
-                     │                    · calls seat_view() /     │
-                     │                      redact_event() (§5)     │
+                     │                    · builds frames with      │
+                     │                      app/frames (pure, over  │
+                     │                      seat_view() /           │
+                     │                      redact_event(), §5)     │
                      │                         │                    │
                      │                         ▼                    │
                      │  mahjong_core  (PURE — stdlib only, no       │
@@ -372,6 +374,26 @@ def redact_event(state: GameState, seat: int | None, event: Event) -> dict:
     """Per-event wire redaction: the JSON actually sent for one logical Event,
     to one recipient. Concealed tiles become counts, never identities."""
 ```
+
+### Frame building
+
+`app/frames.py` turns those two into the payload of every frame a recipient gets, as pure
+functions of `(state, recipient, event…)`: `turn_frame` (with `legal` for the acting seat only),
+`claim_offer_frame`/`claim_options_wire`, `hand_start_frame`, `deal_frame`, `event_frame`
+(`redact_event` plus `discard.tile`/`pool_index` and `hand_end`'s deadline and fairness),
+`score_frame`, `state_sync_frame`, and `to_envelope` for the `{v, t, seq, ts, d}` wrapper.
+
+| Owned by the caller, passed in | Never inside a builder |
+| --- | --- |
+| deadlines `Table` armed, seat statuses and names, `host_seat`, hand history, bot tiers, the fairness commit/reveal | clocks, sockets, `seq`, timers, the claim hold |
+
+`Table` adds those around the builders; its frames are byte-identical to what it built inline
+before the split (`tests/test_frames.py` pins every recipient's stream for seeded games and
+rebuilds every frame from its state). A caller with no `Table` builds the same bytes: learn
+mode's lesson bundle ([ADR 0025](decisions/0025-learn-mode.md)) and, later, a replay
+re-redaction ([ADR 0011](decisions/0011-replay-viewer.md)). It is a separate module from
+`views.py` because `views.py` answers what a recipient may see, with its `Entitlement`-annotated
+types the redaction walker checks; `frames.py` only assembles wire shapes from that answer.
 
 ### `SeatView`
 

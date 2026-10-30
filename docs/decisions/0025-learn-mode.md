@@ -55,7 +55,7 @@ endless puzzles (phase 4) use the same grading module behind `GET /lessons/rando
 | `check_hand` / `POST /score` | `hand_check.py`, `app/main.py` | precedent for a stateless evaluator; too narrow for melded hands |
 | `seat_view` → `seat_view_wire` | `app/views.py` | a `state_sync` payload redacted for seat 0 |
 | `redact_event` | `app/views.py` | wire frames for tutorial steps |
-| `turn`/`claim_offer`/`deal` frame builders | `app/table.py` (methods on `Table`) | not reusable until pulled out (phase 3; also unblocks [ADR 0011](0011-replay-viewer.md)) |
+| `turn_frame`/`claim_offer_frame`/`deal_frame`/`event_frame`/`state_sync_frame`, `to_envelope` | `app/frames.py` (pulled out of `Table` in phase 3; also unblocks [ADR 0011](0011-replay-viewer.md)) | the generated `state_sync` snapshots; tutorial frame streams |
 | `seen34`, `no_chance`, `is_genbutsu` | `bots/features.py`, `bots/safety.py` | explain why a discard is safe. `tile_risk` is a heuristic and never grades |
 | `make proto` generator + proto-check | `tools/gen_protocol.py`, `Makefile`, `.github/workflows/proto-check.yml` | precedent for server-owned data emitted to the web |
 
@@ -78,9 +78,8 @@ Closed so far: the position builder and answer keys (`app/lessons/`), public `ca
 `TableScene`/`legal-actions.ts` and `TilePalette` out of their pages, mined positions (phase 4
 below), the generated lesson bundle ([protocol.md §6](../protocol.md)) and the first catalog
 (`catalog/basics.py`, eight hand-written puzzles; `catalog/mined.py`, the 60-puzzle shortlist as
-the `waits`/`efficiency`/`defence`/`faan` tracks). Still open:
-
-1. Frame builders exist only on `Table`.
+the `waits`/`efficiency`/`defence`/`faan` tracks), and the frame builders, pulled out of `Table`
+into `app/frames.py` ([architecture.md §5](../architecture.md) "Frame building").
 
 ## Design
 
@@ -265,7 +264,7 @@ all scored advanced; the shortlist leaves them out. `safe_discard` reasons: all 
 | `test_lessons_catalog.py` | parametrized over every lesson (below) |
 | `test_gen_lessons.py` | generator output is deterministic |
 | `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; one mined game is deterministic and every record regrades; the committed shortlist regrades |
-| `test_lessons_frames.py` | (phase 3) the pulled-out frame builders match what `Table` sends |
+| `test_frames.py` | the pulled-out frame builders match what `Table` sends |
 
 For every lesson, `test_lessons_catalog.py` checks:
 
@@ -316,7 +315,8 @@ For every lesson, `test_lessons_catalog.py` checks:
 
 ### 3. Guided tutorial
 
-15. `refactor(server): pure turn, claim_offer and deal frame builders shared with Table`
+15. `refactor(server): pure turn, claim_offer and deal frame builders shared with Table` (done:
+    `app/frames.py`, every outbound payload; `tests/test_frames.py` pins `Table`'s streams)
 16. `feat(server): tutorial scripts with stacked wall and expect steps`
 17. `feat(web): lesson player and tutorial coach`
 18. `feat(server): basics tutorial content`

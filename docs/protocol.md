@@ -381,8 +381,8 @@ as static files in `web/src/lib/learn/generated/`. No endpoint serves them: the 
 | `lessons.d.ts` | `PuzzleKind`, `SafeReason`, `Band`, `Track`, `LessonKind`, the key interfaces, `LessonIndexEntry` and `Lesson` (a union discriminated on `kind`). `StateSync`/`WinType` are imported from `protocol.d.ts`, not re-emitted |
 
 - **`snapshot`** is a full `state_sync` frame (`{v, t: "state_sync", seq: 0, ts: 0, d}`) for seat 0:
-  `seat_view_wire(seat_view(state, 0))` plus the fields `Table.state_sync_wire` adds (`hand_history:
-  []`, `ruleset_preset`, `ruleset`, `bot_levels`), with no deadlines. It validates as
+  `app/frames.py`'s `state_sync_frame(state, 0)`, the builder `Table.state_sync_wire` uses, with no
+  bound seats, history or deadlines. It validates as
   `app.protocol.StateSync`, so the client's `reduce()` takes it as the same full replace a live
   resync is.
 - **Discard wins** (`count_faan` with a `discard`): the snapshot is the claim window the engine

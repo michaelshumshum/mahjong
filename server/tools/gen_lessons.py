@@ -25,6 +25,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from app.frames import state_sync_frame, to_envelope
 from app.lessons.catalog import CATALOG
 from app.lessons.grade import (
     BestDiscardKey,
@@ -36,9 +37,7 @@ from app.lessons.grade import (
     stated_answer_holds,
 )
 from app.lessons.model import Band, LessonKind, Puzzle, PuzzleKind, SafeReason, Track
-from app.views import seat_view, seat_view_wire
 from mahjong_core.engine import ENGINE_VERSION
-from mahjong_core.presets import preset_id_for
 from mahjong_core.state import GameState, WinType
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "learn" / "generated"
@@ -81,12 +80,7 @@ def check_catalog(catalog: Sequence[Puzzle]) -> None:
 def snapshot(state: GameState) -> dict[str, Any]:
     """Seat 0's `state_sync` frame, as `Table.state_sync_wire` and `ws.py` would send it to a
     fresh seat with no clock: no deadlines, no history, `seq`/`ts` 0."""
-    d = seat_view_wire(seat_view(state, 0))
-    d["hand_history"] = []
-    d["ruleset_preset"] = preset_id_for(state.ruleset)
-    d["ruleset"] = state.ruleset.to_dict()
-    d["bot_levels"] = [None] * len(state.seats)
-    return {"v": 1, "t": "state_sync", "seq": 0, "ts": 0, "d": d}
+    return to_envelope(state_sync_frame(state, 0), seq=0, ts=0)
 
 
 def index_entries(catalog: Sequence[Puzzle]) -> list[dict[str, Any]]:

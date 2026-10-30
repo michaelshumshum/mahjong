@@ -41,6 +41,7 @@ from app.errors import (
     TableAlreadyStartedError,
     TableFullError,
 )
+from app.frames import to_envelope
 from app.limits import IpConnectionCounter, TokenBucket, WsLimits, client_ip
 from app.outbox import BoundedOutbox
 from app.registry import TableRegistry
@@ -188,9 +189,7 @@ class Session:
 
     def _push(self, seq: int, wire: dict[str, Any]) -> None:
         """Registered with `Table` as this seat's `SeatBinding.send` once joined."""
-        t = wire["t"]
-        d = {k: v for k, v in wire.items() if k != "t"}
-        self.outbox.push({"v": 1, "t": t, "seq": seq, "ts": now_ms(), "d": d})
+        self.outbox.push(to_envelope(wire, seq=seq, ts=now_ms()))
 
     def _send_local(self, t: str, payload: dict[str, Any]) -> None:
         """Pre-join (or join-failure) frames only -- the per-connection counter, never the

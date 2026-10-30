@@ -56,7 +56,9 @@ are this Table's half of the wire protocol -- `app/ws.py`'s `Session` is the oth
 `SeatBinding` holds the live per-seat state that has no home in the pure `GameState`. Several
 wire events (`hand_start`/`deal`/`turn`/`claim_offer`/`score`) have no backing
 `mahjong_core.engine.Event` to redact -- see `_publish_hand_start_and_deal`/
-`_publish_turn_if_active`/`_send_claim_offers`.
+`_publish_turn_if_active`/`_send_claim_offers`. Every frame's payload is built by the pure
+`app/frames.py`; this module only adds what it owns around them (deadlines, seat statuses,
+fairness nonces, `seq`).
 
 One table = one `asyncio.Task` = one writer (server/AGENTS.md): every mutation of `self.state`
 happens inside `_apply`, called only from this module's own loop. `join`/`mark_ready`/
@@ -108,6 +110,15 @@ from app.errors import (
     TableFullError,
 )
 from app.fairness import fairness_reveal, new_nonce, seed_commit
+from app.frames import (
+    claim_offer_frame,
+    deal_frame,
+    event_frame,
+    hand_start_frame,
+    score_frame,
+    state_sync_frame,
+    turn_frame,
+)
 from app.status import stats as server_stats
 from app.table_types import (
     BotJobTag,
@@ -120,17 +131,14 @@ from app.table_types import (
     WireSeatStatus,
 )
 from app.views import (
-    CLAIM_KIND_WIRE,
     HandHistoryRecord,
     _omniscient_seat_view,
-    hand_history_wire,
     redact_event,
     seat_view,
-    seat_view_wire,
 )
 from bots.tiers import BOT_TIERS, DEFAULT_BOT_TIER, BotTier
 from bots.worker import compute_action
-from mahjong_core.actions import Action, Discard, Pass, action_to_dict, legal_actions
+from mahjong_core.actions import Action, Discard, Pass, legal_actions
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.events import (
@@ -144,9 +152,8 @@ from mahjong_core.events import (
 )
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
-from mahjong_core.presets import preset_id_for
-from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
-from mahjong_core.tiles import TileId, tile_code, tile_id_type
+from mahjong_core.state import ClaimWindow, GameState, Phase
+from mahjong_core.tiles import TileId
 
 __all__ = [
     "Table",
@@ -867,7 +874,7 @@ class Table:
             else None
         )
         turn_deadline_ts = self._turn_deadline_ms.get(seat) if seat is not None else None
-        view = seat_view(
+        return state_sync_frame(
             self.state,
             seat,
             seat_status=self.seat_status_tuple(),
@@ -877,19 +884,10 @@ class Table:
             hand_end_deadline_ts=self._hand_end_deadline_ms,
             host_seat=self.host_seat,
             reveal_hands=seat is None and self.settings.spectators_see_hands,
+            hand_history=self._hand_history,
+            bot_levels=self.bot_levels_tuple(),
+            seed_commit=self._seed_commit(),
         )
-        wire = seat_view_wire(view)
-        wire["t"] = "state_sync"
-        wire["hand_history"] = hand_history_wire(self._hand_history)
-        # fixed at construction, never changes after new_game(). ruleset_preset is the
-        # RULESET_PRESETS key it matches, or null for a custom ruleset.
-        wire["ruleset_preset"] = preset_id_for(self.state.ruleset)
-        wire["ruleset"] = self.state.ruleset.to_dict()
-        wire["bot_levels"] = list(self.bot_levels_tuple())
-        commit = self._seed_commit()
-        if commit is not None:
-            wire["seed_commit"] = commit
-        return wire
 
     def seat_status_tuple(
         self,
@@ -1666,57 +1664,21 @@ class Table:
         offer for `seat` and a deadline already armed for it (both callers guarantee this)."""
         window = self.state.claim_window
         assert window is not None
-        offer = next(o for o in window.offers if o.seat == seat)
-        self.publish_to_seat(
-            seat,
-            {
-                "t": "claim_offer",
-                "window_id": window.window_id,
-                "options": self._claim_options_wire(offer, window.tile),
-                "deadline_ts": self._claim_deadline_ms[(window.window_id, seat)],
-            },
+        wire = claim_offer_frame(
+            self.state, seat, deadline_ts=self._claim_deadline_ms[(window.window_id, seat)]
         )
-
-    @staticmethod
-    def _claim_options_wire(offer: ClaimOffer, claimed: TileId) -> list[dict[str, Any]]:
-        """`tiles` names only the claimer's own tiles, excluding the claimed discard -- echoing
-        the full meld here made every disambiguated claim fail `_pick_claim_meld` as
-        `illegal`."""
-        options: list[dict[str, Any]] = []
-        if offer.can_win:
-            options.append({"kind": "win"})
-        for meld in offer.melds:
-            own = [t for t in meld.tiles if t != claimed]
-            options.append({"kind": CLAIM_KIND_WIRE[meld.kind], "tiles": own})
-        options.append({"kind": "pass"})
-        return options
+        assert wire is not None
+        self.publish_to_seat(seat, wire)
 
     def _publish_hand_start_and_deal(self) -> None:
         """Synthesize `hand_start` (broadcast) and `deal` (per-seat) -- these have no backing
         `Event`. Called once the table actually starts and once per later hand."""
         state = self.state
-        hand_start: dict[str, Any] = {
-            "t": "hand_start",
-            "hand_no": state.hand_no,
-            "prevailing": state.prevailing.name,
-            "dealer": state.dealer,
-            "seats": list(self.seat_status_tuple()),
-        }
-        commit = self._seed_commit()
-        if commit is not None:
-            hand_start["seed_commit"] = commit
-        self._broadcast_wire(hand_start)
+        self._broadcast_wire(
+            hand_start_frame(state, seats=self.seat_status_tuple(), seed_commit=self._seed_commit())
+        )
         for seat in range(4):
-            self.publish_to_seat(
-                seat,
-                {
-                    "t": "deal",
-                    "your_hand": list(state.seats[seat].concealed),
-                    "counts": {s: len(state.seats[s].concealed) for s in range(4)},
-                    "flowers": [[tile_code(f) for f in s.flowers] for s in state.seats],
-                    "wall_remaining": len(state.wall.tiles),
-                },
-            )
+            self.publish_to_seat(seat, deal_frame(state, seat))
         if self.settings.spectators_see_hands:
             # spectators get no `deal`; a fresh snapshot is how they learn the new hands
             for session_id in list(self.spectators):
@@ -1734,37 +1696,27 @@ class Table:
         """
         if self.state.phase != Phase.AWAIT_ACTION:
             return
-        seat = self.state.turn
-        deadline_ts = self._arm_turn_timer(seat)
-        legal = [action_to_dict(a) for a in legal_actions(self.state, seat)]
-        public_wire: dict[str, Any] = {
-            "t": "turn",
-            "seat": seat,
-            "phase": self.state.phase.value,
-            "deadline_ts": deadline_ts,
-        }
+        deadline_ts = self._arm_turn_timer(self.state.turn)
         for s in range(4):
-            wire: dict[str, Any] = dict(public_wire)
-            if s == seat:
-                wire["legal"] = legal
+            wire = turn_frame(self.state, s, deadline_ts=deadline_ts)
+            assert wire is not None
             self.publish_to_seat(s, wire)
-        self._broadcast_to_spectators(public_wire)
+        if self.spectators:
+            public_wire = turn_frame(self.state, None, deadline_ts=deadline_ts)
+            assert public_wire is not None
+            self._broadcast_to_spectators(public_wire)
 
-    def _augment_event_wire(self, wire: dict[str, Any], event: Event) -> None:
-        """The two fields `redact_event` alone can't derive from `state` in general:
-        `discard.tile`/`pool_index` (this Table still holds `state` from immediately after the
-        `reduce()` call, before a later command could claim that discard away) and
-        `hand_end.deadline_ts` (already computed by `_open_hand_end_window`). Identical for
-        every recipient, so computed once per event, not once per recipient."""
-        if isinstance(event, Discarded):
-            pool = self.state.seats[event.seat].discards
-            wire["tile"] = tile_code(tile_id_type(event.tile_id))
-            wire["pool_index"] = len(pool) - 1
-        if isinstance(event, HandEnded):
-            wire["deadline_ts"] = self._hand_end_deadline_ms
-            reveal = self._fairness_reveal()
-            if reveal is not None:
-                wire["fairness"] = reveal
+    def _event_wire(self, recipient: int | None, event: Event) -> dict[str, Any]:
+        """`event_frame` with this table's spectator setting, hand-end deadline (computed by
+        `_open_hand_end_window`) and fairness reveal."""
+        return event_frame(
+            self.state,
+            recipient,
+            event,
+            reveal_hands=recipient is None and self.settings.spectators_see_hands,
+            hand_end_deadline_ts=self._hand_end_deadline_ms,
+            fairness=self._fairness_reveal() if isinstance(event, HandEnded) else None,
+        )
 
     def _seed_commit(self) -> str | None:
         """The current hand's `seed_commit`, or `None` off `provable_fairness`. The nonce is
@@ -1798,20 +1750,12 @@ class Table:
                 self._publish_claim_resolved(event, offered)
                 continue
             for seat in range(4):
-                wire = redact_event(self.state, seat, event)
-                self._augment_event_wire(wire, event)
-                self.publish_to_seat(seat, wire)
+                self.publish_to_seat(seat, self._event_wire(seat, event))
             if self.spectators:
-                spectator_wire = redact_event(
-                    self.state, None, event, reveal_hands=self.settings.spectators_see_hands
-                )
-                self._augment_event_wire(spectator_wire, event)
-                self._broadcast_to_spectators(spectator_wire)
+                self._broadcast_to_spectators(self._event_wire(None, event))
             if isinstance(event, HandEnded):
                 self._record_hand_history(event)
-                self._broadcast_wire(
-                    {"t": "score", "totals": {s: self.state.seats[s].score for s in range(4)}}
-                )
+                self._broadcast_wire(score_frame(self.state))
             if isinstance(event, Discarded) or (
                 isinstance(event, MeldFormed) and self._kong_may_be_robbed(event.meld.kind)
             ):
@@ -1832,10 +1776,10 @@ class Table:
         for seat in range(4):
             if seat in offered or not private:
                 self.publish_to_seat(
-                    seat, redact_event(self.state, seat, event), bypass_hold=seat in offered
+                    seat, event_frame(self.state, seat, event), bypass_hold=seat in offered
                 )
         if not private and self.spectators:
-            self._broadcast_to_spectators(redact_event(self.state, None, event))
+            self._broadcast_to_spectators(event_frame(self.state, None, event))
 
     def _record_hand_history(self, event: HandEnded) -> None:
         """Snapshot this just-ended hand into `self._hand_history`. Called from `_publish` while

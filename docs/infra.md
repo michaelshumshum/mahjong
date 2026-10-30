@@ -45,6 +45,7 @@ mahjong/
 │   │   ├── rate_limit.py       # POST /tables per-IP RateLimiter
 │   │   ├── status.py           # ServerStats: bot latency, loop lag, history ring for GET /status (§8)
 │   │   ├── views.py            # seat_view() + redact_event()
+│   │   ├── frames.py           # pure outbound frame payloads over views.py (architecture.md §5)
 │   │   ├── protocol.py         # pydantic message models (SOURCE OF TRUTH)
 │   │   ├── idempotency.py      # per-seat intent id cache (protocol.md §1)
 │   │   ├── outbox.py           # BoundedOutbox, per-connection backpressure
