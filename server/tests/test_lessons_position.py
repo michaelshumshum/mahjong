@@ -106,6 +106,15 @@ def test_wall_front_draws_first() -> None:
     assert tile_id_type(front[2]) == TileType.WIND_NORTH  # type: ignore[arg-type]
 
 
+def test_wall_back_draws_first_from_the_end() -> None:
+    state = build_position(dataclasses.replace(SPEC, wall_back="1s3f"))
+    assert tile_id_type(state.wall.tiles[-1]) == TileType.SOU_1  # type: ignore[arg-type]
+    assert state.wall.tiles[-2] == Flower.FLOWER_3
+    assert total_tiles(state) == TOTAL_PHYSICAL_TILES
+    with pytest.raises(ValueError):
+        build_position(dataclasses.replace(SPEC, wall_back="2f"))  # already in wall_front
+
+
 def test_engine_plays_on_from_a_built_position() -> None:
     state = build_position(SPEC)
     discard = next(a for a in legal_actions(state, 0) if isinstance(a, Discard))
@@ -270,6 +279,9 @@ def test_position_from_state_rejects_a_claim_window() -> None:
 
 def test_position_dict_round_trip() -> None:
     assert position_from_dict(json.loads(json.dumps(position_to_dict(SPEC)))) == SPEC
+    stacked = dataclasses.replace(SPEC, wall_back="1s")
+    assert position_from_dict(json.loads(json.dumps(position_to_dict(stacked)))) == stacked
+    assert "wall_back" not in position_to_dict(SPEC)
 
 
 def test_from_seed_matches_new_game_and_reduce() -> None:

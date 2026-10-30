@@ -87,11 +87,11 @@ into `app/frames.py` ([architecture.md §5](../architecture.md) "Frame building"
 
 | Module | Holds |
 | --- | --- |
-| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle` (`TutorialStep`, `Lesson` in phase 3); `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`, `Band`, `Track`. Wire vocabulary, emitted to TS by `gen_lessons` |
+| `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`; `Tutorial` with its steps (`Narrate`, `Expect`, `Auto`, each move a `Move(ActionKind, tiles)`); `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`, `Band`, `Track`, `StepKind`, `Highlight`. Wire vocabulary, emitted to TS by `gen_lessons` |
 | `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `discard_on(state, tile)` (claim positions), `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
 | `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`; runtime-safe |
-| `catalog/*.py` | content: `basics` (hand-written, one teaching point each) and `mined` (the shortlist, one `Track` per kind: `waits`, `efficiency`, `defence`, `faan`); `CATALOG` is `/learn`'s order |
-| `frames.py` | (phase 3) tutorial frame stream |
+| `catalog/*.py` | content: `basics` (hand-written, one teaching point each), `mined` (the shortlist, one `Track` per kind: `waits`, `efficiency`, `defence`, `faan`) and `tutorials` (`TUTORIALS`); `CATALOG` is `/learn`'s puzzle order |
+| `tutorial.py` | `run_tutorial(tutorial) -> TutorialRun`: plays and validates a script, and builds seat 0's frame stream with `app/frames.py` (protocol.md §6 "Tutorials") |
 | `tools/gen_lessons.py` | emits `web/src/lib/learn/generated/index.json`, `<id>.json` per lesson, `lessons.d.ts` |
 
 **Position spec:** tile-code strings, the same codes as `parse_tile`. Fields:
@@ -100,14 +100,16 @@ into `app/frames.py` ([architecture.md §5](../architecture.md) "Frame building"
 - `melds=[("pung", "555s", from_seat=2)]`
 - `discards`, `flowers`
 - `dealer`, `prevailing`, `turn`
-- optional `wall_front`, the stacked next draws
+- optional `wall_front`, the stacked next draws, and `wall_back`, the stacked next back draws
+  (kong and flower replacements come off the back of the same wall)
 
 A position can instead be `FromSeed(seed, actions)`, pinned to `ENGINE_VERSION`.
 
 **`build_position` must:**
 
 - assign physical tile ids across all seats, sharing `hand_check`'s logic; a fifth copy fails;
-- fill the rest of the wall: `wall_front` first, then the remaining tiles shuffled by the lesson seed;
+- fill the rest of the wall: `wall_front` first, then the remaining tiles shuffled by the lesson
+  seed, then `wall_back` reversed, so its first tile is the first back draw;
 - set `total_discards`;
 - set `hand_seed = derive_hand_seed(lesson_seed, 1)`;
 - validate hand sizes: 13 − 3·melds, +1 for the seat that has just drawn.
@@ -128,8 +130,9 @@ before it, so the engine opens the window.
 The server holds structure and answers only. All prose lives in `messages/{en,zh-Hant}/learn.json`
 as `learn_*` and `lesson_<text>_title|prompt|explain` keys, with numbers from the key interpolated.
 `text` is a stem per hand-written lesson, and per kind for mined ones, which share templated prose
-([frontend.md §9](../frontend.md) "Lesson text"). A spec asserts every generated lesson has its
-keys.
+([frontend.md §9](../frontend.md) "Lesson text"). A tutorial has `lesson_<text>_title` and one
+`lesson_<text>_<step>` per `narrate` tip and `expect` hint. A spec asserts every generated lesson
+has its keys.
 
 ### Puzzle kinds
 
@@ -150,9 +153,18 @@ keys.
 | Payload | `state_sync` + answer key | seat-0 redacted frames per step, with a `state_sync` at each `expect` |
 | Client | `PuzzleBoard` + `AnswerPanel` | `LessonPlayer`: a `$state<ClientGameState>` stepped by `reduce`, no socket |
 
-Basics tutorial: draw/discard → pung → chow → kong → self-draw win. Flowers are off, or kept out of
-every scripted draw. The script runs through `reduce()` at generation time, so an illegal script
-fails `make proto`.
+Basics tutorial (`basics-tutorial`): draw/discard → pung → chow → kong → self-draw win and the
+hand-end result, 8 `expect` steps. The script runs through `reduce()` at generation time, so an
+illegal script fails `make proto`.
+
+| Question | Answer |
+| --- | --- |
+| Flowers | kept out of every scripted draw, not turned off: `LESSON_RULESET` is pinned with flowers on. Every draw must come off the stacked `wall_front`/`wall_back`, and any flower drawn fails generation |
+| A script's moves | `Move(ActionKind, tiles)` by tile codes, resolved against `legal_actions` (a claim's own tiles, as `claim_offer` lists them); tile and window ids would tie content to id assignment |
+| Who `expect`s | always seat 0, so an `Expect` has no seat; one where seat 0 has no decision fails, as does an `Auto` for seat 0 |
+| Other seats' claim offers | none unplanned: an offer the script doesn't answer leaves its window open, so the next scripted move is illegal and generation fails. Opponents hold scattered suited tiles and throw honours nobody pairs |
+| Deadlines | 0 where a frame type needs one (`turn`, `claim_offer`, `hand_end`): the player keeps no clock |
+| Where it lists | the index carries the tutorial (`lesson_kind: "tutorial"`, first), but `/learn` lists puzzles only until the player (17) lands |
 
 ### Web
 
@@ -265,14 +277,17 @@ all scored advanced; the shortlist leaves them out. `safe_discard` reasons: all 
 | `test_gen_lessons.py` | generator output is deterministic |
 | `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; one mined game is deterministic and every record regrades; the committed shortlist regrades |
 | `test_frames.py` | the pulled-out frame builders match what `Table` sends |
+| `test_lessons_tutorial.py` | every tutorial runs to its end phase with valid, densely numbered seat-0 frames and each `expect`'s action in its snapshot's `legal_actions`; an illegal move, an `expect` off seat 0's turn, an `auto` for seat 0, a flower or a draw past the stacked wall, and a wrong end phase are rejected; every step's frames equal a live `Table`'s for the same actions |
 
 For every lesson, `test_lessons_catalog.py` checks:
 
 - the position builds;
 - the author's `answer=` equals `answer_key()`;
 - for safe discard, the stated reason holds;
-- for `FromSeed` positions, `ENGINE_VERSION` matches;
-- for tutorials, every scripted action is legal and every `expect` step is seat 0's.
+- for `FromSeed` positions, `ENGINE_VERSION` matches.
+
+Tutorials are checked in `test_lessons_tutorial.py` instead: every scripted action is legal and
+every `expect` step is seat 0's.
 
 ### Web and e2e
 
@@ -317,9 +332,12 @@ For every lesson, `test_lessons_catalog.py` checks:
 
 15. `refactor(server): pure turn, claim_offer and deal frame builders shared with Table` (done:
     `app/frames.py`, every outbound payload; `tests/test_frames.py` pins `Table`'s streams)
-16. `feat(server): tutorial scripts with stacked wall and expect steps`
+16. `feat(server): tutorial scripts with stacked wall and expect steps` (done: `Tutorial` in
+    `model.py`, `tutorial.py`, `Position.wall_back`, the generated tutorial shape, protocol.md §6
+    "Tutorials"; the basics content landed here too, so 18 is folded in. `/learn` skips the
+    tutorial entry until 17)
 17. `feat(web): lesson player and tutorial coach`
-18. `feat(server): basics tutorial content`
+18. `feat(server): basics tutorial content` (done with 16)
 19. `feat(web): tutorial completion sets coach marks and links to easy practice`
 
 ### 4. Random endless puzzles

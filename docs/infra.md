@@ -52,8 +52,9 @@ mahjong/
 │   │   ├── limits.py           # /ws caps: per-IP connections, spectators, token bucket (protocol.md §11); client_ip (CF-Connecting-IP rule)
 │   │   ├── lessons/            # learn mode (ADR 0025): model.py (position specs, kinds),
 │   │   │                       # position.py (build_position, from_seed, position_from_state),
-│   │   │                       # grade.py (answer keys), catalog/ (curated puzzles, one module per
-│   │   │                       # track), mined_puzzles.json (mined shortlist, committed)
+│   │   │                       # grade.py (answer keys), tutorial.py (tutorial scripts -> seat-0
+│   │   │                       # frames), catalog/ (curated puzzles, one module per track, and
+│   │   │                       # tutorials.py), mined_puzzles.json (mined shortlist, committed)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)

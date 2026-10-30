@@ -15,6 +15,7 @@ from mahjong_core.scoring.faan import seven_pairs_enabled
 from mahjong_core.state import GameState, Phase, SeatState, Wind, derive_hand_seed, new_game
 from mahjong_core.tiles import (
     Flower,
+    TileId,
     TileType,
     all_flowers,
     all_tile_ids,
@@ -62,6 +63,12 @@ def _check_hand_size(seat: SeatSetup, n: int, hand_len: int, to_act: bool) -> No
         )
 
 
+def _stacked(tiles: list[TileType | Flower], ids: list[TileId]) -> list[WallTile]:
+    """Stacked wall tiles in draw order, each suited or honour tile given its assigned id."""
+    next_id = iter(ids)
+    return [t if isinstance(t, Flower) else next(next_id) for t in tiles]
+
+
 def build_position(spec: Position | FromSeed) -> GameState:
     """Raises `ValueError` on a position no real deal could reach: a fifth copy, a repeated
     flower, a hand size that doesn't match the melds, or a malformed meld."""
@@ -71,15 +78,22 @@ def build_position(spec: Position | FromSeed) -> GameState:
 
     seat_groups = [_seat_groups(seat, n) for n, seat in enumerate(spec.seats)]
     wall_front_tiles = parse_tiles(spec.wall_front)
-    wall_front_types = [t for t in wall_front_tiles if isinstance(t, TileType)]
-    ids = assign_tile_ids([*(g for groups in seat_groups for g in groups), wall_front_types])
+    wall_back_tiles = parse_tiles(spec.wall_back)
+    ids = assign_tile_ids(
+        [
+            *(g for groups in seat_groups for g in groups),
+            [t for t in wall_front_tiles if isinstance(t, TileType)],
+            [t for t in wall_back_tiles if isinstance(t, TileType)],
+        ]
+    )
+    wall_back_ids = ids.pop()
     wall_front_ids = ids.pop()
 
     seat_flowers = [
         _flowers(seat.flowers, f"seat {n} flowers") for n, seat in enumerate(spec.seats)
     ]
     flowers_used = [f for fl in seat_flowers for f in fl]
-    flowers_used += [t for t in wall_front_tiles if isinstance(t, Flower)]
+    flowers_used += [t for t in (*wall_front_tiles, *wall_back_tiles) if isinstance(t, Flower)]
     if len(set(flowers_used)) != len(flowers_used):
         raise ValueError("each flower is a single tile")
     if flowers_used and not ruleset.flowers_enabled:
@@ -108,12 +122,10 @@ def build_position(spec: Position | FromSeed) -> GameState:
             )
         )
 
-    front: list[WallTile] = []
-    front_ids = iter(wall_front_ids)
-    for t in wall_front_tiles:
-        front.append(t if isinstance(t, Flower) else next(front_ids))
+    front = _stacked(wall_front_tiles, wall_front_ids)
+    back = _stacked(wall_back_tiles, wall_back_ids)
 
-    placed = {i for group in ids for i in group} | set(wall_front_ids)
+    placed = {i for group in ids for i in group} | set(wall_front_ids) | set(wall_back_ids)
     rest: list[WallTile] = [i for i in all_tile_ids() if i not in placed]
     if ruleset.flowers_enabled:
         rest += [f for f in all_flowers() if f not in flowers_used]
@@ -123,7 +135,8 @@ def build_position(spec: Position | FromSeed) -> GameState:
         ruleset=ruleset,
         game_seed=spec.seed,
         hand_seed=derive_hand_seed(spec.seed, 1),
-        wall=Wall((*front, *rest)),
+        # the back draws from the end of the wall
+        wall=Wall((*front, *rest, *reversed(back))),
         seats=(seats[0], seats[1], seats[2], seats[3]),
         phase=Phase.AWAIT_ACTION,
         turn=spec.turn,
@@ -206,8 +219,10 @@ def position_from_state(state: GameState, *, seed: int, seat: int = 0) -> Positi
 
 
 def position_to_dict(spec: Position) -> dict[str, Any]:
-    """JSON-ready; `position_from_dict` reads it back."""
-    return {
+    """JSON-ready; `position_from_dict` reads it back. `wall_back` only when stacked, so mined
+    records (never stacked) keep their shape."""
+    back = {"wall_back": spec.wall_back} if spec.wall_back else {}
+    return back | {
         "seats": [
             {
                 "hand": s.hand,
@@ -247,4 +262,5 @@ def position_from_dict(data: Mapping[str, Any]) -> Position:
         prevailing=Wind[data["prevailing"]],
         wall_front=data["wall_front"],
         seed=data["seed"],
+        wall_back=data.get("wall_back", ""),
     )

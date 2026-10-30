@@ -1,6 +1,14 @@
 [
 	{
 		"band": "beginner",
+		"id": "basics-tutorial",
+		"lesson_kind": "tutorial",
+		"n": 1,
+		"text": "basicsTutorial",
+		"track": "basics"
+	},
+	{
+		"band": "beginner",
 		"id": "basics-isolated-honour",
 		"kind": "best_discard",
 		"lesson_kind": "puzzle",

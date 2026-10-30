@@ -19,7 +19,9 @@ differs.
 
 Re-redaction can reuse `app/frames.py` ([architecture.md §5](../architecture.md) "Frame
 building"): the pure `turn`/`claim_offer`/`deal`/event builders `Table` sends from, so a replay
-stream is byte-identical to the live one but for deadlines and `seq`.
+stream is byte-identical to the live one but for deadlines and `seq`. Learn mode's tutorials
+already build a seat-0 stream offline this way (`app/lessons/tutorial.py`,
+[ADR 0025](0025-learn-mode.md)).
 
 ## Needs before reviving
 

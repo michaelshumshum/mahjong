@@ -5,17 +5,23 @@ from pathlib import Path
 import pytest
 from pydantic import TypeAdapter
 
-from app.lessons.catalog import CATALOG
+from app.lessons.catalog import CATALOG, TUTORIALS
+from app.lessons.catalog.tutorials import BASICS_TUTORIAL
 from app.lessons.grade import answer_key
 from app.lessons.model import (
     Band,
+    Expect,
     MeldSetup,
+    Narrate,
     Puzzle,
     PuzzleKind,
     SafeReason,
     SeatSetup,
+    StepKind,
     Track,
+    Tutorial,
 )
+from app.lessons.tutorial import run_tutorial
 from app.protocol import ServerMessage, StateSync
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.melds import MeldKind
@@ -164,15 +170,82 @@ def test_write_bundle_drops_stale_lessons(tmp_path: Path) -> None:
 
 def test_types_name_every_kind() -> None:
     types = render_types()
-    for kind in PuzzleKind:
+    for kind in (*PuzzleKind, *StepKind):
         assert f"kind: '{kind}'" in types
+
+
+_TUTORIALS = (BASICS_TUTORIAL,)
+
+
+def test_tutorials_lead_the_index_without_a_puzzle_kind() -> None:
+    index = json.loads(render_bundle(_FIXTURE, _TUTORIALS)[INDEX_FILE])
+    assert [e["id"] for e in index] == [BASICS_TUTORIAL.id, *(p.id for p in _FIXTURE)]
+    assert index[0] == {
+        "id": "basics-tutorial",
+        "lesson_kind": "tutorial",
+        "track": "basics",
+        "band": "beginner",
+        "text": "basicsTutorial",
+        "n": 1,
+    }
+    assert index[1]["n"] == 1  # puzzles count their own places in a track
+
+
+def test_tutorial_file_holds_the_script_and_seat_zero_frames() -> None:
+    lesson = _lessons(render_bundle(_FIXTURE, _TUTORIALS))[BASICS_TUTORIAL.id]
+    run = run_tutorial(BASICS_TUTORIAL)
+    assert lesson["engine_version"] == ENGINE_VERSION
+    assert isinstance(_server_message.validate_python(lesson["start"]), StateSync)
+    assert len(lesson["steps"]) == len(BASICS_TUTORIAL.steps)
+    for step, scripted in zip(lesson["steps"], run.steps, strict=True):
+        source = scripted.step
+        if isinstance(source, Narrate):
+            assert step == {"kind": "narrate", "text": source.text, "highlight": source.highlight}
+            continue
+        assert step["frames"] == json.loads(json.dumps(list(scripted.frames)))
+        if isinstance(source, Expect):
+            assert step["kind"] == "expect" and step["text"] == source.text
+            assert step["snapshot"]["d"]["seat"] == 0
+        else:
+            assert step["kind"] == "auto" and step["seat"] == source.seat
+        for frame in step["frames"]:
+            _server_message.validate_python(frame)
+
+
+def test_tutorial_output_is_deterministic() -> None:
+    assert render_bundle(_FIXTURE, _TUTORIALS) == render_bundle(_FIXTURE, _TUTORIALS)
+
+
+@pytest.mark.parametrize(
+    "tutorial",
+    [
+        pytest.param(
+            dataclasses.replace(BASICS_TUTORIAL, id="waits-a"), id="id-shared-with-a-puzzle"
+        ),
+        pytest.param(
+            dataclasses.replace(
+                BASICS_TUTORIAL, steps=(Narrate("bad-stem"), *BASICS_TUTORIAL.steps[1:])
+            ),
+            id="bad-step-stem",
+        ),
+    ],
+)
+def test_check_catalog_rejects_tutorials(tutorial: Tutorial) -> None:
+    with pytest.raises(ValueError):
+        check_catalog(_FIXTURE, (tutorial,))
+
+
+def test_a_broken_tutorial_fails_generation() -> None:
+    broken = dataclasses.replace(BASICS_TUTORIAL, steps=BASICS_TUTORIAL.steps[:-3])
+    with pytest.raises(ValueError, match="basics-tutorial"):
+        render_bundle(_FIXTURE, (broken,))
 
 
 # the api container mounts server/ alone; ci runs natively with the whole repo
 @pytest.mark.skipif(not OUT_DIR.is_dir(), reason="web/ is not mounted")
 def test_committed_bundle_is_current() -> None:
     """Content only: `make proto` formats the files with oxfmt afterwards."""
-    files = render_bundle(CATALOG)
+    files = render_bundle(CATALOG, TUTORIALS)
     committed = {p.name for p in OUT_DIR.glob("*.json")}
     assert committed == {n for n in files if n.endswith(".json")}
     for name in committed:

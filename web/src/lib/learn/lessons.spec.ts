@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import settings from '../../../project.inlang/settings.json';
 import index from './generated/index.json';
-import type { LessonIndexEntry } from './generated/lessons';
+import type { IndexEntry, LessonIndexEntry, Tutorial } from './generated/lessons';
 import { LESSON_TEXT, lessonTextParams } from './lesson-text';
 import {
 	LESSONS,
@@ -25,11 +25,35 @@ const keysByLocale = new Map(
 	])
 );
 
-const lessons: LessonIndexEntry[] = index as LessonIndexEntry[];
+const entries = index as IndexEntry[];
+const lessons = entries.filter((e): e is LessonIndexEntry => e.lesson_kind === 'puzzle');
+
+const generated = import.meta.glob<Tutorial>('./generated/*.json', {
+	eager: true,
+	import: 'default'
+});
+const tutorials = entries
+	.filter((e) => e.lesson_kind === 'tutorial')
+	.map((e) => generated[`./generated/${e.id}.json`]);
 
 describe('generated lessons', () => {
 	it('has lessons', () => {
 		expect(lessons.length).toBeGreaterThan(0);
+	});
+
+	it('lists only puzzles until tutorials have a player', () => {
+		expect(LESSONS).toEqual(lessons);
+		expect(tutorials.length).toBeGreaterThan(0);
+	});
+
+	it.each(settings.locales)('has every tutorial title and step key in %s', (locale) => {
+		const keys = keysByLocale.get(locale)!;
+		const missing = tutorials.flatMap((tutorial) =>
+			['title', ...tutorial.steps.flatMap((step) => (step.kind === 'auto' ? [] : [step.text]))]
+				.map((part) => `lesson_${tutorial.text}_${part}`)
+				.filter((key) => !keys.has(key))
+		);
+		expect(missing).toEqual([]);
 	});
 
 	it.each(settings.locales)('has every lesson text key in %s', (locale) => {
@@ -51,7 +75,7 @@ describe('generated lessons', () => {
 	it.each(settings.locales)('has a label for every track and band in %s', (locale) => {
 		const keys = keysByLocale.get(locale)!;
 		const capitalize = (s: string) => s[0].toUpperCase() + s.slice(1);
-		for (const lesson of lessons) {
+		for (const lesson of entries) {
 			expect(keys.has(`learn_track${capitalize(lesson.track)}`), lesson.track).toBe(true);
 			expect(keys.has(`learn_band${capitalize(lesson.band)}`), lesson.band).toBe(true);
 		}

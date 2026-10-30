@@ -1,8 +1,18 @@
 import index from './generated/index.json';
-import type { Band, Lesson, LessonIndexEntry, SafeReason, Track } from './generated/lessons';
+import type {
+	Band,
+	IndexEntry,
+	Lesson,
+	LessonIndexEntry,
+	SafeReason,
+	Track
+} from './generated/lessons';
 import { m } from '$lib/paraglide/messages.js';
 
-export const LESSONS: readonly LessonIndexEntry[] = index as LessonIndexEntry[];
+// puzzles only: tutorials have no player yet (adr 0025 phase 3)
+export const LESSONS: readonly LessonIndexEntry[] = (index as IndexEntry[]).filter(
+	(entry): entry is LessonIndexEntry => entry.lesson_kind === 'puzzle'
+);
 
 export const TRACKS = [
 	'basics',

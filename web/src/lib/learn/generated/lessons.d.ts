@@ -1,13 +1,15 @@
 // GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.
 // Source of truth: server/app/lessons/ (docs/protocol.md §6).
 
-import type { StateSync, WinType } from '$lib/net/protocol';
+import type { Seat, ServerEvent, StateSync, WinType } from '$lib/net/protocol';
 
 export type LessonKind = 'puzzle' | 'tutorial';
 export type PuzzleKind = 'winning_tiles' | 'best_discard' | 'count_faan' | 'safe_discard';
 export type Track = 'basics' | 'waits' | 'efficiency' | 'defence' | 'faan';
 export type Band = 'beginner' | 'intermediate' | 'advanced';
 export type SafeReason = 'genbutsu' | 'all_copies_visible' | 'no_chance';
+export type StepKind = 'narrate' | 'expect' | 'auto';
+export type Highlight = 'hand' | 'discards' | 'claim' | 'wall' | 'melds' | 'hub';
 
 export interface WaitOption {
 	tile: string;
@@ -64,13 +66,24 @@ export interface SafeDiscardKey {
 
 export interface LessonIndexEntry {
 	id: string;
-	lesson_kind: LessonKind;
+	lesson_kind: 'puzzle';
 	kind: PuzzleKind;
 	track: Track;
 	band: Band;
 	text: string;
 	n: number;
 }
+
+export interface TutorialIndexEntry {
+	id: string;
+	lesson_kind: 'tutorial';
+	track: Track;
+	band: Band;
+	text: string;
+	n: number;
+}
+
+export type IndexEntry = LessonIndexEntry | TutorialIndexEntry;
 
 export type Lesson = LessonIndexEntry & {
 	engine_version: string;
@@ -81,3 +94,20 @@ export type Lesson = LessonIndexEntry & {
 		| { kind: 'count_faan'; key: CountFaanKey }
 		| { kind: 'safe_discard'; key: SafeDiscardKey }
 	);
+
+export type TutorialStep =
+	| { kind: 'narrate'; text: string; highlight: Highlight | null }
+	| {
+			kind: 'expect';
+			text: string;
+			snapshot: StateSync;
+			action: Record<string, unknown>;
+			frames: ServerEvent[];
+	  }
+	| { kind: 'auto'; seat: Seat; action: Record<string, unknown>; frames: ServerEvent[] };
+
+export type Tutorial = TutorialIndexEntry & {
+	engine_version: string;
+	start: StateSync;
+	steps: TutorialStep[];
+};

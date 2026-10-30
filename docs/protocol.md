@@ -371,14 +371,43 @@ being ignored.
 
 ### Generated lesson bundle
 
-`server/tools/gen_lessons.py` emits learn mode's curated puzzles ([ADR 0025](decisions/0025-learn-mode.md))
-as static files in `web/src/lib/learn/generated/`. No endpoint serves them: the web imports them.
+`server/tools/gen_lessons.py` emits learn mode's curated puzzles and guided tutorials
+([ADR 0025](decisions/0025-learn-mode.md)) as static files in `web/src/lib/learn/generated/`. No
+endpoint serves them: the web imports them.
 
 | File | Holds |
 | --- | --- |
-| `index.json` | one `LessonIndexEntry` per catalog puzzle, in `/learn` display order: `id`, `lesson_kind`, `kind` (`PuzzleKind`), `track`, `band`, `text`, `n` |
-| `<id>.json` | one `Lesson`: the index entry, `engine_version`, `snapshot`, and `key` (`grade.py`'s answer key for the kind, `dataclasses.asdict`) |
-| `lessons.d.ts` | `PuzzleKind`, `SafeReason`, `Band`, `Track`, `LessonKind`, the key interfaces, `LessonIndexEntry` and `Lesson` (a union discriminated on `kind`). `StateSync`/`WinType` are imported from `protocol.d.ts`, not re-emitted |
+| `index.json` | one entry per lesson, tutorials first, then puzzles in catalog order. A puzzle's `LessonIndexEntry`: `id`, `lesson_kind: "puzzle"`, `kind` (`PuzzleKind`), `track`, `band`, `text`, `n`. A tutorial's `TutorialIndexEntry`: the same without `kind`. `n` counts within the track per `lesson_kind` |
+| `<id>.json` | a puzzle's `Lesson`: the index entry, `engine_version`, `snapshot`, and `key` (`grade.py`'s answer key for the kind, `dataclasses.asdict`). A tutorial's `Tutorial`: the index entry, `engine_version`, `start` and `steps` (below) |
+| `lessons.d.ts` | `PuzzleKind`, `SafeReason`, `Band`, `Track`, `LessonKind`, `StepKind`, `Highlight`, the key interfaces, `LessonIndexEntry`, `TutorialIndexEntry`, `IndexEntry` (either), `Lesson` (a union discriminated on `kind`), `TutorialStep` and `Tutorial`. `Seat`/`ServerEvent`/`StateSync`/`WinType` are imported from `protocol.d.ts`, not re-emitted |
+
+**Tutorials** (`app/lessons/tutorial.py`'s `run_tutorial`). The script runs through `reduce()`
+from its position, and every frame is seat 0's, built with `redact_event` and `app/frames.py` in
+the order a live `Table` sends them, so the client plays it through the same reducer
+(`discard`, `claim_offer`, `turn` and the rest, last-discard marker included).
+
+```jsonc
+{"id": "basics-tutorial", "lesson_kind": "tutorial", "track": "basics", "band": "beginner",
+ "text": "basicsTutorial", "n": 1, "engine_version": "…",
+ "start": {"v": 1, "t": "state_sync", "seq": 0, "ts": 0, "d": {…}},  // seat 0, before step 0
+ "steps": [
+   {"kind": "narrate", "text": "welcome", "highlight": "hub"},       // highlight may be null
+   {"kind": "auto", "seat": 3, "action": {…}, "frames": [{"t": "discard", "seq": 1, …}, …]},
+   {"kind": "expect", "text": "discardFirst", "action": {"kind": "discard", "tile_id": 128},
+    "snapshot": {"t": "state_sync", "seq": 3, …}, "frames": […]}]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `action` | `action_to_dict` of the scripted action: an `auto` seat's, or the one seat 0 must take at an `expect` |
+| `frames` | seat 0's frames after the action, enveloped; `seq` runs densely from 1 across the whole tutorial; `ts` is 0 |
+| `snapshot` | `expect` only: seat 0's `state_sync` before it acts, carrying `legal_actions`/`claim_options`; its `seq` is that of the last frame before it, the stream it stands for |
+| `deadline_ts` | 0 wherever the frame type requires one (`turn`, `claim_offer`, `hand_end`): there is no clock; `null` in a `state_sync` |
+| `text` | `narrate`: the tip; `expect`: the hint. The message is `lesson_<tutorial text>_<step text>` |
+
+The generator refuses a script with a move outside that seat's legal actions (or claim offer),
+an `expect` where seat 0 has no decision, an `auto` for seat 0, a draw past the stacked
+`wall_front`/`wall_back`, any flower drawn, or an end in a phase other than its `end_phase`.
 
 - **`snapshot`** is a full `state_sync` frame (`{v, t: "state_sync", seq: 0, ts: 0, d}`) for seat 0:
   `app/frames.py`'s `state_sync_frame(state, 0)`, the builder `Table.state_sync_wire` uses, with no

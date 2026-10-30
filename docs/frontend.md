@@ -968,7 +968,7 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
-| `lessons.ts` | the typed index (`LESSONS`), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lessons.ts` | the typed index (`LESSONS`: puzzle entries only, so the generated tutorial stays unlisted until its player lands, ADR 0025 phase 3), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in (you, then each opponent by seat wind, as the prompts name them) |
 | `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |
@@ -1423,7 +1423,9 @@ each locale.
 shortlist shares one stem per kind (`minedWaits`, `minedEfficiency`; `minedDefence*` per
 `SafeReason`, `minedFaanSelfDraw`/`minedFaanDiscard`), so re-mining never needs new prose:
 titles take `{n}` (the place in the track), explanations take the key's numbers (`{tiles}`,
-`{count}`, `{faan}`).
+`{count}`, `{faan}`). A tutorial has `lesson_<text>_title` plus one `lesson_<text>_<step>` per
+`narrate` and `expect` step (the tip, or the hint for the action expected); `lessons.spec.ts`
+checks both locales hold every one.
 
 **Plurals:** the inlang plugin (`@inlang/plugin-message-format@4`) does *not* support flat ICU
 strings like `"{count, plural, one {...} other {...}}"` — it compiles but mangles the braces into

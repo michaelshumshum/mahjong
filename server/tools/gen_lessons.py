@@ -1,11 +1,12 @@
 """Learn-mode lesson bundle for the web (docs/protocol.md §6, ADR 0025).
 
-Builds every `app.lessons.catalog` puzzle, grades it with `answer_key`, and writes into
-`web/src/lib/learn/generated/`:
+Builds every `app.lessons.catalog` puzzle, grades it with `answer_key`, runs every tutorial
+script (`run_tutorial`), and writes into `web/src/lib/learn/generated/`:
 
-- `index.json`: every lesson's `LessonIndexEntry`, in catalog order;
-- `<id>.json`: one `Lesson` each: the entry, `engine_version`, a seat-0 `state_sync` frame and
-  the answer key;
+- `index.json`: every lesson's `IndexEntry`, tutorials first, then puzzles in catalog order;
+- `<id>.json`: one `Lesson` per puzzle (the entry, `engine_version`, a seat-0 `state_sync`
+  frame and the answer key) or `Tutorial` (the entry, `engine_version`, the opening
+  `state_sync` and the steps with seat 0's frames);
 - `lessons.d.ts`: the TS types for both, and the lesson vocabularies.
 
 Usage (from `server/`): uv run python -m tools.gen_lessons [--out <dir>]
@@ -26,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from app.frames import state_sync_frame, to_envelope
-from app.lessons.catalog import CATALOG
+from app.lessons.catalog import CATALOG, TUTORIALS
 from app.lessons.grade import (
     BestDiscardKey,
     CountFaanKey,
@@ -36,7 +37,22 @@ from app.lessons.grade import (
     puzzle_state,
     stated_answer_holds,
 )
-from app.lessons.model import Band, LessonKind, Puzzle, PuzzleKind, SafeReason, Track
+from app.lessons.model import (
+    Auto,
+    Band,
+    Expect,
+    Highlight,
+    LessonKind,
+    Narrate,
+    Puzzle,
+    PuzzleKind,
+    SafeReason,
+    StepKind,
+    Track,
+    Tutorial,
+)
+from app.lessons.tutorial import ScriptedStep, run_tutorial
+from mahjong_core.actions import action_to_dict
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import GameState, WinType
 
@@ -55,7 +71,15 @@ KEY_TYPES: Mapping[PuzzleKind, type] = {
 _ID = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 _TEXT = re.compile(r"[A-Za-z0-9]+")
 
-_LESSON_ENUMS: tuple[type[StrEnum], ...] = (LessonKind, PuzzleKind, Track, Band, SafeReason)
+_LESSON_ENUMS: tuple[type[StrEnum], ...] = (
+    LessonKind,
+    PuzzleKind,
+    Track,
+    Band,
+    SafeReason,
+    StepKind,
+    Highlight,
+)
 # already named in protocol.d.ts
 _PROTOCOL_ENUMS: tuple[type[StrEnum], ...] = (WinType,)
 
@@ -65,16 +89,25 @@ _HEADER = (
 )
 
 
-def check_catalog(catalog: Sequence[Puzzle]) -> None:
-    """Raises `ValueError` on a duplicate or malformed id or text stem."""
-    dupes = [i for i, n in Counter(p.id for p in catalog).items() if n > 1]
+def _text_stems(lesson: Puzzle | Tutorial) -> list[str]:
+    if isinstance(lesson, Puzzle):
+        return [lesson.text]
+    return [lesson.text, *(s.text for s in lesson.steps if not isinstance(s, Auto))]
+
+
+def check_catalog(catalog: Sequence[Puzzle], tutorials: Sequence[Tutorial] = ()) -> None:
+    """Raises `ValueError` on a duplicate or malformed id or text stem, a tutorial's step stems
+    included."""
+    lessons: list[Puzzle | Tutorial] = [*tutorials, *catalog]
+    dupes = [i for i, n in Counter(p.id for p in lessons).items() if n > 1]
     if dupes:
         raise ValueError(f"duplicate lesson ids: {dupes}")
-    for p in catalog:
+    for p in lessons:
         if not _ID.fullmatch(p.id):
             raise ValueError(f"lesson id {p.id!r} is not lowercase kebab-case")
-        if not _TEXT.fullmatch(p.text):
-            raise ValueError(f"{p.id}: text stem {p.text!r} is not alphanumeric")
+        for stem in _text_stems(p):
+            if not _TEXT.fullmatch(stem):
+                raise ValueError(f"{p.id}: text stem {stem!r} is not alphanumeric")
 
 
 def snapshot(state: GameState) -> dict[str, Any]:
@@ -83,24 +116,55 @@ def snapshot(state: GameState) -> dict[str, Any]:
     return to_envelope(state_sync_frame(state, 0), seq=0, ts=0)
 
 
-def index_entries(catalog: Sequence[Puzzle]) -> list[dict[str, Any]]:
-    """`n` is the 1-based place within the track, for titles shared across a track."""
-    per_track: Counter[Track] = Counter()
+def index_entries(
+    catalog: Sequence[Puzzle], tutorials: Sequence[Tutorial] = ()
+) -> list[dict[str, Any]]:
+    """Tutorials first, then puzzles. `n` is the 1-based place among the track's lessons of
+    the same `lesson_kind`, for titles shared across a track."""
+    seen: Counter[tuple[LessonKind, Track]] = Counter()
     entries = []
-    for p in catalog:
-        per_track[p.track] += 1
+    for p in (*tutorials, *catalog):
+        lesson_kind = LessonKind.TUTORIAL if isinstance(p, Tutorial) else LessonKind.PUZZLE
+        seen[lesson_kind, p.track] += 1
+        kind = {"kind": str(p.kind)} if isinstance(p, Puzzle) else {}
         entries.append(
-            {
-                "id": p.id,
-                "lesson_kind": str(LessonKind.PUZZLE),
-                "kind": str(p.kind),
+            {"id": p.id, "lesson_kind": str(lesson_kind)}
+            | kind
+            | {
                 "track": str(p.track),
                 "band": str(p.band),
                 "text": p.text,
-                "n": per_track[p.track],
+                "n": seen[lesson_kind, p.track],
             }
         )
     return entries
+
+
+def _step_payload(scripted: ScriptedStep) -> dict[str, Any]:
+    step = scripted.step
+    if isinstance(step, Narrate):
+        return {
+            "kind": str(StepKind.NARRATE),
+            "text": step.text,
+            "highlight": None if step.highlight is None else str(step.highlight),
+        }
+    assert scripted.action is not None
+    played = {"action": action_to_dict(scripted.action), "frames": list(scripted.frames)}
+    if isinstance(step, Expect):
+        expect = {"kind": str(StepKind.EXPECT), "text": step.text, "snapshot": scripted.snapshot}
+        return expect | played
+    return {"kind": str(StepKind.AUTO), "seat": scripted.seat} | played
+
+
+def tutorial_payload(tutorial: Tutorial, entry: Mapping[str, Any]) -> dict[str, Any]:
+    """Raises `ValueError` on a script that doesn't run (`run_tutorial`)."""
+    run = run_tutorial(tutorial)
+    return {
+        **entry,
+        "engine_version": ENGINE_VERSION,
+        "start": run.start,
+        "steps": [_step_payload(s) for s in run.steps],
+    }
 
 
 def lesson_payload(puzzle: Puzzle, entry: Mapping[str, Any]) -> dict[str, Any]:
@@ -178,41 +242,63 @@ def render_types() -> str:
         _interface(cls.__name__, ((f, ts_type(h)) for f, h in typing.get_type_hints(cls).items()))
         for cls in _key_dataclasses()
     )
-    entry = _interface(
+    common = [("track", "Track"), ("band", "Band"), ("text", "string"), ("n", "number")]
+    puzzle_entry = _interface(
         "LessonIndexEntry",
         [
             ("id", "string"),
-            ("lesson_kind", "LessonKind"),
+            ("lesson_kind", _ts_literal(LessonKind.PUZZLE)),
             ("kind", "PuzzleKind"),
-            ("track", "Track"),
-            ("band", "Band"),
-            ("text", "string"),
-            ("n", "number"),
+            *common,
         ],
+    )
+    tutorial_entry = _interface(
+        "TutorialIndexEntry",
+        [("id", "string"), ("lesson_kind", _ts_literal(LessonKind.TUTORIAL)), *common],
     )
     variants = "\n".join(
         f"\t| {{ kind: {_ts_literal(kind.value)}; key: {cls.__name__} }}"
         for kind, cls in KEY_TYPES.items()
     )
-    protocol = ", ".join(sorted(["StateSync", *(e.__name__ for e in _PROTOCOL_ENUMS)]))
+    played = "action: Record<string, unknown>; frames: ServerEvent[]"
+    steps = (
+        f"\t| {{ kind: {_ts_literal(StepKind.NARRATE)}; text: string; highlight: Highlight | null }}\n"
+        f"\t| {{ kind: {_ts_literal(StepKind.EXPECT)}; text: string; snapshot: StateSync; {played} }}\n"
+        f"\t| {{ kind: {_ts_literal(StepKind.AUTO)}; seat: Seat; {played} }}"
+    )
+    protocol = ", ".join(
+        sorted(["Seat", "ServerEvent", "StateSync", *(e.__name__ for e in _PROTOCOL_ENUMS)])
+    )
     return (
         f"{_HEADER}\n"
         f"import type {{ {protocol} }} from '$lib/net/protocol';\n\n"
-        f"{enums}\n{keys}\n{entry}\n"
+        f"{enums}\n{keys}\n{puzzle_entry}\n{tutorial_entry}\n"
+        "export type IndexEntry = LessonIndexEntry | TutorialIndexEntry;\n\n"
         "export type Lesson = LessonIndexEntry & {\n"
         "\tengine_version: string;\n"
         "\tsnapshot: StateSync;\n"
-        f"}} & (\n{variants}\n);\n"
+        f"}} & (\n{variants}\n);\n\n"
+        f"export type TutorialStep =\n{steps};\n\n"
+        "export type Tutorial = TutorialIndexEntry & {\n"
+        "\tengine_version: string;\n"
+        "\tstart: StateSync;\n"
+        "\tsteps: TutorialStep[];\n"
+        "};\n"
     )
 
 
-def render_bundle(catalog: Sequence[Puzzle]) -> dict[str, str]:
+def render_bundle(catalog: Sequence[Puzzle], tutorials: Sequence[Tutorial] = ()) -> dict[str, str]:
     """File name -> contents."""
-    check_catalog(catalog)
-    entries = index_entries(catalog)
+    check_catalog(catalog, tutorials)
+    entries = index_entries(catalog, tutorials)
     files = {INDEX_FILE: _dump(entries), TYPES_FILE: render_types()}
-    for puzzle, entry in zip(catalog, entries, strict=True):
-        files[f"{puzzle.id}.json"] = _dump(lesson_payload(puzzle, entry))
+    for lesson, entry in zip((*tutorials, *catalog), entries, strict=True):
+        payload = (
+            tutorial_payload(lesson, entry)
+            if isinstance(lesson, Tutorial)
+            else lesson_payload(lesson, entry)
+        )
+        files[f"{lesson.id}.json"] = _dump(payload)
     return files
 
 
@@ -230,7 +316,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=OUT_DIR)
     args = parser.parse_args(argv)
-    files = render_bundle(CATALOG)
+    files = render_bundle(CATALOG, TUTORIALS)
     write_bundle(args.out, files)
     print(f"wrote {len(files)} files to {args.out}")
 

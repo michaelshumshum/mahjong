@@ -1,5 +1,5 @@
 import index from './generated/index.json';
-import type { LessonIndexEntry } from './generated/lessons';
+import type { IndexEntry } from './generated/lessons';
 import {
 	loadLearnProgress,
 	saveLearnProgress,
@@ -8,7 +8,7 @@ import {
 } from '$lib/ui/settings-storage';
 
 export const LESSON_IDS: ReadonlySet<string> = new Set(
-	(index as LessonIndexEntry[]).map((lesson) => lesson.id)
+	(index as IndexEntry[]).map((lesson) => lesson.id)
 );
 
 /** One graded answer. A solved lesson stays solved, and keeps its first `solvedAt`. */

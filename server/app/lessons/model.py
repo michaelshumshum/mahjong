@@ -6,10 +6,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from mahjong_core.actions import Action
+from mahjong_core.actions import Action, ActionKind
 from mahjong_core.melds import MeldKind
 from mahjong_core.presets import RULESET_PRESETS
-from mahjong_core.state import Wind
+from mahjong_core.state import Phase, Wind
 
 # pinned (adr 0025): must not follow DEFAULT_PRESET_ID
 LESSON_RULESET = RULESET_PRESETS["hk_classic"]
@@ -77,7 +77,8 @@ class SeatSetup:
 class Position:
     """`turn` has just drawn and is to act (`AWAIT_ACTION`); claim positions are reached by
     reducing a `Discard` from the state before, never built here. `wall_front` is the next
-    front draws in order; the rest of the wall is shuffled from `seed`."""
+    front draws in order, `wall_back` the next back (kong and flower replacement) draws; the
+    rest of the wall is shuffled from `seed`."""
 
     seats: tuple[SeatSetup, SeatSetup, SeatSetup, SeatSetup]
     turn: int = 0
@@ -85,6 +86,7 @@ class Position:
     prevailing: Wind = Wind.EAST
     wall_front: str = ""
     seed: int = 0
+    wall_back: str = ""
 
 
 @dataclass(frozen=True)
@@ -113,3 +115,71 @@ class Puzzle:
     text: str
     reason: SafeReason | None = None
     discard: str | None = None
+
+
+class StepKind(StrEnum):
+    NARRATE = "narrate"
+    EXPECT = "expect"
+    AUTO = "auto"
+
+
+class Highlight(StrEnum):
+    """What a `narrate` step points at; the web maps each to a table region."""
+
+    HAND = "hand"
+    DISCARDS = "discards"
+    CLAIM = "claim"
+    WALL = "wall"
+    MELDS = "melds"
+    HUB = "hub"
+
+
+@dataclass(frozen=True)
+class Move:
+    """A scripted action by tile codes, matched against `legal_actions` when the script runs.
+    `tiles`: the discard; a claim's own tiles (not the claimed one); a declared kong's four.
+    Empty for a win or a pass."""
+
+    kind: ActionKind
+    tiles: str = ""
+
+
+@dataclass(frozen=True)
+class Narrate:
+    text: str
+    highlight: Highlight | None = None
+
+
+@dataclass(frozen=True)
+class Expect:
+    """Seat 0 must take `move`; `text` is the hint stem."""
+
+    move: Move
+    text: str
+
+
+@dataclass(frozen=True)
+class Auto:
+    """Another seat's scripted action."""
+
+    seat: int
+    move: Move
+
+
+type TutorialStep = Narrate | Expect | Auto
+
+
+@dataclass(frozen=True)
+class Tutorial:
+    """A guided lesson: `position` (its draws stacked in `wall_front`/`wall_back`) played
+    through `steps` for all four seats. `text` is the message stem: the title is
+    `lesson_<text>_title`, each step's message `lesson_<text>_<step.text>`. The script must
+    leave the hand in `end_phase`."""
+
+    id: str
+    track: Track
+    band: Band
+    position: Position
+    steps: tuple[TutorialStep, ...]
+    text: str
+    end_phase: Phase = Phase.HAND_OVER
