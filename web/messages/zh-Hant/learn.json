@@ -84,6 +84,8 @@
 	"learn_tutorialResume": "繼續",
 	"learn_tutorialStartOver": "由頭開始",
 	"learn_tutorialBackToPuzzles": "返去題目",
+	"learn_tutorialPractice": "同簡單機械人練習",
+	"learn_tutorialPracticeError": "開唔到練習枱，請再試一次。",
 	"lesson_basicsIsolatedHonour_title": "打走孤張",
 	"lesson_basicsIsolatedHonour_prompt": "應該打邊隻牌？",
 	"lesson_basicsIsolatedHonour_explain": "紅中同手上其他牌完全連唔上。打走佢，所有搭子都保留到，而且即刻聽牌。",

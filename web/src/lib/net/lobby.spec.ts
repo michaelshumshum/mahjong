@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	createPracticeTable,
 	createTable,
 	fetchTables,
+	practiceTableRequest,
 	seatedCount,
 	waitForApiHealthy,
 	type TableSummary
@@ -249,5 +251,22 @@ describe('createTable', () => {
 
 	it('throws on a non-2xx response', async () => {
 		await expect(createTable({}, 'http://api.test', stubPost(500, {}))).rejects.toThrow('500');
+	});
+
+	it('builds a practice table from each seat difficulty', async () => {
+		expect(practiceTableRequest({ 1: 'easy', 2: 'expert', 3: 'impossible' })).toEqual({
+			practice: true,
+			bot_tiers: { 1: 'T1', 2: 'T4', 3: 'ORACLE' }
+		});
+		const seen: { url: string; init?: RequestInit }[] = [];
+		await createPracticeTable(
+			{ 1: 'easy', 2: 'easy', 3: 'easy' },
+			'http://api.test',
+			stubPost(200, { table_id: 'P1', ruleset_preset: null, ruleset: DEFAULT_RULESET }, seen)
+		);
+		expect(JSON.parse(String(seen[0].init?.body))).toEqual({
+			practice: true,
+			bot_tiers: { 1: 'T1', 2: 'T1', 3: 'T1' }
+		});
 	});
 });

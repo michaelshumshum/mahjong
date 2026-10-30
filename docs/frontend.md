@@ -667,7 +667,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:clientPrefs:v1` | `soundEnabled`, `motion`, `discardMode`, `haptics`, `announceAllDiscards`, `tileSize`, `handOrder`, `sfxVolume` | purely local; every field after `motion` postdates this key, so `loadClientPrefs` defaults each when missing/invalid instead of discarding an older stored object (`settings-storage.ts`) |
 | `mahjong:autoArm:v1` | `no_calls`, `auto_pass_chow` | see below |
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
-| `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped; never shown again in this browser |
+| `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped, or the learn tutorial is finished (§7 "Learn"); never shown again in this browser |
 | `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
 | `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point (saved at each waiting step after the first, cleared by Restart and at the end, §7 "Learn"). Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
 
@@ -1052,7 +1052,11 @@ starts from `start` and goes through the same `viewFromClientState` → `TableSc
   focuses Pass itself.
 - **End.** The self-drawn win's `hand_end` leaves the last tip up with `FaanBreakdown` (payments
   included; pattern names open the guide) and a step counter of "18 of 18". Reaching it records
-  the tutorial solved (`saveTutorialDone`).
+  the tutorial solved (`saveTutorialDone`) and sets `coachMarksDone` (§6), so the first practice
+  hand doesn't repeat what it taught. Its buttons are "Back to puzzles" and "Practice vs Easy
+  bots": `createPracticeTable` (`lib/net/lobby.ts`, the practice dialog's create path) with every
+  bot seat `easy`, saved as the last practice setup so "Play again" repeats it, then
+  `/table/<id>?practice=1`. A failed create shows an error line and keeps the buttons.
 - **Resume and restart.** Each waiting step after the first saves its index as `step`; reopening
   the page offers "Resume" or "Start over" before step 1. Restart, in the nav, clears `step` and
   replays from the start. Any step is rebuilt by replaying every step before it at once.
@@ -1068,7 +1072,9 @@ rings and `/tables` cards,
 each Easy/Normal/Expert/Impossible ([bots.md §6](bots.md)), defaulting to the last practice setup
 (else Normal), above a short legend
 with a one-line blurb per level. Submitting sends `POST /tables`
-with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` and navigates to `/table/<id>?practice=1`.
+with `{practice: true, bot_tiers: {1: …, 2: …, 3: …}}` (`lib/net/lobby.ts`'s `createPracticeTable`,
+shared with the game-end "Play again" and the learn tutorial's "Practice vs Easy bots") and
+navigates to `/table/<id>?practice=1`.
 
 **First-hand coach marks.** On a practice table's hand 1, until `mahjong:onboarding:v1` says
 they're done, `lib/ui/CoachMarks.svelte` shows one tip at a time in a card pinned to the top of the
@@ -1078,6 +1084,9 @@ up over the table. The current tip's target — your seat region, or the centre 
 on phone, where they sit under their seats) — gets a brass outline through `TableScene`'s `coach`
 prop (`data-coach` on `.table-surface`, shared with the learn tutorial's highlights). The card is
 `lib/ui/CoachCard.svelte`, also the tutorial's. "Next"/"Got it" and "Skip tips" both end it for good.
+Until the learn tutorial is solved, the card carries one muted line, "New to mahjong? Basics
+tutorial", linking to it (`FIRST_TUTORIAL`). Finishing the tutorial ends the coach marks, so in
+practice the line shows to someone who has neither done the tutorial nor dismissed the tips.
 Practice only: in a multiplayer game nobody should be reading tips while three people wait.
 
 **In-game guide.** The header rail carries a "Guide" button opening the same `GuideDialog` as the

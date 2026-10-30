@@ -132,5 +132,7 @@
 	"coachMarks_claims": "When you can claim a discard, big buttons pop up over the table. Pick one, or pass.",
 	"coachMarks_nextButton": "Next",
 	"coachMarks_doneButton": "Got it",
-	"coachMarks_skipButton": "Skip tips"
+	"coachMarks_skipButton": "Skip tips",
+	"coachMarks_newToMahjong": "New to mahjong?",
+	"coachMarks_tutorialLink": "Basics tutorial"
 }

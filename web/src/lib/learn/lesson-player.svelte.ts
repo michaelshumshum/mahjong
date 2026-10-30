@@ -6,6 +6,7 @@ import { tileIdToCode } from '$lib/table/tile-code';
 import type { Tutorial, TutorialStep } from './generated/lessons';
 import { withSeatNames } from './puzzle-state';
 import { saveTutorialDone, saveTutorialStep } from './progress';
+import { saveOnboarding } from '$lib/ui/settings-storage';
 
 /** What the player did at an `expect` step, in the table's own intent vocabulary. */
 export type TutorialIntent =
@@ -17,7 +18,8 @@ export type TutorialIntent =
 export interface LessonPlayerOptions {
 	/** pause before each `auto` step; 0 applies it at once. */
 	autoDelayMs?: number;
-	/** keep `mahjong:learnProgress:v1` current: the resume step, then completion. */
+	/** keep `mahjong:learnProgress:v1` current (the resume step, then completion), and finish the
+	 * practice coach marks at the end. */
 	persist?: boolean;
 	/** runs once, when the last step is reached. */
 	onComplete?: () => void;
@@ -233,7 +235,11 @@ export class LessonPlayer {
 	}
 
 	#complete(): void {
-		if (this.#persist) saveTutorialDone(this.tutorial.id);
+		if (this.#persist) {
+			saveTutorialDone(this.tutorial.id);
+			// the first practice hand's coach marks would only repeat what this taught.
+			saveOnboarding({ coachMarksDone: true });
+		}
 		if (this.#completed) return;
 		this.#completed = true;
 		this.#onComplete?.();

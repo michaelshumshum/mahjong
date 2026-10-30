@@ -342,7 +342,12 @@ every `expect` step is seat 0's.
     `_components/PuzzlePage.svelte` beside `TutorialPage.svelte`, [frontend.md §7](../frontend.md)
     "Learn")
 18. `feat(server): basics tutorial content` (done with 16)
-19. `feat(web): tutorial completion sets coach marks and links to easy practice`
+19. `feat(web): tutorial completion sets coach marks and links to easy practice` (done: the last
+    step's "Practice vs Easy bots" goes through `createPracticeTable`, now the practice dialog's
+    and "Play again"'s create path too; the practice coach marks link first-timers to the
+    tutorial)
+
+Phase 3 is complete.
 
 ### 4. Random endless puzzles
 

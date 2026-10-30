@@ -26,7 +26,14 @@
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import { motionMs } from '$lib/ui/motion';
-	import { loadClientPrefs, DEFAULT_CLIENT_PREFS } from '$lib/ui/settings-storage';
+	import {
+		loadClientPrefs,
+		savePracticeSetup,
+		DEFAULT_CLIENT_PREFS,
+		type PracticeSetup
+	} from '$lib/ui/settings-storage';
+	import { goto } from '$app/navigation';
+	import { createPracticeTable } from '$lib/net/lobby';
 
 	let { tutorial }: { tutorial: Tutorial } = $props();
 
@@ -122,6 +129,25 @@
 	}
 
 	let guideFocus = $state<string | null>(null);
+
+	const EASY_PRACTICE: PracticeSetup = { 1: 'easy', 2: 'easy', 3: 'easy' };
+	let practicePending = $state(false);
+	let practiceFailed = $state(false);
+
+	// the practice dialog's own create path, all three bots easy; saved as the last setup so the
+	// game-end "Play again" repeats it.
+	async function practiceEasy(): Promise<void> {
+		practicePending = true;
+		practiceFailed = false;
+		try {
+			const { table_id } = await createPracticeTable(EASY_PRACTICE);
+			savePracticeSetup(EASY_PRACTICE);
+			await goto(`/table/${encodeURIComponent(table_id)}?practice=1`);
+		} catch {
+			practiceFailed = true;
+			practicePending = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -217,6 +243,9 @@
 						/>
 					</div>
 				{/if}
+				{#if practiceFailed}
+					<p class="practice-error" role="alert">{m.learn_tutorialPracticeError()}</p>
+				{/if}
 			</TutorialCoach>
 		{/if}
 	</section>
@@ -242,8 +271,15 @@
 </div>
 
 {#snippet tutorialEnd()}
-	<a class="coach-next" href="/learn" data-sfx="on" data-testid="tutorial-to-puzzles"
+	<a class="coach-skip" href="/learn" data-sfx="on" data-testid="tutorial-to-puzzles"
 		>{m.learn_tutorialBackToPuzzles()}</a
+	>
+	<button
+		type="button"
+		class="coach-next"
+		data-testid="tutorial-practice"
+		disabled={practicePending}
+		onclick={practiceEasy}>{m.learn_tutorialPractice()}</button
 	>
 {/snippet}
 
@@ -385,6 +421,12 @@
 		@include layout.phone-landscape {
 			height: 100dvh;
 		}
+	}
+
+	.practice-error {
+		margin: 0;
+		color: var(--color-negative);
+		font-size: var(--font-size-sm);
 	}
 
 	.tutorial-claim {

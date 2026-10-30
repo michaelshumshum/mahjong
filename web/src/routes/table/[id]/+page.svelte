@@ -71,8 +71,9 @@
 	import { createToast, removeToast, type ToastEntry, type ToastSeverity } from '$lib/ui/toasts';
 	import { serverErrorToastMessage } from '$lib/net/server-error-messages';
 	import { shareOrCopy } from '$lib/ui/share-invite';
-	import { createTable } from '$lib/net/lobby';
-	import { PRACTICE_DIFFICULTY_TO_TIER } from '$lib/net/practice-difficulty';
+	import { createPracticeTable } from '$lib/net/lobby';
+	import { FIRST_TUTORIAL } from '$lib/learn/lessons';
+	import { loadProgress } from '$lib/learn/progress';
 	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
 	import CenterHub from '$lib/table/CenterHub.svelte';
 	import TableScene from '$lib/table/TableScene.svelte';
@@ -656,14 +657,7 @@
 		playAgainFailed = false;
 		const setup = loadPracticeSetup() ?? { 1: 'normal', 2: 'normal', 3: 'normal' };
 		try {
-			const { table_id } = await createTable({
-				practice: true,
-				bot_tiers: {
-					1: PRACTICE_DIFFICULTY_TO_TIER[setup[1]],
-					2: PRACTICE_DIFFICULTY_TO_TIER[setup[2]],
-					3: PRACTICE_DIFFICULTY_TO_TIER[setup[3]]
-				}
-			});
+			const { table_id } = await createPracticeTable(setup);
 			window.location.assign(`/table/${encodeURIComponent(table_id)}?practice=1`);
 		} catch {
 			playAgainFailed = true;
@@ -689,6 +683,8 @@
 			!claimOptions &&
 			!resultOverlayUp
 	);
+	// a first-timer who hasn't done the tutorial gets a link to it on the tip card.
+	const tutorialDone = loadProgress()[FIRST_TUTORIAL.id]?.solved ?? false;
 	function finishCoachMarks(): void {
 		onboarding = { coachMarksDone: true };
 		saveOnboarding(onboarding);
@@ -794,6 +790,7 @@
 						discardMode={clientPrefs.discardMode}
 						onStepChange={(target) => (coachTarget = target)}
 						onDone={finishCoachMarks}
+						tutorialHref={tutorialDone ? null : `/learn/${FIRST_TUTORIAL.id}`}
 					/>
 				</div>
 			{/if}

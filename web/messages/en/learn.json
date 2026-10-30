@@ -84,6 +84,8 @@
 	"learn_tutorialResume": "Resume",
 	"learn_tutorialStartOver": "Start over",
 	"learn_tutorialBackToPuzzles": "Back to puzzles",
+	"learn_tutorialPractice": "Practice vs Easy bots",
+	"learn_tutorialPracticeError": "Couldn't start a practice table. Try again.",
 	"lesson_basicsIsolatedHonour_title": "Discard the loner",
 	"lesson_basicsIsolatedHonour_prompt": "Which tile should you discard?",
 	"lesson_basicsIsolatedHonour_explain": "The Red Dragon connects to nothing else in your hand. Discarding it keeps every set and partial set, and leaves you one tile from winning.",

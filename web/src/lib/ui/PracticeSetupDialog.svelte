@@ -1,11 +1,7 @@
 <script lang="ts">
 	import ModalDialog from './ModalDialog.svelte';
-	import { createTable } from '$lib/net/lobby';
-	import {
-		PRACTICE_DIFFICULTIES,
-		PRACTICE_DIFFICULTY_TO_TIER,
-		type PracticeDifficulty
-	} from '$lib/net/practice-difficulty';
+	import { createPracticeTable } from '$lib/net/lobby';
+	import { PRACTICE_DIFFICULTIES, type PracticeDifficulty } from '$lib/net/practice-difficulty';
 	import { m } from '$lib/paraglide/messages.js';
 	import PanelHeader from './PanelHeader.svelte';
 	import PracticeDifficultySlot from './PracticeDifficultySlot.svelte';
@@ -43,14 +39,7 @@
 		submitting = true;
 		error = null;
 		try {
-			const { table_id } = await createTable({
-				practice: true,
-				bot_tiers: {
-					1: PRACTICE_DIFFICULTY_TO_TIER[difficulty[1]],
-					2: PRACTICE_DIFFICULTY_TO_TIER[difficulty[2]],
-					3: PRACTICE_DIFFICULTY_TO_TIER[difficulty[3]]
-				}
-			});
+			const { table_id } = await createPracticeTable(difficulty);
 			savePracticeSetup($state.snapshot(difficulty));
 			onCreated(table_id);
 		} catch {

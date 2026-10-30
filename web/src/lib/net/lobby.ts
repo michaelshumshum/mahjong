@@ -1,6 +1,8 @@
 import { env } from '$env/dynamic/public';
 import type { BotTier, WireSeatStatus } from './protocol';
 import type { RuleSet } from './ruleset';
+import { PRACTICE_DIFFICULTY_TO_TIER } from './practice-difficulty';
+import type { PracticeSetup } from '$lib/ui/settings-storage';
 
 // hand-written: GET/POST /tables are plain HTTP, outside the WS protocol make proto generates.
 export interface SeatSummary {
@@ -103,4 +105,24 @@ export async function createTable(
 	});
 	if (!response.ok) throw new Error(`POST /tables failed: ${response.status}`);
 	return (await response.json()) as CreateTableResponse;
+}
+
+/** A practice table: seats 1-3 bound to bots at each seat's difficulty. */
+export function practiceTableRequest(setup: PracticeSetup): CreateTableRequest {
+	return {
+		practice: true,
+		bot_tiers: {
+			1: PRACTICE_DIFFICULTY_TO_TIER[setup[1]],
+			2: PRACTICE_DIFFICULTY_TO_TIER[setup[2]],
+			3: PRACTICE_DIFFICULTY_TO_TIER[setup[3]]
+		}
+	};
+}
+
+export function createPracticeTable(
+	setup: PracticeSetup,
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<CreateTableResponse> {
+	return createTable(practiceTableRequest(setup), baseUrl, fetchFn);
 }

@@ -5,6 +5,7 @@ import { LessonPlayer, intentMatches } from './lesson-player.svelte';
 import { loadProgress } from './progress';
 import { legalClaimOptions } from '$lib/table/legal-actions';
 import { viewFromClientState } from '$lib/table/live-view';
+import { loadOnboarding } from '$lib/ui/settings-storage';
 
 const tutorial = tutorialJson as unknown as Tutorial;
 const at = (text: string) =>
@@ -138,6 +139,14 @@ describe('LessonPlayer', () => {
 		expect(onComplete).toHaveBeenCalledOnce();
 		expect(loadProgress()[tutorial.id]).toMatchObject({ solved: true });
 		expect(loadProgress()[tutorial.id].step).toBeUndefined();
+		// the practice coach marks would only repeat it
+		expect(loadOnboarding()).toEqual({ coachMarksDone: true });
+	});
+
+	it('leaves the coach marks alone until the end', () => {
+		const player = play({ persist: true });
+		player.goTo(at('declareWin'));
+		expect(loadOnboarding()).toBeNull();
 	});
 
 	it('saves the step it waits on, and resumes there with the same position', () => {

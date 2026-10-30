@@ -362,6 +362,44 @@ test('the tutorial resumes where it was left after a reload', async ({ page }) =
 	await expect(page.getByTestId('tutorial-resume')).toHaveCount(0);
 });
 
+test('finishing the tutorial ends the coach marks and offers practice vs easy bots', async ({
+	page
+}) => {
+	let sentBody: Record<string, unknown> | null = null;
+	await page.route('**/tables', (route) => {
+		if (route.request().method() !== 'POST') return route.fallback();
+		sentBody = route.request().postDataJSON();
+		return route.fulfill({
+			json: { table_id: 'EASY01', ruleset_preset: 'hk_classic', ruleset: {} }
+		});
+	});
+	// straight to the win through the saved resume point
+	await page.goto('/learn/basics-tutorial');
+	await page.evaluate(() =>
+		localStorage.setItem(
+			'mahjong:learnProgress:v1',
+			JSON.stringify({ 'basics-tutorial': { solved: false, attempts: 0, step: 25 } })
+		)
+	);
+	await page.reload();
+	await page.getByTestId('tutorial-resume-button').click();
+	await expect(tip(page)).toContainText('Declare the win');
+	await page.locator('.declare-btn--hero').click();
+	await expect(page.getByTestId('tutorial-to-puzzles')).toBeVisible();
+	expect(
+		await page.evaluate(() => JSON.parse(localStorage.getItem('mahjong:onboarding:v1') ?? 'null'))
+	).toEqual({ coachMarksDone: true });
+
+	await page.getByTestId('tutorial-practice').click();
+	await expect(page).toHaveURL('/table/EASY01?practice=1');
+	expect(sentBody).toEqual({ practice: true, bot_tiers: { 1: 'T1', 2: 'T1', 3: 'T1' } });
+	expect(
+		await page.evaluate(() =>
+			JSON.parse(localStorage.getItem('mahjong:practiceSetup:v1') ?? 'null')
+		)
+	).toEqual({ 1: 'easy', 2: 'easy', 3: 'easy' });
+});
+
 test('an unknown lesson id is a 404', async ({ page }) => {
 	await page.goto('/learn/no-such-lesson');
 	await expect(page.locator('h1')).toHaveText('404');

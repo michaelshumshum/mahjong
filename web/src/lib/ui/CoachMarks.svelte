@@ -7,12 +7,15 @@
 	let {
 		discardMode,
 		onStepChange,
-		onDone
+		onDone,
+		tutorialHref = null
 	}: {
 		discardMode: DiscardMode;
 		// lets the table outline whatever the current tip points at.
 		onStepChange: (target: CoachTarget | null) => void;
 		onDone: () => void;
+		// given: a one-line pointer to the learn tutorial, for someone who hasn't done it.
+		tutorialHref?: string | null;
 	} = $props();
 
 	let steps = $derived([
@@ -47,6 +50,14 @@
 	{#key index}
 		<p class="coach-text">{step.text}</p>
 	{/key}
+	{#if tutorialHref}
+		<p class="coach-tutorial">
+			{m.coachMarks_newToMahjong()}
+			<a href={tutorialHref} data-sfx="on" data-testid="coach-tutorial-link"
+				>{m.coachMarks_tutorialLink()}</a
+			>
+		</p>
+	{/if}
 	{#snippet actions()}
 		<button type="button" class="coach-skip" data-testid="coach-skip" onclick={onDone}
 			>{m.coachMarks_skipButton()}</button
@@ -56,3 +67,15 @@
 		>
 	{/snippet}
 </CoachCard>
+
+<style lang="scss">
+	.coach-tutorial {
+		margin: 0;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+
+		a {
+			color: var(--color-brass);
+		}
+	}
+</style>

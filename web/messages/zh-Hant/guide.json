@@ -132,5 +132,7 @@
 	"coachMarks_claims": "可以叫糊嘅時候，枱上會彈出大掣，揀一個或者過。",
 	"coachMarks_nextButton": "下一個",
 	"coachMarks_doneButton": "明白",
-	"coachMarks_skipButton": "略過貼士"
+	"coachMarks_skipButton": "略過貼士",
+	"coachMarks_newToMahjong": "第一次打麻雀？",
+	"coachMarks_tutorialLink": "基礎教學"
 }

@@ -12,12 +12,18 @@ describe('CoachMarks', () => {
 		target?.remove();
 	});
 
-	function setup(discardMode: 'two-step' | 'one-tap' = 'two-step') {
+	function setup(
+		discardMode: 'two-step' | 'one-tap' = 'two-step',
+		tutorialHref: string | null = null
+	) {
 		target = document.createElement('div');
 		document.body.appendChild(target);
 		const onStepChange = vi.fn();
 		const onDone = vi.fn();
-		component = mount(CoachMarks, { target, props: { discardMode, onStepChange, onDone } });
+		component = mount(CoachMarks, {
+			target,
+			props: { discardMode, onStepChange, onDone, tutorialHref }
+		});
 		flushSync();
 		const next = () => {
 			(target.querySelector('[data-testid="coach-next"]') as HTMLButtonElement).click();
@@ -44,6 +50,18 @@ describe('CoachMarks', () => {
 	it('matches the discard tip to one-tap mode', () => {
 		setup('one-tap');
 		expect(target.textContent).toContain('Tap a tile in your hand to discard it.');
+	});
+
+	it('points a first-timer to the tutorial only when given its link', () => {
+		setup('two-step', '/learn/basics-tutorial');
+		const link = target.querySelector<HTMLAnchorElement>('[data-testid="coach-tutorial-link"]');
+		expect(link?.getAttribute('href')).toBe('/learn/basics-tutorial');
+		expect(link?.closest('p')?.textContent).toContain('New to mahjong?');
+		unmount(component!);
+		component = null;
+		target.remove();
+		setup();
+		expect(target.querySelector('[data-testid="coach-tutorial-link"]')).toBeNull();
 	});
 
 	it('skip finishes immediately', () => {
