@@ -18,10 +18,20 @@ from hypothesis import strategies as st
 from app.views import SeatView, seat_view
 from bots.base import NO_DEADLINE
 from bots.efficiency import EfficiencyBot
+from bots.features import after_claim34
 from mahjong_core.config import RuleSet
-from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.melds import Meld, MeldKind
+from mahjong_core.ml import (
+    CHOW_HIGH_ID,
+    CHOW_LOW_ID,
+    CHOW_MIDDLE_ID,
+    PASS_ID,
+    PUNG_ID,
+    decode_action,
+    legal_mask,
+)
 from mahjong_core.state import Phase, Wind
-from mahjong_core.tiles import TileId, TileType, tile_ids_for_type
+from mahjong_core.tiles import TileId, TileType, new_count_array, tile_ids_for_type
 from tests.decisions import decision_points, discard_mask
 
 _BOUNDED_RULESET = RuleSet(dealer_repeat_on_win=False, dealer_repeat_on_draw=False)
@@ -34,10 +44,11 @@ def _build_view(
     phase: Phase = Phase.AWAIT_ACTION,
     turn: int | None = None,
     discard_pools: tuple[tuple[TileId, ...], ...] | None = None,
+    melds: tuple[Meld, ...] = (),
 ) -> SeatView:
     """A minimal, hand-built `SeatView` carrying exactly what `EfficiencyBot.act` reads:
-    `own_hand`, `melds[seat]` (always empty here -- closed-hand scenarios only), `phase`,
-    `turn`, `discard_pools`. Every other field is a harmless placeholder."""
+    `own_hand`, `melds[seat]`, `phase`, `turn`, `discard_pools`. Every other field is a harmless
+    placeholder."""
     ids = []
     used: dict[TileType, int] = {}
     for t in types:
@@ -53,7 +64,7 @@ def _build_view(
         phase=phase,
         own_hand=tuple(ids),
         concealed_counts=(len(ids), 0, 0, 0),
-        melds=((), (), (), ()),
+        melds=tuple(melds if s == seat else () for s in range(4)),
         discard_pools=discard_pools if discard_pools is not None else ((), (), (), ()),
         flowers=((), (), (), ()),
         wall_remaining=50,
@@ -248,6 +259,58 @@ async def test_never_declares_a_self_kong() -> None:
     aid = await EfficiencyBot().act(view, mask, NO_DEADLINE)
     assert aid != 34 + int(T.MAN_1)
     assert aid < 34  # took a discard, not the kong
+
+
+def _chow(*types: TileType, copy: int) -> Meld:
+    return Meld(MeldKind.CHOW, tuple(tile_ids_for_type(t)[copy] for t in types), from_seat=3)
+
+
+_THREE_PIN_CHOWS = (
+    _chow(T.PIN_1, T.PIN_2, T.PIN_3, copy=3),
+    _chow(T.PIN_2, T.PIN_3, T.PIN_4, copy=2),
+    _chow(T.PIN_7, T.PIN_8, T.PIN_9, copy=3),
+)
+
+
+async def test_discard_does_not_count_waits_borrowed_from_exposed_melds() -> None:
+    """Concealed 1p 666p 1m beside chows 123p 234p 789p. Discarding 1m leaves 1666p, whose only
+    real wait is 1p (2 live); the whole-hand parse regroups the chows and also reads 4p/5p (9
+    live). Discarding 1p leaves a 1m tanki (3 live), the better real wait."""
+    hand = [T.PIN_1, T.PIN_6, T.PIN_6, T.PIN_6, T.MAN_1]
+    view = _build_view(0, hand, melds=_THREE_PIN_CHOWS)
+    aid = await EfficiencyBot().act(view, discard_mask(hand), NO_DEADLINE)
+    assert aid == int(T.PIN_1)
+
+
+async def test_claim_scores_each_chow_variant_on_the_tiles_it_locks() -> None:
+    """5p is discarded to a 1-shanten hand holding 1p 4p 6p 77p. 456p (middle) locks 4p6p and
+    leaves 77p beside 123m 123s EE: tenpai after dropping 1p. 567p (low, listed first) breaks the
+    77p pair and stays 1-shanten. The whole-hand form scored every variant alike and took low."""
+    hand = [
+        T.MAN_1, T.MAN_2, T.MAN_3, T.SOU_1, T.SOU_2, T.SOU_3, T.WIND_EAST, T.WIND_EAST,
+        T.PIN_1, T.PIN_4, T.PIN_6, T.PIN_7, T.PIN_7,
+    ]  # fmt: skip
+    pools = ((), (), (), (tile_ids_for_type(T.PIN_5)[0],))
+    view = _build_view(0, hand, phase=Phase.AWAIT_CLAIMS, turn=3, discard_pools=pools)
+    mask = [False] * 109
+    mask[PASS_ID] = mask[CHOW_LOW_ID] = mask[CHOW_MIDDLE_ID] = True
+    assert await EfficiencyBot().act(view, mask, NO_DEADLINE) == CHOW_MIDDLE_ID
+
+
+def test_after_claim34_removes_the_locked_tiles_not_the_claimed_one() -> None:
+    """Claimed 5p: low chow is 567p, middle 456p, high 345p."""
+    concealed = new_count_array()
+    for t in (T.PIN_3, T.PIN_4, T.PIN_6, T.PIN_7, T.PIN_5):
+        concealed[int(t)] += 1
+    claimed = int(T.PIN_5)
+    low = after_claim34(concealed, claimed, CHOW_LOW_ID)
+    middle = after_claim34(concealed, claimed, CHOW_MIDDLE_ID)
+    high = after_claim34(concealed, claimed, CHOW_HIGH_ID)
+    pung = after_claim34([*concealed[:claimed], 2, *concealed[claimed + 1 :]], claimed, PUNG_ID)
+    assert (low[int(T.PIN_6)], low[int(T.PIN_7)], low[claimed]) == (0, 0, 1)
+    assert (middle[int(T.PIN_4)], middle[int(T.PIN_6)], middle[claimed]) == (0, 0, 1)
+    assert (high[int(T.PIN_3)], high[int(T.PIN_4)], high[claimed]) == (0, 0, 1)
+    assert pung[claimed] == 0
 
 
 async def test_win_always_takes_priority() -> None:

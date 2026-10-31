@@ -145,12 +145,22 @@ as the minimum of three parses (`mahjong_core/shanten.py`):
    `HandSet.NEW_18` is in `hand_sets` (§8).
 3. **Thirteen Orphans** (十三么) — `13 - distinct_terminals_honors - (1 if has_pair else 0)`.
 
-**Exposed melds.** Bots pass the whole hand, exposed meld tiles included (`own_hand34`), and score
-it as 4 melds + 1 pair. That lets a parse regroup tiles locked in a meld, so ukeire can count waits
-the hand doesn't have (concealed `1666p` beside chows `123p 234p 789p` reads 4p/5p as waits). Learn
-mode grades exactly instead: `shanten(..., melds=n)` / `ukeire(..., melds=n)` take the concealed
-tiles only and need `4 - n` melds + 1 pair (ADR 0025). The bots keep the cheap form; switching them
-is a behaviour change needing an arena run.
+**Exposed melds.** Bots score shanten and ukeire exactly: `shanten(..., melds=n)` /
+`ukeire(..., melds=n)` take the concealed tiles only (`features.own_concealed34`) beside the `n`
+declared melds held fixed, and need `4 - n` melds + 1 pair. The whole-hand form (`melds=0` on
+`own_hand34`) lets a parse regroup tiles locked in a meld, so it reads waits the hand doesn't have
+(concealed `1666p` beside chows `123p 234p 789p` reads 4p/5p as waits) and calls some 1-shanten
+hands tenpai. Where it applies:
+
+| Caller | Exact form |
+| --- | --- |
+| `EfficiencyBot`, `FaanBot` discard/claim/kong scoring | concealed tiles + `own_meld_count`; a claim is scored on `features.after_claim34` (the meld's own tiles leave the hand, the meld count goes up), so each chow variant is scored separately instead of all three alike |
+| `FaanBot`'s value proxies (`estimate_best_faan`, `pattern_optionality`, `_should_claim`) | still the whole hand: they count suits and pairs across melds, not shanten |
+| `labels.is_tenpai`, `labels.winning_tile_types(..., melds34=)`, `arena` tenpai/sub-minimum stats, `safety`'s hands-aware `_opponent_real_shanten`/`ron_credit` | exact |
+| ML labels: `labels.danger_labels_for_opponents` (`is_tenpai(..., melds_fixed=False)`), `ml.generate_aux.shanten_labels`, `ml.train_env`'s `cur_shanten` (shaping) | **whole-hand, pinned**: the shipped datasets, aux heads and PPO shaping were built on it ([ml.md §5](ml.md)); changing them is a label change with a dataset `SCHEMA_VERSION` bump |
+
+Learn mode grades with the same exact form (ADR 0025). Measured in
+[ADR 0027](decisions/0027-bot-exact-shanten-and-no-chance.md).
 
 Validated against [MahjongRepository/mahjong](https://github.com/MahjongRepository/mahjong)'s
 `Shanten` class (same 34-index layout, checked against 26M Tenhou hands) as a test oracle.

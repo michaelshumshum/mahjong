@@ -11,15 +11,17 @@ holds directly; there's no need for an omniscient `SeatView` detour to get them.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from mahjong_core.actions import build_scoring_context, hand_is_winning_shape
 from mahjong_core.config import HandSet
 from mahjong_core.melds import Meld
 from mahjong_core.scoring.faan import score_winning_hand
-from mahjong_core.shanten import shanten
+from mahjong_core.shanten import AGARI, shanten
 from mahjong_core.state import GameState, SeatState
 from mahjong_core.tiles import (
+    COPIES_PER_TYPE,
     N_TILE_TYPES,
     TileId,
     TileType,
@@ -28,8 +30,12 @@ from mahjong_core.tiles import (
     tile_ids_for_type,
 )
 
+_MELD_TILES = 3
+"""Tiles one meld adds to a count array; a kong adds 3 too (`meld_counts34`)."""
+
 __all__ = [
     "OpponentDangerLabel",
+    "concealed_counts34",
     "danger_labels_for_opponents",
     "discard_counts34",
     "expected_faan_if_won",
@@ -44,12 +50,18 @@ __all__ = [
 def seat_hand34(seat_state: SeatState) -> list[int]:
     """34-array contract straight from `SeatState` -- no `SeatView` involved. A kong contributes
     3 tiles, matching `mahjong_core.shanten`'s convention."""
-    counts = new_count_array()
-    for t in seat_state.concealed:
-        counts[int(tile_id_type(t))] += 1
+    counts = concealed_counts34(seat_state)
     meld_counts = meld_counts34(seat_state.melds)
     for i in range(N_TILE_TYPES):
         counts[i] += meld_counts[i]
+    return counts
+
+
+def concealed_counts34(seat_state: SeatState) -> list[int]:
+    """34-count array of the concealed tiles alone -- `shanten`'s `melds=` input."""
+    counts = new_count_array()
+    for t in seat_state.concealed:
+        counts[int(tile_id_type(t))] += 1
     return counts
 
 
@@ -75,19 +87,33 @@ def discard_counts34(discards: tuple[TileId, ...]) -> list[int]:
 
 
 def winning_tile_types(
-    hand34: list[int], *, closed: bool, hand_sets: frozenset[HandSet]
+    hand34: Sequence[int],
+    *,
+    closed: bool,
+    hand_sets: frozenset[HandSet],
+    melds34: Sequence[int] | None = None,
 ) -> list[int]:
-    """Every tile type that would bring `hand34` (already tenpai) to agari, under `hand_sets`
-    (docs/bots.md §8 -- a hand that's only tenpai via a shape `hand_sets` excludes, e.g. Seven
-    Pairs under `hk_strict`, must not be reported as a real wait)."""
+    """Every tile type that would bring `hand34` (the whole hand, already tenpai) to agari, under
+    `hand_sets` (docs/bots.md §8 -- a hand that's only tenpai via a shape `hand_sets` excludes,
+    e.g. Seven Pairs under `hk_strict`, must not be reported as a real wait).
+
+    `melds34` (the exposed melds' tiles, `meld_counts34`) holds those melds fixed: only
+    `hand34 - melds34` is parsed, beside them (docs/bots.md §3). `None` parses the whole hand,
+    which can regroup meld tiles into a wait the hand doesn't have; kept only for the ML labels
+    generated with it (`danger_labels_for_opponents`, docs/ml.md §5)."""
+    if melds34 is None:
+        parsed, melds = list(hand34), 0
+    else:
+        parsed = [h - m for h, m in zip(hand34, melds34, strict=True)]
+        melds = sum(melds34) // _MELD_TILES
     out = []
     for t in range(N_TILE_TYPES):
-        if hand34[t] >= 4:
+        if hand34[t] >= COPIES_PER_TYPE:
             continue
-        candidate = list(hand34)
-        candidate[t] += 1
-        if shanten(candidate, closed=closed, hand_sets=hand_sets) == -1:
+        parsed[t] += 1
+        if shanten(parsed, closed=closed, hand_sets=hand_sets, melds=melds) == AGARI:
             out.append(t)
+        parsed[t] -= 1
     return out
 
 
@@ -110,13 +136,18 @@ def unused_tile_id_for_type(tile_type_value: int, seat_state: SeatState) -> Tile
     raise AssertionError("no unused physical tile for a hypothetical win check")
 
 
-def is_tenpai(state: GameState, seat: int) -> bool:
+def is_tenpai(state: GameState, seat: int, *, melds_fixed: bool = True) -> bool:
     """Whether `seat`'s real hand is one tile from a structurally-complete shape -- shanten==0,
-    ruleset-aware (`hand_sets` gates Seven Pairs, docs/bots.md §8)."""
+    ruleset-aware (`hand_sets` gates Seven Pairs, docs/bots.md §8). `melds_fixed=False` is the
+    whole-hand form (see `winning_tile_types`), kept only for the ML labels."""
     seat_state = state.seats[seat]
-    hand34 = seat_hand34(seat_state)
     closed = not seat_state.melds
-    return shanten(hand34, closed=closed, hand_sets=state.ruleset.hand_sets) == 0
+    hand_sets = state.ruleset.hand_sets
+    if not melds_fixed:
+        return shanten(seat_hand34(seat_state), closed=closed, hand_sets=hand_sets) == 0
+    concealed = concealed_counts34(seat_state)
+    melds = len(seat_state.melds)
+    return shanten(concealed, closed=closed, hand_sets=hand_sets, melds=melds) == 0
 
 
 def expected_faan_if_won(state: GameState, seat: int, tile_type: int, *, discarder: int) -> float:
@@ -153,12 +184,16 @@ class OpponentDangerLabel:
 def danger_labels_for_opponents(state: GameState, seat: int) -> dict[int, OpponentDangerLabel]:
     """`OpponentDangerLabel` for the three seats other than `seat`, as `seat` would compute them
     right before deciding what to discard (`discarder=seat`, matching how `bots/safety.py`'s
-    `tile_risk` frames the same question at inference)."""
+    `tile_risk` frames the same question at inference).
+
+    Pinned to the whole-hand shanten form the shipped datasets and aux heads were labelled with
+    (docs/ml.md §5/§8): switching it changes training labels, which needs a dataset
+    `SCHEMA_VERSION` bump, not a silent drift."""
     labels: dict[int, OpponentDangerLabel] = {}
     for opponent in range(4):
         if opponent == seat:
             continue
-        if not is_tenpai(state, opponent):
+        if not is_tenpai(state, opponent, melds_fixed=False):
             labels[opponent] = OpponentDangerLabel(False, (), (0.0,) * N_TILE_TYPES)
             continue
         opponent_state = state.seats[opponent]

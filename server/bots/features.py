@@ -12,15 +12,19 @@ from __future__ import annotations
 
 from app.views import SeatView
 from mahjong_core.melds import Meld
+from mahjong_core.ml import CHOW_IDS, CHOW_LOW_ID, PUNG_ID
 from mahjong_core.state import Phase
 from mahjong_core.tiles import N_SUITED_TYPES, RANKS_PER_SUIT, new_count_array, tile_id_type
 
 __all__ = [
     "add_meld",
+    "after_claim34",
     "claimed_tile_type",
     "is_closed",
     "is_terminal_or_honor",
+    "own_concealed34",
     "own_hand34",
+    "own_meld_count",
     "seen34",
 ]
 
@@ -51,12 +55,42 @@ def own_hand34(view: SeatView) -> list[int]:
     concealed kongs, fully visible to yourself unlike everyone else's)."""
     if view.seat is None:
         raise ValueError("own_hand34 needs a seated view, not a spectator's")
-    counts = new_count_array()
-    for t in view.own_hand:
-        counts[int(tile_id_type(t))] += 1
+    counts = own_concealed34(view)
     for meld in view.melds[view.seat]:
         add_meld(counts, meld)
     return counts
+
+
+def own_concealed34(view: SeatView) -> list[int]:
+    """This seat's concealed tiles only: what `shanten`/`ukeire` parse in their `melds=` mode,
+    beside `own_meld_count(view)` exposed melds held fixed (docs/bots.md §3)."""
+    if view.seat is None:
+        raise ValueError("own_concealed34 needs a seated view, not a spectator's")
+    counts = new_count_array()
+    for t in view.own_hand:
+        counts[int(tile_id_type(t))] += 1
+    return counts
+
+
+def own_meld_count(view: SeatView) -> int:
+    """Melds this seat has declared, concealed kongs included."""
+    if view.seat is None:
+        raise ValueError("own_meld_count needs a seated view, not a spectator's")
+    return len(view.melds[view.seat])
+
+
+def after_claim34(concealed34: list[int], claimed_type: int, aid: int) -> list[int]:
+    """Concealed counts once claim `aid` (`PUNG_ID` or a `CHOW_IDS` id) on `claimed_type` locks
+    its meld: the claimed tile never enters the hand, the meld's other tiles leave it."""
+    after = list(concealed34)
+    if aid == PUNG_ID:
+        after[claimed_type] -= 2
+        return after
+    low = claimed_type - (aid - CHOW_LOW_ID)
+    for t in range(low, low + len(CHOW_IDS)):
+        if t != claimed_type:
+            after[t] -= 1
+    return after
 
 
 def is_closed(view: SeatView) -> bool:

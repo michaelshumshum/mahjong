@@ -25,7 +25,7 @@ import pytest
 from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.base import NO_DEADLINE
 from bots.faanbot import _THREAT_THRESHOLD, FaanBot
-from bots.features import own_hand34, seen34
+from bots.features import own_concealed34, own_hand34, seen34
 from bots.oracle_learned import OracleLearnedBot
 from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
@@ -714,16 +714,19 @@ async def test_omniscient_view_avoids_a_kong_that_would_be_robbed(
         )
 
     probabilistic_view = _build(None)
-    hand34 = own_hand34(probabilistic_view)
-    after_kong = list(hand34)
+    after_kong = own_concealed34(probabilistic_view)
     after_kong[kong_type] -= 1
 
     def _fake_shanten(
-        tiles: list[int], *, closed: bool = True, hand_sets: frozenset = frozenset()
+        tiles: list[int],
+        *,
+        closed: bool = True,
+        hand_sets: frozenset = frozenset(),
+        melds: int = 0,
     ) -> int:
         if not closed and list(tiles) == after_kong:
             return 0  # pretend this exact candidate is a huge improvement
-        return shanten(tiles, closed=closed, hand_sets=hand_sets)
+        return shanten(tiles, closed=closed, hand_sets=hand_sets, melds=melds)
 
     monkeypatch.setattr("bots.faanbot.shanten", _fake_shanten)
 

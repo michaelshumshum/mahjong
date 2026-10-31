@@ -169,7 +169,7 @@ canary for this failure mode in heuristic and learned bots alike.
 | `GameRecord`, `HandRecord` | `app/db/` (§2) | every eval hand exported as a replayable record |
 | entitlement-safe view rows | `ml/raw.py` | the one place view-derived columns are built |
 | encoder | `ml/encode.py`: `encode_seat_view`, `encode_ruleset`, `encode_batch` | parity target for the fast encoder (§7); ruleset as input |
-| exact labels | `bots/labels.py`: `is_tenpai`, `winning_tile_types`, `expected_faan_if_won`, `danger_labels_for_opponents` | auxiliary heads (§8) |
+| exact labels | `bots/labels.py`: `is_tenpai`, `winning_tile_types`, `expected_faan_if_won`, `danger_labels_for_opponents` | auxiliary heads (§8). Tenpai/wait labels (`danger_labels_for_opponents`), `generate_aux.shanten_labels` and `train_env`'s `cur_shanten` stay on the whole-hand shanten form they were generated with, which can regroup exposed meld tiles; bots and eval stats use the exact `melds=` form ([bots.md §3](bots.md) "Exposed melds"). Moving the labels needs a dataset `SCHEMA_VERSION` bump |
 | dataset | `ml/generate_dataset.py`, `ml/pack.py`, `ml/splits.py`, `ml/dataset.py` | optional auxiliary pretraining (§10) |
 | `DangerNet` + training | `ml/danger_model.py`, `ml/losses.py`, `ml/train.py`, `ml/configs/danger.yaml` | trunk template and R1 reference (§8, §14) |
 | offline eval | `ml/evaluate.py`, `ml/metrics.py` | AUC / log-loss / Brier with game-level bootstrap CIs, reliability table |

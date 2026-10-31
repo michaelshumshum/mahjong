@@ -183,6 +183,44 @@ def test_danger_labels_for_opponents_covers_every_seat_but_self_with_real_labels
     assert labels[3].expected_faan_by_tile_type == (0.0,) * 34
 
 
+def _chow(*types: TileType, copy: int) -> Meld:
+    return Meld(
+        kind=MeldKind.CHOW, tiles=tuple(tile_ids_for_type(t)[copy] for t in types), from_seat=0
+    )
+
+
+_PIN_CHOWS = (
+    _chow(TileType.PIN_1, TileType.PIN_2, TileType.PIN_3, copy=3),
+    _chow(TileType.PIN_2, TileType.PIN_3, TileType.PIN_4, copy=2),
+    _chow(TileType.PIN_7, TileType.PIN_8, TileType.PIN_9, copy=3),
+)
+
+
+def test_is_tenpai_holds_exposed_melds_fixed() -> None:
+    """11p 4p 9m beside chows 123p 234p 789p is 1-shanten. The whole-hand parse regroups the
+    chows into 111p 234p 234p 789p and reads a 9m tanki; that form stays for the ML labels."""
+    concealed = (*_tids(TileType.PIN_1, 2), *_tids(TileType.PIN_4), *_tids(TileType.MAN_9))
+    state = with_seat(_state(), 1, concealed=concealed, melds=_PIN_CHOWS, flowers=())
+    assert not is_tenpai(state, 1)
+    assert is_tenpai(state, 1, melds_fixed=False)
+    assert danger_labels_for_opponents(state, 0)[1].is_tenpai  # pinned ML form
+
+
+def test_winning_tile_types_does_not_borrow_tiles_from_exposed_melds() -> None:
+    """Concealed 1666p beside chows 123p 234p 789p waits on 1p only; the whole-hand parse also
+    reads 4p/5p by regrouping the chows (docs/bots.md §3)."""
+    concealed = (*_tids(TileType.PIN_1), *_tids(TileType.PIN_6, 3))
+    state = with_seat(_state(), 1, concealed=concealed, melds=_PIN_CHOWS, flowers=())
+    seat = state.seats[1]
+    hand34 = seat_hand34(seat)
+    sets = state.ruleset.hand_sets
+    melds34 = meld_counts34(seat.melds)
+    exact = winning_tile_types(hand34, closed=False, hand_sets=sets, melds34=melds34)
+    whole = winning_tile_types(hand34, closed=False, hand_sets=sets)
+    assert exact == [int(TileType.PIN_1)]
+    assert {int(TileType.PIN_4), int(TileType.PIN_5)} <= set(whole)
+
+
 def test_meld_counts34_matches_seat_hand34_when_concealed_is_empty() -> None:
     """`meld_counts34` is `seat_hand34` restricted to melds only -- with an empty concealed hand
     they must agree exactly."""

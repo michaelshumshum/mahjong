@@ -399,30 +399,26 @@ def kong_rob_risk(view: SeatView, tile_type: int, *, concealed: bool) -> float:
     return best
 
 
-def _opponent_hand34(view: SeatView, opponent_seat: int) -> list[int]:
-    """`opponent_seat`'s real hand as a 34-array (concealed tiles from `view.hands` plus their
-    own melds) -- mirrors `bots.features.own_hand34`'s shape/meld-counting rule (a kong
-    contributes 3, matching `mahjong_core.shanten`'s contract) but for another seat, only valid
-    when `view.hands` is populated. Duplicated rather than imported: `own_hand34` is hardwired to
-    `view.seat`, and reusing it for an arbitrary opponent seat would mean threading an extra
-    parameter through a helper every other caller expects to mean "this seat"."""
+def _opponent_concealed34(view: SeatView, opponent_seat: int) -> list[int]:
+    """`opponent_seat`'s real concealed tiles as a 34-array, parsed beside their melds held fixed
+    (`shanten`'s `melds=`, docs/bots.md §3) -- only valid when `view.hands` is populated."""
     assert view.hands is not None
     counts = new_count_array()
     for t in view.hands[opponent_seat]:
         counts[int(tile_id_type(t))] += 1
-    for meld in view.melds[opponent_seat]:
-        tiles = meld.tiles[:3] if meld.is_kong else meld.tiles
-        for t in tiles:
-            counts[int(tile_id_type(t))] += 1
     return counts
 
 
 def _opponent_real_shanten(view: SeatView, opponent_seat: int) -> int:
     """`opponent_seat`'s exact shanten (`mahjong_core.shanten.shanten`, `-1` = already won, `0` =
     tenpai) computed from their real hand -- only valid when `view.hands` is populated."""
-    hand34 = _opponent_hand34(view, opponent_seat)
-    closed = not view.melds[opponent_seat]
-    return shanten(hand34, closed=closed, hand_sets=view.ruleset.hand_sets)
+    melds = view.melds[opponent_seat]
+    return shanten(
+        _opponent_concealed34(view, opponent_seat),
+        closed=not melds,
+        hand_sets=view.ruleset.hand_sets,
+        melds=len(melds),
+    )
 
 
 _RON_CREDIT_SURPLUS = 0.5
@@ -442,20 +438,18 @@ def ron_credit(view: SeatView, waits: Sequence[int]) -> dict[int, float]:
     for opponent in range(4):
         if opponent == view.seat:
             continue
-        held = new_count_array()
-        for t in view.hands[opponent]:
-            held[int(tile_id_type(t))] += 1
+        held = _opponent_concealed34(view, opponent)
         if not any(held[w] for w in waits):
             continue
-        hand34 = _opponent_hand34(view, opponent)
         closed = not view.melds[opponent]
-        base = shanten(hand34, closed=closed, hand_sets=hand_sets)
+        melds = len(view.melds[opponent])
+        base = shanten(held, closed=closed, hand_sets=hand_sets, melds=melds)
         for w in waits:
             if not held[w]:
                 continue
-            hand34[w] -= 1
-            surplus = shanten(hand34, closed=closed, hand_sets=hand_sets) <= base
-            hand34[w] += 1
+            held[w] -= 1
+            surplus = shanten(held, closed=closed, hand_sets=hand_sets, melds=melds) <= base
+            held[w] += 1
             credit[w] += held[w] * (_RON_CREDIT_SURPLUS if surplus else _RON_CREDIT_NEEDED)
     return credit
 

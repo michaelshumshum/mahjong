@@ -39,7 +39,13 @@ from app.views import SeatView, _omniscient_seat_view, seat_view
 from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.efficiency import EfficiencyBot
 from bots.faanbot import AGGRESSIVE, DEFENSIVE, FLUSH_CHASING, FaanBot, WeightProfile
-from bots.labels import is_tenpai, seat_hand34, unused_tile_id_for_type, winning_tile_types
+from bots.labels import (
+    is_tenpai,
+    meld_counts34,
+    seat_hand34,
+    unused_tile_id_for_type,
+    winning_tile_types,
+)
 from bots.random import RandomBot
 from bots.tiers import BotTier
 from mahjong_core.actions import build_scoring_context
@@ -158,7 +164,9 @@ def _tenpai_can_reach_min_faan(state: GameState, seat: int) -> bool:
     hand34 = seat_hand34(seat_state)
     closed = not seat_state.melds
     ctx = build_scoring_context(state, seat, self_drawn=True)
-    for t in winning_tile_types(hand34, closed=closed, hand_sets=state.ruleset.hand_sets):
+    melds34 = meld_counts34(seat_state.melds)
+    hand_sets = state.ruleset.hand_sets
+    for t in winning_tile_types(hand34, closed=closed, hand_sets=hand_sets, melds34=melds34):
         try:
             tile_id = unused_tile_id_for_type(t, seat_state)
         except AssertionError:

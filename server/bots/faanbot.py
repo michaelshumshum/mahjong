@@ -12,8 +12,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.views import SeatView
-from bots.features import claimed_tile_type, is_closed, is_terminal_or_honor, own_hand34, seen34
-from bots.labels import winning_tile_types
+from bots.features import (
+    after_claim34,
+    claimed_tile_type,
+    is_closed,
+    is_terminal_or_honor,
+    own_concealed34,
+    own_hand34,
+    own_meld_count,
+    seen34,
+)
+from bots.labels import meld_counts34, winning_tile_types
 from bots.safety import kong_rob_risk, opponent_threat_level, ron_credit, tile_risk
 from bots.valuation import (
     estimate_best_faan,
@@ -35,7 +44,7 @@ from mahjong_core.ml import (
 )
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import N_TILE_TYPES, TileId, new_count_array, tile_id_type
+from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES, TileId, new_count_array, tile_id_type
 from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
@@ -112,23 +121,22 @@ def _opponents(seat: int) -> tuple[int, ...]:
 
 
 def _best_after_discard(
-    hand34: list[int], *, closed: bool, hand_sets: frozenset[HandSet]
-) -> tuple[int, list[int]]:
-    """`(best_shanten, resulting_hand34)` after discarding one tile -- lets `_should_claim` check
-    the real post-discard shape. Duplicated from `bots/efficiency.py`'s same-named helper (T1/T2
-    stay independently editable) but also returns the hand."""
-    best_shanten: int | None = None
-    best_hand: list[int] | None = None
+    concealed34: list[int], *, melds: int, hand_sets: frozenset[HandSet]
+) -> tuple[int, int]:
+    """`(best_shanten, discard_type)` after discarding one concealed tile -- lets `_should_claim`
+    check the real post-discard shape. Duplicated from `bots/efficiency.py`'s same-named helper
+    (T1/T2 stay independently editable) but also returns the discard."""
+    best: tuple[int, int] | None = None
     for t in range(N_TILE_TYPES):
-        if hand34[t] == 0:
+        if concealed34[t] == 0:
             continue
-        after = list(hand34)
+        after = list(concealed34)
         after[t] -= 1
-        s = shanten(after, closed=closed, hand_sets=hand_sets)
-        if best_shanten is None or s < best_shanten:
-            best_shanten, best_hand = s, after
-    assert best_shanten is not None and best_hand is not None, "hand34 must hold at least one tile"
-    return best_shanten, best_hand
+        s = shanten(after, closed=False, hand_sets=hand_sets, melds=melds)
+        if best is None or s < best[0]:
+            best = (s, t)
+    assert best is not None, "concealed34 must hold at least one tile"
+    return best
 
 
 def _without_one(tiles: tuple[TileId, ...], tile_type: int) -> tuple[TileId, ...]:
@@ -186,10 +194,12 @@ class FaanBot:
 
     def _act_on_claim(self, view: SeatView, mask: list[bool]) -> int:
         hand = own_hand34(view)
+        concealed = own_concealed34(view)
+        melds = own_meld_count(view)
         closed = is_closed(view)
         hand_sets = view.ruleset.hand_sets
         route_faan = route_faan_for(view.ruleset.faan_overrides)
-        before_shanten = shanten(hand, closed=closed, hand_sets=hand_sets)
+        before_shanten = shanten(concealed, closed=closed, hand_sets=hand_sets, melds=melds)
         before_value, _ = estimate_best_faan(hand, closed=closed, route_faan=route_faan)
 
         best_aid = PASS_ID
@@ -198,28 +208,18 @@ class FaanBot:
         min_faan = view.ruleset.min_faan
         claimed_type = claimed_tile_type(view)
         if claimed_type is not None:
-            if mask[PUNG_ID]:
-                candidate = list(hand)
-                candidate[claimed_type] += 1
-                s, resulting_hand = _best_after_discard(
-                    candidate, closed=False, hand_sets=hand_sets
-                )
+            for aid in (PUNG_ID, *CHOW_IDS):
+                if not mask[aid]:
+                    continue
+                candidate = after_claim34(concealed, claimed_type, aid)
+                s, discard = _best_after_discard(candidate, melds=melds + 1, hand_sets=hand_sets)
+                resulting_hand = list(hand)
+                resulting_hand[claimed_type] += 1
+                resulting_hand[discard] -= 1
                 if s < best_shanten and self._should_claim(
                     before_value, resulting_hand, min_faan, route_faan
                 ):
-                    best_shanten, best_aid = s, PUNG_ID
-
-            chow_aid = next((aid for aid in CHOW_IDS if mask[aid]), None)
-            if chow_aid is not None:
-                candidate = list(hand)
-                candidate[claimed_type] += 1
-                s, resulting_hand = _best_after_discard(
-                    candidate, closed=False, hand_sets=hand_sets
-                )
-                if s < best_shanten and self._should_claim(
-                    before_value, resulting_hand, min_faan, route_faan
-                ):
-                    best_shanten, best_aid = s, chow_aid
+                    best_shanten, best_aid = s, aid
 
         # claiming an exposed kong never helps shanten (same reason as bots/efficiency.py) -- skip.
         # ORACLE-only: the proxy claim guard passed, but the exact post-claim tenpai may be worth it.
@@ -256,20 +256,23 @@ class FaanBot:
                     if t != claimed_id:
                         concealed.remove(t)
                 melds = (*view.melds[view.seat], meld)
-                hand34 = new_count_array()
+                melds34 = meld_counts34(melds)
+                concealed34 = new_count_array()
                 for t in concealed:
-                    hand34[int(tile_id_type(t))] += 1
-                for m in melds:
-                    for t in m.tiles[:3]:
-                        hand34[int(tile_id_type(t))] += 1
+                    concealed34[int(tile_id_type(t))] += 1
                 for d in sorted({int(tile_id_type(t)) for t in concealed}):
                     if tile_risk(view, d) > 0.0:
                         continue
-                    after = list(hand34)
+                    after = list(concealed34)
                     after[d] -= 1
-                    if shanten(after, closed=False, hand_sets=hand_sets) != 0:
+                    if shanten(after, closed=False, hand_sets=hand_sets, melds=len(melds)) != 0:
                         continue
-                    waits = winning_tile_types(after, closed=False, hand_sets=hand_sets)
+                    waits = winning_tile_types(
+                        [a + m for a, m in zip(after, melds34, strict=True)],
+                        closed=False,
+                        hand_sets=hand_sets,
+                        melds34=melds34,
+                    )
                     acc, val = exact_wait_value(
                         view,
                         _without_one(tuple(concealed), d),
@@ -302,24 +305,29 @@ class FaanBot:
 
     def _act_on_turn(self, view: SeatView, mask: list[bool]) -> int:
         hand = own_hand34(view)
+        concealed = own_concealed34(view)
+        melds = own_meld_count(view)
         closed = is_closed(view)
         hand_sets = view.ruleset.hand_sets
-        base = shanten(hand, closed=closed, hand_sets=hand_sets)
+        base = shanten(concealed, closed=closed, hand_sets=hand_sets, melds=melds)
 
         best_kong_aid: int | None = None
         best_kong_shanten = base
-        for kong_base, concealed in ((CONCEALED_KONG_BASE, True), (ADDED_KONG_BASE, False)):
+        for kong_base, is_concealed, removed, new_melds in (
+            (CONCEALED_KONG_BASE, True, COPIES_PER_TYPE, melds + 1),
+            (ADDED_KONG_BASE, False, 1, melds),
+        ):
             for t in range(N_TILE_TYPES):
                 aid = kong_base + t
                 if not mask[aid]:
                     continue
                 # ORACLE-only: skip a kong outright if it hands an opponent an immediate 搶槓 win,
                 # regardless of shanten gain -- other tiers can't see this (view.hands is None).
-                if view.hands is not None and kong_rob_risk(view, t, concealed=concealed) > 0.0:
+                if view.hands is not None and kong_rob_risk(view, t, concealed=is_concealed) > 0.0:
                     continue
-                candidate = list(hand)
-                candidate[t] -= 1
-                s = shanten(candidate, closed=False, hand_sets=hand_sets)
+                candidate = list(concealed)
+                candidate[t] -= removed
+                s = shanten(candidate, closed=False, hand_sets=hand_sets, melds=new_melds)
                 if s < best_kong_shanten:
                     best_kong_shanten, best_kong_aid = s, aid
         if best_kong_aid is not None:
@@ -329,22 +337,28 @@ class FaanBot:
         # this seat's own discard count -- closest proxy to docs/bots.md §4's turn-number
         # language available from a SeatView alone.
         turn = len(view.discard_pools[view.seat])
-        return self._best_discard(view, hand, seen34(view), mask, closed=closed, turn=turn)
+        return self._best_discard(
+            view, hand, concealed, seen34(view), mask, closed=closed, melds=melds, turn=turn
+        )
 
     def _best_discard(
         self,
         view: SeatView,
         hand: list[int],
+        concealed: list[int],
         seen: list[int],
         mask: list[bool],
         *,
         closed: bool,
+        melds: int,
         turn: int,
     ) -> int:
+        """`hand` (whole, melds included) feeds the value proxies; `concealed` beside `melds`
+        fixed feeds shanten/ukeire (docs/bots.md §3)."""
         assert view.seat is not None
         hand_sets = view.ruleset.hand_sets
         route_faan = route_faan_for(view.ruleset.faan_overrides)
-        base_shanten = shanten(hand, closed=closed, hand_sets=hand_sets)
+        base_shanten = shanten(concealed, closed=closed, hand_sets=hand_sets, melds=melds)
         threatening = any(
             opponent_threat_level(view, opp) >= _THREAT_THRESHOLD for opp in _opponents(view.seat)
         )
@@ -357,7 +371,8 @@ class FaanBot:
         w_value *= profile.w_value
         w_safety *= profile.w_safety
         w_flex *= profile.w_flex
-        accepts = ukeire(hand, seen, closed=closed, hand_sets=hand_sets)
+        accepts = ukeire(concealed, seen, closed=closed, hand_sets=hand_sets, melds=melds)
+        melds34 = [h - c for h, c in zip(hand, concealed, strict=True)]
 
         risks = {d: tile_risk(view, d) for d in range(N_TILE_TYPES) if mask[DISCARD_BASE + d]}
         candidates = list(risks)
@@ -373,14 +388,19 @@ class FaanBot:
             aid = DISCARD_BASE + d
             after = list(hand)
             after[d] -= 1
-            result_shanten = shanten(after, closed=closed, hand_sets=hand_sets)
+            concealed_after = list(concealed)
+            concealed_after[d] -= 1
+            result_shanten = shanten(
+                concealed_after, closed=closed, hand_sets=hand_sets, melds=melds
+            )
             kinds, tiles = accepts[d]
             exact_tenpai: tuple[float, float] | None = None
             if view.hands is not None and result_shanten == 0:
-                waits = winning_tile_types(after, closed=closed, hand_sets=hand_sets)
-                concealed = _without_one(view.own_hand, d)
+                waits = winning_tile_types(
+                    after, closed=closed, hand_sets=hand_sets, melds34=melds34
+                )
                 exact_tenpai = exact_wait_value(
-                    view, concealed, waits, seen, ron_credit(view, waits)
+                    view, _without_one(view.own_hand, d), waits, seen, ron_credit(view, waits)
                 )
                 tiles = exact_tenpai[0]
             risk = risks[d]
