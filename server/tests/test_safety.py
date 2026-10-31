@@ -11,6 +11,7 @@ import pytest
 
 from app.views import SeatView
 from bots.faanbot import _THREAT_THRESHOLD
+from bots.features import seen34
 from bots.safety import (
     deal_in_probability,
     expected_cost,
@@ -21,6 +22,7 @@ from bots.safety import (
     ron_credit,
     tile_risk,
     wall_pressure_multiplier,
+    walls_every_run,
 )
 from mahjong_core.actions import hand_is_winning_shape
 from mahjong_core.config import HandSet, RuleSet
@@ -100,11 +102,114 @@ def test_no_chance_false_with_a_copy_still_unseen() -> None:
     assert not no_chance(int(TileType.PIN_3), seen)
 
 
-def test_deal_in_probability_zero_when_no_chance() -> None:
-    # This seat holds all 4 copies of PIN_3 itself -- seen34 counts the seat's own hand, so
-    # deal_in_probability must read as a hard 0 regardless of every other signal.
-    view = _view(own_hand_types=(TileType.PIN_3,) * 4)
-    assert deal_in_probability(view, opponent_seat=1, tile_type=int(TileType.PIN_3)) == 0.0
+def _discards(*types: TileType, skip: int = 0) -> tuple[TileId, ...]:
+    """Physical ids for a discard pool, skipping the first `skip` copies of each type (held by
+    this seat in `_view`'s `own_hand_types`)."""
+    taken: dict[TileType, int] = {}
+    ids = []
+    for t in types:
+        n = taken.get(t, skip)
+        ids.append(tile_ids_for_type(t)[n])
+        taken[t] = n + 1
+    return tuple(ids)
+
+
+def test_last_copy_in_own_hand_is_not_safe_against_a_kanchan_wait() -> None:
+    """The bug this pins: this seat holds the last 4p, the other three are discarded, so every
+    copy is accounted for, but opponent 1's 3p+5p waits on 4p without holding one."""
+    tile = int(TileType.PIN_4)
+    pools = ((), (), _discards(TileType.PIN_4, TileType.PIN_4, TileType.PIN_4, skip=1), ())
+    view = _view(own_hand_types=(TileType.PIN_4,), discard_pools=pools)
+    assert no_chance(tile, seen34(view))
+    assert deal_in_probability(view, opponent_seat=1, tile_type=tile) > 0.0
+
+    kanchan = tile_ids(
+        *(TileType.PIN_1,) * 3,
+        *(TileType.PIN_2,) * 3,
+        TileType.PIN_6,
+        TileType.PIN_7,
+        TileType.PIN_8,
+        TileType.PIN_9,
+        TileType.PIN_9,
+        TileType.PIN_3,
+        TileType.PIN_5,
+    )
+    exact = _view(
+        own_hand_types=(TileType.PIN_4,),
+        discard_pools=pools,
+        hands=((), kanchan, (), ()),
+    )
+    assert tile_risk(exact, tile) > 0.0  # the real hand does win on it
+
+
+def test_last_copy_is_not_safe_against_a_ryanmen_wait() -> None:
+    tile = int(TileType.SOU_4)
+    pools = ((), (), _discards(TileType.SOU_4, TileType.SOU_4, TileType.SOU_4, skip=1), ())
+    view = _view(own_hand_types=(TileType.SOU_4,), discard_pools=pools)
+    assert deal_in_probability(view, opponent_seat=1, tile_type=tile) > 0.0
+
+
+def test_deal_in_probability_zero_when_every_run_through_the_tile_is_walled() -> None:
+    """All four 3p accounted for (no pair/pung/tanki wait), and every run through 3p (123, 234,
+    345) needs a 2p or 4p, all of which are visible too."""
+    tile = int(TileType.PIN_3)
+    view = _view(
+        own_hand_types=(TileType.PIN_3,) * 4,
+        discard_pools=(
+            (),
+            tile_ids_for_type(TileType.PIN_2),
+            tile_ids_for_type(TileType.PIN_4),
+            (),
+        ),
+    )
+    assert walls_every_run(tile, seen34(view))
+    assert deal_in_probability(view, opponent_seat=1, tile_type=tile) == 0.0
+
+
+def test_one_walled_neighbour_leaves_the_other_side_open() -> None:
+    """2p walled blocks 123 and 234, but 45p still waits on 3p."""
+    tile = int(TileType.PIN_3)
+    view = _view(
+        own_hand_types=(TileType.PIN_3,) * 4,
+        discard_pools=((), tile_ids_for_type(TileType.PIN_2), (), ()),
+    )
+    assert not walls_every_run(tile, seen34(view))
+    assert deal_in_probability(view, opponent_seat=1, tile_type=tile) > 0.0
+
+
+def test_no_chance_with_an_open_run_ranks_below_one_chance() -> None:
+    tile = int(TileType.PIN_7)
+    one_left = _view(own_hand_types=(TileType.PIN_7,) * 3)
+    none_left = _view(own_hand_types=(TileType.PIN_7,) * 4)
+    p_one = deal_in_probability(one_left, opponent_seat=1, tile_type=tile)
+    p_none = deal_in_probability(none_left, opponent_seat=1, tile_type=tile)
+    assert 0.0 < p_none < p_one
+
+
+def test_honor_no_chance_is_zero_against_an_open_hand() -> None:
+    """An honor has no runs; with an exposed meld the opponent can't be on Thirteen Orphans."""
+    tile = int(TileType.DRAGON_RED)
+    view = _view(
+        own_hand_types=(TileType.DRAGON_RED,),
+        discard_pools=((), (), _discards(*(TileType.DRAGON_RED,) * 3, skip=1), ()),
+        melds=((), (_pung(TileType.MAN_1),), (), ()),
+    )
+    assert deal_in_probability(view, opponent_seat=1, tile_type=tile) == 0.0
+
+
+def test_honor_no_chance_stays_open_to_a_closed_thirteen_orphans_wait() -> None:
+    """Thirteen Orphans' single wait holds no copy of the winning tile, so a closed opponent can
+    still take it -- unless another orphan type is gone, which makes the hand impossible."""
+    tile = int(TileType.DRAGON_RED)
+    reds = _discards(*(TileType.DRAGON_RED,) * 3, skip=1)
+    closed = _view(own_hand_types=(TileType.DRAGON_RED,), discard_pools=((), (), reds, ()))
+    assert deal_in_probability(closed, opponent_seat=1, tile_type=tile) > 0.0
+
+    no_east = _view(
+        own_hand_types=(TileType.DRAGON_RED,),
+        discard_pools=((), tile_ids_for_type(TileType.WIND_EAST), reds, ()),
+    )
+    assert deal_in_probability(no_east, opponent_seat=1, tile_type=tile) == 0.0
 
 
 # --- genbutsu: weak, never a hard zero --------------------------------------------------------

@@ -6,7 +6,8 @@ not calibrated accuracy: offline, `deal_in_probability` ranks legal waits at AUC
 opponents (docs/ml.md §5). Kept as-is; the learned bot is a separate RL policy.
 
 No `is_safe(tile) -> bool`: every signal is a multiplier into `deal_in_probability`, a float in
-`[0, 1]` -- `no_chance` is the only hard zero. Genbutsu/suji only ever scale the estimate down,
+`[0, 1]` -- `_provably_safe` (no-chance plus every run and Thirteen Orphans wait blocked) is the
+only hard zero. Genbutsu/suji only ever scale the estimate down,
 never to exactly zero (HK has no furiten).
 
 **`tile_risk` is hands-aware.** When `view.hands` is populated (the `"ORACLE"` tier's omniscient
@@ -32,8 +33,10 @@ from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
 from mahjong_core.shanten import shanten
 from mahjong_core.state import SeatState
 from mahjong_core.tiles import (
+    COPIES_PER_TYPE,
     DRAGON_TYPES,
     N_SUITED_TYPES,
+    ORPHAN_INDICES,
     RANKS_PER_SUIT,
     TileId,
     new_count_array,
@@ -50,6 +53,7 @@ __all__ = [
     "ron_credit",
     "synthetic_tile_id",
     "tile_risk",
+    "walls_every_run",
 ]
 
 
@@ -58,8 +62,15 @@ _BASE_RATE = 0.06
 corpus yet); sized so multipliers stay in a believable 0-0.3 range without saturating."""
 
 _ONE_CHANCE_FACTOR = 0.4
-"""Soft half of one-chance/no-chance: exactly one copy left. Not a hard constraint (that's
-`no_chance`), just a real reduction since only one hidden copy can support the wait."""
+"""Soft half of one-chance/no-chance: exactly one copy left. Not a hard constraint, just a real
+reduction since only one hidden copy can support the wait."""
+
+_NO_CHANCE_FACTOR = 0.2
+"""Every copy accounted for but a run (or Thirteen Orphans) wait through the tile still open:
+pair/pung/tanki waits are gone, so below one-chance, which still allows them. Hand-set, like the
+other factors."""
+
+_RUN_LENGTH = 3
 
 _GENBUTSU_FACTOR = 0.35
 """Weakest-guarantee, highest-volume signal -- largest reduction here short of `no_chance`,
@@ -113,10 +124,47 @@ logic here would just re-run that check one level up for no behavioural gain."""
 
 
 def no_chance(tile_type: int, seen: Sequence[int]) -> bool:
-    """Hard-constraint half of one-chance/no-chance: every copy of `tile_type` is already
-    accounted for, so no one can complete a wait needing it. Tile-count fact, not psychology --
-    unlike every other signal here, allowed to force probability to exactly 0."""
-    return seen[tile_type] >= 4
+    """Every copy of `tile_type` is accounted for (`seen` counts your own hand too), so no
+    opponent holds one concealed: rules out the waits that need a held copy -- pair/pung
+    (shanpon), tanki, Seven Pairs. Not run waits *through* `tile_type` (3m+5m waiting 4m holds no
+    4m), nor Thirteen Orphans' single wait; `deal_in_probability` checks those separately
+    (docs/bots.md §5)."""
+    return seen[tile_type] >= COPIES_PER_TYPE
+
+
+def walls_every_run(tile_type: int, seen: Sequence[int]) -> bool:
+    """Every run containing suited `tile_type` has another tile with every copy accounted for,
+    so no opponent can hold the two-tile shape that waits on it. `False` for honors (no runs)."""
+    if tile_type >= N_SUITED_TYPES:
+        return False
+    rank = tile_type % RANKS_PER_SUIT
+    suit = tile_type - rank
+    for start in range(max(0, rank - _RUN_LENGTH + 1), min(rank, RANKS_PER_SUIT - _RUN_LENGTH) + 1):
+        others = (suit + start + i for i in range(_RUN_LENGTH) if start + i != rank)
+        if not any(no_chance(other, seen) for other in others):
+            return False
+    return True
+
+
+def _orphans_wait_open(
+    view: SeatView, opponent_seat: int, tile_type: int, seen: Sequence[int]
+) -> bool:
+    """Whether `opponent_seat` could be waiting on `tile_type` for Thirteen Orphans, which needs
+    no copy of the winning tile in hand: closed, and every other orphan type still has a copy
+    unaccounted for."""
+    if tile_type not in ORPHAN_INDICES or view.melds[opponent_seat]:
+        return False
+    return not any(no_chance(o, seen) for o in ORPHAN_INDICES if o != tile_type)
+
+
+def _provably_safe(view: SeatView, opponent_seat: int, tile_type: int, seen: Sequence[int]) -> bool:
+    """No wait shape can take `tile_type`: no held copy (pair/pung/tanki), every run through it
+    walled, and no Thirteen Orphans wait. The only hard zero in the probabilistic model."""
+    if not no_chance(tile_type, seen):
+        return False
+    if tile_type < N_SUITED_TYPES and not walls_every_run(tile_type, seen):
+        return False
+    return not _orphans_wait_open(view, opponent_seat, tile_type, seen)
 
 
 def is_genbutsu(view: SeatView, opponent_seat: int, tile_type: int) -> bool:
@@ -189,15 +237,17 @@ def wall_pressure_multiplier(wall_remaining: int) -> float:
 
 def deal_in_probability(view: SeatView, opponent_seat: int, tile_type: int) -> float:
     """`P(deal_in | tile)` against one opponent, all signals folded into one `[0, 1]` estimate
-    (`no_chance` the only hard override). Genbutsu/suji are mutually exclusive -- suji only
+    (`_provably_safe` the only hard override). Genbutsu/suji are mutually exclusive -- suji only
     checked when genbutsu doesn't already apply, since genbutsu is the stronger read."""
     seen = seen34(view)
-    if no_chance(tile_type, seen):
+    if _provably_safe(view, opponent_seat, tile_type, seen):
         return 0.0
 
     p = _BASE_RATE
-    live = 4 - seen[tile_type]
-    if live == 1:
+    live = COPIES_PER_TYPE - seen[tile_type]
+    if live <= 0:
+        p *= _NO_CHANCE_FACTOR
+    elif live == 1:
         p *= _ONE_CHANCE_FACTOR
 
     if is_genbutsu(view, opponent_seat, tile_type):

@@ -246,7 +246,7 @@ candidate has drifted back toward pure-efficiency play.
 
 **Heuristic only — statistical evidence, not proof.** HK has no furiten: a player may win on a tile
 they themselves discarded. Every signal below is a likelihood shift, not a hard filter (except
-no-chance).
+a provably blocked wait, item 3).
 
 1. **Genbutsu — weak in HK.** In riichi, furiten makes a tile in an opponent's own pool provably
    safe against them. Without furiten, an opponent can win on a tile identical to one they
@@ -255,8 +255,22 @@ no-chance).
    **never an `is_safe(tile)` boolean.**
 2. **Suji — weaker still.** Its force in riichi comes entirely from furiten. A low-confidence prior,
    weighted below genbutsu.
-3. **One-chance / no-chance** — if all four 3s are visible, nobody has a 4-5 wait needing a 3. A
-   hard constraint (tile counts, not psychology).
+3. **One-chance / no-chance** — tile counts, not psychology. `seen34` includes your own hand, so
+   "every copy accounted for" (`no_chance`) means no opponent holds the tile concealed. That rules
+   out only the waits that need a held copy: pair/pung (shanpon), tanki, Seven Pairs. It does
+   **not** rule out a run wait *through* the tile (3m+5m waits on 4m holding no 4m) or Thirteen
+   Orphans' single wait, and since you can only discard a tile you hold, no-chance on a discard
+   always means you hold a copy. The hard zero (`_provably_safe`) therefore needs all three:
+
+   | Wait shape on tile `t` | Blocked when |
+   | --- | --- |
+   | pair / pung / tanki / Seven Pairs | `no_chance(t)`: every copy of `t` accounted for |
+   | run (ryanmen, kanchan, penchan) | `walls_every_run(t)`: each run containing `t` has another tile with every copy accounted for (every 3p and 5p visible walls 234p, 345p and 456p, so no run waits on 4p); honors have no runs |
+   | Thirteen Orphans (orphan `t` only) | the opponent has an exposed meld, or another orphan type has every copy accounted for |
+
+   No-chance with a run still open scales the estimate by `_NO_CHANCE_FACTOR` (0.2, below
+   one-chance's 0.4, which still allows tanki/shanpon). `walls_every_run` is also learn mode's
+   `NO_CHANCE` reason check (`app/lessons/grade.py`).
 4. **Meld reading** — three melds in one suit plus honor discards means half flush; a dragon pung on
    the table makes the next dragon expensive.
 5. **Discard tempo** — fast discards, then a long think and a middle-tile discard, often marks a
@@ -264,14 +278,14 @@ no-chance).
 6. **Wall pressure** — fewer tiles left means a higher deal-in cost per discard.
 
 `server/bots/safety.py` implements all six as bounded multipliers on a baseline deal-in rate
-(`no_chance` the sole hard-zero override), combined into `tile_risk = Σ P(deal_in | tile) ×
+(`_provably_safe` the sole hard-zero override), combined into `tile_risk = Σ P(deal_in | tile) ×
 expected_cost` over opponents. **Hand-tuned, not trained.** A logistic regression over these
 features, fit on labelled self-play logs, is the better model — and matters more in HK than riichi
 because signals 1–2 are structurally weaker — but needs a labelled corpus first
 ([ml.md](ml.md)). `tests/test_safety.py` pins each signal's *direction*, not its calibration.
 
 Learn-mode puzzles grade safety exactly, never with `tile_risk`: `app/lessons/grade.py`'s
-`safe_discard` reduces each discard against the real hands, and uses `is_genbutsu`/`no_chance`
+`safe_discard` reduces each discard against the real hands, and uses `is_genbutsu`/`no_chance`/`walls_every_run`
 only to check the author's stated reason ([ADR 0025](decisions/0025-learn-mode.md)).
 
 `opponent_threat_level` (meld count × 0.3 + a tempo bump, against `_THREAT_THRESHOLD = 0.3`) feeds
@@ -542,7 +556,6 @@ gate run).
 
 | Issue | Where | Status |
 | --- | --- | --- |
-| **`no_chance` counts the observer's own tiles.** `deal_in_probability` returns 0 when `seen34(view)[t] >= 4`, and `seen34` includes the candidate tile itself, so when the other three copies are visible the opponent can still win on this discard yet it scores 0 (3.4% of 32,080 sampled candidate discards). Fix: count `seen34` minus the candidate copy | `bots/safety.py` | unfixed: `FaanBot` is the RL evaluation baseline ([ml.md §12](ml.md)), so change it between gate runs, not during one |
 | `FaanBot` vs `EfficiencyBot` points CI includes zero | §7 | open tuning work |
 | `_act_on_turn`'s kong loop never fires. Shanten is monotonic in a tile type's count, so removing one copy from a complete group can never lower it, and `s < best_kong_shanten` is never true — no tier voluntarily declares a self-kong. Kong-rob avoidance (§9) guards a branch that is currently unreachable | `bots/faanbot.py` | known; harmless today |
 | `kong_rob_risk` reuses `_exact_deal_in_faan`, which hardcodes `is_robbing_kong=False`, so a hand one faan short that 搶槓's +1 would lift over `min_faan` reads as safe | `bots/safety.py` | accepted; narrow and rare |

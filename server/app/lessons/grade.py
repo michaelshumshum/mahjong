@@ -15,7 +15,7 @@ from app.lessons.model import Puzzle, PuzzleKind, SafeReason
 from app.lessons.position import build_position, discard_on
 from app.views import SeatView, seat_view
 from bots.features import is_closed, seen34
-from bots.safety import is_genbutsu, no_chance
+from bots.safety import is_genbutsu, no_chance, walls_every_run
 from mahjong_core.actions import (
     Discard,
     build_scoring_context,
@@ -29,9 +29,7 @@ from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import ClaimKind, GameState, Phase, SeatState, WinType
 from mahjong_core.tiles import (
     COPIES_PER_TYPE,
-    N_SUITED_TYPES,
     N_TILE_TYPES,
-    RANKS_PER_SUIT,
     TileId,
     TileType,
     parse_tile,
@@ -39,8 +37,6 @@ from mahjong_core.tiles import (
     tile_id_type,
     tile_ids_for_type,
 )
-
-_RUN_LENGTH = 3
 
 
 @dataclass(frozen=True)
@@ -262,18 +258,6 @@ def count_faan(state: GameState, seat: int) -> CountFaanKey:
     )
 
 
-def _walls_every_run(tile_type: int, visible: list[int]) -> bool:
-    if tile_type >= N_SUITED_TYPES:
-        return False
-    rank = tile_type % RANKS_PER_SUIT
-    suit = tile_type - rank
-    for start in range(max(0, rank - _RUN_LENGTH + 1), min(rank, RANKS_PER_SUIT - _RUN_LENGTH) + 1):
-        others = (suit + start + i for i in range(_RUN_LENGTH) if start + i != rank)
-        if not any(no_chance(other, visible) for other in others):
-            return False
-    return True
-
-
 def _reasons(
     view: SeatView, visible: list[int], seat: int, tile_type: int
 ) -> tuple[SafeReason, ...]:
@@ -285,7 +269,7 @@ def _reasons(
         ),
         # bots.safety.no_chance is the plain every-copy-visible count
         SafeReason.ALL_COPIES_VISIBLE: no_chance(tile_type, visible),
-        SafeReason.NO_CHANCE: _walls_every_run(tile_type, visible),
+        SafeReason.NO_CHANCE: walls_every_run(tile_type, visible),
     }
     return tuple(r for r in SafeReason if holds[r])
 
