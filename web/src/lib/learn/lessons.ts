@@ -45,8 +45,7 @@ export const BAND_LABEL: Record<Band, () => string> = {
 
 export const SAFE_REASON_LABEL: Record<SafeReason, () => string> = {
 	all_copies_visible: m.learn_reasonAllCopiesVisible,
-	no_chance: m.learn_reasonNoChance,
-	genbutsu: m.learn_reasonGenbutsu
+	no_chance: m.learn_reasonNoChance
 };
 
 // a mined puzzle's title (docs/frontend.md §7 "Learn"); listed by hand so the messages tree-shake.
@@ -67,7 +66,6 @@ export const THEME_LABEL: Record<PuzzleTheme, () => string> = {
 	cut_floater: m.learn_themeCutFloater,
 	break_pair: m.learn_themeBreakPair,
 	most_tiles: m.learn_themeMostTiles,
-	genbutsu: m.learn_themeGenbutsu,
 	walled_runs: m.learn_themeWalledRuns,
 	dead_honour: m.learn_themeDeadHonour,
 	all_visible: m.learn_themeAllVisible,

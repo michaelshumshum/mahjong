@@ -84,11 +84,6 @@ export const LESSON_TEXT: Record<string, LessonText> = {
 		prompt: m.lesson_minedDefenceNoChance_prompt,
 		explain: m.lesson_minedDefenceNoChance_explain
 	},
-	minedDefenceGenbutsu: {
-		title: m.lesson_minedDefenceGenbutsu_title,
-		prompt: m.lesson_minedDefenceGenbutsu_prompt,
-		explain: m.lesson_minedDefenceGenbutsu_explain
-	},
 	minedFaanSelfDraw: {
 		title: m.lesson_minedFaanSelfDraw_title,
 		prompt: m.lesson_minedFaanSelfDraw_prompt,
