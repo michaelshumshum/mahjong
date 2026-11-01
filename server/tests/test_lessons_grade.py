@@ -10,11 +10,12 @@ from app.lessons.grade import (
     WinningTilesKey,
     best_discard,
     count_faan,
+    reaches_min_faan,
     safe_discard,
     safe_options,
     winning_tiles,
 )
-from app.lessons.model import LESSON_RULESET, MeldSetup, SafeReason, SeatSetup
+from app.lessons.model import LESSON_RULESET, MeldSetup, Position, SafeReason, SeatSetup
 from app.lessons.position import build_position
 from mahjong_core.actions import ClaimWin, DeclareWin, Discard, Pass
 from mahjong_core.engine import reduce
@@ -23,7 +24,7 @@ from mahjong_core.melds import MeldKind
 from mahjong_core.scoring.patterns import seat_wind_for
 from mahjong_core.state import Phase, WinType
 from mahjong_core.tiles import TileType, parse_tile, parse_tiles, tile_id_type
-from tests.lesson_positions import DEDUCED, DEFENCE, ORPHANS
+from tests.lesson_positions import DEDUCED, DEFENCE, ORPHANS, SOLE_TENPAI, one_route
 from tests.lesson_positions import PIN as _PIN
 from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
@@ -117,6 +118,25 @@ def test_best_discard(others: dict[str, SeatSetup], correct: tuple[str, ...]) ->
     by_tile = {o.tile: o for o in key.options}
     assert by_tile["1p"].shanten == 1
     assert by_tile["1m"].shanten > 1
+
+
+@pytest.mark.parametrize(
+    ("position", "tile", "reaches"),
+    [
+        # the chows and a self-draw make 2: only a flush clears 3, and 7p leaves 8m, 2s, 6s
+        pytest.param(one_route("3f4f"), "7p", False, id="cut-keeps-off-suit-tiles"),
+        pytest.param(one_route("3f4f"), "8m", True, id="cut-heads-for-the-flush"),
+        pytest.param(one_route(""), "7p", True, id="no-flowers-is-the-third-faan"),
+        pytest.param(SOLE_TENPAI, "1s", True, id="ready-on-a-full-flush"),
+    ],
+)
+def test_reaches_min_faan(position: Position, tile: str, reaches: bool) -> None:
+    assert reaches_min_faan(build_position(position), 0, tile) is reaches
+
+
+def test_reaches_min_faan_rejects_a_tile_not_held() -> None:
+    with pytest.raises(ValueError):
+        reaches_min_faan(build_position(SOLE_TENPAI), 0, "5m")
 
 
 def test_best_discard_keeps_exposed_melds_fixed() -> None:

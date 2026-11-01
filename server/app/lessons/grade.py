@@ -226,6 +226,58 @@ def best_discard(state: GameState, seat: int) -> BestDiscardKey:
     )
 
 
+def reaches_min_faan(state: GameState, seat: int, tile: str) -> bool:
+    """Whether discarding `tile` keeps a win that clears `min_faan` within the hand's shortest
+    route: every live draw that lowers shanten, each with a discard that keeps it lowered, down
+    to ready, where some live wait must clear the minimum by discard or self-draw
+    (`winning_tiles`). Draws stand in for claims, which hold the same tiles. Bounded by the
+    shanten after the discard (the miner keeps ≤ 2); the miner's value filter (ADR 0025)."""
+    seat_state = state.seats[seat]
+    discard = int(parse_tile(tile))
+    held = [t for t in seat_state.concealed if tile_id_type(t) == discard]
+    if not held:
+        raise ValueError(f"seat {seat} holds no {tile}")
+    concealed = tuple(t for t in seat_state.concealed if t != held[0])
+    hand_sets = state.ruleset.hand_sets
+    melds = len(seat_state.melds)
+    closed = not seat_state.melds
+    live = [COPIES_PER_TYPE - n for n in _visible34(seat_view(state, seat))]
+
+    def with_hand(hand: tuple[TileId, ...]) -> GameState:
+        seats = list(state.seats)
+        seats[seat] = dataclasses.replace(seat_state, concealed=hand)
+        return dataclasses.replace(state, seats=tuple(seats))
+
+    def reaches(hand: tuple[TileId, ...], steps: int) -> bool:
+        if steps == 0:
+            return bool(winning_tiles(with_hand(hand), seat).correct)
+        hand34 = [0] * N_TILE_TYPES
+        for t in hand:
+            hand34[int(tile_id_type(t))] += 1
+        for draw in range(N_TILE_TYPES):
+            tile_id = _free_id(draw, dataclasses.replace(seat_state, concealed=hand))
+            if live[draw] <= 0 or tile_id is None:
+                continue
+            hand34[draw] += 1
+            live[draw] -= 1
+            for cut in sorted({int(tile_id_type(t)) for t in hand} - {draw}):
+                hand34[cut] -= 1
+                lower = shanten(hand34, closed=closed, hand_sets=hand_sets, melds=melds) < steps
+                hand34[cut] += 1
+                cut_id = next(t for t in hand if tile_id_type(t) == cut)
+                if lower and reaches((*(t for t in hand if t != cut_id), tile_id), steps - 1):
+                    live[draw] += 1
+                    return True
+            hand34[draw] -= 1
+            live[draw] += 1
+        return False
+
+    hand34 = [0] * N_TILE_TYPES
+    for t in concealed:
+        hand34[int(tile_id_type(t))] += 1
+    return reaches(concealed, shanten(hand34, closed=closed, hand_sets=hand_sets, melds=melds))
+
+
 def count_faan(state: GameState, seat: int) -> CountFaanKey:
     """A won position: `seat` to act holding a winning hand (self-draw), or `seat` offered a win
     in a discard claim window (reduce the feeding `Discard`, ADR 0025 "Claim positions").

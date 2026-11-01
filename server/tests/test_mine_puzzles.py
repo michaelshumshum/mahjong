@@ -18,12 +18,14 @@ from app.lessons.grade import (
     safe_options,
     winning_tiles,
 )
-from app.lessons.model import Band, PuzzleKind, SafeReason, SeatSetup
+from app.lessons.model import Band, Position, PuzzleKind, SafeReason, SeatSetup
+from app.lessons.position import build_position, position_to_dict
 from bots.tiers import BotTier
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import GameState, WinType
 from mahjong_core.tiles import TileType, parse_tiles, tile_code, tile_id_type
 from tests.lesson_positions import PIN as _PIN
+from tests.lesson_positions import SOLE_TENPAI, one_route
 from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
 from tools.mine_puzzles import (
@@ -31,12 +33,15 @@ from tools.mine_puzzles import (
     SAME_HAND_WINDOW,
     SHORTLIST_GAME_CAP,
     band_for,
+    best_discard_band,
     best_discard_ok,
     count_faan_ok,
     decision_score,
+    keeps_value,
     mine,
     naive_discard,
     puzzle_state,
+    recheck,
     safe_choice,
     shortlist,
     varied,
@@ -80,6 +85,71 @@ def test_best_discard_kept_when_the_naive_cut_loses_tiles() -> None:
 def test_best_discard_rejected(hand: str) -> None:
     state = _position(SeatSetup(hand=hand), turn=0)
     assert not best_discard_ok(best_discard(state, 0), _naive(state))
+
+
+def test_sole_tenpai_move_is_a_puzzle_but_beginner() -> None:
+    """The earlier shortlist rated this advanced: few options make T0 miss often."""
+    state = build_position(SOLE_TENPAI)
+    key = best_discard(state, 0)
+    assert key.correct == ("1s",)
+    assert best_discard_ok(key, _naive(state))
+    assert best_discard_band(key, 0.9) == Band.BEGINNER
+
+
+def _key(*options: tuple[str, int, int]) -> BestDiscardKey:
+    opts = tuple(DiscardOption(t, s, 1, n) for t, s, n in options)
+    best = min((o.shanten, -o.tiles) for o in opts)
+    return BestDiscardKey(tuple(o.tile for o in opts if (o.shanten, -o.tiles) == best), opts)
+
+
+@pytest.mark.parametrize(
+    ("key", "score", "band"),
+    [
+        pytest.param(_key(("1m", 1, 20), ("9p", 2, 30)), 0.9, Band.INTERMEDIATE, id="sole-drop"),
+        pytest.param(_key(("1m", 1, 20), ("9p", 2, 30)), 0.1, Band.BEGINNER, id="sole-drop-easy"),
+        pytest.param(_key(("1m", 0, 8), ("9p", 0, 2)), 0.9, Band.ADVANCED, id="ready-two-ways"),
+        pytest.param(_key(("1m", 1, 20), ("9p", 1, 12)), 0.9, Band.ADVANCED, id="count-tiles"),
+        pytest.param(
+            _key(("1m", 0, 8), ("9p", 0, 8), ("5s", 1, 30)), 0.9, Band.BEGINNER, id="tied-ready"
+        ),
+    ],
+)
+def test_best_discard_band_caps_a_sole_shanten_drop(
+    key: BestDiscardKey, score: float, band: Band
+) -> None:
+    assert best_discard_band(key, score) == band
+
+
+def test_best_discard_rejected_when_the_answer_abandons_the_only_route() -> None:
+    state = build_position(one_route("3f4f"))
+    key = best_discard(state, 0)
+    assert "7p" in key.correct
+    assert not keeps_value(state, key)
+    flowerless = build_position(one_route(""))
+    assert keeps_value(flowerless, best_discard(flowerless, 0))
+
+
+def _discard_record(spec: Position, game: int) -> dict[str, Any]:
+    key = best_discard(build_position(spec), 0)
+    return {
+        "kind": PuzzleKind.BEST_DISCARD,
+        "position": position_to_dict(spec),
+        "discard": None,
+        "key": {**dataclasses.asdict(key), "naive": "z1"},
+        "difficulty": {"band": Band.ADVANCED, "score": 0.9, "rates": {BotTier.T4: 1.0}},
+        "source": {"game_seed": game, "seat": 0, "decision": 0},
+    }
+
+
+def test_recheck_refilters_and_rebands_stored_records() -> None:
+    """`--from` reads bands and keys as mined; recheck applies the value filter and band cap."""
+    waits = _cut_record(PuzzleKind.WINNING_TILES, 3, 0, 0)
+    records = [_discard_record(one_route("3f4f"), 1), _discard_record(SOLE_TENPAI, 2), waits]
+    kept, stats = recheck(records, workers=1)
+    assert [r["source"]["game_seed"] for r in kept] == [2, 3]
+    assert kept[0]["difficulty"]["band"] == Band.BEGINNER
+    assert kept[1] is waits
+    assert stats == {"value_rejected": 1, "rebanded": 1}
 
 
 def test_best_discard_rejected_on_a_thin_ukeire_lead() -> None:

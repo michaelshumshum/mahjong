@@ -52,6 +52,41 @@ ORPHANS = Position(
 )
 
 
+def one_route(flowers: str) -> Position:
+    """Seat 0 holds two exposed dots chows; 7p is the most efficient cut but keeps off-suit 8m,
+    2s and 6s. With two flowers that aren't its own, a flush is its only way to 3 faan; with
+    none, 無花 + 平糊 + self-draw get there too."""
+    chows = tuple(MeldSetup(MeldKind.CHOW, t, from_seat=3) for t in ("789p", "456p"))
+    return Position(
+        seats=(
+            SeatSetup(hand="8m12347p26s", melds=chows, flowers=flowers),
+            SeatSetup(hand="2233445566778m"),
+            SeatSetup(hand="1122334455667z"),
+            SeatSetup(hand="99m3345577889s7z"),
+        ),
+        turn=0,
+    )
+
+
+# full flush, three exposed melds: 1s is the only discard that reaches ready (2s pair, 67s)
+SOLE_TENPAI = Position(
+    seats=(
+        SeatSetup(
+            hand="12267s",
+            melds=(
+                MeldSetup(MeldKind.CHOW, "345s", from_seat=3),
+                MeldSetup(MeldKind.PUNG, "999s", from_seat=2),
+                MeldSetup(MeldKind.CHOW, "789s", from_seat=3),
+            ),
+        ),
+        SeatSetup(hand="2233445566778m"),
+        SeatSetup(hand="1122334455667z"),
+        SeatSetup(hand="99m1122334455p7z"),
+    ),
+    turn=0,
+)
+
+
 def _filler(spec: str, to_act: bool) -> SeatSetup:
     return SeatSetup(hand=spec if to_act else spec[:-2] + spec[-1])
 

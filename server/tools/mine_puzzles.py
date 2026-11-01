@@ -38,6 +38,8 @@ from app.lessons.grade import (
     WinningTilesKey,
     best_discard,
     count_faan,
+    key_from_dict,
+    reaches_min_faan,
     safe_discard,
     safe_options,
     winning_tiles,
@@ -149,6 +151,25 @@ def naive_discard(hand: Iterable[TileType]) -> TileType:
     return TileType(min((t for t in range(len(counts)) if counts[t]), key=order))
 
 
+def best_discard_band(key: BestDiscardKey, score: float) -> Band:
+    """`band_for` the score, capped where shanten alone decides: when every wrong discard ends
+    further from ready than the answer, ready (shanten 0) is beginner and 1-2 at most
+    intermediate (adr 0025 "difficulty, decision kinds")."""
+    band = band_for(score, DECISION_BANDS[PuzzleKind.BEST_DISCARD])
+    best = min(o.shanten for o in key.options)
+    if any(o.shanten == best for o in key.options if o.tile not in key.correct):
+        return band
+    cap = Band.BEGINNER if best <= 0 else Band.INTERMEDIATE
+    order = list(Band)
+    return order[min(order.index(band), order.index(cap))]
+
+
+def keeps_value(state: GameState, key: BestDiscardKey) -> bool:
+    """Every answer keeps a route to `min_faan` (`reaches_min_faan`): efficiency must not grade
+    a discard that leaves the hand unable to win as right."""
+    return all(reaches_min_faan(state, 0, tile) for tile in key.correct)
+
+
 def best_discard_ok(key: BestDiscardKey, naive: str) -> bool:
     best = min(o.shanten for o in key.options)
     if best > MAX_SHANTEN or not 1 <= len(key.correct) <= MAX_CORRECT or naive in key.correct:
@@ -240,6 +261,44 @@ def puzzle_state(record: Mapping[str, Any]) -> GameState:
     return state if record["discard"] is None else discard_on(state, record["discard"])
 
 
+def _record_keeps_value(record: Mapping[str, Any]) -> bool:
+    key = key_from_dict(PuzzleKind.BEST_DISCARD, record["key"])
+    assert isinstance(key, BestDiscardKey)
+    return keeps_value(puzzle_state(record), key)
+
+
+def recheck(
+    records: Sequence[dict[str, Any]], workers: int
+) -> tuple[list[dict[str, Any]], Counter[str]]:
+    """What `--from` re-applies, since a stored record keeps the band and filters it was mined
+    under: drops a `best_discard` that fails `keeps_value` and re-bands the rest by
+    `best_discard_band` on the stored score. Both read only the stored key and position."""
+    discards = [r for r in records if r["kind"] == PuzzleKind.BEST_DISCARD]
+    if workers <= 1:
+        verdicts = list(map(_record_keeps_value, discards))
+    else:
+        with ProcessPoolExecutor(workers, mp_context=get_context("spawn")) as executor:
+            verdicts = list(executor.map(_record_keeps_value, discards, chunksize=200))
+    keeps = {id(r): ok for r, ok in zip(discards, verdicts, strict=True)}
+    stats: Counter[str] = Counter()
+    out: list[dict[str, Any]] = []
+    for record in records:
+        if record["kind"] != PuzzleKind.BEST_DISCARD:
+            out.append(record)
+            continue
+        if not keeps[id(record)]:
+            stats["value_rejected"] += 1
+            continue
+        key = key_from_dict(PuzzleKind.BEST_DISCARD, record["key"])
+        assert isinstance(key, BestDiscardKey)
+        band = best_discard_band(key, record["difficulty"]["score"])
+        if band != record["difficulty"]["band"]:
+            stats["rebanded"] += 1
+            record = {**record, "difficulty": {**record["difficulty"], "band": band}}
+        out.append(record)
+    return out, stats
+
+
 @dataclass(frozen=True)
 class Source:
     game_seed: int
@@ -313,7 +372,10 @@ class _Miner:
     ) -> None:  # fmt: skip
         rates = tier_rates(rebuilt, correct, self.rate_tiers, seed)
         score = decision_score(kind, rates)
-        band = band_for(score, DECISION_BANDS[kind])
+        if isinstance(key, BestDiscardKey):
+            band = best_discard_band(key, score)
+        else:
+            band = band_for(score, DECISION_BANDS[kind])
         difficulty = {"band": band, "score": score, "rates": rates}
         record = _record(kind, state, src, seed, key, difficulty, self.play_tier, extra=extra)
         self._keep(record, rebuilt)
@@ -341,7 +403,7 @@ class _Miner:
             return
         key = best_discard(rebuilt, 0)
         naive = tile_code(naive_discard(tile_id_type(t) for t in rebuilt.seats[0].concealed))
-        if best_discard_ok(key, naive):
+        if best_discard_ok(key, naive) and keeps_value(rebuilt, key):
             extra = {"naive": naive}
             self._decision(PuzzleKind.BEST_DISCARD, state, src, seed, rebuilt, key, key.correct,
                            extra)  # fmt: skip
@@ -617,6 +679,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.from_ is not None:
         with args.from_.open() as f:
             records = [json.loads(line) for line in f]
+        records, stats = recheck(records, args.workers)
         play_tier = records[0]["miner_tier"]
         game_seeds = [r["source"]["game_seed"] for r in records]
         seed_range = [min(game_seeds), max(game_seeds)]
