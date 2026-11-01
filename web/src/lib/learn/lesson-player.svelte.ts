@@ -74,27 +74,8 @@ function withoutDeadlines(state: ClientGameState): ClientGameState {
 	};
 }
 
-function sameTiles(a: readonly number[], b: readonly number[]): boolean {
-	return a.length === b.length && a.every((id) => b.includes(id));
-}
-
-// a resync can't carry the held-apart tile, the newest discard or the open window's id and offer
-// (claim_options are per seat); the stream before it can (docs/frontend.md §7 "Learn").
 function applySnapshot(prev: ClientGameState, snapshot: StateSync): ClientGameState {
-	const next = reduce(prev, snapshot);
-	const windowId = next.legalActions.find((a) => typeof a.window_id === 'number')?.window_id;
-	const sameWindow = next.claimOffer !== null && prev.claimOffer?.windowId === windowId;
-	const lastDiscard =
-		next.lastDiscard ??
-		(prev.lastDiscard && next.discardPools[prev.lastDiscard.seat].includes(prev.lastDiscard.tileId)
-			? prev.lastDiscard
-			: null);
-	return withSeatNames({
-		...next,
-		drawnTileId: sameTiles(prev.ownHand, next.ownHand) ? prev.drawnTileId : next.drawnTileId,
-		claimOffer: sameWindow ? prev.claimOffer : next.claimOffer,
-		lastDiscard
-	});
+	return withSeatNames(reduce(prev, snapshot));
 }
 
 function applyFrames(state: ClientGameState, frames: readonly ServerEvent[]): ClientGameState {

@@ -1037,10 +1037,9 @@ starts from `start` and goes through the same `viewFromClientState` → `TableSc
   option's tiles inside the scripted meld by type, so a pung where a kong is scripted is wrong;
   `pass` matches only a scripted pass. A wrong discard remounts the scene, as a graded puzzle tap
   does, to drop the pending tile.
-- **Snapshot vs stream.** A `state_sync` can't say which tile is held apart (it guesses the last
-  one, wrong after a claim), which discard is newest, or the open window's id and offer (its
-  `claim_options` are per seat, not `claim_offer`'s options). Applying a snapshot keeps those
-  from the stream before it.
+- **Snapshot vs stream.** An `expect` snapshot is a plain `reduce()`, no carry-over: it holds
+  the drawn tile, newest discard and claim offer itself (§6 "`state_sync` and resync"), and
+  `lesson-player.svelte.spec.ts` pins that each lands where the stream before it did.
 - **No clock.** Tutorial deadlines are 0, which would read as expired: every ring at once, and a
   claim dialog that auto-passes the moment it opens. The player nulls `deadlineTs`,
   `claimOffer.deadlineTs` and `handEndDeadlineTs` after every frame, so the hub has no turn ring

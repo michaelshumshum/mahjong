@@ -3,6 +3,8 @@ import tutorialJson from './generated/basics-tutorial.json';
 import type { Tutorial } from './generated/lessons';
 import { LessonPlayer, intentMatches } from './lesson-player.svelte';
 import { loadProgress } from './progress';
+import { initialClientGameState } from '$lib/game/state';
+import { reduce } from '$lib/net/reducer';
 import { legalClaimOptions } from '$lib/table/legal-actions';
 import { viewFromClientState } from '$lib/table/live-view';
 import { loadOnboarding } from '$lib/ui/settings-storage';
@@ -28,6 +30,22 @@ afterEach(() => {
 // the hand's tiles by type: the script names one copy, the player may click another.
 const PUNG_TILES = [108, 109];
 const CHOW_TILES = [8, 16];
+
+describe('tutorial snapshots', () => {
+	it('each expect snapshot alone lands where the stream before it did', () => {
+		let state = reduce(initialClientGameState(), tutorial.start);
+		for (const step of tutorial.steps) {
+			if (step.kind === 'expect') {
+				const synced = reduce(initialClientGameState(), step.snapshot);
+				expect(synced.drawnTileId).toBe(state.drawnTileId);
+				expect(synced.claimOffer).toEqual(state.claimOffer);
+				expect(synced.lastDiscard).toEqual(state.lastDiscard);
+				expect(synced.ownHand.slice().sort()).toEqual(state.ownHand.slice().sort());
+			}
+			if (step.kind !== 'narrate') state = step.frames.reduce(reduce, state);
+		}
+	});
+});
 
 describe('LessonPlayer', () => {
 	it('starts on the first tip, from the tutorial start position with seats named', () => {
