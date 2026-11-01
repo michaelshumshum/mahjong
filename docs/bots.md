@@ -316,7 +316,7 @@ The ladder is ordered by strength, `hk_classic` points/hand (paired, 95% CI):
 
 | Comparison | Result | Source |
 | --- | --- | --- |
-| Normal vs Easy | `T2` ×1 vs `T1` ×3: +2.67 points/game [+1.92, +3.42] | §7 |
+| Normal vs Easy | `T2` ×1 vs `T1` ×3: +1.29 points/game [+0.70, +1.88] | §7 |
 | Expert vs Normal | `T4` ×1 vs `T2` ×3: +10.75 [+9.64, +11.86] | [ml.md §14](ml.md) R4 |
 | Impossible vs Expert | `ORACLE` ×1 vs `T4` ×3: +3.60 [+3.15, +4.06]; `T4` ×1 vs `ORACLE` ×3: −4.51 [−5.15, −3.88] | §9 |
 
@@ -367,24 +367,28 @@ python -m bots.arena --a <candidate> --b FaanBot --games 200 --seed 1000000 --pa
 
 ### Current numbers: `FaanBot` vs `EfficiencyBot`
 
-`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1000 --seed 1 --parallel 4` (1000
-duplicate sets = 4000 games), engine 1.3.0, `hk_classic`. Shipped weights: `bots/faanbot.py`'s
-`_weights_for_turn` (its docstring carries the tuning history).
+`python -m bots.arena --a FaanBot --b EfficiencyBot --games 1500 --seed 30000000 --parallel 12`
+(1500 duplicate sets = 6000 games), engine 1.3.0, `hk_classic`, after both bots moved to exact
+shanten (§3) and the no-chance fix (§5). Shipped weights: `bots/faanbot.py`'s `_weights_for_turn`
+(its docstring carries the tuning history).
 
 | Metric | FaanBot (A) | EfficiencyBot (B) |
 | --- | --- | --- |
-| win_rate | 0.1974 | 0.1632 |
-| deal_in_rate | 0.0416 | 0.0685 |
-| avg_winning_faan | 3.3029 | 3.2179 |
-| tenpai_at_draw_rate | 0.6084 | 0.9869 |
-| tenpai_rate_on_sub_minimum_hand | 0.0394 | 0.3374 |
-| avg_points_per_hand | 0.5002 | -0.1668 |
+| win_rate | 0.1913 | 0.1749 |
+| deal_in_rate | 0.0449 | 0.0696 |
+| avg_winning_faan | 3.3020 | 3.1990 |
+| tenpai_at_draw_rate | 0.6080 | 0.9842 |
+| tenpai_rate_on_sub_minimum_hand | 0.0451 | 0.3202 |
+| avg_points_per_hand | 0.2415 | -0.0805 |
 
-Paired difference (A − B): **+2.668 points/game, 95% CI [+1.916, +3.420]**: `FaanBot` clears the
+Paired difference (A − B): **+1.288 points/game, 95% CI [+0.695, +1.881]**: `FaanBot` clears the
 merge gate against `T1`. It wins more, deals in less, and almost never sits tenpai on a hand that
-can't reach `min_faan` (0.04 vs 0.34). Exhaustive draws are ~31% of hands, about double the
-engine-1.0.0 table, because far fewer hands reach 3 faan without 缺一門. The engine-1.0.0 numbers,
-where the CI still spanned zero, are in [ADR 0020](decisions/0020-hk-scoring-table-alignment.md).
+can't reach `min_faan` (0.05 vs 0.32). The gap narrowed from +2.42 on the same seeds because exact
+shanten made `T1` stronger (+1.32 points/game against a fixed `LearnedBot` table), not `T2`
+weaker ([ADR 0027](decisions/0027-bot-exact-shanten-and-no-chance.md)). Exhaustive draws are ~31%
+of hands, about double the engine-1.0.0 table, because far fewer hands reach 3 faan without 缺一門.
+The engine-1.0.0 numbers, where the CI still spanned zero, are in
+[ADR 0020](decisions/0020-hk-scoring-table-alignment.md).
 
 ## 8. Ruleset awareness
 
