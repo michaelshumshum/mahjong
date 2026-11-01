@@ -116,3 +116,17 @@ def test_pool_generation_is_deterministic_and_regrades() -> None:
     assert rebuilt["puzzles"] == json.loads(json.dumps(first))
     for pooled in (p for ps in pool_from_dict(rebuilt).puzzles.values() for p in ps):
         assert dict(pooled.key) == _key(pooled), pooled.puzzle.id
+
+
+def test_pool_takes_one_puzzle_per_game_per_kind() -> None:
+    """Endless plays one kind at a time, so a game may recur across kinds but not within one."""
+    records, _ = mine([7], 1, BotTier.T2, _TIERS)
+    assert len([r for r in records if r["kind"] == PuzzleKind.BEST_DISCARD]) > 1
+    pooled = pool(records, 2)
+    assert sorted(p["kind"] for p in pooled) == sorted({r["kind"] for r in records})
+
+
+def test_committed_pool_has_one_puzzle_per_game_per_kind() -> None:
+    puzzles = json.loads(POOL_PATH.read_text())["puzzles"]
+    games = [(p["kind"], p["source"]["game_seed"]) for p in puzzles]
+    assert len(games) == len(set(games))

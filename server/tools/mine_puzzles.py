@@ -109,6 +109,10 @@ WINNING_TILES_BANDS = (2, 4)
 COUNT_FAAN_BANDS = (3, 4)
 # endless pool size per kind and band: ~1.1 kB a puzzle (adr 0025 "random endless puzzles")
 POOL_PER_BAND = 100
+# shortlist variety: a game recurs at most this often across all tracks, once per track
+SHORTLIST_GAME_CAP = 2
+# decisions: the same seat this close in one game is the same hand (a hand is ~70-120)
+SAME_HAND_WINDOW = 60
 
 
 def band_for(score: float, bounds: tuple[float, float]) -> Band:
@@ -469,12 +473,51 @@ def _by_band(
     return bands
 
 
+def _fits(record: Mapping[str, Any], same_game: Sequence[Mapping[str, Any]], game_cap: int) -> bool:
+    if len(same_game) >= game_cap or any(t["kind"] == record["kind"] for t in same_game):
+        return False
+    src = record["source"]
+    return not any(
+        t["source"]["seat"] == src["seat"]
+        and abs(t["source"]["decision"] - src["decision"]) <= SAME_HAND_WINDOW
+        for t in same_game
+    )
+
+
+def varied(
+    bands: Sequence[Sequence[Mapping[str, Any]]],
+    n: int,
+    taken: dict[int, list[Mapping[str, Any]]],
+    game_cap: int,
+) -> list[Mapping[str, Any]]:
+    """Up to `n` records round-robin over `bands`, each band skipping ahead past a record whose
+    game already has `game_cap` in `taken`, one of its kind, or its seat's same hand
+    (`SAME_HAND_WINDOW`). Adds what it picks to `taken`, keyed by game seed."""
+    out: list[Mapping[str, Any]] = []
+    at = [0] * len(bands)
+    while len(out) < n and any(i < len(b) for i, b in zip(at, bands, strict=True)):
+        for b, band in enumerate(bands):
+            while at[b] < len(band):
+                record = band[at[b]]
+                at[b] += 1
+                game = record["source"]["game_seed"]
+                if _fits(record, taken.get(game, []), game_cap):
+                    taken.setdefault(game, []).append(record)
+                    out.append(record)
+                    break
+            if len(out) == n:
+                break
+    return out
+
+
 def shortlist(records: Sequence[Mapping[str, Any]], per_kind: int) -> list[Mapping[str, Any]]:
     """Up to `per_kind` per kind, round-robin over bands, then over `_SPREAD` values within a
-    band, in mining order. Deterministic for a given `records`."""
+    band, in mining order, skipping what `varied` refuses against every track taken so far.
+    Deterministic for a given `records`."""
     out: list[Mapping[str, Any]] = []
+    taken: dict[int, list[Mapping[str, Any]]] = {}
     for kind in PuzzleKind:
-        out += list(_round_robin(_by_band(records, kind)))[:per_kind]
+        out += varied(_by_band(records, kind), per_kind, taken, SHORTLIST_GAME_CAP)
     return out
 
 
@@ -500,13 +543,15 @@ def pool_record(record: Mapping[str, Any]) -> dict[str, Any]:
 
 def pool(records: Sequence[Mapping[str, Any]], per_band: int) -> list[dict[str, Any]]:
     """The endless pool: up to `per_band` per kind and band, picked as `shortlist` orders a
-    band. Deterministic for a given `records`."""
-    return [
-        pool_record(r)
-        for kind in PuzzleKind
-        for in_band in _by_band(records, kind)
-        for r in in_band[:per_band]
-    ]
+    band, one per game per kind (`varied` with the kind's own `taken`). Endless plays one kind
+    at a time, so a game recurring across kinds is never seen back to back. Deterministic for a
+    given `records`."""
+    out = []
+    for kind in PuzzleKind:
+        taken: dict[int, list[Mapping[str, Any]]] = {}
+        for in_band in _by_band(records, kind):
+            out += [pool_record(r) for r in varied([in_band], per_band, taken, game_cap=1)]
+    return out
 
 
 def pool_text(puzzles: Sequence[Mapping[str, Any]], meta: Mapping[str, Any]) -> str:

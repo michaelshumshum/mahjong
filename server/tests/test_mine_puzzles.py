@@ -28,6 +28,8 @@ from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
 from tools.mine_puzzles import (
     POLICY_RATE,
+    SAME_HAND_WINDOW,
+    SHORTLIST_GAME_CAP,
     band_for,
     best_discard_ok,
     count_faan_ok,
@@ -36,6 +38,8 @@ from tools.mine_puzzles import (
     naive_discard,
     puzzle_state,
     safe_choice,
+    shortlist,
+    varied,
     winning_tiles_ok,
     winning_tiles_points,
 )
@@ -230,6 +234,74 @@ def test_winning_tiles_points() -> None:
     assert winning_tiles_points(key) == 1
 
 
+_SPREAD_KEY: Mapping[PuzzleKind, dict[str, Any]] = {
+    PuzzleKind.BEST_DISCARD: {"options": [{"shanten": 1}]},
+    PuzzleKind.SAFE_DISCARD: {"reason": SafeReason.NO_CHANCE},
+    PuzzleKind.WINNING_TILES: {"correct": ["1m", "4m"]},
+    PuzzleKind.COUNT_FAAN: {"correct": 3},
+}
+
+
+def _cut_record(kind: PuzzleKind, game: int, seat: int, decision: int) -> dict[str, Any]:
+    """Only the fields the shortlist cut reads."""
+    return {
+        "kind": kind,
+        "difficulty": {"band": Band.BEGINNER, "rates": {BotTier.T4: 1}},
+        "key": _SPREAD_KEY[kind],
+        "source": {"game_seed": game, "seat": seat, "decision": decision},
+    }
+
+
+def _games(records: list[Mapping[str, Any]]) -> list[tuple[str, int, int, int]]:
+    return [
+        (r["kind"], r["source"]["game_seed"], r["source"]["seat"], r["source"]["decision"])
+        for r in records
+    ]
+
+
+def test_shortlist_takes_one_puzzle_per_game_per_kind() -> None:
+    waits = PuzzleKind.WINNING_TILES
+    records = [
+        _cut_record(waits, 1, 0, 10),
+        _cut_record(waits, 1, 1, 400),
+        _cut_record(waits, 1, 2, 800),
+        _cut_record(waits, 2, 0, 10),
+    ]
+    assert _games(shortlist(records, 15)) == [(waits, 1, 0, 10), (waits, 2, 0, 10)]
+
+
+def test_shortlist_caps_puzzles_per_game_across_tracks() -> None:
+    records = [_cut_record(kind, 1, seat, 300 * seat) for seat, kind in enumerate(PuzzleKind)]
+    records.append(_cut_record(PuzzleKind.COUNT_FAAN, 2, 0, 0))
+    cut = _games(shortlist(records, 15))
+    assert [g for _, g, _, _ in cut].count(1) == SHORTLIST_GAME_CAP
+    assert cut[-1] == (PuzzleKind.COUNT_FAAN, 2, 0, 0)
+
+
+def test_shortlist_drops_the_same_hand_in_another_track() -> None:
+    first = _cut_record(PuzzleKind.BEST_DISCARD, 1, 0, 100)
+    same_hand = _cut_record(PuzzleKind.SAFE_DISCARD, 1, 0, 100 + SAME_HAND_WINDOW)
+    other_seat = _cut_record(PuzzleKind.COUNT_FAAN, 1, 1, 100)
+    assert _games(shortlist([first, same_hand], 15)) == _games([first])
+    assert _games(shortlist([first, other_seat], 15)) == _games([first, other_seat])
+    later = _cut_record(PuzzleKind.SAFE_DISCARD, 1, 0, 101 + SAME_HAND_WINDOW)
+    assert _games(shortlist([first, later], 15)) == _games([first, later])
+
+
+def test_varied_skips_within_a_band_and_keeps_the_round_robin() -> None:
+    waits = PuzzleKind.WINNING_TILES
+    beginner = [
+        _cut_record(waits, 1, 0, 0),
+        _cut_record(waits, 1, 1, 500),
+        _cut_record(waits, 2, 0, 0),
+    ]
+    advanced = [_cut_record(waits, 1, 2, 900), _cut_record(waits, 3, 0, 0)]
+    taken: dict[int, list[Mapping[str, Any]]] = {}
+    picked = varied([beginner, advanced], 3, taken, game_cap=1)
+    assert _games(picked) == _games([beginner[0], advanced[1], beginner[2]])
+    assert sorted(taken) == [1, 2, 3]
+
+
 _TIERS = [BotTier.T0, BotTier.T1, BotTier.T2]
 
 
@@ -252,6 +324,16 @@ def test_committed_shortlist_regrades() -> None:
     for record in puzzles:
         assert record["engine_version"] == ENGINE_VERSION
         assert_regrades(record)
+
+
+def test_committed_shortlist_is_varied() -> None:
+    puzzles = _games(json.loads(SHORTLIST_PATH.read_text())["puzzles"])
+    games = [g for _, g, _, _ in puzzles]
+    assert max(games.count(g) for g in games) <= SHORTLIST_GAME_CAP
+    assert len({(k, g) for k, g, _, _ in puzzles}) == len(puzzles)
+    for i, (_, game, seat, decision) in enumerate(puzzles):
+        for _, g, s, d in puzzles[i + 1 :]:
+            assert (g, s) != (game, seat) or abs(d - decision) > SAME_HAND_WINDOW
 
 
 def assert_regrades(record: Mapping[str, Any]) -> None:
