@@ -336,17 +336,10 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
             assert live_frame["seq"] == seq_before + 1
 
 
-def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect() -> None:
-    """A seat that disconnects while its own claim offer is still live forfeits it immediately
-    (docs/decisions/0004-claim-forfeit-on-disconnect.md), so there's nothing left for any later
-    reconnect to hand back.
-
-    Proving the forfeit already landed *before* any reconnect, without racing the server's own
-    event-loop thread (this module's own docstring): seat 1's chow and seat 2's pung are the
-    window's only two offers, so it can only resolve once *both* have a response recorded.
-    Seat 2 sends a real `Pass` after seat 1 disconnects; seat 1 itself never sends anything at
-    all (it's offline). Seeing the window resolve regardless is only possible if seat 1's offer
-    was already forfeited -- there's no other way its response could exist."""
+def test_disconnect_mid_claim_window_reconnect_can_still_answer() -> None:
+    """A seat that disconnects while its own claim offer is still live keeps it
+    (docs/decisions/0004-claim-forfeit-on-disconnect.md): seat 2's `Pass` alone can't resolve
+    the window, and seat 1's reconnect gets a fresh `claim_offer` it answers itself."""
     table_id = f"reconnect-claim-{uuid.uuid4()}"
     with table_client(table_id) as client, client.websocket_connect(f"/ws?table={table_id}") as ws0:
         table = get_table(table_id)
@@ -388,39 +381,35 @@ def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect(
                 "name": "Guest 2",
             }
 
-            # a real Pass from seat 2 -- the window's other, still-open offer -- with seat 1
-            # never sending anything itself (this module's own docstring, above).
             claim_id = next_id()
             ws2.send_json(msg("claim", {"window_id": window_id, "choice": "pass"}, id_=claim_id))
             ack = ws2.receive_json()
             assert ack["d"] == {"id": claim_id, "ok": True}
 
-            resolved = ws2.receive_json()
-            assert resolved["t"] == "claim_resolved"
-            assert resolved["d"] == {
-                "window_id": window_id,
-                "claim_kind": "discard",
-                "seat": None,
-                "action_kind": None,
-            }
-            assert table.state.claim_window is None  # fully resolved, nobody claimed
-
-        # seat 1's claim offer was already forfeited and the window resolved while offline, so
-        # no `claim_offer` appears in the replay -- drain until resume()'s reconnect frame (always last) and check.
+        # the window waits on seat 1; drain until resume()'s reconnect frame, then its offer
         with client.websocket_connect(f"/ws?table={table_id}") as ws1b:
             ws1b.send_json(hello(seat=1, last_seq=seat1_last_seq, secret=seat1_secret))
 
-            seen_types: list[str] = []
             while True:
                 frame = ws1b.receive_json()
-                seen_types.append(frame["t"])
                 if frame["t"] == "seat_state" and frame["d"] == {
                     "seat": 1,
                     "status": "connected",
                     "name": "Guest 2",
                 }:
                     break
-            assert "claim_offer" not in seen_types
+            offer = ws1b.receive_json()
+            assert offer["t"] == "claim_offer"
+            assert offer["d"]["window_id"] == window_id
+            assert table.state.claim_window is not None
+
+            claim_id = next_id()
+            ws1b.send_json(msg("claim", {"window_id": window_id, "choice": "pass"}, id_=claim_id))
+            assert ws1b.receive_json()["d"] == {"id": claim_id, "ok": True}
+            resolved = ws1b.receive_json()
+            assert resolved["t"] == "claim_resolved"
+            assert resolved["d"]["window_id"] == window_id
+            assert resolved["d"]["seat"] is None
 
 
 def test_reconnect_preserves_chosen_name_without_resending_it() -> None:

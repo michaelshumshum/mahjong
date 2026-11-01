@@ -126,7 +126,6 @@ from app.table_types import (
     Command,
     Envelope,
     SeatBinding,
-    SeatDisconnected,
     TableSettings,
     WireSeatStatus,
 )
@@ -361,9 +360,7 @@ class Table:
         self._bot_name_rng = random.Random(game_seed ^ 0x8888)
         self._bot_names_used: set[str] = set()
         self.table_id = table_id
-        self.inbox: asyncio.Queue[Command | BotResult | SeatDisconnected | _WakeUp] = (
-            asyncio.Queue()
-        )
+        self.inbox: asyncio.Queue[Command | BotResult | _WakeUp] = asyncio.Queue()
         self.state: GameState = new_game(ruleset, game_seed)
         self.event_id = 0  # internal id, logging/replay only, never on the wire
         # full-game action log -- every action that ran through reduce(), never start_next_hand().
@@ -385,7 +382,7 @@ class Table:
         self._spectator_close: dict[str, Callable[[], None]] = {}
         self.settings = settings if settings is not None else TableSettings()
         self.deadlines = TimerHeap()  # claim + disconnect + turn deadlines -- see module docstring
-        self._getter: asyncio.Task[Command | BotResult | SeatDisconnected | _WakeUp] | None = (
+        self._getter: asyncio.Task[Command | BotResult | _WakeUp] | None = (
             None  # long-lived, never cancelled
         )
         self._armed_window_id: int | None = None  # last claim_window.window_id given a deadline
@@ -395,6 +392,9 @@ class Table:
         # (window_id, seat) -> the timer id that's actually live for it right now
         self._active_seat_timer: dict[tuple[int, int], int] = {}
         self._claim_deadline_ms: dict[tuple[int, int], int] = {}
+        # (window_id, seat) pairs a resume already gave a fresh deadline -- one each, so a
+        # reconnect loop can't hold a window open
+        self._rearmed_claims: set[tuple[int, int]] = set()
         self._disconnect_timer_seat: dict[int, int] = {}
         self._active_disconnect_timer: dict[int, int] = {}
         # None never ends the table early (showcase, bare test tables)
@@ -646,10 +646,8 @@ class Table:
 
         No-op if the seat isn't bound, or is already `disconnected`/`autoplay`.
 
-        Also enqueues `SeatDisconnected` so this table's own loop can forfeit a live claim offer
-        this seat is mid-decision on, if it has one -- routed through `self.inbox` rather than
-        applied inline, since this method runs on `Session`'s task, not this table's own, and
-        `_apply()` must only ever run from inside this table's loop.
+        A live claim offer this seat holds stays open on its own deadline: a reconnect inside
+        the window can still answer it (docs/decisions/0004-claim-forfeit-on-disconnect.md).
         """
         binding = self.seat_bindings[seat]
         if binding is None or binding.session_id != session_id:
@@ -661,7 +659,6 @@ class Table:
             {"t": "seat_state", "seat": seat, "status": "disconnected", "name": binding.name}
         )
         self._arm_disconnect_timer(seat)
-        self.inbox.put_nowait(SeatDisconnected(seat=seat))
 
     def resume(self, seat: int, last_seq: int | None, *, announce_reconnect: bool = False) -> None:
         """The three-way `hello{last_seq}` branch for a seat that just called `reconnect()`,
@@ -673,8 +670,8 @@ class Table:
           which has moved on).
         - otherwise -- a full `state_sync`, same as `join`.
 
-        Also re-arms this seat's own claim-window deadline first if it holds a live, unresolved
-        offer -- done before the branch above so a `state_sync` picks up the fresh deadline in
+        Also re-arms this seat's own claim-window deadline first (once per window) if it holds a
+        live, unresolved offer -- done before the branch above so a `state_sync` picks up the fresh deadline in
         the same round trip; the live/replay branches instead follow up with one fresh
         `claim_offer`, since a replayed frame is history and must not be mutated in place.
 
@@ -687,7 +684,7 @@ class Table:
         """
         binding = self.seat_bindings[seat]
         assert binding is not None  # reconnect() above already required a bound seat
-        rearmed = self._rearm_seat_claim_timer(seat)
+        offer_live = self._rearm_seat_claim_timer(seat)
         head = self.seat_seq[seat] - 1  # last seq actually sent, or -1 if this seat never got one
         ring = self.ring[seat]
         if last_seq is not None and last_seq == head:
@@ -707,7 +704,7 @@ class Table:
             self._broadcast_wire(
                 {"t": "seat_state", "seat": seat, "status": "connected", "name": binding.name}
             )
-        if rearmed:
+        if offer_live:
             self._send_seat_claim_offer(seat)
 
     def publish_to_seat(
@@ -962,8 +959,6 @@ class Table:
             self._handle(event)
         elif isinstance(event, BotResult):
             self._handle_bot_result(event)
-        elif isinstance(event, SeatDisconnected):
-            self._handle_seat_disconnected(event)
         elif isinstance(event, _WakeUp):
             pass  # nothing to handle -- see _WakeUp's own docstring
         else:
@@ -994,15 +989,15 @@ class Table:
         if self._boundary_this_tick and self._shutdown_boundary is not None:
             self._shutdown_boundary.set()
 
-    async def _inbox_getter(self) -> Command | BotResult | SeatDisconnected | _WakeUp:
+    async def _inbox_getter(self) -> Command | BotResult | _WakeUp:
         return await self.inbox.get()
 
-    def _ensure_getter(self) -> asyncio.Task[Command | BotResult | SeatDisconnected | _WakeUp]:
+    def _ensure_getter(self) -> asyncio.Task[Command | BotResult | _WakeUp]:
         if self._getter is None:
             self._getter = asyncio.create_task(self._inbox_getter())
         return self._getter
 
-    async def _next(self) -> Command | BotResult | SeatDisconnected | _WakeUp | list[int]:
+    async def _next(self) -> Command | BotResult | _WakeUp | list[int]:
         """One long-lived `_inbox_getter()` task for the table's entire lifetime, raced against
         a sleep to `self.deadlines`' soonest entry -- the getter is never cancelled, on either
         branch. When both are ready in the same `asyncio.wait` call, the getter always wins: a
@@ -1453,25 +1448,6 @@ class Table:
             return
         self._apply(Pass(window_id=window_id, seat=seat))
 
-    def _handle_seat_disconnected(self, event: SeatDisconnected) -> None:
-        """`mark_disconnected` enqueued this the moment `event.seat`'s socket closed. If that
-        seat held a live, unresolved claim offer at that instant, forfeit it right now,
-        immediately, not on the claim-window timeout -- same `Pass` path a real timeout uses.
-
-        Why immediately rather than waiting for `resume()` to re-arm on reconnect:
-        docs/decisions/0004-claim-forfeit-on-disconnect.md. Forfeiting on disconnect removes the
-        offer before any reconnect can observe it; a resync that isn't a disconnect (a seq gap,
-        a backpressure collapse) keeps it, and its `state_sync.claim_offer` hands it back.
-
-        No-op if there's no live window, this seat has no offer in it, or it already responded
-        (whichever arrives first at `_apply`'s single-writer ordering wins)."""
-        window = self.state.claim_window
-        if window is None or event.seat in window.responses:
-            return
-        if not any(o.seat == event.seat for o in window.offers):
-            return
-        self._apply(Pass(window_id=window.window_id, seat=event.seat))
-
     def _apply(self, action: Action) -> None:
         """Run one already-authorized `Action` through `reduce()`, publish, and open the
         hand-end hold on `HAND_OVER` -- the common tail shared by a real `Command`, a
@@ -1614,9 +1590,11 @@ class Table:
     def _rearm_seat_claim_timer(self, seat: int) -> bool:
         """If `seat` holds a live, unresolved claim offer, give it a fresh full-length window
         measured from right now -- every other offered seat's deadline is untouched, since each
-        has its own heap entry. Returns whether a re-arm actually happened, so `resume()` knows
-        whether to also push a fresh `claim_offer`. No-op (`False`) if there's no live window,
-        this seat has no offer in it, or it already responded.
+        has its own heap entry. Only the first resume per window re-arms
+        (`_rearmed_claims`); a later one keeps the deadline already armed. Returns whether the
+        seat holds a live offer at all, so `resume()` knows whether to also push a fresh
+        `claim_offer`. `False` if there's no live window, this seat has no offer in it, or it
+        already responded.
 
         Without this re-arm, a seat that disconnects partway through its window and reconnects
         late would get only whatever sliver of the original deadline is left, not a fair chance
@@ -1627,8 +1605,11 @@ class Table:
             return False
         if not any(o.seat == seat for o in window.offers):
             return False
-        self._arm_seat_claim_timer(window.window_id, seat)
-        self._wake()  # out-of-loop call (resume(), via Session) -- see _WakeUp's docstring
+        key = (window.window_id, seat)
+        if key not in self._rearmed_claims:
+            self._rearmed_claims.add(key)
+            self._arm_seat_claim_timer(window.window_id, seat)
+            self._wake()  # out-of-loop call (resume(), via Session) -- see _WakeUp's docstring
         return True
 
     def _send_claim_offers(self, window: ClaimWindow) -> None:

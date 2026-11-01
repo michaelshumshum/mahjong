@@ -170,8 +170,8 @@ async def test_late_bot_result_after_end_is_dropped() -> None:
     submitted = pool.submitted
 
     table.mark_disconnected(1, "seat-1")
-    # _WakeUp + SeatDisconnected, then the deadline armed at the first tick's tail pops
-    for _ in range(3):
+    # _WakeUp, then the deadline armed at the first tick's tail pops
+    for _ in range(2):
         await table.process_one()
     assert table.closed
     assert table._pending_bot == {}

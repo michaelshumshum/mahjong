@@ -242,51 +242,59 @@ async def test_stale_timer_after_early_exit_is_a_noop() -> None:
     assert table.state is resolved_state
 
 
-# --- disconnect mid-claim-window: forfeit immediately, don't wait for reconnect ----------------
+# --- disconnect mid-claim-window: the offer stays open for a reconnect ------------------------
 
 
-async def test_disconnect_mid_claim_window_forfeits_seats_own_offer_only() -> None:
-    """A seat that disconnects while its own claim offer is still live forfeits it right away --
-    `mark_disconnected` enqueues `SeatDisconnected`, and the next `process_one()` tick applies a
-    synthesized `Pass` for it, the same `_apply()` path a claim-window timeout uses
-    (docs/decisions/0004-claim-forfeit-on-disconnect.md). Seat 2's own pung offer, untouched
-    throughout, proves this is seat-scoped, not a window-wide cancellation."""
-    table = await _open_claim_window(DEFAULT_RULESET, game_seed=1)
+async def test_disconnect_mid_claim_window_keeps_the_offer_open() -> None:
+    """docs/decisions/0004-claim-forfeit-on-disconnect.md: a disconnect leaves the seat's
+    offer unanswered on its own deadline, and a reconnect inside the window can claim."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=999)
+    table = await _open_claim_window(ruleset)
     window = table.state.claim_window
     assert window is not None
-    window_id = window.window_id
-    table.join("sess-1", lambda seq, wire: None, seat=1)
+    sent: list[dict[str, object]] = []
+    table.join("sess-2", lambda seq, wire: sent.append(wire), seat=2)
+    secret = table.seat_bindings[2].reconnect_secret  # type: ignore[union-attr]
 
-    table.mark_disconnected(1, "sess-1")
-    # `mark_disconnected` queues _WakeUp then SeatDisconnected -- this single-step driver needs
-    # two ticks (unlike Table.run()'s while loop) to reach the one that forfeits the offer.
-    await table.process_one()
-    await table.process_one()
-
-    window = table.state.claim_window
-    assert window is not None  # seat 2's pung offer is still outstanding
-    assert window.window_id == window_id
-    assert isinstance(window.responses.get(1), Pass)
+    table.mark_disconnected(2, "sess-2")
+    await table.process_one()  # the _WakeUp _arm_disconnect_timer queued
+    assert table.state.claim_window is window
     assert 2 not in window.responses
 
+    sent.clear()
+    table.reconnect(2, "sess-2b", lambda seq, wire: sent.append(wire), secret)
+    table.resume(2, None)
+    sync = next(w for w in sent if w["t"] == "state_sync")
+    offer = sync["claim_offer"]
+    assert isinstance(offer, dict)
+    assert offer["window_id"] == window.window_id
 
-async def test_disconnect_with_no_live_claim_offer_is_a_noop() -> None:
-    """A seat with nothing to forfeit (no offer of its own in the live window, or it already
-    responded) just gets the normal disconnect bookkeeping -- `_handle_seat_disconnected` is a
-    silent no-op, not an error, the same staleness discipline every other synthesized action
-    here uses (`_handle_claim_timeout`'s docstring)."""
-    table = await _open_claim_window(DEFAULT_RULESET, game_seed=1)
-    table.join("sess-3", lambda seq, wire: None, seat=3)  # seat 3 was never offered anything
+    table.submit(2, next(a for a in legal_actions(table.state, 2) if isinstance(a, ClaimPung)))
+    await table.process_one()  # the re-arm's _WakeUp
+    await table.process_one()
+    assert table.state.claim_window is None
+    assert any(m.kind == MeldKind.PUNG for m in table.state.seats[2].melds)
 
-    table.mark_disconnected(3, "sess-3")
-    pre_state = table.state
-    await table.process_one()  # the _WakeUp _arm_disconnect_timer queued: no-op
-    await table.process_one()  # SeatDisconnected(seat=3): nothing to forfeit, no-op
 
-    assert table.state is pre_state
+async def test_only_the_first_resume_in_a_window_extends_the_deadline() -> None:
+    """A reconnect loop can't hold a window open: a second resume keeps the first re-arm's
+    deadline, though it still hands the offer back."""
+    table = await _open_claim_window(DEFAULT_RULESET)
     window = table.state.claim_window
     assert window is not None
-    assert 3 not in window.responses
+    key = (window.window_id, 1)
+    sent: list[dict[str, object]] = []
+    table.join("sess-1", lambda seq, wire: sent.append(wire), seat=1)
+
+    table.resume(1, None)
+    first_timer = table._active_seat_timer[key]
+    sent.clear()
+    table.resume(1, None)
+
+    assert table._active_seat_timer[key] == first_timer
+    sync = next(w for w in sent if w["t"] == "state_sync")
+    assert isinstance(sync["claim_offer"], dict)
+    assert sync["claim_offer"]["deadline_ts"] == table._claim_deadline_ms[key]
 
 
 # --- state_sync resumes the window and the turn on its own (docs/protocol.md §3) ---------------

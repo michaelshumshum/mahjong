@@ -18,7 +18,7 @@ moved on.
 | [0001](0001-guest-only-identity.md) | Guest-only identity | Accepted |
 | [0002](0002-dom-rendering.md) | DOM/CSS rendering, no PixiJS | Accepted |
 | [0003](0003-product-scope.md) | Product scope | Accepted |
-| [0004](0004-claim-forfeit-on-disconnect.md) | A mid-claim-window disconnect forfeits the offer | Accepted |
+| [0004](0004-claim-forfeit-on-disconnect.md) | A mid-claim-window disconnect keeps the offer | Accepted |
 | [0005](0005-client-entropy-fairness.md) | Client-contributed entropy for provable fairness | Deferred |
 | [0006](0006-multi-node-and-durability.md) | Multi-node scaling and mid-game durability | Deferred |
 | [0007](0007-multi-win-and-pao.md) | Multi-win (一炮多響) and responsibility payments (包) | Deferred |

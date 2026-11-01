@@ -17,7 +17,6 @@ __all__ = [
     "Command",
     "Envelope",
     "SeatBinding",
-    "SeatDisconnected",
     "SeatStatus",
     "TableSettings",
     "WireSeatStatus",
@@ -126,14 +125,3 @@ class BotResult:
     seat: int
     tag: BotJobTag
     aid: int
-
-
-@dataclass(frozen=True)
-class SeatDisconnected:
-    """A seat's live socket just closed (`mark_disconnected`, called directly from `Session`,
-    outside this table's own loop). Routed through `Table.inbox` rather than forfeiting the
-    seat's claim inline: forfeiting means calling `_apply()`, which mutates `self.state`, and
-    server/AGENTS.md reserves every `GameState` mutation for this table's own task processing
-    its inbox in order. Handled by `_handle_seat_disconnected`."""
-
-    seat: int

@@ -307,13 +307,14 @@ spectator again" — no seat, no `SeatBinding`, and a spectator's `session_id` i
 client can present back. `unregister_spectator` drops its ring/seq entry when the connection
 closes; reconnecting is a brand-new spectator session with a fresh `state_sync`.
 
-**A mid-claim-window disconnect forfeits the offer** ([architecture.md §8](architecture.md),
-[ADR 0004](decisions/0004-claim-forfeit-on-disconnect.md)), so a reconnect never has anything
-claim-shaped to resolve. A resync that isn't a disconnect — a `hello{last_seq}` on the live
-socket past the ring, a backpressure collapse (§9) — can land mid-window with the offer live:
-`resume()` re-arms the seat's deadline first, and the `state_sync`'s `claim_offer` (§3) carries
-the window id, options and fresh deadline, so the claim buttons come back answerable. The
-ring-replay branch instead follows the replay with one fresh `claim_offer` frame.
+**A mid-claim-window disconnect keeps the offer** ([architecture.md §8](architecture.md),
+[ADR 0004](decisions/0004-claim-forfeit-on-disconnect.md)). Any resume that lands mid-window with
+the seat's offer live — a reconnect, a `hello{last_seq}` on the live socket past the ring, a
+backpressure collapse (§9) — gets it back answerable: `resume()` re-arms the seat's deadline
+first, and the `state_sync`'s `claim_offer` (§3) carries the window id, options and fresh
+deadline. The ring-replay and nothing-missed branches instead follow with one fresh `claim_offer`
+frame. Only the first resume per window and seat extends the deadline; later ones hand the offer
+back with the deadline already armed, so a reconnect loop can't stall the table.
 
 ## 6. Schema generation
 
