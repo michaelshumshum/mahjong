@@ -160,7 +160,6 @@ def _best_discard(
 def _safe_discard(key: SafeDiscardKey) -> Mapping[PuzzleTheme, Callable[[], bool]]:
     honours = all(int(parse_tile(c)) >= N_SUITED_TYPES for c in key.correct)
     return {
-        PuzzleTheme.GENBUTSU: lambda: key.reason == SafeReason.GENBUTSU,
         PuzzleTheme.WALLED_RUNS: lambda: key.reason == SafeReason.NO_CHANCE,
         PuzzleTheme.DEAD_HONOUR: lambda: honours,
         PuzzleTheme.ALL_VISIBLE: lambda: True,

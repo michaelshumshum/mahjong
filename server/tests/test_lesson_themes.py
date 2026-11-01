@@ -5,6 +5,7 @@ from app.lessons.grade import (
     AnswerKey,
     BestDiscardKey,
     DiscardOption,
+    SafeDiscardKey,
     WaitOption,
     WinningTilesKey,
     answer_key,
@@ -28,7 +29,7 @@ from app.lessons.themes import WaitShape, puzzle_theme, wait_shapes
 from mahjong_core.melds import MeldKind
 from mahjong_core.state import GameState
 from mahjong_core.tiles import TileType, parse_tile, parse_tiles, tile_id_type
-from tests.lesson_positions import DEFENCE, position
+from tests.lesson_positions import DEDUCED, position
 
 
 def _hand(state: GameState) -> list[TileType]:
@@ -117,24 +118,28 @@ def test_best_discard_theme(hand: str, correct: tuple[str, ...], theme: PuzzleTh
     assert _theme(state, key) == theme
 
 
-_DEFENCE = build_position(DEFENCE)
+def test_safe_discard_theme_on_a_graded_key() -> None:
+    state = build_position(DEDUCED)
+    key = safe_discard(state, 0, ["9p", "z1"], SafeReason.ALL_COPIES_VISIBLE)
+    assert _theme(state, key) == PuzzleTheme.ALL_VISIBLE
 
 
 @pytest.mark.parametrize(
     ("accepted", "reason", "theme"),
     [
-        pytest.param(["9p"], SafeReason.GENBUTSU, PuzzleTheme.GENBUTSU, id="genbutsu"),
-        pytest.param(["1s"], SafeReason.NO_CHANCE, PuzzleTheme.WALLED_RUNS, id="walled"),
-        pytest.param(["z1"], SafeReason.ALL_COPIES_VISIBLE, PuzzleTheme.DEAD_HONOUR, id="honour"),
-        pytest.param(["9p"], SafeReason.ALL_COPIES_VISIBLE, PuzzleTheme.ALL_VISIBLE, id="suited"),
+        pytest.param(("1s",), SafeReason.NO_CHANCE, PuzzleTheme.WALLED_RUNS, id="walled"),
+        pytest.param(("z1",), SafeReason.ALL_COPIES_VISIBLE, PuzzleTheme.DEAD_HONOUR, id="honour"),
+        pytest.param(("9p",), SafeReason.ALL_COPIES_VISIBLE, PuzzleTheme.ALL_VISIBLE, id="suited"),
         pytest.param(
-            ["9p", "z1"], SafeReason.ALL_COPIES_VISIBLE, PuzzleTheme.ALL_VISIBLE, id="mixed"
+            ("9p", "1s"), SafeReason.NO_CHANCE, PuzzleTheme.WALLED_RUNS, id="walled-beats-visible"
         ),
     ],
 )
-def test_safe_discard_theme(accepted: list[str], reason: SafeReason, theme: PuzzleTheme) -> None:
-    key = safe_discard(_DEFENCE, 0, accepted, reason)
-    assert _theme(_DEFENCE, key) == theme
+def test_safe_discard_theme(
+    accepted: tuple[str, ...], reason: SafeReason, theme: PuzzleTheme
+) -> None:
+    key = SafeDiscardKey(correct=accepted, reason=reason, safe=accepted, options=())
+    assert puzzle_theme(key, []) == theme
 
 
 def _pung(tiles: str) -> MeldSetup:

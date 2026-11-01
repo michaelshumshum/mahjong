@@ -11,6 +11,7 @@ from app.lessons.grade import (
     CountFaanKey,
     DiscardOption,
     FaanLine,
+    SafeOption,
     best_discard,
     count_faan,
     safe_discard,
@@ -85,19 +86,22 @@ def test_best_discard_rejected_on_a_thin_ukeire_lead() -> None:
     assert not best_discard_ok(key, "9p")
 
 
-# seat 1 waits on z1/z2 for a half flush; seat 0's isolated honours are z2 and z5
+# seat 1 waits on z1/z2 for a half flush; seat 0's isolated z2 is an efficient cut, its z5
+# pair isn't
 _WAITING = SeatSetup(hand="123m456m789m11z22z")
-_FOLDER = SeatSetup(hand="23456789m99p11s2z5z")
+_FOLDER = SeatSetup(hand="23456789m99p1s2z55z")
 
 
-def _fold(*, z5_visible: bool) -> GameState:
+def _fold(*, z5_visible: bool, orphans_closed: bool = True) -> GameState:
     pools = "5z" if z5_visible else ""
+    # seat 0 holds 99p: two more in the pools make 9p dead, so no thirteen orphans wait
+    nines = "9p" if orphans_closed else ""
     return _position(
         _FOLDER,
         turn=0,
         seat1=_WAITING,
-        seat2=SeatSetup(hand=_PIN[:-2] + _PIN[-1], discards=pools),
-        seat3=SeatSetup(hand=_SOU[:-2] + _SOU[-1], discards=pools * 2),
+        seat2=SeatSetup(hand=_PIN[:-2] + _PIN[-1], discards=pools + nines),
+        seat3=SeatSetup(hand=_SOU[:-2] + _SOU[-1], discards=pools + nines),
     )
 
 
@@ -115,9 +119,62 @@ def test_safe_discard_rejected_without_a_provable_tile() -> None:
     assert safe_choice(safe_options(state, 0), best_discard(state, 0).correct) is None
 
 
+def test_safe_discard_rejected_while_a_dead_honour_could_feed_thirteen_orphans() -> None:
+    state = _fold(z5_visible=True, orphans_closed=False)
+    assert safe_choice(safe_options(state, 0), best_discard(state, 0).correct) is None
+
+
 def test_safe_discard_rejected_when_the_efficient_cut_is_safe() -> None:
     state = _fold(z5_visible=True)
     assert safe_choice(safe_options(state, 0), ("5m",)) is None
+
+
+_ALL = SafeReason.ALL_COPIES_VISIBLE
+_WALLED = SafeReason.NO_CHANCE
+_DEALS_IN = SafeOption("z2", deals_in_to=(1,), reasons=())
+
+
+@pytest.mark.parametrize(
+    ("options", "choice"),
+    [
+        pytest.param(
+            [SafeOption("9p", (), (_ALL, _WALLED)), SafeOption("z5", (), (_ALL,))],
+            (("9p", "z5"), _ALL),
+            id="every-deducible-tile",
+        ),
+        pytest.param(
+            [SafeOption("9p", (), (_ALL, _WALLED)), SafeOption("1s", (), (_WALLED,))],
+            (("9p", "1s"), _WALLED),
+            id="shared-reason-states-the-weaker",
+        ),
+        pytest.param(
+            [SafeOption("z5", (), (_ALL,)), SafeOption("1s", (), (_WALLED,))],
+            None,
+            id="no-shared-reason",
+        ),
+        pytest.param(
+            [SafeOption("z5", (), (_ALL,)), SafeOption("1s", (1,), (_WALLED,))],
+            None,
+            id="walled-tile-deals-in-to-a-pair-wait",
+        ),
+        pytest.param(
+            [SafeOption(t, (), (_WALLED,)) for t in ("1s", "2s", "3s", "4s")],
+            None,
+            id="too-many",
+        ),
+        pytest.param([SafeOption("9p", (), ())], None, id="lucky-only"),
+    ],
+)
+def test_safe_choice_accepts_every_deducible_tile(
+    options: list[SafeOption], choice: tuple[tuple[str, ...], SafeReason] | None
+) -> None:
+    assert safe_choice([_DEALS_IN, *options], ("z2",)) == choice
+
+
+def test_safe_choice_rejected_when_folding_costs_nothing() -> None:
+    """The deducible tile is one of the efficient answers too: no tension."""
+    options = [_DEALS_IN, SafeOption("z5", (), (_ALL,))]
+    assert safe_choice(options, ("z2", "z5")) is None
 
 
 @pytest.mark.parametrize(

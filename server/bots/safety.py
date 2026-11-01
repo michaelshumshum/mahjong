@@ -6,7 +6,7 @@ not calibrated accuracy: offline, `deal_in_probability` ranks legal waits at AUC
 opponents (docs/ml.md §5). Kept as-is; the learned bot is a separate RL policy.
 
 No `is_safe(tile) -> bool`: every signal is a multiplier into `deal_in_probability`, a float in
-`[0, 1]` -- `_provably_safe` (no-chance plus every run and Thirteen Orphans wait blocked) is the
+`[0, 1]` -- `provably_safe` (no-chance plus every run and Thirteen Orphans wait blocked) is the
 only hard zero. Genbutsu/suji only ever scale the estimate down,
 never to exactly zero (HK has no furiten).
 
@@ -50,6 +50,7 @@ __all__ = [
     "kong_rob_risk",
     "no_chance",
     "opponent_threat_level",
+    "provably_safe",
     "ron_credit",
     "synthetic_tile_id",
     "tile_risk",
@@ -157,9 +158,10 @@ def _orphans_wait_open(
     return not any(no_chance(o, seen) for o in ORPHAN_INDICES if o != tile_type)
 
 
-def _provably_safe(view: SeatView, opponent_seat: int, tile_type: int, seen: Sequence[int]) -> bool:
+def provably_safe(view: SeatView, opponent_seat: int, tile_type: int, seen: Sequence[int]) -> bool:
     """No wait shape can take `tile_type`: no held copy (pair/pung/tanki), every run through it
-    walled, and no Thirteen Orphans wait. The only hard zero in the probabilistic model."""
+    walled, and no Thirteen Orphans wait. The only hard zero in the probabilistic model, and
+    learn mode's full safe-discard deduction (`app/lessons/grade.py`)."""
     if not no_chance(tile_type, seen):
         return False
     if tile_type < N_SUITED_TYPES and not walls_every_run(tile_type, seen):
@@ -237,10 +239,10 @@ def wall_pressure_multiplier(wall_remaining: int) -> float:
 
 def deal_in_probability(view: SeatView, opponent_seat: int, tile_type: int) -> float:
     """`P(deal_in | tile)` against one opponent, all signals folded into one `[0, 1]` estimate
-    (`_provably_safe` the only hard override). Genbutsu/suji are mutually exclusive -- suji only
+    (`provably_safe` the only hard override). Genbutsu/suji are mutually exclusive -- suji only
     checked when genbutsu doesn't already apply, since genbutsu is the stronger read."""
     seen = seen34(view)
-    if _provably_safe(view, opponent_seat, tile_type, seen):
+    if provably_safe(view, opponent_seat, tile_type, seen):
         return 0.0
 
     p = _BASE_RATE

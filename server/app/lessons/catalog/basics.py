@@ -115,8 +115,10 @@ BASICS: tuple[Puzzle, ...] = (
         "all-copies-visible",
         PuzzleKind.SAFE_DISCARD,
         _table(
-            SeatSetup(hand="123m456m78m99m6s3z9p1s", discards="2z"),
+            SeatSetup(hand="123m456m78m99m6s3z9p1s", discards="2z9p"),
             hands={1: _TENPAI},
+            # every 9p out: no thirteen orphans wait on the west either
+            pools={1: _POOL + "9p", 2: _POOL + "9p", 3: _POOL},
         ),
         ("z3",),
         reason=SafeReason.ALL_COPIES_VISIBLE,

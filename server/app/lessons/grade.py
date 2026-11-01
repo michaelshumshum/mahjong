@@ -17,7 +17,7 @@ from app.lessons.model import Puzzle, PuzzleKind, SafeReason
 from app.lessons.position import build_position, discard_on
 from app.views import SeatView, seat_view
 from bots.features import is_closed, seen34
-from bots.safety import is_genbutsu, no_chance, walls_every_run
+from bots.safety import provably_safe, walls_every_run
 from mahjong_core.actions import (
     Discard,
     build_scoring_context,
@@ -100,8 +100,8 @@ class CountFaanKey:
 
 @dataclass(frozen=True)
 class SafeOption:
-    """`deals_in_to`: seats whose real hand wins on this discard. `reasons`: the reasons that
-    hold for it from the seat's own view."""
+    """`deals_in_to`: seats whose real hand wins on this discard. `reasons`: the deductions that
+    hold for it from the seat's own view (`_reasons`); empty means safe only by luck."""
 
     tile: str
     deals_in_to: tuple[int, ...]
@@ -110,8 +110,9 @@ class SafeOption:
 
 @dataclass(frozen=True)
 class SafeDiscardKey:
-    """`correct`: the author's accepted tiles, each checked. `safe`: every discard no one can win
-    on, deducible or not."""
+    """`correct`: every hand tile with a deduction, each checked safe. `reason`: one every
+    correct tile has, the one the explanation states. `safe`: every discard no one can win on,
+    deducible or not."""
 
     correct: tuple[str, ...]
     reason: SafeReason
@@ -263,14 +264,14 @@ def count_faan(state: GameState, seat: int) -> CountFaanKey:
 def _reasons(
     view: SeatView, visible: list[int], seat: int, tile_type: int
 ) -> tuple[SafeReason, ...]:
+    """The deductions that hold for `tile_type` from `view` alone (ADR 0025 "Safe-discard
+    deductions"). Every copy visible only rules out waits that hold a copy, so it counts once
+    no other shape is left either (`provably_safe` against every opponent)."""
+    opponents = [opp for opp in range(len(view.discard_pools)) if opp != seat]
     holds = {
-        SafeReason.GENBUTSU: all(
-            is_genbutsu(view, opp, tile_type)
-            for opp in range(len(view.discard_pools))
-            if opp != seat
+        SafeReason.ALL_COPIES_VISIBLE: all(
+            provably_safe(view, opp, tile_type, visible) for opp in opponents
         ),
-        # bots.safety.no_chance is the plain every-copy-visible count
-        SafeReason.ALL_COPIES_VISIBLE: no_chance(tile_type, visible),
         SafeReason.NO_CHANCE: walls_every_run(tile_type, visible),
     }
     return tuple(r for r in SafeReason if holds[r])
@@ -300,7 +301,8 @@ def safe_discard(
     state: GameState, seat: int, accepted: Iterable[str], reason: SafeReason
 ) -> SafeDiscardKey:
     """`safe_options`, graded against the author's `accepted` tiles. Raises `ValueError` unless
-    every `accepted` tile is in hand, deals in to nobody, and `reason` holds for it."""
+    `accepted` is exactly the hand tiles with a deduction, each deals in to nobody, and `reason`
+    holds for every one."""
     options = safe_options(state, seat)
     by_tile = {o.tile: o for o in options}
     wanted = {tile_code(parse_tile(code)) for code in accepted}
@@ -314,6 +316,10 @@ def safe_discard(
             raise ValueError(f"{code} deals in to seats {option.deals_in_to}")
         if reason not in option.reasons:
             raise ValueError(f"{reason} does not hold for {code}")
+    # a deducible tile graded "couldn't know" would contradict the lesson
+    left_out = sorted(o.tile for o in options if o.reasons and o.tile not in wanted)
+    if left_out:
+        raise ValueError(f"{left_out} have a deduction too but aren't accepted")
     return SafeDiscardKey(
         correct=tuple(o.tile for o in options if o.tile in wanted),
         reason=reason,

@@ -270,7 +270,7 @@ a provably blocked wait, item 3).
    out only the waits that need a held copy: pair/pung (shanpon), tanki, Seven Pairs. It does
    **not** rule out a run wait *through* the tile (3m+5m waits on 4m holding no 4m) or Thirteen
    Orphans' single wait, and since you can only discard a tile you hold, no-chance on a discard
-   always means you hold a copy. The hard zero (`_provably_safe`) therefore needs all three:
+   always means you hold a copy. The hard zero (`provably_safe`) therefore needs all three:
 
    | Wait shape on tile `t` | Blocked when |
    | --- | --- |
@@ -279,8 +279,9 @@ a provably blocked wait, item 3).
    | Thirteen Orphans (orphan `t` only) | the opponent has an exposed meld, or another orphan type has every copy accounted for |
 
    No-chance with a run still open scales the estimate by `_NO_CHANCE_FACTOR` (0.2, below
-   one-chance's 0.4, which still allows tanki/shanpon). `walls_every_run` is also learn mode's
-   `NO_CHANCE` reason check (`app/lessons/grade.py`).
+   one-chance's 0.4, which still allows tanki/shanpon). Learn mode reuses both checks
+   (`app/lessons/grade.py`): `walls_every_run` is its `NO_CHANCE` deduction and `provably_safe`
+   against every opponent its `ALL_COPIES_VISIBLE` one.
 4. **Meld reading** — three melds in one suit plus honor discards means half flush; a dragon pung on
    the table makes the next dragon expensive.
 5. **Discard tempo** — fast discards, then a long think and a middle-tile discard, often marks a
@@ -288,15 +289,16 @@ a provably blocked wait, item 3).
 6. **Wall pressure** — fewer tiles left means a higher deal-in cost per discard.
 
 `server/bots/safety.py` implements all six as bounded multipliers on a baseline deal-in rate
-(`_provably_safe` the sole hard-zero override), combined into `tile_risk = Σ P(deal_in | tile) ×
+(`provably_safe` the sole hard-zero override), combined into `tile_risk = Σ P(deal_in | tile) ×
 expected_cost` over opponents. **Hand-tuned, not trained.** A logistic regression over these
 features, fit on labelled self-play logs, is the better model — and matters more in HK than riichi
 because signals 1–2 are structurally weaker — but needs a labelled corpus first
 ([ml.md](ml.md)). `tests/test_safety.py` pins each signal's *direction*, not its calibration.
 
 Learn-mode puzzles grade safety exactly, never with `tile_risk`: `app/lessons/grade.py`'s
-`safe_discard` reduces each discard against the real hands, and uses `is_genbutsu`/`no_chance`/`walls_every_run`
-only to check the author's stated reason ([ADR 0025](decisions/0025-learn-mode.md)).
+`safe_discard` reduces each discard against the real hands, and uses `provably_safe`/`walls_every_run`
+only to decide which tiles are deducible from seat 0's view; genbutsu is never one, for the
+reason in item 1 ([ADR 0025](decisions/0025-learn-mode.md) "Safe-discard deductions").
 
 `opponent_threat_level` (meld count × 0.3 + a tempo bump, against `_THREAT_THRESHOLD = 0.3`) feeds
 §4's fold gate.

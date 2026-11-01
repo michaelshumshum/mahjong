@@ -27,6 +27,31 @@ DEFENCE = Position(
 )
 
 
+# seat 1 is tenpai on 4m/7m. every 4m, 8p, 9p and z1 is visible to seat 0: 9p is walled by
+# the dead 8p, and z1 can't feed thirteen orphans with 9p dead. 1s stays open (2s hidden)
+DEDUCED = Position(
+    seats=(
+        SeatSetup(hand="12347789m9p1s1155z"),
+        SeatSetup(hand="56m234567p34599s", discards="4m9p1z8p"),
+        SeatSetup(hand="19m135p19s234567z", discards="4m9p1z8p8p"),
+        SeatSetup(hand="19m15p78s3467z222s", discards="4m9p8p"),
+    ),
+    turn=0,
+)
+
+# seat 1 is closed and waits on z7 for thirteen orphans; seat 0 can see the other three z7 but
+# no orphan type is dead, so that wait stays open
+ORPHANS = Position(
+    seats=(
+        SeatSetup(hand="123m456m789m22p7z56s"),
+        SeatSetup(hand="119m19p19s123456z", discards="7z"),
+        SeatSetup(hand="2233445566788s", discards="7z"),
+        SeatSetup(hand="2233445566788p", discards="7z"),
+    ),
+    turn=0,
+)
+
+
 def _filler(spec: str, to_act: bool) -> SeatSetup:
     return SeatSetup(hand=spec if to_act else spec[:-2] + spec[-1])
 

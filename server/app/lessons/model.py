@@ -24,14 +24,14 @@ class PuzzleKind(StrEnum):
 
 
 class SafeReason(StrEnum):
-    """Why a `safe_discard` answer is safe, judged on what seat 0 can see. A stated fact, not a
-    proof: the answer key also checks every accepted tile against the real hands."""
+    """A deduction that a `safe_discard` tile is safe, from what seat 0 can see (ADR 0025
+    "Safe-discard deductions"). The answer key also checks every accepted tile against the real
+    hands. No genbutsu: hk has no furiten, so a tile in an opponent's pool still wins for them."""
 
-    # in every opponent's own pool. weak in hk: no furiten
-    GENBUTSU = "genbutsu"
-    # every copy visible: nobody holds one, so no pair or pung wait on it
+    # every copy visible, and no wait shape left: a suited tile also needs every run walled, an
+    # orphan no open thirteen orphans wait (bots.safety.provably_safe)
     ALL_COPIES_VISIBLE = "all_copies_visible"
-    # suited, and every run through it has another member with every copy visible: no run wait
+    # suited, every run through it walled by a dead tile. pair and pung waits stay possible
     NO_CHANCE = "no_chance"
 
 
@@ -59,7 +59,6 @@ class PuzzleTheme(StrEnum):
     BREAK_PAIR = "break_pair"
     MOST_TILES = "most_tiles"
     # safe_discard
-    GENBUTSU = "genbutsu"
     WALLED_RUNS = "walled_runs"
     DEAD_HONOUR = "dead_honour"
     ALL_VISIBLE = "all_visible"
@@ -97,7 +96,6 @@ THEMES_BY_KIND: Mapping[PuzzleKind, tuple[PuzzleTheme, ...]] = {
         PuzzleTheme.MOST_TILES,
     ),
     PuzzleKind.SAFE_DISCARD: (
-        PuzzleTheme.GENBUTSU,
         PuzzleTheme.WALLED_RUNS,
         PuzzleTheme.DEAD_HONOUR,
         PuzzleTheme.ALL_VISIBLE,

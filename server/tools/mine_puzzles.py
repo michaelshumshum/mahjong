@@ -82,8 +82,8 @@ MAX_SHANTEN = 2
 MAX_CORRECT = 2
 # ukeire lead over the best wrong discard at the same shanten: one tile type's four copies
 MIN_UKEIRE_MARGIN = 4
-# strongest proof first: a reason only qualifies when every hand tile it covers is safe
-SAFE_REASON_ORDER = (SafeReason.ALL_COPIES_VISIBLE, SafeReason.NO_CHANCE, SafeReason.GENBUTSU)
+# the stated reason: the strongest one every accepted tile shares
+SAFE_REASON_ORDER = (SafeReason.ALL_COPIES_VISIBLE, SafeReason.NO_CHANCE)
 # a reason that clears half the hand isn't a deduction worth asking for
 MAX_ACCEPTED = 3
 
@@ -158,17 +158,21 @@ def safe_choice(
     options: Sequence[SafeOption], efficient: Iterable[str]
 ) -> tuple[tuple[str, ...], SafeReason] | None:
     """The accepted tiles and reason for a `safe_discard` puzzle, or `None`. A shape-efficient
-    discard (`best_discard`'s answer) must deal in, so the puzzle is a real fold; every tile
-    the chosen reason covers must be safe; and at most `MAX_ACCEPTED` tiles are."""
+    discard (`best_discard`'s answer) must deal in, so the puzzle is a real fold, and none of
+    them may be deducible, so folding costs shape. Accepted are every tile with a deduction:
+    1 to `MAX_ACCEPTED` of them, none dealing in, sharing a reason the explanation can state."""
+    natural = set(efficient)
     dealing = {o.tile for o in options if o.deals_in_to}
-    if not dealing & set(efficient):
+    if not dealing & natural:
+        return None
+    deducible = [o for o in options if o.reasons]
+    if not 1 <= len(deducible) <= MAX_ACCEPTED:
+        return None
+    if any(o.deals_in_to or o.tile in natural for o in deducible):
         return None
     for reason in SAFE_REASON_ORDER:
-        covered = [o for o in options if reason in o.reasons]
-        if covered and not any(o.deals_in_to for o in covered):
-            if len(covered) > MAX_ACCEPTED:
-                return None
-            return tuple(o.tile for o in covered), reason
+        if all(reason in o.reasons for o in deducible):
+            return tuple(o.tile for o in deducible), reason
     return None
 
 

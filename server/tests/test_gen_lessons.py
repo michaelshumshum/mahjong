@@ -28,7 +28,7 @@ from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.melds import MeldKind
 from mahjong_core.state import Phase
 from tests.lesson_payloads import assert_puzzle_payload
-from tests.lesson_positions import DEFENCE, PIN, spec
+from tests.lesson_positions import DEDUCED, PIN, spec
 from tools.gen_lessons import (
     INDEX_FILE,
     OUT_DIR,
@@ -84,8 +84,8 @@ _FIXTURE = (
         kind=PuzzleKind.SAFE_DISCARD,
         track=Track.DEFENCE,
         band=Band.BEGINNER,
-        position=DEFENCE,
-        answer=("z1",),
+        position=DEDUCED,
+        answer=("9p", "z1"),
         text="fixtureDefence",
         reason=SafeReason.ALL_COPIES_VISIBLE,
     ),

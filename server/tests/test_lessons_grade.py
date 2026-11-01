@@ -11,6 +11,7 @@ from app.lessons.grade import (
     best_discard,
     count_faan,
     safe_discard,
+    safe_options,
     winning_tiles,
 )
 from app.lessons.model import LESSON_RULESET, MeldSetup, SafeReason, SeatSetup
@@ -22,7 +23,7 @@ from mahjong_core.melds import MeldKind
 from mahjong_core.scoring.patterns import seat_wind_for
 from mahjong_core.state import Phase, WinType
 from mahjong_core.tiles import TileType, parse_tile, parse_tiles, tile_id_type
-from tests.lesson_positions import DEFENCE
+from tests.lesson_positions import DEDUCED, DEFENCE, ORPHANS
 from tests.lesson_positions import PIN as _PIN
 from tests.lesson_positions import SOU as _SOU
 from tests.lesson_positions import position as _position
@@ -209,41 +210,60 @@ def test_count_faan_needs_a_legal_win() -> None:
 _DEFENCE = build_position(DEFENCE)
 
 
-def test_safe_discard_is_exact_against_the_hidden_hands() -> None:
-    key = safe_discard(_DEFENCE, 0, ["9p"], SafeReason.GENBUTSU)
-    assert key.correct == ("9p",)
-    assert key.safe == ("1m", "2m", "3m", "8m", "9m", "9p", "1s", "z1", "z5")
-    by_tile = {o.tile: o for o in key.options}
-    both = (SafeReason.GENBUTSU, SafeReason.ALL_COPIES_VISIBLE)
-    assert by_tile["4m"] == SafeOption("4m", deals_in_to=(1,), reasons=both)
+def test_safe_options_are_exact_against_the_hidden_hands() -> None:
+    by_tile = {o.tile: o for o in safe_options(_DEFENCE, 0)}
+    safe = tuple(tile for tile, o in by_tile.items() if not o.deals_in_to)
+    assert safe == ("1m", "2m", "3m", "8m", "9m", "9p", "1s", "z1", "z5")
+    # every 4m is visible, but 56m waits on it: a run wait holds no copy
+    assert by_tile["4m"] == SafeOption("4m", deals_in_to=(1,), reasons=())
     assert by_tile["7m"] == SafeOption("7m", deals_in_to=(1,), reasons=())
+    # in every opponent's pool with every copy visible, but 78p is open: safe only by luck
+    assert by_tile["9p"].reasons == ()
     assert by_tile["z1"].reasons == (SafeReason.ALL_COPIES_VISIBLE,)
     assert by_tile["1s"].reasons == (SafeReason.NO_CHANCE,)
 
 
-@pytest.mark.parametrize(
-    ("accepted", "reason"),
-    [
-        pytest.param(["z1"], SafeReason.ALL_COPIES_VISIBLE, id="fourth-honor"),
-        pytest.param(["1s"], SafeReason.NO_CHANCE, id="walled-terminal"),
-        pytest.param(["9p", "z1"], SafeReason.ALL_COPIES_VISIBLE, id="several"),
-    ],
-)
-def test_safe_discard_accepts_a_stated_reason(accepted: list[str], reason: SafeReason) -> None:
-    assert safe_discard(_DEFENCE, 0, accepted, reason).correct == tuple(accepted)
+_DEDUCED = build_position(DEDUCED)
+
+
+def test_every_copy_visible_counts_for_a_suited_tile_only_with_its_runs_walled() -> None:
+    by_tile = {o.tile: o for o in safe_options(_DEDUCED, 0)}
+    both = (SafeReason.ALL_COPIES_VISIBLE, SafeReason.NO_CHANCE)
+    assert by_tile["9p"] == SafeOption("9p", deals_in_to=(), reasons=both)
+    assert by_tile["4m"] == SafeOption("4m", deals_in_to=(1,), reasons=())
+    assert by_tile["z1"].reasons == (SafeReason.ALL_COPIES_VISIBLE,)
+    assert [o.tile for o in by_tile.values() if o.reasons] == ["9p", "z1"]
+
+
+def test_a_dead_honour_is_no_deduction_while_thirteen_orphans_can_wait_on_it() -> None:
+    by_tile = {o.tile: o for o in safe_options(build_position(ORPHANS), 0)}
+    assert by_tile["z7"] == SafeOption("z7", deals_in_to=(1,), reasons=())
+
+
+def test_safe_discard_accepts_every_deducible_tile() -> None:
+    key = safe_discard(_DEDUCED, 0, ["z1", "9p"], SafeReason.ALL_COPIES_VISIBLE)
+    assert key.correct == ("9p", "z1")
+    assert key.reason == SafeReason.ALL_COPIES_VISIBLE
 
 
 @pytest.mark.parametrize(
     ("accepted", "reason"),
     [
-        pytest.param(["4m"], SafeReason.GENBUTSU, id="genbutsu-deals-in-without-furiten"),
-        pytest.param(["4m"], SafeReason.ALL_COPIES_VISIBLE, id="last-copy-deals-in-to-a-run"),
-        pytest.param(["z1"], SafeReason.GENBUTSU, id="reason-does-not-hold"),
-        pytest.param(["2m"], SafeReason.NO_CHANCE, id="safe-but-not-deducible"),
-        pytest.param(["5p"], SafeReason.GENBUTSU, id="not-in-hand"),
-        pytest.param([], SafeReason.GENBUTSU, id="nothing-accepted"),
+        pytest.param(["z1"], SafeReason.ALL_COPIES_VISIBLE, id="deducible-9p-left-out"),
+        pytest.param(["9p", "z1"], SafeReason.NO_CHANCE, id="reason-not-shared"),
+        pytest.param(["9p", "z1", "4m"], SafeReason.ALL_COPIES_VISIBLE, id="last-copy-deals-in"),
+        pytest.param(["9p", "z1", "2m"], SafeReason.ALL_COPIES_VISIBLE, id="not-deducible"),
+        pytest.param(["9p", "z1", "5p"], SafeReason.ALL_COPIES_VISIBLE, id="not-in-hand"),
+        pytest.param([], SafeReason.ALL_COPIES_VISIBLE, id="nothing-accepted"),
     ],
 )
 def test_safe_discard_rejects(accepted: list[str], reason: SafeReason) -> None:
     with pytest.raises(ValueError):
-        safe_discard(_DEFENCE, 0, accepted, reason)
+        safe_discard(_DEDUCED, 0, accepted, reason)
+
+
+def test_safe_discard_rejects_mixed_reasons() -> None:
+    """z1 is a full deduction and 1s only no-chance: no one stated reason covers both."""
+    for reason in SafeReason:
+        with pytest.raises(ValueError):
+            safe_discard(_DEFENCE, 0, ["z1", "1s"], reason)
