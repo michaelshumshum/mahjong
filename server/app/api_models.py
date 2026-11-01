@@ -1,5 +1,6 @@
 """REST request/response models for `app/main.py`'s routes (docs/protocol.md §10). Hand-typed on
-the client in `web/src/lib/net/lobby.ts`, not codegen'd."""
+the client in `web/src/lib/net/lobby.ts`, not codegen'd, except `RandomLessonResponse`: a lesson
+file, typed by the generated `lessons.d.ts`."""
 
 from __future__ import annotations
 
@@ -7,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.lessons.model import Band, LessonKind, PuzzleKind, Track
+from app.protocol import StateSync
 from app.table_types import WireSeatStatus
 from mahjong_core.hand_check import HAND_SIZE
 from mahjong_core.presets import DEFAULT_PRESET_ID
@@ -18,6 +21,7 @@ __all__ = [
     "CreateTableRequest",
     "CreateTableResponse",
     "LoadPointOut",
+    "RandomLessonResponse",
     "ScoreHandRequest",
     "ScoreHandResponse",
     "SeatSummary",
@@ -120,6 +124,23 @@ class ScoreHandRequest(BaseModel):
     # mahjong_core.state.Wind: 0 = East .. 3 = North
     seat_wind: int = Field(default=0, ge=0, le=3)
     prevailing_wind: int = Field(default=0, ge=0, le=3)
+
+
+class RandomLessonResponse(BaseModel):
+    """A generated puzzle file's `Lesson` (docs/protocol.md §6), the shape `lessons.d.ts` types
+    on the web. Documents `GET /lessons/random`, which returns the payload unvalidated."""
+
+    id: str
+    lesson_kind: Literal[LessonKind.PUZZLE]
+    kind: PuzzleKind
+    track: Track
+    band: Band
+    text: str
+    n: int
+    engine_version: str
+    snapshot: StateSync
+    # app/lessons/grade.py's key for `kind`, dataclasses.asdict
+    key: dict[str, Any]
 
 
 class ScoreHandResponse(BaseModel):

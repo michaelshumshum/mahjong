@@ -10,7 +10,7 @@ mahjong_core/   pure rules engine — no asyncio, no I/O, no unseeded randomness
 app/            FastAPI, table actors, WebSocket, redaction, protocol models, db/
 bots/           bot tiers + arena harness
 ml/             RL + supervised training (torch via the `ml` extra)
-tools/          gen_protocol.py, gen_lessons.py (make proto), mine_puzzles.py (learn-mode puzzles, ADR 0025)
+tools/          gen_protocol.py, gen_lessons.py (make proto), mine_puzzles.py (learn-mode shortlist and endless pool, ADR 0025)
 tests/          pytest
 ```
 
@@ -71,13 +71,15 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Bot tier ids (`BotTier`, `BOT_TIERS`, `DEFAULT_BOT_TIER`, `LEARNED_TIERS`) — wire values, generated to TS | `bots/tiers.py` |
 | Lesson vocabularies (`PuzzleKind`, `SafeReason`, `PuzzleTheme` and `THEMES_BY_KIND`, `LessonKind`, `Band`, `Track`, `StepKind`, `Highlight`), `Puzzle`, `Tutorial` and its steps, `LESSON_RULESET` — generated to TS by `tools/gen_lessons.py` | `app/lessons/model.py` |
 | Tutorial runner (`run_tutorial`, the learner `SEAT`, `NO_CLOCK`) | `app/lessons/tutorial.py` |
+| One puzzle's lesson JSON (`snapshot`, `puzzle_entry`, `puzzle_payload`), shared by `gen_lessons` and `GET /lessons/random` | `app/lessons/payload.py` |
+| Endless puzzle pool (`load_pool`, `pick`, `lesson_payload`; data in `puzzle_pool.json`, written by `tools/mine_puzzles.py --pool`) | `app/lessons/pool.py` |
 | Harness limits: `NO_DEADLINE`, `GAME_STEP_CAP` | `bots/base.py` |
 | `SeatView` → count-array features (`own_hand34`, `seen34`, `add_meld`, `claimed_tile_type`, …) | `bots/features.py` |
 | ML format: `PAD`, `MAX_DISCARDS`, `PADDED_WIDTH`/`PADDED_POSITIONS`, `PHASE_INDEX`, `N_OPPONENTS` | `ml/encode.py` (torch-free) |
 | Dataset splits (`SPLITS`) | `ml/splits.py` |
 | Channel/head layout → slices (`layout_slices`) | `ml/encode_v2.py` (torch-free; `policy_net.py` imports it) |
 | SIGINT/SIGTERM stop flag for long jobs (`StopSignal`) | `ml/stop_signal.py` |
-| Shared test helpers (plain modules; fixtures only in `conftest.py`) | `tests/game_state.py`, `hands.py`, `decisions.py`, `ws_frames.py`, `game_records.py`, `lesson_positions.py` (`docs/testing.md §3`) |
+| Shared test helpers (plain modules; fixtures only in `conftest.py`) | `tests/game_state.py`, `hands.py`, `decisions.py`, `ws_frames.py`, `game_records.py`, `lesson_positions.py`, `lesson_payloads.py` (`docs/testing.md §3`) |
 | Table exceptions, wire `ErrorCode`, `TABLE_CLOSED_ERROR` / table dataclasses (`Command`, `Envelope`, `SeatBinding`, `TableSettings`, …) and seat-status aliases (`SeatStatus`, `WireSeatStatus`) | `app/errors.py` / `app/table_types.py` |
 | REST request/response models | `app/api_models.py` |
 | WS wire models (source of `protocol.d.ts`), wire `Seat` alias. Wire field types reuse the owning enum/alias (`docs/protocol.md §6`) | `app/protocol.py` |

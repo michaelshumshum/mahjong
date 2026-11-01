@@ -20,11 +20,13 @@ import secrets
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import ws
@@ -33,6 +35,7 @@ from app.api_models import (
     CreateTableRequest,
     CreateTableResponse,
     LoadPointOut,
+    RandomLessonResponse,
     ScoreHandRequest,
     ScoreHandResponse,
     SeatSummary,
@@ -44,6 +47,8 @@ from app.api_models import (
 from app.body_limit import BodySizeLimitMiddleware
 from app.db.records import count_games_since
 from app.db.session import make_engine, make_session_factory
+from app.lessons.model import Band, PuzzleKind
+from app.lessons.pool import lesson_payload, load_pool, pick
 from app.limits import IpNetwork, client_ip, parse_trusted_proxies
 from app.rate_limit import RateLimiter
 from app.registry import REAP_INTERVAL_SECONDS, TableLimitError
@@ -66,6 +71,12 @@ _DEFAULT_UNSTARTED_TABLE_TTL_SECONDS = 600.0
 _DEFAULT_FINISHED_TABLE_TTL_SECONDS = 600.0
 _DEFAULT_TABLE_CREATE_RATE_LIMIT = 10
 _DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS = 60.0
+# a puzzle takes seconds to answer; one a second sustained is a script
+_DEFAULT_LESSON_RATE_LIMIT = 60
+_DEFAULT_LESSON_RATE_WINDOW_SECONDS = 60.0
+# ids a client may ask GET /lessons/random to skip: its recent puzzles
+_MAX_LESSON_EXCLUDE = 50
+_MAX_LESSON_ID_LENGTH = 64
 # matches web/src/lib/table/table-code.ts's TABLE_CODE_ALPHABET -- no 0/O/1/I look-alikes.
 _TABLE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _TABLE_CODE_LENGTH = 6
@@ -77,8 +88,9 @@ _GAMES_COUNT_CACHE_SECONDS = 60.0
 logger = logging.getLogger(__name__)
 
 _learned_weights_problem: str | None = None
-# rebuilt per lifespan like the registry; None = POST /tables unlimited
+# rebuilt per lifespan like the registry; None = unlimited
 _create_limiter: RateLimiter | None = None
+_lesson_limiter: RateLimiter | None = None
 _trusted_proxies: tuple[IpNetwork, ...] = ()
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 # (monotonic time fetched, count)
@@ -91,12 +103,22 @@ def _optional_limit(raw: str) -> int | None:
     return value if value > 0 else None
 
 
+def _rate_limiter(
+    limit_var: str, default_limit: int, window_var: str, default_window: float
+) -> RateLimiter | None:
+    limit = _optional_limit(os.environ.get(limit_var, str(default_limit)))
+    if limit is None:
+        return None
+    window = float(os.environ.get(window_var, default_window))
+    return RateLimiter(limit=limit, window_seconds=window)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # degrade rather than refuse to start: a crash-looping api takes every table down, a missing
     # policy only Expert/Impossible (docs/bots.md §2 "Missing weights")
     global _learned_weights_problem, _create_limiter, _trusted_proxies, _session_factory
-    global _games_24h_cache
+    global _games_24h_cache, _lesson_limiter
     _learned_weights_problem = weights_problem()
     if _learned_weights_problem is not None:
         logger.error(
@@ -124,20 +146,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ),
     )
     registry.start_reaper()
-    rate_limit = _optional_limit(
-        os.environ.get("TABLE_CREATE_RATE_LIMIT", str(_DEFAULT_TABLE_CREATE_RATE_LIMIT))
+    _create_limiter = _rate_limiter(
+        "TABLE_CREATE_RATE_LIMIT",
+        _DEFAULT_TABLE_CREATE_RATE_LIMIT,
+        "TABLE_CREATE_RATE_WINDOW_SECONDS",
+        _DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS,
     )
-    _create_limiter = (
-        RateLimiter(
-            limit=rate_limit,
-            window_seconds=float(
-                os.environ.get(
-                    "TABLE_CREATE_RATE_WINDOW_SECONDS", _DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS
-                )
-            ),
-        )
-        if rate_limit is not None
-        else None
+    _lesson_limiter = _rate_limiter(
+        "LESSON_RATE_LIMIT",
+        _DEFAULT_LESSON_RATE_LIMIT,
+        "LESSON_RATE_WINDOW_SECONDS",
+        _DEFAULT_LESSON_RATE_WINDOW_SECONDS,
     )
     _trusted_proxies = parse_trusted_proxies(os.environ.get("TRUSTED_PROXY_IPS"))
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
@@ -225,23 +244,29 @@ def _resolve_seat_bot_tiers(
     return resolved or None
 
 
+def _check_rate(limiter: RateLimiter | None, request: Request, detail: str) -> None:
+    """429 with `Retry-After` once the request's client IP is past `limiter`."""
+    if limiter is None:
+        return
+    ip = client_ip(
+        request.client.host if request.client is not None else None,
+        request.headers,
+        _trusted_proxies,
+    )
+    if not limiter.allow(ip):
+        raise HTTPException(
+            status_code=429,
+            detail=detail,
+            headers={"Retry-After": str(limiter.retry_after(ip))},
+        )
+
+
 @app.post("/tables")
 async def create_table(body: CreateTableRequest, request: Request) -> CreateTableResponse:
     """Resolves the ruleset and mints the table id together in one request -- the only way a
     table is created (`/ws` attaches to existing ones only). 429 past the per-IP rate limit,
     503 past `MAX_TABLES` (docs/architecture.md §8.3)."""
-    if _create_limiter is not None:
-        ip = client_ip(
-            request.client.host if request.client is not None else None,
-            request.headers,
-            _trusted_proxies,
-        )
-        if not _create_limiter.allow(ip):
-            raise HTTPException(
-                status_code=429,
-                detail="too many tables created, try again shortly",
-                headers={"Retry-After": str(_create_limiter.retry_after(ip))},
-            )
+    _check_rate(_create_limiter, request, "too many tables created, try again shortly")
     resolved = resolve_ruleset(body.ruleset, body.rules)
     table_id = _generate_table_id()
     try:
@@ -366,6 +391,24 @@ async def score_hand(body: ScoreHandRequest) -> ScoreHandResponse:
         points=checked.points,
         min_faan=ruleset.min_faan,
     )
+
+
+@app.get("/lessons/random", response_model=RandomLessonResponse)
+async def random_lesson(
+    request: Request,
+    kind: PuzzleKind,
+    band: Band | None = None,
+    exclude: Annotated[
+        list[Annotated[str, StringConstraints(max_length=_MAX_LESSON_ID_LENGTH)]],
+        Query(max_length=_MAX_LESSON_EXCLUDE),
+    ] = [],  # noqa: B006 -- fastapi copies query defaults
+) -> JSONResponse:
+    """Learn mode's endless puzzles (docs/protocol.md §10): a random pooled puzzle of `kind`
+    and `band` (any band if omitted), skipping `exclude`d ids while others remain. Returned as
+    the stored lesson payload, so the key is never regraded per request."""
+    _check_rate(_lesson_limiter, request, "too many puzzles requested, try again shortly")
+    pooled = pick(load_pool(), kind, band, frozenset(exclude))
+    return JSONResponse(lesson_payload(pooled))
 
 
 @app.get("/healthz")

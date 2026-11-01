@@ -19,7 +19,8 @@ Puzzle content is written once in Python under `server/app/lessons/`. The engine
 answer key, and `make proto` emits the result as committed static JSON. The web plays a puzzle
 through the existing client reducer and table components on `/learn`, and grades it by looking the
 answer up in the precomputed key. Curated puzzles need no new HTTP or WebSocket endpoint. Random
-endless puzzles (phase 4) use the same grading module behind `GET /lessons/random`.
+endless puzzles (phase 4) come from a committed pool graded the same way, served by
+`GET /lessons/random` in the curated files' shape.
 
 | Option | Verdict |
 | --- | --- |
@@ -93,6 +94,8 @@ into `app/frames.py` ([architecture.md §5](../architecture.md) "Frame building"
 | `themes.py` | `puzzle_theme(key, hand) -> PuzzleTheme`, what a puzzle teaches ("Themes" below); pure |
 | `catalog/*.py` | content: `basics` (hand-written, one teaching point each), `mined` (the shortlist, one `Track` per kind: `waits`, `efficiency`, `defence`, `faan`) and `tutorials` (`TUTORIALS`); `CATALOG` is `/learn`'s puzzle order |
 | `tutorial.py` | `run_tutorial(tutorial) -> TutorialRun`: plays and validates a script, and builds seat 0's frame stream with `app/frames.py` (protocol.md §6 "Tutorials") |
+| `payload.py` | one puzzle's lesson JSON (`puzzle_entry`, `snapshot`, `puzzle_payload`), shared by the generator and `GET /lessons/random` |
+| `pool.py` | the endless pool (`puzzle_pool.json`): `load_pool`, `pick`, `lesson_payload` |
 | `tools/gen_lessons.py` | emits `web/src/lib/learn/generated/index.json`, `<id>.json` per lesson, `lessons.d.ts` |
 
 **Position spec:** tile-code strings, the same codes as `parse_tile`. Fields:
@@ -184,14 +187,29 @@ illegal script fails `make proto`.
 | --- | --- |
 | `tools/mine_puzzles.py` | mines candidates of all four kinds from seeded Expert (`T4`) self-play and rates each one's difficulty with the bot tiers (below) |
 | `app/lessons/mined_puzzles.json` | the committed shortlist the miner curates: up to 15 per kind, spread across difficulty bands |
-| `GET /lessons/random?kind=` | builds and grades on the server with `lessons/grade.py`, rate-limited like other per-IP endpoints |
+| `app/lessons/puzzle_pool.json` | the committed endless pool the miner writes (`--pool`): 100 per kind and band, 1,200 puzzles, keys stored |
+| `GET /lessons/random?kind=&band=&exclude=` | a random pooled puzzle as a curated lesson file, rate-limited per IP ([protocol.md §10](../protocol.md)) |
 | Grading | the answer key is returned with the puzzle; the client grades it the same way as curated ones |
 | Shared with | the ADR 0010 `hint` request can reuse `grade.py` |
+
+| Question | Decision | Why |
+| --- | --- | --- |
+| What the server serves from | a committed pool, `app/lessons/puzzle_pool.json` (~1.5 MB), cut from the full mined corpus by `tools.mine_puzzles --from <corpus.jsonl> --pool …` | the corpus is 256 MB of JSONL and isn't in the repo. Mining on demand means an Expert game per puzzle, and a T4 seat loads numpy and the policy into the API process. 1,200 puzzles is a few hundred per kind, enough that a recent-id skip rarely runs dry, at ~1.1 kB each |
+| Pool size | 100 per kind and band (`POOL_PER_BAND`) | even bands, so the band picker always finds puzzles; `winning_tiles` has only 380 advanced candidates in the corpus. Load is ~0.4 s and ~18 MB on first request, well inside the 1.9 GiB prod box |
+| Which puzzles | per band, the shortlist's own order: round-robin over best shanten / reason / wait count / faan total, `best_discard` only where `T4` agreed | one rule for both cuts (`_by_band`), so the pool is the shortlist continued; the first 15 per kind overlap with the curated tracks, which is harmless |
+| Grading cost | keys stored in the pool and served as is; `tests/test_lessons_pool.py` regrades all 1,200 against `answer_key()` (~1.5 s) | a `best_discard` key is ~470 shanten evaluations (bots.md §3), ~1.5 ms warm, and safe-discard keys reduce one discard per hand tile. Stored keys make a request ~1 ms whatever the kind, and the regrade test turns any engine change that moves a key into a failing test, as the shortlist's does |
+| Reproducibility | a pool record keeps its explicit `Position`, its `source` (`game_seed`, `decision`, `seat`) as its id, and the pool file the corpus's `engine_version`, `miner_tier` and seed range. `pool()` is deterministic for a corpus, and the corpus for its seeds | an engine change that fails the regrade test means re-mining (~1 h on the laptop) and rewriting both files |
+| Response shape | exactly a generated `<id>.json` puzzle, built by the generator's own `app/lessons/payload.py` | the web plays it through the same page and types it with the generated `Lesson`, so no new wire type and no second builder |
+| Text | each record becomes its `Puzzle` through `catalog/mined.py`'s `mined_puzzles`, so `text` is the mined track's stem; the web titles endless puzzles per kind | endless prose follows whatever the mined catalog uses, with no second copy of its naming |
+| Don't repeat | `exclude=` with the client's last 20 ids (server cap 50); when every candidate is excluded, any is returned | stateless on the server; the alternative, a client re-request on a repeat, spends the rate limit |
+| Rate limit | 60 per 60 s per IP (`LESSON_RATE_LIMIT`), the `POST /tables` limiter | a puzzle takes seconds; a sustained one a second is a script |
 
 ### Mined puzzles
 
 `uv run python -m tools.mine_puzzles --games N --seed S --workers W --out all.jsonl --shortlist
-app/lessons/mined_puzzles.json`, from `server/`.
+app/lessons/mined_puzzles.json`, from `server/`. `--from all.jsonl` reads an earlier run's
+candidates instead of mining, and `--pool app/lessons/puzzle_pool.json` writes the endless pool;
+both cuts are deterministic for a corpus.
 
 **Source.** Four `T4` seats play `LESSON_RULESET` games, seeds `S … S+N−1`, one game per pool task.
 Expert rather than `FaanBot`, so the positions are ones strong play reaches. Without loadable
@@ -331,6 +349,8 @@ Why this shape:
 | `test_gen_lessons.py` | generator output is deterministic |
 | `test_lesson_themes.py` | `wait_shapes` per shape; each theme on a hand-built position; priority where several apply; every mined puzzle's theme equals `puzzle_theme` on the engine's key |
 | `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; one mined game is deterministic and every record regrades; the committed shortlist regrades |
+| `test_lessons_pool.py` | every pooled key equals `answer_key()`; even kind × band coverage, unique ids, the file is the tool's output; `pick` keeps kind and band and honours `exclude`; pooling one mined game is deterministic |
+| `test_lessons_random.py` | `GET /lessons/random` per kind × band returns a lesson payload shaped like a bundle file; `exclude`; `422` on bad params; the per-IP `429` |
 | `test_frames.py` | the pulled-out frame builders match what `Table` sends |
 | `test_lessons_tutorial.py` | every tutorial runs to its end phase with valid, densely numbered seat-0 frames and each `expect`'s action in its snapshot's `legal_actions`; an illegal move, an `expect` off seat 0's turn, an `auto` for seat 0, a flower or a draw past the stacked wall, and a wrong end phase are rejected; every step's frames equal a live `Table`'s for the same actions |
 
@@ -407,7 +427,8 @@ Phase 3 is complete.
 ### 4. Random endless puzzles
 
 20. `feat(server): mine puzzles from expert self-play with bot difficulty` (done, with `position_from_state` and the first shortlist; "Mined puzzles")
-21. `feat(server): GET /lessons/random`
+21. `feat(server): GET /lessons/random` (done: the pool, `app/lessons/payload.py` shared with the
+    generator, the endpoint; "Random endless puzzles")
 22. `feat(web): endless mode on /learn`
 
 ## Docs to update alongside
@@ -428,7 +449,9 @@ Phase 3 is complete.
 
 | Risk | Notes |
 | --- | --- |
-| Answers ship in the bundle | fine for cosmetic stakes; revisit if puzzles ever feed a leaderboard |
+| Answers ship in the bundle | fine for cosmetic stakes; revisit if puzzles ever feed a leaderboard. Endless puzzles return their key the same way, so the endless streak is honour-system too |
+| Endless pool goes stale | an engine change that moves a key fails `test_lessons_pool.py`; fixing it means re-mining the corpus (~1 h, not committed) and rewriting the pool and shortlist together |
+| Pool cost | ~1.5 MB in the repo and the image, ~18 MB and ~0.4 s on the first request; per request ~1 ms of event-loop time, bounded by the 60/min per-IP limit |
 | Coupling to `ENGINE_VERSION` and the ruleset | a scoring change moves `count_faan` answers. The catalog test and proto-check diff make that loud, but the prose explanations need re-checking by hand |
 | `FromSeed` positions | break on any change to dealing; prefer explicit positions |
 | `safe_discard` | safe is not the same as deducibly safe; content needs care |

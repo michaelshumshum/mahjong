@@ -34,7 +34,7 @@ mahjong/
 │   │   └── scoring/            # patterns.py (faan detectors), faan.py (maximise over
 │   │                           # decompositions), payout.py (faan -> points -> payments)
 │   ├── app/
-│   │   ├── main.py             # FastAPI app, lifespan, /healthz, GET/POST /tables
+│   │   ├── main.py             # FastAPI app, lifespan, /healthz, GET/POST /tables, GET /lessons/random
 │   │   ├── api_models.py       # REST request/response models for main.py
 │   │   ├── ws.py               # WebSocket endpoint, Session
 │   │   ├── table.py            # Table actor: task loop, timers, claim windows, seq/ring
@@ -42,7 +42,7 @@ mahjong/
 │   │   ├── errors.py           # Table exceptions (one per wire error code), TABLE_CLOSED_ERROR
 │   │   ├── clock.py            # now_ms(): server epoch ms for every wire ts/deadline_ts
 │   │   ├── registry.py         # TableRegistry, reaper + table cap, showcase table, shutdown drain
-│   │   ├── rate_limit.py       # POST /tables per-IP RateLimiter
+│   │   ├── rate_limit.py       # per-IP RateLimiter: POST /tables, GET /lessons/random
 │   │   ├── status.py           # ServerStats: bot latency, loop lag, history ring for GET /status (§8)
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── frames.py           # pure outbound frame payloads over views.py (architecture.md §5)
@@ -54,7 +54,9 @@ mahjong/
 │   │   │                       # position.py (build_position, from_seed, position_from_state),
 │   │   │                       # grade.py (answer keys), tutorial.py (tutorial scripts -> seat-0
 │   │   │                       # frames), catalog/ (curated puzzles, one module per track, and
-│   │   │                       # tutorials.py), mined_puzzles.json (mined shortlist, committed)
+│   │   │                       # tutorials.py), mined_puzzles.json (mined shortlist, committed),
+│   │   │                       # payload.py (one puzzle's lesson JSON), pool.py + puzzle_pool.json
+│   │   │                       # (the endless pool behind GET /lessons/random, committed, ~1.5 MB)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
@@ -62,7 +64,8 @@ mahjong/
 │   ├── ml/                     # RL + supervised training (ml.md); stop_signal.py (SIGINT/SIGTERM flag)
 │   ├── tools/gen_protocol.py   # pydantic → TS (+ informational JSON Schema), protocol.md §6
 │   ├── tools/gen_lessons.py    # lesson catalog → web/src/lib/learn/generated/ (protocol.md §6)
-│   ├── tools/mine_puzzles.py   # learn-mode puzzles from Expert self-play, bot-rated difficulty (ADR 0025)
+│   ├── tools/mine_puzzles.py   # learn-mode puzzles from Expert self-play, bot-rated difficulty;
+│   │                           # writes the shortlist and the endless pool (ADR 0025)
 │   └── tests/                  # pytest; pins/ holds pinned fixtures; shared helper modules
 │                               # (game_state, hands, decisions, ws_frames, game_records; testing.md §3)
 ├── web/
@@ -138,6 +141,7 @@ pnpm --dir web dev
 | `UNSTARTED_TABLE_TTL_SECONDS` | 600 | a never-started table with no seat connected is reaped at this age (§8.3) |
 | `FINISHED_TABLE_TTL_SECONDS` | 600 | how long a finished game stays reconnectable before it's reaped (§8.3) |
 | `TABLE_CREATE_RATE_LIMIT` / `TABLE_CREATE_RATE_WINDOW_SECONDS` | 10 / 60; limit `0` disables | `POST /tables` per client IP (§8.3) |
+| `LESSON_RATE_LIMIT` / `LESSON_RATE_WINDOW_SECONDS` | 60 / 60; limit `0` disables | `GET /lessons/random` per client IP ([protocol.md §10](protocol.md)) |
 | `SHOWCASE_TABLE_ID` | `BOTS`; empty disables | [architecture.md §3](architecture.md) |
 | `CLAIM_HOLD_SECONDS` | 1.0 | the pause after every discard and robbable kong that hides whether a claim window opened; `0` disables ([architecture.md §4](architecture.md) "Claim hold") |
 | `LOG_LEVEL` | `info` | |

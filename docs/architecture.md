@@ -37,7 +37,8 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      ┌──────────────────────────────────────────────┐
    Python process    │  FastAPI / Starlette (uvicorn + uvloop)      │
                      │                                              │
-                     │  REST ──── GET/POST /tables, /healthz        │
+                     │  REST ──── GET/POST /tables, /healthz,       │
+                     │            GET /lessons/random               │
                      │                                              │
                      │  WS endpoint ──► Session (thin)              │
                      │                    · bind seat from          │
@@ -68,7 +69,10 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      │  bots/ ─────────────────┘ (same seat_view,   │
                      │                       worker pool, §3)       │
                      │  app/lessons/ ──────────┘ (positions built   │
-                     │                       and graded offline)    │
+                     │                       and graded offline;    │
+                     │                       the endless pool is    │
+                     │                       served with its keys   │
+                     │                       stored)                │
                      └──────────────────────────────────────────────┘
                                 │
                            Postgres
