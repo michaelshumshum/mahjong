@@ -2,7 +2,7 @@ import { flushSync } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupAll, render } from '$lib/table/test-render';
 import defence01 from './generated/defence-01.json';
-import efficiency01 from './generated/efficiency-01.json';
+import efficiency02 from './generated/efficiency-02.json';
 import faan02 from './generated/faan-02.json';
 import isolatedHonour from './generated/basics-isolated-honour.json';
 import keepTwoSided from './generated/basics-keep-two-sided.json';
@@ -102,7 +102,7 @@ describe('AnswerPanel', () => {
 	});
 
 	it('keeps the tables out of the live region', () => {
-		const target = answered(efficiency01, { kind: 'best_discard', tile: '6m' });
+		const target = answered(efficiency02, { kind: 'best_discard', tile: '3m' });
 		const live = byTestId(target, 'answer-feedback');
 		expect(live.getAttribute('role')).toBe('status');
 		expect(live.querySelector('table')).toBeNull();
@@ -112,13 +112,16 @@ describe('AnswerPanel', () => {
 
 describe('AnswerPanel best_discard feedback', () => {
 	it('a wrong pick: the options table with answers and pick marked, and why it is worse', () => {
-		const target = answered(efficiency01, { kind: 'best_discard', tile: '6m' });
+		const target = answered(efficiency02, { kind: 'best_discard', tile: '3m' });
 		const table = rows(target, 'discard-table');
-		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['4m', '7m']);
-		expect(table.find((r) => r.picked)).toMatchObject({ tile: '6m', cells: ['1 away', '6', '12'] });
-		expect(table[0].cells).toEqual(['Ready', '2', '4']);
+		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['9p', '4s']);
+		expect(table.find((r) => r.picked)).toMatchObject({
+			tile: '3m',
+			cells: ['2 away', '16', '41']
+		});
+		expect(table[0].cells).toEqual(['1 away', '3', '10']);
 		expect(lines(target)['discard-compare']).toEqual([
-			'Discarding 6 Characters leaves you further from ready than discarding 4 Characters.'
+			'Discarding 3 Characters leaves you further from ready than discarding 9 Dots.'
 		]);
 	});
 
@@ -130,11 +133,11 @@ describe('AnswerPanel best_discard feedback', () => {
 	});
 
 	it('a right pick: the table, no comparison', () => {
-		const target = answered(efficiency01, { kind: 'best_discard', tile: '7m' });
+		const target = answered(efficiency02, { kind: 'best_discard', tile: '4s' });
 		expect(byTestId(target, 'answer-feedback').dataset.result).toBe('correct');
 		expect(lines(target)).toEqual({});
 		expect(rows(target, 'discard-table').find((r) => r.picked)).toMatchObject({
-			tile: '7m',
+			tile: '4s',
 			answer: true
 		});
 	});
@@ -175,9 +178,11 @@ describe('AnswerPanel winning_tiles feedback', () => {
 describe('AnswerPanel safe_discard feedback', () => {
 	it('correct: the stated reason, and every tile with its outcome', () => {
 		const target = answered(defence01, { kind: 'safe_discard', tile: '2m' });
-		expect(lines(target)).toEqual({ why: ["Why it's safe: every copy is visible."] });
+		expect(lines(target)).toEqual({
+			why: ["Why it's safe: every copy is visible and no run can be waiting on it."]
+		});
 		const table = rows(target, 'safe-table');
-		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['1m', '2m', '6m']);
+		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['1m', '2m']);
 		expect(table.find((r) => r.tile === '4m')?.cells).toEqual([
 			"Safe this time, but you couldn't know"
 		]);

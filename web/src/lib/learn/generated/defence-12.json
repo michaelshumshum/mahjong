@@ -3,41 +3,36 @@
 	"engine_version": "1.3.0",
 	"id": "defence-12",
 	"key": {
-		"correct": ["9m"],
+		"correct": ["9p"],
 		"options": [
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "2m"
+				"tile": "5p"
+			},
+			{
+				"deals_in_to": [],
+				"reasons": ["no_chance"],
+				"tile": "9p"
 			},
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "3m"
-			},
-			{
-				"deals_in_to": [],
-				"reasons": [],
-				"tile": "7m"
-			},
-			{
-				"deals_in_to": [],
-				"reasons": ["genbutsu", "all_copies_visible"],
-				"tile": "9m"
+				"tile": "3s"
 			},
 			{
 				"deals_in_to": [1],
-				"reasons": ["all_copies_visible"],
-				"tile": "3p"
+				"reasons": [],
+				"tile": "8s"
 			},
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "z4"
+				"tile": "z7"
 			}
 		],
-		"reason": "genbutsu",
-		"safe": ["2m", "3m", "7m", "9m", "z4"]
+		"reason": "no_chance",
+		"safe": ["5p", "9p", "3s", "z7"]
 	},
 	"kind": "safe_discard",
 	"lesson_kind": "puzzle",
@@ -46,95 +41,101 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [8, 7, 10, 13],
+			"concealed_counts": [8, 10, 7, 10],
 			"deadline_ts": null,
-			"dealer": 0,
+			"dealer": 3,
 			"discard_pools": [
-				[88, 76, 45, 89, 52, 77, 92, 72, 112, 48, 104, 105, 116, 132, 100, 124],
-				[12, 73, 28, 93, 80, 96, 113, 33, 84, 133, 29, 13, 85, 97, 74],
-				[114, 65, 134, 39, 40, 117, 46, 69, 70, 62, 82, 34, 30, 18, 87, 78],
-				[41, 47, 23, 15, 7, 55, 42, 35, 135, 115, 95, 99, 106, 75, 125]
+				[92, 20, 88, 28, 112, 120, 48, 76, 84, 21],
+				[8, 0, 22, 32, 36, 56, 49, 24, 113, 133],
+				[37, 54, 97, 101, 44, 45, 29, 16, 86, 119, 67],
+				[50, 63, 17, 18, 7, 40, 38, 19, 15, 30]
 			],
-			"drawn_tile": 121,
-			"flowers": [["f3", "f5"], ["f7", "f1", "f2"], ["f6"], ["f8"]],
+			"drawn_tile": 132,
+			"flowers": [["f7", "f6", "f8"], [], ["f3", "f1"], ["f2"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 125
+				"tile_id": 30
 			},
 			"legal_actions": [
 				{
 					"kind": "discard",
-					"tile_id": 4
+					"tile_id": 52
 				},
 				{
 					"kind": "discard",
-					"tile_id": 8
+					"tile_id": 53
 				},
 				{
 					"kind": "discard",
-					"tile_id": 9
+					"tile_id": 68
 				},
 				{
 					"kind": "discard",
-					"tile_id": 24
+					"tile_id": 69
 				},
 				{
 					"kind": "discard",
-					"tile_id": 32
+					"tile_id": 80
 				},
 				{
 					"kind": "discard",
-					"tile_id": 44
+					"tile_id": 81
 				},
 				{
 					"kind": "discard",
-					"tile_id": 120
+					"tile_id": 100
 				},
 				{
 					"kind": "discard",
-					"tile_id": 121
+					"tile_id": 132
 				}
 			],
 			"melds": [
 				[
 					{
-						"from_seat": 1,
+						"from_seat": 3,
 						"kind": "pung",
-						"tiles": [0, 1, 2]
+						"tiles": [12, 13, 14]
 					},
 					{
-						"from_seat": 1,
+						"from_seat": 3,
 						"kind": "pung",
-						"tiles": [128, 129, 130]
+						"tiles": [60, 61, 62]
+					}
+				],
+				[
+					{
+						"from_seat": 2,
+						"kind": "pung",
+						"tiles": [116, 117, 118]
 					}
 				],
 				[
 					{
 						"from_seat": 3,
 						"kind": "pung",
-						"tiles": [36, 37, 38]
+						"tiles": [4, 5, 6]
 					},
 					{
 						"from_seat": 0,
-						"kind": "chow",
-						"tiles": [61, 64, 68]
+						"kind": "pung",
+						"tiles": [64, 65, 66]
 					}
 				],
 				[
 					{
 						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [90, 94, 98]
+						"kind": "pung",
+						"tiles": [89, 90, 91]
 					}
-				],
-				[]
+				]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [4, 8, 9, 24, 32, 44, 120, 121],
+			"own_hand": [52, 53, 68, 69, 80, 81, 100, 132],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -173,14 +174,14 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 22
+			"wall_remaining": 44
 		},
 		"seq": 0,
 		"t": "state_sync",
 		"ts": 0,
 		"v": 1
 	},
-	"text": "minedDefenceGenbutsu",
-	"theme": "genbutsu",
+	"text": "minedDefenceNoChance",
+	"theme": "walled_runs",
 	"track": "defence"
 }

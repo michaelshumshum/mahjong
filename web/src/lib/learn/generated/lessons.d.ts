@@ -7,7 +7,7 @@ export type LessonKind = 'puzzle' | 'tutorial';
 export type PuzzleKind = 'winning_tiles' | 'best_discard' | 'count_faan' | 'safe_discard';
 export type Track = 'basics' | 'waits' | 'efficiency' | 'defence' | 'faan';
 export type Band = 'beginner' | 'intermediate' | 'advanced';
-export type SafeReason = 'genbutsu' | 'all_copies_visible' | 'no_chance';
+export type SafeReason = 'all_copies_visible' | 'no_chance';
 export type PuzzleTheme =
 	| 'too_cheap'
 	| 'dead_wait'
@@ -25,7 +25,6 @@ export type PuzzleTheme =
 	| 'cut_floater'
 	| 'break_pair'
 	| 'most_tiles'
-	| 'genbutsu'
 	| 'walled_runs'
 	| 'dead_honour'
 	| 'all_visible'

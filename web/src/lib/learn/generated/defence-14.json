@@ -3,11 +3,11 @@
 	"engine_version": "1.3.0",
 	"id": "defence-14",
 	"key": {
-		"correct": ["7p", "9p"],
+		"correct": ["8p", "9p"],
 		"options": [
 			{
 				"deals_in_to": [],
-				"reasons": ["all_copies_visible"],
+				"reasons": [],
 				"tile": "7p"
 			},
 			{
@@ -26,7 +26,7 @@
 				"tile": "2s"
 			}
 		],
-		"reason": "all_copies_visible",
+		"reason": "no_chance",
 		"safe": ["7p", "8p", "9p"]
 	},
 	"kind": "safe_discard",
@@ -184,7 +184,7 @@
 		"ts": 0,
 		"v": 1
 	},
-	"text": "minedDefenceAllCopiesVisible",
-	"theme": "all_visible",
+	"text": "minedDefenceNoChance",
+	"theme": "walled_runs",
 	"track": "defence"
 }

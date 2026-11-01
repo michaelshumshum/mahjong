@@ -67,7 +67,7 @@
 			},
 			{
 				"deals_in_to": [],
-				"reasons": ["genbutsu", "all_copies_visible"],
+				"reasons": ["all_copies_visible"],
 				"tile": "z3"
 			}
 		],
@@ -84,7 +84,7 @@
 			"concealed_counts": [14, 13, 13, 13],
 			"deadline_ts": null,
 			"dealer": 1,
-			"discard_pools": [[112], [117], [118], [119]],
+			"discard_pools": [[112, 69], [117, 70], [118, 71], [119]],
 			"drawn_tile": 72,
 			"flowers": [[], [], [], []],
 			"hand_history": [],
@@ -194,7 +194,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 87
+			"wall_remaining": 84
 		},
 		"seq": 0,
 		"t": "state_sync",

@@ -403,8 +403,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 2,
-		"text": "minedDefenceGenbutsu",
-		"theme": "genbutsu",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -413,8 +413,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 3,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -423,8 +423,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 4,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -433,8 +433,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 5,
-		"text": "minedDefenceGenbutsu",
-		"theme": "genbutsu",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -453,8 +453,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 7,
-		"text": "minedDefenceGenbutsu",
-		"theme": "genbutsu",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -463,8 +463,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 8,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -473,8 +473,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 9,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -483,8 +483,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 10,
-		"text": "minedDefenceGenbutsu",
-		"theme": "genbutsu",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -503,8 +503,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 12,
-		"text": "minedDefenceGenbutsu",
-		"theme": "genbutsu",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -513,8 +513,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 13,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -523,8 +523,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 14,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -533,8 +533,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 15,
-		"text": "minedDefenceGenbutsu",
-		"theme": "genbutsu",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "dead_honour",
 		"track": "defence"
 	},
 	{

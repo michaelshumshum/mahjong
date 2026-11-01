@@ -196,13 +196,13 @@ const PAGES = [
 			await solveTwoSidedWait(page);
 		}
 	},
-	// best-discard feedback: a wrong pick (6 Characters, tile id 20), so the comparison line shows
+	// best-discard feedback: a wrong pick (3 Characters, tile id 8), so the comparison line shows
 	// above the options table.
 	{
 		name: 'learn-puzzle-feedback',
-		url: '/learn/efficiency-01',
+		url: '/learn/efficiency-02',
 		async before(page) {
-			const tile = page.locator('.seat-region--self [data-tile-id="20"]');
+			const tile = page.locator('.seat-region--self [data-tile-id="8"]');
 			await tile.click();
 			await tile.click();
 			await page.getByTestId('discard-table').waitFor();

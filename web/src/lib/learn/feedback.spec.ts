@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import defence01 from './generated/defence-01.json';
-import efficiency01 from './generated/efficiency-01.json';
+import efficiency02 from './generated/efficiency-02.json';
 import faan02 from './generated/faan-02.json';
 import keepTwoSided from './generated/basics-keep-two-sided.json';
 import waits12 from './generated/waits-12.json';
@@ -19,18 +19,18 @@ import {
 	waitsFeedback
 } from './feedback';
 
-const discardKey = efficiency01.key as BestDiscardKey;
+const discardKey = efficiency02.key as BestDiscardKey;
 const waitsKey = waits12.key as WinningTilesKey;
 const safeKey = defence01.key as SafeDiscardKey;
 const faanKey = faan02.key as CountFaanKey;
 
 describe('discardRows', () => {
 	it('lists every option best first, marking the answers and the pick', () => {
-		const rows = discardRows(discardKey, '6m');
+		const rows = discardRows(discardKey, '3m');
 		expect(rows).toHaveLength(discardKey.options.length);
-		expect(rows.slice(0, 2).map((r) => r.tile)).toEqual(['4m', '7m']);
-		expect(rows.filter((r) => r.correct).map((r) => r.tile)).toEqual(['4m', '7m']);
-		expect(rows.filter((r) => r.picked).map((r) => r.tile)).toEqual(['6m']);
+		expect(rows.slice(0, 2).map((r) => r.tile)).toEqual(['9p', '4s']);
+		expect(rows.filter((r) => r.correct).map((r) => r.tile)).toEqual(['9p', '4s']);
+		expect(rows.filter((r) => r.picked).map((r) => r.tile)).toEqual(['3m']);
 		const later = rows.slice(2);
 		expect(later.every((r, i) => i === 0 || r.tiles <= later[i - 1].tiles)).toBe(true);
 	});
@@ -44,7 +44,7 @@ describe('discardComparison', () => {
 	});
 
 	it('is null for a right pick', () => {
-		expect(discardComparison(discardKey, '7m')).toBeNull();
+		expect(discardComparison(discardKey, '4s')).toBeNull();
 	});
 });
 

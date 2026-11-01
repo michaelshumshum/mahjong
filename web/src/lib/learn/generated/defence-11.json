@@ -3,36 +3,36 @@
 	"engine_version": "1.3.0",
 	"id": "defence-11",
 	"key": {
-		"correct": ["8s"],
+		"correct": ["4p"],
 		"options": [
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "5m"
-			},
-			{
-				"deals_in_to": [3],
-				"reasons": [],
-				"tile": "5p"
+				"tile": "6m"
 			},
 			{
 				"deals_in_to": [],
-				"reasons": ["no_chance"],
-				"tile": "6s"
+				"reasons": [],
+				"tile": "9m"
 			},
 			{
 				"deals_in_to": [],
 				"reasons": ["all_copies_visible", "no_chance"],
-				"tile": "8s"
+				"tile": "4p"
 			},
 			{
-				"deals_in_to": [],
+				"deals_in_to": [3],
 				"reasons": [],
-				"tile": "z5"
+				"tile": "6s"
+			},
+			{
+				"deals_in_to": [3],
+				"reasons": [],
+				"tile": "9s"
 			}
 		],
 		"reason": "all_copies_visible",
-		"safe": ["5m", "6s", "8s", "z5"]
+		"safe": ["6m", "9m", "4p"]
 	},
 	"kind": "safe_discard",
 	"lesson_kind": "puzzle",
@@ -41,33 +41,49 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [5, 10, 4, 10],
+			"concealed_counts": [8, 10, 10, 7],
 			"deadline_ts": null,
 			"dealer": 3,
 			"discard_pools": [
-				[68, 24, 56, 44, 32, 53, 33, 112, 108, 120, 34, 35, 109, 113, 81],
-				[89, 73, 45, 64, 102, 77, 114, 78, 110, 121, 97, 132, 60],
-				[1, 10, 115, 98, 85, 86, 99, 2, 87, 103, 116, 82, 111, 122, 74, 133],
-				[83, 25, 5, 75, 22, 94, 90, 105, 29, 63, 11, 134, 71, 125, 30]
+				[36, 64, 72, 100, 28, 84, 12, 132, 116, 96, 120, 128],
+				[117, 133, 85, 108, 44, 86, 52, 56, 101, 57, 53],
+				[37, 88, 50, 118, 54, 58, 134, 26, 38, 129, 45],
+				[15, 51, 0, 43, 8, 1, 61, 39, 9, 130, 121, 30, 55, 90]
 			],
-			"drawn_tile": 124,
-			"flowers": [["f1", "f3"], ["f7"], ["f8"], []],
+			"drawn_tile": 104,
+			"flowers": [[], ["f5"], ["f2", "f4"], ["f7", "f6", "f1"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 30
+				"tile_id": 90
 			},
 			"legal_actions": [
 				{
 					"kind": "discard",
-					"tile_id": 16
+					"tile_id": 20
 				},
 				{
 					"kind": "discard",
-					"tile_id": 52
+					"tile_id": 21
+				},
+				{
+					"kind": "discard",
+					"tile_id": 32
+				},
+				{
+					"kind": "discard",
+					"tile_id": 33
+				},
+				{
+					"kind": "discard",
+					"tile_id": 48
+				},
+				{
+					"kind": "discard",
+					"tile_id": 49
 				},
 				{
 					"kind": "discard",
@@ -75,65 +91,51 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 100
-				},
-				{
-					"kind": "discard",
-					"tile_id": 124
+					"tile_id": 104
 				}
 			],
 			"melds": [
 				[
 					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [84, 88, 93]
+						"from_seat": 1,
+						"kind": "pung",
+						"tiles": [68, 69, 70]
 					},
 					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [72, 76, 80]
-					},
-					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [96, 101, 104]
+						"from_seat": 2,
+						"kind": "pung",
+						"tiles": [124, 125, 126]
 					}
 				],
 				[
 					{
 						"from_seat": 0,
 						"kind": "chow",
-						"tiles": [4, 9, 14]
-					}
-				],
-				[
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [36, 41, 46]
-					},
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [61, 65, 69]
-					},
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [42, 47, 48]
+						"tiles": [25, 29, 34]
 					}
 				],
 				[
 					{
 						"from_seat": 0,
 						"kind": "pung",
-						"tiles": [117, 118, 119]
+						"tiles": [40, 41, 42]
+					}
+				],
+				[
+					{
+						"from_seat": 1,
+						"kind": "pung",
+						"tiles": [81, 82, 83]
+					},
+					{
+						"from_seat": 0,
+						"kind": "pung",
+						"tiles": [73, 74, 75]
 					}
 				]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [16, 52, 92, 100, 124],
+			"own_hand": [20, 21, 32, 33, 48, 49, 92, 104],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -172,7 +174,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 28
+			"wall_remaining": 37
 		},
 		"seq": 0,
 		"t": "state_sync",
