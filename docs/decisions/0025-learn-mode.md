@@ -90,7 +90,7 @@ into `app/frames.py` ([architecture.md §5](../architecture.md) "Frame building"
 | --- | --- |
 | `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`; `Tutorial` with its steps (`Narrate`, `Expect`, `Auto`, each move a `Move(ActionKind, tiles)`); `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`, `Band`, `Track`, `StepKind`, `Highlight`. Wire vocabulary, emitted to TS by `gen_lessons` |
 | `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `discard_on(state, tile)` (claim positions), `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
-| `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`, `key_from_dict` (a key back from the shortlist's JSON); runtime-safe |
+| `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`, `key_from_dict` (a key back from the shortlist's JSON), `reaches_min_faan` (the miner's value filter); runtime-safe |
 | `themes.py` | `puzzle_theme(key, hand) -> PuzzleTheme`, what a puzzle teaches ("Themes" below); pure |
 | `catalog/*.py` | content: `basics` (hand-written, one teaching point each), `mined` (the shortlist, one `Track` per kind: `waits`, `efficiency`, `defence`, `faan`) and `tutorials` (`TUTORIALS`); `CATALOG` is `/learn`'s puzzle order |
 | `tutorial.py` | `run_tutorial(tutorial) -> TutorialRun`: plays and validates a script, and builds seat 0's frame stream with `app/frames.py` (protocol.md §6 "Tutorials") |
@@ -251,13 +251,33 @@ dealing; `source` (`game_seed`, `decision` = step index, `seat`) replays the liv
 
 | Kind | Kept when | Why |
 | --- | --- | --- |
-| `best_discard` | best shanten after the discard ≤ 2; 1–2 correct tiles; a naive pick (the most isolated tile: fewest extra copies and same-suit neighbours within two ranks, honours then terminals first, blind to shanten) is not correct; and the answer accepts ≥ 4 more live tiles than the best wrong discard at the same shanten | far from tenpai there is rarely one answer; ties of 3+ stop being about a shape; a pick the naive heuristic finds teaches nothing; a lead under one tile type's four copies is noise |
+| `best_discard` | best shanten after the discard ≤ 2; 1–2 correct tiles; a naive pick (the most isolated tile: fewest extra copies and same-suit neighbours within two ranks, honours then terminals first, blind to shanten) is not correct; the answer accepts ≥ 4 more live tiles than the best wrong discard at the same shanten; and every correct tile keeps a route to `min_faan` ("Value filter") | far from tenpai there is rarely one answer; ties of 3+ stop being about a shape; a pick the naive heuristic finds teaches nothing; a lead under one tile type's four copies is noise; an efficient discard that leaves the hand unable to win is not a right answer |
 | `safe_discard` | some discard the efficient answer (`best_discard`'s) would make deals in; 1–3 hand tiles have a deduction ("Safe-discard deductions"), none of them deals in, none is an efficient answer, and they share a reason (all-copies-visible preferred, else no-chance); `accepted` = all of them | a real fold: the natural discard loses; a deducible tile that deals in (a no-chance tile into a pair wait) would teach a false rule; a deducible tile that is also efficient makes folding free, so nothing is taught; one shared reason keeps the explanation true; a deduction that clears half the hand isn't one worth asking for |
 | `winning_tiles` | at least one live winning tile, and ≥ 2 of them, or a wait below `min_faan`, or a dead wait | a single clean wait is a lookup |
 | `count_faan` | a self-draw, or a discard win (the record's `discard` is reduced on the rebuilt position, "Claim positions"), scoring ≥ 2 patterns | one pattern is a lookup |
 
 Duplicates (same kind, seat-0 hand and melds, and the same visible tiles; for `winning_tiles` the
 same waits, for `count_faan` the same breakdown) keep their first sighting in seed order.
+
+**Value filter** (`best_discard`). The key is pure efficiency, but `hk_classic` needs 3 faan, and
+an open hand often has one route to it, typically a flush in its exposed chows' suit. Efficiency
+can then rank first a discard that throws that suit while off-suit tiles stay (two exposed dots
+chows, `8m 1p 2p 3p 4p 7p 2s 6s`, two flowers not the seat's own: 7p was accepted, and leaves
+2 faan at most). `grade.reaches_min_faan(state, seat, tile)` decides it on the engine:
+
+| Step | Rule |
+| --- | --- |
+| route | from the hand after the discard, every live draw that lowers shanten, paired with each discard that keeps it lowered, down to ready (the shortest route; a detour through a worse shape doesn't count) |
+| at ready | some live wait clears `min_faan` by discard or self-draw, scored by `grade.winning_tiles` with the real scorer, flowers, winds and melds included |
+| claims | not searched: a claimed set holds the same tiles as a drawn one, and once open, exposure changes no `hk_classic` pattern; for a closed hand the draw route keeps 門前清, the optimistic side |
+| bound | depth = shanten after the discard, ≤ 2 by the shanten filter; early exit on the first route found |
+| cost | ~4 ms per candidate on average, 0.9 s at worst (a depth-2 hand with no route, searched in full), on the laptop: ~225 s of CPU over the corpus's 56,586 candidates, under a minute on 8 workers |
+
+A candidate is rejected when any correct tile fails, rather than dropping that tile from the key:
+grading semantics stay "lowest shanten, then most tiles", and a puzzle whose answer set needs a
+value caveat isn't an efficiency lesson. Closed hands get the check too: measured on the
+`T4`-agreed candidates, 1,230 of 21,709 closed ones (5.7%) fail (with flowers that aren't its own, so no 無花
+or 正花, and no pattern, a closed hand tops out at 門前清 + 自摸 = 2), against 4,460 of 19,303 open ones (23%).
 
 **Difficulty, decision kinds** (`best_discard`, `safe_discard`). Each tier that plays on a plain
 `seat_view` answers the rebuilt position from seat 0; `ORACLE` sees every hand, so it is not
@@ -276,7 +296,23 @@ asked. Rates per tier:
 | Kind | Beginner | Intermediate | Advanced | Reading |
 | --- | --- | --- | --- | --- |
 | `safe_discard` | < 0.55 | < 0.85 | ≥ 0.85 | about: `T2` and `T4` both right / one misses / both miss |
-| `best_discard` | < 0.28 | < 0.32 | ≥ 0.32 | terciles of an 80-game calibration run: after the filters `T2` and `T4` solve nearly every kept puzzle, so the spread comes from the option count (`T0`) and the policy's confidence |
+| `best_discard` | < 0.28 | < 0.32 | ≥ 0.32 | terciles of an 80-game calibration run: after the filters `T2` and `T4` solve nearly every kept puzzle, so the spread comes from the option count (`T0`) and the policy's confidence; capped below by shape (next table) |
+
+The score alone rated trivial puzzles advanced: an open hand has few discard options, so `T0`
+misses often and the policy spreads its mass, though one discard is plainly right (`1s 2s 2s 6s
+7s` with three sou melds: only 1s reaches ready). `best_discard_band` caps the band where shanten
+alone decides, i.e. every wrong discard ends further from ready than the answer (a sole shanten
+drop; tied answers count as one):
+
+| Sole shanten drop to | Band at most | Why |
+| --- | --- | --- |
+| ready (shanten 0; theme `reach_ready`) | beginner | try each discard and see which leaves a wait: no tile counting, and the waits are on the board |
+| 1 or 2 | intermediate | the player has to count blocks to see every other cut loses a step, a real skill, but still no ukeire comparison, which is what advanced asks for |
+
+No cap where a wrong discard ties the answer's shanten: the answer then wins on live tiles, the
+comparison the score's spread was calibrated on. Measured on the corpus, 32,877 of the 41,012
+`T4`-agreed candidates were sole drops (31,027 at ready), and 22,747 of the 46,759 candidates
+the value filter keeps moved band.
 
 **Difficulty, structural kinds.** No decision to ask a bot about, so a proxy:
 
@@ -288,7 +324,8 @@ asked. Rates per tier:
 **Shortlist.** Per kind up to 15, round-robin across bands, and within a band round-robin across
 best shanten (`best_discard`), reason (`safe_discard`), wait count (`winning_tiles`) or faan total
 (`count_faan`). The `best_discard` key is pure efficiency, which a value play under `min_faan` can
-beat, so the shortlist keeps a `best_discard` only where `T4` also played a correct answer.
+beat, so the shortlist keeps a `best_discard` only where `T4` also played a correct answer, on
+top of the value filter, which rejects the candidates where no route reaches it.
 `tests/test_mine_puzzles.py` regrades every shortlisted record and fails when an engine change
 moves one.
 
@@ -305,11 +342,19 @@ all tracks, or the same seat within `SAME_HAND_WINDOW` = 60 decisions in any tra
 | Shortlist | Source games | Most from one game | From the top two games | Same seat within 60 |
 | --- | --- | --- | --- | --- |
 | before (`44d4590`) | 23 | 15 | 28 | 28 pairs |
-| now | 48 | 2 | 4 | 0 |
-| pool before / now | 449 / 732 | 61 / 4 | 98 / 8 | 563 / 39 pairs (now only across kinds) |
+| now | 46 | 2 | 4 | 0 |
+| pool before / now | 449 / 726 | 61 / 4 | 98 / 8 | 563 / 45 pairs (now only across kinds) |
+
+A skip moves to the next record in the band's round-robin, which belongs to the next spread
+value, so a value whose records crowd into few games is thinned: the pool's beginner
+`best_discard` 100 hold 14 at shanten 0, 70 at 1 and 16 at 2, though its candidates are mostly
+shanten 0 (sole drops to ready, capped there).
 
 Shortlist ids are positional, so a re-cut moves them and resets saved progress on the mined
-tracks; 24 of the 60 records survived this one, 12 under the same id.
+tracks; 24 of the 60 records survived the per-game cut, 12 under the same id. The value filter
+and band cap re-cut kept 53 of those 60 and moved `efficiency-03`, `-05` and `-09` to `-15`, and
+`faan-10` (a defence or faan pick shifts when a `best_discard` from its game leaves the shortlist,
+since the per-game cap counts every track).
 
 **Current run** (laptop, i7-1265U, 8 workers, ~59 min wall, engine 1.3.0): 6,000 games, seeds
 20,000,000–20,005,999; 3,655,016 decisions, 2,993,369 turns scanned; 55,735 candidate positions
@@ -321,19 +366,26 @@ shortlist and pool:
 | first | graded `best_discard` with exposed meld tiles regroupable (the bots' whole-hand shanten, [bots.md §3](../bots.md)), which picked wrong answers for melded hands; now `melds=n` |
 | second | `safe_discard` counted every copy of a suited tile visible and genbutsu as deductions, and accepted only the first reason's tiles: 103 of the pool's 300 defence puzzles rested on a suited all-copies-visible tile, several such tiles dealt in, and 104 had an accepted tile among the efficient answers. Now "Safe-discard deductions" and the tension filter |
 
-`--from` re-cuts a corpus without regrading or re-filtering it, so a filter change means a full
-re-mine. Re-mining also re-rates every kind against the current bot tiers, so two `best_discard`
-shortlist entries changed with the defence fix.
+`--from` re-cuts a corpus without regrading it or re-running the bot tiers. It re-applies only
+what reads the stored key and position (`recheck`): the value filter and the `best_discard` band
+cap, on the stored score. Any other filter change means a full re-mine, which also re-rates every
+kind against the current bot tiers (two `best_discard` shortlist entries changed with the
+defence fix). The value filter and band cap came in as such a re-cut of this corpus, no re-mine:
+9,827 `best_discard` candidates rejected, 22,747 re-banded; of the previous pool's 300, 36 were
+rejected (16 advanced, 13 beginner, 7 intermediate) and 14 re-banded down (13 from advanced), and
+of the previous shortlist's 15, 2 were rejected. The pool's `best_discard` cells keep 170 of
+their 300; the other kinds' 900 are unchanged.
 
 | Kind | Kept | Beginner | Intermediate | Advanced |
 | --- | --- | --- | --- | --- |
-| `best_discard` | 56,586 | 11,444 | 16,615 | 28,527 |
+| `best_discard` | 46,759 (56,586 mined) | 31,582 | 4,315 | 10,862 |
 | `safe_discard` | 16,551 | 811 | 4,466 | 11,274 |
 | `winning_tiles` | 57,488 | 44,032 | 13,076 | 380 |
 | `count_faan` | 30,029 (17,521 discard wins) | 9,325 | 13,944 | 6,760 |
 
-15,574 of the `best_discard` candidates (28%) are ones where `T4` played something else, nearly
-all scored advanced; the shortlist leaves them out. `safe_discard` stated reasons: no-chance
+11,437 of the kept `best_discard` candidates (24%) are ones where `T4` played something else,
+nearly all scored advanced; the shortlist and pool leave them out, which leaves 27,564 / 3,707 /
+4,051 per band to cut from. `safe_discard` stated reasons: no-chance
 12,774, all copies visible 3,777 (1,184 of them honours only); accepted tiles per puzzle 1 /
 2 / 3: 10,535 / 4,430 / 1,586. The pool's 300 split 194 all copies visible / 106 no-chance; the
 shortlist's 15 are 8 / 7.
@@ -359,12 +411,12 @@ current 60-puzzle shortlist.
 | | `many_sided` | 3+ tile types complete the hand | 5 |
 | | `two_sided` / `pair_wait` / `single_wait` / `edge_closed` | every completing type plays only that shape, over every standard split of hand + tile (`wait_shapes`: two-sided, edge 12-3 / 89-7, closed, pung of a pair, pair) | 2 / 1 / 1 / 0 |
 | | `mixed_wait` | otherwise (66+68 closed or 666+8 single) | 1 |
-| `best_discard` | `wider_wait` | the answer reaches ready and so does a wrong discard, with fewer tiles | 1 |
-| | `reach_ready` | the answer reaches ready and nothing else does | 2 |
+| `best_discard` | `wider_wait` | the answer reaches ready and so does a wrong discard, with fewer tiles | 4 |
+| | `reach_ready` | the answer reaches ready and nothing else does (always beginner, "Difficulty, decision kinds") | 1 |
 | | `trim_run` | an answer ends four or more held consecutive ranks (1 of 1234) | 1 |
-| | `cut_terminal` | an answer is a suited 1 or 9 | 5 |
+| | `cut_terminal` | an answer is a suited 1 or 9 | 4 |
 | | `keep_two_sided` | a lone answer two from a held tile with a neighbour beyond (2 of 245) | 3 |
-| | `cut_floater` | a lone honour, or a lone suited tile with nothing held within two ranks | 2 |
+| | `cut_floater` | a lone honour, or a lone suited tile with nothing held within two ranks | 1 |
 | | `break_pair` | an answer is held twice or more | 1 |
 | | `most_tiles` | otherwise | 0 |
 | `safe_discard` | `walled_runs` | the stated reason is no-chance | 7 |
@@ -372,7 +424,7 @@ current 60-puzzle shortlist.
 | | `all_visible` | otherwise (all copies visible, a suited tile among them) | 7 |
 | `count_faan` | `limit_hand` | a limit pattern | 0 |
 | | `full_flush` | 清一色 | 4 |
-| | `half_flush_pungs` / `half_flush_honours` / `half_flush` | 混一色 with 對對糊 / with 箭刻, 門風 or 圈風 / alone | 4 / 1 / 1 |
+| | `half_flush_pungs` / `half_flush_honours` / `half_flush` | 混一色 with 對對糊 / with 箭刻, 門風 or 圈風 / alone | 3 / 1 / 2 |
 | | `all_pungs` / `all_chows` | 對對糊 / 平糊 | 2 / 2 |
 | | `flowers` | 正花 or 一台花 | 1 |
 | | `small_faan` | otherwise | 0 |
@@ -397,11 +449,11 @@ Why this shape:
 | Test file | Covers |
 | --- | --- |
 | `test_lessons_position.py` | tile conservation; invariants; fifth copy and bad hand sizes rejected; deterministic |
-| `test_lessons_grade.py` | per kind: known waits; a wait below the minimum is excluded; tied discards; safe discard against a known hidden hand; `count_faan` agrees with `check_hand` |
+| `test_lessons_grade.py` | per kind: known waits; a wait below the minimum is excluded; tied discards; safe discard against a known hidden hand; `count_faan` agrees with `check_hand`; `reaches_min_faan` on a one-route open hand (7p kills the flush, 8m keeps it, no flowers adds 無花) and a sole-tenpai full flush |
 | `test_lessons_catalog.py` | parametrized over every lesson (below) |
 | `test_gen_lessons.py` | generator output is deterministic |
 | `test_lesson_themes.py` | `wait_shapes` per shape; each theme on a hand-built position; priority where several apply; every mined puzzle's theme equals `puzzle_theme` on the engine's key |
-| `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; the shortlist's per-game caps and same-hand window on hand-built records; one mined game is deterministic and every record regrades; the committed shortlist regrades and is varied |
+| `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position, the value filter included; difficulty score and bands, and the sole-shanten-drop cap; `recheck` drops and re-bands stored records; the shortlist's per-game caps and same-hand window on hand-built records; one mined game is deterministic and every record regrades; the committed shortlist regrades and is varied; every committed `best_discard` (shortlist and pool) keeps value under its band cap |
 | `test_lessons_pool.py` | every pooled key equals `answer_key()`; even kind × band coverage, unique ids, one per game per kind, the file is the tool's output; `pick` keeps kind and band and honours `exclude`; pooling one mined game is deterministic and takes one per kind |
 | `test_lessons_random.py` | `GET /lessons/random` per kind × band returns a lesson payload shaped like a bundle file; `exclude`; `422` on bad params; the per-IP `429` |
 | `test_frames.py` | the pulled-out frame builders match what `Table` sends |
