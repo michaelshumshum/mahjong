@@ -218,7 +218,7 @@ illegal script fails `make proto`.
 | --- | --- | --- |
 | What the server serves from | a committed pool, `app/lessons/puzzle_pool.json` (~1.5 MB), cut from the full mined corpus by `tools.mine_puzzles --from <corpus.jsonl> --pool …` | the corpus is 256 MB of JSONL and isn't in the repo. Mining on demand means an Expert game per puzzle, and a T4 seat loads numpy and the policy into the API process. 1,200 puzzles is a few hundred per kind, enough that a recent-id skip rarely runs dry, at ~1.1 kB each |
 | Pool size | 100 per kind and band (`POOL_PER_BAND`) | even bands, so the band picker always finds puzzles; `winning_tiles` has only 380 advanced candidates in the corpus. Load is ~0.4 s and ~18 MB on first request, well inside the 1.9 GiB prod box |
-| Which puzzles | per band, the shortlist's own order: round-robin over best shanten / reason / wait count / faan total, `best_discard` only where `T4` agreed | one rule for both cuts (`_by_band`), so the pool is the shortlist continued; the first 15 per kind overlap with the curated tracks, which is harmless |
+| Which puzzles | per band, the shortlist's own order: round-robin over best shanten / reason / wait count / faan total, `best_discard` only where `T4` agreed; one puzzle per source game per kind (`varied`, as the shortlist) | one rule for both cuts (`_by_band`), so the pool is the shortlist continued; many of the curated tracks' picks reappear, which is harmless. No cap across kinds: endless plays one kind at a time, so a game recurring in another kind is never met back to back, and a cross-kind cap would only thin `winning_tiles` advanced (380 candidates) |
 | Grading cost | keys stored in the pool and served as is; `tests/test_lessons_pool.py` regrades all 1,200 against `answer_key()` (~1.5 s) | a `best_discard` key is ~470 shanten evaluations (bots.md §3), ~1.5 ms warm, and safe-discard keys reduce one discard per hand tile. Stored keys make a request ~1 ms whatever the kind, and the regrade test turns any engine change that moves a key into a failing test, as the shortlist's does |
 | Reproducibility | a pool record keeps its explicit `Position`, its `source` (`game_seed`, `decision`, `seat`) as its id, and the pool file the corpus's `engine_version`, `miner_tier` and seed range. `pool()` is deterministic for a corpus, and the corpus for its seeds | an engine change that fails the regrade test means re-mining (~1 h on the laptop) and rewriting both files |
 | Response shape | exactly a generated `<id>.json` puzzle, built by the generator's own `app/lessons/payload.py` | the web plays it through the same page and types it with the generated `Lesson`, so no new wire type and no second builder |
@@ -292,6 +292,25 @@ beat, so the shortlist keeps a `best_discard` only where `T4` also played a corr
 `tests/test_mine_puzzles.py` regrades every shortlisted record and fails when an engine change
 moves one.
 
+The walk then skips (`varied`, in the band it is taking from, so band and spread balance hold) a
+record whose source game already has one puzzle of its kind or `SHORTLIST_GAME_CAP` = 2 across
+all tracks, or the same seat within `SAME_HAND_WINDOW` = 60 decisions in any track.
+
+| Rule | Why |
+| --- | --- |
+| one per game per kind | the walk is in seed order, so uncapped the first games fill every band: before this cut 28 of the 60 came from seeds 20,000,000 and 20,000,001, and one game gave a track 7 puzzles |
+| 2 per game across tracks | 60 puzzles from 6,000 games leaves room for one game per puzzle, but a second puzzle from a game's other seat or a later hand is a different hand and costs nothing; the cap keeps it at a pair |
+| same seat within 60 decisions | `decision` counts every seat's actions and claim answers, so a hand runs ~70–120 of them; the near-duplicates found (defence 294/298/302/308, waits 208/213, a wait at 80 with a best discard at 79 and a faan at 85) sat ≤ 15 apart, the same hand a few draws on with the same answer |
+
+| Shortlist | Source games | Most from one game | From the top two games | Same seat within 60 |
+| --- | --- | --- | --- | --- |
+| before (`44d4590`) | 23 | 15 | 28 | 28 pairs |
+| now | 48 | 2 | 4 | 0 |
+| pool before / now | 449 / 732 | 61 / 4 | 98 / 8 | 563 / 39 pairs (now only across kinds) |
+
+Shortlist ids are positional, so a re-cut moves them and resets saved progress on the mined
+tracks; 24 of the 60 records survived this one, 12 under the same id.
+
 **Current run** (laptop, i7-1265U, 8 workers, ~59 min wall, engine 1.3.0): 6,000 games, seeds
 20,000,000–20,005,999; 3,655,016 decisions, 2,993,369 turns scanned; 55,735 candidate positions
 skipped as unrepresentable; 460,328 duplicates dropped. Earlier runs, each replacing its
@@ -316,8 +335,8 @@ shortlist entries changed with the defence fix.
 15,574 of the `best_discard` candidates (28%) are ones where `T4` played something else, nearly
 all scored advanced; the shortlist leaves them out. `safe_discard` stated reasons: no-chance
 12,774, all copies visible 3,777 (1,184 of them honours only); accepted tiles per puzzle 1 /
-2 / 3: 10,535 / 4,430 / 1,586. The pool's 300 split 150 / 150 by reason; the shortlist's 15 are
-9 all copies visible, 6 no-chance.
+2 / 3: 10,535 / 4,430 / 1,586. The pool's 300 split 194 all copies visible / 106 no-chance; the
+shortlist's 15 are 8 / 7.
 
 ### Themes
 
@@ -336,25 +355,25 @@ current 60-puzzle shortlist.
 | Kind | Theme, in priority order | Holds when | Now |
 | --- | --- | --- | --- |
 | `winning_tiles` | `too_cheap` | a wait completes the hand but clears `min_faan` neither way | 2 |
-| | `dead_wait` | a winning wait has every copy visible | 5 |
-| | `many_sided` | 3+ tile types complete the hand | 3 |
-| | `two_sided` / `pair_wait` / `single_wait` / `edge_closed` | every completing type plays only that shape, over every standard split of hand + tile (`wait_shapes`: two-sided, edge 12-3 / 89-7, closed, pung of a pair, pair) | 2 / 2 / 0 / 0 |
+| | `dead_wait` | a winning wait has every copy visible | 3 |
+| | `many_sided` | 3+ tile types complete the hand | 5 |
+| | `two_sided` / `pair_wait` / `single_wait` / `edge_closed` | every completing type plays only that shape, over every standard split of hand + tile (`wait_shapes`: two-sided, edge 12-3 / 89-7, closed, pung of a pair, pair) | 2 / 1 / 1 / 0 |
 | | `mixed_wait` | otherwise (66+68 closed or 666+8 single) | 1 |
 | `best_discard` | `wider_wait` | the answer reaches ready and so does a wrong discard, with fewer tiles | 1 |
-| | `reach_ready` | the answer reaches ready and nothing else does | 5 |
-| | `trim_run` | an answer ends four or more held consecutive ranks (1 of 1234) | 2 |
-| | `cut_terminal` | an answer is a suited 1 or 9 | 3 |
+| | `reach_ready` | the answer reaches ready and nothing else does | 2 |
+| | `trim_run` | an answer ends four or more held consecutive ranks (1 of 1234) | 1 |
+| | `cut_terminal` | an answer is a suited 1 or 9 | 5 |
 | | `keep_two_sided` | a lone answer two from a held tile with a neighbour beyond (2 of 245) | 3 |
-| | `cut_floater` | a lone honour, or a lone suited tile with nothing held within two ranks | 1 |
-| | `break_pair` | an answer is held twice or more | 0 |
+| | `cut_floater` | a lone honour, or a lone suited tile with nothing held within two ranks | 2 |
+| | `break_pair` | an answer is held twice or more | 1 |
 | | `most_tiles` | otherwise | 0 |
-| `safe_discard` | `walled_runs` | the stated reason is no-chance | 6 |
-| | `dead_honour` | all copies visible, every accepted tile an honour | 2 |
+| `safe_discard` | `walled_runs` | the stated reason is no-chance | 7 |
+| | `dead_honour` | all copies visible, every accepted tile an honour | 1 |
 | | `all_visible` | otherwise (all copies visible, a suited tile among them) | 7 |
 | `count_faan` | `limit_hand` | a limit pattern | 0 |
-| | `full_flush` | 清一色 | 1 |
-| | `half_flush_pungs` / `half_flush_honours` / `half_flush` | 混一色 with 對對糊 / with 箭刻, 門風 or 圈風 / alone | 2 / 3 / 1 |
-| | `all_pungs` / `all_chows` | 對對糊 / 平糊 | 3 / 4 |
+| | `full_flush` | 清一色 | 4 |
+| | `half_flush_pungs` / `half_flush_honours` / `half_flush` | 混一色 with 對對糊 / with 箭刻, 門風 or 圈風 / alone | 4 / 1 / 1 |
+| | `all_pungs` / `all_chows` | 對對糊 / 平糊 | 2 / 2 |
 | | `flowers` | 正花 or 一台花 | 1 |
 | | `small_faan` | otherwise | 0 |
 
@@ -364,8 +383,7 @@ Why this shape:
   dead tile; a 9 that is also the outer tile of 79+6). The first match in a fixed order is
   deterministic and testable, and the order puts what makes the puzzle hard first: a too-cheap
   or dead wait is the trap, the shape comes second.
-- **Themes with no puzzle today** (`single_wait`, `edge_closed`, `break_pair`, `most_tiles`,
-  `limit_hand`, `small_faan`) keep the classifier total for a re-mined shortlist or random
+- **Themes with no puzzle today** (`edge_closed`, `most_tiles`, `limit_hand`, `small_faan`) keep the classifier total for a re-mined shortlist or random
   endless puzzles. The mining filters rule some out (a single clean wait is a lookup; a limit hand
   is one pattern).
 - **Titles only.** Prompts and explanations stay per kind (`text`); a theme adds one
@@ -383,8 +401,8 @@ Why this shape:
 | `test_lessons_catalog.py` | parametrized over every lesson (below) |
 | `test_gen_lessons.py` | generator output is deterministic |
 | `test_lesson_themes.py` | `wait_shapes` per shape; each theme on a hand-built position; priority where several apply; every mined puzzle's theme equals `puzzle_theme` on the engine's key |
-| `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; one mined game is deterministic and every record regrades; the committed shortlist regrades |
-| `test_lessons_pool.py` | every pooled key equals `answer_key()`; even kind × band coverage, unique ids, the file is the tool's output; `pick` keeps kind and band and honours `exclude`; pooling one mined game is deterministic |
+| `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; the shortlist's per-game caps and same-hand window on hand-built records; one mined game is deterministic and every record regrades; the committed shortlist regrades and is varied |
+| `test_lessons_pool.py` | every pooled key equals `answer_key()`; even kind × band coverage, unique ids, one per game per kind, the file is the tool's output; `pick` keeps kind and band and honours `exclude`; pooling one mined game is deterministic and takes one per kind |
 | `test_lessons_random.py` | `GET /lessons/random` per kind × band returns a lesson payload shaped like a bundle file; `exclude`; `422` on bad params; the per-IP `429` |
 | `test_frames.py` | the pulled-out frame builders match what `Table` sends |
 | `test_lessons_tutorial.py` | every tutorial runs to its end phase with valid, densely numbered seat-0 frames and each `expect`'s action in its snapshot's `legal_actions`; an illegal move, an `expect` off seat 0's turn, an `auto` for seat 0, a flower or a draw past the stacked wall, and a wrong end phase are rejected; every step's frames equal a live `Table`'s for the same actions |
