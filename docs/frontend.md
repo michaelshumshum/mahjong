@@ -669,6 +669,7 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped, or the learn tutorial is finished (§7 "Learn"); never shown again in this browser |
 | `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
+| `mahjong:learnEndless:v1` | `{ band, scores: { [PuzzleKind]: { streak, best, solved } } }` (`loadLearnEndless`/`saveLearnEndless`; `lib/learn/endless.ts` updates it) | endless mode's last band and per-kind run, local only. A bad band falls back to beginner and a malformed or unknown kind's score is dropped on its own |
 | `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point (saved at each waiting step after the first, cleared by Restart and at the end, §7 "Learn"). Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
 
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
@@ -774,6 +775,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/profile` | on | placeholder heading only |
 | `/learn` | on | learn index: tracks, lesson cards, solved state (below); skips `ApiConnectGate` |
 | `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
+| `/learn/endless` | off | endless random puzzles, `?kind=<PuzzleKind>&band=<Band>` (band defaults to beginner; an unknown kind or band → 404); fetches `GET /lessons/random`, so behind `ApiConnectGate` (below) |
 | `/status` | on | public server status (below); fetches `GET /status` client-side |
 | `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
@@ -790,7 +792,7 @@ own title would keep the previous page's, e.g. a stale "Your turn · Hoi Toi" af
 
 ### API health gate (`ApiConnectGate`)
 
-Every route except `?mock=`/`/demo`/`/status`/`/learn` is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
+Every route except `?mock=`/`/demo`/`/status`/`/learn` (but not `/learn/endless`) is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
 the root `+layout.svelte`), which polls `GET /healthz` (`lib/net/lobby.ts`'s `waitForApiHealthy`)
 before rendering the page. Without it a page looks interactive before the backend is reachable.
 
@@ -805,6 +807,7 @@ before rendering the page. Without it a page looks interactive before the backen
 - Claims mural visibility (§2) while up, releasing it as the page mounts.
 - Skipped: `?mock=` and `/demo` run with no backend; `/status` reports an unreachable API itself
   (below); `/learn` ships its lessons as static JSON ([ADR 0025](decisions/0025-learn-mode.md)).
+  `/learn/endless` is the exception under `/learn`: its puzzles come from the API.
 
 ### Create a table
 
@@ -971,6 +974,7 @@ render under `?mock=` too.
 Short puzzles with one right answer ([ADR 0025](decisions/0025-learn-mode.md)). No backend: the
 lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](protocol.md)
 "Generated lesson bundle"), so both routes skip `ApiConnectGate` and work with the API down.
+Endless mode (below) is the one part that needs the API.
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
@@ -1025,8 +1029,23 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
   live table keeps the pulse only, §6 "Last-discard marker") and names the tile above the faan
   input.
 
+**Endless.** An "Endless puzzles" section right after basics on `/learn` has a band picker
+(radios, saved to `mahjong:learnEndless:v1`, §6) and one card per kind, each linking to
+`/learn/endless?kind=…&band=…` with its best streak. The route fetches `GET /lessons/random`
+([protocol.md §10](protocol.md)), whose body is a generated `Lesson`, and plays it through the
+same `routes/learn/_components/PuzzlePage.svelte` as `/learn/[id]`, titled by its theme
+(`lessonTitle`).
+
+| Piece | Detail |
+| --- | --- |
+| `lib/learn/endless.ts` | `fetchRandomLesson` (never throws: `rate_limited` with `Retry-After` when readable, else `unavailable`, also for a puzzle of another kind), `rememberRecent` (the last 20 ids, sent as `exclude`), `recordEndlessAnswer`/`recordEndlessSkip`, `ENDLESS_TITLE` (kind-level card and loading titles) |
+| `lib/learn/kinds.ts` | `PUZZLE_KINDS`, `BANDS`, `isPuzzleKind`/`isBand`, shared by the route's `+page.ts` and storage validation |
+| `PuzzlePage` props | `navExtra` (streak and Skip in the nav), `afterCorrect` (a "Next puzzle" button instead of the Next link), `onGraded` (replaces `saveAttempt`, so endless ids never reach `learnProgress`) |
+| Streak | puzzles solved with no miss in a row: a wrong or partial answer, or Skip, ends it; a later solve counts toward `solved` only. `best` keeps the longest run, per kind |
+| Errors | a loading card with a spinner; on failure a `role="alert"` line ("Couldn't load a puzzle…", or the rate-limit wait in seconds) and Try again |
+
 **Tutorial.** `/learn/[id]` renders `_components/TutorialPage.svelte` for a `lesson_kind:
-"tutorial"` file and `_components/PuzzlePage.svelte` otherwise. The tutorial's frames
+"tutorial"` file and `../_components/PuzzlePage.svelte` otherwise. The tutorial's frames
 ([protocol.md §6](protocol.md) "Tutorials") drive a `LessonPlayer`, whose `$state<ClientGameState>`
 starts from `start` and goes through the same `viewFromClientState` → `TableScene` as a puzzle.
 

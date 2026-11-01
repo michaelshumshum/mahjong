@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PuzzlePage from './_components/PuzzlePage.svelte';
+	import PuzzlePage from '../_components/PuzzlePage.svelte';
 	import TutorialPage from './_components/TutorialPage.svelte';
 	import type { PageProps } from './$types';
 

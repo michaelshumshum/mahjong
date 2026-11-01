@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
@@ -20,7 +21,19 @@
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import { loadClientPrefs, DEFAULT_CLIENT_PREFS } from '$lib/ui/settings-storage';
 
-	let { lesson }: { lesson: Lesson } = $props();
+	let {
+		lesson,
+		navExtra,
+		afterCorrect,
+		onGraded
+	}: {
+		lesson: Lesson;
+		navExtra?: Snippet;
+		/** replaces the Next link once solved. */
+		afterCorrect?: Snippet;
+		/** replaces saving to learn progress. */
+		onGraded?: (result: GradeResult) => void;
+	} = $props();
 
 	let gameState = $derived(puzzleState(lesson));
 	// the snapshot always seats you at 0, so the projection is never null.
@@ -45,7 +58,7 @@
 		lastAnswer = null;
 		attempts = 0;
 		guideFocus = null;
-		solvedBefore = loadProgress()[id]?.solved ?? false;
+		solvedBefore = onGraded ? false : (loadProgress()[id]?.solved ?? false);
 	});
 
 	// a discard win: the claimed tile is the snapshot's last discard
@@ -66,7 +79,8 @@
 		result = grade(lesson, given).result;
 		lastAnswer = given;
 		attempts += 1;
-		saveAttempt(lesson.id, result === 'correct');
+		if (onGraded) onGraded(result);
+		else saveAttempt(lesson.id, result === 'correct');
 	}
 
 	function discard(tileId: number): void {
@@ -95,7 +109,12 @@
 {/snippet}
 
 {#key lesson.id}
-	<div class="puzzle-page" data-testid="puzzle-page" data-kind={lesson.kind}>
+	<div
+		class="puzzle-page"
+		data-testid="puzzle-page"
+		data-kind={lesson.kind}
+		data-lesson={lesson.id}
+	>
 		<nav class="puzzle-nav">
 			<BackButton label={m.learn_indexLabel()} href="/learn" />
 			<span class="step-links">
@@ -116,6 +135,7 @@
 						<ChevronRight size={18} aria-hidden="true" />
 					</a>
 				{/if}
+				{@render navExtra?.()}
 			</span>
 		</nav>
 
@@ -164,7 +184,9 @@
 				onAnswer={answer}
 				onPatternSelect={(pattern) => (guideFocus = pattern)}
 			/>
-			{#if result === 'correct' && next}
+			{#if result === 'correct' && afterCorrect}
+				{@render afterCorrect()}
+			{:else if result === 'correct' && next}
 				<a class="next-button" href="/learn/{next.id}" data-sfx="on" data-testid="answer-next"
 					>{m.learn_nextLabel()}</a
 				>

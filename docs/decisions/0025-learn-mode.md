@@ -176,7 +176,7 @@ illegal script fails `make proto`.
 | --- | --- |
 | Lobby | 3rd card becomes **學** (Learn) and links to `/learn`. The faan guide becomes a `btn-secondary` beside the language toggle and Settings |
 | Refactors | `lib/table/TableScene.svelte` and `lib/table/legal-actions.ts` out of the table page; `lib/ui/TilePalette.svelte` out of `HandChecker` |
-| Routes | `/learn` (tracks, lesson cards, solved state) and `/learn/[id]`. Both skip `ApiConnectGate` |
+| Routes | `/learn` (tracks, lesson cards, solved state) and `/learn/[id]`. Both skip `ApiConnectGate`. Phase 4 adds `/learn/endless`, which doesn't |
 | Modules (`lib/learn/`) | `lessons.ts` (index, lazy import per lesson), `grade.ts` (lookup only), `lesson-player.svelte.ts`, `PuzzleBoard.svelte`, `AnswerPanel.svelte`, `TutorialCoach.svelte`, `types.ts` |
 | Persistence | `mahjong:learnProgress:v1`: `{ [id]: { solved, attempts, solvedAt?, step? } }`, local only ([ADR 0001](0001-guest-only-identity.md)); unknown ids dropped |
 | Other entry points | faan guide links to a faan puzzle; practice points first-timers to the tutorial; the tutorial ends with "Practice vs Easy bots" |
@@ -203,6 +203,9 @@ illegal script fails `make proto`.
 | Text and title | each record becomes its `Puzzle` through `catalog/mined.py`'s `mined_puzzles`, so `text` is the mined track's stem and `theme` is `puzzle_theme` on its key, titled by `THEME_LABEL` like a mined lesson. The pool stores each `theme` too, and `test_lessons_pool.py` checks it against the one read at load | endless prose and titles follow the mined catalog, with no second copy; a stored theme makes a change in theme rules show up as a pool diff |
 | Don't repeat | `exclude=` with the client's last 20 ids (server cap 50); when every candidate is excluded, any is returned | stateless on the server; the alternative, a client re-request on a repeat, spends the rate limit |
 | Rate limit | 60 per 60 s per IP (`LESSON_RATE_LIMIT`), the `POST /tables` limiter | a puzzle takes seconds; a sustained one a second is a script |
+| Web | `/learn/endless?kind=&band=` plays the fetched lesson through the curated puzzle page (`routes/learn/_components/PuzzlePage.svelte`, moved up from `[id]/`), with snippets for the streak, Skip and "Next puzzle", and an `onGraded` hook in place of learn progress | one page for both; endless ids are positional per pool and must never land in `learnProgress` |
+| Gate | `/learn/endless` stays behind `ApiConnectGate`; the rest of `/learn` still skips it | it can't render anything without the API, unlike the bundled lessons |
+| Score | per kind, local only: streak of no-miss solves (a wrong or partial answer or a skip ends it), best streak, solves | honour-system like the curated progress; per kind, since a defence streak and a faan streak aren't comparable |
 
 ### Mined puzzles
 
@@ -368,8 +371,8 @@ every `expect` step is seat 0's.
 
 | Where | Covers |
 | --- | --- |
-| Vitest | `grade.spec.ts`; `feedback.spec.ts` and `AnswerPanel.svelte.spec.ts` (feedback per kind); `lesson-player.svelte.spec.ts`; `lessons.spec.ts` (message keys); `settings-storage.spec.ts` (progress); `legal-actions.spec.ts` |
-| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, a safe pick that was only lucky, a discard win's breakdown, progress survives a reload, answering at phone width and by keyboard alone, a zh-Hant smoke, and the tutorial in phase 3 |
+| Vitest | `grade.spec.ts`; `feedback.spec.ts` and `AnswerPanel.svelte.spec.ts` (feedback per kind); `lesson-player.svelte.spec.ts`; `lessons.spec.ts` (message keys); `settings-storage.spec.ts` (progress, endless scores); `legal-actions.spec.ts`; `endless.spec.ts` (the fetch, its errors, recent ids, the streak) |
+| Playwright | `routes/learn/learn.e2e.ts`: best discard wrong then right, winning-tile multi-select, faan entry, a safe pick that was only lucky, a discard win's breakdown, progress survives a reload, answering at phone width and by keyboard alone, a zh-Hant smoke, and the tutorial in phase 3. `routes/learn/endless/endless.e2e.ts` (`GET /lessons/random` mocked): band picker links, a right answer counting toward the streak, the next puzzle excluding the last, a miss and a skip ending it, a themed title, a failed and a rate-limited fetch |
 | Screenshots | `/learn`, one puzzle, best-discard and safe-discard feedback, and later one tutorial state |
 
 ## Phases
@@ -429,7 +432,11 @@ Phase 3 is complete.
 20. `feat(server): mine puzzles from expert self-play with bot difficulty` (done, with `position_from_state` and the first shortlist; "Mined puzzles")
 21. `feat(server): GET /lessons/random` (done: the pool, `app/lessons/payload.py` shared with the
     generator, the endpoint; "Random endless puzzles")
-22. `feat(web): endless mode on /learn`
+22. `feat(web): endless mode on /learn` (done: `/learn/endless` over the shared `PuzzlePage`,
+    the index's band picker and per-kind cards, a per-kind streak in `mahjong:learnEndless:v1`;
+    [frontend.md §7](../frontend.md) "Learn")
+
+Phase 4 is complete.
 
 ## Docs to update alongside
 
@@ -452,6 +459,7 @@ Phase 3 is complete.
 | Answers ship in the bundle | fine for cosmetic stakes; revisit if puzzles ever feed a leaderboard. Endless puzzles return their key the same way, so the endless streak is honour-system too |
 | Endless pool goes stale | an engine change that moves a key fails `test_lessons_pool.py`; fixing it means re-mining the corpus (~1 h, not committed) and rewriting the pool and shortlist together |
 | Pool cost | ~1.5 MB in the repo and the image, ~18 MB and ~0.4 s on the first request; per request ~1 ms of event-loop time, bounded by the 60/min per-IP limit |
+| Endless needs the API | unlike curated lessons, `/learn/endless` sits behind `ApiConnectGate` and says so when a fetch fails or is rate-limited |
 | Coupling to `ENGINE_VERSION` and the ruleset | a scoring change moves `count_faan` answers. The catalog test and proto-check diff make that loud, but the prose explanations need re-checking by hand |
 | `FromSeed` positions | break on any change to dealing; prefer explicit positions |
 | `safe_discard` | safe is not the same as deducibly safe; content needs care |

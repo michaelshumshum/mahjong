@@ -14,6 +14,8 @@ import {
 	type RuleSet
 } from '$lib/net/ruleset';
 import { OVERRIDABLE_PATTERNS } from './faan-guide';
+import type { Band, PuzzleKind } from '$lib/learn/generated/lessons';
+import { isBand, isPuzzleKind } from '$lib/learn/kinds';
 
 // Namespaced, versioned keys -- `v1` lets a future shape change fail closed (treated as
 // missing, below) instead of crashing on an old stored shape.
@@ -24,6 +26,7 @@ export const PRACTICE_SETUP_STORAGE_KEY = 'mahjong:practiceSetup:v1';
 export const ONBOARDING_STORAGE_KEY = 'mahjong:onboarding:v1';
 export const CREATE_TABLE_SETUP_STORAGE_KEY = 'mahjong:createTableSetup:v1';
 export const LEARN_PROGRESS_STORAGE_KEY = 'mahjong:learnProgress:v1';
+export const LEARN_ENDLESS_STORAGE_KEY = 'mahjong:learnEndless:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
@@ -425,4 +428,50 @@ export function loadLearnProgress(knownIds: ReadonlySet<string>): LearnProgress 
 
 export function saveLearnProgress(progress: LearnProgress): void {
 	writeRaw(LEARN_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+}
+
+/** One puzzle kind's endless run: first-try solves in a row, the best run, and solves overall. */
+export interface EndlessScore {
+	streak: number;
+	best: number;
+	solved: number;
+}
+
+export interface LearnEndless {
+	band: Band;
+	scores: Partial<Record<PuzzleKind, EndlessScore>>;
+}
+
+export function isEndlessScore(value: unknown): value is EndlessScore {
+	if (typeof value !== 'object' || value === null) return false;
+	const v = value as Record<string, unknown>;
+	return isCount(v.streak) && isCount(v.best) && isCount(v.solved);
+}
+
+/** The endless band and per-kind scores. A bad band falls back to beginner and a malformed or
+ * unknown kind's score is dropped, each on its own. */
+export function loadLearnEndless(): LearnEndless {
+	const fallback: LearnEndless = { band: 'beginner', scores: {} };
+	const raw = readRaw(LEARN_ENDLESS_STORAGE_KEY);
+	if (raw === null) return fallback;
+	try {
+		const v: unknown = JSON.parse(raw);
+		if (typeof v !== 'object' || v === null || Array.isArray(v)) return fallback;
+		const { band, scores } = v as Record<string, unknown>;
+		const kept =
+			typeof scores === 'object' && scores !== null && !Array.isArray(scores)
+				? Object.fromEntries(
+						Object.entries(scores).filter(
+							([kind, score]) => isPuzzleKind(kind) && isEndlessScore(score)
+						)
+					)
+				: {};
+		return { band: isBand(band) ? band : 'beginner', scores: kept };
+	} catch {
+		return fallback;
+	}
+}
+
+export function saveLearnEndless(endless: LearnEndless): void {
+	writeRaw(LEARN_ENDLESS_STORAGE_KEY, JSON.stringify(endless));
 }

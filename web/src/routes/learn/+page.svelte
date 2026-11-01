@@ -1,10 +1,17 @@
 <script lang="ts">
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import { m } from '$lib/paraglide/messages.js';
+	import { ENDLESS_TITLE, endlessScore, saveEndlessBand } from '$lib/learn/endless';
+	import type { Band } from '$lib/learn/generated/lessons';
+	import { BANDS, PUZZLE_KINDS } from '$lib/learn/kinds';
 	import { BAND_LABEL, lessonsByTrack, TRACK_LABEL } from '$lib/learn/lessons';
 	import { lessonTitle } from '$lib/learn/lesson-text';
 	import { loadProgress, solvedCount } from '$lib/learn/progress';
-	import type { LearnProgress } from '$lib/ui/settings-storage';
+	import {
+		loadLearnEndless,
+		type LearnEndless,
+		type LearnProgress
+	} from '$lib/ui/settings-storage';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import BackButton from '$lib/ui/BackButton.svelte';
 
@@ -14,9 +21,17 @@
 
 	// localStorage only: read after mount so the SSR'd index and its hydration agree (all unsolved).
 	let progress = $state<LearnProgress>({});
+	let endless = $state<LearnEndless>({ band: 'beginner', scores: {} });
 	$effect(() => {
 		progress = loadProgress();
+		endless = loadLearnEndless();
 	});
+	let band = $derived(endless.band);
+
+	function pickBand(next: Band): void {
+		endless = { ...endless, band: next };
+		saveEndlessBand(next);
+	}
 </script>
 
 <svelte:head>
@@ -77,8 +92,59 @@
 				{/each}
 			</ul>
 		</section>
+		<!-- endless right after basics, where a newcomer still sees it -->
+		{#if group.track === 'basics'}
+			{@render endlessSection()}
+		{/if}
 	{/each}
 </div>
+
+{#snippet endlessSection()}
+	<section class="track endless" aria-labelledby="endless-title" data-testid="endless">
+		<header class="track-header">
+			<h2 id="endless-title">{m.learn_endlessHeading()}</h2>
+		</header>
+		<p class="endless-intro">{m.learn_endlessIntro()}</p>
+		<fieldset class="band-picker">
+			<legend>{m.learn_endlessBandLabel()}</legend>
+			{#each BANDS as option (option)}
+				<label class="band-option">
+					<input
+						type="radio"
+						name="endless-band"
+						value={option}
+						checked={band === option}
+						data-testid="endless-band-{option}"
+						onchange={() => pickBand(option)}
+					/>
+					<span>{BAND_LABEL[option]()}</span>
+				</label>
+			{/each}
+		</fieldset>
+		<ul class="lessons">
+			{#each PUZZLE_KINDS as kind (kind)}
+				{@const best = endlessScore(endless, kind).best}
+				<li>
+					<a
+						class="lesson-card"
+						href="/learn/endless?kind={kind}&band={band}"
+						data-sfx="on"
+						data-testid="endless-card-{kind}"
+					>
+						<span class="lesson-title">{ENDLESS_TITLE[kind]()}</span>
+						<span class="lesson-meta">
+							<span>{BAND_LABEL[band]()}</span>
+							{#if best > 0}
+								<span data-testid="endless-best-{kind}">{m.learn_endlessBest({ count: best })}</span
+								>
+							{/if}
+						</span>
+					</a>
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/snippet}
 
 <style lang="scss">
 	@use '$lib/styles/layout';
@@ -216,5 +282,34 @@
 	.solved-mark {
 		display: inline-flex;
 		color: var(--color-positive);
+	}
+
+	.endless-intro {
+		margin: 0;
+		color: var(--color-text-muted);
+	}
+
+	.band-picker {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2) var(--space-4);
+		margin: 0;
+		padding: 0;
+		border: 0;
+
+		legend {
+			float: left;
+			margin-right: var(--space-2);
+			color: var(--color-text-muted);
+			font-size: var(--font-size-sm);
+		}
+	}
+
+	.band-option {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		cursor: pointer;
 	}
 </style>

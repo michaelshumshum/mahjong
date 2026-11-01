@@ -8,6 +8,9 @@ import {
 	ONBOARDING_STORAGE_KEY,
 	CREATE_TABLE_SETUP_STORAGE_KEY,
 	LEARN_PROGRESS_STORAGE_KEY,
+	LEARN_ENDLESS_STORAGE_KEY,
+	loadLearnEndless,
+	saveLearnEndless,
 	isLessonProgress,
 	loadLearnProgress,
 	saveLearnProgress,
@@ -383,6 +386,42 @@ describe('settings-storage', () => {
 			expect(isLessonProgress({ solved: false, attempts: 1.5 })).toBe(false);
 			expect(isLessonProgress({ solved: false, attempts: 0, step: -2 })).toBe(false);
 			expect(isLessonProgress({ solved: true, attempts: 1, solvedAt: 'now' })).toBe(false);
+		});
+	});
+
+	describe('learnEndless', () => {
+		it('round-trips the band and per-kind scores', () => {
+			const endless = {
+				band: 'advanced' as const,
+				scores: { count_faan: { streak: 2, best: 4, solved: 9 } }
+			};
+			saveLearnEndless(endless);
+			expect(loadLearnEndless()).toEqual(endless);
+		});
+
+		it('defaults to beginner with no scores when missing or malformed', () => {
+			const empty = { band: 'beginner', scores: {} };
+			expect(loadLearnEndless()).toEqual(empty);
+			localStorage.setItem(LEARN_ENDLESS_STORAGE_KEY, '{not json');
+			expect(loadLearnEndless()).toEqual(empty);
+		});
+
+		it('drops a bad band, unknown kinds and malformed scores one by one', () => {
+			localStorage.setItem(
+				LEARN_ENDLESS_STORAGE_KEY,
+				JSON.stringify({
+					band: 'expert',
+					scores: {
+						best_discard: { streak: 1, best: 1, solved: 1 },
+						safe_discard: { streak: -1, best: 1, solved: 1 },
+						claim: { streak: 1, best: 1, solved: 1 }
+					}
+				})
+			);
+			expect(loadLearnEndless()).toEqual({
+				band: 'beginner',
+				scores: { best_discard: { streak: 1, best: 1, solved: 1 } }
+			});
 		});
 	});
 
