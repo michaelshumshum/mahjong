@@ -992,9 +992,11 @@ Endless mode (below) is the one part that needs the API.
 - **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title, band, a
   check once solved), each a link to `/learn/<id>`. `lessonTitle` gives a mined puzzle its
   theme's label (`THEME_LABEL` in `lessons.ts`, "Two-sided wait", "Half flush, all pungs";
-  [ADR 0025](decisions/0025-learn-mode.md) "Themes") with no number: several cards in a track can
-  share a theme, told apart by band and position. A puzzle with no theme falls back to its stem's
-  title with `{n}`. The puzzle page's heading and `<title>` use the same `lessonTitle`. A tutorial leads its track on a
+  [ADR 0025](decisions/0025-learn-mode.md) "Themes") with no number. Several cards in a track can
+  share a theme, so `lessonSubtitle` adds a small muted "Puzzle 3" line under a themed title, and
+  the puzzle page shows it beside the band; endless puzzles aren't in the index and get none. A
+  puzzle with no theme falls back to its stem's title with `{n}`. The puzzle page's heading and
+  `<title>` use the same `lessonTitle`. A tutorial leads its track on a
   full-width "Start here" card and counts toward the track's solved total. Progress lives in
   localStorage only, so the SSR'd page renders everything unsolved and an `$effect` reads it
   after mount; reading it during render would make server and client markup differ.

@@ -5,7 +5,7 @@
 	import type { Band } from '$lib/learn/generated/lessons';
 	import { BANDS, PUZZLE_KINDS } from '$lib/learn/kinds';
 	import { BAND_LABEL, lessonsByTrack, TRACK_LABEL } from '$lib/learn/lessons';
-	import { lessonTitle } from '$lib/learn/lesson-text';
+	import { lessonSubtitle, lessonTitle } from '$lib/learn/lesson-text';
 	import { loadProgress, solvedCount } from '$lib/learn/progress';
 	import {
 		loadLearnEndless,
@@ -62,6 +62,7 @@
 				{#each group.lessons as lesson (lesson.id)}
 					{@const done = progress[lesson.id]?.solved ?? false}
 					{@const tutorial = lesson.lesson_kind === 'tutorial'}
+					{@const subtitle = lessonSubtitle(lesson)}
 					<li class:tutorial-item={tutorial}>
 						<a
 							class="lesson-card"
@@ -75,7 +76,12 @@
 							{#if tutorial}
 								<span class="start-here">{m.learn_tutorialStartHere()}</span>
 							{/if}
-							<span class="lesson-title">{lessonTitle(lesson)}</span>
+							<span class="lesson-heading">
+								<span class="lesson-title">{lessonTitle(lesson)}</span>
+								{#if subtitle}
+									<span class="lesson-sub" data-testid="lesson-sub-{lesson.id}">{subtitle}</span>
+								{/if}
+							</span>
 							<span class="lesson-meta">
 								<span class="band"
 									>{tutorial ? m.learn_tutorialLabel() : BAND_LABEL[lesson.band]()}</span
@@ -266,8 +272,18 @@
 		text-transform: uppercase;
 	}
 
+	.lesson-heading {
+		display: flex;
+		flex-direction: column;
+	}
+
 	.lesson-title {
 		font-weight: 600;
+	}
+
+	.lesson-sub {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-xs);
 	}
 
 	.lesson-meta {

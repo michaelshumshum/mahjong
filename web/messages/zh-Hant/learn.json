@@ -7,6 +7,7 @@
 	"learn_solvedCount": "{solved} / {total}",
 	"learn_solvedCountAriaLabel": "已解答 {total} 題中的 {solved} 題",
 	"learn_solvedMark": "已解答",
+	"learn_puzzleNumber": "第 {n} 題",
 	"learn_lessonPageTitle": "{title} · 開枱",
 	"learn_indexLabel": "全部題目",
 	"learn_previousLabel": "上一題",

@@ -5,8 +5,13 @@
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import AnswerPanel from '$lib/learn/AnswerPanel.svelte';
 	import { grade } from '$lib/learn/grade';
-	import { BAND_LABEL, nextLesson, previousLesson } from '$lib/learn/lessons';
-	import { LESSON_TEXT, lessonTextParams, lessonTitle } from '$lib/learn/lesson-text';
+	import { BAND_LABEL, lessonEntry, nextLesson, previousLesson } from '$lib/learn/lessons';
+	import {
+		LESSON_TEXT,
+		lessonSubtitle,
+		lessonTextParams,
+		lessonTitle
+	} from '$lib/learn/lesson-text';
 	import { loadProgress, saveAttempt } from '$lib/learn/progress';
 	import { puzzleState } from '$lib/learn/puzzle-state';
 	import type { Answer, GradeResult } from '$lib/learn/types';
@@ -42,6 +47,11 @@
 	let text = $derived(LESSON_TEXT[lesson.text]);
 	let params = $derived(lessonTextParams(lesson));
 	let title = $derived(lessonTitle(lesson));
+	// endless puzzles aren't in the index, so they get no number
+	let subtitle = $derived.by(() => {
+		const entry = lessonEntry(lesson.id);
+		return entry ? lessonSubtitle(entry) : null;
+	});
 	let previous = $derived(previousLesson(lesson.id));
 	let next = $derived(nextLesson(lesson.id));
 
@@ -142,6 +152,9 @@
 		<section class="prompt-card" aria-labelledby="puzzle-title">
 			<p class="meta">
 				<span class="band">{BAND_LABEL[lesson.band]()}</span>
+				{#if subtitle}
+					<span data-testid="puzzle-sub">{subtitle}</span>
+				{/if}
 				{#if solved}
 					<span class="solved" data-testid="puzzle-solved">
 						<CircleCheck size={16} aria-hidden="true" />

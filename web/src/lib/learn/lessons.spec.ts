@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest';
 import settings from '../../../project.inlang/settings.json';
 import index from './generated/index.json';
 import type { IndexEntry, Lesson, LessonIndexEntry, Tutorial } from './generated/lessons';
-import { LESSON_TEXT, TUTORIAL_TEXT, lessonTextParams, lessonTitle } from './lesson-text';
+import {
+	LESSON_TEXT,
+	TUTORIAL_TEXT,
+	lessonSubtitle,
+	lessonTextParams,
+	lessonTitle
+} from './lesson-text';
 import {
 	FIRST_TUTORIAL,
 	LESSONS,
@@ -108,6 +114,14 @@ describe('generated lessons', () => {
 		const basics = lessons.filter((lesson) => lesson.track === 'basics');
 		expect(basics.every((lesson) => lesson.theme === null)).toBe(true);
 		expect(lessonTitle(lessonEntry('basics-isolated-honour')!)).toBe('Discard the loner');
+	});
+
+	it('tells same-theme cards in a track apart by their subtitle', () => {
+		const labels = lessons.map((lesson) => `${lesson.track}|${lessonTitle(lesson)}|${lessonSubtitle(lesson)}`);
+		expect(new Set(labels).size).toBe(labels.length);
+		expect(lessonSubtitle(lessonEntry('waits-03')!)).toBe('Puzzle 3');
+		expect(lessonSubtitle(lessonEntry('basics-isolated-honour')!)).toBeNull();
+		expect(lessonSubtitle(FIRST_TUTORIAL)).toBeNull();
 	});
 
 	it.each(settings.locales)('has a label for every track and band in %s', (locale) => {
