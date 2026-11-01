@@ -57,7 +57,7 @@ endless puzzles (phase 4) come from a committed pool graded the same way, served
 | `seat_view` → `seat_view_wire` | `app/views.py` | a `state_sync` payload redacted for seat 0 |
 | `redact_event` | `app/views.py` | wire frames for tutorial steps |
 | `turn_frame`/`claim_offer_frame`/`deal_frame`/`event_frame`/`state_sync_frame`, `to_envelope` | `app/frames.py` (pulled out of `Table` in phase 3; also unblocks [ADR 0011](0011-replay-viewer.md)) | the generated `state_sync` snapshots; tutorial frame streams |
-| `seen34`, `no_chance`, `is_genbutsu` | `bots/features.py`, `bots/safety.py` | explain why a discard is safe. `tile_risk` is a heuristic and never grades |
+| `seen34`, `provably_safe`, `walls_every_run` | `bots/features.py`, `bots/safety.py` | decide which discards are deducibly safe ("Safe-discard deductions"). `tile_risk` is a heuristic and never grades |
 | `make proto` generator + proto-check | `tools/gen_protocol.py`, `Makefile`, `.github/workflows/proto-check.yml` | precedent for server-owned data emitted to the web |
 
 ### Web
@@ -145,7 +145,29 @@ has its keys.
 | `winning_tiles` | for each of the 34 types: does it complete the hand, its faan, does it clear `min_faan` (`can_win_on`); both discard and self-draw | multi-select must equal the waits that clear the minimum. Feedback names waits that complete the hand but score too low |
 | `best_discard` | per discard: shanten after, then `ukeire` over what seat 0 can see only | lowest shanten, then most tiles accepted; ties all count |
 | `count_faan` | `score_winning_hand` + `points()` | number entry; feedback shows `FaanBreakdown` |
-| `safe_discard` | `can_win_on` against the real hidden hands, plus the author's accepted set and reason | in the accepted set. A tile that is safe but can't be deduced gets "safe this time, but you couldn't know" |
+| `safe_discard` | `can_win_on` against the real hidden hands, plus which tiles are deducible from seat 0's view ("Safe-discard deductions"); the author states the accepted set and a reason, and both are checked | in the accepted set, which is every deducible tile. A tile that is safe but can't be deduced gets "safe this time, but you couldn't know" |
+
+#### Safe-discard deductions
+
+`grade._reasons` separates what seat 0 can see from what counts as a deduction. Only these do:
+
+| Reason | Holds when | Rules out |
+| --- | --- | --- |
+| `all_copies_visible` | every copy visible, and `bots.safety.provably_safe` against every opponent: a suited tile also needs every run walled, an orphan (honour or 1/9) needs every opponent melded or another orphan type dead | every wait: nobody can win on it |
+| `no_chance` | suited, every run through it walled by a tile with every copy visible (`walls_every_run`) | run waits only; a pair or pung wait can still take it, and the explanation says so |
+
+| Not a deduction | Why |
+| --- | --- |
+| every copy of a suited tile visible, a run still open | rules out only waits that hold a copy; 45m waits on 3m/6m holding neither. The first mined defence shortlist accepted such tiles, and several dealt in |
+| a dead honour or terminal with Thirteen Orphans still open | the single wait holds no copy of its tile |
+| genbutsu (in every opponent's pool) | HK has no furiten: a player can win on a tile they discarded ([bots.md §5](../bots.md) item 1). Removed from `SafeReason` |
+
+`safe_discard` (the key) requires the stated `accepted` set to be exactly the hand tiles with a
+deduction, none dealing in, all sharing the stated `reason`. Grading a deducible tile as "you
+couldn't know" would contradict the lesson, and one stated reason keeps the explanation (one
+stem per reason) true for every accepted tile. A suited tile with every copy visible always has
+both reasons, so `all_copies_visible` is the stronger statement and is stated when every accepted
+tile has it. The answer panel still lists each tile's own reasons.
 | `claim` (later) | shanten/ukeire after the best follow-up discard, plus value vs `min_faan` | author-stated, engine-checked |
 
 ### Guided tutorial vs one-shot puzzle
@@ -230,7 +252,7 @@ dealing; `source` (`game_seed`, `decision` = step index, `seat`) replays the liv
 | Kind | Kept when | Why |
 | --- | --- | --- |
 | `best_discard` | best shanten after the discard ≤ 2; 1–2 correct tiles; a naive pick (the most isolated tile: fewest extra copies and same-suit neighbours within two ranks, honours then terminals first, blind to shanten) is not correct; and the answer accepts ≥ 4 more live tiles than the best wrong discard at the same shanten | far from tenpai there is rarely one answer; ties of 3+ stop being about a shape; a pick the naive heuristic finds teaches nothing; a lead under one tile type's four copies is noise |
-| `safe_discard` | some discard the efficient answer (`best_discard`'s) would make deals in; the first reason of all-copies-visible, no-chance, genbutsu that covers 1–3 hand tiles, every one of them safe; `accepted` = those tiles | a real fold: the natural discard loses; a reason that also covers a tile that deals in would teach a false rule; one that clears half the hand isn't a deduction |
+| `safe_discard` | some discard the efficient answer (`best_discard`'s) would make deals in; 1–3 hand tiles have a deduction ("Safe-discard deductions"), none of them deals in, none is an efficient answer, and they share a reason (all-copies-visible preferred, else no-chance); `accepted` = all of them | a real fold: the natural discard loses; a deducible tile that deals in (a no-chance tile into a pair wait) would teach a false rule; a deducible tile that is also efficient makes folding free, so nothing is taught; one shared reason keeps the explanation true; a deduction that clears half the hand isn't one worth asking for |
 | `winning_tiles` | at least one live winning tile, and ≥ 2 of them, or a wait below `min_faan`, or a dead wait | a single clean wait is a lookup |
 | `count_faan` | a self-draw, or a discard win (the record's `discard` is reduced on the rebuilt position, "Claim positions"), scoring ≥ 2 patterns | one pattern is a lookup |
 
@@ -270,22 +292,32 @@ beat, so the shortlist keeps a `best_discard` only where `T4` also played a corr
 `tests/test_mine_puzzles.py` regrades every shortlisted record and fails when an engine change
 moves one.
 
-**Current run** (laptop, i7-1265U, 8 workers, ~63 min wall, engine 1.3.0): 6,000 games, seeds
-20,000,000–20,005,999; 3,655,016 decisions, 2,993,369 turns scanned; 56,413 candidate positions
-skipped as unrepresentable; 460,328 duplicates dropped. A first run graded `best_discard` with
-exposed meld tiles regroupable (the bots' whole-hand shanten, [bots.md §3](../bots.md)), which
-picked wrong answers for melded hands; this run uses `melds=n` and replaced its shortlist.
+**Current run** (laptop, i7-1265U, 8 workers, ~59 min wall, engine 1.3.0): 6,000 games, seeds
+20,000,000–20,005,999; 3,655,016 decisions, 2,993,369 turns scanned; 55,735 candidate positions
+skipped as unrepresentable; 460,328 duplicates dropped. Earlier runs, each replacing its
+shortlist and pool:
+
+| Run | Why it was replaced |
+| --- | --- |
+| first | graded `best_discard` with exposed meld tiles regroupable (the bots' whole-hand shanten, [bots.md §3](../bots.md)), which picked wrong answers for melded hands; now `melds=n` |
+| second | `safe_discard` counted every copy of a suited tile visible and genbutsu as deductions, and accepted only the first reason's tiles: 103 of the pool's 300 defence puzzles rested on a suited all-copies-visible tile, several such tiles dealt in, and 104 had an accepted tile among the efficient answers. Now "Safe-discard deductions" and the tension filter |
+
+`--from` re-cuts a corpus without regrading or re-filtering it, so a filter change means a full
+re-mine. Re-mining also re-rates every kind against the current bot tiers, so two `best_discard`
+shortlist entries changed with the defence fix.
 
 | Kind | Kept | Beginner | Intermediate | Advanced |
 | --- | --- | --- | --- | --- |
-| `best_discard` | 56,586 | 10,864 | 16,413 | 29,309 |
-| `safe_discard` | 36,856 | 8,611 | 11,721 | 16,524 |
+| `best_discard` | 56,586 | 11,444 | 16,615 | 28,527 |
+| `safe_discard` | 16,551 | 811 | 4,466 | 11,274 |
 | `winning_tiles` | 57,488 | 44,032 | 13,076 | 380 |
 | `count_faan` | 30,029 (17,521 discard wins) | 9,325 | 13,944 | 6,760 |
 
 15,574 of the `best_discard` candidates (28%) are ones where `T4` played something else, nearly
-all scored advanced; the shortlist leaves them out. `safe_discard` reasons: all copies visible
-30,907, no-chance 5,880, genbutsu 69 (needs the tile in every opponent's pool).
+all scored advanced; the shortlist leaves them out. `safe_discard` stated reasons: no-chance
+12,774, all copies visible 3,777 (1,184 of them honours only); accepted tiles per puzzle 1 /
+2 / 3: 10,535 / 4,430 / 1,586. The pool's 300 split 150 / 150 by reason; the shortlist's 15 are
+9 all copies visible, 6 no-chance.
 
 ### Themes
 
@@ -316,9 +348,9 @@ current 60-puzzle shortlist.
 | | `cut_floater` | a lone honour, or a lone suited tile with nothing held within two ranks | 1 |
 | | `break_pair` | an answer is held twice or more | 0 |
 | | `most_tiles` | otherwise | 0 |
-| `safe_discard` | `genbutsu` / `walled_runs` | the stated reason is genbutsu / no-chance | 6 / 3 |
-| | `dead_honour` | all copies visible, every accepted tile an honour | 1 |
-| | `all_visible` | otherwise | 5 |
+| `safe_discard` | `walled_runs` | the stated reason is no-chance | 6 |
+| | `dead_honour` | all copies visible, every accepted tile an honour | 2 |
+| | `all_visible` | otherwise (all copies visible, a suited tile among them) | 7 |
 | `count_faan` | `limit_hand` | a limit pattern | 0 |
 | | `full_flush` | 清一色 | 1 |
 | | `half_flush_pungs` / `half_flush_honours` / `half_flush` | 混一色 with 對對糊 / with 箭刻, 門風 or 圈風 / alone | 2 / 3 / 1 |
