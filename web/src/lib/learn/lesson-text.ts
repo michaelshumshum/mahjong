@@ -143,7 +143,6 @@ export function lessonTitle(entry: IndexEntry): string {
 	return LESSON_TEXT[entry.text].title({ n: entry.n, tiles: '', count: 0, faan: 0 });
 }
 
-
 /** The small line under a themed title, so cards sharing a theme can be told apart. Basics
  * and tutorials get none. */
 export function lessonSubtitle(entry: IndexEntry): string | null {

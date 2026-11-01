@@ -117,7 +117,9 @@ describe('generated lessons', () => {
 	});
 
 	it('tells same-theme cards in a track apart by their subtitle', () => {
-		const labels = lessons.map((lesson) => `${lesson.track}|${lessonTitle(lesson)}|${lessonSubtitle(lesson)}`);
+		const labels = lessons.map(
+			(lesson) => `${lesson.track}|${lessonTitle(lesson)}|${lessonSubtitle(lesson)}`
+		);
 		expect(new Set(labels).size).toBe(labels.length);
 		expect(lessonSubtitle(lessonEntry('waits-03')!)).toBe('Puzzle 3');
 		expect(lessonSubtitle(lessonEntry('basics-isolated-honour')!)).toBeNull();
