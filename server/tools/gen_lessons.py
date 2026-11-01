@@ -26,7 +26,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from app.frames import state_sync_frame, to_envelope
 from app.lessons.catalog import CATALOG, TUTORIALS
 from app.lessons.grade import (
     BestDiscardKey,
@@ -52,11 +51,12 @@ from app.lessons.model import (
     Track,
     Tutorial,
 )
+from app.lessons.payload import puzzle_entry, puzzle_payload
 from app.lessons.themes import puzzle_theme
 from app.lessons.tutorial import ScriptedStep, run_tutorial
 from mahjong_core.actions import action_to_dict
 from mahjong_core.engine import ENGINE_VERSION
-from mahjong_core.state import GameState, WinType
+from mahjong_core.state import WinType
 from mahjong_core.tiles import tile_id_type
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "learn" / "generated"
@@ -114,12 +114,6 @@ def check_catalog(catalog: Sequence[Puzzle], tutorials: Sequence[Tutorial] = ())
                 raise ValueError(f"{p.id}: text stem {stem!r} is not alphanumeric")
 
 
-def snapshot(state: GameState) -> dict[str, Any]:
-    """Seat 0's `state_sync` frame, as `Table.state_sync_wire` and `ws.py` would send it to a
-    fresh seat with no clock: no deadlines, no history, `seq`/`ts` 0."""
-    return to_envelope(state_sync_frame(state, 0), seq=0, ts=0)
-
-
 def index_entries(
     catalog: Sequence[Puzzle], tutorials: Sequence[Tutorial] = ()
 ) -> list[dict[str, Any]]:
@@ -128,22 +122,20 @@ def index_entries(
     seen: Counter[tuple[LessonKind, Track]] = Counter()
     entries = []
     for p in (*tutorials, *catalog):
-        lesson_kind = LessonKind.TUTORIAL if isinstance(p, Tutorial) else LessonKind.PUZZLE
-        seen[lesson_kind, p.track] += 1
-        kind = {"kind": str(p.kind)} if isinstance(p, Puzzle) else {}
-        theme = (
-            {"theme": None if p.theme is None else str(p.theme)} if isinstance(p, Puzzle) else {}
-        )
+        if isinstance(p, Puzzle):
+            seen[LessonKind.PUZZLE, p.track] += 1
+            entries.append(puzzle_entry(p, seen[LessonKind.PUZZLE, p.track]))
+            continue
+        seen[LessonKind.TUTORIAL, p.track] += 1
         entries.append(
-            {"id": p.id, "lesson_kind": str(lesson_kind)}
-            | kind
-            | {
+            {
+                "id": p.id,
+                "lesson_kind": str(LessonKind.TUTORIAL),
                 "track": str(p.track),
                 "band": str(p.band),
                 "text": p.text,
-                "n": seen[lesson_kind, p.track],
+                "n": seen[LessonKind.TUTORIAL, p.track],
             }
-            | theme
         )
     return entries
 
@@ -184,12 +176,7 @@ def lesson_payload(puzzle: Puzzle, entry: Mapping[str, Any]) -> dict[str, Any]:
     hand = [tile_id_type(t) for t in state.seats[0].concealed]
     if puzzle.theme is not None and puzzle.theme != (theme := puzzle_theme(key, hand)):
         raise ValueError(f"{puzzle.id}: theme {puzzle.theme}, the key reads as {theme}")
-    return {
-        **entry,
-        "engine_version": ENGINE_VERSION,
-        "snapshot": snapshot(state),
-        "key": dataclasses.asdict(key),
-    }
+    return puzzle_payload(entry, state, dataclasses.asdict(key))
 
 
 def _dump(data: Any) -> str:

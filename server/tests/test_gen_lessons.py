@@ -27,6 +27,7 @@ from app.protocol import ServerMessage, StateSync
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.melds import MeldKind
 from mahjong_core.state import Phase
+from tests.lesson_payloads import assert_puzzle_payload
 from tests.lesson_positions import DEFENCE, PIN, spec
 from tools.gen_lessons import (
     INDEX_FILE,
@@ -130,13 +131,8 @@ def test_lesson_round_trips_the_answer_key() -> None:
 
 
 @pytest.mark.parametrize("puzzle", _FIXTURE, ids=lambda p: p.id)
-def test_snapshot_is_a_seat_zero_state_sync_frame(puzzle: Puzzle) -> None:
-    snapshot = _lessons(render_bundle(_FIXTURE))[puzzle.id]["snapshot"]
-    frame = _server_message.validate_python(snapshot)
-    assert isinstance(frame, StateSync)
-    assert frame.d.seat == 0
-    assert frame.d.hands is None
-    assert frame.d.ruleset_preset == "hk_classic"
+def test_lesson_is_a_puzzle_payload_with_a_seat_zero_snapshot(puzzle: Puzzle) -> None:
+    assert_puzzle_payload(_lessons(render_bundle(_FIXTURE))[puzzle.id])
 
 
 def test_discard_win_snapshot_is_the_claim_window() -> None:
