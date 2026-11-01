@@ -30,7 +30,7 @@ from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
 
-from app.lessons.catalog.mined import TRACKS
+from app.lessons.catalog.mined import TRACKS, mined_puzzles
 from app.lessons.grade import (
     BestDiscardKey,
     CountFaanKey,
@@ -475,20 +475,23 @@ def shortlist(records: Sequence[Mapping[str, Any]], per_kind: int) -> list[Mappi
 
 
 def pool_record(record: Mapping[str, Any]) -> dict[str, Any]:
-    """What `app/lessons/pool.py` serves: the record without its bot rates, and with an id
-    from its source, unique within a kind."""
+    """What `app/lessons/pool.py` serves: the record without its bot rates, with an id from its
+    source (unique within a kind) and the theme the mined catalog reads off it."""
     src = record["source"]
     kind = PuzzleKind(record["kind"])
-    return {
+    # naive is a mining filter's input, not part of answer_key()
+    key = {k: v for k, v in record["key"].items() if k != "naive"}
+    out = {
         "id": f"{TRACKS[kind]}-{src['game_seed']}-{src['decision']}-{src['seat']}",
         "kind": record["kind"],
         "difficulty": {"band": record["difficulty"]["band"]},
         "position": record["position"],
         "discard": record["discard"],
-        # naive is a mining filter's input, not part of answer_key()
-        "key": {k: v for k, v in record["key"].items() if k != "naive"},
+        "key": key,
         "source": src,
     }
+    (puzzle,) = mined_puzzles([out])
+    return out | {"theme": None if puzzle.theme is None else str(puzzle.theme)}
 
 
 def pool(records: Sequence[Mapping[str, Any]], per_band: int) -> list[dict[str, Any]]:

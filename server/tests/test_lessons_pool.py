@@ -55,6 +55,13 @@ def test_every_pooled_key_is_the_engine_key(kind: PuzzleKind) -> None:
         assert dict(pooled.key) == _key(pooled), pooled.puzzle.id
 
 
+def test_every_stored_theme_is_the_one_its_key_reads_as() -> None:
+    stored = {p["id"]: p["theme"] for p in json.loads(POOL_PATH.read_text())["puzzles"]}
+    for pooled in _ALL:
+        assert pooled.puzzle.theme is not None, pooled.puzzle.id
+        assert stored[pooled.puzzle.id] == pooled.puzzle.theme, pooled.puzzle.id
+
+
 def test_pick_keeps_kind_and_band() -> None:
     rng = random.Random(0)
     for kind in PuzzleKind:

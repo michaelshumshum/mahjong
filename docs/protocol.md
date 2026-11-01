@@ -645,6 +645,7 @@ GET /lessons/random?kind=best_discard&band=advanced&exclude=efficiency-20000412-
 ->
 {"id": "efficiency-20003117-41-0", "lesson_kind": "puzzle", "kind": "best_discard",
  "track": "efficiency", "band": "advanced", "text": "minedEfficiency", "n": 212,
+ "theme": "keep_two_sided",
  "engine_version": "1.3.0", "snapshot": {…state_sync…}, "key": {…}}
 ```
 
