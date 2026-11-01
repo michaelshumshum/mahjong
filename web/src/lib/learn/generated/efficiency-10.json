@@ -3,67 +3,73 @@
 	"engine_version": "1.3.0",
 	"id": "efficiency-10",
 	"key": {
-		"correct": ["1s"],
+		"correct": ["1m", "1p"],
 		"options": [
 			{
-				"kinds": 20,
-				"shanten": 3,
-				"tile": "3m",
-				"tiles": 68
+				"kinds": 2,
+				"shanten": 1,
+				"tile": "1m",
+				"tiles": 8
 			},
 			{
-				"kinds": 21,
-				"shanten": 3,
-				"tile": "5m",
-				"tiles": 72
-			},
-			{
-				"kinds": 14,
+				"kinds": 7,
 				"shanten": 2,
-				"tile": "9m",
-				"tiles": 47
-			},
-			{
-				"kinds": 19,
-				"shanten": 3,
-				"tile": "3p",
-				"tiles": 63
-			},
-			{
-				"kinds": 20,
-				"shanten": 3,
-				"tile": "4p",
-				"tiles": 66
-			},
-			{
-				"kinds": 17,
-				"shanten": 3,
-				"tile": "5p",
-				"tiles": 58
+				"tile": "3m",
+				"tiles": 22
 			},
 			{
 				"kinds": 12,
 				"shanten": 2,
-				"tile": "7p",
-				"tiles": 41
+				"tile": "5m",
+				"tiles": 34
 			},
 			{
-				"kinds": 6,
+				"kinds": 11,
 				"shanten": 2,
-				"tile": "8p",
-				"tiles": 20
+				"tile": "7m",
+				"tiles": 29
 			},
 			{
-				"kinds": 15,
+				"kinds": 2,
+				"shanten": 1,
+				"tile": "1p",
+				"tiles": 8
+			},
+			{
+				"kinds": 12,
 				"shanten": 2,
-				"tile": "1s",
-				"tiles": 52
+				"tile": "3p",
+				"tiles": 32
 			},
 			{
-				"kinds": 13,
+				"kinds": 4,
+				"shanten": 2,
+				"tile": "3s",
+				"tiles": 14
+			},
+			{
+				"kinds": 3,
+				"shanten": 2,
+				"tile": "4s",
+				"tiles": 11
+			},
+			{
+				"kinds": 4,
 				"shanten": 2,
 				"tile": "5s",
-				"tiles": 43
+				"tiles": 11
+			},
+			{
+				"kinds": 10,
+				"shanten": 2,
+				"tile": "8s",
+				"tiles": 27
+			},
+			{
+				"kinds": 11,
+				"shanten": 2,
+				"tile": "9s",
+				"tiles": 30
 			}
 		]
 	},
@@ -74,21 +80,41 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [11, 13, 13, 13],
+			"concealed_counts": [14, 13, 10, 13],
 			"deadline_ts": null,
 			"dealer": 0,
-			"discard_pools": [[12], [76], [125], []],
-			"drawn_tile": 88,
-			"flowers": [[], [], ["f2"], ["f4"]],
+			"discard_pools": [
+				[52, 53, 76, 56],
+				[77, 89, 25, 92],
+				[17, 90, 1, 2, 101],
+				[102, 18, 12, 72, 127]
+			],
+			"drawn_tile": 104,
+			"flowers": [["f1"], [], ["f5", "f2"], ["f7"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
-			"last_discard": null,
+			"last_discard": {
+				"seat": 3,
+				"tile_id": 127
+			},
 			"legal_actions": [
 				{
 					"kind": "discard",
+					"tile_id": 0
+				},
+				{
+					"kind": "discard",
 					"tile_id": 8
+				},
+				{
+					"kind": "discard",
+					"tile_id": 9
+				},
+				{
+					"kind": "discard",
+					"tile_id": 10
 				},
 				{
 					"kind": "discard",
@@ -96,7 +122,11 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 32
+					"tile_id": 24
+				},
+				{
+					"kind": "discard",
+					"tile_id": 36
 				},
 				{
 					"kind": "discard",
@@ -104,47 +134,43 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 48
+					"tile_id": 45
 				},
 				{
 					"kind": "discard",
-					"tile_id": 52
+					"tile_id": 80
 				},
 				{
 					"kind": "discard",
-					"tile_id": 60
-				},
-				{
-					"kind": "discard",
-					"tile_id": 64
-				},
-				{
-					"kind": "discard",
-					"tile_id": 65
-				},
-				{
-					"kind": "discard",
-					"tile_id": 72
+					"tile_id": 84
 				},
 				{
 					"kind": "discard",
 					"tile_id": 88
+				},
+				{
+					"kind": "discard",
+					"tile_id": 100
+				},
+				{
+					"kind": "discard",
+					"tile_id": 104
 				}
 			],
 			"melds": [
+				[],
+				[],
 				[
 					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [36, 40, 45]
+						"from_seat": 0,
+						"kind": "pung",
+						"tiles": [124, 125, 126]
 					}
 				],
-				[],
-				[],
 				[]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [8, 16, 32, 44, 48, 52, 60, 64, 65, 72, 88],
+			"own_hand": [0, 8, 9, 10, 16, 24, 36, 44, 45, 80, 84, 88, 100, 104],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -183,7 +209,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 86
+			"wall_remaining": 69
 		},
 		"seq": 0,
 		"t": "state_sync",

@@ -264,7 +264,7 @@
 		"lesson_kind": "puzzle",
 		"n": 3,
 		"text": "minedEfficiency",
-		"theme": "cut_floater",
+		"theme": "cut_terminal",
 		"track": "efficiency"
 	},
 	{
@@ -284,7 +284,7 @@
 		"lesson_kind": "puzzle",
 		"n": 5,
 		"text": "minedEfficiency",
-		"theme": "cut_terminal",
+		"theme": "cut_floater",
 		"track": "efficiency"
 	},
 	{
@@ -324,7 +324,7 @@
 		"lesson_kind": "puzzle",
 		"n": 9,
 		"text": "minedEfficiency",
-		"theme": "cut_floater",
+		"theme": "break_pair",
 		"track": "efficiency"
 	},
 	{
@@ -344,7 +344,7 @@
 		"lesson_kind": "puzzle",
 		"n": 11,
 		"text": "minedEfficiency",
-		"theme": "trim_run",
+		"theme": "wider_wait",
 		"track": "efficiency"
 	},
 	{
@@ -354,7 +354,7 @@
 		"lesson_kind": "puzzle",
 		"n": 12,
 		"text": "minedEfficiency",
-		"theme": "keep_two_sided",
+		"theme": "trim_run",
 		"track": "efficiency"
 	},
 	{
@@ -364,7 +364,7 @@
 		"lesson_kind": "puzzle",
 		"n": 13,
 		"text": "minedEfficiency",
-		"theme": "cut_terminal",
+		"theme": "keep_two_sided",
 		"track": "efficiency"
 	},
 	{
@@ -374,7 +374,7 @@
 		"lesson_kind": "puzzle",
 		"n": 14,
 		"text": "minedEfficiency",
-		"theme": "break_pair",
+		"theme": "wider_wait",
 		"track": "efficiency"
 	},
 	{
@@ -384,7 +384,7 @@
 		"lesson_kind": "puzzle",
 		"n": 15,
 		"text": "minedEfficiency",
-		"theme": "reach_ready",
+		"theme": "wider_wait",
 		"track": "efficiency"
 	},
 	{
@@ -633,8 +633,8 @@
 		"kind": "count_faan",
 		"lesson_kind": "puzzle",
 		"n": 10,
-		"text": "minedFaanDiscard",
-		"theme": "half_flush_pungs",
+		"text": "minedFaanSelfDraw",
+		"theme": "half_flush",
 		"track": "faan"
 	},
 	{

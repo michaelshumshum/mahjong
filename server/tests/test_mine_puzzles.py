@@ -14,11 +14,13 @@ from app.lessons.grade import (
     SafeOption,
     best_discard,
     count_faan,
+    key_from_dict,
     safe_discard,
     safe_options,
     winning_tiles,
 )
 from app.lessons.model import Band, Position, PuzzleKind, SafeReason, SeatSetup
+from app.lessons.pool import POOL_PATH
 from app.lessons.position import build_position, position_to_dict
 from bots.tiers import BotTier
 from mahjong_core.engine import ENGINE_VERSION
@@ -404,6 +406,24 @@ def test_committed_shortlist_is_varied() -> None:
     for i, (_, game, seat, decision) in enumerate(puzzles):
         for _, g, s, d in puzzles[i + 1 :]:
             assert (g, s) != (game, seat) or abs(d - decision) > SAME_HAND_WINDOW
+
+
+def test_committed_best_discards_keep_value_under_the_band_cap() -> None:
+    """Both cuts went through `recheck`: no answer loses `min_faan`, and no band sits above
+    what `best_discard_band` allows for its key."""
+    order = list(Band)
+    puzzles = [
+        *json.loads(SHORTLIST_PATH.read_text())["puzzles"],
+        *json.loads(POOL_PATH.read_text())["puzzles"],
+    ]
+    discards = [p for p in puzzles if p["kind"] == PuzzleKind.BEST_DISCARD]
+    assert discards
+    for record in discards:
+        key = key_from_dict(PuzzleKind.BEST_DISCARD, record["key"])
+        assert isinstance(key, BestDiscardKey)
+        assert keeps_value(puzzle_state(record), key)
+        cap = best_discard_band(key, 1.0)
+        assert order.index(Band(record["difficulty"]["band"])) <= order.index(cap)
 
 
 def assert_regrades(record: Mapping[str, Any]) -> None:

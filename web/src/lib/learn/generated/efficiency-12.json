@@ -3,73 +3,79 @@
 	"engine_version": "1.3.0",
 	"id": "efficiency-12",
 	"key": {
-		"correct": ["5p"],
+		"correct": ["1p", "4p"],
 		"options": [
 			{
-				"kinds": 17,
-				"shanten": 3,
-				"tile": "1m",
-				"tiles": 52
+				"kinds": 12,
+				"shanten": 2,
+				"tile": "2m",
+				"tiles": 38
 			},
 			{
-				"kinds": 5,
+				"kinds": 11,
 				"shanten": 2,
+				"tile": "3m",
+				"tiles": 35
+			},
+			{
+				"kinds": 12,
+				"shanten": 2,
+				"tile": "4m",
+				"tiles": 38
+			},
+			{
+				"kinds": 3,
+				"shanten": 1,
 				"tile": "7m",
-				"tiles": 19
+				"tiles": 10
 			},
 			{
-				"kinds": 5,
-				"shanten": 2,
+				"kinds": 3,
+				"shanten": 1,
 				"tile": "8m",
-				"tiles": 19
-			},
-			{
-				"kinds": 10,
-				"shanten": 3,
-				"tile": "9m",
-				"tiles": 32
-			},
-			{
-				"kinds": 6,
-				"shanten": 2,
-				"tile": "2p",
-				"tiles": 22
-			},
-			{
-				"kinds": 5,
-				"shanten": 2,
-				"tile": "3p",
-				"tiles": 18
+				"tiles": 9
 			},
 			{
 				"kinds": 7,
-				"shanten": 2,
-				"tile": "5p",
-				"tiles": 26
+				"shanten": 1,
+				"tile": "1p",
+				"tiles": 23
 			},
 			{
-				"kinds": 6,
+				"kinds": 11,
 				"shanten": 2,
-				"tile": "8p",
-				"tiles": 22
+				"tile": "2p",
+				"tiles": 36
 			},
 			{
-				"kinds": 6,
+				"kinds": 10,
 				"shanten": 2,
-				"tile": "9p",
-				"tiles": 22
+				"tile": "3p",
+				"tiles": 32
 			},
 			{
-				"kinds": 5,
-				"shanten": 2,
+				"kinds": 7,
+				"shanten": 1,
+				"tile": "4p",
+				"tiles": 23
+			},
+			{
+				"kinds": 3,
+				"shanten": 1,
+				"tile": "7p",
+				"tiles": 12
+			},
+			{
+				"kinds": 4,
+				"shanten": 1,
 				"tile": "3s",
-				"tiles": 19
+				"tiles": 14
 			},
 			{
-				"kinds": 5,
-				"shanten": 2,
-				"tile": "4s",
-				"tiles": 19
+				"kinds": 4,
+				"shanten": 1,
+				"tile": "5s",
+				"tiles": 14
 			}
 		]
 	},
@@ -80,28 +86,37 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [14, 13, 13, 13],
+			"concealed_counts": [14, 13, 10, 13],
 			"deadline_ts": null,
-			"dealer": 2,
-			"discard_pools": [[], [], [41], [88]],
-			"drawn_tile": 84,
-			"flowers": [["f3"], [], [], ["f6"]],
+			"dealer": 0,
+			"discard_pools": [
+				[100, 72],
+				[16, 73],
+				[25, 0, 74],
+				[65, 56]
+			],
+			"drawn_tile": 88,
+			"flowers": [["f1"], ["f4", "f6"], ["f8"], ["f5"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 88
+				"tile_id": 56
 			},
 			"legal_actions": [
 				{
 					"kind": "discard",
-					"tile_id": 0
+					"tile_id": 4
 				},
 				{
 					"kind": "discard",
-					"tile_id": 1
+					"tile_id": 8
+				},
+				{
+					"kind": "discard",
+					"tile_id": 12
 				},
 				{
 					"kind": "discard",
@@ -109,19 +124,11 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 25
-				},
-				{
-					"kind": "discard",
 					"tile_id": 28
 				},
 				{
 					"kind": "discard",
-					"tile_id": 29
-				},
-				{
-					"kind": "discard",
-					"tile_id": 32
+					"tile_id": 36
 				},
 				{
 					"kind": "discard",
@@ -133,15 +140,19 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 52
+					"tile_id": 48
 				},
 				{
 					"kind": "discard",
-					"tile_id": 64
+					"tile_id": 60
 				},
 				{
 					"kind": "discard",
-					"tile_id": 68
+					"tile_id": 61
+				},
+				{
+					"kind": "discard",
+					"tile_id": 62
 				},
 				{
 					"kind": "discard",
@@ -149,12 +160,23 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 84
+					"tile_id": 88
 				}
 			],
-			"melds": [[], [], [], []],
+			"melds": [
+				[],
+				[],
+				[
+					{
+						"from_seat": 3,
+						"kind": "pung",
+						"tiles": [49, 50, 51]
+					}
+				],
+				[]
+			],
 			"names": [null, null, null, null],
-			"own_hand": [0, 1, 24, 25, 28, 29, 32, 40, 44, 52, 64, 68, 80, 84],
+			"own_hand": [4, 8, 12, 24, 28, 36, 40, 44, 48, 60, 61, 62, 80, 88],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -193,7 +215,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 87
+			"wall_remaining": 77
 		},
 		"seq": 0,
 		"t": "state_sync",
@@ -201,6 +223,6 @@
 		"v": 1
 	},
 	"text": "minedEfficiency",
-	"theme": "keep_two_sided",
+	"theme": "trim_run",
 	"track": "efficiency"
 }
