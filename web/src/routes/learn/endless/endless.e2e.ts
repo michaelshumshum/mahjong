@@ -40,10 +40,11 @@ test('the index links each kind to endless mode at the picked band', async ({ pa
 	await page.goto('/learn');
 	const card = page.getByTestId('endless-card-best_discard');
 	await expect(card).toHaveAttribute('href', '/learn/endless?kind=best_discard&band=beginner');
-	await page.getByTestId('endless-band-advanced').check();
+	const advanced = page.getByTestId('endless-band').getByRole('radio', { name: 'Advanced' });
+	await advanced.check();
 	await expect(card).toHaveAttribute('href', '/learn/endless?kind=best_discard&band=advanced');
 	await page.reload();
-	await expect(page.getByTestId('endless-band-advanced')).toBeChecked();
+	await expect(advanced).toBeChecked();
 });
 
 test('answer right, the streak counts it, and the next puzzle loads without repeating', async ({

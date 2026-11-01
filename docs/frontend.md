@@ -1032,7 +1032,7 @@ Endless mode (below) is the one part that needs the API.
   input.
 
 **Endless.** An "Endless puzzles" section right after basics on `/learn` has a band picker
-(radios, saved to `mahjong:learnEndless:v1`, §6) and one card per kind, each linking to
+(`SegmentedControl`, as in Settings, saved to `mahjong:learnEndless:v1`, §6) and one card per kind, each linking to
 `/learn/endless?kind=…&band=…` with its best streak. The route fetches `GET /lessons/random`
 ([protocol.md §10](protocol.md)), whose body is a generated `Lesson`, and plays it through the
 same `routes/learn/_components/PuzzlePage.svelte` as `/learn/[id]`, titled by its theme

@@ -14,6 +14,7 @@
 	} from '$lib/ui/settings-storage';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import BackButton from '$lib/ui/BackButton.svelte';
+	import SegmentedControl from '$lib/ui/SegmentedControl.svelte';
 
 	claimMuralVisible();
 
@@ -111,22 +112,15 @@
 			<h2 id="endless-title">{m.learn_endlessHeading()}</h2>
 		</header>
 		<p class="endless-intro">{m.learn_endlessIntro()}</p>
-		<fieldset class="band-picker">
-			<legend>{m.learn_endlessBandLabel()}</legend>
-			{#each BANDS as option (option)}
-				<label class="band-option">
-					<input
-						type="radio"
-						name="endless-band"
-						value={option}
-						checked={band === option}
-						data-testid="endless-band-{option}"
-						onchange={() => pickBand(option)}
-					/>
-					<span>{BAND_LABEL[option]()}</span>
-				</label>
-			{/each}
-		</fieldset>
+		<div class="band-picker" data-testid="endless-band">
+			<SegmentedControl
+				legend={m.learn_endlessBandLabel()}
+				name="endless-band"
+				options={BANDS.map((option) => ({ value: option, label: BAND_LABEL[option]() }))}
+				value={band}
+				onChange={pickBand}
+			/>
+		</div>
 		<ul class="lessons">
 			{#each PUZZLE_KINDS as kind (kind)}
 				{@const best = endlessScore(endless, kind).best}
@@ -306,26 +300,6 @@
 	}
 
 	.band-picker {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--space-2) var(--space-4);
-		margin: 0;
-		padding: 0;
-		border: 0;
-
-		legend {
-			float: left;
-			margin-right: var(--space-2);
-			color: var(--color-text-muted);
-			font-size: var(--font-size-sm);
-		}
-	}
-
-	.band-option {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-1);
-		cursor: pointer;
+		width: min(24rem, 100%);
 	}
 </style>
