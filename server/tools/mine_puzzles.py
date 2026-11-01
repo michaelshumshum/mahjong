@@ -3,6 +3,7 @@
 
     uv run python -m tools.mine_puzzles --games 2000 --seed 20000000 --workers 8 \\
         --out /tmp/mined.jsonl --shortlist app/lessons/mined_puzzles.json
+    uv run python -m tools.mine_puzzles --from /tmp/mined.jsonl --pool app/lessons/puzzle_pool.json
 
 Four `T4` seats play `LESSON_RULESET` games; a game is a pure function of its seed, so a record
 replays from `source.game_seed` + `source.decision` (the step index in that game). Every seat's
@@ -29,6 +30,7 @@ from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
 
+from app.lessons.catalog.mined import TRACKS
 from app.lessons.grade import (
     BestDiscardKey,
     CountFaanKey,
@@ -105,6 +107,8 @@ DECISION_BANDS: Mapping[PuzzleKind, tuple[float, float]] = {
 # structural points; see winning_tiles_points / count_faan_points
 WINNING_TILES_BANDS = (2, 4)
 COUNT_FAAN_BANDS = (3, 4)
+# endless pool size per kind and band: ~1.1 kB a puzzle (adr 0025 "random endless puzzles")
+POOL_PER_BAND = 100
 
 
 def band_for(score: float, bounds: tuple[float, float]) -> Band:
@@ -445,21 +449,64 @@ def _shortlist_eligible(record: Mapping[str, Any]) -> bool:
     return bool(rates[strongest])
 
 
+def _by_band(
+    records: Sequence[Mapping[str, Any]], kind: PuzzleKind
+) -> list[list[Mapping[str, Any]]]:
+    """A kind's eligible records per band in `Band` order, each band round-robin over
+    `_SPREAD` values, in mining order within a value."""
+    mine = [r for r in records if r["kind"] == kind and _shortlist_eligible(r)]
+    bands = []
+    for band in Band:
+        by_value: dict[Any, list[Any]] = {}
+        for r in mine:
+            if r["difficulty"]["band"] == band:
+                by_value.setdefault(_SPREAD[kind](r), []).append(r)
+        bands.append(list(_round_robin(by_value[v] for v in sorted(by_value))))
+    return bands
+
+
 def shortlist(records: Sequence[Mapping[str, Any]], per_kind: int) -> list[Mapping[str, Any]]:
     """Up to `per_kind` per kind, round-robin over bands, then over `_SPREAD` values within a
     band, in mining order. Deterministic for a given `records`."""
     out: list[Mapping[str, Any]] = []
     for kind in PuzzleKind:
-        mine = [r for r in records if r["kind"] == kind and _shortlist_eligible(r)]
-        bands = []
-        for band in Band:
-            in_band = [r for r in mine if r["difficulty"]["band"] == band]
-            by_value: dict[Any, list[Any]] = {}
-            for r in in_band:
-                by_value.setdefault(_SPREAD[kind](r), []).append(r)
-            bands.append(list(_round_robin(by_value[v] for v in sorted(by_value))))
-        out += list(_round_robin(bands))[:per_kind]
+        out += list(_round_robin(_by_band(records, kind)))[:per_kind]
     return out
+
+
+def pool_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """What `app/lessons/pool.py` serves: the record without its bot rates, and with an id
+    from its source, unique within a kind."""
+    src = record["source"]
+    kind = PuzzleKind(record["kind"])
+    return {
+        "id": f"{TRACKS[kind]}-{src['game_seed']}-{src['decision']}-{src['seat']}",
+        "kind": record["kind"],
+        "difficulty": {"band": record["difficulty"]["band"]},
+        "position": record["position"],
+        "discard": record["discard"],
+        # naive is a mining filter's input, not part of answer_key()
+        "key": {k: v for k, v in record["key"].items() if k != "naive"},
+        "source": src,
+    }
+
+
+def pool(records: Sequence[Mapping[str, Any]], per_band: int) -> list[dict[str, Any]]:
+    """The endless pool: up to `per_band` per kind and band, picked as `shortlist` orders a
+    band. Deterministic for a given `records`."""
+    return [
+        pool_record(r)
+        for kind in PuzzleKind
+        for in_band in _by_band(records, kind)
+        for r in in_band[:per_band]
+    ]
+
+
+def pool_text(puzzles: Sequence[Mapping[str, Any]], meta: Mapping[str, Any]) -> str:
+    """`meta` plus `puzzles`, one puzzle per line so a regenerated pool diffs by puzzle."""
+    lines = ",\n".join(json.dumps(p, sort_keys=True, separators=(",", ":")) for p in puzzles)
+    head = json.dumps(dict(meta), sort_keys=True)
+    return f'{head[:-1]}, "puzzles": [\n{lines}\n]}}\n'
 
 
 def mine(
@@ -505,34 +552,45 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--games", type=int, default=10)
     parser.add_argument("--seed", type=int, default=0, help="first game seed")
     parser.add_argument("--workers", type=int, default=1)
-    parser.add_argument("--out", type=Path, required=True, help="every candidate, JSONL")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--out", type=Path, help="mine, and write every candidate as JSONL")
+    source.add_argument("--from", dest="from_", type=Path, help="read an earlier --out instead")
     parser.add_argument("--shortlist", type=Path, help="curated JSON, per kind and band")
     parser.add_argument("--per-kind", type=int, default=15)
+    parser.add_argument("--pool", type=Path, help="endless pool JSON, per kind and band")
+    parser.add_argument("--per-band", type=int, default=POOL_PER_BAND)
     args = parser.parse_args(argv)
 
-    # one thread per process: workers already fill the cores (docs/testing.md §1)
-    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-    play_tier, rate_tiers, problem = _tiers()
-    if problem is not None:
-        print(
-            f"T4 unavailable ({problem}); playing {play_tier}, rating without T4", file=sys.stderr
-        )
-
-    seeds = range(args.seed, args.seed + args.games)
-    records, stats = mine(seeds, args.workers, play_tier, rate_tiers)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("w") as f:
-        for record in records:
-            f.write(json.dumps(record, sort_keys=True) + "\n")
+    stats: Counter[str] = Counter()
+    if args.from_ is not None:
+        with args.from_.open() as f:
+            records = [json.loads(line) for line in f]
+        play_tier = records[0]["miner_tier"]
+        game_seeds = [r["source"]["game_seed"] for r in records]
+        seed_range = [min(game_seeds), max(game_seeds)]
+    else:
+        # one thread per process: workers already fill the cores (docs/testing.md §1)
+        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+        play_tier, rate_tiers, problem = _tiers()
+        if problem is not None:
+            print(
+                f"T4 unavailable ({problem}); playing {play_tier}, rating without T4",
+                file=sys.stderr,
+            )
+        seeds = range(args.seed, args.seed + args.games)
+        records, stats = mine(seeds, args.workers, play_tier, rate_tiers)
+        seed_range = [args.seed, args.seed + args.games - 1]
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        with args.out.open("w") as f:
+            for record in records:
+                f.write(json.dumps(record, sort_keys=True) + "\n")
+    meta = {"engine_version": ENGINE_VERSION, "miner_tier": play_tier, "seeds": seed_range}
     if args.shortlist is not None:
-        picked = shortlist(records, args.per_kind)
-        payload = {
-            "engine_version": ENGINE_VERSION,
-            "miner_tier": play_tier,
-            "seeds": [args.seed, args.seed + args.games - 1],
-            "puzzles": picked,
-        }
+        payload = {**meta, "puzzles": shortlist(records, args.per_kind)}
         args.shortlist.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n")
+    if args.pool is not None:
+        pooled = pool(records, args.per_band)
+        args.pool.write_text(pool_text(pooled, {**meta, "per_band": args.per_band}))
 
     bands = Counter((r["kind"], r["difficulty"]["band"]) for r in records)
     summary = {

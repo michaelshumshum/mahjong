@@ -1,6 +1,7 @@
 """Answer keys for lesson puzzles (ADR 0025 "Puzzle kinds"): what the engine says is right for
-a position, plus the numbers feedback quotes. Pure and cheap per call, since
-`GET /lessons/random` (phase 4) grades at request time.
+a position, plus the numbers feedback quotes. Pure and cheap per call (~1 ms warm): the miner
+grades every candidate, and tests regrade the whole endless pool (`app/lessons/pool.py`), whose
+keys `GET /lessons/random` serves stored.
 
 What a player is graded on reads only `seat_view(state, seat)`: public tiles plus the seat's own
 hand. Whether a win actually happens reads the real hands, as the engine does."""
