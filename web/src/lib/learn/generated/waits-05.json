@@ -150,5 +150,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
+	"theme": "mixed_wait",
 	"track": "waits"
 }

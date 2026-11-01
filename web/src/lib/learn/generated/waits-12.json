@@ -147,5 +147,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
+	"theme": "too_cheap",
 	"track": "waits"
 }

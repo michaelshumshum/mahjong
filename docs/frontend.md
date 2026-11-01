@@ -974,7 +974,7 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
-| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them). It drops the snapshot's claim offer (a claim puzzle is answered in the answer card, not the claim dialog) and keeps `lastDiscard` only for a claim snapshot's tile |
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
@@ -985,8 +985,12 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
 | `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
 | `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
 
-- **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title with
-  `{n}`, band, a check once solved), each a link to `/learn/<id>`. A tutorial leads its track on a
+- **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title, band, a
+  check once solved), each a link to `/learn/<id>`. `lessonTitle` gives a mined puzzle its
+  theme's label (`THEME_LABEL` in `lessons.ts`, "Two-sided wait", "Half flush, all pungs";
+  [ADR 0025](decisions/0025-learn-mode.md) "Themes") with no number: several cards in a track can
+  share a theme, told apart by band and position. A puzzle with no theme falls back to its stem's
+  title with `{n}`. The puzzle page's heading and `<title>` use the same `lessonTitle`. A tutorial leads its track on a
   full-width "Start here" card and counts toward the track's solved total. Progress lives in
   localStorage only, so the SSR'd page renders everything unsolved and an `$effect` reads it
   after mount; reading it during render would make server and client markup differ.
@@ -1483,7 +1487,10 @@ each locale.
 shortlist shares one stem per kind (`minedWaits`, `minedEfficiency`; `minedDefence*` per
 `SafeReason`, `minedFaanSelfDraw`/`minedFaanDiscard`), so re-mining never needs new prose:
 titles take `{n}` (the place in the track), explanations take the key's numbers (`{tiles}`,
-`{count}`, `{faan}`). A tutorial has `lesson_<text>_title` plus one `lesson_<text>_<step>` per
+`{count}`, `{faan}`). A mined puzzle's card and heading show its theme instead, one
+`learn_theme<Theme>` per `PuzzleTheme` value (a closed vocabulary, so per theme, not per
+puzzle); the stem titles stay as the fallback for an unthemed puzzle. `lessons.spec.ts` checks
+every theme has its key in both locales. A tutorial has `lesson_<text>_title` plus one `lesson_<text>_<step>` per
 `narrate` and `expect` step (the tip, or the hint for the action expected); `lessons.spec.ts`
 checks both locales hold every one.
 

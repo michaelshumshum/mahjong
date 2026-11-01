@@ -6,6 +6,7 @@ import { LESSON_TEXT, TUTORIAL_TEXT, lessonTextParams, lessonTitle } from './les
 import {
 	FIRST_TUTORIAL,
 	LESSONS,
+	THEME_LABEL,
 	TRACKS,
 	lessonEntry,
 	lessonsByTrack,
@@ -85,6 +86,28 @@ describe('generated lessons', () => {
 		expect(lessons.map((lesson) => lesson.text).filter((text) => !(text in LESSON_TEXT))).toEqual(
 			[]
 		);
+	});
+
+	it.each(settings.locales)('has a title for every theme in %s', (locale) => {
+		const keys = keysByLocale.get(locale)!;
+		const camel = (s: string) => s.replace(/(^|_)(\w)/g, (_, __, c: string) => c.toUpperCase());
+		const missing = Object.keys(THEME_LABEL)
+			.map((theme) => `learn_theme${camel(theme)}`)
+			.filter((key) => !keys.has(key));
+		expect(missing).toEqual([]);
+	});
+
+	it('titles every mined puzzle by its theme, the basics by their own text', () => {
+		const mined = lessons.filter((lesson) => lesson.track !== 'basics');
+		expect(mined.length).toBeGreaterThan(0);
+		for (const lesson of mined) {
+			expect(lesson.theme, lesson.id).not.toBeNull();
+			expect(lessonTitle(lesson)).toBe(THEME_LABEL[lesson.theme!]());
+		}
+		expect(lessonTitle(lessonEntry('waits-01')!)).toBe('Two-sided wait');
+		const basics = lessons.filter((lesson) => lesson.track === 'basics');
+		expect(basics.every((lesson) => lesson.theme === null)).toBe(true);
+		expect(lessonTitle(lessonEntry('basics-isolated-honour')!)).toBe('Discard the loner');
 	});
 
 	it.each(settings.locales)('has a label for every track and band in %s', (locale) => {

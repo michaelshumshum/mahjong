@@ -12,7 +12,7 @@ from app.lessons.grade import (
     puzzle_state,
     stated_answer_holds,
 )
-from app.lessons.model import Position, Puzzle, PuzzleKind, Track
+from app.lessons.model import THEMES_BY_KIND, Position, Puzzle, PuzzleKind, Track
 from app.views import seat_view
 from mahjong_core.state import Phase, WinType
 from tools.gen_lessons import check_catalog
@@ -34,6 +34,12 @@ def test_every_mined_record_is_in_the_catalog() -> None:
     records = json.loads(SHORTLIST_PATH.read_text())["puzzles"]
     assert len(MINED) == len(records)
     assert {p.track for p in MINED} == set(TRACKS.values())
+
+
+def test_mined_puzzles_are_titled_by_theme() -> None:
+    """Basics keep their own titles; every mined puzzle has a theme of its own kind."""
+    assert all(p.theme is None for p in BASICS)
+    assert all(p.theme in THEMES_BY_KIND[p.kind] for p in MINED)
 
 
 def test_basics_cover_every_kind() -> None:

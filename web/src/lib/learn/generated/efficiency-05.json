@@ -211,5 +211,6 @@
 		"v": 1
 	},
 	"text": "minedEfficiency",
+	"theme": "cut_terminal",
 	"track": "efficiency"
 }

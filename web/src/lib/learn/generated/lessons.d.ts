@@ -8,6 +8,36 @@ export type PuzzleKind = 'winning_tiles' | 'best_discard' | 'count_faan' | 'safe
 export type Track = 'basics' | 'waits' | 'efficiency' | 'defence' | 'faan';
 export type Band = 'beginner' | 'intermediate' | 'advanced';
 export type SafeReason = 'genbutsu' | 'all_copies_visible' | 'no_chance';
+export type PuzzleTheme =
+	| 'too_cheap'
+	| 'dead_wait'
+	| 'many_sided'
+	| 'two_sided'
+	| 'pair_wait'
+	| 'single_wait'
+	| 'edge_closed'
+	| 'mixed_wait'
+	| 'wider_wait'
+	| 'reach_ready'
+	| 'trim_run'
+	| 'cut_terminal'
+	| 'keep_two_sided'
+	| 'cut_floater'
+	| 'break_pair'
+	| 'most_tiles'
+	| 'genbutsu'
+	| 'walled_runs'
+	| 'dead_honour'
+	| 'all_visible'
+	| 'limit_hand'
+	| 'full_flush'
+	| 'half_flush_pungs'
+	| 'half_flush_honours'
+	| 'half_flush'
+	| 'all_pungs'
+	| 'all_chows'
+	| 'flowers'
+	| 'small_faan';
 export type StepKind = 'narrate' | 'expect' | 'auto';
 export type Highlight = 'hand' | 'discards' | 'claim' | 'wall' | 'melds' | 'hub';
 
@@ -72,6 +102,7 @@ export interface LessonIndexEntry {
 	band: Band;
 	text: string;
 	n: number;
+	theme: PuzzleTheme | null;
 }
 
 export interface TutorialIndexEntry {

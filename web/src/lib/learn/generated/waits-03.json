@@ -145,5 +145,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
+	"theme": "pair_wait",
 	"track": "waits"
 }

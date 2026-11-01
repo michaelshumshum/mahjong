@@ -3,6 +3,7 @@ import { getLocale } from '$lib/paraglide/runtime.js';
 import type { TileCode } from '$lib/table/tile-code';
 import { tileName } from '$lib/table/tile-name';
 import type { IndexEntry, Lesson } from './generated/lessons';
+import { THEME_LABEL } from './lessons';
 
 /** Every value a lesson message may interpolate; each message reads the ones it names. */
 export interface LessonTextParams {
@@ -134,9 +135,11 @@ export const TUTORIAL_TEXT: Record<string, TutorialText> = {
 	}
 };
 
-/** A title needs only the entry's place in its track, so the index can render it unloaded. */
+/** A title needs only the index entry, so the index can render it unloaded: a mined puzzle's
+ * theme, else its stem's title with its place in the track. */
 export function lessonTitle(entry: IndexEntry): string {
 	if (entry.lesson_kind === 'tutorial') return TUTORIAL_TEXT[entry.text].title();
+	if (entry.theme) return THEME_LABEL[entry.theme]();
 	return LESSON_TEXT[entry.text].title({ n: entry.n, tiles: '', count: 0, faan: 0 });
 }
 

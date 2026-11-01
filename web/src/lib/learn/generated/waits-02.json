@@ -139,5 +139,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
+	"theme": "two_sided",
 	"track": "waits"
 }

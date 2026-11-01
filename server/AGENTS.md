@@ -69,7 +69,7 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Action types / engine event types (`Event`, `EventKind`) | `mahjong_core/actions.py` / `mahjong_core/events.py` |
 | Seat range check (`validate_seat`) | `mahjong_core/state.py` |
 | Bot tier ids (`BotTier`, `BOT_TIERS`, `DEFAULT_BOT_TIER`, `LEARNED_TIERS`) — wire values, generated to TS | `bots/tiers.py` |
-| Lesson vocabularies (`PuzzleKind`, `SafeReason`, `LessonKind`, `Band`, `Track`, `StepKind`, `Highlight`), `Puzzle`, `Tutorial` and its steps, `LESSON_RULESET` — generated to TS by `tools/gen_lessons.py` | `app/lessons/model.py` |
+| Lesson vocabularies (`PuzzleKind`, `SafeReason`, `PuzzleTheme` and `THEMES_BY_KIND`, `LessonKind`, `Band`, `Track`, `StepKind`, `Highlight`), `Puzzle`, `Tutorial` and its steps, `LESSON_RULESET` — generated to TS by `tools/gen_lessons.py` | `app/lessons/model.py` |
 | Tutorial runner (`run_tutorial`, the learner `SEAT`, `NO_CLOCK`) | `app/lessons/tutorial.py` |
 | Harness limits: `NO_DEADLINE`, `GAME_STEP_CAP` | `bots/base.py` |
 | `SeatView` → count-array features (`own_hand34`, `seen34`, `add_meld`, `claimed_tile_type`, …) | `bots/features.py` |

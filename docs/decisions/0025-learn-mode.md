@@ -89,7 +89,8 @@ into `app/frames.py` ([architecture.md §5](../architecture.md) "Frame building"
 | --- | --- |
 | `model.py` | frozen `Position`, `SeatSetup`, `Puzzle`; `Tutorial` with its steps (`Narrate`, `Expect`, `Auto`, each move a `Move(ActionKind, tiles)`); `PuzzleKind(StrEnum)`, `LessonKind`, `SafeReason`, `Band`, `Track`, `StepKind`, `Highlight`. Wire vocabulary, emitted to TS by `gen_lessons` |
 | `position.py` | `build_position(spec) -> GameState`, `from_seed(ruleset, seed, actions)`, `discard_on(state, tile)` (claim positions), `position_from_state(state, seed=, seat=)` (a live `AWAIT_ACTION` state as an explicit spec, rotated so `seat` is seat 0), `position_to_dict`/`position_from_dict` |
-| `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`; runtime-safe |
+| `grade.py` | one key function per kind, `answer_key(puzzle) -> AnswerKey` dispatching over them, `stated_answer_holds`, `key_from_dict` (a key back from the shortlist's JSON); runtime-safe |
+| `themes.py` | `puzzle_theme(key, hand) -> PuzzleTheme`, what a puzzle teaches ("Themes" below); pure |
 | `catalog/*.py` | content: `basics` (hand-written, one teaching point each), `mined` (the shortlist, one `Track` per kind: `waits`, `efficiency`, `defence`, `faan`) and `tutorials` (`TUTORIALS`); `CATALOG` is `/learn`'s puzzle order |
 | `tutorial.py` | `run_tutorial(tutorial) -> TutorialRun`: plays and validates a script, and builds seat 0's frame stream with `app/frames.py` (protocol.md §6 "Tutorials") |
 | `tools/gen_lessons.py` | emits `web/src/lib/learn/generated/index.json`, `<id>.json` per lesson, `lessons.d.ts` |
@@ -265,6 +266,59 @@ picked wrong answers for melded hands; this run uses `melds=n` and replaced its 
 all scored advanced; the shortlist leaves them out. `safe_discard` reasons: all copies visible
 30,907, no-chance 5,880, genbutsu 69 (needs the tile in every opponent's pool).
 
+### Themes
+
+A mined puzzle's title is its theme ("Two-sided wait", "Half flush, all pungs"), not "Waits 7".
+`app/lessons/themes.py`'s `puzzle_theme(key, hand)` reads it off the answer key and seat 0's
+concealed hand, nothing else, so it is pure and costs nothing at import: `catalog/mined.py` sets
+`Puzzle.theme` from the shortlist's stored key (`key_from_dict`), and `gen_lessons` refuses a
+puzzle whose `theme` differs from `puzzle_theme` on the freshly graded key, as it does a wrong
+`answer`. Basics keep their hand-written titles (`theme=None`).
+
+`PuzzleTheme` is one closed `StrEnum` (wire vocabulary, emitted to `lessons.d.ts`);
+`model.THEMES_BY_KIND` lists each kind's themes in priority order. The classifier takes the first
+that holds, and each kind's last one always holds, so every key gets a theme. Counts are the
+current 60-puzzle shortlist.
+
+| Kind | Theme, in priority order | Holds when | Now |
+| --- | --- | --- | --- |
+| `winning_tiles` | `too_cheap` | a wait completes the hand but clears `min_faan` neither way | 2 |
+| | `dead_wait` | a winning wait has every copy visible | 5 |
+| | `many_sided` | 3+ tile types complete the hand | 3 |
+| | `two_sided` / `pair_wait` / `single_wait` / `edge_closed` | every completing type plays only that shape, over every standard split of hand + tile (`wait_shapes`: two-sided, edge 12-3 / 89-7, closed, pung of a pair, pair) | 2 / 2 / 0 / 0 |
+| | `mixed_wait` | otherwise (66+68 closed or 666+8 single) | 1 |
+| `best_discard` | `wider_wait` | the answer reaches ready and so does a wrong discard, with fewer tiles | 1 |
+| | `reach_ready` | the answer reaches ready and nothing else does | 5 |
+| | `trim_run` | an answer ends four or more held consecutive ranks (1 of 1234) | 2 |
+| | `cut_terminal` | an answer is a suited 1 or 9 | 3 |
+| | `keep_two_sided` | a lone answer two from a held tile with a neighbour beyond (2 of 245) | 3 |
+| | `cut_floater` | a lone honour, or a lone suited tile with nothing held within two ranks | 1 |
+| | `break_pair` | an answer is held twice or more | 0 |
+| | `most_tiles` | otherwise | 0 |
+| `safe_discard` | `genbutsu` / `walled_runs` | the stated reason is genbutsu / no-chance | 6 / 3 |
+| | `dead_honour` | all copies visible, every accepted tile an honour | 1 |
+| | `all_visible` | otherwise | 5 |
+| `count_faan` | `limit_hand` | a limit pattern | 0 |
+| | `full_flush` | 清一色 | 1 |
+| | `half_flush_pungs` / `half_flush_honours` / `half_flush` | 混一色 with 對對糊 / with 箭刻, 門風 or 圈風 / alone | 2 / 3 / 1 |
+| | `all_pungs` / `all_chows` | 對對糊 / 平糊 | 3 / 4 |
+| | `flowers` | 正花 or 一台花 | 1 |
+| | `small_faan` | otherwise | 0 |
+
+Why this shape:
+
+- **Priority over a scoring model.** A puzzle often fits two themes (a many-sided wait with one
+  dead tile; a 9 that is also the outer tile of 79+6). The first match in a fixed order is
+  deterministic and testable, and the order puts what makes the puzzle hard first: a too-cheap
+  or dead wait is the trap, the shape comes second.
+- **Themes with no puzzle today** (`single_wait`, `edge_closed`, `break_pair`, `most_tiles`,
+  `limit_hand`, `small_faan`) keep the classifier total for a re-mined shortlist or random
+  endless puzzles. The mining filters rule some out (a single clean wait is a lookup; a limit hand
+  is one pattern).
+- **Titles only.** Prompts and explanations stay per kind (`text`); a theme adds one
+  `learn_theme*` message per value, never one per puzzle.
+- **Ids unchanged.** Progress is keyed by id, so titling by theme moves nothing.
+
 ## Tests
 
 ### Server (pytest)
@@ -275,6 +329,7 @@ all scored advanced; the shortlist leaves them out. `safe_discard` reasons: all 
 | `test_lessons_grade.py` | per kind: known waits; a wait below the minimum is excluded; tied discards; safe discard against a known hidden hand; `count_faan` agrees with `check_hand` |
 | `test_lessons_catalog.py` | parametrized over every lesson (below) |
 | `test_gen_lessons.py` | generator output is deterministic |
+| `test_lesson_themes.py` | `wait_shapes` per shape; each theme on a hand-built position; priority where several apply; every mined puzzle's theme equals `puzzle_theme` on the engine's key |
 | `test_mine_puzzles.py` | each filter keeps and rejects a hand-built position; difficulty score and bands; one mined game is deterministic and every record regrades; the committed shortlist regrades |
 | `test_frames.py` | the pulled-out frame builders match what `Table` sends |
 | `test_lessons_tutorial.py` | every tutorial runs to its end phase with valid, densely numbered seat-0 frames and each `expect`'s action in its snapshot's `legal_actions`; an illegal move, an `expect` off seat 0's turn, an `auto` for seat 0, a flower or a draw past the stacked wall, and a wrong end phase are rejected; every step's frames equal a live `Table`'s for the same actions |

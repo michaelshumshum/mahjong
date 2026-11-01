@@ -193,5 +193,6 @@
 		"v": 1
 	},
 	"text": "minedDefenceNoChance",
+	"theme": "walled_runs",
 	"track": "defence"
 }

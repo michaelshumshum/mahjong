@@ -5,7 +5,7 @@
 	import AnswerPanel from '$lib/learn/AnswerPanel.svelte';
 	import { grade } from '$lib/learn/grade';
 	import { BAND_LABEL, nextLesson, previousLesson } from '$lib/learn/lessons';
-	import { LESSON_TEXT, lessonTextParams } from '$lib/learn/lesson-text';
+	import { LESSON_TEXT, lessonTextParams, lessonTitle } from '$lib/learn/lesson-text';
 	import { loadProgress, saveAttempt } from '$lib/learn/progress';
 	import { puzzleState } from '$lib/learn/puzzle-state';
 	import type { Answer, GradeResult } from '$lib/learn/types';
@@ -28,6 +28,7 @@
 	let view = $derived(live.view);
 	let text = $derived(LESSON_TEXT[lesson.text]);
 	let params = $derived(lessonTextParams(lesson));
+	let title = $derived(lessonTitle(lesson));
 	let previous = $derived(previousLesson(lesson.id));
 	let next = $derived(nextLesson(lesson.id));
 
@@ -77,7 +78,7 @@
 </script>
 
 <svelte:head>
-	<title>{m.learn_lessonPageTitle({ title: text.title(params) })}</title>
+	<title>{m.learn_lessonPageTitle({ title })}</title>
 </svelte:head>
 
 {#snippet hub()}
@@ -128,7 +129,7 @@
 					</span>
 				{/if}
 			</p>
-			<h1 id="puzzle-title">{text.title(params)}</h1>
+			<h1 id="puzzle-title">{title}</h1>
 			<p class="prompt" data-testid="puzzle-prompt">{text.prompt(params)}</p>
 		</section>
 

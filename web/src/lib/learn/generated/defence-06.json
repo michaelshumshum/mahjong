@@ -182,5 +182,6 @@
 		"v": 1
 	},
 	"text": "minedDefenceAllCopiesVisible",
+	"theme": "dead_honour",
 	"track": "defence"
 }

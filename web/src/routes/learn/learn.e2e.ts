@@ -30,7 +30,8 @@ test('the index lists every track and its lessons', async ({ page }) => {
 	await expect(page.getByTestId('lesson-card-basics-isolated-honour')).toContainText(
 		'Discard the loner'
 	);
-	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('Waits 1');
+	// mined puzzles are titled by what they teach
+	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('Two-sided wait');
 });
 
 test('a best discard puzzle: a wrong tile says try again, the right one solves it', async ({
@@ -228,6 +229,7 @@ test('learn renders in zh-Hant', async ({ page, context, baseURL }) => {
 	await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
 	await expect(page.locator('h1')).toHaveText('學打牌');
 	await expect(page).toHaveTitle('學打牌 · 開枱');
+	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('兩頭聽');
 
 	await page.getByTestId('lesson-card-basics-isolated-honour').click();
 	await expect(page.locator('h1')).toHaveText('打走孤張');

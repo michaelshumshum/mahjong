@@ -140,5 +140,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
+	"theme": "dead_wait",
 	"track": "waits"
 }

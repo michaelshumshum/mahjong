@@ -160,5 +160,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
+	"theme": "many_sided",
 	"track": "waits"
 }

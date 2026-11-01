@@ -3,6 +3,7 @@ import type {
 	Band,
 	IndexEntry,
 	Lesson,
+	PuzzleTheme,
 	SafeReason,
 	Track,
 	Tutorial,
@@ -46,6 +47,39 @@ export const SAFE_REASON_LABEL: Record<SafeReason, () => string> = {
 	all_copies_visible: m.learn_reasonAllCopiesVisible,
 	no_chance: m.learn_reasonNoChance,
 	genbutsu: m.learn_reasonGenbutsu
+};
+
+// a mined puzzle's title (docs/frontend.md §7 "Learn"); listed by hand so the messages tree-shake.
+export const THEME_LABEL: Record<PuzzleTheme, () => string> = {
+	too_cheap: m.learn_themeTooCheap,
+	dead_wait: m.learn_themeDeadWait,
+	many_sided: m.learn_themeManySided,
+	two_sided: m.learn_themeTwoSided,
+	pair_wait: m.learn_themePairWait,
+	single_wait: m.learn_themeSingleWait,
+	edge_closed: m.learn_themeEdgeClosed,
+	mixed_wait: m.learn_themeMixedWait,
+	wider_wait: m.learn_themeWiderWait,
+	reach_ready: m.learn_themeReachReady,
+	trim_run: m.learn_themeTrimRun,
+	cut_terminal: m.learn_themeCutTerminal,
+	keep_two_sided: m.learn_themeKeepTwoSided,
+	cut_floater: m.learn_themeCutFloater,
+	break_pair: m.learn_themeBreakPair,
+	most_tiles: m.learn_themeMostTiles,
+	genbutsu: m.learn_themeGenbutsu,
+	walled_runs: m.learn_themeWalledRuns,
+	dead_honour: m.learn_themeDeadHonour,
+	all_visible: m.learn_themeAllVisible,
+	limit_hand: m.learn_themeLimitHand,
+	full_flush: m.learn_themeFullFlush,
+	half_flush_pungs: m.learn_themeHalfFlushPungs,
+	half_flush_honours: m.learn_themeHalfFlushHonours,
+	half_flush: m.learn_themeHalfFlush,
+	all_pungs: m.learn_themeAllPungs,
+	all_chows: m.learn_themeAllChows,
+	flowers: m.learn_themeFlowers,
+	small_faan: m.learn_themeSmallFaan
 };
 
 export interface TrackGroup {

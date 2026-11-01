@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -32,6 +33,87 @@ class SafeReason(StrEnum):
     ALL_COPIES_VISIBLE = "all_copies_visible"
     # suited, and every run through it has another member with every copy visible: no run wait
     NO_CHANCE = "no_chance"
+
+
+class PuzzleTheme(StrEnum):
+    """What a mined puzzle teaches, its title on `/learn`. `themes.puzzle_theme` reads it off
+    the answer key and seat 0's hand; `THEMES_BY_KIND` lists each kind's themes in the order
+    the classifier tries them."""
+
+    # winning_tiles
+    TOO_CHEAP = "too_cheap"
+    DEAD_WAIT = "dead_wait"
+    MANY_SIDED = "many_sided"
+    TWO_SIDED = "two_sided"
+    PAIR_WAIT = "pair_wait"
+    SINGLE_WAIT = "single_wait"
+    EDGE_CLOSED = "edge_closed"
+    MIXED_WAIT = "mixed_wait"
+    # best_discard
+    WIDER_WAIT = "wider_wait"
+    REACH_READY = "reach_ready"
+    TRIM_RUN = "trim_run"
+    CUT_TERMINAL = "cut_terminal"
+    KEEP_TWO_SIDED = "keep_two_sided"
+    CUT_FLOATER = "cut_floater"
+    BREAK_PAIR = "break_pair"
+    MOST_TILES = "most_tiles"
+    # safe_discard
+    GENBUTSU = "genbutsu"
+    WALLED_RUNS = "walled_runs"
+    DEAD_HONOUR = "dead_honour"
+    ALL_VISIBLE = "all_visible"
+    # count_faan
+    LIMIT_HAND = "limit_hand"
+    FULL_FLUSH = "full_flush"
+    HALF_FLUSH_PUNGS = "half_flush_pungs"
+    HALF_FLUSH_HONOURS = "half_flush_honours"
+    HALF_FLUSH = "half_flush"
+    ALL_PUNGS = "all_pungs"
+    ALL_CHOWS = "all_chows"
+    FLOWERS = "flowers"
+    SMALL_FAAN = "small_faan"
+
+
+THEMES_BY_KIND: Mapping[PuzzleKind, tuple[PuzzleTheme, ...]] = {
+    PuzzleKind.WINNING_TILES: (
+        PuzzleTheme.TOO_CHEAP,
+        PuzzleTheme.DEAD_WAIT,
+        PuzzleTheme.MANY_SIDED,
+        PuzzleTheme.TWO_SIDED,
+        PuzzleTheme.PAIR_WAIT,
+        PuzzleTheme.SINGLE_WAIT,
+        PuzzleTheme.EDGE_CLOSED,
+        PuzzleTheme.MIXED_WAIT,
+    ),
+    PuzzleKind.BEST_DISCARD: (
+        PuzzleTheme.WIDER_WAIT,
+        PuzzleTheme.REACH_READY,
+        PuzzleTheme.TRIM_RUN,
+        PuzzleTheme.CUT_TERMINAL,
+        PuzzleTheme.KEEP_TWO_SIDED,
+        PuzzleTheme.CUT_FLOATER,
+        PuzzleTheme.BREAK_PAIR,
+        PuzzleTheme.MOST_TILES,
+    ),
+    PuzzleKind.SAFE_DISCARD: (
+        PuzzleTheme.GENBUTSU,
+        PuzzleTheme.WALLED_RUNS,
+        PuzzleTheme.DEAD_HONOUR,
+        PuzzleTheme.ALL_VISIBLE,
+    ),
+    PuzzleKind.COUNT_FAAN: (
+        PuzzleTheme.LIMIT_HAND,
+        PuzzleTheme.FULL_FLUSH,
+        PuzzleTheme.HALF_FLUSH_PUNGS,
+        PuzzleTheme.HALF_FLUSH_HONOURS,
+        PuzzleTheme.HALF_FLUSH,
+        PuzzleTheme.ALL_PUNGS,
+        PuzzleTheme.ALL_CHOWS,
+        PuzzleTheme.FLOWERS,
+        PuzzleTheme.SMALL_FAAN,
+    ),
+}
 
 
 class LessonKind(StrEnum):
@@ -104,7 +186,8 @@ class Puzzle:
     key: tile codes for the tile kinds (`safe_discard`: the accepted tiles, `reason` saying why),
     the total faan for `count_faan`. `discard` (`count_faan` only): the tile the seat to act
     discards into seat 0's win; `None` is a self-draw. `text` is the message stem, read as
-    `lesson_<text>_title|prompt|explain`."""
+    `lesson_<text>_prompt|explain`, plus `_title` unless `theme` titles it. `theme` (mined
+    puzzles) is checked against `themes.puzzle_theme` like `answer`."""
 
     id: str
     kind: PuzzleKind
@@ -115,6 +198,7 @@ class Puzzle:
     text: str
     reason: SafeReason | None = None
     discard: str | None = None
+    theme: PuzzleTheme | None = None
 
 
 class StepKind(StrEnum):

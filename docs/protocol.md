@@ -395,9 +395,9 @@ endpoint serves them: the web imports them.
 
 | File | Holds |
 | --- | --- |
-| `index.json` | one entry per lesson, tutorials first, then puzzles in catalog order. A puzzle's `LessonIndexEntry`: `id`, `lesson_kind: "puzzle"`, `kind` (`PuzzleKind`), `track`, `band`, `text`, `n`. A tutorial's `TutorialIndexEntry`: the same without `kind`. `n` counts within the track per `lesson_kind` |
+| `index.json` | one entry per lesson, tutorials first, then puzzles in catalog order. A puzzle's `LessonIndexEntry`: `id`, `lesson_kind: "puzzle"`, `kind` (`PuzzleKind`), `track`, `band`, `text`, `n`, `theme` (`PuzzleTheme`, the title of a mined puzzle; `null` for hand-written ones, [ADR 0025](decisions/0025-learn-mode.md) "Themes"). A tutorial's `TutorialIndexEntry`: the same without `kind` and `theme`. `n` counts within the track per `lesson_kind` |
 | `<id>.json` | a puzzle's `Lesson`: the index entry, `engine_version`, `snapshot`, and `key` (`grade.py`'s answer key for the kind, `dataclasses.asdict`). A tutorial's `Tutorial`: the index entry, `engine_version`, `start` and `steps` (below) |
-| `lessons.d.ts` | `PuzzleKind`, `SafeReason`, `Band`, `Track`, `LessonKind`, `StepKind`, `Highlight`, the key interfaces, `LessonIndexEntry`, `TutorialIndexEntry`, `IndexEntry` (either), `Lesson` (a union discriminated on `kind`), `TutorialStep` and `Tutorial`. `Seat`/`ServerEvent`/`StateSync`/`WinType` are imported from `protocol.d.ts`, not re-emitted |
+| `lessons.d.ts` | `PuzzleKind`, `SafeReason`, `PuzzleTheme`, `Band`, `Track`, `LessonKind`, `StepKind`, `Highlight`, the key interfaces, `LessonIndexEntry`, `TutorialIndexEntry`, `IndexEntry` (either), `Lesson` (a union discriminated on `kind`), `TutorialStep` and `Tutorial`. `Seat`/`ServerEvent`/`StateSync`/`WinType` are imported from `protocol.d.ts`, not re-emitted |
 
 **Tutorials** (`app/lessons/tutorial.py`'s `run_tutorial`). The script runs through `reduce()`
 from its position, and every frame is seat 0's, built with `redact_event` and `app/frames.py` in
@@ -438,8 +438,9 @@ an `expect` where seat 0 has no decision, an `auto` for seat 0, a draw past the 
   answers 食糊 from.
 - **`text`** is the message stem: the web reads `lesson_<text>_title|prompt|explain` from
   `messages/<locale>/learn.json` ([frontend.md §9](frontend.md)). Mined puzzles share one stem per
-  kind, with `n` and the key's numbers interpolated.
-- The generator refuses a puzzle whose author-stated `answer` differs from the engine's key, and a
+  kind, with `n` and the key's numbers interpolated; a non-null `theme` replaces the stem's title.
+- The generator refuses a puzzle whose author-stated `answer` differs from the engine's key, or
+  whose `theme` differs from `themes.puzzle_theme` on that key, and a
   duplicate or non-kebab-case `id`. Each run replaces every `.json` in the directory, so a dropped
   lesson's file is deleted.
 

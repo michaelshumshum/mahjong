@@ -15,6 +15,7 @@ from app.lessons.model import (
     Narrate,
     Puzzle,
     PuzzleKind,
+    PuzzleTheme,
     SafeReason,
     SeatSetup,
     StepKind,
@@ -75,6 +76,7 @@ _FIXTURE = (
         answer=5,
         text="fixtureFaan",
         discard="z5",
+        theme=PuzzleTheme.HALF_FLUSH_HONOURS,
     ),
     Puzzle(
         id="defence-a",
@@ -112,7 +114,9 @@ def test_index_lists_lessons_in_catalog_order() -> None:
         "band": "beginner",
         "text": "fixtureFaan",
         "n": 1,
+        "theme": "half_flush_honours",
     }
+    assert index[0]["theme"] is None
 
 
 def test_lesson_round_trips_the_answer_key() -> None:
@@ -148,6 +152,12 @@ def test_discard_win_snapshot_is_the_claim_window() -> None:
 def test_a_wrong_stated_answer_fails_generation() -> None:
     wrong = dataclasses.replace(_FIXTURE[2], answer=4)
     with pytest.raises(ValueError, match="faan-a"):
+        render_bundle([wrong])
+
+
+def test_a_theme_the_key_does_not_read_as_fails_generation() -> None:
+    wrong = dataclasses.replace(_FIXTURE[2], theme=PuzzleTheme.ALL_PUNGS)
+    with pytest.raises(ValueError, match="faan-a: theme all_pungs"):
         render_bundle([wrong])
 
 

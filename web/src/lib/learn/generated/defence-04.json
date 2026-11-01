@@ -203,5 +203,6 @@
 		"v": 1
 	},
 	"text": "minedDefenceAllCopiesVisible",
+	"theme": "all_visible",
 	"track": "defence"
 }

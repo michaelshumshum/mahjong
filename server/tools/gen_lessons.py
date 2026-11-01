@@ -46,15 +46,18 @@ from app.lessons.model import (
     Narrate,
     Puzzle,
     PuzzleKind,
+    PuzzleTheme,
     SafeReason,
     StepKind,
     Track,
     Tutorial,
 )
+from app.lessons.themes import puzzle_theme
 from app.lessons.tutorial import ScriptedStep, run_tutorial
 from mahjong_core.actions import action_to_dict
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.state import GameState, WinType
+from mahjong_core.tiles import tile_id_type
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "learn" / "generated"
 INDEX_FILE = "index.json"
@@ -77,6 +80,7 @@ _LESSON_ENUMS: tuple[type[StrEnum], ...] = (
     Track,
     Band,
     SafeReason,
+    PuzzleTheme,
     StepKind,
     Highlight,
 )
@@ -127,6 +131,9 @@ def index_entries(
         lesson_kind = LessonKind.TUTORIAL if isinstance(p, Tutorial) else LessonKind.PUZZLE
         seen[lesson_kind, p.track] += 1
         kind = {"kind": str(p.kind)} if isinstance(p, Puzzle) else {}
+        theme = (
+            {"theme": None if p.theme is None else str(p.theme)} if isinstance(p, Puzzle) else {}
+        )
         entries.append(
             {"id": p.id, "lesson_kind": str(lesson_kind)}
             | kind
@@ -136,6 +143,7 @@ def index_entries(
                 "text": p.text,
                 "n": seen[lesson_kind, p.track],
             }
+            | theme
         )
     return entries
 
@@ -173,6 +181,9 @@ def lesson_payload(puzzle: Puzzle, entry: Mapping[str, Any]) -> dict[str, Any]:
     key = answer_key(puzzle, state)
     if not stated_answer_holds(puzzle, key):
         raise ValueError(f"{puzzle.id}: answer {puzzle.answer!r}, engine says {key.correct!r}")
+    hand = [tile_id_type(t) for t in state.seats[0].concealed]
+    if puzzle.theme is not None and puzzle.theme != (theme := puzzle_theme(key, hand)):
+        raise ValueError(f"{puzzle.id}: theme {puzzle.theme}, the key reads as {theme}")
     return {
         **entry,
         "engine_version": ENGINE_VERSION,
@@ -250,6 +261,7 @@ def render_types() -> str:
             ("lesson_kind", _ts_literal(LessonKind.PUZZLE)),
             ("kind", "PuzzleKind"),
             *common,
+            ("theme", "PuzzleTheme | null"),
         ],
     )
     tutorial_entry = _interface(

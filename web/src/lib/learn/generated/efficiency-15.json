@@ -234,5 +234,6 @@
 		"v": 1
 	},
 	"text": "minedEfficiency",
+	"theme": "trim_run",
 	"track": "efficiency"
 }

@@ -8,8 +8,9 @@ hand. Whether a win actually happens reads the real hands, as the engine does.""
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from app.lessons.model import Puzzle, PuzzleKind, SafeReason
 from app.lessons.position import build_position, discard_on
@@ -347,6 +348,44 @@ def answer_key(puzzle: Puzzle, state: GameState | None = None) -> AnswerKey:
             if puzzle.reason is None or isinstance(puzzle.answer, int):
                 raise ValueError(f"{puzzle.id}: safe_discard states accepted tiles and a reason")
             return safe_discard(state, 0, puzzle.answer, puzzle.reason)
+
+
+def key_from_dict(kind: PuzzleKind, data: Mapping[str, Any]) -> AnswerKey:
+    """The inverse of `dataclasses.asdict` on `kind`'s key, as the shortlist stores it."""
+    match kind:
+        case PuzzleKind.WINNING_TILES:
+            return WinningTilesKey(
+                correct=tuple(data["correct"]),
+                below_minimum=tuple(data["below_minimum"]),
+                dead=tuple(data["dead"]),
+                options=tuple(WaitOption(**o) for o in data["options"]),
+            )
+        case PuzzleKind.BEST_DISCARD:
+            return BestDiscardKey(
+                correct=tuple(data["correct"]),
+                options=tuple(DiscardOption(**o) for o in data["options"]),
+            )
+        case PuzzleKind.COUNT_FAAN:
+            return CountFaanKey(
+                correct=data["correct"],
+                win_type=WinType(data["win_type"]),
+                breakdown=tuple(FaanLine(**line) for line in data["breakdown"]),
+                points=data["points"],
+            )
+        case PuzzleKind.SAFE_DISCARD:
+            return SafeDiscardKey(
+                correct=tuple(data["correct"]),
+                reason=SafeReason(data["reason"]),
+                safe=tuple(data["safe"]),
+                options=tuple(
+                    SafeOption(
+                        tile=o["tile"],
+                        deals_in_to=tuple(o["deals_in_to"]),
+                        reasons=tuple(SafeReason(r) for r in o["reasons"]),
+                    )
+                    for o in data["options"]
+                ),
+            )
 
 
 def stated_answer_holds(puzzle: Puzzle, key: AnswerKey) -> bool:

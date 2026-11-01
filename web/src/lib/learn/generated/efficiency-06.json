@@ -212,5 +212,6 @@
 		"v": 1
 	},
 	"text": "minedEfficiency",
+	"theme": "wider_wait",
 	"track": "efficiency"
 }

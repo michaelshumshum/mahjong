@@ -203,5 +203,6 @@
 		"v": 1
 	},
 	"text": "minedEfficiency",
+	"theme": "cut_floater",
 	"track": "efficiency"
 }
