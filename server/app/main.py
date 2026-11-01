@@ -197,6 +197,8 @@ app.add_middleware(
     # POST sends a JSON body -- not a CORS-safelisted content type, so browsers preflight and
     # need this header even though GET never did.
     allow_headers=["Content-Type"],
+    # not cors-safelisted: without this a cross-origin 429's wait is unreadable
+    expose_headers=["Retry-After"],
 )
 
 

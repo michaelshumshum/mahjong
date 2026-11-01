@@ -74,9 +74,12 @@ def test_rate_limited_per_ip(monkeypatch: pytest.MonkeyPatch) -> None:
     with TestClient(app, client=("203.0.113.7", 5000)) as client:
         for _ in range(2):
             assert client.get("/lessons/random", params={"kind": "count_faan"}).status_code == 200
-        response = client.get("/lessons/random", params={"kind": "count_faan"})
+        origin = {"Origin": "http://localhost:5173"}
+        response = client.get("/lessons/random", params={"kind": "count_faan"}, headers=origin)
         assert response.status_code == 429
         assert "retry-after" in response.headers
+        # the web reads the wait cross-origin
+        assert "retry-after" in response.headers["access-control-expose-headers"].lower()
 
 
 def test_cross_origin_reads_are_allowed_for_cors_origins(client: TestClient) -> None:
