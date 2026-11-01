@@ -172,6 +172,48 @@ describe('viewFromClientState turnDurationMs', () => {
 	});
 });
 
+describe('viewFromClientState claim window after a resync', () => {
+	it('offers answerable claim buttons from a state_sync alone', () => {
+		const state = reduce(initialClientGameState(), {
+			v: 1,
+			ts: 1,
+			seq: 7,
+			t: 'state_sync',
+			d: {
+				seat: 1,
+				hand_no: 1,
+				prevailing: 'EAST',
+				dealer: 0,
+				turn: 0,
+				phase: 'AWAIT_CLAIMS',
+				own_hand: [12, 20, 50],
+				concealed_counts: [13, 3, 13, 13],
+				melds: [[], [], [], []],
+				discard_pools: [[16], [], [], []],
+				flowers: [[], [], [], []],
+				wall_remaining: 50,
+				seat_status: ['bot', 'connected', 'bot', 'bot'],
+				names: [null, null, null, null],
+				host_seat: null,
+				scores: [0, 0, 0, 0],
+				legal_actions: [],
+				deadline_ts: null,
+				claim_offer: {
+					window_id: 3,
+					options: [{ kind: 'chow', tiles: [12, 20] }, { kind: 'pass' }],
+					deadline_ts: 0
+				},
+				drawn_tile: null,
+				last_discard: { seat: 0, tile_id: 16 }
+			}
+		} as ServerEvent);
+		const claim = viewFromClientState(state)!.view.claimWindow;
+		expect(claim?.windowId).toBe(3);
+		expect(claim?.tile).toBe('5m');
+		expect(claim?.yourOptions?.map((o) => o.kind)).toEqual(['chow', 'pass']);
+	});
+});
+
 describe('viewFromClientState spectator', () => {
 	function spectatorState() {
 		return reduce(initialClientGameState(), {
