@@ -230,10 +230,25 @@ class HandHistoryEntryPayload(BaseModel):
     fairness: FairnessPayload | None = None
 
 
+class ClaimOfferPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    window_id: int
+    options: list[dict[str, Any]]
+    deadline_ts: int
+
+
+class LastDiscardPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    seat: Seat
+    tile_id: int
+
+
 class StateSyncPayload(BaseModel):
     """Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for.
-    `legal_actions`/`claim_options` are the JSON-safe dicts `action_to_dict`/the claim-offer
-    serializer produce -- a full typed model per variant would just re-derive the same shape."""
+    `legal_actions` are the JSON-safe dicts `action_to_dict` produces -- a full typed model per
+    variant would just re-derive the same shape."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -254,7 +269,12 @@ class StateSyncPayload(BaseModel):
     names: list[str | None]
     scores: list[int]
     legal_actions: list[dict[str, Any]]
-    claim_options: list[dict[str, Any]]
+    # this seat's unanswered offer in the open window, exactly as its `claim_offer` frame
+    claim_offer: ClaimOfferPayload | None
+    # the tile this seat holds apart on its own turn: its draw, or the dealer's 14th
+    drawn_tile: int | None
+    # the latest discard still unclaimed, as the `discard` frame named it
+    last_discard: LastDiscardPayload | None
     deadline_ts: int | None
     # whichever seat's join was first; never actually null on the wire.
     host_seat: Seat | None
@@ -316,14 +336,6 @@ class DiscardEventPayload(BaseModel):
     tile_id: int
     tile: str
     pool_index: int
-
-
-class ClaimOfferPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    window_id: int
-    options: list[dict[str, Any]]
-    deadline_ts: int
 
 
 class ClaimResolvedPayload(BaseModel):

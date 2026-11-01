@@ -23,7 +23,7 @@ from app.views import (
 from mahjong_core.actions import action_to_dict, legal_actions
 from mahjong_core.events import Discarded, Event, HandEnded
 from mahjong_core.presets import preset_id_for
-from mahjong_core.state import ClaimOffer, GameState, Phase
+from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
 __all__ = [
@@ -72,21 +72,29 @@ def claim_options_wire(offer: ClaimOffer, claimed: TileId) -> list[dict[str, Any
     return options
 
 
-def claim_offer_frame(state: GameState, seat: int, *, deadline_ts: int) -> dict[str, Any] | None:
-    """`None` when `seat` holds no offer in the live window. Unicast: only an offered seat
-    ever gets one."""
-    window = state.claim_window
-    if window is None:
-        return None
-    offer = next((o for o in window.offers if o.seat == seat), None)
-    if offer is None:
+def _claim_offer_payload(
+    window: ClaimWindow, offers: Sequence[ClaimOffer], seat: int, deadline_ts: int
+) -> dict[str, Any] | None:
+    """`claim_offer`'s payload, shared with `state_sync.claim_offer`. `None` once `seat` has
+    answered: a second answer is dropped, so there is nothing left to offer."""
+    offer = next((o for o in offers if o.seat == seat), None)
+    if offer is None or seat in window.responses:
         return None
     return {
-        "t": "claim_offer",
         "window_id": window.window_id,
         "options": claim_options_wire(offer, window.tile),
         "deadline_ts": deadline_ts,
     }
+
+
+def claim_offer_frame(state: GameState, seat: int, *, deadline_ts: int) -> dict[str, Any] | None:
+    """`None` when `seat` holds no unanswered offer in the live window. Unicast: only an
+    offered seat ever gets one."""
+    window = state.claim_window
+    if window is None:
+        return None
+    payload = _claim_offer_payload(window, window.offers, seat, deadline_ts)
+    return None if payload is None else {"t": "claim_offer", **payload}
 
 
 def hand_start_frame(
@@ -160,9 +168,10 @@ def state_sync_frame(
     bot_levels: Sequence[str | None] | None = None,
     seed_commit: str | None = None,
 ) -> dict[str, Any]:
-    """`seat_view_wire(seat_view(...))` plus the table-level fields. Every keyword is
-    `seat_view`'s or the caller's own state; omitted, they read as a table with nobody bound
-    and no clock."""
+    """`seat_view_wire(seat_view(...))` plus the table-level fields and `claim_offer`, built
+    from the view's own offer by `claim_offer_frame`'s builder, so a client resumes the
+    window from this frame alone. Every keyword is `seat_view`'s or the caller's own state;
+    omitted, they read as a table with nobody bound and no clock."""
     view = seat_view(
         state,
         seat,
@@ -176,6 +185,18 @@ def state_sync_frame(
     )
     wire = seat_view_wire(view)
     wire["t"] = "state_sync"
+    window = state.claim_window
+    wire["claim_offer"] = (
+        _claim_offer_payload(
+            window,
+            view.claim_options,
+            seat,
+            # no clock: 0, as an offline caller's claim_offer frames carry
+            view.deadline_ts if view.deadline_ts is not None else 0,
+        )
+        if window is not None and seat is not None
+        else None
+    )
     wire["hand_history"] = hand_history_wire(hand_history)
     wire["ruleset_preset"] = preset_id_for(state.ruleset)
     wire["ruleset"] = state.ruleset.to_dict()

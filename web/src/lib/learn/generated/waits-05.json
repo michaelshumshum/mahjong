@@ -31,7 +31,7 @@
 	"snapshot": {
 		"d": {
 			"bot_levels": [null, null, null, null],
-			"claim_options": [],
+			"claim_offer": null,
 			"concealed_counts": [4, 11, 4, 10],
 			"deadline_ts": null,
 			"dealer": 1,
@@ -41,11 +41,16 @@
 				[71, 25, 59, 46, 32, 54, 33, 113, 109, 121, 34, 35, 110, 114, 83, 95, 126, 122, 102],
 				[90, 75, 47, 67, 103, 77, 115, 78, 111, 123, 99, 134, 63, 79, 43, 2, 11]
 			],
+			"drawn_tile": null,
 			"flowers": [["f8"], [], ["f1", "f3", "f5", "f2"], ["f7"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
+			"last_discard": {
+				"seat": 0,
+				"tile_id": 37
+			},
 			"legal_actions": [],
 			"melds": [
 				[

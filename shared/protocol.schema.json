@@ -1985,6 +1985,24 @@
       "title": "KongReplacePayload",
       "type": "object"
     },
+    "LastDiscardPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "seat": {
+          "$ref": "#/$defs/Seat"
+        },
+        "tile_id": {
+          "title": "Tile Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "tile_id"
+      ],
+      "title": "LastDiscardPayload",
+      "type": "object"
+    },
     "Meld": {
       "additionalProperties": false,
       "properties": {
@@ -2677,7 +2695,7 @@
     },
     "StateSyncPayload": {
       "additionalProperties": false,
-      "description": "Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for.\n`legal_actions`/`claim_options` are the JSON-safe dicts `action_to_dict`/the claim-offer\nserializer produce -- a full typed model per variant would just re-derive the same shape.",
+      "description": "Mirrors `app/views.py`'s `SeatView`, already redacted for the one seat it was built for.\n`legal_actions` are the JSON-safe dicts `action_to_dict` produces -- a full typed model per\nvariant would just re-derive the same shape.",
       "properties": {
         "seat": {
           "anyOf": [
@@ -2790,13 +2808,36 @@
           "title": "Legal Actions",
           "type": "array"
         },
-        "claim_options": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Claim Options",
-          "type": "array"
+        "claim_offer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClaimOfferPayload"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "drawn_tile": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Drawn Tile"
+        },
+        "last_discard": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LastDiscardPayload"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "deadline_ts": {
           "anyOf": [
@@ -2908,7 +2949,9 @@
         "names",
         "scores",
         "legal_actions",
-        "claim_options",
+        "claim_offer",
+        "drawn_tile",
+        "last_discard",
         "deadline_ts",
         "host_seat"
       ],

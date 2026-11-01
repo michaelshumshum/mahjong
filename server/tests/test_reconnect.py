@@ -337,15 +337,9 @@ def test_reconnect_at_head_resumes_live_with_nothing_replayed() -> None:
 
 
 def test_disconnect_mid_claim_window_forfeits_immediately_no_rearm_on_reconnect() -> None:
-    """Superseded design (`app/table.py`'s `_handle_seat_disconnected` docstring): a seat that
-    disconnects while its own claim offer is still live used to just sit there until either it
-    reconnected (`Table.resume()`'s `_rearm_seat_claim_timer`, re-arming a fresh full window) or
-    the original deadline timed it out to Pass. That re-arm was never actually reachable through
-    a full-`state_sync` reconnect (the common case once a page reload persists its own seat,
-    docs/frontend.md) -- `StateSyncPayload.claim_options` carries no `window_id`, so the
-    client had nothing to render a dialog against or submit a `claim` with, even though the
-    server was still nominally waiting on it. Now a disconnect forfeits the offer immediately
-    instead, so there's nothing left for any later reconnect to hand back.
+    """A seat that disconnects while its own claim offer is still live forfeits it immediately
+    (docs/decisions/0004-claim-forfeit-on-disconnect.md), so there's nothing left for any later
+    reconnect to hand back.
 
     Proving the forfeit already landed *before* any reconnect, without racing the server's own
     event-loop thread (this module's own docstring): seat 1's chow and seat 2's pung are the

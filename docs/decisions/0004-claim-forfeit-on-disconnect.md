@@ -14,6 +14,11 @@ a page reload persists its own seat. `state_sync.claim_options` carries no `wind
 a `claim` with, while the server was still waiting on it. The seat reconnected into a table that
 looked paused, with no way to act on the thing pausing it.
 
+**Update (2026-11):** `state_sync` now carries the seat's offer as `claim_offer`, window id and
+deadline included ([protocol.md §3](../protocol.md)), so the blocker above no longer holds and a
+resync that isn't a disconnect (seq gap, backpressure collapse) hands the offer back. The
+decision below was not revisited; re-arm-on-reconnect would now be reachable.
+
 ## Decision
 
 A seat that disconnects while holding a live, unresolved claim offer forfeits it immediately —

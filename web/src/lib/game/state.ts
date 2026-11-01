@@ -13,10 +13,9 @@ import type { RuleSet } from '$lib/net/ruleset';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'resyncing' | 'closed';
 
-/** A live claim offer, or the options embedded in a `state_sync` snapshot — the latter has no
- * `window_id` on the wire, so `windowId` stays `null` until a real `claim_offer` supplies one. */
+/** A live claim offer, from a `claim_offer` frame or a `state_sync`'s `claim_offer`. */
 export interface ClaimWindowState {
-	windowId: number | null;
+	windowId: number;
 	options: Record<string, unknown>[];
 	deadlineTs: number | null;
 }

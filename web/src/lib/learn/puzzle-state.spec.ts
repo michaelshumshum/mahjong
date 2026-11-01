@@ -28,7 +28,8 @@ describe('puzzleState', () => {
 		const state = puzzleState(discardWin as unknown as Lesson);
 		const live = viewFromClientState(state)!;
 		expect(live.view.lastDiscard?.seat).toBe(state.turn);
-		// no live window id, so no claim buttons over the puzzle
+		expect(live.view.lastDiscard?.seat).toBe(discardWin.snapshot.d.last_discard?.seat);
+		// answered in the answer card: no claim buttons over the puzzle
 		expect(live.view.claimWindow).toBeNull();
 	});
 });

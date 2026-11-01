@@ -49,6 +49,7 @@ from typing import Any, Literal, cast
 from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.actions import legal_actions as compute_legal_actions
 from mahjong_core.config import RuleSet
+from mahjong_core.engine import drawn_tile, newest_discard
 from mahjong_core.events import (
     ClaimResolved,
     Discarded,
@@ -142,6 +143,13 @@ class SeatView:
     hands: tuple[tuple[TileId, ...], ...] | None = field(
         default=None, metadata=_entitled(Entitlement.OPEN_HANDS)
     )
+    # the tile held apart on this seat's own turn (`engine.drawn_tile`); `None` for any other
+    # seat's turn and for a spectator
+    drawn_tile: TileId | None = field(default=None, metadata=_entitled(Entitlement.OWN_SEAT))
+    # `(seat, tile_id)` of the latest discard still unclaimed (`engine.newest_discard`)
+    last_discard: tuple[int, TileId] | None = field(
+        default=None, metadata=_entitled(Entitlement.PUBLIC)
+    )
 
 
 def _check_reveal(seat: int | None, reveal_hands: bool) -> None:
@@ -215,6 +223,8 @@ def seat_view(
         host_seat=host_seat,
         ruleset=state.ruleset,
         hands=tuple(s.concealed for s in state.seats) if reveal_hands else None,
+        drawn_tile=drawn_tile(state) if seat is not None and seat == state.turn else None,
+        last_discard=newest_discard(state),
     )
 
 
@@ -433,18 +443,12 @@ def _meld_wire(meld: Meld) -> dict[str, Any]:
     return {"kind": meld.kind.value, "tiles": list(meld.tiles), "from_seat": meld.from_seat}
 
 
-def _claim_offer_wire(offer: ClaimOffer) -> dict[str, Any]:
-    return {
-        "seat": offer.seat,
-        "can_win": offer.can_win,
-        "melds": [_meld_wire(m) for m in offer.melds],
-    }
-
-
 def seat_view_wire(view: SeatView) -> dict[str, Any]:
-    """JSON-safe wire dict for a `SeatView` -- `state_sync`'s payload. `legal_actions`/
-    `claim_options` hold real `Action`/`ClaimOffer` instances rather than a `WireEvent`
-    dataclass, so they get their own serializers here instead of `_wire_value`'s generic unwrap.
+    """JSON-safe wire dict for a `SeatView` -- `state_sync`'s payload. `legal_actions` holds
+    real `Action` instances rather than a `WireEvent` dataclass, so it gets its own serializer
+    here instead of `_wire_value`'s generic unwrap. `claim_options` stays off: `state_sync`
+    carries the offer as `claim_offer` (`app/frames.py`'s `state_sync_frame`), which needs the
+    window id and claimed tile a `SeatView` doesn't hold.
     """
     return {
         "seat": view.seat,
@@ -463,10 +467,15 @@ def seat_view_wire(view: SeatView) -> dict[str, Any]:
         "names": list(view.names),
         "scores": list(view.scores),
         "legal_actions": [action_to_dict(a) for a in view.legal_actions],
-        "claim_options": [_claim_offer_wire(o) for o in view.claim_options],
         "deadline_ts": view.deadline_ts,
         "host_seat": view.host_seat,
         "hands": [list(h) for h in view.hands] if view.hands is not None else None,
+        "drawn_tile": view.drawn_tile,
+        "last_discard": (
+            {"seat": view.last_discard[0], "tile_id": view.last_discard[1]}
+            if view.last_discard is not None
+            else None
+        ),
     }
 
 

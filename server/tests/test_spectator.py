@@ -77,7 +77,8 @@ def test_spectator_gets_state_sync_then_live_events_with_dense_seq() -> None:
             assert sync["d"]["seat"] is None
             assert sync["d"]["own_hand"] == []
             assert sync["d"]["legal_actions"] == []
-            assert sync["d"]["claim_options"] == []
+            assert sync["d"]["claim_offer"] is None
+            assert sync["d"]["drawn_tile"] is None
 
             for ws in wss:
                 ws.send_json(msg("hello", {"client_version": "test"}))

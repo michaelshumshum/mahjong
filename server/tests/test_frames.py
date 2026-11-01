@@ -178,33 +178,33 @@ _GAMES = {
             {"chow", "pung", "exposed_kong", "concealed_kong", "flower", "win:self_draw"}
         ),
         digests={
-            0: "0a13d37fb187df14",
-            1: "2def300b3f74f079",
-            2: "25c2c86b74b5905d",
-            3: "1f602adc16e8ffbc",
-            _SPECTATOR: "da09165487da9dc7",
+            0: "402ce82d2e153786",
+            1: "4c90bae70f67e120",
+            2: "6505b976f6950423",
+            3: "0df9491989494dd2",
+            _SPECTATOR: "67155399bcd52c39",
         },
     ),
     "discard-win": Game(
         seed=30,
         covers=frozenset({"discard:claim_win", "win:discard", "exhaustive_draw:None"}),
         digests={
-            0: "06e5f1edefda4228",
-            1: "2b0eadaad283422d",
-            2: "3ea041ea13a072f5",
-            3: "f8457dc9b05e59fd",
-            _SPECTATOR: "f33e4f4051db1d99",
+            0: "7f5ab5d50ad0fc08",
+            1: "b8b4891da50812f3",
+            2: "cf318ed7b2c91ad4",
+            3: "d9d307ac32b34508",
+            _SPECTATOR: "34185faeef534f91",
         },
     ),
     "kong-rob": Game(
         seed=7,
         covers=frozenset({"added_kong", "kong_rob:claim_win", "win:kong_rob"}),
         digests={
-            0: "bf5e42e68d257de4",
-            1: "256cfa26aa10b3c5",
-            2: "58e7bf2ab9390665",
-            3: "ab22d8d1ac2e3aae",
-            _SPECTATOR: "562fd7846500c908",
+            0: "6f306906e83647f3",
+            1: "1d3e14dd5022b0df",
+            2: "89197bafac572cab",
+            3: "66fd7abb3d666078",
+            _SPECTATOR: "7f651126472b642e",
         },
         rigged=True,
     ),
@@ -257,7 +257,13 @@ def _rebuilt(sent: Sent, recipient: int | None) -> dict[str, Any] | None:
         case "score":
             return score_frame(state)
         case "state_sync":
-            sync = state_sync_frame(state, recipient, seed_commit=wire.get("seed_commit"))
+            offer = wire["claim_offer"]
+            sync = state_sync_frame(
+                state,
+                recipient,
+                claim_deadline_ts=offer["deadline_ts"] if offer is not None else None,
+                seed_commit=wire.get("seed_commit"),
+            )
             return {k: (wire[k] if k in _SYNC_OWNED else v) for k, v in sync.items()}
         case _:
             return None

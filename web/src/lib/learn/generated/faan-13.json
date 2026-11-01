@@ -31,24 +31,26 @@
 	"snapshot": {
 		"d": {
 			"bot_levels": [null, null, null, null],
-			"claim_options": [
-				{
-					"can_win": true,
-					"melds": [
-						{
-							"from_seat": 3,
-							"kind": "chow",
-							"tiles": [92, 96, 101]
-						},
-						{
-							"from_seat": 3,
-							"kind": "chow",
-							"tiles": [96, 101, 104]
-						}
-					],
-					"seat": 0
-				}
-			],
+			"claim_offer": {
+				"deadline_ts": 0,
+				"options": [
+					{
+						"kind": "win"
+					},
+					{
+						"kind": "chow",
+						"tiles": [92, 96]
+					},
+					{
+						"kind": "chow",
+						"tiles": [96, 104]
+					},
+					{
+						"kind": "pass"
+					}
+				],
+				"window_id": 0
+			},
 			"concealed_counts": [10, 7, 10, 7],
 			"deadline_ts": null,
 			"dealer": 2,
@@ -58,11 +60,16 @@
 				[49, 60, 17, 18, 7, 40, 38, 19, 12, 29],
 				[95, 21, 91, 30, 113, 122, 50, 78, 86, 22, 101]
 			],
+			"drawn_tile": null,
 			"flowers": [[], ["f3", "f1"], ["f2"], ["f7", "f6", "f8"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
+			"last_discard": {
+				"seat": 3,
+				"tile_id": 101
+			},
 			"legal_actions": [
 				{
 					"kind": "pass",

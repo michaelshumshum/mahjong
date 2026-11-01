@@ -272,7 +272,9 @@ export interface StateSyncPayload {
 	names: (string | null)[];
 	scores: number[];
 	legal_actions: Record<string, unknown>[];
-	claim_options: Record<string, unknown>[];
+	claim_offer: ClaimOfferPayload | null;
+	drawn_tile: number | null;
+	last_discard: LastDiscardPayload | null;
 	deadline_ts: number | null;
 	host_seat: Seat | null;
 	hands?: number[][] | null;
@@ -388,6 +390,11 @@ export interface AckPayload {
 	ok: boolean;
 	error?: string | null;
 	reconnect_secret?: string | null;
+}
+
+export interface LastDiscardPayload {
+	seat: Seat;
+	tile_id: number;
 }
 
 export interface HandHistoryEntryPayload {

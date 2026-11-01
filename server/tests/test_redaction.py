@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 
+from app.frames import state_sync_frame
 from app.table import Table
 from app.views import (
     ClaimResolvedWire,
@@ -349,6 +350,13 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
         leaked = _offer_tile_ids(offer) - allowed
         assert not leaked, f"claim_options leaked {leaked} to seat {seat}: {offer!r}"
 
+    if seat is None or seat != state.turn:
+        assert view.drawn_tile is None, f"drawn_tile leaked to seat {seat}: {view.drawn_tile}"
+    elif view.drawn_tile is not None:
+        assert view.drawn_tile in state.seats[seat].concealed
+
+    _assert_state_sync_entitled(state, seat, allowed)
+
     # `melds` has hand-rolled serialization (`_meld_wire`), not the schema walker above.
     wire = seat_view_wire(view)
     for owner_seat, seat_melds in enumerate(view.melds):
@@ -357,6 +365,25 @@ def _assert_seat_view_entitled(state: GameState, seat: int | None) -> None:
             assert wire_meld["tiles"] == list(meld.tiles), (
                 f"public meld tiles altered for seat {seat}: {wire_meld!r}"
             )
+
+
+def _assert_state_sync_entitled(state: GameState, seat: int | None, allowed: set[TileId]) -> None:
+    """The wire `state_sync` itself: `drawn_tile` and `claim_offer` are built outside
+    `seat_view_wire`, so check what the frame carries, not just the view."""
+    sync = state_sync_frame(state, seat)
+    view = seat_view(state, seat)
+    assert sync["drawn_tile"] == view.drawn_tile
+    if seat is None:
+        assert sync["drawn_tile"] is None
+        assert sync["claim_offer"] is None
+    offer = sync["claim_offer"]
+    if offer is not None:
+        assert seat is not None and any(o.seat == seat for o in view.claim_options)
+        for option in offer["options"]:
+            leaked = set(option.get("tiles", ())) - allowed
+            assert not leaked, f"state_sync.claim_offer leaked {leaked} to seat {seat}"
+    if sync["last_discard"] is not None:
+        assert sync["last_discard"]["tile_id"] in _public_tile_ids(state)
 
 
 def _assert_event_redaction(state: GameState, event: Event) -> None:
@@ -439,6 +466,25 @@ def test_seat_view_schema(event_samples: list[tuple[GameState, Event]]) -> None:
     for state in seen_states.values():
         for seat in (0, 1, 2, 3, None):
             _assert_seat_view_entitled(state, seat)
+
+
+def test_state_sync_drawn_tile_reaches_only_the_drawing_seat(
+    event_samples: list[tuple[GameState, Event]],
+) -> None:
+    """Ground truth beside the walker: the drawing seat's own `state_sync` names the real
+    tile, so a `drawn_tile` nulled for everyone would fail here, not pass."""
+    checked = 0
+    for state, event in event_samples:
+        if not isinstance(event, (Drawn, KongReplacementDrawn)):
+            continue
+        if state.phase != Phase.AWAIT_ACTION or state.turn != event.seat:
+            continue
+        assert state_sync_frame(state, event.seat)["drawn_tile"] == event.tile_id
+        for viewer in (0, 1, 2, 3, None):
+            if viewer != event.seat:
+                assert state_sync_frame(state, viewer)["drawn_tile"] is None
+        checked += 1
+    assert checked > 0
 
 
 def test_seat_view_own_hand_matches_state() -> None:
@@ -573,6 +619,10 @@ def test_open_hands_spectator_seat_view(event_samples: list[tuple[GameState, Eve
         assert view.own_hand == ()
         assert view.legal_actions == ()
         assert view.claim_options == ()
+        assert view.drawn_tile is None
+        sync = state_sync_frame(state, None, reveal_hands=True)
+        assert sync["drawn_tile"] is None
+        assert sync["claim_offer"] is None
 
         wire = seat_view_wire(view)
         assert wire["hands"] == [list(s.concealed) for s in state.seats]

@@ -90,9 +90,7 @@ function claimOptionToView(o: Record<string, unknown>): ClaimOption {
 
 function claimWindowToView(state: ClientGameState): ClaimWindowView | null {
 	const offer = state.claimOffer;
-	// a window_id-less offer comes from a state_sync snapshot with no live claim_offer yet --
-	// no real id to claim against, so don't offer buttons; the real claim_offer will carry one.
-	if (!offer || offer.windowId === null) return null;
+	if (!offer) return null;
 	// `kind` stays a placeholder -- the wire never says discard vs kong_rob and nothing
 	// downstream branches on it. `sourceSeat`/`tile` are real, from `state.lastDiscard`.
 	return {

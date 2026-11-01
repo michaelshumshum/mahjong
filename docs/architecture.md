@@ -381,7 +381,8 @@ def redact_event(state: GameState, seat: int | None, event: Event) -> dict:
 functions of `(state, recipient, event…)`: `turn_frame` (with `legal` for the acting seat only),
 `claim_offer_frame`/`claim_options_wire`, `hand_start_frame`, `deal_frame`, `event_frame`
 (`redact_event` plus `discard.tile`/`pool_index` and `hand_end`'s deadline and fairness),
-`score_frame`, `state_sync_frame`, and `to_envelope` for the `{v, t, seq, ts, d}` wrapper.
+`score_frame`, `state_sync_frame` (its `claim_offer` built by `claim_offer_frame`'s payload
+builder), and `to_envelope` for the `{v, t, seq, ts, d}` wrapper.
 
 | Owned by the caller, passed in | Never inside a builder |
 | --- | --- |
@@ -425,6 +426,8 @@ class SeatView:
     host_seat: int | None                          # first seat to join; None with no Table behind the caller
     ruleset: RuleSet                               # public; bots read thresholds off it (bots.md §8)
     hands: tuple[tuple[int, ...], ...] | None      # every seat's concealed tiles; see below
+    drawn_tile: int | None                         # the tile held apart on this seat's own turn
+    last_discard: tuple[int, int] | None           # (seat, tile_id) of the latest unclaimed discard
 ```
 
 | Field | Notes |
@@ -434,6 +437,8 @@ class SeatView:
 | `names` | `SeatBinding.name`, set once at `join` (`_normalize_name`); bot seats draw a display name at bind time |
 | `deadline_ts` | `ClaimWindow.deadline_ts` for a claim offer, or the per-turn deadline when `seat == state.turn` and `phase == AWAIT_ACTION` |
 | `hands` | `None` for every real seat. `seat_view(..., reveal_hands=True)` fills it for a spectator only and raises (`_check_reveal`) for a real seat |
+| `drawn_tile` / `last_discard` | `mahjong_core.engine.drawn_tile` / `newest_discard`, pure reads of `GameState` (a draw lands last in `concealed`; `self_draw_win_allowed` is false only on a claimed turn; a front draw only follows the previous seat's unclaimed discard). `drawn_tile` is `OWN_SEAT`: set only when `seat == state.turn`, never for a spectator, open-hands included. `last_discard` is public. Both default to `None`, so code building a `SeatView` by hand is unaffected |
+| `claim_options` on the wire | not sent as is: `state_sync_frame` turns the seat's unanswered offer into `state_sync.claim_offer` with `claim_offer_frame`'s own payload builder, so the two can't drift ([protocol.md §3](protocol.md)) |
 
 **The one contained exception to "a real seat never gets another seat's tiles":**
 `_omniscient_seat_view` (`app/views.py`) deliberately bypasses `_check_reveal` to build a real

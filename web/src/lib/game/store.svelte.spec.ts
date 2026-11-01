@@ -62,7 +62,9 @@ function stateSyncEvent(seat: Seat | null, seq: number): ServerEvent {
 			host_seat: null,
 			scores: [0, 0, 0, 0],
 			legal_actions: [],
-			claim_options: [],
+			claim_offer: null,
+			drawn_tile: null,
+			last_discard: null,
 			deadline_ts: null
 		}
 	};

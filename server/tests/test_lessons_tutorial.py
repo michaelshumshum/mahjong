@@ -143,7 +143,10 @@ _TABLE_OWNED = frozenset({"t", "seat_status", "names", "host_seat", "deadline_ts
 
 
 def _sync_fields(sync: dict[str, Any]) -> dict[str, Any]:
-    return as_parsed({k: v for k, v in sync.items() if k not in _TABLE_OWNED})
+    fields = {k: v for k, v in sync.items() if k not in _TABLE_OWNED}
+    if fields["claim_offer"] is not None:
+        fields["claim_offer"] = _flat({"t": "claim_offer", "d": fields["claim_offer"]})
+    return as_parsed(fields)
 
 
 @pytest.mark.parametrize("tutorial", TUTORIALS, ids=lambda t: t.id)

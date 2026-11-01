@@ -1459,11 +1459,9 @@ class Table:
         immediately, not on the claim-window timeout -- same `Pass` path a real timeout uses.
 
         Why immediately rather than waiting for `resume()` to re-arm on reconnect:
-        `StateSyncPayload.claim_options` carries no `window_id`, so a reconnecting client has
-        nothing to render a dialog from or submit a `claim` against even if the server were
-        still nominally waiting on this seat -- it would reconnect into a table that looked
-        paused with no way to act on the thing pausing it. Forfeiting on disconnect removes the
-        offer before any reconnect can observe it.
+        docs/decisions/0004-claim-forfeit-on-disconnect.md. Forfeiting on disconnect removes the
+        offer before any reconnect can observe it; a resync that isn't a disconnect (a seq gap,
+        a backpressure collapse) keeps it, and its `state_sync.claim_offer` hands it back.
 
         No-op if there's no live window, this seat has no offer in it, or it already responded
         (whichever arrives first at `_apply`'s single-writer ordering wins)."""

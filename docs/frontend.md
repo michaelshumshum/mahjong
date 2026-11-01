@@ -562,7 +562,7 @@ interface ClientGameState {
   legalActions: Record<string, unknown>[]; // this seat's turn options, else []
   deadlineTs: number | null;
   claimOffer: {
-    windowId: number | null;
+    windowId: number;
     options: Record<string, unknown>[];
     deadlineTs: number | null;
   } | null;
@@ -700,10 +700,8 @@ brief landing pulse (`motion-ok`) and a `title` tooltip ("`<name>` discarded"); 
 persistent underline on the live table. `/learn`'s discard wins pass `holdLastDiscard`, a lasting
 brass outline, since the claimed tile is the puzzle (§7 "Learn"). The pulse animates the standalone `scale` property, not `transform`: a
 `transform` keyframe replaces the side pools' rotation for its duration, so the tile flashed
-upright. A `state_sync` only derives `lastDiscard` for an embedded claim window (needed there
-for `ClaimDialog`'s `sourceSeat`/`tile`) — a resync outside an active claim window loses the
-marker until the next discard, a deliberate, cosmetic-only tradeoff (no wire field names "last
-discard" generally).
+upright. A `state_sync` sets `lastDiscard` from its own `last_discard` field
+([protocol.md §3](protocol.md)), so a resync keeps the marker wherever the stream would have.
 
 ### Hand history
 
@@ -723,6 +721,13 @@ breakdown, so the score sheet needs the running list.
 
 A `state_sync` is a store replace — set every field from the snapshot, bump `version`. Keyed
 `{#each}` blocks reconcile existing elements automatically, so there is no teardown path.
+
+Nothing is guessed: `drawnTileId`, `claimOffer` and `lastDiscard` come from the payload's
+`drawn_tile`, `claim_offer` and `last_discard`, so the state after a resync equals the state the
+live stream would have left. A resync during a claim window (seq gap past the ring, backpressure
+collapse) brings back answerable claim buttons — `claim_offer` is the `claim_offer` frame's own
+payload, window id included — and one right after a pung holds no tile apart. Pinned in
+`reducer.spec.ts`.
 
 On reconnecting to your own seat after the `AUTOPLAY` handover
 ([architecture.md §8](architecture.md)), the snapshot already reflects what the bot did; missed
@@ -971,7 +976,7 @@ lessons are the generated bundle in `lib/learn/generated/` ([protocol.md §6](pr
 | --- | --- |
 | `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track and band labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
-| `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them) |
+| `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them). It drops the snapshot's claim offer (a claim puzzle is answered in the answer card, not the claim dialog) and keeps `lastDiscard` only for a claim snapshot's tile |
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
 | `TutorialCoach.svelte` | the tutorial's tip card on `lib/ui/CoachCard.svelte`, the card the practice coach marks use: step counter, tip, wrong-move line, Back/Next or the last step's buttons |
 | `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |

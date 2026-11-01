@@ -23,28 +23,36 @@
 	"snapshot": {
 		"d": {
 			"bot_levels": [null, null, null, null],
-			"claim_options": [
-				{
-					"can_win": true,
-					"melds": [
-						{
-							"from_seat": 1,
-							"kind": "pung",
-							"tiles": [128, 129, 130]
-						}
-					],
-					"seat": 0
-				}
-			],
+			"claim_offer": {
+				"deadline_ts": 0,
+				"options": [
+					{
+						"kind": "win"
+					},
+					{
+						"kind": "pung",
+						"tiles": [128, 129]
+					},
+					{
+						"kind": "pass"
+					}
+				],
+				"window_id": 0
+			},
 			"concealed_counts": [10, 13, 13, 13],
 			"deadline_ts": null,
 			"dealer": 1,
 			"discard_pools": [[112], [116, 130], [117], [118]],
+			"drawn_tile": null,
 			"flowers": [["f1"], [], [], []],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
+			"last_discard": {
+				"seat": 1,
+				"tile_id": 130
+			},
 			"legal_actions": [
 				{
 					"kind": "pass",

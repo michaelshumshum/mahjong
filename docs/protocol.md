@@ -181,9 +181,23 @@ Payload shapes match `server/app/protocol.py` (§6).
 | `host_seat` | the first seat to `join`, or `null` |
 | `bot_levels` | each `bot` seat's tier (`BotTier`: `T0`\|`T1`\|`T2`\|`T4`\|`ORACLE`, [bots.md §6](bots.md)), `null` for every other seat, `autoplay` included. Fixed for the table's life (bot seats are bound at construction). Defaults to `[]` |
 | `hands` | every seat's concealed tiles for an open-hands spectator, `null` otherwise |
+| `claim_offer` | this seat's unanswered offer in the open window: `claim_offer`'s own payload (`{window_id, options, deadline_ts}`, one builder in `app/frames.py`), deadline included. `null` for a seat with no offer, once it has answered, and for spectators. With no clock (a lesson snapshot) `deadline_ts` is 0, as in that caller's `claim_offer` frames |
+| `drawn_tile` | the tile this seat holds apart on its own `AWAIT_ACTION` turn: its draw or kong replacement, or the dealer's 14th at a hand's start (what `deal` holds apart). `null` on a turn a chow/pung claim started, on any other seat's turn and for spectators, open-hands included (`mahjong_core.engine.drawn_tile`; `OWN_SEAT`, [architecture.md §5](architecture.md)) |
+| `last_discard` | `{seat, tile_id}` of the latest discard play has only moved past: the open discard window's tile, or the one the seat on turn drew after. `null` once a meld or a new hand followed it, during a kong-rob window, and at `HAND_OVER` (`mahjong_core.engine.newest_discard`). Public |
 | `hand_history` | every completed hand, oldest first: `hand_end`'s fields plus `dealer`/`prevailing`/`winner_melds`. Lets a client with no earlier live stream (mid-game spectator, resync) render past hands. Defaults to `[]` |
 | `ruleset` / `ruleset_preset` | the table's fixed `RuleSet.to_dict()` and matching preset id (or `null`) |
 | `seed_commit` | the current hand's commit, `provable_fairness` tables only (see Fairness) |
+
+A client resumes from a `state_sync` alone: those last three fields are exactly what the live
+stream (`draw`/`kong_replace`, `discard`, `claim_offer`) would have left it holding, so the
+reducer sets them from the payload instead of guessing from `own_hand`/`discard_pools`.
+`SeatView.claim_options` (the per-seat `{can_win, melds}` shape bots read) never goes on the wire.
+
+**No `v` bump for wire-shape changes.** The web client is built and deployed with the server
+([infra.md](infra.md)), and tables live in one process's memory: a deploy drains them
+([architecture.md §8.1](architecture.md)), so an open tab's reconnect gets `table_closed`, never a
+new-shape frame for a game it was playing. The one skew left is an old tab that navigates
+client-side into a new table without reloading; it is accepted, not versioned.
 
 ### Fairness (optional, ruleset flag)
 
@@ -295,7 +309,11 @@ closes; reconnecting is a brand-new spectator session with a fresh `state_sync`.
 
 **A mid-claim-window disconnect forfeits the offer** ([architecture.md §8](architecture.md),
 [ADR 0004](decisions/0004-claim-forfeit-on-disconnect.md)), so a reconnect never has anything
-claim-shaped to resolve.
+claim-shaped to resolve. A resync that isn't a disconnect — a `hello{last_seq}` on the live
+socket past the ring, a backpressure collapse (§9) — can land mid-window with the offer live:
+`resume()` re-arms the seat's deadline first, and the `state_sync`'s `claim_offer` (§3) carries
+the window id, options and fresh deadline, so the claim buttons come back answerable. The
+ring-replay branch instead follows the replay with one fresh `claim_offer` frame.
 
 ## 6. Schema generation
 
@@ -401,8 +419,8 @@ the order a live `Table` sends them, so the client plays it through the same red
 | --- | --- |
 | `action` | `action_to_dict` of the scripted action: an `auto` seat's, or the one seat 0 must take at an `expect` |
 | `frames` | seat 0's frames after the action, enveloped; `seq` runs densely from 1 across the whole tutorial; `ts` is 0 |
-| `snapshot` | `expect` only: seat 0's `state_sync` before it acts, carrying `legal_actions`/`claim_options`; its `seq` is that of the last frame before it, the stream it stands for |
-| `deadline_ts` | 0 wherever the frame type requires one (`turn`, `claim_offer`, `hand_end`): there is no clock; `null` in a `state_sync` |
+| `snapshot` | `expect` only: seat 0's `state_sync` before it acts, carrying `legal_actions`, `claim_offer`, `drawn_tile` and `last_discard`, so it stands on its own; its `seq` is that of the last frame before it, the stream it stands for |
+| `deadline_ts` | 0 wherever the frame type requires one (`turn`, `claim_offer`, `hand_end`, a `state_sync`'s `claim_offer`): there is no clock; `null` as a `state_sync`'s own field |
 | `text` | `narrate`: the tip; `expect`: the hint. The message is `lesson_<tutorial text>_<step text>` |
 
 The generator refuses a script with a move outside that seat's legal actions (or claim offer),
@@ -415,8 +433,9 @@ an `expect` where seat 0 has no decision, an `auto` for seat 0, a draw past the 
   `app.protocol.StateSync`, so the client's `reduce()` takes it as the same full replace a live
   resync is.
 - **Discard wins** (`count_faan` with a `discard`): the snapshot is the claim window the engine
-  opens once the seat to act discards that tile. Seat 0's `claim_options` holds its `can_win`
-  offer and `turn` names the discarder, the same state a live player answers 食糊 from.
+  opens once the seat to act discards that tile. Seat 0's `claim_offer` leads with its `win`
+  option, `last_discard` names the tile and `turn` the discarder, the same state a live player
+  answers 食糊 from.
 - **`text`** is the message stem: the web reads `lesson_<text>_title|prompt|explain` from
   `messages/<locale>/learn.json` ([frontend.md §9](frontend.md)). Mined puzzles share one stem per
   kind, with `n` and the key's numbers interpolated.

@@ -89,9 +89,11 @@ __all__ = [
     "MAX_HANDS_PER_GAME",
     "Action",
     "IllegalActionError",
+    "drawn_tile",
     "game_outcome",
     "new_game",
     "new_hand",
+    "newest_discard",
     "prevailing_winds",
     "reduce",
     "start_next_hand",
@@ -361,6 +363,38 @@ def _draw_for_turn(
         KongReplacementDrawn(seat=seat, tile_id=tile) if kong else Drawn(seat=seat, tile_id=tile)
     )
     return state, [*events, draw_event]
+
+
+def drawn_tile(state: GameState) -> TileId | None:
+    """The tile the seat on turn holds apart: the one it just drew (kong replacements
+    included), or the dealer's 14th at a hand's start -- `_draw_for_turn` and the deal both put
+    it last in `concealed`. `None` outside `AWAIT_ACTION` and on a turn a chow/pung claim
+    started, the only turns `self_draw_win_allowed` is false on."""
+    if state.phase != Phase.AWAIT_ACTION or not state.self_draw_win_allowed:
+        return None
+    concealed = state.seats[state.turn].concealed
+    return concealed[-1] if concealed else None
+
+
+def newest_discard(state: GameState) -> tuple[int, TileId] | None:
+    """`(seat, tile_id)` of the latest discard while play has only moved past it: the open
+    discard window's tile, or the one the seat on turn drew from the front after. A front draw
+    only ever follows the previous seat's unclaimed discard, which is still last in its pool.
+    `None` once any meld or a new hand has followed it, during a kong-rob window, and at
+    `HAND_OVER`."""
+    window = state.claim_window
+    if state.phase == Phase.AWAIT_CLAIMS and window is not None:
+        return window.source_seat, window.tile
+    if (
+        state.phase != Phase.AWAIT_ACTION
+        or not state.self_draw_win_allowed
+        or state.last_draw_was_kong_replacement
+        or state.total_discards == 0
+    ):
+        return None
+    seat = (state.turn - 1) % len(state.seats)
+    pool = state.seats[seat].discards
+    return (seat, pool[-1]) if pool else None
 
 
 def _discard_claim_offers(state: GameState, discarder: int, tile: TileId) -> tuple[ClaimOffer, ...]:

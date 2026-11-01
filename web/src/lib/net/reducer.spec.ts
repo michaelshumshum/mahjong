@@ -6,10 +6,44 @@ import {
 	type HandHistoryEntry,
 	type MeldState
 } from '../game/state';
-import type { HandHistoryEntryPayload, ServerEvent } from './protocol';
+import type { HandHistoryEntryPayload, ServerEvent, StateSyncPayload } from './protocol';
 
 function state(patch: Partial<ClientGameState> = {}): ClientGameState {
 	return { ...initialClientGameState(), ...patch };
+}
+
+/** A seat-0 `state_sync` on its own turn; `patch` overrides payload fields. */
+function syncEvent(patch: Partial<StateSyncPayload> = {}): ServerEvent {
+	return {
+		v: 1,
+		ts: 1,
+		seq: 5,
+		t: 'state_sync',
+		d: {
+			seat: 0,
+			hand_no: 1,
+			prevailing: 'EAST',
+			dealer: 0,
+			turn: 0,
+			phase: 'AWAIT_ACTION',
+			own_hand: [10, 11, 12],
+			concealed_counts: [3, 13, 13, 13],
+			melds: [[], [], [], []],
+			discard_pools: [[], [], [], []],
+			flowers: [[], [], [], []],
+			wall_remaining: 80,
+			seat_status: ['connected', 'connected', 'connected', 'connected'],
+			names: ['Alice', 'Bob', 'Carol', 'Dave'],
+			host_seat: 0,
+			scores: [0, 0, 0, 0],
+			legal_actions: [],
+			claim_offer: null,
+			drawn_tile: null,
+			last_discard: null,
+			deadline_ts: null,
+			...patch
+		}
+	};
 }
 
 describe('reduce', () => {
@@ -75,7 +109,13 @@ describe('reduce', () => {
 				host_seat: 0,
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
-				claim_options: [{ kind: 'pung', tiles: [4, 4] }],
+				claim_offer: {
+					window_id: 9,
+					options: [{ kind: 'pung', tiles: [4, 4] }, { kind: 'pass' }],
+					deadline_ts: 1000
+				},
+				drawn_tile: null,
+				last_discard: { seat: 1, tile_id: 7 },
 				deadline_ts: 1000
 			}
 		};
@@ -87,16 +127,50 @@ describe('reduce', () => {
 		expect(next.melds[2]).toEqual([{ kind: 'pung', tiles: [4, 4, 4], fromSeat: 0 }]);
 		expect(next.names).toEqual(['Alice', 'Bob', null, 'Dave']);
 		expect(next.botLevels).toEqual([null, 'T1', null, 'ORACLE']);
+		// the same shape a claim_offer frame leaves: answerable, window id included.
 		expect(next.claimOffer).toEqual({
-			windowId: null,
-			options: [{ kind: 'pung', tiles: [4, 4] }],
+			windowId: 9,
+			options: [{ kind: 'pung', tiles: [4, 4] }, { kind: 'pass' }],
 			deadlineTs: 1000
 		});
-		// d.turn (2) is the discarder; its pool's last entry (7) is the claimed tile.
-		expect(next.lastDiscard).toEqual({ seat: 2, tileId: 7 });
+		expect(next.lastDiscard).toEqual({ seat: 1, tileId: 7 });
+		expect(next.drawnTileId).toBeNull();
 	});
 
-	it('state_sync with no embedded claim window leaves lastDiscard null', () => {
+	it('state_sync claim offer matches what the claim_offer frame leaves', () => {
+		const offer = {
+			window_id: 4,
+			options: [{ kind: 'chow', tiles: [3, 8] }, { kind: 'pass' }],
+			deadline_ts: 5000
+		};
+		const live = reduce(state(), { v: 1, ts: 1, seq: 1, t: 'claim_offer', d: offer });
+		const synced = reduce(state(), syncEvent({ phase: 'AWAIT_CLAIMS', claim_offer: offer }));
+		expect(synced.claimOffer).toEqual(live.claimOffer);
+	});
+
+	it('state_sync takes the drawn tile from the payload, never the last own-hand tile', () => {
+		const drew = reduce(
+			state({ drawnTileId: 3 }),
+			syncEvent({ own_hand: [10, 55, 12], drawn_tile: 55, legal_actions: [{ kind: 'discard' }] })
+		);
+		expect(drew.drawnTileId).toBe(55);
+		// right after a pung: own turn, discards legal, nothing held apart.
+		const claimed = reduce(
+			state({ drawnTileId: 3 }),
+			syncEvent({ own_hand: [10, 11, 12], drawn_tile: null, legal_actions: [{ kind: 'discard' }] })
+		);
+		expect(claimed.drawnTileId).toBeNull();
+	});
+
+	it('state_sync takes lastDiscard from the payload outside a claim window too', () => {
+		const next = reduce(
+			state({ lastDiscard: null }),
+			syncEvent({ last_discard: { seat: 3, tile_id: 7 }, discard_pools: [[], [], [], [7]] })
+		);
+		expect(next.lastDiscard).toEqual({ seat: 3, tileId: 7 });
+	});
+
+	it('state_sync with no last_discard leaves lastDiscard null', () => {
 		const s = state({ lastDiscard: { seat: 0, tileId: 47 } });
 		const event: ServerEvent = {
 			v: 1,
@@ -121,7 +195,9 @@ describe('reduce', () => {
 				host_seat: 0,
 				scores: [0, 0, 0, 0],
 				legal_actions: [{ kind: 'discard' }],
-				claim_options: [],
+				claim_offer: null,
+				drawn_tile: 12,
+				last_discard: null,
 				deadline_ts: 1000
 			}
 		};
@@ -776,7 +852,9 @@ describe('reduce', () => {
 				host_seat: 0,
 				scores: [300, -100, -100, -100],
 				legal_actions: [],
-				claim_options: [],
+				claim_offer: null,
+				drawn_tile: null,
+				last_discard: null,
 				deadline_ts: null,
 				hand_history: handHistory
 			}
@@ -994,7 +1072,9 @@ describe('reduce open-hands spectator', () => {
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
 				deadline_ts: null,
-				claim_options: [],
+				claim_offer: null,
+				drawn_tile: null,
+				last_discard: null,
 				hands: [
 					[0, 1, 40],
 					[4, 5],
@@ -1105,7 +1185,9 @@ describe('reduce open-hands spectator', () => {
 					host_seat: 0,
 					scores: [0, 0, 0, 0],
 					legal_actions: [],
-					claim_options: [],
+					claim_offer: null,
+					drawn_tile: null,
+					last_discard: null,
 					deadline_ts: null,
 					seed_commit: 'def',
 					hand_history: [

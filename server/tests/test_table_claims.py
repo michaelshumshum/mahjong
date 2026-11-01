@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 
+from app.frames import claim_offer_frame
 from app.table import Table, TimerHeap
 from mahjong_core.actions import ClaimPung, Discard, Pass, legal_actions
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
@@ -247,13 +248,9 @@ async def test_stale_timer_after_early_exit_is_a_noop() -> None:
 async def test_disconnect_mid_claim_window_forfeits_seats_own_offer_only() -> None:
     """A seat that disconnects while its own claim offer is still live forfeits it right away --
     `mark_disconnected` enqueues `SeatDisconnected`, and the next `process_one()` tick applies a
-    synthesized `Pass` for it, the same `_apply()` path a claim-window timeout uses. Why not wait
-    for reconnect to re-arm a fresh window instead (the previous design): a reconnect's own
-    `state_sync` has no `window_id` to offer a dialog against (`app/protocol.py`'s
-    `StateSyncPayload.claim_options` carries only `{kind, tiles?}`), so the seat would come back
-    to a table that looked paused with nothing to act on. Forfeiting up front means there is
-    nothing left for a reconnect to hand back. Seat 2's own pung offer, untouched throughout,
-    proves this is seat-scoped, not a window-wide cancellation."""
+    synthesized `Pass` for it, the same `_apply()` path a claim-window timeout uses
+    (docs/decisions/0004-claim-forfeit-on-disconnect.md). Seat 2's own pung offer, untouched
+    throughout, proves this is seat-scoped, not a window-wide cancellation."""
     table = await _open_claim_window(DEFAULT_RULESET, game_seed=1)
     window = table.state.claim_window
     assert window is not None
@@ -290,6 +287,101 @@ async def test_disconnect_with_no_live_claim_offer_is_a_noop() -> None:
     window = table.state.claim_window
     assert window is not None
     assert 3 not in window.responses
+
+
+# --- state_sync resumes the window and the turn on its own (docs/protocol.md §3) ---------------
+
+
+async def test_state_sync_mid_window_carries_each_seats_own_claim_offer() -> None:
+    """The same payload, window id and deadline as that seat's `claim_offer` frame; nothing
+    for a seat with no offer, and nothing once a seat has answered."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=999)
+    table = await _open_claim_window(ruleset)
+    window = table.state.claim_window
+    assert window is not None
+
+    for seat in (1, 2):
+        deadline = table._claim_deadline_ms[(window.window_id, seat)]
+        frame = claim_offer_frame(table.state, seat, deadline_ts=deadline)
+        assert frame is not None
+        sync = table.state_sync_wire(seat)
+        assert sync["claim_offer"] == {k: v for k, v in frame.items() if k != "t"}
+        assert sync["claim_offer"]["window_id"] == window.window_id
+        assert sync["drawn_tile"] is None
+        assert sync["last_discard"] == {"seat": 0, "tile_id": _MAN_5[0]}
+    assert {o["kind"] for o in table.state_sync_wire(1)["claim_offer"]["options"]} == {
+        "chow",
+        "pass",
+    }
+    for seat in (0, 3, None):
+        assert table.state_sync_wire(seat)["claim_offer"] is None
+
+    table.submit(2, Pass(window_id=window.window_id, seat=2))
+    await table.process_one()
+    assert table.state.claim_window is not None  # seat 1's chow is still outstanding
+    assert table.state_sync_wire(2)["claim_offer"] is None
+    assert table.state_sync_wire(1)["claim_offer"] is not None
+
+
+async def test_resync_mid_window_without_a_disconnect_hands_back_a_claimable_offer() -> None:
+    """A gap resync on the live socket (`hello{last_seq}` past the ring) or a backpressure
+    collapse lands mid-window with the offer still live. Its `state_sync` must carry a window id
+    and options the client can answer, with the fresh deadline `resume()` re-armed."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=999)
+    table = await _open_claim_window(ruleset)
+    window = table.state.claim_window
+    assert window is not None
+    sent: list[dict[str, object]] = []
+    table.join("sess-1", lambda seq, wire: sent.append(wire), seat=1)
+    sent.clear()
+
+    table.resume(1, None)
+
+    syncs = [w for w in sent if w["t"] == "state_sync"]
+    assert len(syncs) == 1
+    offer = syncs[0]["claim_offer"]
+    assert isinstance(offer, dict)
+    assert offer["window_id"] == window.window_id
+    assert offer["deadline_ts"] == table._claim_deadline_ms[(window.window_id, 1)]
+    assert offer["options"][-1] == {"kind": "pass"}
+    chow = next(o for o in offer["options"] if o["kind"] == "chow")
+    assert sorted(chow["tiles"]) == sorted([_MAN_4[0], _MAN_6[0]])
+
+
+async def test_state_sync_after_a_claim_holds_no_drawn_tile() -> None:
+    """A pung's turn starts with no draw: the claimer's hand has no tile held apart, and the
+    claimed discard left the pool."""
+    ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=999)
+    table = await _open_claim_window(ruleset)
+    pung = next(a for a in legal_actions(table.state, 2) if isinstance(a, ClaimPung))
+    table.submit(2, pung)
+    await table.process_one()
+    assert table.state.phase == Phase.AWAIT_ACTION
+    assert table.state.turn == 2
+
+    sync = table.state_sync_wire(2)
+    assert sync["drawn_tile"] is None
+    assert sync["claim_offer"] is None
+    assert sync["last_discard"] is None
+    assert any(a["kind"] == "discard" for a in sync["legal_actions"])
+
+
+async def test_state_sync_after_a_draw_names_the_drawn_tile_to_its_seat_only() -> None:
+    ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=5)
+    table = _pre_discard_table(ruleset)
+    table.state = with_seat(table.state, 0, concealed=(*_JUNK_HAND, _SOU_8[2]), discards=())
+    table.state = with_seat(table.state, 2, concealed=_JUNK_HAND)
+    table.submit(0, Discard(tile_id=_SOU_8[2]))
+    await table.process_one()
+    assert table.state.phase == Phase.AWAIT_ACTION
+    assert table.state.turn == 1
+
+    drawn = table.state.seats[1].concealed[-1]
+    assert drawn == table._turn_draw_tile
+    assert table.state_sync_wire(1)["drawn_tile"] == drawn
+    for viewer in (0, 2, 3, None):
+        assert table.state_sync_wire(viewer)["drawn_tile"] is None
+        assert table.state_sync_wire(viewer)["last_discard"] == {"seat": 0, "tile_id": _SOU_8[2]}
 
 
 # --- D17: a command arriving the same tick a deadline expires must not be silently dropped -----

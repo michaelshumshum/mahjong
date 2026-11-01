@@ -1,5 +1,10 @@
-import type { HandHistoryEntryPayload, MeldKind, ServerEvent } from './protocol';
-import { type ClientGameState, type HandHistoryEntry, type MeldState } from '../game/state';
+import type { ClaimOfferPayload, HandHistoryEntryPayload, MeldKind, ServerEvent } from './protocol';
+import {
+	type ClaimWindowState,
+	type ClientGameState,
+	type HandHistoryEntry,
+	type MeldState
+} from '../game/state';
 import type { RuleSet } from './ruleset';
 
 function assertNever(x: never): never {
@@ -49,6 +54,11 @@ function mapMeldDict(m: Record<string, unknown>): MeldState {
 		tiles: m.tiles as number[],
 		fromSeat: (m.from_seat as number | null | undefined) ?? null
 	};
+}
+
+/** The `claim_offer` frame's payload, which `state_sync.claim_offer` repeats as is. */
+function claimOfferFromWire(d: ClaimOfferPayload): ClaimWindowState {
+	return { windowId: d.window_id, options: d.options, deadlineTs: d.deadline_ts };
 }
 
 /** `state_sync.hand_history[i]` -> `HandHistoryEntry`, `winner_melds` mapped through `mapMeldDict`. */
@@ -113,11 +123,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				turn: d.turn,
 				phase: d.phase,
 				ownHand: d.own_hand.slice(),
-				// no dedicated wire field for "held apart" -- inferred as the last tile, same as deal/draw.
-				drawnTileId:
-					d.turn === d.seat && d.legal_actions.some((a) => a.kind === 'discard')
-						? (d.own_hand[d.own_hand.length - 1] ?? null)
-						: null,
+				drawnTileId: d.drawn_tile,
 				concealedCounts: d.concealed_counts.slice(),
 				hands: d.hands ? d.hands.map((hand) => hand.slice()) : null,
 				melds: d.melds.map((seatMelds) => seatMelds.map(mapMeldDict)),
@@ -134,19 +140,10 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				scores: d.scores.slice(),
 				legalActions: d.legal_actions,
 				deadlineTs: d.deadline_ts,
-				claimOffer:
-					d.claim_options.length > 0
-						? { windowId: null, options: d.claim_options, deadlineTs: d.deadline_ts }
-						: null,
-				// `d.turn` names the discarder for the window's lifetime; derived from `discard_pools`
-				// since a resync carries no dedicated field.
-				lastDiscard:
-					d.claim_options.length > 0 && d.discard_pools[d.turn].length > 0
-						? {
-								seat: d.turn,
-								tileId: d.discard_pools[d.turn][d.discard_pools[d.turn].length - 1]
-							}
-						: null,
+				claimOffer: d.claim_offer ? claimOfferFromWire(d.claim_offer) : null,
+				lastDiscard: d.last_discard
+					? { seat: d.last_discard.seat, tileId: d.last_discard.tile_id }
+					: null,
 				handHistory: mergeHandHistory(state.handHistory, d.hand_history)
 			};
 		}
@@ -254,11 +251,7 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 		}
 
 		case 'claim_offer': {
-			const d = event.d;
-			return {
-				...state,
-				claimOffer: { windowId: d.window_id, options: d.options, deadlineTs: d.deadline_ts }
-			};
+			return { ...state, claimOffer: claimOfferFromWire(event.d) };
 		}
 
 		case 'claim_resolved': {

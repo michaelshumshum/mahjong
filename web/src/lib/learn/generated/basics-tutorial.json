@@ -7,16 +7,18 @@
 	"start": {
 		"d": {
 			"bot_levels": [null, null, null, null],
-			"claim_options": [],
+			"claim_offer": null,
 			"concealed_counts": [13, 13, 13, 14],
 			"deadline_ts": null,
 			"dealer": 0,
 			"discard_pools": [[], [], [], []],
+			"drawn_tile": null,
 			"flowers": [[], [], [], []],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
+			"last_discard": null,
 			"legal_actions": [],
 			"melds": [[], [], [], []],
 			"names": [null, null, null, null],
@@ -227,16 +229,21 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [],
+					"claim_offer": null,
 					"concealed_counts": [14, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[], [], [], [112]],
+					"drawn_tile": 124,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": {
+						"seat": 3,
+						"tile_id": 112
+					},
 					"legal_actions": [
 						{
 							"kind": "discard",
@@ -489,28 +496,33 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [
-						{
-							"can_win": false,
-							"melds": [
-								{
-									"from_seat": 1,
-									"kind": "pung",
-									"tiles": [108, 109, 110]
-								}
-							],
-							"seat": 0
-						}
-					],
+					"claim_offer": {
+						"deadline_ts": 0,
+						"options": [
+							{
+								"kind": "pung",
+								"tiles": [108, 109]
+							},
+							{
+								"kind": "pass"
+							}
+						],
+						"window_id": 0
+					},
 					"concealed_counts": [13, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[128], [110], [], [112]],
+					"drawn_tile": null,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": {
+						"seat": 1,
+						"tile_id": 110
+					},
 					"legal_actions": [
 						{
 							"kind": "pass",
@@ -627,16 +639,18 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [],
+					"claim_offer": null,
 					"concealed_counts": [11, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[128], [], [], [112]],
+					"drawn_tile": null,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": null,
 					"legal_actions": [
 						{
 							"kind": "discard",
@@ -962,28 +976,33 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [
-						{
-							"can_win": false,
-							"melds": [
-								{
-									"from_seat": 3,
-									"kind": "chow",
-									"tiles": [8, 13, 16]
-								}
-							],
-							"seat": 0
-						}
-					],
+					"claim_offer": {
+						"deadline_ts": 0,
+						"options": [
+							{
+								"kind": "chow",
+								"tiles": [8, 16]
+							},
+							{
+								"kind": "pass"
+							}
+						],
+						"window_id": 1
+					},
 					"concealed_counts": [10, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[128, 32], [116], [120], [112, 13]],
+					"drawn_tile": null,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": {
+						"seat": 3,
+						"tile_id": 13
+					},
 					"legal_actions": [
 						{
 							"kind": "pass",
@@ -1106,16 +1125,18 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [],
+					"claim_offer": null,
 					"concealed_counts": [8, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[128, 32], [116], [120], [112]],
+					"drawn_tile": null,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": null,
 					"legal_actions": [
 						{
 							"kind": "discard",
@@ -1350,33 +1371,37 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [
-						{
-							"can_win": false,
-							"melds": [
-								{
-									"from_seat": 1,
-									"kind": "exposed_kong",
-									"tiles": [68, 69, 70, 71]
-								},
-								{
-									"from_seat": 1,
-									"kind": "pung",
-									"tiles": [68, 69, 71]
-								}
-							],
-							"seat": 0
-						}
-					],
+					"claim_offer": {
+						"deadline_ts": 0,
+						"options": [
+							{
+								"kind": "kong",
+								"tiles": [68, 69, 70]
+							},
+							{
+								"kind": "pung",
+								"tiles": [68, 69]
+							},
+							{
+								"kind": "pass"
+							}
+						],
+						"window_id": 2
+					},
 					"concealed_counts": [7, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[128, 32, 124], [116, 71], [120], [112]],
+					"drawn_tile": null,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": {
+						"seat": 1,
+						"tile_id": 71
+					},
 					"legal_actions": [
 						{
 							"kind": "pass",
@@ -1519,16 +1544,18 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [],
+					"claim_offer": null,
 					"concealed_counts": [5, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
 					"discard_pools": [[128, 32, 124], [116], [120], [112]],
+					"drawn_tile": 132,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": null,
 					"legal_actions": [
 						{
 							"kind": "discard",
@@ -1835,7 +1862,7 @@
 			"snapshot": {
 				"d": {
 					"bot_levels": [null, null, null, null],
-					"claim_options": [],
+					"claim_offer": null,
 					"concealed_counts": [5, 13, 13, 13],
 					"deadline_ts": null,
 					"dealer": 0,
@@ -1845,11 +1872,16 @@
 						[120, 121],
 						[112, 113]
 					],
+					"drawn_tile": 41,
 					"flowers": [[], [], [], []],
 					"hand_history": [],
 					"hand_no": 1,
 					"hands": null,
 					"host_seat": null,
+					"last_discard": {
+						"seat": 3,
+						"tile_id": 113
+					},
 					"legal_actions": [
 						{
 							"kind": "discard",

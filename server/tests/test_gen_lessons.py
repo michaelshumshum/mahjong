@@ -139,7 +139,10 @@ def test_discard_win_snapshot_is_the_claim_window() -> None:
     snapshot = _lessons(render_bundle(_FIXTURE))["faan-a"]["snapshot"]["d"]
     assert snapshot["phase"] == Phase.AWAIT_CLAIMS
     assert snapshot["turn"] == 1
-    assert [o["can_win"] for o in snapshot["claim_options"]] == [True]
+    assert snapshot["claim_offer"]["options"][0] == {"kind": "win"}
+    assert snapshot["claim_offer"]["deadline_ts"] == 0
+    assert snapshot["last_discard"]["seat"] == 1
+    assert snapshot["drawn_tile"] is None
 
 
 def test_a_wrong_stated_answer_fails_generation() -> None:

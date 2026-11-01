@@ -5,9 +5,15 @@ import { reduce } from '$lib/net/reducer';
 import { seatWind, windWord } from '$lib/table/wind';
 import type { Lesson } from './generated/lessons';
 
-/** The lesson's snapshot as the same full replace a live resync is, with no socket. */
+/** The snapshot as a live resync would apply it. A claim puzzle is answered in the answer card,
+ * so its offer is dropped; only its claimed tile keeps the last-discard mark. */
 export function puzzleState(lesson: Lesson): ClientGameState {
-	return withSeatNames(reduce(initialClientGameState(), lesson.snapshot));
+	const state = reduce(initialClientGameState(), lesson.snapshot);
+	return withSeatNames({
+		...state,
+		claimOffer: null,
+		lastDiscard: state.claimOffer ? state.lastDiscard : null
+	});
 }
 
 /** A lesson snapshot has no players to name: you, and each opponent by seat wind, as the

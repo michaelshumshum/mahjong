@@ -31,7 +31,9 @@ describe('viewFromClientState own-hand split', () => {
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
 				deadline_ts: null,
-				claim_options: []
+				claim_offer: null,
+				drawn_tile: null,
+				last_discard: null
 			}
 		} as ServerEvent);
 
@@ -196,7 +198,9 @@ describe('viewFromClientState spectator', () => {
 				scores: [0, 0, 0, 0],
 				legal_actions: [],
 				deadline_ts: null,
-				claim_options: []
+				claim_offer: null,
+				drawn_tile: null,
+				last_discard: null
 			}
 		} as ServerEvent);
 	}
