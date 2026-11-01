@@ -4,7 +4,7 @@
 	"id": "waits-05",
 	"key": {
 		"below_minimum": [],
-		"correct": ["7p", "8p"],
+		"correct": ["5p", "8p"],
 		"dead": [],
 		"options": [
 			{
@@ -13,13 +13,13 @@
 				"live": 1,
 				"self_draw_faan": 10,
 				"self_draw_wins": true,
-				"tile": "7p"
+				"tile": "5p"
 			},
 			{
-				"discard_faan": 8,
+				"discard_faan": 9,
 				"discard_wins": true,
-				"live": 1,
-				"self_draw_faan": 9,
+				"live": 2,
+				"self_draw_faan": 10,
 				"self_draw_wins": true,
 				"tile": "8p"
 			}
@@ -32,24 +32,24 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [4, 11, 4, 10],
+			"concealed_counts": [7, 14, 10, 13],
 			"deadline_ts": null,
-			"dealer": 1,
+			"dealer": 0,
 			"discard_pools": [
-				[0, 8, 112, 96, 84, 85, 97, 1, 86, 100, 116, 80, 108, 120, 72, 132, 42, 4, 16, 37],
-				[81, 24, 5, 73, 20, 92, 88, 104, 28, 62, 9, 133, 70, 124, 29, 6, 125, 93],
-				[71, 25, 59, 46, 32, 54, 33, 113, 109, 121, 34, 35, 110, 114, 83, 95, 126, 122, 102],
-				[90, 75, 47, 67, 103, 77, 115, 78, 111, 123, 99, 134, 63, 79, 43, 2, 11]
+				[84, 12, 72, 20, 96, 28, 0, 124, 4, 128, 129, 46],
+				[38, 65, 32, 25, 41, 17, 132, 120, 1, 26, 8],
+				[77, 81, 5, 6, 29, 9, 33, 53, 78, 13, 125, 2],
+				[27, 7, 54, 39, 10, 18, 82, 85, 30, 34]
 			],
 			"drawn_tile": null,
-			"flowers": [["f8"], [], ["f1", "f3", "f5", "f2"], ["f7"]],
+			"flowers": [[], ["f8"], ["f7", "f2", "f6", "f4"], ["f1"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 0,
-				"tile_id": 37
+				"tile_id": 46
 			},
 			"legal_actions": [],
 			"melds": [
@@ -57,53 +57,26 @@
 					{
 						"from_seat": 3,
 						"kind": "chow",
-						"tiles": [36, 40, 44]
+						"tiles": [44, 48, 52]
 					},
 					{
 						"from_seat": 3,
 						"kind": "chow",
-						"tiles": [60, 65, 68]
-					},
-					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [41, 45, 48]
+						"tiles": [40, 45, 49]
 					}
 				],
+				[],
 				[
 					{
-						"from_seat": 2,
+						"from_seat": 0,
 						"kind": "pung",
-						"tiles": [117, 118, 119]
+						"tiles": [112, 113, 114]
 					}
 				],
-				[
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [87, 89, 94]
-					},
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [74, 76, 82]
-					},
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [98, 101, 105]
-					}
-				],
-				[
-					{
-						"from_seat": 2,
-						"kind": "chow",
-						"tiles": [7, 10, 15]
-					}
-				]
+				[]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [56, 57, 58, 64],
+			"own_hand": [36, 37, 56, 60, 61, 64, 68],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -142,7 +115,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 1,
-			"wall_remaining": 11
+			"wall_remaining": 40
 		},
 		"seq": 0,
 		"t": "state_sync",

@@ -3,36 +3,51 @@
 	"engine_version": "1.3.0",
 	"id": "defence-07",
 	"key": {
-		"correct": ["6s", "8s"],
+		"correct": ["1p", "6p"],
 		"options": [
 			{
-				"deals_in_to": [],
+				"deals_in_to": [2],
 				"reasons": [],
 				"tile": "5m"
 			},
 			{
-				"deals_in_to": [3],
+				"deals_in_to": [],
+				"reasons": ["no_chance"],
+				"tile": "1p"
+			},
+			{
+				"deals_in_to": [],
 				"reasons": [],
 				"tile": "5p"
 			},
 			{
 				"deals_in_to": [],
-				"reasons": ["no_chance"],
-				"tile": "6s"
-			},
-			{
-				"deals_in_to": [],
 				"reasons": ["all_copies_visible", "no_chance"],
-				"tile": "8s"
+				"tile": "6p"
 			},
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "z5"
+				"tile": "7p"
+			},
+			{
+				"deals_in_to": [],
+				"reasons": [],
+				"tile": "3s"
+			},
+			{
+				"deals_in_to": [],
+				"reasons": [],
+				"tile": "5s"
+			},
+			{
+				"deals_in_to": [],
+				"reasons": [],
+				"tile": "z7"
 			}
 		],
 		"reason": "no_chance",
-		"safe": ["5m", "6s", "8s", "z5"]
+		"safe": ["1p", "5p", "6p", "7p", "3s", "5s", "z7"]
 	},
 	"kind": "safe_discard",
 	"lesson_kind": "puzzle",
@@ -41,24 +56,24 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [5, 10, 4, 10],
+			"concealed_counts": [11, 13, 7, 10],
 			"deadline_ts": null,
-			"dealer": 3,
+			"dealer": 2,
 			"discard_pools": [
-				[68, 24, 56, 44, 32, 53, 33, 112, 108, 120, 34, 35, 109, 113, 81],
-				[89, 73, 45, 64, 102, 77, 114, 78, 110, 121, 97, 132, 60],
-				[1, 10, 115, 98, 85, 86, 99, 2, 87, 103, 116, 82, 111, 122, 74, 133],
-				[83, 25, 5, 75, 22, 94, 90, 105, 29, 63, 11, 134, 71, 125, 30]
+				[92, 8, 20, 76, 0, 9, 32, 84, 100, 93, 108, 112, 116, 128, 48, 57],
+				[33, 4, 85, 72, 90, 106, 77, 120, 69, 40, 45, 109, 113, 125, 53],
+				[46, 73, 81, 54, 96, 66, 58, 121, 126, 129, 114, 34, 6, 59, 41, 117, 14],
+				[122, 127, 7, 130, 47, 2, 55, 35, 67, 110, 3, 123, 118, 42, 102, 49, 43]
 			],
-			"drawn_tile": 124,
-			"flowers": [["f1", "f3"], ["f7"], ["f8"], []],
+			"drawn_tile": 132,
+			"flowers": [["f7", "f5"], ["f8"], ["f3", "f2", "f6"], ["f1"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 30
+				"tile_id": 43
 			},
 			"legal_actions": [
 				{
@@ -67,19 +82,43 @@
 				},
 				{
 					"kind": "discard",
+					"tile_id": 36
+				},
+				{
+					"kind": "discard",
+					"tile_id": 37
+				},
+				{
+					"kind": "discard",
 					"tile_id": 52
 				},
 				{
 					"kind": "discard",
-					"tile_id": 92
+					"tile_id": 56
 				},
 				{
 					"kind": "discard",
-					"tile_id": 100
+					"tile_id": 60
 				},
 				{
 					"kind": "discard",
-					"tile_id": 124
+					"tile_id": 61
+				},
+				{
+					"kind": "discard",
+					"tile_id": 62
+				},
+				{
+					"kind": "discard",
+					"tile_id": 80
+				},
+				{
+					"kind": "discard",
+					"tile_id": 88
+				},
+				{
+					"kind": "discard",
+					"tile_id": 132
 				}
 			],
 			"melds": [
@@ -87,53 +126,32 @@
 					{
 						"from_seat": 3,
 						"kind": "chow",
-						"tiles": [84, 88, 93]
-					},
-					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [72, 76, 80]
-					},
-					{
-						"from_seat": 3,
-						"kind": "chow",
-						"tiles": [96, 101, 104]
+						"tiles": [63, 64, 68]
 					}
 				],
-				[
-					{
-						"from_seat": 0,
-						"kind": "chow",
-						"tiles": [4, 9, 14]
-					}
-				],
+				[],
 				[
 					{
 						"from_seat": 1,
 						"kind": "chow",
-						"tiles": [36, 41, 46]
+						"tiles": [1, 5, 11]
 					},
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [61, 65, 69]
-					},
-					{
-						"from_seat": 1,
-						"kind": "chow",
-						"tiles": [42, 47, 48]
-					}
-				],
-				[
 					{
 						"from_seat": 0,
 						"kind": "pung",
-						"tiles": [117, 118, 119]
+						"tiles": [24, 25, 26]
+					}
+				],
+				[
+					{
+						"from_seat": 2,
+						"kind": "chow",
+						"tiles": [97, 101, 107]
 					}
 				]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [16, 52, 92, 100, 124],
+			"own_hand": [16, 36, 37, 52, 56, 60, 61, 62, 80, 88, 132],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -172,7 +190,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 28
+			"wall_remaining": 19
 		},
 		"seq": 0,
 		"t": "state_sync",

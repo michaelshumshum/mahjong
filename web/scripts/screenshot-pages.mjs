@@ -211,13 +211,13 @@ const PAGES = [
 			await page.waitForTimeout(800);
 		}
 	},
-	// safe-discard feedback: a pick that was only lucky (4 Characters, tile id 12), so each hand
+	// safe-discard feedback: a pick that was only lucky (2 Characters, tile id 4), so each hand
 	// tile's verdict shows.
 	{
 		name: 'learn-puzzle-safe',
-		url: '/learn/defence-01',
+		url: '/learn/defence-02',
 		async before(page) {
-			const tile = page.locator('.seat-region--self [data-tile-id="12"]');
+			const tile = page.locator('.seat-region--self [data-tile-id="4"]');
 			await tile.click();
 			await tile.click();
 			await page.getByTestId('safe-table').waitFor();

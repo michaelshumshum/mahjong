@@ -10,10 +10,6 @@
 			},
 			{
 				"faan": 1,
-				"pattern": "自摸"
-			},
-			{
-				"faan": 1,
 				"pattern": "門風"
 			},
 			{
@@ -23,11 +19,15 @@
 			{
 				"faan": 1,
 				"pattern": "箭刻"
+			},
+			{
+				"faan": 1,
+				"pattern": "正花"
 			}
 		],
 		"correct": 7,
 		"points": 48,
-		"win_type": "self_draw"
+		"win_type": "discard"
 	},
 	"kind": "count_faan",
 	"lesson_kind": "puzzle",
@@ -35,107 +35,92 @@
 	"snapshot": {
 		"d": {
 			"bot_levels": [null, null, null, null],
-			"claim_offer": null,
-			"concealed_counts": [11, 10, 13, 7],
+			"claim_offer": {
+				"deadline_ts": 0,
+				"options": [
+					{
+						"kind": "win"
+					},
+					{
+						"kind": "pass"
+					}
+				],
+				"window_id": 0
+			},
+			"concealed_counts": [10, 10, 4, 10],
 			"deadline_ts": null,
 			"dealer": 0,
 			"discard_pools": [
-				[48, 16, 52, 20, 60, 21, 44, 28, 72, 64],
-				[97, 53, 49, 85, 101, 68, 54, 36, 116, 40, 111],
-				[37, 93, 117, 45, 105, 99, 50, 33],
-				[6, 34, 25, 41, 42, 22, 57, 118, 70, 23]
+				[48, 88, 36, 64, 40, 116, 65, 49, 96, 112, 89, 32, 50, 12, 100, 117, 24, 4, 76],
+				[22, 9, 13, 52, 53, 33, 68, 69, 118, 37, 120, 38, 44, 45, 97, 101, 132, 78, 5],
+				[60, 54, 46, 39, 28, 6, 51, 26, 34, 66, 56, 70, 113, 14, 57, 41, 61, 133, 91, 134, 25],
+				[114, 119, 94, 102, 47, 35, 42, 3, 79, 62, 43, 95, 55, 59, 98, 99, 63, 115, 27, 103]
 			],
-			"drawn_tile": 110,
-			"flowers": [["f7"], ["f6"], ["f3"], ["f4", "f8"]],
+			"drawn_tile": null,
+			"flowers": [["f1", "f6", "f4"], ["f7", "f5", "f8"], ["f2"], ["f3"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
-				"seat": 3,
-				"tile_id": 23
+				"seat": 2,
+				"tile_id": 25
 			},
 			"legal_actions": [
 				{
-					"kind": "discard",
-					"tile_id": 76
+					"kind": "pass",
+					"seat": 0,
+					"window_id": 0
 				},
 				{
-					"kind": "discard",
-					"tile_id": 77
-				},
-				{
-					"kind": "discard",
-					"tile_id": 80
-				},
-				{
-					"kind": "discard",
-					"tile_id": 84
-				},
-				{
-					"kind": "discard",
-					"tile_id": 88
-				},
-				{
-					"kind": "discard",
-					"tile_id": 96
-				},
-				{
-					"kind": "discard",
-					"tile_id": 100
-				},
-				{
-					"kind": "discard",
-					"tile_id": 104
-				},
-				{
-					"kind": "discard",
-					"tile_id": 108
-				},
-				{
-					"kind": "discard",
-					"tile_id": 109
-				},
-				{
-					"kind": "discard",
-					"tile_id": 110
-				},
-				{
-					"kind": "declare_win"
+					"kind": "claim_win",
+					"seat": 0,
+					"window_id": 0
 				}
 			],
 			"melds": [
 				[
 					{
-						"from_seat": 2,
-						"kind": "pung",
-						"tiles": [124, 125, 126]
+						"from_seat": 3,
+						"kind": "added_kong",
+						"tiles": [108, 109, 110, 111]
 					}
 				],
 				[
 					{
 						"from_seat": 0,
-						"kind": "chow",
-						"tiles": [0, 4, 10]
+						"kind": "added_kong",
+						"tiles": [104, 105, 106, 107]
 					}
 				],
-				[],
+				[
+					{
+						"from_seat": 0,
+						"kind": "pung",
+						"tiles": [121, 122, 123]
+					},
+					{
+						"from_seat": 0,
+						"kind": "added_kong",
+						"tiles": [72, 73, 74, 75]
+					},
+					{
+						"from_seat": 1,
+						"kind": "chow",
+						"tiles": [86, 90, 92]
+					}
+				],
 				[
 					{
 						"from_seat": 2,
 						"kind": "chow",
-						"tiles": [73, 78, 81]
-					},
-					{
-						"from_seat": 2,
-						"kind": "chow",
-						"tiles": [87, 91, 95]
+						"tiles": [7, 11, 15]
 					}
 				]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [76, 77, 80, 84, 88, 96, 100, 104, 108, 109, 110],
-			"phase": "AWAIT_ACTION",
+			"own_hand": [0, 1, 2, 16, 17, 18, 20, 128, 129, 130],
+			"phase": "AWAIT_CLAIMS",
 			"prevailing": "EAST",
 			"ruleset": {
 				"claim_seconds": 5,
@@ -172,15 +157,15 @@
 			"scores": [0, 0, 0, 0],
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
-			"turn": 0,
-			"wall_remaining": 47
+			"turn": 2,
+			"wall_remaining": 2
 		},
 		"seq": 0,
 		"t": "state_sync",
 		"ts": 0,
 		"v": 1
 	},
-	"text": "minedFaanSelfDraw",
+	"text": "minedFaanDiscard",
 	"theme": "half_flush_honours",
 	"track": "faan"
 }

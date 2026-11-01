@@ -124,7 +124,7 @@
 		"lesson_kind": "puzzle",
 		"n": 4,
 		"text": "minedWaits",
-		"theme": "pair_wait",
+		"theme": "single_wait",
 		"track": "waits"
 	},
 	{
@@ -154,7 +154,7 @@
 		"lesson_kind": "puzzle",
 		"n": 7,
 		"text": "minedWaits",
-		"theme": "dead_wait",
+		"theme": "many_sided",
 		"track": "waits"
 	},
 	{
@@ -174,7 +174,7 @@
 		"lesson_kind": "puzzle",
 		"n": 9,
 		"text": "minedWaits",
-		"theme": "many_sided",
+		"theme": "dead_wait",
 		"track": "waits"
 	},
 	{
@@ -184,7 +184,7 @@
 		"lesson_kind": "puzzle",
 		"n": 10,
 		"text": "minedWaits",
-		"theme": "dead_wait",
+		"theme": "many_sided",
 		"track": "waits"
 	},
 	{
@@ -224,7 +224,7 @@
 		"lesson_kind": "puzzle",
 		"n": 14,
 		"text": "minedWaits",
-		"theme": "dead_wait",
+		"theme": "many_sided",
 		"track": "waits"
 	},
 	{
@@ -274,7 +274,7 @@
 		"lesson_kind": "puzzle",
 		"n": 4,
 		"text": "minedEfficiency",
-		"theme": "reach_ready",
+		"theme": "cut_terminal",
 		"track": "efficiency"
 	},
 	{
@@ -324,7 +324,7 @@
 		"lesson_kind": "puzzle",
 		"n": 9,
 		"text": "minedEfficiency",
-		"theme": "reach_ready",
+		"theme": "cut_floater",
 		"track": "efficiency"
 	},
 	{
@@ -344,7 +344,7 @@
 		"lesson_kind": "puzzle",
 		"n": 11,
 		"text": "minedEfficiency",
-		"theme": "reach_ready",
+		"theme": "trim_run",
 		"track": "efficiency"
 	},
 	{
@@ -354,7 +354,7 @@
 		"lesson_kind": "puzzle",
 		"n": 12,
 		"text": "minedEfficiency",
-		"theme": "trim_run",
+		"theme": "keep_two_sided",
 		"track": "efficiency"
 	},
 	{
@@ -364,7 +364,7 @@
 		"lesson_kind": "puzzle",
 		"n": 13,
 		"text": "minedEfficiency",
-		"theme": "keep_two_sided",
+		"theme": "cut_terminal",
 		"track": "efficiency"
 	},
 	{
@@ -374,7 +374,7 @@
 		"lesson_kind": "puzzle",
 		"n": 14,
 		"text": "minedEfficiency",
-		"theme": "reach_ready",
+		"theme": "break_pair",
 		"track": "efficiency"
 	},
 	{
@@ -384,7 +384,7 @@
 		"lesson_kind": "puzzle",
 		"n": 15,
 		"text": "minedEfficiency",
-		"theme": "trim_run",
+		"theme": "reach_ready",
 		"track": "efficiency"
 	},
 	{
@@ -393,8 +393,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 1,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -403,8 +403,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 2,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -413,8 +413,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 3,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -423,8 +423,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 4,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -433,8 +433,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 5,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -443,8 +443,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 6,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "dead_honour",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -483,8 +483,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 10,
-		"text": "minedDefenceAllCopiesVisible",
-		"theme": "all_visible",
+		"text": "minedDefenceNoChance",
+		"theme": "walled_runs",
 		"track": "defence"
 	},
 	{
@@ -503,8 +503,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 12,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -523,8 +523,8 @@
 		"kind": "safe_discard",
 		"lesson_kind": "puzzle",
 		"n": 14,
-		"text": "minedDefenceNoChance",
-		"theme": "walled_runs",
+		"text": "minedDefenceAllCopiesVisible",
+		"theme": "dead_honour",
 		"track": "defence"
 	},
 	{
@@ -534,7 +534,7 @@
 		"lesson_kind": "puzzle",
 		"n": 15,
 		"text": "minedDefenceAllCopiesVisible",
-		"theme": "dead_honour",
+		"theme": "all_visible",
 		"track": "defence"
 	},
 	{
@@ -554,7 +554,7 @@
 		"lesson_kind": "puzzle",
 		"n": 2,
 		"text": "minedFaanDiscard",
-		"theme": "half_flush_honours",
+		"theme": "all_pungs",
 		"track": "faan"
 	},
 	{
@@ -564,7 +564,7 @@
 		"lesson_kind": "puzzle",
 		"n": 3,
 		"text": "minedFaanDiscard",
-		"theme": "all_pungs",
+		"theme": "half_flush_pungs",
 		"track": "faan"
 	},
 	{
@@ -574,7 +574,7 @@
 		"lesson_kind": "puzzle",
 		"n": 4,
 		"text": "minedFaanDiscard",
-		"theme": "half_flush_pungs",
+		"theme": "full_flush",
 		"track": "faan"
 	},
 	{
@@ -594,7 +594,7 @@
 		"lesson_kind": "puzzle",
 		"n": 6,
 		"text": "minedFaanDiscard",
-		"theme": "all_chows",
+		"theme": "all_pungs",
 		"track": "faan"
 	},
 	{
@@ -604,7 +604,7 @@
 		"lesson_kind": "puzzle",
 		"n": 7,
 		"text": "minedFaanDiscard",
-		"theme": "all_chows",
+		"theme": "half_flush_pungs",
 		"track": "faan"
 	},
 	{
@@ -614,7 +614,7 @@
 		"lesson_kind": "puzzle",
 		"n": 8,
 		"text": "minedFaanSelfDraw",
-		"theme": "all_pungs",
+		"theme": "full_flush",
 		"track": "faan"
 	},
 	{
@@ -624,7 +624,7 @@
 		"lesson_kind": "puzzle",
 		"n": 9,
 		"text": "minedFaanDiscard",
-		"theme": "all_pungs",
+		"theme": "all_chows",
 		"track": "faan"
 	},
 	{
@@ -644,7 +644,7 @@
 		"lesson_kind": "puzzle",
 		"n": 11,
 		"text": "minedFaanSelfDraw",
-		"theme": "all_chows",
+		"theme": "half_flush",
 		"track": "faan"
 	},
 	{
@@ -654,7 +654,7 @@
 		"lesson_kind": "puzzle",
 		"n": 12,
 		"text": "minedFaanSelfDraw",
-		"theme": "all_chows",
+		"theme": "full_flush",
 		"track": "faan"
 	},
 	{
@@ -663,8 +663,8 @@
 		"kind": "count_faan",
 		"lesson_kind": "puzzle",
 		"n": 13,
-		"text": "minedFaanDiscard",
-		"theme": "half_flush_honours",
+		"text": "minedFaanSelfDraw",
+		"theme": "all_chows",
 		"track": "faan"
 	},
 	{
@@ -673,7 +673,7 @@
 		"kind": "count_faan",
 		"lesson_kind": "puzzle",
 		"n": 14,
-		"text": "minedFaanSelfDraw",
+		"text": "minedFaanDiscard",
 		"theme": "half_flush_honours",
 		"track": "faan"
 	},
@@ -684,7 +684,7 @@
 		"lesson_kind": "puzzle",
 		"n": 15,
 		"text": "minedFaanSelfDraw",
-		"theme": "half_flush",
+		"theme": "half_flush_pungs",
 		"track": "faan"
 	}
 ]

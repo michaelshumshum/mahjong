@@ -3,79 +3,55 @@
 	"engine_version": "1.3.0",
 	"id": "efficiency-09",
 	"key": {
-		"correct": ["6m"],
+		"correct": ["2s"],
 		"options": [
 			{
-				"kinds": 7,
-				"shanten": 1,
-				"tile": "4m",
-				"tiles": 20
-			},
-			{
-				"kinds": 6,
-				"shanten": 1,
-				"tile": "5m",
-				"tiles": 18
-			},
-			{
-				"kinds": 3,
-				"shanten": 0,
-				"tile": "6m",
-				"tiles": 11
-			},
-			{
-				"kinds": 11,
-				"shanten": 1,
-				"tile": "8m",
-				"tiles": 34
-			},
-			{
-				"kinds": 4,
-				"shanten": 1,
-				"tile": "7p",
-				"tiles": 13
-			},
-			{
-				"kinds": 4,
-				"shanten": 1,
-				"tile": "8p",
-				"tiles": 14
-			},
-			{
-				"kinds": 5,
-				"shanten": 1,
-				"tile": "9p",
-				"tiles": 16
+				"kinds": 13,
+				"shanten": 2,
+				"tile": "1m",
+				"tiles": 40
 			},
 			{
 				"kinds": 13,
-				"shanten": 1,
-				"tile": "4s",
-				"tiles": 38
+				"shanten": 2,
+				"tile": "3m",
+				"tiles": 39
 			},
 			{
-				"kinds": 12,
-				"shanten": 1,
-				"tile": "5s",
+				"kinds": 13,
+				"shanten": 2,
+				"tile": "8m",
 				"tiles": 36
 			},
 			{
-				"kinds": 3,
-				"shanten": 1,
-				"tile": "6s",
-				"tiles": 11
-			},
-			{
-				"kinds": 11,
-				"shanten": 1,
-				"tile": "7s",
-				"tiles": 33
+				"kinds": 15,
+				"shanten": 2,
+				"tile": "2s",
+				"tiles": 47
 			},
 			{
 				"kinds": 14,
-				"shanten": 1,
-				"tile": "8s",
-				"tiles": 42
+				"shanten": 2,
+				"tile": "5s",
+				"tiles": 41
+			},
+			{
+				"kinds": 17,
+				"shanten": 3,
+				"tile": "9s",
+				"tiles": 51
+			},
+			{
+				"kinds": 17,
+				"shanten": 3,
+				"tile": "z4",
+				"tiles": 51
+			},
+			{
+				"kinds": 18,
+				"shanten": 3,
+				"tile": "z5",
+				"tiles": 52
 			}
 		]
 	},
@@ -86,41 +62,37 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [14, 13, 13, 13],
+			"concealed_counts": [14, 13, 10, 13],
 			"deadline_ts": null,
-			"dealer": 0,
+			"dealer": 1,
 			"discard_pools": [
-				[124, 61, 52, 89],
-				[54, 36, 13, 69],
-				[4, 37, 44, 70],
-				[1, 33, 5, 14]
+				[40, 56, 100],
+				[84, 60, 72],
+				[17, 4, 52, 11],
+				[53, 41, 107, 89]
 			],
-			"drawn_tile": 100,
-			"flowers": [[], [], ["f7", "f4"], ["f2"]],
+			"drawn_tile": 126,
+			"flowers": [[], ["f5", "f3", "f8", "f4"], [], ["f7"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 14
+				"tile_id": 89
 			},
 			"legal_actions": [
 				{
 					"kind": "discard",
-					"tile_id": 12
+					"tile_id": 0
 				},
 				{
 					"kind": "discard",
-					"tile_id": 16
+					"tile_id": 1
 				},
 				{
 					"kind": "discard",
-					"tile_id": 20
-				},
-				{
-					"kind": "discard",
-					"tile_id": 21
+					"tile_id": 8
 				},
 				{
 					"kind": "discard",
@@ -128,23 +100,7 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 29
-				},
-				{
-					"kind": "discard",
-					"tile_id": 60
-				},
-				{
-					"kind": "discard",
-					"tile_id": 64
-				},
-				{
-					"kind": "discard",
-					"tile_id": 68
-				},
-				{
-					"kind": "discard",
-					"tile_id": 84
+					"tile_id": 76
 				},
 				{
 					"kind": "discard",
@@ -152,20 +108,51 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 92
+					"tile_id": 104
 				},
 				{
 					"kind": "discard",
-					"tile_id": 96
+					"tile_id": 105
 				},
 				{
 					"kind": "discard",
-					"tile_id": 100
+					"tile_id": 106
+				},
+				{
+					"kind": "discard",
+					"tile_id": 120
+				},
+				{
+					"kind": "discard",
+					"tile_id": 121
+				},
+				{
+					"kind": "discard",
+					"tile_id": 124
+				},
+				{
+					"kind": "discard",
+					"tile_id": 125
+				},
+				{
+					"kind": "discard",
+					"tile_id": 126
 				}
 			],
-			"melds": [[], [], [], []],
+			"melds": [
+				[],
+				[],
+				[
+					{
+						"from_seat": 1,
+						"kind": "chow",
+						"tiles": [73, 77, 81]
+					}
+				],
+				[]
+			],
 			"names": [null, null, null, null],
-			"own_hand": [12, 16, 20, 21, 28, 29, 60, 64, 68, 84, 88, 92, 96, 100],
+			"own_hand": [0, 1, 8, 28, 76, 88, 104, 105, 106, 120, 121, 124, 125, 126],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -212,6 +199,6 @@
 		"v": 1
 	},
 	"text": "minedEfficiency",
-	"theme": "reach_ready",
+	"theme": "cut_floater",
 	"track": "efficiency"
 }

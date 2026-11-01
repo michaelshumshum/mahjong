@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import defence01 from './generated/defence-01.json';
+import defence02 from './generated/defence-02.json';
 import efficiency02 from './generated/efficiency-02.json';
-import faan02 from './generated/faan-02.json';
+import faan03 from './generated/faan-03.json';
 import keepTwoSided from './generated/basics-keep-two-sided.json';
 import waits12 from './generated/waits-12.json';
 import type {
@@ -21,8 +21,8 @@ import {
 
 const discardKey = efficiency02.key as BestDiscardKey;
 const waitsKey = waits12.key as WinningTilesKey;
-const safeKey = defence01.key as SafeDiscardKey;
-const faanKey = faan02.key as CountFaanKey;
+const safeKey = defence02.key as SafeDiscardKey;
+const faanKey = faan03.key as CountFaanKey;
 
 describe('discardRows', () => {
 	it('lists every option best first, marking the answers and the pick', () => {
@@ -71,15 +71,15 @@ describe('waitsFeedback', () => {
 
 describe('safe discard', () => {
 	it('tells deducible, lucky and dealing-in tiles apart', () => {
-		expect(safeOutcome(safeKey, '1m')).toBe('deducible');
-		expect(safeOutcome(safeKey, '4m')).toBe('lucky');
+		expect(safeOutcome(safeKey, '8s')).toBe('deducible');
+		expect(safeOutcome(safeKey, '2m')).toBe('lucky');
 		expect(safeOutcome(safeKey, 'z5')).toBe('deals_in');
 	});
 
 	it('keeps every hand tile, with who it deals in to', () => {
-		const rows = safeRows(safeKey, '4m');
+		const rows = safeRows(safeKey, '2m');
 		expect(rows).toHaveLength(safeKey.options.length);
-		expect(rows.find((r) => r.picked)?.tile).toBe('4m');
+		expect(rows.find((r) => r.picked)?.tile).toBe('2m');
 		expect(rows.find((r) => r.tile === 'z5')).toMatchObject({
 			outcome: 'deals_in',
 			deals_in_to: [2]
@@ -89,8 +89,8 @@ describe('safe discard', () => {
 
 describe('faanMiss', () => {
 	it('says which way a wrong count missed', () => {
-		expect(faanMiss(faanKey, 4)).toBeNull();
-		expect(faanMiss(faanKey, 5)).toBe('high');
-		expect(faanMiss(faanKey, 3)).toBe('low');
+		expect(faanMiss(faanKey, 6)).toBeNull();
+		expect(faanMiss(faanKey, 7)).toBe('high');
+		expect(faanMiss(faanKey, 5)).toBe('low');
 	});
 });

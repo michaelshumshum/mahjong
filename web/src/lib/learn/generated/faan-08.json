@@ -9,16 +9,16 @@
 				"pattern": "對對糊"
 			},
 			{
-				"faan": 1,
-				"pattern": "自摸"
+				"faan": 7,
+				"pattern": "清一色"
 			},
 			{
 				"faan": 1,
-				"pattern": "箭刻"
+				"pattern": "自摸"
 			}
 		],
-		"correct": 5,
-		"points": 24,
+		"correct": 10,
+		"points": 128,
 		"win_type": "self_draw"
 	},
 	"kind": "count_faan",
@@ -28,45 +28,57 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [5, 10, 13, 1],
+			"concealed_counts": [8, 10, 10, 7],
 			"deadline_ts": null,
-			"dealer": 0,
+			"dealer": 2,
 			"discard_pools": [
-				[20, 56, 24, 88, 116, 48, 92, 21, 108, 22, 36, 84, 112, 25, 128],
-				[44, 64, 49, 4, 9, 26, 5, 65, 123, 127, 117, 52, 50, 66, 129],
-				[113, 45, 57, 114, 46, 67, 85, 37, 38, 98],
-				[102, 58, 6, 118, 51, 33, 94, 99, 109, 69, 86, 130, 34, 7]
+				[68, 120, 124, 20, 32, 132, 108, 64, 104, 84, 4],
+				[0, 36, 24, 21, 69, 52, 56, 28, 133, 1],
+				[57, 60, 12, 103, 5, 86, 25, 105, 26, 48, 22, 134],
+				[29, 81, 13, 33, 34, 49, 106, 30, 14, 135, 114, 58]
 			],
-			"drawn_tile": 61,
-			"flowers": [["f7", "f8"], ["f2"], ["f4", "f1", "f5", "f3"], []],
+			"drawn_tile": 101,
+			"flowers": [["f6", "f2", "f8"], ["f1"], [], ["f4", "f5"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 7
+				"tile_id": 58
 			},
 			"legal_actions": [
 				{
 					"kind": "discard",
-					"tile_id": 28
+					"tile_id": 76
 				},
 				{
 					"kind": "discard",
-					"tile_id": 29
+					"tile_id": 77
 				},
 				{
 					"kind": "discard",
-					"tile_id": 30
+					"tile_id": 78
 				},
 				{
 					"kind": "discard",
-					"tile_id": 60
+					"tile_id": 88
 				},
 				{
 					"kind": "discard",
-					"tile_id": 61
+					"tile_id": 89
+				},
+				{
+					"kind": "discard",
+					"tile_id": 90
+				},
+				{
+					"kind": "discard",
+					"tile_id": 100
+				},
+				{
+					"kind": "discard",
+					"tile_id": 101
 				},
 				{
 					"kind": "declare_win"
@@ -75,54 +87,45 @@
 			"melds": [
 				[
 					{
-						"from_seat": 2,
+						"from_seat": 3,
 						"kind": "pung",
-						"tiles": [120, 121, 122]
+						"tiles": [96, 97, 98]
 					},
 					{
-						"from_seat": 2,
+						"from_seat": 3,
 						"kind": "pung",
 						"tiles": [72, 73, 74]
-					},
-					{
-						"from_seat": 2,
-						"kind": "pung",
-						"tiles": [124, 125, 126]
 					}
 				],
 				[
 					{
 						"from_seat": 0,
 						"kind": "chow",
-						"tiles": [75, 76, 81]
+						"tiles": [79, 80, 85]
 					}
 				],
-				[],
 				[
 					{
-						"from_seat": 2,
+						"from_seat": 0,
 						"kind": "pung",
-						"tiles": [40, 41, 42]
-					},
+						"tiles": [44, 45, 46]
+					}
+				],
+				[
 					{
-						"from_seat": 2,
+						"from_seat": 1,
 						"kind": "pung",
 						"tiles": [53, 54, 55]
 					},
 					{
-						"from_seat": 0,
-						"kind": "pung",
-						"tiles": [0, 1, 2]
-					},
-					{
 						"from_seat": 1,
-						"kind": "added_kong",
-						"tiles": [16, 17, 18, 19]
+						"kind": "pung",
+						"tiles": [40, 41, 42]
 					}
 				]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [28, 29, 30, 60, 61],
+			"own_hand": [76, 77, 78, 88, 89, 90, 100, 101],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -161,7 +164,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 29
+			"wall_remaining": 40
 		},
 		"seq": 0,
 		"t": "state_sync",
@@ -169,6 +172,6 @@
 		"v": 1
 	},
 	"text": "minedFaanSelfDraw",
-	"theme": "all_pungs",
+	"theme": "full_flush",
 	"track": "faan"
 }

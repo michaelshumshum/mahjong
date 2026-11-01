@@ -4,48 +4,48 @@
 	"id": "waits-14",
 	"key": {
 		"below_minimum": [],
-		"correct": ["1m", "2m", "4m", "7m"],
-		"dead": ["5m"],
+		"correct": ["1m", "4m", "6m", "7m", "9m"],
+		"dead": [],
 		"options": [
 			{
-				"discard_faan": 8,
+				"discard_faan": 4,
 				"discard_wins": true,
-				"live": 2,
-				"self_draw_faan": 9,
+				"live": 1,
+				"self_draw_faan": 5,
 				"self_draw_wins": true,
 				"tile": "1m"
 			},
 			{
-				"discard_faan": 9,
+				"discard_faan": 4,
 				"discard_wins": true,
-				"live": 2,
-				"self_draw_faan": 10,
-				"self_draw_wins": true,
-				"tile": "2m"
-			},
-			{
-				"discard_faan": 8,
-				"discard_wins": true,
-				"live": 1,
-				"self_draw_faan": 9,
+				"live": 3,
+				"self_draw_faan": 5,
 				"self_draw_wins": true,
 				"tile": "4m"
 			},
 			{
-				"discard_faan": 9,
+				"discard_faan": 4,
 				"discard_wins": true,
-				"live": 0,
-				"self_draw_faan": 10,
+				"live": 1,
+				"self_draw_faan": 5,
 				"self_draw_wins": true,
-				"tile": "5m"
+				"tile": "6m"
 			},
 			{
-				"discard_faan": 8,
+				"discard_faan": 4,
 				"discard_wins": true,
-				"live": 3,
-				"self_draw_faan": 9,
+				"live": 2,
+				"self_draw_faan": 5,
 				"self_draw_wins": true,
 				"tile": "7m"
+			},
+			{
+				"discard_faan": 4,
+				"discard_wins": true,
+				"live": 2,
+				"self_draw_faan": 5,
+				"self_draw_wins": true,
+				"tile": "9m"
 			}
 		]
 	},
@@ -56,67 +56,72 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [13, 10, 7, 5],
+			"concealed_counts": [10, 2, 7, 13],
 			"deadline_ts": null,
-			"dealer": 2,
+			"dealer": 0,
 			"discard_pools": [
-				[88, 48, 96, 36, 100, 89, 72, 49, 44, 84, 56, 92, 116, 108, 50],
-				[41, 5, 52, 90, 37, 53, 73, 109, 38, 120, 74, 117, 68, 64, 132, 80],
-				[29, 39, 17, 21, 18, 22, 61, 133, 57, 91, 14, 86, 51, 62, 30, 3, 112],
-				[94, 54, 69, 65, 82, 45, 66, 110, 83, 87, 118, 70, 134, 58, 75, 71, 19]
+				[96, 52, 56, 64, 65, 60, 88, 92, 104, 68, 80, 128],
+				[5, 21, 25, 54, 76, 44, 69, 77, 29, 120, 19, 105, 121, 45],
+				[48, 40, 30, 46, 33, 70, 78, 22, 9, 49, 106, 57, 122, 58],
+				[6, 41, 66, 47, 59, 98, 90, 67, 99, 71, 50]
 			],
 			"drawn_tile": null,
-			"flowers": [["f5"], ["f8"], ["f3", "f4"], ["f1", "f7", "f6"]],
+			"flowers": [[], ["f3", "f4"], ["f2", "f7", "f1", "f5", "f6"], ["f8"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
-				"seat": 2,
-				"tile_id": 112
+				"seat": 0,
+				"tile_id": 128
 			},
 			"legal_actions": [],
 			"melds": [
-				[],
 				[
 					{
-						"from_seat": 0,
-						"kind": "pung",
-						"tiles": [101, 102, 103]
+						"from_seat": 3,
+						"kind": "added_kong",
+						"tiles": [112, 113, 114, 115]
 					}
 				],
 				[
 					{
 						"from_seat": 3,
 						"kind": "pung",
-						"tiles": [97, 98, 99]
-					},
-					{
-						"from_seat": 3,
-						"kind": "pung",
-						"tiles": [121, 122, 123]
-					}
-				],
-				[
-					{
-						"from_seat": 2,
-						"kind": "pung",
-						"tiles": [33, 34, 35]
+						"tiles": [0, 1, 2]
 					},
 					{
 						"from_seat": 2,
 						"kind": "pung",
-						"tiles": [113, 114, 115]
+						"tiles": [36, 37, 38]
 					},
 					{
 						"from_seat": 0,
 						"kind": "pung",
-						"tiles": [129, 130, 131]
+						"tiles": [100, 101, 102]
+					},
+					{
+						"from_seat": 2,
+						"kind": "pung",
+						"tiles": [124, 125, 126]
 					}
-				]
+				],
+				[
+					{
+						"from_seat": 1,
+						"kind": "pung",
+						"tiles": [84, 85, 86]
+					},
+					{
+						"from_seat": 3,
+						"kind": "pung",
+						"tiles": [81, 82, 83]
+					}
+				],
+				[]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [0, 4, 8, 9, 10, 11, 12, 13, 16, 20, 24, 28, 32],
+			"own_hand": [4, 8, 12, 16, 17, 18, 20, 24, 28, 32],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -154,8 +159,8 @@
 			"scores": [0, 0, 0, 0],
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
-			"turn": 3,
-			"wall_remaining": 19
+			"turn": 1,
+			"wall_remaining": 31
 		},
 		"seq": 0,
 		"t": "state_sync",
@@ -163,6 +168,6 @@
 		"v": 1
 	},
 	"text": "minedWaits",
-	"theme": "dead_wait",
+	"theme": "many_sided",
 	"track": "waits"
 }

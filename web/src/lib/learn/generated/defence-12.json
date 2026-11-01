@@ -3,36 +3,36 @@
 	"engine_version": "1.3.0",
 	"id": "defence-12",
 	"key": {
-		"correct": ["9p"],
+		"correct": ["9m", "1s"],
 		"options": [
 			{
 				"deals_in_to": [],
-				"reasons": [],
-				"tile": "5p"
+				"reasons": ["all_copies_visible", "no_chance"],
+				"tile": "9m"
 			},
 			{
 				"deals_in_to": [],
-				"reasons": ["no_chance"],
-				"tile": "9p"
+				"reasons": ["all_copies_visible", "no_chance"],
+				"tile": "1s"
 			},
 			{
-				"deals_in_to": [],
+				"deals_in_to": [3],
 				"reasons": [],
-				"tile": "3s"
-			},
-			{
-				"deals_in_to": [1],
-				"reasons": [],
-				"tile": "8s"
+				"tile": "7s"
 			},
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "z7"
+				"tile": "z4"
+			},
+			{
+				"deals_in_to": [],
+				"reasons": [],
+				"tile": "z6"
 			}
 		],
-		"reason": "no_chance",
-		"safe": ["5p", "9p", "3s", "z7"]
+		"reason": "all_copies_visible",
+		"safe": ["9m", "1s", "z4", "z6"]
 	},
 	"kind": "safe_discard",
 	"lesson_kind": "puzzle",
@@ -41,101 +41,97 @@
 		"d": {
 			"bot_levels": [null, null, null, null],
 			"claim_offer": null,
-			"concealed_counts": [8, 10, 7, 10],
+			"concealed_counts": [11, 10, 10, 13],
 			"deadline_ts": null,
-			"dealer": 3,
+			"dealer": 0,
 			"discard_pools": [
-				[92, 20, 88, 28, 112, 120, 48, 76, 84, 21],
-				[8, 0, 22, 32, 36, 56, 49, 24, 113, 133],
-				[37, 54, 97, 101, 44, 45, 29, 16, 86, 119, 67],
-				[50, 63, 17, 18, 7, 40, 38, 19, 15, 30]
+				[80, 97, 48, 52, 0, 104, 100, 124, 64, 116, 40, 44, 24, 4, 108, 41, 8],
+				[36, 60, 68, 117, 12, 29, 16, 9, 20, 1, 35, 5, 17, 2, 21, 30, 125, 133],
+				[42, 37, 102, 118, 89, 126, 127, 18, 22, 90, 13, 25, 31, 110, 38, 50, 14, 10],
+				[59, 23, 3, 6, 53, 26, 63, 54, 45, 27, 119, 111, 55, 134, 75, 15, 19]
 			],
-			"drawn_tile": 132,
-			"flowers": [["f7", "f6", "f8"], [], ["f3", "f1"], ["f2"]],
+			"drawn_tile": 129,
+			"flowers": [["f3"], [], ["f8", "f7", "f5"], ["f2", "f4", "f6"]],
 			"hand_history": [],
 			"hand_no": 1,
 			"hands": null,
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 30
+				"tile_id": 19
 			},
 			"legal_actions": [
 				{
 					"kind": "discard",
-					"tile_id": 52
+					"tile_id": 32
 				},
 				{
 					"kind": "discard",
-					"tile_id": 53
+					"tile_id": 33
 				},
 				{
 					"kind": "discard",
-					"tile_id": 68
+					"tile_id": 34
 				},
 				{
 					"kind": "discard",
-					"tile_id": 69
+					"tile_id": 72
 				},
 				{
 					"kind": "discard",
-					"tile_id": 80
+					"tile_id": 73
 				},
 				{
 					"kind": "discard",
-					"tile_id": 81
+					"tile_id": 74
 				},
 				{
 					"kind": "discard",
-					"tile_id": 100
+					"tile_id": 96
 				},
 				{
 					"kind": "discard",
-					"tile_id": 132
+					"tile_id": 120
+				},
+				{
+					"kind": "discard",
+					"tile_id": 121
+				},
+				{
+					"kind": "discard",
+					"tile_id": 128
+				},
+				{
+					"kind": "discard",
+					"tile_id": 129
 				}
 			],
 			"melds": [
 				[
 					{
-						"from_seat": 3,
-						"kind": "pung",
-						"tiles": [12, 13, 14]
-					},
-					{
-						"from_seat": 3,
-						"kind": "pung",
-						"tiles": [60, 61, 62]
-					}
-				],
-				[
-					{
 						"from_seat": 2,
 						"kind": "pung",
-						"tiles": [116, 117, 118]
+						"tiles": [56, 57, 58]
 					}
 				],
 				[
 					{
 						"from_seat": 3,
 						"kind": "pung",
-						"tiles": [4, 5, 6]
-					},
+						"tiles": [81, 82, 83]
+					}
+				],
+				[
 					{
 						"from_seat": 0,
 						"kind": "pung",
-						"tiles": [64, 65, 66]
+						"tiles": [69, 70, 71]
 					}
 				],
-				[
-					{
-						"from_seat": 1,
-						"kind": "pung",
-						"tiles": [89, 90, 91]
-					}
-				]
+				[]
 			],
 			"names": [null, null, null, null],
-			"own_hand": [52, 53, 68, 69, 80, 81, 100, 132],
+			"own_hand": [32, 33, 34, 72, 73, 74, 96, 120, 121, 128, 129],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -174,14 +170,14 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 44
+			"wall_remaining": 14
 		},
 		"seq": 0,
 		"t": "state_sync",
 		"ts": 0,
 		"v": 1
 	},
-	"text": "minedDefenceNoChance",
-	"theme": "walled_runs",
+	"text": "minedDefenceAllCopiesVisible",
+	"theme": "all_visible",
 	"track": "defence"
 }

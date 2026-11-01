@@ -88,16 +88,16 @@ test('a best discard puzzle shows every option, with the pick against the best',
 });
 
 test("a safe discard that only luck made safe isn't solved", async ({ page }) => {
-	await page.goto('/learn/defence-01');
-	await discard(page, 12); // 4 Characters: nobody waits on it, but nothing shows that
+	await page.goto('/learn/defence-02');
+	await discard(page, 4); // 2 Characters: nobody waits on it, but nothing shows that
 	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
 	await expect(feedback(page)).toHaveAttribute('data-lucky', 'true');
 	await expect(feedback(page)).toContainText("couldn't have known");
 	await expect(page.getByTestId('puzzle-solved')).toHaveCount(0);
 	const table = page.getByTestId('safe-table');
-	await expect(table.locator('tr[data-tile="z5"]')).toContainText('Deals in to North');
+	await expect(table.locator('tr[data-tile="z5"]')).toContainText('Deals in to East');
 
-	await discard(page, 0); // 1 Characters: every copy visible
+	await discard(page, 100); // 8 Bamboo: every copy visible
 	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
 	await expect(feedback(page)).not.toHaveAttribute('data-lucky');
 	await expect(feedback(page).locator('[data-line="why"]')).toContainText('every copy is visible');

@@ -1,9 +1,9 @@
 import { flushSync } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupAll, render } from '$lib/table/test-render';
-import defence01 from './generated/defence-01.json';
+import defence02 from './generated/defence-02.json';
 import efficiency02 from './generated/efficiency-02.json';
-import faan02 from './generated/faan-02.json';
+import faan03 from './generated/faan-03.json';
 import isolatedHonour from './generated/basics-isolated-honour.json';
 import keepTwoSided from './generated/basics-keep-two-sided.json';
 import simpleHand from './generated/basics-simple-hand.json';
@@ -177,59 +177,59 @@ describe('AnswerPanel winning_tiles feedback', () => {
 
 describe('AnswerPanel safe_discard feedback', () => {
 	it('correct: the stated reason, and every tile with its outcome', () => {
-		const target = answered(defence01, { kind: 'safe_discard', tile: '2m' });
+		const target = answered(defence02, { kind: 'safe_discard', tile: '8s' });
 		expect(lines(target)).toEqual({
 			why: ["Why it's safe: every copy is visible and no run can be waiting on it."]
 		});
 		const table = rows(target, 'safe-table');
-		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['1m', '2m']);
-		expect(table.find((r) => r.tile === '4m')?.cells).toEqual([
+		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['8s']);
+		expect(table.find((r) => r.tile === '2m')?.cells).toEqual([
 			"Safe this time, but you couldn't know"
 		]);
-		expect(table.find((r) => r.tile === 'z5')?.cells).toEqual(['Deals in to North']);
+		expect(table.find((r) => r.tile === 'z5')?.cells).toEqual(['Deals in to East']);
 	});
 
 	it("safe by luck: not solved, and says you couldn't have known", () => {
-		const target = answered(defence01, { kind: 'safe_discard', tile: '4m' });
+		const target = answered(defence02, { kind: 'safe_discard', tile: '2m' });
 		const live = byTestId(target, 'answer-feedback');
 		expect(live.dataset.result).toBe('wrong');
 		expect(live.dataset.lucky).toBe('true');
 		expect(live.querySelector('.result')?.textContent).toBe(
-			"4 Characters was safe this time, but you couldn't have known that."
+			"2 Characters was safe this time, but you couldn't have known that."
 		);
 		expect(byTestId(target, 'answer-explain')).toBeNull();
 	});
 
 	it('deals in: names who it deals in to', () => {
-		const target = answered(defence01, { kind: 'safe_discard', tile: 'z5' });
+		const target = answered(defence02, { kind: 'safe_discard', tile: 'z5' });
 		expect(byTestId(target, 'answer-feedback').dataset.lucky).toBeUndefined();
-		expect(lines(target)).toEqual({ 'deals-in': ['Red Dragon deals in to North.'] });
+		expect(lines(target)).toEqual({ 'deals-in': ['Red Dragon deals in to East.'] });
 	});
 });
 
 describe('AnswerPanel count_faan feedback', () => {
 	it('correct: the breakdown with guide links, the total and the points', () => {
 		const onPatternSelect = vi.fn();
-		const target = answered(faan02, { kind: 'count_faan', faan: 4 }, { onPatternSelect });
-		expect(lines(target)).toEqual({ points: ['Worth 16 points.'] });
+		const target = answered(faan03, { kind: 'count_faan', faan: 6 }, { onPatternSelect });
+		expect(lines(target)).toEqual({ points: ['Worth 32 points.'] });
 		const breakdown = byTestId(target, 'faan-breakdown');
 		expect(breakdown.querySelectorAll('.pattern-row')).toHaveLength(2);
-		expect(breakdown.querySelector('.total')?.textContent).toContain('4 faan');
+		expect(breakdown.querySelector('.total')?.textContent).toContain('6 faan');
 		expect(breakdown.querySelector('.payments')).toBeNull();
 		byTestId<HTMLButtonElement>(breakdown, 'faan-pattern-link').click();
-		expect(onPatternSelect).toHaveBeenCalledWith('混一色');
+		expect(onPatternSelect).toHaveBeenCalledWith('對對糊');
 	});
 
 	it('wrong: says high or low, and keeps the breakdown hidden', () => {
-		const high = answered(faan02, { kind: 'count_faan', faan: 6 });
-		expect(lines(high)).toEqual({ 'faan-high': ['6 is too high.'] });
+		const high = answered(faan03, { kind: 'count_faan', faan: 8 });
+		expect(lines(high)).toEqual({ 'faan-high': ['8 is too high.'] });
 		expect(byTestId(high, 'faan-breakdown')).toBeNull();
-		const low = answered(faan02, { kind: 'count_faan', faan: 2 });
-		expect(lines(low)).toEqual({ 'faan-low': ['2 is too low.'] });
+		const low = answered(faan03, { kind: 'count_faan', faan: 4 });
+		expect(lines(low)).toEqual({ 'faan-low': ['4 is too low.'] });
 	});
 
 	it('shows the claimed tile of a discard win', () => {
-		const { target } = render(AnswerPanel, props(faan02, { claimedTile: '7s' }));
+		const { target } = render(AnswerPanel, props(faan03, { claimedTile: '7s' }));
 		const claimed = byTestId(target, 'claimed-tile');
 		expect(claimed.querySelector('[data-tile="7s"]')).not.toBeNull();
 		expect(claimed.textContent).toContain('7 Bamboo');
