@@ -62,12 +62,29 @@
 	let band = $derived(endless.band);
 
 	let tabBar = $state<HTMLElement>();
+	// instant on load, smooth only for a tab change
+	let tabBarScrolled = false;
 	$effect(() => {
-		tabBar?.querySelector(`[data-tab="${tab}"]`)?.scrollIntoView({
+		const current = tabBar?.querySelector(`[data-tab="${tab}"]`);
+		if (!tabBar || !current) return;
+		current.scrollIntoView({
 			inline: 'nearest',
 			block: 'nearest',
-			behavior: isMotionReduced() ? 'auto' : 'smooth'
+			behavior: tabBarScrolled && !isMotionReduced() ? 'smooth' : 'auto'
 		});
+		tabBarScrolled = true;
+		// font swap and post-mount counts widen tabs after the first scroll
+		const widths = new Map<Element, number>();
+		for (const el of tabBar.children) widths.set(el, el.getBoundingClientRect().width);
+		const observer = new ResizeObserver((entries) => {
+			const changed = entries.some(
+				(entry) => entry.borderBoxSize[0].inlineSize !== widths.get(entry.target)
+			);
+			for (const entry of entries) widths.set(entry.target, entry.borderBoxSize[0].inlineSize);
+			if (changed) current.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+		});
+		for (const el of tabBar.children) observer.observe(el, { box: 'border-box' });
+		return () => observer.disconnect();
 	});
 	// the tutorial leads until it's solved; after that, the first unsolved lesson does.
 	let next = $derived(firstUnsolved(progress));
