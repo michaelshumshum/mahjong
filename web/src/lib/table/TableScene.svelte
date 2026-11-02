@@ -3,7 +3,13 @@
 	import type { Seat } from '$lib/game/types';
 	import type { DiscardMode } from '$lib/ui/client-prefs';
 	import { m } from '$lib/paraglide/messages.js';
-	import type { CoachTarget, DeclareOption, OwnHandTile, TableView } from './view-types';
+	import type {
+		CoachTarget,
+		DeclareOption,
+		HandTileMark,
+		OwnHandTile,
+		TableView
+	} from './view-types';
 	import { relativeSeat, seatAtPosition } from './wind';
 	import OpponentRegion from './OpponentRegion.svelte';
 	import CenterDiscardPool from './CenterDiscardPool.svelte';
@@ -27,7 +33,9 @@
 		scoreDeltas = {},
 		sealStamp = null,
 		holdLastDiscard = false,
-		coach = null
+		coach = null,
+		liftedTileId = $bindable(null),
+		tileMarks = new Map()
 	}: {
 		view: TableView;
 		spectating: boolean;
@@ -48,6 +56,10 @@
 		holdLastDiscard?: boolean;
 		// the region a coach tip points at, outlined in brass.
 		coach?: CoachTarget | null;
+		// the two-step lifted tile, bound through to the hand
+		liftedTileId?: number | null;
+		// per-tile marks on your hand, keyed by tile_id
+		tileMarks?: ReadonlyMap<number, HandTileMark>;
 	} = $props();
 
 	function seatAt(position: 0 | 1 | 2 | 3) {
@@ -147,6 +159,8 @@
 		{onReorder}
 		{declareOptions}
 		scoreDelta={scoreDeltaFor(seatAt(0).seat)}
+		bind:liftedTileId
+		{tileMarks}
 	/>
 </div>
 

@@ -135,6 +135,9 @@ export interface OwnHandTile {
 /** A table region a tip points at; `TableScene` outlines it (`data-coach`). */
 export type CoachTarget = 'hand' | 'melds' | 'discards' | 'wall' | 'hub';
 
+/** A graded puzzle's mark on one of your hand tiles, keyed by `tile_id`: presentation only. */
+export type HandTileMark = 'pick' | 'answer';
+
 export interface DeclareOption {
 	key: string;
 	label: string;
