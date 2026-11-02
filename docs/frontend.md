@@ -774,7 +774,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
 | `/profile` | on | placeholder heading only |
-| `/learn` | on | learn index: tracks, lesson cards, solved state (below); skips `ApiConnectGate` |
+| `/learn` | on | learn index, one track per tab: `?track=<Track>` or `endless` (missing or unknown → basics, then the continue track after mount), lesson cards, solved state (below); skips `ApiConnectGate` |
 | `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/learn/endless` | off | endless random puzzles, `?kind=<PuzzleKind>&band=<Band>` (band defaults to beginner; an unknown kind or band → 404); fetches `GET /lessons/random`, so behind `ApiConnectGate` (below) |
 | `/status` | on | public server status (below); fetches `GET /status` client-side |
@@ -979,7 +979,7 @@ Endless mode (below) is the one part that needs the API.
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
-| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `lessonsByBand`, `ORDERED_LESSONS` with `nextLesson`/`previousLesson` over that order, `trackPosition` (a lesson's "4 / 15" in its track), track labels and blurbs, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), the index tabs (`IndexTab`, `INDEX_TABS`: the tracks then `endless`; `parseIndexTab` for `?track=`, `indexHref`), `lessonsByTrack`, `lessonsByBand`, `ORDERED_LESSONS` with `nextLesson`/`previousLesson` over that order, `trackPosition` (a lesson's "4 / 15" in its track), track labels and blurbs, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them). It drops the snapshot's claim offer (a claim puzzle is answered in the answer card, not the claim dialog) and keeps `lastDiscard` only for a claim snapshot's tile |
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
@@ -988,9 +988,23 @@ Endless mode (below) is the one part that needs the API.
 | `AnswerPanel.svelte` | one input per kind (a discard kind's is the hand plus Check), the result line, per-kind feedback (below), "Show answer" after a miss, and the explanation once correct or revealed |
 | `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
 | `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
-| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`/`firstUnsolved`/`nextUnsolved`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
+| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`/`firstUnsolved`/`nextUnsolved`, `continueTab` (`firstUnsolved`'s track, `endless` once all are solved), and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
 
-- **Index.** Per track: its label, a "3 / 15" solved count beside a thin `role="progressbar"`
+- **Tabs.** Under the Continue card (which stays above them, whatever tab is open), a tab bar
+  holds one tab per track ("Waits 3 / 15", the count filling in after mount) and a last
+  "Endless" tab; only the open tab's panel renders.
+
+  | Aspect | Detail |
+  | --- | --- |
+  | URL | the open tab is `?track=<Track>` (`endless` for Endless), read from `page.url`, so the server renders the right panel and a tab link is shareable. A missing or unknown value falls back to basics, never a 404 |
+  | Links | real `<a href="/learn?track=…">`s with `data-sveltekit-replacestate`, `-noscroll` and `-keepfocus`: they work without JS, focus stays on the tab, and switching adds no history entry, so Back leaves `/learn` from the last tab seen |
+  | Default | the server renders basics. After mount, with no `?track=`, the page `goto`s `continueTab(progress)` (`replaceState`, `noScroll`, `keepFocus`): the Continue lesson's track, or Endless once everything is solved. An explicit `?track=` is never overridden. No last-tab memory: the URL plus this default cover it |
+  | Semantics | navigation links, so a `<nav aria-label="Puzzle tracks">` with `aria-current="page"` on the open tab, not `role="tablist"` (whose arrow-key model doesn't fit links that load a URL). A count is `aria-hidden` beside an sr-only "3 of 15 solved" |
+  | Look | `SegmentedControl`'s: a recessed strip, the open tab a filled brass pill (bold, ink text), so it reads without colour too; the global focus ring, with strip padding so the scroller doesn't clip it |
+  | Phone | the strip scrolls sideways (`nowrap`, `scroll-snap-type: x proximity`) and never widens the page; on mount and on each change the open tab is `scrollIntoView({ inline: 'nearest', block: 'nearest' })`, smooth unless motion is reduced (`isMotionReduced`, §9) |
+  | Back links | the puzzle and tutorial pages' "All puzzles" link and the tutorial's end "Back to puzzles" go to `indexHref(<the lesson's track>)`; endless's (`PuzzlePage`'s `backHref`, and its loading card's) to `?track=endless`; the post-solve "Back to all puzzles" stays `/learn` |
+
+- **Index.** A track's panel: its label, a "3 / 15" solved count beside a thin `role="progressbar"`
   bar, a one-line blurb of what its puzzles ask (`TRACK_BLURB` in `lessons.ts`), then its cards
   under Beginner / Intermediate / Advanced subheadings (`lessonsByBand`, `BANDS` order), so a
   card holds only its title and a check once solved, each a link to `/learn/<id>`. `lessonTitle`
@@ -1002,10 +1016,10 @@ Endless mode (below) is the one part that needs the API.
   with `{n}`. The puzzle page's heading and `<title>` use the same `lessonTitle`. A tutorial
   leads its track on a full-width card ("Start here" until solved, then "Tutorial") and counts
   toward the track's solved total.
-- **Continue.** Once the tutorial is solved, a full-width "Continue" card above the tracks links
+- **Continue.** Once the tutorial is solved, a full-width "Continue" card above the tabs links
   to `firstUnsolved` (`progress.ts`: the first unsolved lesson in `ORDERED_LESSONS`, the
   prev/next order) as "Efficiency · Cut the terminal"; with everything solved it gives way to an
-  "All puzzles solved" line linking to Endless. While the tutorial is unsolved it stays the lead
+  "All puzzles solved" line linking to the Endless tab (`?track=endless`). While the tutorial is unsolved it stays the lead
   card and no Continue card shows. Progress lives in localStorage only, so the SSR'd page renders
   everything unsolved (no Continue card) and an `$effect` reads it after mount; reading it during
   render would make server and client markup differ.
@@ -1087,8 +1101,8 @@ Endless mode (below) is the one part that needs the API.
   live table keeps the pulse only, §6 "Last-discard marker") and names the tile above the faan
   input.
 
-**Endless.** An "Endless puzzles" section after the last track on `/learn` (last because it's
-the one part that needs the server) has a band picker (`SegmentedControl`, as in Settings, saved
+**Endless.** The "Endless" tab, after the last track's on `/learn` (last because it's the one
+part that needs the server), holds an "Endless puzzles" panel with a band picker (`SegmentedControl`, as in Settings, saved
 to `mahjong:learnEndless:v1`, §6) and one card per kind, each linking to
 `/learn/endless?kind=…&band=…` with its best streak as a "Best: 7" pill once above 0. The route fetches `GET /lessons/random`
 ([protocol.md §10](protocol.md)), whose body is a generated `Lesson`, and plays it through the
