@@ -1087,7 +1087,7 @@ Endless mode (below) is the one part that needs the API.
   | --- | --- | --- |
   | `best_discard` | every option best first (steps from ready, kinds and unseen tiles that help), answers and your pick marked | one line against the best: further from ready, or fewer tiles that help |
   | `winning_tiles` | correct: the waits that complete the hand but score under the minimum (their discard and self-draw faan) and the dead ones (every copy visible). Revealed: every winning tile, each wrong pick with why, then those teaching points | each wrong pick with why (no win, too cheap, dead) and how many waits are missing; no winning tile is named |
-  | `safe_discard` | every hand tile: safe with its reasons, "safe this time, but you couldn't know", or who it deals in to | who your pick deals in to; a pick in `safe` but not `correct` is not solved and gets a "couldn't have known" line instead of "try again" |
+  | `safe_discard` | every hand tile: safe with its reasons, "safe this time, but you couldn't have known", or who it deals in to | who your pick deals in to; a pick in `safe` but not `correct` is not solved and gets a "couldn't have known" line instead of "try again" |
   | `count_faan` | `FaanBreakdown` (heading "Your hand", no payments; pattern names open `GuideDialog` on the pattern, under the lesson's ruleset as "This table") and the points | too high or too low |
 
 - **Marks on the table.** After a graded `best_discard`/`safe_discard`, the hand marks tiles by

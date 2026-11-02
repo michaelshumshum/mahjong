@@ -86,7 +86,7 @@ test('a track tab lists its lessons by band', async ({ page }) => {
 	// mined puzzles are titled by what they teach
 	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('Two-sided wait');
 	await expect(page.getByTestId('track-waits')).toContainText(
-		'Find every tile that completes the hand.'
+		'Find every tile that wins the hand.'
 	);
 	// cards sit under band headings, in band order
 	const headings = page.getByTestId('track-waits').locator('.band-heading');
@@ -193,7 +193,7 @@ test('a best discard puzzle hints at a miss, and shows every option once reveale
 	await page.goto('/learn/basics-keep-two-sided');
 	await discard(page, 4); // 2 Characters: ready, but fewer tiles than 5 Characters
 	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
-	await expect(feedback(page).locator('[data-line="discard-compare"]')).toContainText('7 unseen');
+	await expect(feedback(page).locator('[data-line="discard-compare"]')).toContainText('7 after discarding');
 	await expect(page.getByTestId('discard-table')).toHaveCount(0);
 	await expect(page.getByTestId('answer-next')).toHaveCount(0);
 

@@ -148,7 +148,7 @@ describe('generated lessons', () => {
 
 	it('describes every track', () => {
 		for (const track of TRACKS) expect(TRACK_BLURB[track]()).not.toBe('');
-		expect(TRACK_BLURB.waits()).toBe('Find every tile that completes the hand.');
+		expect(TRACK_BLURB.waits()).toBe('Find every tile that wins the hand.');
 	});
 });
 

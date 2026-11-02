@@ -165,7 +165,7 @@ describe('AnswerPanel best_discard feedback', () => {
 	it('a wrong pick at the same distance compares tiles accepted', () => {
 		const target = answered(keepTwoSided, { kind: 'best_discard', tile: '2m' });
 		expect(lines(target)['discard-compare']).toEqual([
-			'After discarding 2 Characters, 7 unseen tiles improve your hand. After 5 Characters, 10 do.'
+			'Unseen tiles that help: 7 after discarding 2 Characters, 10 after discarding 5 Characters.'
 		]);
 	});
 
@@ -185,8 +185,8 @@ describe('AnswerPanel winning_tiles feedback', () => {
 		const target = answered(waits12, { kind: 'winning_tiles', tiles: ['1p', '7p'] });
 		expect(lines(target)).toEqual({
 			'below-minimum': [
-				'2 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.',
-				'5 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.'
+				"2 Dots completes the hand, but it's worth only 1 faan on a discard win and 2 self-drawn: below the minimum either way.",
+				"5 Dots completes the hand, but it's worth only 1 faan on a discard win and 2 self-drawn: below the minimum either way."
 			],
 			dead: ['4 Dots would win, but every copy is already visible.']
 		});
@@ -203,7 +203,7 @@ describe('AnswerPanel winning_tiles feedback', () => {
 		expect(lines(target)).toEqual({
 			'no-win': ["9 Characters doesn't complete your hand."],
 			'below-minimum': [
-				'2 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.'
+				"2 Dots completes the hand, but it's worth only 1 faan on a discard win and 2 self-drawn: below the minimum either way."
 			],
 			dead: ['4 Dots would win, but every copy is already visible.'],
 			missing: ['1 more winning tile to find.']
@@ -220,8 +220,8 @@ describe('AnswerPanel winning_tiles feedback', () => {
 			answer: ['The winning tiles: 1 Dot and 7 Dots.'],
 			'no-win': ["9 Characters doesn't complete your hand."],
 			'below-minimum': [
-				'2 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.',
-				'5 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.'
+				"2 Dots completes the hand, but it's worth only 1 faan on a discard win and 2 self-drawn: below the minimum either way.",
+				"5 Dots completes the hand, but it's worth only 1 faan on a discard win and 2 self-drawn: below the minimum either way."
 			],
 			dead: ['4 Dots would win, but every copy is already visible.']
 		});
@@ -233,12 +233,12 @@ describe('AnswerPanel safe_discard feedback', () => {
 	it('correct: the stated reason, and every tile with its outcome', () => {
 		const target = answered(defence02, { kind: 'safe_discard', tile: '8s' });
 		expect(lines(target)).toEqual({
-			why: ["Why it's safe: every copy is visible and no run can be waiting on it."]
+			why: ["Why it's safe: every copy is visible and no chow can be waiting on it."]
 		});
 		const table = rows(target, 'safe-table');
 		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['8s']);
 		expect(table.find((r) => r.tile === '2m')?.cells).toEqual([
-			"Safe this time, but you couldn't know"
+			"Safe this time, but you couldn't have known"
 		]);
 		expect(table.find((r) => r.tile === 'z5')?.cells).toEqual(['Deals in to East']);
 	});
@@ -282,16 +282,16 @@ describe('AnswerPanel count_faan feedback', () => {
 
 	it('wrong: says high or low, and keeps the breakdown hidden', () => {
 		const high = answered(faan03, { kind: 'count_faan', faan: 8 });
-		expect(lines(high)).toEqual({ 'faan-high': ['8 is too high.'] });
+		expect(lines(high)).toEqual({ 'faan-high': ['8 faan is too high.'] });
 		expect(byTestId(high, 'faan-breakdown')).toBeNull();
 		const low = answered(faan03, { kind: 'count_faan', faan: 4 });
-		expect(lines(low)).toEqual({ 'faan-low': ['4 is too low.'] });
+		expect(lines(low)).toEqual({ 'faan-low': ['4 faan is too low.'] });
 	});
 
 	it('revealed: the miss, the points and the breakdown', () => {
 		const target = answered(faan03, { kind: 'count_faan', faan: 8 }, { revealed: true });
 		expect(lines(target)).toEqual({
-			'faan-high': ['8 is too high.'],
+			'faan-high': ['8 faan is too high.'],
 			points: ['Worth 32 points.']
 		});
 		expect(byTestId(target, 'faan-breakdown').querySelector('.total')?.textContent).toContain(
