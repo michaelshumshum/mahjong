@@ -103,6 +103,7 @@
 	"learn_tutorialStartHere": "由呢度開始",
 	"learn_tutorialCoachLabel": "教學貼士",
 	"learn_tutorialStepCounter": "第 {n} 步，共 {total} 步",
+	"learn_tutorialProgressLabel": "教學進度",
 	"learn_tutorialNext": "下一步",
 	"learn_tutorialBack": "上一步",
 	"learn_tutorialRestart": "重新開始",

@@ -103,6 +103,7 @@
 	"learn_tutorialStartHere": "Start here",
 	"learn_tutorialCoachLabel": "Tutorial tips",
 	"learn_tutorialStepCounter": "Step {n} of {total}",
+	"learn_tutorialProgressLabel": "Tutorial progress",
 	"learn_tutorialNext": "Next",
 	"learn_tutorialBack": "Back",
 	"learn_tutorialRestart": "Restart",

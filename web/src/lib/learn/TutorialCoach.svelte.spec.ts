@@ -48,6 +48,19 @@ describe('TutorialCoach', () => {
 		expect(onBack).toHaveBeenCalledOnce();
 	});
 
+	it('shows the step as a labelled progress bar', () => {
+		const { byTestId } = setup({ step: 7 });
+		const bar = byTestId('tutorial-progress')!;
+		expect(bar.getAttribute('role')).toBe('progressbar');
+		expect(bar.getAttribute('aria-label')).toBe('Tutorial progress');
+		expect(bar.getAttribute('aria-valuemin')).toBe('0');
+		expect(bar.getAttribute('aria-valuemax')).toBe('18');
+		expect(bar.getAttribute('aria-valuenow')).toBe('7');
+		expect(bar.getAttribute('aria-valuetext')).toBe('Step 7 of 18');
+		const fill = bar.firstElementChild as HTMLElement;
+		expect(Number(fill.style.getPropertyValue('--progress'))).toBeCloseTo(7 / 18);
+	});
+
 	it('has no Next at a move, and says so after a wrong one', () => {
 		const { byTestId } = setup({ move: true, canNext: false, wrongMoves: 1 });
 		expect(byTestId('tutorial-next')).toBeNull();

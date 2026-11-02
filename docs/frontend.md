@@ -982,7 +982,7 @@ Endless mode (below) is the one part that needs the API.
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them). It drops the snapshot's claim offer (a claim puzzle is answered in the answer card, not the claim dialog) and keeps `lastDiscard` only for a claim snapshot's tile |
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
-| `TutorialCoach.svelte` | the tutorial's tip card on `lib/ui/CoachCard.svelte`, the card the practice coach marks use: step counter, tip, wrong-move line, Back/Next or the last step's buttons |
+| `TutorialCoach.svelte` | the tutorial's tip card on `lib/ui/CoachCard.svelte`, the card the practice coach marks use: step counter and progress bar, tip, wrong-move line, Back/Next or the last step's buttons |
 | `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |
 | `AnswerPanel.svelte` | one input per kind, the result line, per-kind feedback (below), and the explanation once correct |
 | `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
@@ -1076,6 +1076,10 @@ starts from `start` and goes through the same `viewFromClientState` → `TableSc
   `data-coach` outline the practice coach marks use): `hand`, `melds`, `discards`, `wall`
   (the hub's wall count), `hub`; `claim` holds the claimable discard in brass instead
   (`holdLastDiscard`).
+- **Progress.** Under the "Step 7 of 18" counter, a 3px brass bar on a faint brass track fills to
+  `step / total`: a `role="progressbar"` labelled "Tutorial progress", `aria-valuenow`/`-max` the
+  step and total, `aria-valuetext` the counter. The fill is a `scaleX` that eases between steps
+  (`--dur-3`) under `motion-ok` only (§9).
 - **Focus.** The tip sits in a polite live region. When a move or Next removes the focused
   control, focus lands on Next, else on the tip, so the hand is the next tab stop; a claim dialog
   focuses Pass itself.

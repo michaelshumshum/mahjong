@@ -35,6 +35,9 @@
 		end?: Snippet;
 	} = $props();
 
+	const counter = $derived(m.learn_tutorialStepCounter({ n: step, total }));
+	const fraction = $derived(total > 0 ? Math.min(1, Math.max(0, step / total)) : 0);
+
 	let tipEl: HTMLElement | undefined = $state();
 	let nextEl: HTMLButtonElement | undefined = $state();
 
@@ -54,9 +57,21 @@
 
 <CoachCard
 	label={m.learn_tutorialCoachLabel()}
-	counter={m.learn_tutorialStepCounter({ n: step, total })}
+	{counter}
 	testid="tutorial-coach"
 >
+	<div
+		class="coach-progress"
+		role="progressbar"
+		aria-label={m.learn_tutorialProgressLabel()}
+		aria-valuemin={0}
+		aria-valuemax={total}
+		aria-valuenow={step}
+		aria-valuetext={counter}
+		data-testid="tutorial-progress"
+	>
+		<div class="coach-progress-fill" style:--progress={fraction}></div>
+	</div>
 	<p class="coach-text" tabindex="-1" bind:this={tipEl} data-testid="tutorial-tip">{tip}</p>
 	{#if busy}
 		<p class="coach-note" data-testid="tutorial-watching">{m.learn_tutorialWatching()}</p>
@@ -89,6 +104,27 @@
 </CoachCard>
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
+
+	.coach-progress {
+		height: 3px;
+		overflow: hidden;
+		border-radius: var(--radius-pill);
+		background: color-mix(in srgb, var(--color-brass) 18%, transparent);
+	}
+
+	.coach-progress-fill {
+		height: 100%;
+		border-radius: inherit;
+		background: var(--color-brass);
+		transform: scaleX(var(--progress));
+		transform-origin: left;
+
+		@include a11y.motion-ok {
+			transition: transform var(--dur-3) var(--ease-out);
+		}
+	}
+
 	.coach-text:focus {
 		outline: none;
 	}
