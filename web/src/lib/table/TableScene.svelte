@@ -35,7 +35,8 @@
 		holdLastDiscard = false,
 		coach = null,
 		liftedTileId = $bindable(null),
-		tileMarks = new Map()
+		tileMarks = new Map(),
+		dimOpponents = null
 	}: {
 		view: TableView;
 		spectating: boolean;
@@ -60,6 +61,9 @@
 		liftedTileId?: number | null;
 		// per-tile marks on your hand, keyed by tile_id
 		tileMarks?: ReadonlyMap<number, HandTileMark>;
+		// presentation only: 'hands' fades opponents' plates and concealed tiles, 'all' their melds
+		// and discards too, except a pool holding the held last discard
+		dimOpponents?: 'hands' | 'all' | null;
 	} = $props();
 
 	function seatAt(position: 0 | 1 | 2 | 3) {
@@ -83,7 +87,12 @@
 	});
 </script>
 
-<div class="table-surface" data-testid="table-scene" data-coach={coach ?? undefined}>
+<div
+	class="table-surface"
+	data-testid="table-scene"
+	data-coach={coach ?? undefined}
+	data-dim-opponents={dimOpponents ?? undefined}
+>
 	<OpponentRegion
 		seat={seatAt(2)}
 		position="across"
@@ -266,6 +275,15 @@
 		outline: 2px solid var(--color-brass);
 		outline-offset: 4px;
 		border-radius: var(--radius-md);
+	}
+
+	.table-surface[data-dim-opponents] :global(.seat-region:not(.seat-region--self) .seat-plate),
+	.table-surface[data-dim-opponents] :global(.seat-region:not(.seat-region--self) .backs-row),
+	.table-surface[data-dim-opponents='all'] :global(.seat-region:not(.seat-region--self) .meld-row),
+	.table-surface[data-dim-opponents='all']
+		:global(.discard-pool:not(.discard-pool--self):not(:has(.discard-tile--held))) {
+		opacity: 0.55;
+		filter: saturate(0.6);
 	}
 
 	@include layout.phone-only {
