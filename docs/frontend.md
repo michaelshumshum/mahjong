@@ -396,6 +396,7 @@ Both modes are presentation only, never a state mutation (`web/AGENTS.md`): the 
 state, and the actual intent still only ever goes `tap → discard{tile_id}`, same as before.
 Mock mode renders hand tiles as non-interactive in the first place (no `tile_id` to discard
 against), so neither mode has anything to do there — a deliberate no-op, not an oversight.
+Learn puzzles ignore the pref and always run `two-step` (pick, then Check: §7 "Learn").
 
 **Hand order.** `ClientPrefs.handOrder`, default `'auto'` (sorted by tile type, `live-view.ts`).
 `'manual'` keeps the player's arrangement, live mode only (mock tiles have no `tile_id`):
@@ -984,7 +985,7 @@ Endless mode (below) is the one part that needs the API.
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
 | `TutorialCoach.svelte` | the tutorial's tip card on `lib/ui/CoachCard.svelte`, the card the practice coach marks use: step counter, tip, wrong-move line, Back/Next or the last step's buttons |
 | `grade.ts` / `types.ts` | `grade(lesson, answer)` → `correct` / `partial` / `wrong`: a lookup in the precomputed key, no game logic ([ADR 0010](decisions/0010-client-scope-cuts.md)). `partial` is a `winning_tiles` pick that holds only waits but misses some. `Answer` is shaped per kind |
-| `AnswerPanel.svelte` | one input per kind, the result line, per-kind feedback (below), and the explanation once correct |
+| `AnswerPanel.svelte` | one input per kind (a discard kind's is the hand plus Check), the result line, per-kind feedback (below), "Show answer" after a miss, and the explanation once correct or revealed |
 | `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
 | `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
 | `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
@@ -1000,31 +1001,46 @@ Endless mode (below) is the one part that needs the API.
   full-width "Start here" card and counts toward the track's solved total. Progress lives in
   localStorage only, so the SSR'd page renders everything unsolved and an `$effect` reads it
   after mount; reading it during render would make server and client markup differ.
-- **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and the
-  discard-mode pref are client-only, so a server render would be an empty felt to hydrate over.
+- **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and learn
+  progress are client-only, so a server render would be an empty felt to hydrate over.
   `+page.ts` loads the lesson and answers an unknown id with SvelteKit's `error(404)`. The
   snapshot renders through `puzzleState` → `viewFromClientState` → `TableScene` with no socket or
   `GameStore`, and the page supplies the `CenterHub` snippet as `/table` does. A prompt card
   (band, title, prompt), back/previous/next links, and the answer card sit beside the table from
   `desktop-up`, stacked above and below it otherwise.
-- **Answering.** `best_discard` and `safe_discard`: tap a tile in your hand, through
-  `TableScene`'s `onDiscard` (discardable = the snapshot's legal discards, i.e. the concealed
-  hand; the player's discard mode applies). Each graded tap remounts the scene, which clears the
-  hand's pending-discard state, since no `discard` echo ever arrives. `winning_tiles`:
-  `TilePalette` multi-select, then Check. `count_faan`: a `StepperField` (0 to `LIMIT_FAAN`),
-  then Check. Every graded answer is saved with `saveAttempt`; a correct one shows the
-  explanation and a Next button.
+- **Answering.** `best_discard` and `safe_discard`: pick, then Check. The scene always runs the
+  hand in `two-step` mode, whatever the player's discard-mode pref (§5): the first tap lifts a
+  tile (discardable = the snapshot's legal discards, i.e. the concealed hand), and Check in the
+  answer card grades it, as does a second tap on the lifted tile, through `TableScene`'s
+  `onDiscard`. The lift is `TableScene`'s bindable `liftedTileId`, so the page knows what Check
+  grades; Escape or a click outside the hand clears it, as on `/table`. Each graded answer
+  remounts the scene, which clears the lift and the hand's pending-discard state, since no
+  `discard` echo ever arrives. `winning_tiles`: `TilePalette` multi-select, then Check.
+  `count_faan`: a `StepperField` (0 to `LIMIT_FAAN`), then Check. Every graded answer is saved
+  with `saveAttempt`; a correct one shows the explanation and a Next button.
+- **Hint first, answer on request.** A wrong or partial answer shows the result line and hint
+  notes only (table below), never a table or line that names the answer, plus a secondary "Show
+  answer" button. Revealing shows the whole answer as a correct one would (tables, the winning
+  tiles, breakdown, explanation) and the Next button, and moves focus to the feedback. It does
+  not solve the lesson: the player can still answer, and a later right answer grades and saves
+  as usual. Endless counts a reveal as a Skip (`onReveal`, below).
 - **Feedback.** Read off the last graded answer and the lesson's key, never the position
   ([ADR 0010](decisions/0010-client-scope-cuts.md)). The result line and one-line notes sit in
   the `role="status"` region; tables and the breakdown sit after it, so an answer doesn't read a
   whole table aloud. Seats are named as `puzzleState` names them (East, 東家).
 
-  | Kind | After an answer |
-  | --- | --- |
-  | `best_discard` | every option best first (steps from ready, kinds and unseen tiles that help), answers and your pick marked; a wrong pick gets one line against the best: further from ready, or fewer tiles that help |
-  | `winning_tiles` | correct: the waits that complete the hand but score under the minimum (their discard and self-draw faan) and the dead ones (every copy visible). Partial: how many waits are missing. Wrong: the right picks, each wrong pick with why (no win, too cheap, dead), and how many are missing; missed waits are counted, not named |
-  | `safe_discard` | every hand tile: safe with its reasons, "safe this time, but you couldn't know", or who it deals in to. A pick in `safe` but not `correct` is not solved and gets that "couldn't have known" line instead of "try again" |
-  | `count_faan` | correct: `FaanBreakdown` (heading "Your hand", no payments; pattern names open `GuideDialog` on the pattern, under the lesson's ruleset as "This table") and the points. Wrong: too high or too low, breakdown hidden |
+  | Kind | Correct, or revealed | A miss (hint) |
+  | --- | --- | --- |
+  | `best_discard` | every option best first (steps from ready, kinds and unseen tiles that help), answers and your pick marked | one line against the best: further from ready, or fewer tiles that help |
+  | `winning_tiles` | correct: the waits that complete the hand but score under the minimum (their discard and self-draw faan) and the dead ones (every copy visible). Revealed: every winning tile, each wrong pick with why, then those teaching points | each wrong pick with why (no win, too cheap, dead) and how many waits are missing; no winning tile is named |
+  | `safe_discard` | every hand tile: safe with its reasons, "safe this time, but you couldn't know", or who it deals in to | who your pick deals in to; a pick in `safe` but not `correct` is not solved and gets a "couldn't have known" line instead of "try again" |
+  | `count_faan` | `FaanBreakdown` (heading "Your hand", no payments; pattern names open `GuideDialog` on the pattern, under the lesson's ruleset as "This table") and the points | too high or too low |
+
+- **Marks on the table.** After a graded `best_discard`/`safe_discard`, the hand marks tiles by
+  `tile_id` through `TableScene`'s `tileMarks` (`HandTileMark`, `lib/table/view-types.ts`;
+  presentation only): the last pick in brass with a ✕ glyph, and once correct or revealed every
+  copy of an answer tile in `--color-positive` with a ✓ glyph. The glyph and the tile's accessible
+  name ("Discard 5 Characters (the answer)") carry the mark beside the colour.
 
 - **Discard wins.** A `count_faan` with `win_type: 'discard'` holds a brass outline on the
   snapshot's last discard (`TableScene`'s `holdLastDiscard`, through `CenterDiscardPool`; the
@@ -1042,8 +1058,8 @@ same `routes/learn/_components/PuzzlePage.svelte` as `/learn/[id]`, titled by it
 | --- | --- |
 | `lib/learn/endless.ts` | `fetchRandomLesson` (never throws: `rate_limited` with `Retry-After` when readable, else `unavailable`, also for a puzzle of another kind), `rememberRecent` (the last 20 ids, sent as `exclude`), `recordEndlessAnswer`/`recordEndlessSkip`, `ENDLESS_TITLE` (kind-level card and loading titles) |
 | `lib/learn/kinds.ts` | `PUZZLE_KINDS`, `BANDS`, `isPuzzleKind`/`isBand`, shared by the route's `+page.ts` and storage validation |
-| `PuzzlePage` props | `navExtra` (streak and Skip in the nav), `afterCorrect` (a "Next puzzle" button instead of the Next link), `onGraded` (replaces `saveAttempt`, so endless ids never reach `learnProgress`) |
-| Streak | puzzles solved with no miss in a row: a wrong or partial answer, or Skip, ends it; a later solve counts toward `solved` only. `best` keeps the longest run, per kind |
+| `PuzzlePage` props | `navExtra` (streak and Skip in the nav), `afterCorrect` (a "Next puzzle" button instead of the Next link, once solved or revealed), `onGraded` (replaces `saveAttempt`, so endless ids never reach `learnProgress`), `onReveal` (Show answer: recorded as a Skip, and Skip leaves the nav) |
+| Streak | puzzles solved with no miss in a row: a wrong or partial answer, Skip, or Show answer ends it; a later solve counts toward `solved` only. `best` keeps the longest run, per kind |
 | Errors | a loading card with a spinner; on failure a `role="alert"` line ("Couldn't load a puzzle…", or the rate-limit wait in seconds) and Try again |
 
 **Tutorial.** `/learn/[id]` renders `_components/TutorialPage.svelte` for a `lesson_kind:
