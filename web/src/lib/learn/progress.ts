@@ -34,7 +34,9 @@ export function recordTutorialStep(
 	id: string,
 	step: number | null
 ): LearnProgress {
-	const next: LessonProgress = { ...(progress[id] ?? { solved: false, attempts: 0 }) };
+	const next: LessonProgress = {
+		...(progress[id] ?? { solved: false, attempts: 0 })
+	};
 	if (step === null) delete next.step;
 	else next.step = step;
 	return { ...progress, [id]: next };
@@ -52,6 +54,17 @@ export function firstUnsolved(
 	lessons: readonly IndexEntry[] = ORDERED_LESSONS
 ): IndexEntry | null {
 	return lessons.find((lesson) => !progress[lesson.id]?.solved) ?? null;
+}
+
+/** The first unsolved lesson after `id` in /learn's order, wrapping round, never `id` itself. */
+export function nextUnsolved(
+	progress: LearnProgress,
+	id: string,
+	lessons: readonly IndexEntry[] = ORDERED_LESSONS
+): IndexEntry | null {
+	const i = lessons.findIndex((lesson) => lesson.id === id);
+	const order = [...lessons.slice(i + 1), ...lessons.slice(0, Math.max(i, 0))];
+	return order.find((lesson) => lesson.id !== id && !progress[lesson.id]?.solved) ?? null;
 }
 
 export function loadProgress(): LearnProgress {

@@ -150,6 +150,28 @@ export function previousLesson(id: string): IndexEntry | null {
 	return i <= 0 ? null : ORDERED_LESSONS[i - 1];
 }
 
+export interface TrackPosition {
+	track: Track;
+	/** 1-based, counting the track's tutorial. */
+	n: number;
+	total: number;
+}
+
+/** Where a lesson sits in its track, in /learn's order; `null` off the index (endless). */
+export function trackPosition(
+	id: string,
+	lessons: readonly IndexEntry[] = ORDERED_LESSONS
+): TrackPosition | null {
+	const entry = lessons.find((lesson) => lesson.id === id);
+	if (!entry) return null;
+	const inTrack = lessons.filter((lesson) => lesson.track === entry.track);
+	return {
+		track: entry.track,
+		n: inTrack.indexOf(entry) + 1,
+		total: inTrack.length
+	};
+}
+
 // lazy, so each lesson is its own chunk and /learn ships only the index.
 const LESSON_FILES = import.meta.glob<unknown>(['./generated/*.json', '!./generated/index.json'], {
 	import: 'default'

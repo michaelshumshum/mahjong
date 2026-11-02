@@ -3,6 +3,7 @@ import { ORDERED_LESSONS } from './lessons';
 import {
 	firstUnsolved,
 	LESSON_IDS,
+	nextUnsolved,
 	recordAttempt,
 	recordTutorialStep,
 	solvedCount
@@ -18,7 +19,9 @@ describe('learn progress', () => {
 		let progress = recordAttempt({}, 'a', false, 100);
 		expect(progress).toEqual({ a: { solved: false, attempts: 1 } });
 		progress = recordAttempt(progress, 'a', true, 200);
-		expect(progress).toEqual({ a: { solved: true, attempts: 2, solvedAt: 200 } });
+		expect(progress).toEqual({
+			a: { solved: true, attempts: 2, solvedAt: 200 }
+		});
 	});
 
 	it('keeps a solved lesson solved, with its first solvedAt', () => {
@@ -47,7 +50,9 @@ describe('learn progress', () => {
 		let progress = recordTutorialStep({}, 't', 4);
 		expect(progress).toEqual({ t: { solved: false, attempts: 0, step: 4 } });
 		progress = recordTutorialStep(recordAttempt(progress, 't', true, 100), 't', null);
-		expect(progress).toEqual({ t: { solved: true, attempts: 1, solvedAt: 100 } });
+		expect(progress).toEqual({
+			t: { solved: true, attempts: 1, solvedAt: 100 }
+		});
 	});
 
 	it('finds the first unsolved lesson in index order, skipping attempted-but-unsolved ones', () => {
@@ -69,5 +74,39 @@ describe('learn progress', () => {
 			Object.fromEntries(lessons.map((l) => [l.id, { solved: true, attempts: 1 }]));
 		expect(firstUnsolved(solved(basics))?.track).toBe('waits');
 		expect(firstUnsolved(solved(ORDERED_LESSONS))).toBeNull();
+	});
+
+	describe('nextUnsolved', () => {
+		const solved = (...ids: string[]) =>
+			Object.fromEntries(ids.map((id) => [id, { solved: true, attempts: 1 }]));
+		const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(
+			(id) => ({ ...ORDERED_LESSONS[0], id }) as (typeof ORDERED_LESSONS)[number]
+		);
+		const lessons = [a, b, c, d];
+
+		it('takes the next unsolved lesson after the current one', () => {
+			expect(nextUnsolved({}, 'a', lessons)).toEqual(b);
+			expect(nextUnsolved(solved('b'), 'a', lessons)).toEqual(c);
+			// attempted but unsolved still counts as unsolved
+			expect(nextUnsolved({ b: { solved: false, attempts: 2 } }, 'a', lessons)).toEqual(b);
+		});
+
+		it('wraps round to an earlier unsolved lesson, never the current one', () => {
+			expect(nextUnsolved(solved('d'), 'c', lessons)).toEqual(a);
+			expect(nextUnsolved({}, 'd', lessons)).toEqual(a);
+			expect(nextUnsolved(solved('a', 'b', 'd'), 'c', lessons)).toBeNull();
+		});
+
+		it('returns null once every lesson is solved', () => {
+			expect(nextUnsolved(solved('a', 'b', 'c', 'd'), 'b', lessons)).toBeNull();
+		});
+
+		it('starts from the top for an id off the list', () => {
+			expect(nextUnsolved(solved('a'), 'endless-1', lessons)).toEqual(b);
+		});
+
+		it('walks the real index order by default', () => {
+			expect(nextUnsolved({}, ORDERED_LESSONS[0].id)).toEqual(ORDERED_LESSONS[1]);
+		});
 	});
 });

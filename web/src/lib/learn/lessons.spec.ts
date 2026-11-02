@@ -22,7 +22,8 @@ import {
 	lessonsByTrack,
 	loadLesson,
 	nextLesson,
-	previousLesson
+	previousLesson,
+	trackPosition
 } from './lessons';
 
 const files = import.meta.glob<Record<string, unknown>>('../../../messages/*/learn.json', {
@@ -203,6 +204,27 @@ describe('lesson loading', () => {
 		const lastBasics = lessonsByTrack()[0].lessons.at(-1)!;
 		expect(nextLesson(lastBasics.id)?.track).toBe(lessonsByTrack()[1].track);
 		expect(nextLesson('no-such-lesson')).toBeNull();
+	});
+
+	it('places a lesson in its track, the tutorial counted, and nothing off the index', () => {
+		const basics = lessonsByTrack()[0].lessons;
+		expect(trackPosition(basics[0].id)).toEqual({
+			track: 'basics',
+			n: 1,
+			total: basics.length
+		});
+		expect(trackPosition(basics[2].id)).toEqual({
+			track: 'basics',
+			n: 3,
+			total: basics.length
+		});
+		const waits = lessonsByTrack().find((g) => g.track === 'waits')!.lessons;
+		expect(trackPosition(waits.at(-1)!.id)).toEqual({
+			track: 'waits',
+			n: waits.length,
+			total: waits.length
+		});
+		expect(trackPosition('no-such-lesson')).toBeNull();
 	});
 
 	it('loads one lesson by id, matching its index entry', async () => {
