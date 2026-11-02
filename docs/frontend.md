@@ -978,7 +978,7 @@ Endless mode (below) is the one part that needs the API.
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
-| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `nextLesson`/`previousLesson` over that order, track, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `lessonsByBand`, `ORDERED_LESSONS` with `nextLesson`/`previousLesson` over that order, track labels and blurbs, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them). It drops the snapshot's claim offer (a claim puzzle is answered in the answer card, not the claim dialog) and keeps `lastDiscard` only for a claim snapshot's tile |
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
@@ -987,19 +987,27 @@ Endless mode (below) is the one part that needs the API.
 | `AnswerPanel.svelte` | one input per kind, the result line, per-kind feedback (below), and the explanation once correct |
 | `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
 | `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
-| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
+| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`/`firstUnsolved`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
 
-- **Index.** Per track: its label, a "3 / 15" solved count, and a card per lesson (title, band, a
-  check once solved), each a link to `/learn/<id>`. `lessonTitle` gives a mined puzzle its
-  theme's label (`THEME_LABEL` in `lessons.ts`, "Two-sided wait", "Half flush, all pungs";
-  [ADR 0025](decisions/0025-learn-mode.md) "Themes") with no number. Several cards in a track can
-  share a theme, so `lessonSubtitle` adds a small muted "Puzzle 3" line under a themed title, and
-  the puzzle page shows it beside the band; endless puzzles aren't in the index and get none. A
-  puzzle with no theme falls back to its stem's title with `{n}`. The puzzle page's heading and
-  `<title>` use the same `lessonTitle`. A tutorial leads its track on a
-  full-width "Start here" card and counts toward the track's solved total. Progress lives in
-  localStorage only, so the SSR'd page renders everything unsolved and an `$effect` reads it
-  after mount; reading it during render would make server and client markup differ.
+- **Index.** Per track: its label, a "3 / 15" solved count beside a thin `role="progressbar"`
+  bar, a one-line blurb of what its puzzles ask (`TRACK_BLURB` in `lessons.ts`), then its cards
+  under Beginner / Intermediate / Advanced subheadings (`lessonsByBand`, `BANDS` order), so a
+  card holds only its title and a check once solved, each a link to `/learn/<id>`. `lessonTitle`
+  gives a mined puzzle its theme's label (`THEME_LABEL` in `lessons.ts`, "Two-sided wait", "Half
+  flush, all pungs"; [ADR 0025](decisions/0025-learn-mode.md) "Themes") with no number. Several
+  cards in a band can share a theme, so those (`BandGroup.numbered`) get `lessonSubtitle`'s small
+  muted "Puzzle 3" line under the title; the puzzle page always shows it beside the band; endless
+  puzzles aren't in the index and get none. A puzzle with no theme falls back to its stem's title
+  with `{n}`. The puzzle page's heading and `<title>` use the same `lessonTitle`. A tutorial
+  leads its track on a full-width card ("Start here" until solved, then "Tutorial") and counts
+  toward the track's solved total.
+- **Continue.** Once the tutorial is solved, a full-width "Continue" card above the tracks links
+  to `firstUnsolved` (`progress.ts`: the first unsolved lesson in `ORDERED_LESSONS`, the
+  prev/next order) as "Efficiency · Cut the terminal"; with everything solved it gives way to an
+  "All puzzles solved" line linking to Endless. While the tutorial is unsolved it stays the lead
+  card and no Continue card shows. Progress lives in localStorage only, so the SSR'd page renders
+  everything unsolved (no Continue card) and an `$effect` reads it after mount; reading it during
+  render would make server and client markup differ.
 - **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and the
   discard-mode pref are client-only, so a server render would be an empty felt to hydrate over.
   `+page.ts` loads the lesson and answers an unknown id with SvelteKit's `error(404)`. The
@@ -1031,9 +1039,10 @@ Endless mode (below) is the one part that needs the API.
   live table keeps the pulse only, §6 "Last-discard marker") and names the tile above the faan
   input.
 
-**Endless.** An "Endless puzzles" section right after basics on `/learn` has a band picker
-(`SegmentedControl`, as in Settings, saved to `mahjong:learnEndless:v1`, §6) and one card per kind, each linking to
-`/learn/endless?kind=…&band=…` with its best streak. The route fetches `GET /lessons/random`
+**Endless.** An "Endless puzzles" section after the last track on `/learn` (last because it's
+the one part that needs the server) has a band picker (`SegmentedControl`, as in Settings, saved
+to `mahjong:learnEndless:v1`, §6) and one card per kind, each linking to
+`/learn/endless?kind=…&band=…` with its best streak as a "Best: 7" pill once above 0. The route fetches `GET /lessons/random`
 ([protocol.md §10](protocol.md)), whose body is a generated `Lesson`, and plays it through the
 same `routes/learn/_components/PuzzlePage.svelte` as `/learn/[id]`, titled by its theme
 (`lessonTitle`).

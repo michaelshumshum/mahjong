@@ -3,12 +3,14 @@ import type {
 	Band,
 	IndexEntry,
 	Lesson,
+	LessonIndexEntry,
 	PuzzleTheme,
 	SafeReason,
 	Track,
 	Tutorial,
 	TutorialIndexEntry
 } from './generated/lessons';
+import { BANDS } from './kinds';
 import { m } from '$lib/paraglide/messages.js';
 
 /** Either generated lesson file: a puzzle or a guided tutorial. */
@@ -35,6 +37,15 @@ export const TRACK_LABEL: Record<Track, () => string> = {
 	efficiency: m.learn_trackEfficiency,
 	defence: m.learn_trackDefence,
 	faan: m.learn_trackFaan
+};
+
+// one line under each track heading on /learn: what its puzzles ask.
+export const TRACK_BLURB: Record<Track, () => string> = {
+	basics: m.learn_trackBasicsBlurb,
+	waits: m.learn_trackWaitsBlurb,
+	efficiency: m.learn_trackEfficiencyBlurb,
+	defence: m.learn_trackDefenceBlurb,
+	faan: m.learn_trackFaanBlurb
 };
 
 export const BAND_LABEL: Record<Band, () => string> = {
@@ -93,21 +104,50 @@ export function lessonsByTrack(lessons: readonly IndexEntry[] = LESSONS): TrackG
 	})).filter((group) => group.lessons.length > 0);
 }
 
-// the order /learn lists them in, so prev/next walk the index top to bottom.
-const ORDERED: readonly IndexEntry[] = lessonsByTrack().flatMap((group) => group.lessons);
+export interface BandGroup {
+	band: Band;
+	lessons: LessonIndexEntry[];
+	/** Ids whose card needs its "Puzzle N" line: another card in the band shares its theme. */
+	numbered: ReadonlySet<string>;
+}
+
+/** A track's puzzles under `BANDS` order, index order within; tutorials and empty bands dropped. */
+export function lessonsByBand(lessons: readonly IndexEntry[]): BandGroup[] {
+	return BANDS.map((band) => {
+		const inBand = lessons.filter(
+			(lesson): lesson is LessonIndexEntry =>
+				lesson.lesson_kind === 'puzzle' && lesson.band === band
+		);
+		const seen = new Map<string, number>();
+		for (const lesson of inBand) {
+			if (lesson.theme) seen.set(lesson.theme, (seen.get(lesson.theme) ?? 0) + 1);
+		}
+		const numbered = new Set(
+			inBand
+				.filter((lesson) => lesson.theme && seen.get(lesson.theme)! > 1)
+				.map((lesson) => lesson.id)
+		);
+		return { band, lessons: inBand, numbered };
+	}).filter((group) => group.lessons.length > 0);
+}
+
+/** Every lesson in the order /learn lists them, so prev/next walk the index top to bottom. */
+export const ORDERED_LESSONS: readonly IndexEntry[] = lessonsByTrack().flatMap(
+	(group) => group.lessons
+);
 
 export function lessonEntry(id: string): IndexEntry | null {
 	return LESSONS.find((lesson) => lesson.id === id) ?? null;
 }
 
 export function nextLesson(id: string): IndexEntry | null {
-	const i = ORDERED.findIndex((lesson) => lesson.id === id);
-	return i === -1 ? null : (ORDERED[i + 1] ?? null);
+	const i = ORDERED_LESSONS.findIndex((lesson) => lesson.id === id);
+	return i === -1 ? null : (ORDERED_LESSONS[i + 1] ?? null);
 }
 
 export function previousLesson(id: string): IndexEntry | null {
-	const i = ORDERED.findIndex((lesson) => lesson.id === id);
-	return i <= 0 ? null : ORDERED[i - 1];
+	const i = ORDERED_LESSONS.findIndex((lesson) => lesson.id === id);
+	return i <= 0 ? null : ORDERED_LESSONS[i - 1];
 }
 
 // lazy, so each lesson is its own chunk and /learn ships only the index.

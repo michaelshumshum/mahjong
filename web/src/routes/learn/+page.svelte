@@ -2,11 +2,18 @@
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import { m } from '$lib/paraglide/messages.js';
 	import { ENDLESS_TITLE, endlessScore, saveEndlessBand } from '$lib/learn/endless';
-	import type { Band } from '$lib/learn/generated/lessons';
+	import type { Band, IndexEntry } from '$lib/learn/generated/lessons';
 	import { BANDS, PUZZLE_KINDS } from '$lib/learn/kinds';
-	import { BAND_LABEL, lessonsByTrack, TRACK_LABEL } from '$lib/learn/lessons';
+	import {
+		BAND_LABEL,
+		FIRST_TUTORIAL,
+		lessonsByBand,
+		lessonsByTrack,
+		TRACK_BLURB,
+		TRACK_LABEL
+	} from '$lib/learn/lessons';
 	import { lessonSubtitle, lessonTitle } from '$lib/learn/lesson-text';
-	import { loadProgress, solvedCount } from '$lib/learn/progress';
+	import { firstUnsolved, loadProgress, solvedCount } from '$lib/learn/progress';
 	import {
 		loadLearnEndless,
 		type LearnEndless,
@@ -18,7 +25,11 @@
 
 	claimMuralVisible();
 
-	const groups = lessonsByTrack();
+	const groups = lessonsByTrack().map((group) => ({
+		...group,
+		tutorials: group.lessons.filter((lesson) => lesson.lesson_kind === 'tutorial'),
+		bands: lessonsByBand(group.lessons)
+	}));
 
 	// localStorage only: read after mount so the SSR'd index and its hydration agree (all unsolved).
 	let progress = $state<LearnProgress>({});
@@ -28,10 +39,13 @@
 		endless = loadLearnEndless();
 	});
 	let band = $derived(endless.band);
+	// the tutorial leads until it's solved; after that, the first unsolved lesson does.
+	let next = $derived(firstUnsolved(progress));
+	let tutorialSolved = $derived(progress[FIRST_TUTORIAL.id]?.solved ?? false);
 
-	function pickBand(next: Band): void {
-		endless = { ...endless, band: next };
-		saveEndlessBand(next);
+	function pickBand(value: Band): void {
+		endless = { ...endless, band: value };
+		saveEndlessBand(value);
 	}
 </script>
 
@@ -46,72 +60,117 @@
 	</header>
 	<p class="subtitle">{m.learn_subtitle()}</p>
 
+	{#if tutorialSolved && next}
+		{@const subtitle = lessonSubtitle(next)}
+		<a
+			class="lesson-card lead-card"
+			href="/learn/{next.id}"
+			data-sfx="on"
+			data-testid="learn-continue"
+		>
+			<span class="eyebrow">{m.learn_continueLabel()}</span>
+			<span class="lesson-title"
+				>{m.learn_continueLesson({
+					track: TRACK_LABEL[next.track](),
+					title: lessonTitle(next)
+				})}</span
+			>
+			{#if subtitle}
+				<span class="lesson-sub">{subtitle}</span>
+			{/if}
+		</a>
+	{:else if tutorialSolved}
+		<p class="all-solved" data-testid="learn-all-solved">
+			<CircleCheck size={18} aria-hidden="true" />
+			<span>{m.learn_allSolved()}</span>
+			<a href="#endless">{m.learn_allSolvedEndless()}</a>
+		</p>
+	{/if}
+
 	{#each groups as group (group.track)}
 		{@const ids = group.lessons.map((lesson) => lesson.id)}
 		{@const solved = solvedCount(progress, ids)}
 		<section class="track" aria-labelledby="track-{group.track}" data-testid="track-{group.track}">
 			<header class="track-header">
 				<h2 id="track-{group.track}">{TRACK_LABEL[group.track]()}</h2>
-				<span
-					class="track-count"
-					data-testid="track-solved-{group.track}"
-					aria-label={m.learn_solvedCountAriaLabel({ solved, total: ids.length })}
-					>{m.learn_solvedCount({ solved, total: ids.length })}</span
-				>
+				<span class="track-progress">
+					<span
+						class="track-bar"
+						role="progressbar"
+						aria-label={m.learn_trackProgressAriaLabel({ track: TRACK_LABEL[group.track]() })}
+						aria-valuemin={0}
+						aria-valuemax={ids.length}
+						aria-valuenow={solved}
+						aria-valuetext={m.learn_solvedCountAriaLabel({ solved, total: ids.length })}
+						data-testid="track-bar-{group.track}"
+						style:--fill="{(solved / ids.length) * 100}%"
+					></span>
+					<span class="track-count" data-testid="track-solved-{group.track}" aria-hidden="true"
+						>{m.learn_solvedCount({ solved, total: ids.length })}</span
+					>
+				</span>
 			</header>
-			<ul class="lessons">
-				{#each group.lessons as lesson (lesson.id)}
-					{@const done = progress[lesson.id]?.solved ?? false}
-					{@const tutorial = lesson.lesson_kind === 'tutorial'}
-					{@const subtitle = lessonSubtitle(lesson)}
-					<li class:tutorial-item={tutorial}>
-						<a
-							class="lesson-card"
-							class:lesson-card--solved={done}
-							class:lesson-card--tutorial={tutorial}
-							href="/learn/{lesson.id}"
-							data-sfx="on"
-							data-testid="lesson-card-{lesson.id}"
-							data-solved={done}
-						>
-							{#if tutorial}
-								<span class="start-here">{m.learn_tutorialStartHere()}</span>
-							{/if}
-							<span class="lesson-heading">
-								<span class="lesson-title">{lessonTitle(lesson)}</span>
-								{#if subtitle}
-									<span class="lesson-sub" data-testid="lesson-sub-{lesson.id}">{subtitle}</span>
-								{/if}
-							</span>
-							<span class="lesson-meta">
-								<span class="band"
-									>{tutorial ? m.learn_tutorialLabel() : BAND_LABEL[lesson.band]()}</span
-								>
-								{#if done}
-									<span class="solved-mark" title={m.learn_solvedMark()}>
-										<CircleCheck size={16} aria-hidden="true" />
-										<span class="sr-only">{m.learn_solvedMark()}</span>
-									</span>
-								{/if}
-							</span>
-						</a>
-					</li>
-				{/each}
-			</ul>
+			<p class="track-blurb">{TRACK_BLURB[group.track]()}</p>
+			{#if group.tutorials.length > 0}
+				<ul class="lessons">
+					{#each group.tutorials as lesson (lesson.id)}
+						<li class="tutorial-item">{@render card(lesson, false)}</li>
+					{/each}
+				</ul>
+			{/if}
+			{#each group.bands as bandGroup (bandGroup.band)}
+				<h3 class="band-heading" data-testid="band-{group.track}-{bandGroup.band}">
+					{BAND_LABEL[bandGroup.band]()}
+				</h3>
+				<ul class="lessons">
+					{#each bandGroup.lessons as lesson (lesson.id)}
+						<li>{@render card(lesson, bandGroup.numbered.has(lesson.id))}</li>
+					{/each}
+				</ul>
+			{/each}
 		</section>
-		<!-- endless right after basics, where a newcomer still sees it -->
-		{#if group.track === 'basics'}
-			{@render endlessSection()}
-		{/if}
 	{/each}
+
+	{@render endlessSection()}
 </div>
 
+{#snippet card(lesson: IndexEntry, numbered: boolean)}
+	{@const done = progress[lesson.id]?.solved ?? false}
+	{@const tutorial = lesson.lesson_kind === 'tutorial'}
+	{@const subtitle = numbered ? lessonSubtitle(lesson) : null}
+	<a
+		class="lesson-card"
+		class:lesson-card--solved={done}
+		class:lesson-card--tutorial={tutorial}
+		href="/learn/{lesson.id}"
+		data-sfx="on"
+		data-testid="lesson-card-{lesson.id}"
+		data-solved={done}
+	>
+		{#if tutorial}
+			<span class="eyebrow">{done ? m.learn_tutorialLabel() : m.learn_tutorialStartHere()}</span>
+		{/if}
+		<span class="lesson-heading">
+			<span class="lesson-title">{lessonTitle(lesson)}</span>
+			{#if subtitle}
+				<span class="lesson-sub" data-testid="lesson-sub-{lesson.id}">{subtitle}</span>
+			{/if}
+		</span>
+		{#if done}
+			<span class="solved-mark" title={m.learn_solvedMark()}>
+				<CircleCheck size={16} aria-hidden="true" />
+				<span class="sr-only">{m.learn_solvedMark()}</span>
+			</span>
+		{/if}
+	</a>
+{/snippet}
+
 {#snippet endlessSection()}
-	<section class="track endless" aria-labelledby="endless-title" data-testid="endless">
+	<section id="endless" class="track endless" aria-labelledby="endless-title" data-testid="endless">
 		<header class="track-header">
 			<h2 id="endless-title">{m.learn_endlessHeading()}</h2>
 		</header>
-		<p class="endless-intro">{m.learn_endlessIntro()}</p>
+		<p class="track-blurb">{m.learn_endlessIntro()}</p>
 		<div class="band-picker" data-testid="endless-band">
 			<SegmentedControl
 				legend={m.learn_endlessBandLabel()}
@@ -135,7 +194,8 @@
 						<span class="lesson-meta">
 							<span>{BAND_LABEL[band]()}</span>
 							{#if best > 0}
-								<span data-testid="endless-best-{kind}">{m.learn_endlessBest({ count: best })}</span
+								<span class="best-pill" data-testid="endless-best-{kind}"
+									>{m.learn_endlessBest({ count: best })}</span
 								>
 							{/if}
 						</span>
@@ -181,6 +241,19 @@
 		color: var(--color-text-muted);
 	}
 
+	.all-solved {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2);
+		margin: 0;
+		color: var(--color-positive);
+
+		a {
+			color: var(--color-accent);
+		}
+	}
+
 	.track {
 		display: flex;
 		flex-direction: column;
@@ -201,10 +274,39 @@
 		}
 	}
 
+	.track-progress {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.track-bar {
+		width: 5rem;
+		height: 0.375rem;
+		border-radius: var(--radius-pill);
+		background:
+			linear-gradient(var(--color-positive), var(--color-positive)) 0 / var(--fill) 100% no-repeat,
+			color-mix(in srgb, var(--color-text-muted) 25%, transparent);
+	}
+
 	.track-count {
 		color: var(--color-text-muted);
 		font-size: var(--font-size-sm);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.track-blurb {
+		margin: calc(-1 * var(--space-1)) 0 0;
+		color: var(--color-text-muted);
+	}
+
+	.band-heading {
+		margin: var(--space-2) 0 0;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-xs);
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 	}
 
 	.lessons {
@@ -248,7 +350,8 @@
 		grid-column: 1 / -1;
 	}
 
-	.lesson-card--tutorial {
+	.lesson-card--tutorial,
+	.lead-card {
 		gap: var(--space-1);
 		border-color: color-mix(in srgb, var(--color-brass) 60%, var(--color-border));
 		background: color-mix(in srgb, var(--color-surface-raised) 96%, var(--color-brass));
@@ -258,7 +361,7 @@
 		}
 	}
 
-	.start-here {
+	.eyebrow {
 		color: var(--color-brass);
 		font-size: var(--font-size-xs);
 		font-weight: 700;
@@ -291,12 +394,18 @@
 
 	.solved-mark {
 		display: inline-flex;
+		align-self: flex-end;
 		color: var(--color-positive);
 	}
 
-	.endless-intro {
-		margin: 0;
-		color: var(--color-text-muted);
+	.best-pill {
+		padding: 0 var(--space-2);
+		border: 1px solid color-mix(in srgb, var(--color-brass) 60%, var(--color-border));
+		border-radius: var(--radius-pill);
+		background: color-mix(in srgb, var(--color-brass) 18%, transparent);
+		color: var(--color-text);
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.band-picker {

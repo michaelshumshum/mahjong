@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import settings from '../../../project.inlang/settings.json';
 import index from './generated/index.json';
+import { BANDS } from './kinds';
 import type { IndexEntry, Lesson, LessonIndexEntry, Tutorial } from './generated/lessons';
 import {
 	LESSON_TEXT,
@@ -12,9 +13,12 @@ import {
 import {
 	FIRST_TUTORIAL,
 	LESSONS,
+	ORDERED_LESSONS,
 	THEME_LABEL,
+	TRACK_BLURB,
 	TRACKS,
 	lessonEntry,
+	lessonsByBand,
 	lessonsByTrack,
 	loadLesson,
 	nextLesson,
@@ -133,6 +137,14 @@ describe('generated lessons', () => {
 			expect(keys.has(`learn_track${capitalize(lesson.track)}`), lesson.track).toBe(true);
 			expect(keys.has(`learn_band${capitalize(lesson.band)}`), lesson.band).toBe(true);
 		}
+		for (const track of TRACKS) {
+			expect(keys.has(`learn_track${capitalize(track)}Blurb`), track).toBe(true);
+		}
+	});
+
+	it('describes every track', () => {
+		for (const track of TRACKS) expect(TRACK_BLURB[track]()).not.toBe('');
+		expect(TRACK_BLURB.waits()).toBe('Find every tile that completes the hand.');
 	});
 });
 
@@ -146,6 +158,33 @@ describe('lesson loading', () => {
 			const ns = group.lessons.map((lesson) => lesson.n);
 			expect(ns).toEqual(ns.toSorted((a, b) => a - b));
 		}
+	});
+
+	it('groups a track by band in band order, numbering only themes shared within a band', () => {
+		const waits = lessonsByTrack().find((g) => g.track === 'waits')!;
+		const bands = lessonsByBand(waits.lessons);
+		expect(bands.map((b) => b.band)).toEqual([...BANDS]);
+		expect(bands.flatMap((b) => b.lessons)).toEqual(waits.lessons);
+		for (const group of bands) {
+			for (const lesson of group.lessons) {
+				const shared = group.lessons.filter((other) => other.theme === lesson.theme).length > 1;
+				expect(group.numbered.has(lesson.id), lesson.id).toBe(shared);
+			}
+		}
+		// waits-01/02 share "two-sided" in beginner; waits-03 is the band's only pair wait
+		expect(bands[0].numbered.has('waits-01')).toBe(true);
+		expect(bands[0].numbered.has('waits-03')).toBe(false);
+	});
+
+	it('leaves tutorials out of the band groups', () => {
+		const basics = lessonsByTrack()[0];
+		const bands = lessonsByBand(basics.lessons);
+		expect(bands.flatMap((b) => b.lessons).some((l) => l.id === FIRST_TUTORIAL.id)).toBe(false);
+		expect(bands.every((b) => b.numbered.size === 0)).toBe(true);
+	});
+
+	it('lists every lesson once in index order', () => {
+		expect(ORDERED_LESSONS).toEqual(lessonsByTrack().flatMap((g) => g.lessons));
 	});
 
 	it('drops tracks with no lessons', () => {

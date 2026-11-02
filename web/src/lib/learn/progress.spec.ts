@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { LESSON_IDS, recordAttempt, recordTutorialStep, solvedCount } from './progress';
+import { ORDERED_LESSONS } from './lessons';
+import {
+	firstUnsolved,
+	LESSON_IDS,
+	recordAttempt,
+	recordTutorialStep,
+	solvedCount
+} from './progress';
 
 describe('learn progress', () => {
 	it('knows every generated lesson id', () => {
@@ -41,5 +48,26 @@ describe('learn progress', () => {
 		expect(progress).toEqual({ t: { solved: false, attempts: 0, step: 4 } });
 		progress = recordTutorialStep(recordAttempt(progress, 't', true, 100), 't', null);
 		expect(progress).toEqual({ t: { solved: true, attempts: 1, solvedAt: 100 } });
+	});
+
+	it('finds the first unsolved lesson in index order, skipping attempted-but-unsolved ones', () => {
+		expect(firstUnsolved({})).toEqual(ORDERED_LESSONS[0]);
+		const [first, second, third] = ORDERED_LESSONS;
+		expect(firstUnsolved({ [first.id]: { solved: true, attempts: 1 } })).toEqual(second);
+		expect(
+			firstUnsolved({
+				[first.id]: { solved: true, attempts: 1 },
+				[third.id]: { solved: true, attempts: 1 },
+				[second.id]: { solved: false, attempts: 3 }
+			})
+		).toEqual(second);
+	});
+
+	it('crosses tracks and returns null once everything is solved', () => {
+		const basics = ORDERED_LESSONS.filter((lesson) => lesson.track === 'basics');
+		const solved = (lessons: readonly { id: string }[]) =>
+			Object.fromEntries(lessons.map((l) => [l.id, { solved: true, attempts: 1 }]));
+		expect(firstUnsolved(solved(basics))?.track).toBe('waits');
+		expect(firstUnsolved(solved(ORDERED_LESSONS))).toBeNull();
 	});
 });
