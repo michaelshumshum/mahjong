@@ -979,7 +979,7 @@ Endless mode (below) is the one part that needs the API.
 
 | Module (`lib/learn/`) | Holds |
 | --- | --- |
-| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `lessonsByBand`, `ORDERED_LESSONS` with `nextLesson`/`previousLesson` over that order, track labels and blurbs, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
+| `lessons.ts` | the typed index (`LESSONS`: tutorials first, then puzzles; `FIRST_TUTORIAL`), `LoadedLesson` (either generated file), `TRACKS` in display order (basics, waits, efficiency, defence, faan), `lessonsByTrack`, `lessonsByBand`, `ORDERED_LESSONS` with `nextLesson`/`previousLesson` over that order, `trackPosition` (a lesson's "4 / 15" in its track), track labels and blurbs, band, safe-reason and theme labels, and `loadLesson(id)`: a lazy `import.meta.glob`, one chunk per lesson, so `/learn` ships only the index |
 | `lesson-text.ts` | `LESSON_TEXT`: each `text` stem → its `lesson_*_title\|prompt\|explain` messages, listed by hand like `TILE_NAME` so they tree-shake (`lessons.spec.ts` pins it to the index); `TUTORIAL_TEXT`: a tutorial's title and one message per step stem, pinned the same way; `lessonTextParams` reads `{n}`, `{tiles}`, `{count}`, `{faan}` off the answer key |
 | `puzzle-state.ts` | `puzzleState(lesson)`: the snapshot through `reduce()` from `initialClientGameState()`, as a live resync would be, with seat names filled in by `withSeatNames` (you, then each opponent by seat wind, as the prompts name them). It drops the snapshot's claim offer (a claim puzzle is answered in the answer card, not the claim dialog) and keeps `lastDiscard` only for a claim snapshot's tile |
 | `lesson-player.svelte.ts` | `LessonPlayer`: a tutorial played through `reduce()` with no socket or `GameStore` (below); `intentMatches`, `TutorialIntent` |
@@ -988,7 +988,7 @@ Endless mode (below) is the one part that needs the API.
 | `AnswerPanel.svelte` | one input per kind (a discard kind's is the hand plus Check), the result line, per-kind feedback (below), "Show answer" after a miss, and the explanation once correct or revealed |
 | `feedback.ts` | what the feedback shows, read off the key: `discardRows`/`discardComparison`, `waitsFeedback` (each pick as wins / below the minimum / dead / no win, and how many waits are missing), `safeRows`/`safeOutcome` (deducible / lucky / deals in), `faanMiss` (high or low) |
 | `OptionTable.svelte` | the feedback table: a tile column (`TileFace`, so its `alt` is the localized name), "Answer" and "Your pick" marks, then text cells |
-| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`/`firstUnsolved`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
+| `progress.ts` | `loadProgress`/`saveAttempt`/`solvedCount`/`firstUnsolved`/`nextUnsolved`, and a tutorial's `saveTutorialStep`/`saveTutorialDone`, over `mahjong:learnProgress:v1` (§6) |
 
 - **Index.** Per track: its label, a "3 / 15" solved count beside a thin `role="progressbar"`
   bar, a one-line blurb of what its puzzles ask (`TRACK_BLURB` in `lessons.ts`), then its cards
@@ -1014,8 +1014,40 @@ Endless mode (below) is the one part that needs the API.
   `+page.ts` loads the lesson and answers an unknown id with SvelteKit's `error(404)`. The
   snapshot renders through `puzzleState` → `viewFromClientState` → `TableScene` with no socket or
   `GameStore`, and the page supplies the `CenterHub` snippet as `/table` does. A prompt card
-  (band, title, prompt), back/previous/next links, and the answer card sit beside the table from
-  `desktop-up`, stacked above and below it otherwise.
+  (track position, band, title, prompt), back/previous/next links, and the answer card sit beside
+  the table from `desktop-up`, stacked above and below it otherwise. The track position is
+  `trackPosition`'s "Waits · 4 / 15", counted over the track's lessons in `ORDERED_LESSONS`, its
+  tutorial included; endless shows none.
+- **Next.** The nav's Previous/Next links walk `ORDERED_LESSONS` plainly, for browsing. The Next
+  button that appears once an answer is correct or revealed goes to `nextUnsolved` instead: the
+  first unsolved lesson after this one, wrapping round to earlier ones, never this one; with none
+  left it reads "Back to all puzzles" and links to `/learn`. Only other lessons' progress decides
+  it, and that can't change while the page is open, so it's read once per lesson.
+- **Keys.** A window `keydown` handler, ignored with any modifier, on a repeat, when the target is
+  in an input/textarea/select/contenteditable, or while any `<dialog>` is open (the faan guide):
+
+  | Key | Effect |
+  | --- | --- |
+  | `Enter` | clicks the answer card's Check when it's enabled and the answer isn't already correct, but only when focus isn't on a button or link, whose own `Enter` already acts (a lifted hand tile grades on its own `Enter`; this covers focus left on the page, as Safari leaves it after a click) |
+  | `N` | clicks the Next button (endless: "Next puzzle") once shown |
+
+  Beside that button a muted "Press N for next" hint shows on hover-capable fine pointers only
+  (`@media (hover: hover) and (pointer: fine)`); it is `aria-hidden`, and the buttons carry
+  `aria-keyshortcuts="N"` instead.
+- **Result in view.** Below `desktop-up` the answer card is under the table, so a graded result
+  (or Show answer) can land off-screen. After each one the page checks the feedback region's
+  `getBoundingClientRect` against the viewport and, only if it isn't wholly visible, calls
+  `scrollIntoView({ block: 'nearest' })`, `smooth` unless motion is reduced (`isMotionReduced`,
+  §9). Scrolling never moves focus, so Show answer's focus on the feedback stays put.
+- **Faded opponents.** `TableScene`'s `dimOpponents` (presentation only; `data-dim-opponents`)
+  fades what a kind doesn't read to opacity 0.55 and 60% saturation; the hub and your own seat
+  never fade.
+
+  | Kind | `dimOpponents` | Faded |
+  | --- | --- | --- |
+  | `best_discard`, `winning_tiles` | `hands` | opponents' plates and concealed tiles only: their melds and discards are visible tiles the key counts (unseen tiles that help, dead waits) |
+  | `count_faan` | `all` | plates, concealed tiles, melds and discard pools, except a pool holding the held last discard of a discard win (`:has(.discard-tile--held)`) |
+  | `safe_discard` | none | defence reads every discard and meld |
 - **Answering.** `best_discard` and `safe_discard`: pick, then Check. The scene always runs the
   hand in `two-step` mode, whatever the player's discard-mode pref (§5): the first tap lifts a
   tile (discardable = the snapshot's legal discards, i.e. the concealed hand), and Check in the
