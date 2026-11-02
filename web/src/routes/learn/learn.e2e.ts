@@ -193,7 +193,9 @@ test('a best discard puzzle hints at a miss, and shows every option once reveale
 	await page.goto('/learn/basics-keep-two-sided');
 	await discard(page, 4); // 2 Characters: ready, but fewer tiles than 5 Characters
 	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
-	await expect(feedback(page).locator('[data-line="discard-compare"]')).toContainText('7 after discarding');
+	await expect(feedback(page).locator('[data-line="discard-compare"]')).toContainText(
+		'7 after discarding'
+	);
 	await expect(page.getByTestId('discard-table')).toHaveCount(0);
 	await expect(page.getByTestId('answer-next')).toHaveCount(0);
 
@@ -581,7 +583,7 @@ test('learn renders in zh-Hant', async ({ page, context, baseURL }) => {
 	await discard(page, 0); // 1 Characters
 	await expect(feedback(page)).toContainText('未啱，再試一次。');
 	await discard(page, 124); // Red Dragon
-	await expect(feedback(page)).toContainText('答對了！');
+	await expect(feedback(page)).toContainText('答啱咗！');
 	await expect(page.getByTestId('answer-explain')).toContainText('紅中');
 });
 
