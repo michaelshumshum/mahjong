@@ -32,6 +32,23 @@ test('the index lists every track and its lessons', async ({ page }) => {
 	);
 	// mined puzzles are titled by what they teach
 	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('Two-sided wait');
+	await expect(page.getByTestId('track-waits')).toContainText(
+		'Find every tile that completes the hand.'
+	);
+	// cards sit under band headings, in band order
+	const headings = page.getByTestId('track-waits').locator('.band-heading');
+	await expect(headings).toHaveText(['Beginner', 'Intermediate', 'Advanced']);
+	// "Puzzle N" only where a band holds the theme twice
+	await expect(page.getByTestId('lesson-sub-waits-01')).toHaveText('Puzzle 1');
+	await expect(page.getByTestId('lesson-sub-waits-03')).toHaveCount(0);
+	// endless (the one part needing the server) comes after the last track
+	const order = await page.evaluate(() =>
+		[...document.querySelectorAll('[data-testid^="track-"], [data-testid="endless"]')]
+			.filter((el) => el.tagName === 'SECTION')
+			.map((el) => el.getAttribute('data-testid'))
+	);
+	expect(order.at(-1)).toBe('endless');
+	expect(order.at(-2)).toBe('track-faan');
 });
 
 test('a best discard puzzle: a wrong tile says try again, the right one solves it', async ({
@@ -146,6 +163,62 @@ test('progress shows on the index and survives a reload', async ({ page }) => {
 		'data-solved',
 		'false'
 	);
+	await expect(page.getByTestId('track-bar-basics')).toHaveAttribute('aria-valuenow', '1');
+	await expect(page.getByTestId('track-bar-basics')).toHaveAttribute('aria-valuemax', '9');
+	// the unsolved tutorial stays the lead card
+	await expect(page.getByTestId('learn-continue')).toHaveCount(0);
+	await expect(page.getByTestId('lesson-card-basics-tutorial')).toContainText('Start here');
+});
+
+async function seedProgress(page: Page, ids: readonly string[]): Promise<void> {
+	await page.addInitScript((ids) => {
+		const progress = Object.fromEntries(ids.map((id) => [id, { solved: true, attempts: 1 }]));
+		localStorage.setItem('mahjong:learnProgress:v1', JSON.stringify(progress));
+	}, ids);
+}
+
+test('once the tutorial is solved, a continue card leads to the first unsolved lesson', async ({
+	page
+}) => {
+	await seedProgress(page, ['basics-tutorial']);
+	await page.goto('/learn');
+	const card = page.getByTestId('learn-continue');
+	await expect(card).toContainText('Basics · Discard the loner');
+	await card.click();
+	await expect(page).toHaveURL('/learn/basics-isolated-honour');
+});
+
+test('the continue card crosses tracks, and gives way to a note once all are solved', async ({
+	page
+}) => {
+	const basics = [
+		'basics-tutorial',
+		'basics-isolated-honour',
+		'basics-two-sided-wait',
+		'basics-keep-two-sided',
+		'basics-pair-wait',
+		'basics-simple-hand',
+		'basics-discard-win',
+		'basics-all-copies-visible',
+		'basics-no-chance'
+	];
+	await seedProgress(page, basics);
+	await page.goto('/learn');
+	await expect(page.getByTestId('learn-continue')).toContainText('Waits · Two-sided wait');
+	await expect(page.getByTestId('learn-continue')).toHaveAttribute('href', '/learn/waits-01');
+	await expect(page.getByTestId('lesson-card-basics-tutorial')).not.toContainText('Start here');
+
+	const all = await page.evaluate(() =>
+		[...document.querySelectorAll('[data-testid^="lesson-card-"]')].map((el) =>
+			el.getAttribute('data-testid')!.slice('lesson-card-'.length)
+		)
+	);
+	await seedProgress(page, all);
+	await page.goto('/learn');
+	await expect(page.getByTestId('learn-continue')).toHaveCount(0);
+	await expect(page.getByTestId('learn-all-solved')).toBeVisible();
+	await page.getByTestId('learn-all-solved').getByRole('link').click();
+	await expect(page.getByTestId('endless')).toBeInViewport();
 });
 
 test('prev and next walk the index', async ({ page }) => {
