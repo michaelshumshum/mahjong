@@ -14,11 +14,11 @@
 	"learn_nextLabel": "下一題",
 	"learn_seatYou": "你",
 	"learn_seatWind": "{wind}家",
-	"learn_discardHintTwoStep": "撳一下手上的牌揀佢，再撳多一下就打出。",
-	"learn_discardHintOneTap": "撳手上的牌就打出。",
+	"learn_discardHint": "撳一下手上的牌揀佢，然後撳「核對」，或者再撳多一下嗰隻牌。",
 	"learn_winningTilesLabel": "食糊牌",
 	"learn_faanLabel": "番數",
 	"learn_checkButton": "核對",
+	"learn_showAnswerButton": "睇答案",
 	"learn_feedbackPartial": "揀咗的都食得，但仲有其他食糊牌。",
 	"learn_trackBasics": "基礎",
 	"learn_trackWaits": "聽牌",
@@ -33,7 +33,7 @@
 	"learn_feedbackBelowMinimum": "{tile} 雖然可以成糊，但食出銃只得 {discardFaan} 番、自摸只得 {selfDrawFaan} 番，唔夠番起糊。",
 	"learn_feedbackDead": "{tiles} 本來可以食糊，但全部都已經見光。",
 	"learn_feedbackSafeByLuck": "{tile} 今次係安全，但你無辦法事先知道。",
-	"learn_feedbackWaitsRight": "啱嘅：{tiles}。",
+	"learn_feedbackWaitsAnswer": "食糊牌係：{tiles}。",
 	"learn_feedbackPickNoWin": "{tile} 唔可以令你成糊。",
 	"learn_feedbackWaitsMissing": [
 		{

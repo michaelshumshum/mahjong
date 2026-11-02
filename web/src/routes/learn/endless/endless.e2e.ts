@@ -82,6 +82,25 @@ test('answer right, the streak counts it, and the next puzzle loads without repe
 	await expect(page.getByTestId('endless-best-best_discard')).toContainText('Best: 1');
 });
 
+test('showing the answer after a miss offers the next puzzle instead of Skip', async ({ page }) => {
+	await serve(page, [lesson(second), lesson(first)]);
+	await page.goto('/learn/endless?kind=best_discard&band=beginner');
+	await page.locator('.seat-region--self [data-tile-id="4"]').click(); // 2 Characters
+	await page.getByTestId('answer-check').click();
+	await expect(page.getByTestId('answer-feedback')).toHaveAttribute('data-result', 'wrong');
+	await expect(page.getByTestId('endless-next')).toHaveCount(0);
+
+	await page.getByTestId('answer-reveal').click();
+	await expect(streak(page)).toHaveAttribute('data-streak', '0');
+	await expect(page.getByTestId('discard-table')).toBeVisible();
+	await expect(page.getByTestId('endless-skip')).toHaveCount(0);
+	await page.getByTestId('endless-next').click();
+	await expect(page.getByTestId('puzzle-page')).toHaveAttribute(
+		'data-lesson',
+		'basics-isolated-honour'
+	);
+});
+
 test('a failed fetch says so and retries', async ({ page }) => {
 	await serve(page, [status(503), lesson(first)]);
 	await page.goto('/learn/endless?kind=best_discard');

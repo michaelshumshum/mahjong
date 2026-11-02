@@ -1,10 +1,10 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { m } from '$lib/paraglide/messages.js';
 	import { LIMIT_FAAN } from '$lib/net/protocol.constants';
 	import type { TileCode } from '$lib/table/tile-code';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import { tileName } from '$lib/table/tile-name';
-	import type { DiscardMode } from '$lib/ui/client-prefs';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import StepperField from '$lib/ui/StepperField.svelte';
 	import TilePalette from '$lib/ui/TilePalette.svelte';
@@ -22,22 +22,24 @@
 	import OptionTable from './OptionTable.svelte';
 	import type { Answer, GradeResult, OptionTableRow } from './types';
 
-	// one input per kind; discard kinds answer by tapping the table's hand (the page wires that).
-	// feedback reads the graded answer against the lesson's key, never the position.
+	// one input per kind; discard kinds pick in the table's hand (the page wires that), then Check.
+	// feedback reads the key, never the position; a miss gets hints until "Show answer".
 	let {
 		lesson,
-		discardMode,
 		answer,
 		result,
 		attempts,
 		explanation,
 		seatNames,
 		claimedTile = null,
+		selectedTile = null,
+		revealed = false,
 		onAnswer,
+		onCheckSelected,
+		onReveal,
 		onPatternSelect
 	}: {
 		lesson: Lesson;
-		discardMode: DiscardMode;
 		// the last graded answer, `null` before the first
 		answer: Answer | null;
 		result: GradeResult | null;
@@ -48,9 +50,25 @@
 		seatNames: readonly (string | null)[];
 		// a discard win's tile, shown beside the faan input
 		claimedTile?: TileCode | null;
+		// discard kinds: the tile picked in the hand, not yet graded
+		selectedTile?: TileCode | null;
+		// the player asked for the answer after a miss
+		revealed?: boolean;
 		onAnswer: (answer: Answer) => void;
+		// discard kinds: grade `selectedTile`
+		onCheckSelected?: () => void;
+		onReveal?: () => void;
 		onPatternSelect?: (pattern: string) => void;
 	} = $props();
+
+	let feedbackEl: HTMLDivElement | null = $state(null);
+
+	// the button goes away with the click, so focus moves to what it revealed
+	async function reveal(): Promise<void> {
+		onReveal?.();
+		await tick();
+		feedbackEl?.focus();
+	}
 
 	interface Line {
 		id: string;
@@ -106,6 +124,9 @@
 			safeOutcome(lesson.key, answer.tile) === 'lucky'
 	);
 
+	// the whole answer: a right one, or a miss once revealed
+	let full = $derived(result === 'correct' || (result !== null && revealed));
+
 	let lines = $derived.by((): Line[] => {
 		const l = lesson;
 		const a = answer;
@@ -144,12 +165,12 @@
 				}
 				return out;
 			}
-			const right = fb.picks.filter((p) => p.verdict === 'wins').map((p) => p.tile);
-			if (result === 'wrong' && right.length > 0) {
+			// a hint never names a winning tile; the revealed answer names them all
+			if (full) {
 				out.push({
-					id: 'right',
+					id: 'answer',
 					tone: 'good',
-					text: m.learn_feedbackWaitsRight({ tiles: tileList(right) })
+					text: m.learn_feedbackWaitsAnswer({ tiles: tileList(l.key.correct) })
 				});
 			}
 			for (const pick of fb.picks) {
@@ -169,7 +190,21 @@
 					});
 				}
 			}
-			if (fb.missing > 0) {
+			if (full) {
+				// the teaching points the picks didn't already cover
+				const pickedTiles = new Set(fb.picks.map((p) => p.tile));
+				for (const option of fb.belowMinimum) {
+					if (!pickedTiles.has(option.tile)) out.push(belowMinimumLine(option, 'neutral'));
+				}
+				const dead = fb.dead.filter((o) => !pickedTiles.has(o.tile));
+				if (dead.length > 0) {
+					out.push({
+						id: 'dead',
+						tone: 'neutral',
+						text: m.learn_feedbackDead({ tiles: tileList(dead.map((o) => o.tile)) })
+					});
+				}
+			} else if (fb.missing > 0) {
 				out.push({
 					id: 'missing',
 					tone: 'neutral',
@@ -213,7 +248,7 @@
 					{ id: 'points', tone: 'neutral', text: m.learn_feedbackPoints({ points: l.key.points }) }
 				];
 			}
-			return [
+			const out: Line[] = [
 				{
 					id: `faan-${miss}`,
 					tone: 'bad',
@@ -223,14 +258,23 @@
 							: m.learn_feedbackFaanLow({ faan: a.faan })
 				}
 			];
+			if (full) {
+				out.push({
+					id: 'points',
+					tone: 'neutral',
+					text: m.learn_feedbackPoints({ points: l.key.points })
+				});
+			}
+			return out;
 		}
 		return [];
 	});
 
+	// the tables give the answer away, so a miss shows them only once revealed
 	let table = $derived.by(() => {
 		const l = lesson;
 		const a = answer;
-		if (a === null) return null;
+		if (a === null || !full) return null;
 		if (l.kind === 'best_discard' && a.kind === 'best_discard') {
 			return {
 				testid: 'discard-table',
@@ -283,7 +327,7 @@
 	});
 
 	let breakdown = $derived(
-		lesson.kind === 'count_faan' && result === 'correct'
+		lesson.kind === 'count_faan' && full
 			? lesson.key.breakdown.map((line) => ({ name: line.pattern, faan: line.faan }))
 			: null
 	);
@@ -291,9 +335,14 @@
 
 <section class="answer-panel" data-testid="answer-panel" data-kind={lesson.kind}>
 	{#if lesson.kind === 'best_discard' || lesson.kind === 'safe_discard'}
-		<p class="hint">
-			{discardMode === 'one-tap' ? m.learn_discardHintOneTap() : m.learn_discardHintTwoStep()}
-		</p>
+		<p class="hint">{m.learn_discardHint()}</p>
+		<button
+			type="button"
+			class="check"
+			data-testid="answer-check"
+			disabled={selectedTile === null}
+			onclick={() => onCheckSelected?.()}>{m.learn_checkButton()}</button
+		>
 	{:else if lesson.kind === 'winning_tiles'}
 		<TilePalette
 			label={m.learn_winningTilesLabel()}
@@ -342,9 +391,12 @@
 	<div
 		class="feedback"
 		role="status"
+		tabindex="-1"
+		bind:this={feedbackEl}
 		data-testid="answer-feedback"
 		data-result={result}
 		data-lucky={lucky || undefined}
+		data-revealed={(result !== 'correct' && full) || undefined}
 	>
 		{#key attempts}
 			{#if result === 'correct'}
@@ -367,11 +419,17 @@
 					{/each}
 				</ul>
 			{/if}
-			{#if result === 'correct'}
+			{#if full}
 				<p class="explain" data-testid="answer-explain">{explanation}</p>
 			{/if}
 		{/key}
 	</div>
+
+	{#if (result === 'wrong' || result === 'partial') && !revealed && onReveal}
+		<button type="button" class="reveal" data-testid="answer-reveal" onclick={reveal}
+			>{m.learn_showAnswerButton()}</button
+		>
+	{/if}
 
 	<!-- outside the live region: a whole table read out on every answer is noise -->
 	{#if table}
@@ -437,6 +495,17 @@
 		@include buttons.btn-base(var(--space-5));
 		@include buttons.btn-primary;
 		align-self: flex-start;
+	}
+
+	.reveal {
+		@include buttons.btn-base(var(--space-5));
+		@include buttons.btn-secondary;
+		align-self: flex-start;
+	}
+
+	// focused only by script, after a reveal; the global ring would frame the whole block
+	.feedback:focus {
+		outline: none;
 	}
 
 	// not :empty: the blocks inside leave whitespace text nodes behind

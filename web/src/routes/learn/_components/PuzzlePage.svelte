@@ -22,22 +22,25 @@
 	import { ownHandTiles as handTiles, viewFromClientState } from '$lib/table/live-view';
 	import TableScene from '$lib/table/TableScene.svelte';
 	import { tileIdToCode } from '$lib/table/tile-code';
+	import type { HandTileMark } from '$lib/table/view-types';
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
-	import { loadClientPrefs, DEFAULT_CLIENT_PREFS } from '$lib/ui/settings-storage';
 
 	let {
 		lesson,
 		navExtra,
 		afterCorrect,
-		onGraded
+		onGraded,
+		onReveal
 	}: {
 		lesson: Lesson;
 		navExtra?: Snippet;
-		/** replaces the Next link once solved. */
+		/** replaces the Next link once solved or revealed. */
 		afterCorrect?: Snippet;
 		/** replaces saving to learn progress. */
 		onGraded?: (result: GradeResult) => void;
+		/** the player asked for the answer after a miss. */
+		onReveal?: () => void;
 	} = $props();
 
 	let gameState = $derived(puzzleState(lesson));
@@ -55,19 +58,24 @@
 	let previous = $derived(previousLesson(lesson.id));
 	let next = $derived(nextLesson(lesson.id));
 
-	const discardMode = (loadClientPrefs() ?? DEFAULT_CLIENT_PREFS).discardMode;
-
 	let result = $state<GradeResult | null>(null);
 	let lastAnswer = $state<Answer | null>(null);
 	let attempts = $state(0);
 	let solvedBefore = $state(false);
 	let guideFocus = $state<string | null>(null);
+	let revealed = $state(false);
+	// the hand's lifted tile (picked, not yet graded) and the tile of the last graded pick
+	let selectedTileId = $state<number | null>(null);
+	let pickedTileId = $state<number | null>(null);
 	$effect.pre(() => {
 		const id = lesson.id;
 		result = null;
 		lastAnswer = null;
 		attempts = 0;
 		guideFocus = null;
+		revealed = false;
+		selectedTileId = null;
+		pickedTileId = null;
 		solvedBefore = onGraded ? false : (loadProgress()[id]?.solved ?? false);
 	});
 
@@ -89,14 +97,43 @@
 		result = grade(lesson, given).result;
 		lastAnswer = given;
 		attempts += 1;
+		selectedTileId = null;
 		if (onGraded) onGraded(result);
 		else saveAttempt(lesson.id, result === 'correct');
 	}
 
+	// a second tap on the lifted tile, or Check on it
 	function discard(tileId: number): void {
 		if (lesson.kind !== 'best_discard' && lesson.kind !== 'safe_discard') return;
+		pickedTileId = tileId;
 		answer({ kind: lesson.kind, tile: tileIdToCode(tileId) });
 	}
+
+	function checkSelected(): void {
+		if (selectedTileId !== null) discard(selectedTileId);
+	}
+
+	// reveals without solving: a later right answer still grades and saves as usual
+	function reveal(): void {
+		revealed = true;
+		onReveal?.();
+	}
+
+	let selectedTile = $derived(selectedTileId === null ? null : tileIdToCode(selectedTileId));
+	let answerShown = $derived(result === 'correct' || (result !== null && revealed));
+
+	// the graded pick in brass; the answer tiles in green once shown
+	let tileMarks = $derived.by(() => {
+		const marks = new Map<number, HandTileMark>();
+		if (lesson.kind !== 'best_discard' && lesson.kind !== 'safe_discard') return marks;
+		if (pickedTileId !== null) marks.set(pickedTileId, 'pick');
+		if (!answerShown) return marks;
+		const correct: readonly string[] = lesson.key.correct;
+		for (const tile of ownHandTiles) {
+			if (tile.tileId !== null && correct.includes(tile.code)) marks.set(tile.tileId, 'answer');
+		}
+		return marks;
+	});
 
 	let solved = $derived(solvedBefore || result === 'correct');
 </script>
@@ -177,9 +214,11 @@
 					{ownHandTiles}
 					{discardableTileIds}
 					declareOptions={[]}
-					{discardMode}
+					discardMode="two-step"
 					onDiscard={discard}
 					holdLastDiscard={claimedTile !== null}
+					bind:liftedTileId={selectedTileId}
+					{tileMarks}
 				/>
 			{/key}
 		</div>
@@ -187,19 +226,22 @@
 		<section class="answer-card">
 			<AnswerPanel
 				{lesson}
-				{discardMode}
 				answer={lastAnswer}
 				{result}
 				{attempts}
 				explanation={text.explain(params)}
 				seatNames={gameState.names}
 				{claimedTile}
+				{selectedTile}
+				{revealed}
 				onAnswer={answer}
+				onCheckSelected={checkSelected}
+				onReveal={reveal}
 				onPatternSelect={(pattern) => (guideFocus = pattern)}
 			/>
-			{#if result === 'correct' && afterCorrect}
+			{#if answerShown && afterCorrect}
 				{@render afterCorrect()}
-			{:else if result === 'correct' && next}
+			{:else if answerShown && next}
 				<a class="next-button" href="/learn/{next.id}" data-sfx="on" data-testid="answer-next"
 					>{m.learn_nextLabel()}</a
 				>
