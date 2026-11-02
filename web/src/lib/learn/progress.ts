@@ -1,5 +1,6 @@
 import index from './generated/index.json';
 import type { IndexEntry } from './generated/lessons';
+import { ORDERED_LESSONS } from './lessons';
 import {
 	loadLearnProgress,
 	saveLearnProgress,
@@ -43,6 +44,14 @@ export function solvedCount(progress: LearnProgress, ids: Iterable<string>): num
 	let n = 0;
 	for (const id of ids) if (progress[id]?.solved) n++;
 	return n;
+}
+
+/** The first lesson not yet solved, in /learn's order; `null` once every one is. */
+export function firstUnsolved(
+	progress: LearnProgress,
+	lessons: readonly IndexEntry[] = ORDERED_LESSONS
+): IndexEntry | null {
+	return lessons.find((lesson) => !progress[lesson.id]?.solved) ?? null;
 }
 
 export function loadProgress(): LearnProgress {
