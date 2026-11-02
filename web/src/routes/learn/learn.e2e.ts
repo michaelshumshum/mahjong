@@ -271,6 +271,102 @@ test('prev and next walk the index', async ({ page }) => {
 	await expect(page.locator('h1')).toHaveText('A two-sided wait');
 });
 
+test('a puzzle shows its place in the track, the tutorial counted', async ({ page }) => {
+	await page.goto('/learn/basics-isolated-honour');
+	await expect(page.getByTestId('puzzle-position')).toHaveText('Basics · 2 / 9');
+	await page.goto('/learn/waits-01');
+	await expect(page.getByTestId('puzzle-position')).toHaveText('Waits · 1 / 15');
+});
+
+test('next after an answer skips solved lessons, wraps round, then leads home', async ({
+	page
+}) => {
+	await seedProgress(page, ['basics-two-sided-wait', 'basics-keep-two-sided']);
+	await page.goto('/learn/basics-isolated-honour');
+	await discard(page, 124); // Red Dragon
+	await expect(page.getByTestId('answer-next')).toHaveAttribute('href', '/learn/basics-pair-wait');
+	// the nav's Next stays the plain next lesson
+	await expect(page.getByTestId('lesson-next')).toHaveAttribute(
+		'href',
+		'/learn/basics-two-sided-wait'
+	);
+
+	await page.goto('/learn');
+	const all = await page.evaluate(() =>
+		[...document.querySelectorAll('[data-testid^="lesson-card-"]')].map((el) =>
+			el.getAttribute('data-testid')!.slice('lesson-card-'.length)
+		)
+	);
+	// only the tutorial, earlier in the order, is left
+	await seedProgress(
+		page,
+		all.filter((id) => id !== 'basics-tutorial')
+	);
+	await page.goto('/learn/basics-simple-hand');
+	await page.getByTestId('answer-faan').fill('3');
+	await page.getByTestId('answer-check').click();
+	await expect(page.getByTestId('answer-next')).toHaveAttribute('href', '/learn/basics-tutorial');
+
+	await seedProgress(page, all);
+	await page.goto('/learn/basics-simple-hand');
+	await page.getByTestId('answer-faan').fill('3');
+	await page.getByTestId('answer-check').click();
+	const next = page.getByTestId('answer-next');
+	await expect(next).toHaveAttribute('href', '/learn');
+	await expect(next).toHaveText('Back to all puzzles');
+});
+
+test('enter checks a pending pick and N moves on, but not while typing', async ({ page }) => {
+	await page.goto('/learn/basics-isolated-honour');
+	await handTile(page, 124).click(); // Red Dragon
+	// focus off the hand, as after a click in Safari, which doesn't focus buttons
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+	await page.keyboard.press('Enter');
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	await expect(page.getByTestId('next-key-hint')).toHaveText('Press N for next');
+	await page.keyboard.press('n');
+	await expect(page).toHaveURL('/learn/basics-two-sided-wait');
+
+	await page.goto('/learn/basics-simple-hand');
+	await page.getByTestId('answer-faan').fill('3');
+	await page.getByTestId('answer-check').click();
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	await page.getByTestId('answer-faan').press('n');
+	await expect(page).toHaveURL('/learn/basics-simple-hand');
+	// nor with the guide dialog open
+	await page.getByTestId('faan-pattern-link').first().click();
+	await expect(page.getByTestId('guide-dialog')).toBeVisible();
+	await page.keyboard.press('n');
+	await expect(page).toHaveURL('/learn/basics-simple-hand');
+});
+
+test('opponents fade where the puzzle has no use for them', async ({ page }) => {
+	const opacity = (locator: Locator) => locator.evaluate((el) => getComputedStyle(el).opacity);
+	const across = (page: Page) => page.locator('.seat-region--across .seat-plate');
+	const acrossPool = (page: Page) => page.locator('.discard-pool--across');
+
+	// waits read visible tiles (dead waits), so only plates and hidden hands fade
+	await page.goto('/learn/basics-isolated-honour');
+	await expect(page.getByTestId('table-scene')).toHaveAttribute('data-dim-opponents', 'hands');
+	expect(await opacity(across(page))).toBe('0.55');
+	expect(await opacity(acrossPool(page))).toBe('1');
+
+	// defence reads every discard
+	await page.goto('/learn/defence-02');
+	await expect(page.getByTestId('table-scene')).not.toHaveAttribute('data-dim-opponents');
+	expect(await opacity(across(page))).toBe('1');
+
+	// count faan fades their discards too, but not the pool holding the claimed tile
+	await page.goto('/learn/basics-discard-win');
+	await expect(page.getByTestId('table-scene')).toHaveAttribute('data-dim-opponents', 'all');
+	const held = page.locator('.discard-pool:has([data-testid="held-discard"])');
+	expect(await opacity(held)).toBe('1');
+	const others = page.locator(
+		'.discard-pool:not(.discard-pool--self):not(:has([data-testid="held-discard"]))'
+	);
+	expect(await opacity(others.first())).toBe('0.55');
+});
+
 test('the index and a puzzle fit a phone without sideways scroll', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	for (const url of [
@@ -300,6 +396,17 @@ test('puzzles answer by tap at phone width', async ({ page }) => {
 	await page.getByTestId('answer-tile-6m').click();
 	await page.getByTestId('answer-check').click();
 	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	// the answer card sits under the table here: the result scrolls into view
+	await expect(feedback(page)).toBeInViewport();
+});
+
+test('a graded discard at phone width scrolls its result into view', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/learn/basics-isolated-honour');
+	await expect(feedback(page)).not.toBeInViewport();
+	await discard(page, 0); // 1 Characters
+	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
+	await expect(feedback(page)).toBeInViewport();
 });
 
 async function tabTo(page: Page, isTarget: () => Promise<boolean>): Promise<void> {

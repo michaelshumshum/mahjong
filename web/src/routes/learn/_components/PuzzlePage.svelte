@@ -1,18 +1,26 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import AnswerPanel from '$lib/learn/AnswerPanel.svelte';
 	import { grade } from '$lib/learn/grade';
-	import { BAND_LABEL, lessonEntry, nextLesson, previousLesson } from '$lib/learn/lessons';
+	import {
+		BAND_LABEL,
+		TRACK_LABEL,
+		lessonEntry,
+		nextLesson,
+		previousLesson,
+		trackPosition
+	} from '$lib/learn/lessons';
 	import {
 		LESSON_TEXT,
 		lessonSubtitle,
 		lessonTextParams,
 		lessonTitle
 	} from '$lib/learn/lesson-text';
-	import { loadProgress, saveAttempt } from '$lib/learn/progress';
+	import { loadProgress, nextUnsolved, saveAttempt } from '$lib/learn/progress';
+	import { isMotionReduced } from '$lib/ui/motion';
 	import { puzzleState } from '$lib/learn/puzzle-state';
 	import type { Answer, GradeResult } from '$lib/learn/types';
 	import { m } from '$lib/paraglide/messages.js';
@@ -57,6 +65,11 @@
 	});
 	let previous = $derived(previousLesson(lesson.id));
 	let next = $derived(nextLesson(lesson.id));
+	// endless isn't a walk through the index, even when a pool id matches one
+	let position = $derived(onGraded ? null : trackPosition(lesson.id));
+	// other lessons' progress can't change while this page is open, and this one is skipped
+	let nextOpen = $derived(onGraded ? null : nextUnsolved(loadProgress(), lesson.id));
+	let nextHref = $derived(nextOpen ? `/learn/${nextOpen.id}` : '/learn');
 
 	let result = $state<GradeResult | null>(null);
 	let lastAnswer = $state<Answer | null>(null);
@@ -136,7 +149,58 @@
 	});
 
 	let solved = $derived(solvedBefore || result === 'correct');
+
+	// waits and best discard read visible tiles (dead waits, unseen counts), so only safe_discard's
+	// opponents stay whole and only count_faan loses their discards too
+	let dimOpponents = $derived<'hands' | 'all' | null>(
+		lesson.kind === 'count_faan' ? 'all' : lesson.kind === 'safe_discard' ? null : 'hands'
+	);
+
+	let pageEl: HTMLDivElement | null = $state(null);
+	let nextActionsEl: HTMLDivElement | null = $state(null);
+
+	// below desktop-up the answer card sits under the table, so a result can land off-screen
+	$effect(() => {
+		if (result === null) return;
+		void attempts;
+		void revealed;
+		void tick().then(() => {
+			const status = pageEl?.querySelector<HTMLElement>('[data-testid="answer-feedback"]');
+			if (!status) return;
+			const box = status.getBoundingClientRect();
+			if (box.top >= 0 && box.bottom <= window.innerHeight) return;
+			status.scrollIntoView({ block: 'nearest', behavior: isMotionReduced() ? 'auto' : 'smooth' });
+		});
+	});
+
+	function ignoredKey(event: KeyboardEvent): boolean {
+		if (event.defaultPrevented || event.repeat) return true;
+		if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return true;
+		const target = event.target instanceof Element ? event.target : null;
+		if (target?.closest('input, textarea, select, [contenteditable], dialog')) return true;
+		return document.querySelector('dialog[open]') !== null;
+	}
+
+	function onKeydown(event: KeyboardEvent): void {
+		if (ignoredKey(event)) return;
+		const target = event.target instanceof Element ? event.target : null;
+		if (event.key === 'Enter') {
+			// a focused control's own Enter already does its thing; a solved answer isn't re-sent
+			if (result === 'correct' || target?.closest('button, a, summary, [role="button"]')) return;
+			const check = pageEl?.querySelector<HTMLButtonElement>('[data-testid="answer-check"]');
+			if (!check || check.disabled) return;
+			event.preventDefault();
+			check.click();
+		} else if (event.key === 'n' || event.key === 'N') {
+			const action = nextActionsEl?.querySelector<HTMLElement>('a, button:not(:disabled)');
+			if (!action) return;
+			event.preventDefault();
+			action.click();
+		}
+	}
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <svelte:head>
 	<title>{m.learn_lessonPageTitle({ title })}</title>
@@ -158,6 +222,7 @@
 {#key lesson.id}
 	<div
 		class="puzzle-page"
+		bind:this={pageEl}
 		data-testid="puzzle-page"
 		data-kind={lesson.kind}
 		data-lesson={lesson.id}
@@ -188,6 +253,15 @@
 
 		<section class="prompt-card" aria-labelledby="puzzle-title">
 			<p class="meta">
+				{#if position}
+					<span class="position" data-testid="puzzle-position"
+						>{m.learn_trackPosition({
+							track: TRACK_LABEL[position.track](),
+							n: position.n,
+							total: position.total
+						})}</span
+					>
+				{/if}
 				<span class="band">{BAND_LABEL[lesson.band]()}</span>
 				{#if subtitle}
 					<span data-testid="puzzle-sub">{subtitle}</span>
@@ -219,6 +293,7 @@
 					holdLastDiscard={claimedTile !== null}
 					bind:liftedTileId={selectedTileId}
 					{tileMarks}
+					{dimOpponents}
 				/>
 			{/key}
 		</div>
@@ -239,12 +314,23 @@
 				onReveal={reveal}
 				onPatternSelect={(pattern) => (guideFocus = pattern)}
 			/>
-			{#if answerShown && afterCorrect}
-				{@render afterCorrect()}
-			{:else if answerShown && next}
-				<a class="next-button" href="/learn/{next.id}" data-sfx="on" data-testid="answer-next"
-					>{m.learn_nextLabel()}</a
-				>
+			{#if answerShown}
+				<div class="next-actions" bind:this={nextActionsEl}>
+					{#if afterCorrect}
+						{@render afterCorrect()}
+					{:else}
+						<a
+							class="next-button"
+							href={nextHref}
+							data-sfx="on"
+							data-testid="answer-next"
+							aria-keyshortcuts="N">{nextOpen ? m.learn_nextLabel() : m.learn_nextDoneLabel()}</a
+						>
+					{/if}
+					<span class="key-hint" data-testid="next-key-hint" aria-hidden="true"
+						>{m.learn_nextKeyHint()}</span
+					>
+				</div>
 			{/if}
 		</section>
 	</div>
@@ -320,6 +406,7 @@
 
 	.meta {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-3);
 		margin: 0;
@@ -352,13 +439,30 @@
 		}
 	}
 
+	.next-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
 	.next-button {
 		@include buttons.btn-base(var(--space-5));
 		@include buttons.btn-primary;
 		display: inline-flex;
 		align-items: center;
-		align-self: flex-start;
 		text-decoration: none;
+	}
+
+	// a keyboard hint is noise on touch
+	.key-hint {
+		display: none;
+		color: var(--color-text-muted);
+		font-size: var(--font-size-xs);
+
+		@media (hover: hover) and (pointer: fine) {
+			display: inline;
+		}
 	}
 
 	.puzzle-table {

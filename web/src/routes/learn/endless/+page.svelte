@@ -98,8 +98,13 @@
 {/snippet}
 
 {#snippet afterCorrect()}
-	<button type="button" class="next-button" data-sfx="on" data-testid="endless-next" onclick={next}
-		>{m.learn_endlessNext()}</button
+	<button
+		type="button"
+		class="next-button"
+		data-sfx="on"
+		data-testid="endless-next"
+		aria-keyshortcuts="N"
+		onclick={next}>{m.learn_endlessNext()}</button
 	>
 {/snippet}
 

@@ -94,7 +94,10 @@ test('showing the answer after a miss offers the next puzzle instead of Skip', a
 	await expect(streak(page)).toHaveAttribute('data-streak', '0');
 	await expect(page.getByTestId('discard-table')).toBeVisible();
 	await expect(page.getByTestId('endless-skip')).toHaveCount(0);
-	await page.getByTestId('endless-next').click();
+	// endless isn't in the index, so no track position; N takes the next puzzle
+	await expect(page.getByTestId('puzzle-position')).toHaveCount(0);
+	await expect(page.getByTestId('next-key-hint')).toBeVisible();
+	await page.keyboard.press('n');
 	await expect(page.getByTestId('puzzle-page')).toHaveAttribute(
 		'data-lesson',
 		'basics-isolated-honour'
