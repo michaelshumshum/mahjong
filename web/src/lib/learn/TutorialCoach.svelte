@@ -55,11 +55,7 @@
 	});
 </script>
 
-<CoachCard
-	label={m.learn_tutorialCoachLabel()}
-	{counter}
-	testid="tutorial-coach"
->
+<CoachCard label={m.learn_tutorialCoachLabel()} {counter} testid="tutorial-coach">
 	<div
 		class="coach-progress"
 		role="progressbar"
