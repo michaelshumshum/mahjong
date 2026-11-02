@@ -145,14 +145,23 @@ export function lessonSubtitle(entry: IndexEntry): string | null {
 	return m.learn_puzzleNumber({ n: entry.n });
 }
 
-/** Words as a locale list ("East and South"). */
-export function localeList(words: readonly string[]): string {
-	return new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format(words);
+/** Words as a locale list ("East and South", or with `disjunction` "East or South"). */
+export function localeList(
+	words: readonly string[],
+	type: 'conjunction' | 'disjunction' = 'conjunction'
+): string {
+	return new Intl.ListFormat(getLocale(), { type }).format(words);
 }
 
 /** Tile names as a locale list ("3 Characters and 6 Characters"). */
-export function tileList(codes: readonly string[]): string {
-	return localeList(codes.map((code) => tileName(code as TileCode)));
+export function tileList(
+	codes: readonly string[],
+	type: 'conjunction' | 'disjunction' = 'conjunction'
+): string {
+	return localeList(
+		codes.map((code) => tileName(code as TileCode)),
+		type
+	);
 }
 
 /** The numbers a lesson's messages interpolate, read off its answer key. */
@@ -163,7 +172,12 @@ export function lessonTextParams(lesson: Lesson): LessonTextParams {
 			return { ...params, faan: lesson.key.correct };
 		case 'best_discard': {
 			const best = lesson.key.options.find((o) => o.tile === lesson.key.correct[0]);
-			return { ...params, tiles: tileList(lesson.key.correct), count: best?.tiles ?? 0 };
+			// tied answers are alternatives: "3 Dots or 6 Dots", not both
+			return {
+				...params,
+				tiles: tileList(lesson.key.correct, 'disjunction'),
+				count: best?.tiles ?? 0
+			};
 		}
 		case 'winning_tiles':
 		case 'safe_discard':

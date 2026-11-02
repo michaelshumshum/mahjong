@@ -284,4 +284,10 @@ describe('lesson loading', () => {
 		const faan = (await loadLesson('basics-simple-hand')) as Lesson;
 		expect(lessonTextParams(faan).faan).toBe(3);
 	});
+
+	it('lists tied best discards as alternatives, not both', async () => {
+		const tied = (await loadLesson('efficiency-02')) as Lesson;
+		expect(tied.kind === 'best_discard' && tied.key.correct.length).toBe(2);
+		expect(lessonTextParams(tied).tiles).toBe('9 Dots or 4 Bamboo');
+	});
 });
