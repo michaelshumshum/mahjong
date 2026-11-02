@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ORDERED_LESSONS } from './lessons';
 import {
+	continueTab,
 	firstUnsolved,
 	LESSON_IDS,
 	nextUnsolved,
@@ -74,6 +75,15 @@ describe('learn progress', () => {
 			Object.fromEntries(lessons.map((l) => [l.id, { solved: true, attempts: 1 }]));
 		expect(firstUnsolved(solved(basics))?.track).toBe('waits');
 		expect(firstUnsolved(solved(ORDERED_LESSONS))).toBeNull();
+	});
+
+	it("opens the index on the first unsolved lesson's track, endless once all are solved", () => {
+		const solved = (lessons: readonly { id: string }[]) =>
+			Object.fromEntries(lessons.map((l) => [l.id, { solved: true, attempts: 1 }]));
+		expect(continueTab({})).toBe('basics');
+		const basics = ORDERED_LESSONS.filter((lesson) => lesson.track === 'basics');
+		expect(continueTab(solved(basics))).toBe('waits');
+		expect(continueTab(solved(ORDERED_LESSONS))).toBe('endless');
 	});
 
 	describe('nextUnsolved', () => {

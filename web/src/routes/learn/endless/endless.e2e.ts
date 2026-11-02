@@ -35,9 +35,14 @@ async function discard(page: Page, tileId: number): Promise<void> {
 
 const streak = (page: Page) => page.getByTestId('endless-streak');
 
-test('the index links each kind to endless mode at the picked band', async ({ page }) => {
+test('the endless tab links each kind to endless mode at the picked band', async ({ page }) => {
 	await page.route('**/healthz', (route) => route.abort());
 	await page.goto('/learn');
+	await expect(page.getByTestId('endless')).toHaveCount(0);
+	await page.getByTestId('learn-tab-endless').click();
+	await expect(page).toHaveURL('/learn?track=endless');
+	await expect(page.getByTestId('endless')).toBeVisible();
+	await expect(page.locator('[data-testid^="endless-card-"]')).toHaveCount(4);
 	const card = page.getByTestId('endless-card-best_discard');
 	await expect(card).toHaveAttribute('href', '/learn/endless?kind=best_discard&band=beginner');
 	const advanced = page.getByTestId('endless-band').getByRole('radio', { name: 'Advanced' });
@@ -56,6 +61,10 @@ test('answer right, the streak counts it, and the next puzzle loads without repe
 	await expect(puzzle).toHaveAttribute('data-lesson', 'basics-isolated-honour');
 	await expect(page.locator('h1')).toHaveText('Discard the loner');
 	await expect(streak(page)).toHaveAttribute('data-streak', '0');
+	await expect(page.getByRole('link', { name: 'All puzzles' })).toHaveAttribute(
+		'href',
+		'/learn?track=endless'
+	);
 	expect(seen[0].searchParams.get('kind')).toBe('best_discard');
 	expect(seen[0].searchParams.get('band')).toBe('beginner');
 
@@ -78,7 +87,7 @@ test('answer right, the streak counts it, and the next puzzle loads without repe
 	await expect(puzzle).toHaveAttribute('data-lesson', 'efficiency-01');
 	await expect(page.locator('h1')).toHaveText('Discard to be ready');
 
-	await page.goto('/learn');
+	await page.goto('/learn?track=endless');
 	await expect(page.getByTestId('endless-best-best_discard')).toContainText('Best: 1');
 });
 
@@ -110,6 +119,10 @@ test('a failed fetch says so and retries', async ({ page }) => {
 	const error = page.getByTestId('endless-error');
 	await expect(error).toHaveAttribute('data-error', 'unavailable');
 	await expect(error).toContainText("Couldn't load a puzzle");
+	await expect(page.getByRole('link', { name: 'All puzzles' })).toHaveAttribute(
+		'href',
+		'/learn?track=endless'
+	);
 	await page.getByTestId('endless-retry').click();
 	await expect(page.getByTestId('puzzle-page')).toHaveAttribute(
 		'data-lesson',

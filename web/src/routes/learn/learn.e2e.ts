@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import index from '../../lib/learn/generated/index.json' with { type: 'json' };
 
 // learn ships its lessons as static JSON: with /healthz unreachable, nothing here may wait on it.
 test.beforeEach(async ({ page }) => {
@@ -16,22 +17,72 @@ async function discard(page: Page, tileId: number): Promise<void> {
 
 const feedback = (page: Page) => page.getByTestId('answer-feedback');
 
-test('the index lists every track and its lessons', async ({ page }) => {
+const ALL_IDS = (index as { id: string }[]).map((entry) => entry.id);
+const TABS = ['basics', 'waits', 'efficiency', 'defence', 'faan', 'endless'];
+
+const tab = (page: Page, name: string) => page.getByTestId(`learn-tab-${name}`);
+
+test('the index shows one track at a time behind a tab per track, endless last', async ({
+	page
+}) => {
 	await page.goto('/learn');
 	await expect(page.locator('h1')).toHaveText('Learn');
-	for (const track of ['basics', 'waits', 'efficiency', 'defence', 'faan']) {
-		await expect(page.getByTestId(`track-${track}`)).toBeVisible();
+	const nav = page.getByRole('navigation', { name: 'Puzzle tracks' });
+	await expect(nav.getByRole('link')).toHaveCount(TABS.length);
+	for (const [i, name] of TABS.entries()) {
+		await expect(nav.getByRole('link').nth(i)).toHaveAttribute('href', `/learn?track=${name}`);
 	}
+	// no ?track= and no progress: basics, and only basics
+	await expect(tab(page, 'basics')).toHaveAttribute('aria-current', 'page');
+	await expect(tab(page, 'waits')).not.toHaveAttribute('aria-current');
+	await expect(page.getByTestId('track-basics')).toBeVisible();
+	await expect(page.locator('section.track')).toHaveCount(1);
+	await expect(page.getByTestId('endless')).toHaveCount(0);
+	await expect(page).toHaveURL('/learn');
+	// each track tab counts its solved lessons; endless has none
+	await expect(page.getByTestId('learn-tab-count-basics')).toHaveText('0 / 9');
+	await expect(page.getByTestId('learn-tab-count-waits')).toHaveText('0 / 15');
+	await expect(tab(page, 'waits')).toHaveAccessibleName('Waits 0 of 15 solved');
+	await expect(page.getByTestId('learn-tab-count-endless')).toHaveCount(0);
 	// the tutorial leads basics, then its 8 puzzles
 	await expect(page.getByTestId('track-solved-basics')).toHaveText('0 / 9');
 	await expect(page.getByTestId('track-basics').locator('.lesson-card').first()).toHaveAttribute(
 		'data-testid',
 		'lesson-card-basics-tutorial'
 	);
-	await expect(page.getByTestId('track-waits').locator('.lesson-card')).toHaveCount(15);
 	await expect(page.getByTestId('lesson-card-basics-isolated-honour')).toContainText(
 		'Discard the loner'
 	);
+});
+
+test('the server renders the tab ?track= names, and basics for an unknown one', async ({
+	page
+}) => {
+	const html = async (url: string) => {
+		const response = await page.request.get(url);
+		expect(response.status(), url).toBe(200);
+		return response.text();
+	};
+	const basics = await html('/learn');
+	expect(basics).toContain('data-testid="track-basics"');
+	expect(basics).not.toContain('data-testid="track-waits"');
+	const waits = await html('/learn?track=waits');
+	expect(waits).toContain('data-testid="track-waits"');
+	expect(waits).not.toContain('data-testid="track-basics"');
+	expect(await html('/learn?track=endless')).toContain('data-testid="endless"');
+	const unknown = await html('/learn?track=claims');
+	expect(unknown).toContain('data-testid="track-basics"');
+
+	await page.goto('/learn?track=claims');
+	await expect(page.getByTestId('track-basics')).toBeVisible();
+	await expect(tab(page, 'basics')).toHaveAttribute('aria-current', 'page');
+});
+
+test('a track tab lists its lessons by band', async ({ page }) => {
+	await page.goto('/learn?track=waits');
+	await expect(tab(page, 'waits')).toHaveAttribute('aria-current', 'page');
+	await expect(page.getByTestId('track-basics')).toHaveCount(0);
+	await expect(page.getByTestId('track-waits').locator('.lesson-card')).toHaveCount(15);
 	// mined puzzles are titled by what they teach
 	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('Two-sided wait');
 	await expect(page.getByTestId('track-waits')).toContainText(
@@ -43,14 +94,36 @@ test('the index lists every track and its lessons', async ({ page }) => {
 	// "Puzzle N" only where a band holds the theme twice
 	await expect(page.getByTestId('lesson-sub-waits-01')).toHaveText('Puzzle 1');
 	await expect(page.getByTestId('lesson-sub-waits-03')).toHaveCount(0);
-	// endless (the one part needing the server) comes after the last track
-	const order = await page.evaluate(() =>
-		[...document.querySelectorAll('[data-testid^="track-"], [data-testid="endless"]')]
-			.filter((el) => el.tagName === 'SECTION')
-			.map((el) => el.getAttribute('data-testid'))
-	);
-	expect(order.at(-1)).toBe('endless');
-	expect(order.at(-2)).toBe('track-faan');
+});
+
+test('tabs switch in place, and Back skips them', async ({ page }) => {
+	await page.goto('/learn');
+	await tab(page, 'waits').click();
+	await expect(page).toHaveURL('/learn?track=waits');
+	await expect(page.getByTestId('track-waits')).toBeVisible();
+	await expect(page.getByTestId('track-basics')).toHaveCount(0);
+	// focus stays on the tab, as a tab bar's would
+	await expect(tab(page, 'waits')).toBeFocused();
+	await tab(page, 'endless').click();
+	await expect(page).toHaveURL('/learn?track=endless');
+	await expect(page.getByTestId('endless')).toBeVisible();
+	await tab(page, 'faan').click();
+	await page.getByTestId('lesson-card-faan-01').click();
+	await expect(page).toHaveURL('/learn/faan-01');
+	// tab switches replace the entry, so Back returns to the last tab, then leaves
+	await page.goBack();
+	await expect(page).toHaveURL('/learn?track=faan');
+	await expect(page.getByTestId('track-faan')).toBeVisible();
+});
+
+test('the tabs work without javascript', async ({ browser }) => {
+	const context = await browser.newContext({ javaScriptEnabled: false });
+	const page = await context.newPage();
+	await page.goto('/learn');
+	await tab(page, 'defence').click();
+	await expect(page).toHaveURL('/learn?track=defence');
+	await expect(page.getByTestId('track-defence')).toBeVisible();
+	await context.close();
 });
 
 test('a best discard puzzle: a wrong tile says try again, the right one solves it', async ({
@@ -193,6 +266,9 @@ test('progress shows on the index and survives a reload', async ({ page }) => {
 	await page.goto('/learn');
 	await page.reload();
 	await expect(page.getByTestId('track-solved-basics')).toHaveText('1 / 9');
+	await expect(page.getByTestId('learn-tab-count-basics')).toHaveText('1 / 9');
+	// the next unsolved lesson (the tutorial) is in basics, so the tab stays put
+	await expect(page).toHaveURL('/learn');
 	await expect(page.getByTestId('lesson-card-basics-simple-hand')).toHaveAttribute(
 		'data-solved',
 		'true'
@@ -244,19 +320,56 @@ test('the continue card crosses tracks, and gives way to a note once all are sol
 	await page.goto('/learn');
 	await expect(page.getByTestId('learn-continue')).toContainText('Waits · Two-sided wait');
 	await expect(page.getByTestId('learn-continue')).toHaveAttribute('href', '/learn/waits-01');
+	// with no ?track=, the index opens on the continue lesson's track, replacing the entry
+	await expect(page).toHaveURL('/learn?track=waits');
+	await expect(tab(page, 'waits')).toHaveAttribute('aria-current', 'page');
+	await expect(page.getByTestId('track-waits')).toBeVisible();
+	await expect(page.getByTestId('learn-tab-count-basics')).toHaveText('9 / 9');
+
+	await page.goto('/learn?track=basics');
+	await expect(page.getByTestId('lesson-card-basics-tutorial')).toHaveAttribute(
+		'data-solved',
+		'true'
+	);
 	await expect(page.getByTestId('lesson-card-basics-tutorial')).not.toContainText('Start here');
 
-	const all = await page.evaluate(() =>
-		[...document.querySelectorAll('[data-testid^="lesson-card-"]')].map((el) =>
-			el.getAttribute('data-testid')!.slice('lesson-card-'.length)
-		)
-	);
-	await seedProgress(page, all);
+	await seedProgress(page, ALL_IDS);
 	await page.goto('/learn');
+	await expect(page).toHaveURL('/learn?track=endless');
+	await expect(page.getByTestId('endless')).toBeVisible();
 	await expect(page.getByTestId('learn-continue')).toHaveCount(0);
 	await expect(page.getByTestId('learn-all-solved')).toBeVisible();
+	await expect(page.getByTestId('learn-all-solved').getByRole('link')).toHaveAttribute(
+		'href',
+		'/learn?track=endless'
+	);
+	await page.goto('/learn?track=faan');
 	await page.getByTestId('learn-all-solved').getByRole('link').click();
-	await expect(page.getByTestId('endless')).toBeInViewport();
+	await expect(page).toHaveURL('/learn?track=endless');
+	await expect(page.getByTestId('endless')).toBeVisible();
+});
+
+test("an explicit ?track= isn't overridden by progress", async ({ page }) => {
+	await seedProgress(page, ['basics-tutorial', 'basics-isolated-honour']);
+	await page.goto('/learn?track=defence');
+	// progress has loaded once the counts fill in
+	await expect(page.getByTestId('learn-tab-count-basics')).toHaveText('2 / 9');
+	await expect(page.getByTestId('learn-continue')).toBeVisible();
+	await expect(page).toHaveURL('/learn?track=defence');
+	await expect(page.getByTestId('track-defence')).toBeVisible();
+});
+
+test('back links return to the lesson’s own track tab', async ({ page }) => {
+	const back = page.getByRole('link', { name: 'All puzzles' });
+	await page.goto('/learn/waits-01');
+	await expect(back).toHaveAttribute('href', '/learn?track=waits');
+	await page.goto('/learn/defence-02');
+	await expect(back).toHaveAttribute('href', '/learn?track=defence');
+	await back.click();
+	await expect(page).toHaveURL('/learn?track=defence');
+	await expect(page.getByTestId('track-defence')).toBeVisible();
+	await page.goto('/learn/basics-tutorial');
+	await expect(back).toHaveAttribute('href', '/learn?track=basics');
 });
 
 test('prev and next walk the index', async ({ page }) => {
@@ -291,12 +404,7 @@ test('next after an answer skips solved lessons, wraps round, then leads home', 
 		'/learn/basics-two-sided-wait'
 	);
 
-	await page.goto('/learn');
-	const all = await page.evaluate(() =>
-		[...document.querySelectorAll('[data-testid^="lesson-card-"]')].map((el) =>
-			el.getAttribute('data-testid')!.slice('lesson-card-'.length)
-		)
-	);
+	const all = ALL_IDS;
 	// only the tutorial, earlier in the order, is left
 	await seedProgress(
 		page,
@@ -384,6 +492,22 @@ test('the index and a puzzle fit a phone without sideways scroll', async ({ page
 	}
 });
 
+test('at phone width the tab bar scrolls sideways, the current tab in view', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/learn?track=endless');
+	const nav = page.getByRole('navigation', { name: 'Puzzle tracks' });
+	const [scrollWidth, clientWidth] = await nav.evaluate((el) => [el.scrollWidth, el.clientWidth]);
+	expect(scrollWidth).toBeGreaterThan(clientWidth);
+	await expect(tab(page, 'endless')).toBeInViewport({ ratio: 1 });
+	await tab(page, 'basics').click();
+	await expect(page).toHaveURL('/learn?track=basics');
+	await expect(tab(page, 'basics')).toBeInViewport({ ratio: 1 });
+	const overflow = await page.evaluate(
+		() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+	);
+	expect(overflow).toBe(0);
+});
+
 test('puzzles answer by tap at phone width', async ({ page }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/learn/basics-isolated-honour');
@@ -447,8 +571,11 @@ test('learn renders in zh-Hant', async ({ page, context, baseURL }) => {
 	await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
 	await expect(page.locator('h1')).toHaveText('學打牌');
 	await expect(page).toHaveTitle('學打牌 · 開枱');
+	await expect(tab(page, 'endless')).toHaveText('無限練習');
+	await tab(page, 'waits').click();
 	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('兩頭聽');
 
+	await tab(page, 'basics').click();
 	await page.getByTestId('lesson-card-basics-isolated-honour').click();
 	await expect(page.locator('h1')).toHaveText('打走孤張');
 	await discard(page, 0); // 1 Characters
@@ -521,7 +648,7 @@ test('the basics tutorial plays end to end by clicks', async ({ page }) => {
 	await expect(page.getByTestId('faan-breakdown').locator('.pattern-row')).toHaveCount(4);
 	await expect(page.getByTestId('tutorial-solved')).toBeVisible();
 	await page.getByTestId('tutorial-to-puzzles').click();
-	await expect(page).toHaveURL('/learn');
+	await expect(page).toHaveURL('/learn?track=basics');
 	await expect(page.getByTestId('lesson-card-basics-tutorial')).toHaveAttribute(
 		'data-solved',
 		'true'

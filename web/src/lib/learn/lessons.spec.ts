@@ -12,16 +12,19 @@ import {
 } from './lesson-text';
 import {
 	FIRST_TUTORIAL,
+	INDEX_TABS,
 	LESSONS,
 	ORDERED_LESSONS,
 	THEME_LABEL,
 	TRACK_BLURB,
 	TRACKS,
+	indexHref,
 	lessonEntry,
 	lessonsByBand,
 	lessonsByTrack,
 	loadLesson,
 	nextLesson,
+	parseIndexTab,
 	previousLesson,
 	trackPosition
 } from './lessons';
@@ -146,6 +149,25 @@ describe('generated lessons', () => {
 	it('describes every track', () => {
 		for (const track of TRACKS) expect(TRACK_BLURB[track]()).not.toBe('');
 		expect(TRACK_BLURB.waits()).toBe('Find every tile that completes the hand.');
+	});
+});
+
+describe('index tabs', () => {
+	it('has one tab per track, then endless', () => {
+		expect(INDEX_TABS).toEqual([...TRACKS, 'endless']);
+	});
+
+	it('reads ?track=, and drops an unknown or missing value', () => {
+		expect(parseIndexTab('waits')).toBe('waits');
+		expect(parseIndexTab('endless')).toBe('endless');
+		expect(parseIndexTab('claims')).toBeNull();
+		expect(parseIndexTab('')).toBeNull();
+		expect(parseIndexTab(null)).toBeNull();
+	});
+
+	it('links each tab', () => {
+		expect(indexHref('defence')).toBe('/learn?track=defence');
+		expect(indexHref('endless')).toBe('/learn?track=endless');
 	});
 });
 
