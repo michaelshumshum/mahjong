@@ -84,7 +84,7 @@
 	"guide_paymentDiscardAll": "出銃者獨付 {points}。",
 	"guide_paymentDiscardHalf": "出銃者付 {half}；其餘兩家各付 {quarter}。",
 	"guide_paymentRobKong": "與食出銃相同，由被搶槓者付款。",
-	"guide_checkerIntro": "揀選 14 隻牌，看看這手牌值多少番。最後揀的一隻是糊牌的那隻；按手牌中的牌可將它取回。",
+	"guide_checkerIntro": "揀選 14 隻牌，計算這手牌的番數。最後揀的一隻為糊牌；按手牌中的牌可將其移除。",
 	"guide_checkerHandLabel": "要計算的手牌",
 	"guide_checkerPaletteLabel": "可加入的牌",
 	"guide_checkerAddTile": "加入{tile}",
