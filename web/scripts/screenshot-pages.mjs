@@ -196,8 +196,8 @@ const PAGES = [
 			await solveTwoSidedWait(page);
 		}
 	},
-	// best-discard feedback: a wrong pick (3 Characters, tile id 8), so the comparison line shows
-	// above the options table.
+	// best-discard feedback: a wrong pick (3 Characters, tile id 8), then Show answer, so the
+	// comparison line shows above the options table and the hand marks.
 	{
 		name: 'learn-puzzle-feedback',
 		url: '/learn/efficiency-02',
@@ -205,14 +205,15 @@ const PAGES = [
 			const tile = page.locator('.seat-region--self [data-tile-id="8"]');
 			await tile.click();
 			await tile.click();
+			await page.getByTestId('answer-reveal').click();
 			await page.getByTestId('discard-table').waitFor();
 			// off the hand's hover lift, and past the remounted table's entrance
 			await page.mouse.move(0, 0);
 			await page.waitForTimeout(800);
 		}
 	},
-	// safe-discard feedback: a pick that was only lucky (2 Characters, tile id 4), so each hand
-	// tile's verdict shows.
+	// safe-discard feedback: a pick that was only lucky (2 Characters, tile id 4), then Show
+	// answer, so each hand tile's verdict shows.
 	{
 		name: 'learn-puzzle-safe',
 		url: '/learn/defence-02',
@@ -220,6 +221,7 @@ const PAGES = [
 			const tile = page.locator('.seat-region--self [data-tile-id="4"]');
 			await tile.click();
 			await tile.click();
+			await page.getByTestId('answer-reveal').click();
 			await page.getByTestId('safe-table').waitFor();
 			await page.mouse.move(0, 0);
 			await page.waitForTimeout(800);
