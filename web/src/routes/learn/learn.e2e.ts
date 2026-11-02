@@ -5,11 +5,13 @@ test.beforeEach(async ({ page }) => {
 	await page.route('**/healthz', (route) => route.abort());
 });
 
-// default discard mode is two-step: the first tap lifts the tile, the second discards it.
+const handTile = (page: Page, tileId: number) =>
+	page.locator(`.seat-region--self [data-tile-id="${tileId}"]`);
+
+// puzzles are always two-step: the first tap picks the tile, the second grades it.
 async function discard(page: Page, tileId: number): Promise<void> {
-	const tile = page.locator(`.seat-region--self [data-tile-id="${tileId}"]`);
-	await tile.click();
-	await tile.click();
+	await handTile(page, tileId).click();
+	await handTile(page, tileId).click();
 }
 
 const feedback = (page: Page) => page.getByTestId('answer-feedback');
@@ -92,16 +94,48 @@ test('a count faan puzzle takes a number', async ({ page }) => {
 	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
 });
 
-test('a best discard puzzle shows every option, with the pick against the best', async ({
+test('a discard puzzle: pick a tile, then Check grades it', async ({ page }) => {
+	await page.goto('/learn/basics-isolated-honour');
+	const check = page.getByTestId('answer-check');
+	await expect(check).toBeDisabled();
+	await handTile(page, 0).click(); // 1 Characters
+	await expect(handTile(page, 0)).toHaveClass(/hand-tile--lifted/);
+	await expect(feedback(page)).not.toHaveAttribute('data-result');
+	await check.click();
+	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
+	await expect(check).toBeDisabled();
+	// the pick is marked on the table; the answer isn't, until it's asked for
+	await expect(handTile(page, 0)).toHaveAttribute('data-mark', 'pick');
+	await expect(page.locator('.seat-region--self [data-mark="answer"]')).toHaveCount(0);
+
+	await handTile(page, 124).click(); // Red Dragon
+	await check.click();
+	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
+	await expect(handTile(page, 124)).toHaveAttribute('data-mark', 'answer');
+});
+
+test('a best discard puzzle hints at a miss, and shows every option once revealed', async ({
 	page
 }) => {
 	await page.goto('/learn/basics-keep-two-sided');
 	await discard(page, 4); // 2 Characters: ready, but fewer tiles than 5 Characters
 	await expect(feedback(page)).toHaveAttribute('data-result', 'wrong');
 	await expect(feedback(page).locator('[data-line="discard-compare"]')).toContainText('7 unseen');
+	await expect(page.getByTestId('discard-table')).toHaveCount(0);
+	await expect(page.getByTestId('answer-next')).toHaveCount(0);
+
+	await page.getByTestId('answer-reveal').click();
+	await expect(page.getByTestId('answer-reveal')).toHaveCount(0);
+	await expect(feedback(page)).toHaveAttribute('data-revealed', 'true');
+	await expect(page.getByTestId('answer-explain')).toBeVisible();
 	const table = page.getByTestId('discard-table');
 	await expect(table.locator('tr[data-picked="true"]')).toHaveAttribute('data-tile', '2m');
 	await expect(table.locator('tr[data-answer="true"]')).toHaveAttribute('data-tile', '5m');
+	await expect(handTile(page, 4)).toHaveAttribute('data-mark', 'pick');
+	await expect(page.locator('.seat-region--self [data-mark="answer"]')).not.toHaveCount(0);
+	// seeing the answer doesn't solve it
+	await expect(page.getByTestId('puzzle-solved')).toHaveCount(0);
+	await expect(page.getByTestId('answer-next')).toBeVisible();
 });
 
 test("a safe discard that only luck made safe isn't solved", async ({ page }) => {
@@ -111,9 +145,13 @@ test("a safe discard that only luck made safe isn't solved", async ({ page }) =>
 	await expect(feedback(page)).toHaveAttribute('data-lucky', 'true');
 	await expect(feedback(page)).toContainText("couldn't have known");
 	await expect(page.getByTestId('puzzle-solved')).toHaveCount(0);
+	await expect(page.getByTestId('safe-table')).toHaveCount(0);
+	await page.getByTestId('answer-reveal').click();
 	const table = page.getByTestId('safe-table');
 	await expect(table.locator('tr[data-tile="z5"]')).toContainText('Deals in to East');
+	await expect(page.getByTestId('puzzle-solved')).toHaveCount(0);
 
+	// still answerable after the reveal
 	await discard(page, 100); // 8 Bamboo: every copy visible
 	await expect(feedback(page)).toHaveAttribute('data-result', 'correct');
 	await expect(feedback(page)).not.toHaveAttribute('data-lucky');

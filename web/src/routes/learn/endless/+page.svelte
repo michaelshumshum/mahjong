@@ -32,6 +32,7 @@
 	let score = $state(EMPTY_SCORE);
 	let missed = $state(false);
 	let solved = $state(false);
+	let revealed = $state(false);
 
 	async function load(): Promise<void> {
 		loading = true;
@@ -45,6 +46,7 @@
 		recent = rememberRecent(recent, fetched.lesson.id);
 		missed = false;
 		solved = false;
+		revealed = false;
 		lesson = fetched.lesson;
 	}
 
@@ -55,8 +57,15 @@
 		score = saveEndlessScore(kind, (s) => recordEndlessAnswer(s, result, wasMissed));
 	}
 
+	// seeing the answer ends the streak as a skip does
+	function reveal(): void {
+		missed = true;
+		revealed = true;
+		score = saveEndlessScore(kind, recordEndlessSkip);
+	}
+
 	function next(): void {
-		if (!solved) score = saveEndlessScore(kind, recordEndlessSkip);
+		if (!solved && !revealed) score = saveEndlessScore(kind, recordEndlessSkip);
 		void load();
 	}
 
@@ -81,7 +90,7 @@
 
 {#snippet navExtra()}
 	{@render scoreLine()}
-	{#if !solved}
+	{#if !solved && !revealed}
 		<button type="button" class="skip" data-sfx="on" data-testid="endless-skip" onclick={next}
 			>{m.learn_endlessSkip()}</button
 		>
@@ -101,7 +110,7 @@
 </svelte:head>
 
 {#if lesson && showing}
-	<PuzzlePage {lesson} {navExtra} {afterCorrect} onGraded={graded} />
+	<PuzzlePage {lesson} {navExtra} {afterCorrect} onGraded={graded} onReveal={reveal} />
 {:else}
 	<div class="endless-status">
 		<BackButton label={m.learn_indexLabel()} href="/learn" />

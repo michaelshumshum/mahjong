@@ -117,6 +117,47 @@ describe('YourSeatRegion discard modes', () => {
 		flushSync();
 		expect(target.querySelector('.pending-spinner--stalled')).not.toBeNull();
 	});
+
+	it('two-step: a lift handed in shows, and a tap on it discards', () => {
+		const onDiscard = vi.fn();
+		const { target } = render(YourSeatRegion, {
+			...baseProps('two-step', onDiscard),
+			liftedTileId: 11
+		});
+		const second = target.querySelector<HTMLButtonElement>('[data-tile-id="11"]')!;
+		expect(second.classList.contains('hand-tile--lifted')).toBe(true);
+		second.click();
+		flushSync();
+		expect(onDiscard).toHaveBeenCalledWith(11);
+	});
+});
+
+describe('YourSeatRegion tile marks', () => {
+	afterEach(cleanupAll);
+
+	it('marks tiles by tile_id with a glyph and in the accessible name', () => {
+		const { target } = render(YourSeatRegion, {
+			...baseProps('two-step'),
+			tileMarks: new Map([
+				[10, 'pick' as const],
+				[11, 'answer' as const]
+			])
+		});
+		const pick = target.querySelector<HTMLButtonElement>('[data-tile-id="10"]')!;
+		const answer = target.querySelector<HTMLButtonElement>('[data-tile-id="11"]')!;
+		expect(pick.dataset.mark).toBe('pick');
+		expect(pick.querySelector('.tile-mark--pick')).not.toBeNull();
+		expect(pick.getAttribute('aria-label')).toBe('Discard 1 Character (your pick)');
+		expect(answer.dataset.mark).toBe('answer');
+		expect(answer.querySelector('.tile-mark--answer')).not.toBeNull();
+		expect(answer.getAttribute('aria-label')).toBe('Discard 2 Characters (the answer)');
+	});
+
+	it('unmarked tiles carry no mark', () => {
+		const { target } = render(YourSeatRegion, baseProps('two-step'));
+		expect(target.querySelector('[data-mark]')).toBeNull();
+		expect(target.querySelector('.tile-mark')).toBeNull();
+	});
 });
 
 describe('YourSeatRegion keyboard hand model', () => {

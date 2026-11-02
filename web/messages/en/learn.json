@@ -19,11 +19,11 @@
 	"learn_nextLabel": "Next",
 	"learn_seatYou": "You",
 	"learn_seatWind": "{wind}",
-	"learn_discardHintTwoStep": "Tap a tile in your hand to pick it, then tap it again to discard it.",
-	"learn_discardHintOneTap": "Tap a tile in your hand to discard it.",
+	"learn_discardHint": "Tap a tile in your hand to pick it, then tap Check, or tap the tile again.",
 	"learn_winningTilesLabel": "Winning tiles",
 	"learn_faanLabel": "Faan",
 	"learn_checkButton": "Check",
+	"learn_showAnswerButton": "Show answer",
 	"learn_feedbackPartial": "Those all win, but there are more.",
 	"learn_trackBasics": "Basics",
 	"learn_trackWaits": "Waits",
@@ -43,7 +43,7 @@
 	"learn_feedbackBelowMinimum": "{tile} completes the hand, but scores only {discardFaan} faan on a discard and {selfDrawFaan} self-drawn, below the minimum.",
 	"learn_feedbackDead": "{tiles} would win, but every copy is already visible.",
 	"learn_feedbackSafeByLuck": "{tile} was safe this time, but you couldn't have known that.",
-	"learn_feedbackWaitsRight": "Right: {tiles}.",
+	"learn_feedbackWaitsAnswer": "The winning tiles: {tiles}.",
 	"learn_feedbackPickNoWin": "{tile} doesn't complete your hand.",
 	"learn_feedbackWaitsMissing": [
 		{

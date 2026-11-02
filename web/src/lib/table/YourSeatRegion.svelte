@@ -7,7 +7,9 @@
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
 	import type { Seat } from '$lib/game/types';
-	import type { DeclareOption, SeatView, OwnHandTile } from './view-types';
+	import Check from '@lucide/svelte/icons/check';
+	import X from '@lucide/svelte/icons/x';
+	import type { DeclareOption, HandTileMark, SeatView, OwnHandTile } from './view-types';
 	import type { TileCode } from './tile-code';
 	import { tileName, tileOptionAriaLabel } from './tile-name';
 	import TileOptionLabel from '$lib/ui/TileOptionLabel.svelte';
@@ -36,7 +38,9 @@
 		arrangeable = false,
 		onReorder = () => {},
 		declareOptions,
-		scoreDelta = null
+		scoreDelta = null,
+		liftedTileId = $bindable(null),
+		tileMarks = new Map()
 	}: {
 		seat: SeatView;
 		spectating: boolean;
@@ -51,11 +55,17 @@
 		onReorder?: (tileId: number, toIndex: number) => void;
 		declareOptions: DeclareOption[];
 		scoreDelta?: { value: number; key: number } | null;
+		// two-step lift, presentation only: a second tap/Enter discards, another tile moves it,
+		// outside-click/Esc clears it. bindable so a puzzle's Check can grade it.
+		liftedTileId?: number | null;
+		tileMarks?: ReadonlyMap<number, HandTileMark>;
 	} = $props();
 
-	// two-step: the lifted tile is presentation-only state, never game truth. A second tap/Enter
-	// on it (same button, same onclick) discards; another tile moves the lift; outside-click/Esc clears it.
-	let liftedTileId = $state<number | null>(null);
+	const MARK_LABEL: Record<HandTileMark, () => string> = {
+		pick: m.yourSeatRegion_tileMarkPick,
+		answer: m.yourSeatRegion_tileMarkAnswer
+	};
+
 	let handRowEl: HTMLDivElement | null = $state(null);
 
 	// pending: dims the tile with a spinner until the echo removes it from `ownHandTiles` (or the
@@ -286,6 +296,16 @@
 	}
 </script>
 
+{#snippet markBadge(mark: HandTileMark)}
+	<span class="tile-mark tile-mark--{mark}" aria-hidden="true">
+		{#if mark === 'answer'}
+			<Check size={12} strokeWidth={3} />
+		{:else}
+			<X size={12} strokeWidth={3} />
+		{/if}
+	</span>
+{/snippet}
+
 <svelte:window
 	onclick={handleWindowClick}
 	onkeydown={handleWindowKeydown}
@@ -383,6 +403,7 @@
 			>
 				{#each ownHandTiles as tile (tile.key)}
 					{@const dragging = drag?.active === true && drag.tileId === tile.tileId}
+					{@const mark = tile.tileId === null ? undefined : tileMarks.get(tile.tileId)}
 					<div
 						class="hand-tile-slot"
 						class:hand-tile-slot--drawn={tile.drawn}
@@ -394,6 +415,7 @@
 						{#if !isMock && tile.tileId !== null && discardableTileIds.has(tile.tileId)}
 							{@const lifted = liftedTileId === tile.tileId}
 							{@const pending = pendingTileId === tile.tileId}
+							{@const label = m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
 							<button
 								type="button"
 								class="hand-tile hand-tile-btn"
@@ -402,13 +424,17 @@
 								class:hand-tile--pending={pending}
 								disabled={pending}
 								data-tile-id={tile.tileId}
+								data-mark={mark}
 								data-sfx="off"
 								tabindex={rovingTileId === tile.tileId ? 0 : -1}
 								onfocus={() => (focusedTileId = tile.tileId)}
-								aria-label={m.yourSeatRegion_discardTileAriaLabel({ tile: tileName(tile.code) })}
+								aria-label={mark
+									? m.yourSeatRegion_markedTileAriaLabel({ label, mark: MARK_LABEL[mark]() })
+									: label}
 								onclick={() => handleTileActivate(tile.tileId as number)}
 							>
 								<TileFace code={tile.code} />
+								{#if mark}{@render markBadge(mark)}{/if}
 								{#if pending}
 									<span
 										class="pending-spinner"
@@ -418,8 +444,12 @@
 								{/if}
 							</button>
 						{:else}
-							<div class="hand-tile" class:hand-tile--drawn={tile.drawn}>
+							<div class="hand-tile" class:hand-tile--drawn={tile.drawn} data-mark={mark}>
 								<TileFace code={tile.code} />
+								{#if mark}
+									{@render markBadge(mark)}
+									<span class="sr-only">{MARK_LABEL[mark]()}</span>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -559,6 +589,43 @@
 
 	.hand-tile :global(.tile-face) {
 		height: 100%;
+	}
+
+	// a graded puzzle's marks: a ring plus a corner glyph, so the cue isn't colour alone.
+	// box-shadow, not outline: the focus ring keeps the outline.
+	.hand-tile[data-mark] {
+		position: relative;
+		border-radius: var(--radius-tile);
+	}
+
+	.hand-tile[data-mark='pick'] {
+		box-shadow: 0 0 0 3px var(--color-brass);
+	}
+
+	.hand-tile[data-mark='answer'] {
+		box-shadow: 0 0 0 3px var(--color-positive);
+	}
+
+	.tile-mark {
+		position: absolute;
+		top: -6px;
+		left: -6px;
+		z-index: 1;
+		display: grid;
+		place-items: center;
+		width: 1.125rem;
+		height: 1.125rem;
+		border-radius: 50%;
+		color: var(--color-bg);
+		pointer-events: none;
+	}
+
+	.tile-mark--pick {
+		background: var(--color-brass);
+	}
+
+	.tile-mark--answer {
+		background: var(--color-positive);
 	}
 
 	// same box as the plain .hand-tile div -- a button reset, not a second style.

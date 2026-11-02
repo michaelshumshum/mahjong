@@ -20,7 +20,6 @@ afterEach(cleanupAll);
 function props(lesson: unknown, extra: Record<string, unknown> = {}) {
 	return {
 		lesson: lesson as Lesson,
-		discardMode: 'two-step' as const,
 		answer: null,
 		result: null,
 		attempts: 0,
@@ -61,10 +60,38 @@ function rows(target: HTMLElement, table: string) {
 }
 
 describe('AnswerPanel', () => {
-	it('discard kinds show only the tap hint: the hand on the table is the input', () => {
-		const { target } = render(AnswerPanel, props(isolatedHonour));
-		expect(target.querySelector('button')).toBeNull();
-		expect(target.querySelector('.hint')).not.toBeNull();
+	it('discard kinds: the hand is the input, and Check grades the picked tile', () => {
+		const none = render(AnswerPanel, props(isolatedHonour)).target;
+		expect(none.querySelector('.hint')).not.toBeNull();
+		expect(byTestId<HTMLButtonElement>(none, 'answer-check').disabled).toBe(true);
+
+		const onCheckSelected = vi.fn();
+		const picked = render(
+			AnswerPanel,
+			props(isolatedHonour, { selectedTile: 'z5', onCheckSelected })
+		).target;
+		const check = byTestId<HTMLButtonElement>(picked, 'answer-check');
+		expect(check.disabled).toBe(false);
+		check.click();
+		expect(onCheckSelected).toHaveBeenCalledOnce();
+	});
+
+	it('offers Show answer after a miss only, until it is used', () => {
+		const onReveal = vi.fn();
+		const wrong = answered(simpleHand, { kind: 'count_faan', faan: 2 }, { onReveal });
+		byTestId<HTMLButtonElement>(wrong, 'answer-reveal').click();
+		expect(onReveal).toHaveBeenCalledOnce();
+		const partial = answered(waits12, { kind: 'winning_tiles', tiles: ['7p'] }, { onReveal });
+		expect(byTestId(partial, 'answer-reveal')).not.toBeNull();
+		const right = answered(simpleHand, { kind: 'count_faan', faan: 3 }, { onReveal });
+		expect(byTestId(right, 'answer-reveal')).toBeNull();
+		const shown = answered(
+			simpleHand,
+			{ kind: 'count_faan', faan: 2 },
+			{ onReveal, revealed: true }
+		);
+		expect(byTestId(shown, 'answer-reveal')).toBeNull();
+		expect(byTestId(shown, 'answer-feedback').dataset.revealed).toBe('true');
 	});
 
 	it('winning_tiles sends the picked tiles on Check', () => {
@@ -93,16 +120,19 @@ describe('AnswerPanel', () => {
 		expect(p.onAnswer).toHaveBeenCalledWith({ kind: 'count_faan', faan: 3 });
 	});
 
-	it('shows the explanation only once the answer is correct', () => {
+	it('shows the explanation once the answer is correct or revealed', () => {
 		const wrong = answered(simpleHand, { kind: 'count_faan', faan: 2 });
 		expect(byTestId(wrong, 'answer-feedback').dataset.result).toBe('wrong');
 		expect(byTestId(wrong, 'answer-explain')).toBeNull();
 		const right = answered(simpleHand, { kind: 'count_faan', faan: 3 });
 		expect(byTestId(right, 'answer-explain').textContent).toBe('because');
+		const shown = answered(simpleHand, { kind: 'count_faan', faan: 2 }, { revealed: true });
+		expect(byTestId(shown, 'answer-feedback').dataset.result).toBe('wrong');
+		expect(byTestId(shown, 'answer-explain').textContent).toBe('because');
 	});
 
 	it('keeps the tables out of the live region', () => {
-		const target = answered(efficiency02, { kind: 'best_discard', tile: '3m' });
+		const target = answered(efficiency02, { kind: 'best_discard', tile: '4s' });
 		const live = byTestId(target, 'answer-feedback');
 		expect(live.getAttribute('role')).toBe('status');
 		expect(live.querySelector('table')).toBeNull();
@@ -111,8 +141,15 @@ describe('AnswerPanel', () => {
 });
 
 describe('AnswerPanel best_discard feedback', () => {
-	it('a wrong pick: the options table with answers and pick marked, and why it is worse', () => {
+	it('a wrong pick: why it is worse, and no table to give the answer away', () => {
 		const target = answered(efficiency02, { kind: 'best_discard', tile: '3m' });
+		expect(lines(target)['discard-compare']).toHaveLength(1);
+		expect(byTestId(target, 'discard-table')).toBeNull();
+		expect(byTestId(target, 'answer-explain')).toBeNull();
+	});
+
+	it('a wrong pick revealed: the options table with answers and pick marked', () => {
+		const target = answered(efficiency02, { kind: 'best_discard', tile: '3m' }, { revealed: true });
 		const table = rows(target, 'discard-table');
 		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['9p', '4s']);
 		expect(table.find((r) => r.picked)).toMatchObject({
@@ -161,10 +198,9 @@ describe('AnswerPanel winning_tiles feedback', () => {
 		expect(lines(target)).toEqual({ missing: ['1 more winning tile to find.'] });
 	});
 
-	it('wrong: right picks, then each wrong pick with its reason, then the count missing', () => {
+	it('wrong: each wrong pick with its reason and the count missing, never a right tile', () => {
 		const target = answered(waits12, { kind: 'winning_tiles', tiles: ['1p', '2p', '4p', '9m'] });
 		expect(lines(target)).toEqual({
-			right: ['Right: 1 Dot.'],
 			'no-win': ["9 Characters doesn't complete your hand."],
 			'below-minimum': [
 				'2 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.'
@@ -172,6 +208,24 @@ describe('AnswerPanel winning_tiles feedback', () => {
 			dead: ['4 Dots would win, but every copy is already visible.'],
 			missing: ['1 more winning tile to find.']
 		});
+	});
+
+	it('revealed: every winning tile, the wrong picks, then the teaching points left', () => {
+		const target = answered(
+			waits12,
+			{ kind: 'winning_tiles', tiles: ['1p', '2p', '4p', '9m'] },
+			{ revealed: true }
+		);
+		expect(lines(target)).toEqual({
+			answer: ['The winning tiles: 1 Dot and 7 Dots.'],
+			'no-win': ["9 Characters doesn't complete your hand."],
+			'below-minimum': [
+				'2 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.',
+				'5 Dots completes the hand, but scores only 1 faan on a discard and 2 self-drawn, below the minimum.'
+			],
+			dead: ['4 Dots would win, but every copy is already visible.']
+		});
+		expect(byTestId(target, 'answer-explain').textContent).toBe('because');
 	});
 });
 
@@ -198,12 +252,18 @@ describe('AnswerPanel safe_discard feedback', () => {
 			"2 Characters was safe this time, but you couldn't have known that."
 		);
 		expect(byTestId(target, 'answer-explain')).toBeNull();
+		expect(byTestId(target, 'safe-table')).toBeNull();
 	});
 
-	it('deals in: names who it deals in to', () => {
+	it('deals in: names who it deals in to, and the table waits for a reveal', () => {
 		const target = answered(defence02, { kind: 'safe_discard', tile: 'z5' });
 		expect(byTestId(target, 'answer-feedback').dataset.lucky).toBeUndefined();
 		expect(lines(target)).toEqual({ 'deals-in': ['Red Dragon deals in to East.'] });
+		expect(byTestId(target, 'safe-table')).toBeNull();
+		const shown = answered(defence02, { kind: 'safe_discard', tile: 'z5' }, { revealed: true });
+		const table = rows(shown, 'safe-table');
+		expect(table.filter((r) => r.answer).map((r) => r.tile)).toEqual(['8s']);
+		expect(table.find((r) => r.picked)?.tile).toBe('z5');
 	});
 });
 
@@ -226,6 +286,17 @@ describe('AnswerPanel count_faan feedback', () => {
 		expect(byTestId(high, 'faan-breakdown')).toBeNull();
 		const low = answered(faan03, { kind: 'count_faan', faan: 4 });
 		expect(lines(low)).toEqual({ 'faan-low': ['4 is too low.'] });
+	});
+
+	it('revealed: the miss, the points and the breakdown', () => {
+		const target = answered(faan03, { kind: 'count_faan', faan: 8 }, { revealed: true });
+		expect(lines(target)).toEqual({
+			'faan-high': ['8 is too high.'],
+			points: ['Worth 32 points.']
+		});
+		expect(byTestId(target, 'faan-breakdown').querySelector('.total')?.textContent).toContain(
+			'6 faan'
+		);
 	});
 
 	it('shows the claimed tile of a discard win', () => {
