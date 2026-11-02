@@ -5,6 +5,7 @@
 	import type { ClaimOption, Seat } from '$lib/game/types';
 	import type { Highlight, Tutorial } from '$lib/learn/generated/lessons';
 	import { LessonPlayer, type TutorialIntent } from '$lib/learn/lesson-player.svelte';
+	import { indexHref } from '$lib/learn/lessons';
 	import { TUTORIAL_TEXT } from '$lib/learn/lesson-text';
 	import { loadProgress } from '$lib/learn/progress';
 	import TutorialCoach from '$lib/learn/TutorialCoach.svelte';
@@ -169,7 +170,7 @@
 
 <div class="tutorial-page" data-testid="tutorial-page" data-step={player.index}>
 	<nav class="tutorial-nav">
-		<BackButton label={m.learn_indexLabel()} href="/learn" />
+		<BackButton label={m.learn_indexLabel()} href={indexHref(tutorial.track)} />
 		<button type="button" class="restart" data-testid="tutorial-restart" onclick={restart}>
 			<RotateCcw size={16} aria-hidden="true" />
 			<span>{m.learn_tutorialRestart()}</span>
@@ -271,8 +272,11 @@
 </div>
 
 {#snippet tutorialEnd()}
-	<a class="coach-skip" href="/learn" data-sfx="on" data-testid="tutorial-to-puzzles"
-		>{m.learn_tutorialBackToPuzzles()}</a
+	<a
+		class="coach-skip"
+		href={indexHref(tutorial.track)}
+		data-sfx="on"
+		data-testid="tutorial-to-puzzles">{m.learn_tutorialBackToPuzzles()}</a
 	>
 	<button
 		type="button"

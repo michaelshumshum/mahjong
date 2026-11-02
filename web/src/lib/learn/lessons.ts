@@ -31,6 +31,20 @@ export const TRACKS = [
 	'faan'
 ] as const satisfies readonly Track[];
 
+/** A tab on /learn, picked by `?track=`: one per track, then endless. */
+export type IndexTab = Track | 'endless';
+
+export const INDEX_TABS: readonly IndexTab[] = [...TRACKS, 'endless'];
+
+/** `?track=`'s tab; an unknown or missing value is `null`, never an error. */
+export function parseIndexTab(value: string | null): IndexTab | null {
+	return INDEX_TABS.find((tab) => tab === value) ?? null;
+}
+
+export function indexHref(tab: IndexTab): string {
+	return `/learn?track=${tab}`;
+}
+
 export const TRACK_LABEL: Record<Track, () => string> = {
 	basics: m.learn_trackBasics,
 	waits: m.learn_trackWaits,

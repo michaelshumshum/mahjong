@@ -8,6 +8,7 @@
 	import {
 		BAND_LABEL,
 		TRACK_LABEL,
+		indexHref,
 		lessonEntry,
 		nextLesson,
 		previousLesson,
@@ -36,12 +37,15 @@
 
 	let {
 		lesson,
+		backHref,
 		navExtra,
 		afterCorrect,
 		onGraded,
 		onReveal
 	}: {
 		lesson: Lesson;
+		/** the "All puzzles" link; the lesson's own track tab by default. */
+		backHref?: string;
 		navExtra?: Snippet;
 		/** replaces the Next link once solved or revealed. */
 		afterCorrect?: Snippet;
@@ -228,7 +232,7 @@
 		data-lesson={lesson.id}
 	>
 		<nav class="puzzle-nav">
-			<BackButton label={m.learn_indexLabel()} href="/learn" />
+			<BackButton label={m.learn_indexLabel()} href={backHref ?? indexHref(lesson.track)} />
 			<span class="step-links">
 				{#if previous}
 					<a

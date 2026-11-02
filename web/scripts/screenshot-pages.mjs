@@ -186,9 +186,10 @@ const PAGES = [
 		}
 	},
 	{ name: 'tables', url: '/tables' },
-	// learn mode (docs/frontend.md §7 "Learn"): the track index, and a puzzle on the real table
-	// answered correctly, so the explanation shows.
-	{ name: 'learn', url: '/learn' },
+	// learn mode (docs/frontend.md §7 "Learn"): the track index on basics (pinned, so earlier
+	// progress in the context can't switch the tab), and a puzzle on the real table answered
+	// correctly, so the explanation shows.
+	{ name: 'learn', url: '/learn?track=basics' },
 	{
 		name: 'learn-puzzle',
 		url: '/learn/basics-two-sided-wait',
@@ -317,7 +318,7 @@ const PAGES = [
 				await page.getByTestId(`checker-add-${code}`).click();
 		}
 	},
-	{ name: 'learn-phone', url: '/learn', viewport: PHONE },
+	{ name: 'learn-phone', url: '/learn?track=basics', viewport: PHONE },
 	{ name: 'learn-puzzle-phone', url: '/learn/basics-isolated-honour', viewport: PHONE },
 	{
 		name: 'learn-tutorial-phone',

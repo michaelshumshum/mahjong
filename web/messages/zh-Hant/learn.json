@@ -12,6 +12,8 @@
 	"learn_continueLesson": "{track} · {title}",
 	"learn_allSolved": "全部題目已解答。",
 	"learn_allSolvedEndless": "去無限練習繼續挑戰",
+	"learn_tabsAriaLabel": "練習類別",
+	"learn_tabEndless": "無限練習",
 	"learn_puzzleNumber": "第 {n} 題",
 	"learn_lessonPageTitle": "{title} · 開枱",
 	"learn_indexLabel": "全部題目",

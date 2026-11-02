@@ -12,6 +12,8 @@
 	"learn_continueLesson": "{track} · {title}",
 	"learn_allSolved": "All puzzles solved.",
 	"learn_allSolvedEndless": "Keep going with endless puzzles",
+	"learn_tabsAriaLabel": "Puzzle tracks",
+	"learn_tabEndless": "Endless",
 	"learn_puzzleNumber": "Puzzle {n}",
 	"learn_lessonPageTitle": "{title} · Hoi Toi",
 	"learn_indexLabel": "All puzzles",

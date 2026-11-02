@@ -1,6 +1,6 @@
 import index from './generated/index.json';
 import type { IndexEntry } from './generated/lessons';
-import { ORDERED_LESSONS } from './lessons';
+import { ORDERED_LESSONS, type IndexTab } from './lessons';
 import {
 	loadLearnProgress,
 	saveLearnProgress,
@@ -54,6 +54,14 @@ export function firstUnsolved(
 	lessons: readonly IndexEntry[] = ORDERED_LESSONS
 ): IndexEntry | null {
 	return lessons.find((lesson) => !progress[lesson.id]?.solved) ?? null;
+}
+
+/** The tab /learn opens on without `?track=`: the first unsolved lesson's, endless once all are solved. */
+export function continueTab(
+	progress: LearnProgress,
+	lessons: readonly IndexEntry[] = ORDERED_LESSONS
+): IndexTab {
+	return firstUnsolved(progress, lessons)?.track ?? 'endless';
 }
 
 /** The first unsolved lesson after `id` in /learn's order, wrapping round, never `id` itself. */

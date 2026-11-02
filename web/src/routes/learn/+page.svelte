@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages.js';
 	import { ENDLESS_TITLE, endlessScore, saveEndlessBand } from '$lib/learn/endless';
 	import type { Band, IndexEntry } from '$lib/learn/generated/lessons';
@@ -7,13 +10,18 @@
 	import {
 		BAND_LABEL,
 		FIRST_TUTORIAL,
+		indexHref,
+		type IndexTab,
 		lessonsByBand,
 		lessonsByTrack,
+		parseIndexTab,
 		TRACK_BLURB,
-		TRACK_LABEL
+		TRACK_LABEL,
+		TRACKS
 	} from '$lib/learn/lessons';
 	import { lessonSubtitle, lessonTitle } from '$lib/learn/lesson-text';
-	import { firstUnsolved, loadProgress, solvedCount } from '$lib/learn/progress';
+	import { continueTab, firstUnsolved, loadProgress, solvedCount } from '$lib/learn/progress';
+	import { isMotionReduced } from '$lib/ui/motion';
 	import {
 		loadLearnEndless,
 		type LearnEndless,
@@ -27,9 +35,14 @@
 
 	const groups = lessonsByTrack().map((group) => ({
 		...group,
+		ids: group.lessons.map((lesson) => lesson.id),
 		tutorials: group.lessons.filter((lesson) => lesson.lesson_kind === 'tutorial'),
 		bands: lessonsByBand(group.lessons)
 	}));
+
+	let explicitTab = $derived(parseIndexTab(page.url.searchParams.get('track')));
+	let tab = $derived(explicitTab ?? TRACKS[0]);
+	let selectedGroup = $derived(groups.find((group) => group.track === tab));
 
 	// localStorage only: read after mount so the SSR'd index and its hydration agree (all unsolved).
 	let progress = $state<LearnProgress>({});
@@ -37,8 +50,25 @@
 	$effect(() => {
 		progress = loadProgress();
 		endless = loadLearnEndless();
+		// no ?track=: open on where the player left off, without a history entry
+		untrack(() => {
+			if (explicitTab) return;
+			const target = continueTab(progress);
+			if (target !== tab) {
+				void goto(indexHref(target), { replaceState: true, noScroll: true, keepFocus: true });
+			}
+		});
 	});
 	let band = $derived(endless.band);
+
+	let tabBar = $state<HTMLElement>();
+	$effect(() => {
+		tabBar?.querySelector(`[data-tab="${tab}"]`)?.scrollIntoView({
+			inline: 'nearest',
+			block: 'nearest',
+			behavior: isMotionReduced() ? 'auto' : 'smooth'
+		});
+	});
 	// the tutorial leads until it's solved; after that, the first unsolved lesson does.
 	let next = $derived(firstUnsolved(progress));
 	let tutorialSolved = $derived(progress[FIRST_TUTORIAL.id]?.solved ?? false);
@@ -83,12 +113,29 @@
 		<p class="all-solved" data-testid="learn-all-solved">
 			<CircleCheck size={18} aria-hidden="true" />
 			<span>{m.learn_allSolved()}</span>
-			<a href="#endless">{m.learn_allSolvedEndless()}</a>
+			<a
+				href={indexHref('endless')}
+				data-sveltekit-replacestate
+				data-sveltekit-noscroll
+				data-sveltekit-keepfocus>{m.learn_allSolvedEndless()}</a
+			>
 		</p>
 	{/if}
 
-	{#each groups as group (group.track)}
-		{@const ids = group.lessons.map((lesson) => lesson.id)}
+	<nav class="tabs" aria-label={m.learn_tabsAriaLabel()} bind:this={tabBar}>
+		{#each groups as group (group.track)}
+			{@const solved = solvedCount(progress, group.ids)}
+			{@render tabLink(group.track, TRACK_LABEL[group.track](), {
+				solved,
+				total: group.ids.length
+			})}
+		{/each}
+		{@render tabLink('endless', m.learn_tabEndless(), null)}
+	</nav>
+
+	{#if selectedGroup}
+		{@const group = selectedGroup}
+		{@const ids = group.ids}
 		{@const solved = solvedCount(progress, ids)}
 		<section class="track" aria-labelledby="track-{group.track}" data-testid="track-{group.track}">
 			<header class="track-header">
@@ -129,10 +176,33 @@
 				</ul>
 			{/each}
 		</section>
-	{/each}
-
-	{@render endlessSection()}
+	{:else}
+		{@render endlessSection()}
+	{/if}
 </div>
+
+{#snippet tabLink(value: IndexTab, label: string, count: { solved: number; total: number } | null)}
+	{@const current = value === tab}
+	<a
+		class="tab"
+		class:tab--current={current}
+		href={indexHref(value)}
+		aria-current={current ? 'page' : undefined}
+		data-sveltekit-replacestate
+		data-sveltekit-noscroll
+		data-sveltekit-keepfocus
+		data-tab={value}
+		data-testid="learn-tab-{value}"
+	>
+		<span>{label}</span>
+		{#if count}
+			<span class="tab-count" data-testid="learn-tab-count-{value}" aria-hidden="true"
+				>{m.learn_solvedCount(count)}</span
+			>
+			<span class="sr-only">{m.learn_solvedCountAriaLabel(count)}</span>
+		{/if}
+	</a>
+{/snippet}
 
 {#snippet card(lesson: IndexEntry, numbered: boolean)}
 	{@const done = progress[lesson.id]?.solved ?? false}
@@ -207,6 +277,7 @@
 {/snippet}
 
 <style lang="scss">
+	@use '$lib/styles/a11y';
 	@use '$lib/styles/layout';
 
 	.learn-page {
@@ -252,6 +323,61 @@
 		a {
 			color: var(--color-accent);
 		}
+	}
+
+	// padding: room for the focus ring inside the scroller's clip.
+	// relative: keeps the absolute sr-only counts inside that clip, or they widen the page.
+	.tabs {
+		position: relative;
+		display: flex;
+		gap: 2px;
+		min-width: 0;
+		padding: var(--space-1);
+		overflow-x: auto;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+		scroll-snap-type: x proximity;
+		scrollbar-width: thin;
+	}
+
+	.tab {
+		display: flex;
+		flex: 1 0 auto;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2);
+		min-height: var(--tap-target-min);
+		padding: var(--space-2) var(--space-3);
+		border-radius: calc(var(--radius-md) - 3px);
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		font-weight: 600;
+		white-space: nowrap;
+		text-decoration: none;
+		scroll-snap-align: start;
+
+		@include a11y.motion-ok {
+			transition:
+				background-color var(--dur-control) ease,
+				color var(--dur-control) ease;
+		}
+
+		&:hover:not(.tab--current) {
+			background: rgb(255 255 255 / 0.05);
+			color: var(--color-text);
+		}
+	}
+
+	.tab--current {
+		background: var(--color-brass);
+		color: var(--color-tile-ink);
+		font-weight: 700;
+	}
+
+	.tab-count {
+		font-size: var(--font-size-xs);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.track {

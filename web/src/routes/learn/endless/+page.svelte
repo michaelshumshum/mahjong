@@ -12,7 +12,7 @@
 		type EndlessFetch
 	} from '$lib/learn/endless';
 	import type { Lesson } from '$lib/learn/generated/lessons';
-	import { BAND_LABEL } from '$lib/learn/lessons';
+	import { BAND_LABEL, indexHref } from '$lib/learn/lessons';
 	import type { GradeResult } from '$lib/learn/types';
 	import { m } from '$lib/paraglide/messages.js';
 	import BackButton from '$lib/ui/BackButton.svelte';
@@ -115,10 +115,17 @@
 </svelte:head>
 
 {#if lesson && showing}
-	<PuzzlePage {lesson} {navExtra} {afterCorrect} onGraded={graded} onReveal={reveal} />
+	<PuzzlePage
+		{lesson}
+		backHref={indexHref('endless')}
+		{navExtra}
+		{afterCorrect}
+		onGraded={graded}
+		onReveal={reveal}
+	/>
 {:else}
 	<div class="endless-status">
-		<BackButton label={m.learn_indexLabel()} href="/learn" />
+		<BackButton label={m.learn_indexLabel()} href={indexHref('endless')} />
 		<section class="status-card" aria-live="polite">
 			<p class="meta">{BAND_LABEL[band]()}</p>
 			<h1>{title}</h1>
