@@ -13,8 +13,9 @@
 Hoi Toi is an open-source, browser-based implementation of Hong Kong mahjong. The server is
 authoritative: it runs the complete ruleset, including faan scoring and payouts, and sends each
 player only the information their seat is entitled to see. Players can practise solo against
-computer opponents ranging from Easy to a full-information "Impossible" tier, or play with
-friends by sharing a table link.
+computer opponents ranging from Easy to a full-information "Impossible" tier, play with
+friends by sharing a table link, or learn the game through a guided tutorial and short puzzles
+graded by the engine.
 
 ## Contents
 
@@ -37,6 +38,11 @@ friends by sharing a table link.
 - **Computer opponents at four levels.** Easy and Normal are heuristic bots, Expert is a
   self-play reinforcement-learning agent, and Impossible (`ORACLE`) adds full-information play on
   top of it ([bots](docs/bots.md), [ml](docs/ml.md)).
+- **Learn mode.** A guided tutorial played on the real table, then 68 puzzles across five tracks
+  (basics, waits, efficiency, defence, counting faan), each with one right answer from the
+  engine's precomputed key and feedback on why a pick is worse. An endless mode serves random
+  puzzles from a pool of 1,200 mined from bot self-play ([frontend §7](docs/frontend.md),
+  [ADR 0025](docs/decisions/0025-learn-mode.md)).
 - **Server-side anti-cheat.** Game state is redacted per seat before it leaves the server, so a
   client never receives hidden tiles ([architecture §5, §9](docs/architecture.md)).
 - **Deterministic replay.** Every hand can be reproduced exactly from `(ruleset, seed, actions)`
@@ -63,7 +69,7 @@ friends by sharing a table link.
 | ![Table, connecting](docs/screenshots/table-pregame-connecting.png) Table — connecting | ![Table, take a seat](docs/screenshots/table-pregame-join.png) Table — take a seat |
 | ![Table, waiting for players](docs/screenshots/table-pregame-waiting.png) Table — seated, waiting for players | ![Faan guide](docs/screenshots/lobby-guide.png) Faan guide — patterns by faan, searchable, with highlighted tile examples and compare links |
 | ![Faan guide, scoring](docs/screenshots/lobby-guide-scoring.png) Faan guide — how faan add up, faan → points table, who pays | ![Faan guide, hand checker](docs/screenshots/lobby-guide-checker.png) Faan guide — check a hand: pick 14 tiles, scored by `POST /score` |
-| ![Learn](docs/screenshots/learn.png) Learn (`/learn`) — a guided tutorial to start, then a tab per puzzle track with solved counts, from the engine-generated lesson bundle | ![Learn, puzzle](docs/screenshots/learn-puzzle.png) Learn — a puzzle on the real table: pick the winning tiles, checked against the engine's answer |
+| ![Learn](docs/screenshots/learn.png) Learn (`/learn`) — a guided tutorial to start, then a tab per puzzle track (each with its own glyph and hue), puzzles grouped by difficulty, solved ones sealed, plus an endless mode | ![Learn, puzzle](docs/screenshots/learn-puzzle.png) Learn — a puzzle on the real table: pick the winning tiles, checked against the engine's answer |
 | ![Learn, discard feedback](docs/screenshots/learn-puzzle-feedback.png) Learn — feedback on a wrong discard: why it is worse, and every option from the engine's key | ![Learn, safe-discard feedback](docs/screenshots/learn-puzzle-safe.png) Learn — a defence pick that was only lucky: each hand tile's verdict, and which one deals in |
 | ![Learn, tutorial](docs/screenshots/learn-tutorial.png) Learn — the guided tutorial: a tip with its part of the table outlined, played through the real table | |
 
