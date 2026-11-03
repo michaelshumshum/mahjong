@@ -391,6 +391,13 @@
 		endless: #e08fb4
 	);
 
+	// registered as a colour so the scrim's gradient can transition between tracks.
+	@property --track-hue {
+		syntax: '<color>';
+		inherits: true;
+		initial-value: #{map.get($track-hues, basics)};
+	}
+
 	@each $track, $hue in $track-hues {
 		[data-hue='#{$track}'] {
 			--track-hue: #{$hue};
@@ -422,6 +429,10 @@
 				),
 				radial-gradient(ellipse at 50% 30%, rgb(28 20 16 / 0.45), rgb(28 20 16 / 0.8) 75%);
 			pointer-events: none;
+
+			@include a11y.motion-ok {
+				transition: --track-hue var(--dur-4) var(--ease-out);
+			}
 		}
 
 		@include layout.phone-only {
