@@ -53,6 +53,16 @@ export const TRACK_LABEL: Record<Track, () => string> = {
 	faan: m.learn_trackFaan
 };
 
+// one CJK glyph per index tab, set on a tile like the lobby's action glyphs.
+export const TAB_GLYPH: Record<IndexTab, () => string> = {
+	basics: m.learn_trackBasicsGlyph,
+	waits: m.learn_trackWaitsGlyph,
+	efficiency: m.learn_trackEfficiencyGlyph,
+	defence: m.learn_trackDefenceGlyph,
+	faan: m.learn_trackFaanGlyph,
+	endless: m.learn_tabEndlessGlyph
+};
+
 // one line under each track heading on /learn: what its puzzles ask.
 export const TRACK_BLURB: Record<Track, () => string> = {
 	basics: m.learn_trackBasicsBlurb,

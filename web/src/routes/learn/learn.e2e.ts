@@ -96,6 +96,18 @@ test('a track tab lists its lessons by band', async ({ page }) => {
 	await expect(page.getByTestId('lesson-sub-waits-03')).toHaveCount(0);
 });
 
+test('each panel links on to the next tab, the last track to endless', async ({ page }) => {
+	await page.goto('/learn?track=waits');
+	const next = page.getByTestId('learn-next-track');
+	await expect(next).toHaveAccessibleName('Up next: Efficiency');
+	await next.click();
+	await expect(page).toHaveURL('/learn?track=efficiency');
+	await page.goto('/learn?track=faan');
+	await expect(next).toHaveAttribute('href', '/learn?track=endless');
+	await page.goto('/learn?track=endless');
+	await expect(next).toHaveCount(0);
+});
+
 test('tabs switch in place, and Back skips them', async ({ page }) => {
 	await page.goto('/learn');
 	await tab(page, 'waits').click();
@@ -573,7 +585,7 @@ test('learn renders in zh-Hant', async ({ page, context, baseURL }) => {
 	await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
 	await expect(page.locator('h1')).toHaveText('學打牌');
 	await expect(page).toHaveTitle('學打牌 · 開枱');
-	await expect(tab(page, 'endless')).toHaveText('無限練習');
+	await expect(tab(page, 'endless')).toHaveAccessibleName('無限練習');
 	await tab(page, 'waits').click();
 	await expect(page.getByTestId('lesson-card-waits-01')).toContainText('兩頭聽');
 

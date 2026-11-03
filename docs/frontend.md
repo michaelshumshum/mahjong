@@ -1000,14 +1000,15 @@ Endless mode (below) is the one part that needs the API.
   | Links | real `<a href="/learn?track=…">`s with `data-sveltekit-replacestate`, `-noscroll` and `-keepfocus`: they work without JS, focus stays on the tab, and switching adds no history entry, so Back leaves `/learn` from the last tab seen |
   | Default | the server renders basics. After mount, with no `?track=`, the page `goto`s `continueTab(progress)` (`replaceState`, `noScroll`, `keepFocus`): the Continue lesson's track, or Endless once everything is solved. An explicit `?track=` is never overridden. No last-tab memory: the URL plus this default cover it |
   | Semantics | navigation links, so a `<nav aria-label="Puzzle tracks">` with `aria-current="page"` on the open tab, not `role="tablist"` (whose arrow-key model doesn't fit links that load a URL). A count is `aria-hidden` beside an sr-only "3 of 15 solved" |
-  | Look | `SegmentedControl`'s: a recessed strip, the open tab a filled brass pill (bold, ink text), so it reads without colour too; the global focus ring, with strip padding so the scroller doesn't clip it |
+  | Look | `SegmentedControl`'s: a recessed strip, the open tab a pill filled in its track hue (below; bold, ink text), so it reads without colour too; each tab leads with its `TAB_GLYPH`; the global focus ring, with strip padding so the scroller doesn't clip it |
   | Phone | the strip scrolls sideways (`nowrap`, `scroll-snap-type: x proximity`) and never widens the page; on mount and on each change the open tab is `scrollIntoView({ inline: 'nearest', block: 'nearest' })`, smooth unless motion is reduced (`isMotionReduced`, §9) |
   | Back links | the puzzle and tutorial pages' "All puzzles" link and the tutorial's end "Back to puzzles" go to `indexHref(<the lesson's track>)`; endless's (`PuzzlePage`'s `backHref`, and its loading card's) to `?track=endless`; the post-solve "Back to all puzzles" stays `/learn` |
 
-- **Index.** A track's panel: its label, a "3 / 15" solved count beside a thin `role="progressbar"`
-  bar, a one-line blurb of what its puzzles ask (`TRACK_BLURB` in `lessons.ts`), then its cards
-  under Beginner / Intermediate / Advanced subheadings (`lessonsByBand`, `BANDS` order), so a
-  card holds only its title and a check once solved, each a link to `/learn/<id>`. `lessonTitle`
+- **Index.** A track's panel: its glyph tile, label and a one-line blurb of what its puzzles ask
+  (`TRACK_BLURB` in `lessons.ts`), a "3 / 15" solved count beside a `role="progressbar"` ring,
+  then its cards under Beginner / Intermediate / Advanced subheadings (`lessonsByBand`, `BANDS`
+  order, each with 1–3 filled pips), so a card holds only its title and a seal once solved, each
+  a link to `/learn/<id>`. `lessonTitle`
   gives a mined puzzle its theme's label (`THEME_LABEL` in `lessons.ts`, "Two-sided wait", "Half
   flush, all pungs"; [ADR 0025](decisions/0025-learn-mode.md) "Themes") with no number. Several
   cards in a band can share a theme, so those (`BandGroup.numbered`) get `lessonSubtitle`'s small
@@ -1023,6 +1024,17 @@ Endless mode (below) is the one part that needs the API.
   card and no Continue card shows. Progress lives in localStorage only, so the SSR'd page renders
   everything unsolved (no Continue card) and an `$effect` reads it after mount; reading it during
   render would make server and client markup differ.
+- **Look.** Local to `routes/learn/+page.svelte` (no other page reads them):
+
+  | Element | Detail |
+  | --- | --- |
+  | Track hue | `$track-hues`, one per `IndexTab`, set as `--track-hue` by `data-hue` on the page (the open tab), each tab, the Continue card and the next-track link. None is `--color-accent`: that red stays the urgent signal. It fills the open tab, the ring, pips, eyebrows, seals and the lead cards' wash |
+  | Glyph | `TAB_GLYPH` (`lessons.ts`): one CJK glyph per tab (基 聽 效 守 番 無), messages in both locales like the lobby's action glyphs, on an ivory tile |
+  | Tutorial card | a decorative five-tile fan (`TUTORIAL_FAN`, `aria-hidden`; not the tutorial's real deal, which isn't in the index) and a "Play" chip until solved |
+  | Solved seal | a double-bordered 解 stamp in the track hue on the card's corner, `sr-only` "Solved" inside. A lesson solved in the last 10 minutes (`FRESH_SOLVE_MS`, off `solvedAt`) presses it in on render |
+  | Next track | a dashed link under the panel to the next `INDEX_TABS` entry ("Up next: Waits"; faan → Endless), scrolling to the top |
+  | Motion | cards fade up staggered by `--i` (display order) on each tab change, lift on hover, the fan spreads on hover; all behind `a11y.motion-ok` |
+  | Scrim | a fixed `::before` dims the mural and tints the top with the open track's hue, so the tiles behind read as texture |
 - **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and learn
   progress are client-only, so a server render would be an empty felt to hydrate over.
   `+page.ts` loads the lesson and answers an unknown id with SvelteKit's `error(404)`. The
