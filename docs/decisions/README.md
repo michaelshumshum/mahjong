@@ -42,6 +42,7 @@ moved on.
 | [0025](0025-learn-mode.md) | Learn mode (學): engine-generated puzzles and a guided tutorial | Accepted (in progress) |
 | [0026](0026-optional-oauth-accounts.md) | Optional accounts via OAuth sign-in | Deferred |
 | [0027](0027-bot-exact-shanten-and-no-chance.md) | Bots read exact shanten and a correct no-chance | Accepted |
+| [0028](0028-user-account-schema.md) | User account schema: auth, game links, learn progress | Deferred |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).

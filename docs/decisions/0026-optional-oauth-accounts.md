@@ -42,7 +42,7 @@ upserts a `users` row keyed by `(provider, provider_subject)` and sets a session
 | --- | --- |
 | Session | an opaque session id in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie, rows in Postgres. Not a JWT: revocation is a row delete, and nothing else needs a stateless token. `JWT_SECRET` (unused since ADR 0001) gets removed rather than revived |
 | WebSocket | the cookie rides the WS handshake (same site); the server resolves it to a user before `join`. Seat possession still uses `reconnect_secret`; an account adds "this seat belongs to this user" for cross-device reclaim |
-| Tables | `users(id, display_name, created_at)`, `identities(user_id, provider, subject)`, `sessions(id, user_id, expires_at)`, plus per-feature tables (`learn_progress(user_id, lesson_id, …)`) |
+| Tables | `users`, `identities`, `sessions`, plus per-feature tables; full schema in [ADR 0028](0028-user-account-schema.md) |
 | Guest → account | on first sign-in, the client uploads its local progress (learn progress, display name, prefs); the server merges, solved wins |
 | Display name | defaults from the provider, editable; uniqueness only matters if a leaderboard ships |
 | Guest identity in game records | unchanged: records keep the display name; a signed-in seat also records `user_id` |
