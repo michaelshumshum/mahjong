@@ -71,7 +71,7 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 | `t` | payload | notes |
 | --- | --- | --- |
 | `hello` | `{last_seq?, client_version, seat?, secret?}` | first frame after connect. `seat` present + already bound → reconnect (§5), authenticated by `secret`; a missing or wrong one refuses the reclaim (`error{code:'bad_secret'}`). Omitted `seat` → no-op ahead of `join`. Never carries a name |
-| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` is the guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty (`app/names.py`'s `normalize_name`). Never rejected once it passes the raw 64-char bound (Size limits, below) |
+| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` is the guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty (`app/names.py`'s `normalize_name`). Never rejected once it passes the raw 64-char bound (Size limits, below). Ignored for a signed-in connection, whose seat takes the account's `display_name` ([architecture.md §2.1](architecture.md)); nothing on the wire tells other seats apart |
 | `ready` | `{}` | lobby → start; only valid once seated |
 | `start_with_bots` | `{}` | host only, before the table starts: bind every empty seat to a bot and deal once all seats are bound and ready. `error{code:'not_host'}` / `error{code:'already_started'}` otherwise |
 | `hand_end_ack` | `{}` | dismiss the hand-end hold early ([architecture.md §3](architecture.md) "Hand-end hold") |
@@ -768,6 +768,10 @@ GET /me/export
 
 `games` is every seat linked to the account, newest first. Learn progress isn't stored
 server-side yet; it joins the export with ADR 0028 phase 5.
+
+**WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
+signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game
+saves the seat as `kind = 'user'`. No frame changes ([architecture.md §2.1](architecture.md)).
 
 `PATCH` and `DELETE` are in the CORS `allow_methods`; a cross-origin one is always preflighted,
 so only `CORS_ORIGINS` can send them with the cookie.

@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import GameMode, GameRecord, GameSeat, HandRecord, SeatKind
+from app.db.models import GameMode, GameRecord, GameSeat, HandRecord, SeatKind, User
 from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.engine import ENGINE_VERSION, game_outcome
 from mahjong_core.state import GameState, Phase
@@ -83,12 +83,20 @@ async def save_game_record(
     if seats is not None:
         await session.flush()
         places = placements(outcome.final_scores)
+        # an account deleted mid-game is a deleted account's seat: `user`, null id, as SET NULL
+        # would have left it. without this its foreign key would lose the whole game
+        claimed = {s.user_id for s in seats if s.user_id is not None}
+        live = (
+            set(await session.scalars(select(User.id).where(User.id.in_(claimed))))
+            if claimed
+            else set()
+        )
         session.add_all(
             GameSeat(
                 game_id=record.id,
                 seat=seat,
                 kind=s.kind,
-                user_id=s.user_id,
+                user_id=s.user_id if s.user_id in live else None,
                 bot_tier=s.bot_tier,
                 final_score=outcome.final_scores[seat],
                 placement=places[seat],

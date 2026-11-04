@@ -29,7 +29,10 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import protocol as proto
+from app.accounts.routes import user_for_cookie
+from app.accounts.sessions import COOKIE_NAME
 from app.clock import now_ms
+from app.db.models import User
 from app.errors import (
     TABLE_CLOSED_ERROR,
     TABLE_GONE_ERROR,
@@ -167,9 +170,11 @@ class Session:
     `ping` never move off it, see `handle`). Once `join` binds a seat, every response routes
     through that seat's own `Table.publish_to_seat`, which owns the real per-seat `seq`."""
 
-    def __init__(self, websocket: WebSocket, table: Table) -> None:
+    def __init__(self, websocket: WebSocket, table: Table, account: User | None = None) -> None:
         self.ws = websocket
         self.table = table
+        # resolved once at the handshake; a signed-in join takes its name and id
+        self.account = account
         self.session_id = str(uuid.uuid4())
         self.seat: int | None = None
         self._local_seq = 0
@@ -306,7 +311,14 @@ class Session:
             self._ack(msg, ok=False, error="already_joined")
             return
         try:
-            seat = self.table.join(self.session_id, self._push, seat=msg.d.seat, name=msg.d.name)
+            # a signed-in seat is always the account's name; any typed join.name is ignored
+            seat = self.table.join(
+                self.session_id,
+                self._push,
+                seat=msg.d.seat,
+                name=self.account.display_name if self.account else msg.d.name,
+                user_id=self.account.id if self.account else None,
+            )
         except SeatTakenError:
             self._ack(msg, ok=False, error="seat_taken")
             return
@@ -475,7 +487,8 @@ async def _serve(websocket: WebSocket, table: str, spectate: bool) -> None:
         # 1013 = "Try Again Later" (RFC 6455).
         await websocket.close(code=_CLOSE_TRY_AGAIN_LATER)
         return
-    # no auth -- accept every other connection, up to the docs/protocol.md §11 caps.
+    # no auth gate -- accept every other connection, up to the docs/protocol.md §11 caps. an
+    # account cookie only names a seat (docs/architecture.md §2.1), never admits one.
     await websocket.accept()
     table_obj = _registry.get(table)
     if table_obj is None:
@@ -491,7 +504,9 @@ async def _serve(websocket: WebSocket, table: str, spectate: bool) -> None:
         await websocket.send_text(json.dumps(frame))
         await websocket.close(code=_CLOSE_TRY_AGAIN_LATER)
         return
-    session = Session(websocket, table_obj)
+    session = Session(
+        websocket, table_obj, account=await user_for_cookie(websocket.cookies.get(COOKIE_NAME))
+    )
     if spectate:
         # explicit connect-time opt-in, not a passive default -- would race the real
         # hello-before-join handshake.

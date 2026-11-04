@@ -81,10 +81,22 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
 
 ### 2.1 Auth
 
-Guest-only ([ADR 0001](decisions/0001-guest-only-identity.md)). There is no account, password,
-email, JWT or REST auth endpoint. A player picks a display name client-side; it persists in
-`localStorage` and travels as a plain field on `join` (`SeatBinding.name` holds it for the game).
+A seat is held by a guest or by an account. Guests are the default; accounts are optional, via
+Google sign-in, and off unless `ACCOUNTS_ENABLED` ([ADR 0029](decisions/0029-optional-accounts.md),
+[ADR 0028](decisions/0028-user-account-schema.md), [protocol.md §10](protocol.md) "Accounts").
+There is no password, JWT or email sign-in.
+
+| | Guest | Signed in |
+| --- | --- | --- |
+| Identity at the handshake | none | the `mj_session` cookie rides the `/ws` upgrade (same site); `_serve` resolves it once (`accounts.routes.user_for_cookie`) into `Session.account`. Accounts off, no cookie, an unknown/expired one, a disabled user or a database error: a guest |
+| Seat name | picked client-side, kept in `localStorage`, sent as `join.name` | `users.display_name`; `join.name` is ignored. Both go through `app/names.py`'s `normalize_name` into `SeatBinding.name` |
+| `SeatBinding.user_id` | None | the account's id, set at `join` and kept for the game (a `hello` reclaim doesn't change it) |
+| Saved seat (`game_players`) | `guest` | `user` + `user_id`, also when `autoplay` finishes the game (§6) |
+| On the wire | — | nothing new: other players see a name, not whether it's an account |
+
 `hello.seat` only ever reclaims an already-bound seat, so a reconnect never resends the name.
+Seat possession is the same for both: the `reconnect_secret` below, never the account, so
+reclaiming a seat from another device stays out of scope (ADR 0028 "Decisions").
 
 ```
 client ──ws://…/ws?table=…────────────────────────────────────────────► WS endpoint
@@ -529,15 +541,16 @@ table is evicted at once and its id tombstoned (§8.2).
 `Phase.HAND_OVER`) via an optional `session_factory: async_sessionmaker[AsyncSession] | None`
 threaded through `Table.__init__`/`TableRegistry`. `app/main.py`'s `lifespan` builds the engine from
 `DATABASE_URL` (unset → no persistence). On `Phase.GAME_OVER`, `Table` calls `save_game_record` at
-most once with `self.actions` and each seat's `SeatBinding.name` — guest names are the permanent
-identity model.
+most once with `self.actions` and each seat's `SeatBinding.name`: the name shown at the table is
+what the record keeps, for guests and accounts alike.
 
 The same commit writes four `game_players` rows ([ADR 0028](decisions/0028-user-account-schema.md)),
 one per seat, and `games.mode` (`practice` iff `Table.practice`, else `multiplayer`):
 
 | Column | Value at save |
 | --- | --- |
-| `kind` | `bot` iff the seat's `SeatBinding.status == "bot"` (bound at construction); otherwise `guest`, including a human finished by `autoplay` and an empty seat. `user` arrives with accounts |
+| `kind` | `bot` iff the seat's `SeatBinding.status == "bot"` (bound at construction); `user` iff its `SeatBinding.user_id` is set (§2.1); otherwise `guest`, including an empty seat. A human finished by `autoplay` keeps `user` or `guest` |
+| `user_id` | `SeatBinding.user_id` for a `user` seat; null if that account was deleted before the save (the seat stays `user`, as `ON DELETE SET NULL` leaves it later) |
 | `bot_tier` | `_effective_bot_tier(seat)` for a `bot` seat, else null |
 | `final_score` | `game_outcome(state).final_scores[seat]` |
 | `placement` | 1–4 by `final_score`; tied scores share the better place (`1, 1, 3, 4`, `records.placements`) |
