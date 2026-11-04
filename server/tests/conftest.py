@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -84,3 +85,16 @@ async def session() -> AsyncIterator[AsyncSession]:
     async with factory() as s:
         yield s
     await engine.dispose()
+
+
+@pytest.fixture
+def accounts_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """A file-backed SQLite `DATABASE_URL` with the schema, and `ACCOUNTS_ENABLED=1`, for a
+    `TestClient(app)` opened inside the test. Returns the url (`tests/accounts.py`)."""
+    from tests.accounts import create_schema
+
+    database_url = f"sqlite+aiosqlite:///{tmp_path / 'accounts.db'}"
+    create_schema(database_url)
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("ACCOUNTS_ENABLED", "1")
+    return database_url

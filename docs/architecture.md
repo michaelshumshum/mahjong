@@ -506,7 +506,7 @@ cheat, and any bot can run as a client against a real server for integration tes
 | Backend | FastAPI + native WebSockets on uvicorn/uvloop | pydantic models double as the protocol schema, codegen'd into TypeScript ([protocol.md §6](protocol.md)) |
 | Serialization | JSON | ~2KB for a full snapshot, ~150 bytes for a typical event |
 | Frontend | SvelteKit 2 on Svelte 5 (runes), DOM/CSS, no canvas | the table surface is DOM like everything else ([ADR 0002](decisions/0002-dom-rendering.md), [frontend.md](frontend.md)) |
-| Storage | Postgres | finished games, their seats (`game_players`) and hand records only ([infra.md §6](infra.md)) |
+| Storage | Postgres | finished games, their seats (`game_players`), hand records, and optional accounts with their sign-in sessions (`users`, `identities`, `sessions`) ([infra.md §6](infra.md)) |
 
 ### Storage
 
