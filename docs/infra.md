@@ -274,6 +274,9 @@ There is no `users` table — identity is guest-only by design
 - Models: `server/app/db/models.py`; migrations: `server/alembic/versions/`.
 - JSON columns use `JSON().with_variant(JSONB(), "postgresql")` — JSONB on Postgres, generic `JSON`
   elsewhere, so tests run against SQLite (CI has no Postgres service, §9).
+- `make_engine` (`server/app/db/session.py`) turns on `PRAGMA foreign_keys` for every SQLite
+  connection: SQLite ignores foreign keys by default, so `ON DELETE CASCADE`/`SET NULL` would
+  otherwise go untested.
 - `save_game_record` (`server/app/db/records.py`) is the only write path; `bots/selfplay.py`'s
   `play_and_record_game` records bot-only games through it.
 - Live table state is never persisted ([architecture.md §7](architecture.md)).
