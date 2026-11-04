@@ -298,6 +298,46 @@ seat records start filling before any user sees an account.
 | 6 | stats and profile (later) | 4 |
 | 7 | privacy policy and terms; sign-in enabled publicly | 3 |
 
+### Pull requests
+
+Each phase lands as several PRs. Rules for every PR:
+
+- one concern; a refactor never shares a PR with a behaviour change;
+- tests and the docs it touches ship in the same PR; CI green;
+- deployable alone: prod keeps working if the next PR never lands;
+- a migration ships in a PR whose code doesn't yet *require* the new tables, so the auto-deploy
+  can run before `make prod-migrate` without breaking saves;
+- server auth routes stay off in prod behind `ACCOUNTS_ENABLED` (unset → `/auth/*` and `/me*`
+  404), the web UI behind the matching flag, until phase 7;
+- rough size: under ~400 changed lines, excluding lockfiles and generated files.
+
+| PR | Phase | Scope | Size |
+| --- | --- | --- | --- |
+| 0.1 | 0 | ADR: optional accounts, superseding 0001; `Superseded` status row | S |
+| 1.1 | 1 | `make_engine`: SQLite `PRAGMA foreign_keys=ON`, with a test | S |
+| 1.2 | 1 | `game_players` model + migration, `games.mode` nullable; constraint tests; nothing writes yet | S |
+| 1.3 | 1 | `save_game_record(seats=, mode=)`, placement; `_persist_game_record` fills them; `architecture.md`, `infra.md §6` | M |
+| 2.1 | 2 | remove `JWT_SECRET` (env, Compose, CI, docs) and `pyjwt` | S |
+| 2.2 | 2 | `users`, `identities`, `sessions` models + migration; `game_players.user_id` FK; indexes | M |
+| 2.3 | 2 | `ACCOUNTS_ENABLED`; session module (issue, hash, resolve, idle/absolute expiry, rotation, cleanup); credentialed CORS; `GET /me`, `POST /auth/logout`. Testable without Google | M |
+| 2.4 | 2 | Authlib; `/auth/google/login` + callback (upsert user/identity, email); rate limits; env vars in `infra.md §2` | M |
+| 2.5 | 2 | `PATCH /me`, `DELETE /me`, `GET /me/export`; deletion cascade tests | M |
+| 2.6 | 2 | WS handshake resolves the cookie; `SeatBinding.user_id`, account name, `kind = 'user'` on save; `architecture.md §2.1` | M |
+| 3.1 | 3 | web flag; session store (`/me` on load, SSR cookie forward, `credentials: 'include'`) | S |
+| 3.2 | 3 | Google sign-in button, sign-out, first-sign-in step (name, consent) | M |
+| 3.3 | 3 | account settings: name, consent, export, delete; screenshots | M |
+| 3.4 | 3 | signed-in join hides the name field | S |
+| 4.1 | 4 | `GET /me/games` (keyset pages, mode filter); `protocol.md §10` | S |
+| 4.2 | 4 | `/profile` games list | M |
+| 5.1 | 5 | learn tables + migration; `GET /me/learn`, `PUT` lesson and endless rows | M |
+| 5.2 | 5 | `POST /me/learn/import`: validate, clamp, merge, `imported`, rate limit | M |
+| 5.3 | 5 | web refactor: progress store behind a backend interface, `localStorage` only; no behaviour change | S |
+| 5.4 | 5 | web API backend; upload once per device, delete keys on success | M |
+| 7.1 | 7 | privacy policy and terms pages, final consent wording | M |
+| 7.2 | 7 | enable both flags in prod; ADR statuses flip | S |
+
+Phase 6 is unscheduled and gets its own breakdown when it's picked up.
+
 ### Phase 0: decisions and setup
 
 No code. Unblocks phase 2.
