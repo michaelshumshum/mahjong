@@ -33,7 +33,6 @@ services:
       --reload --reload-dir /app/app --reload-dir /app/mahjong_core
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mahjong}:${POSTGRES_PASSWORD:-mahjong}@postgres:5432/${POSTGRES_DB:-mahjong}
-      JWT_SECRET: ${JWT_SECRET:-dev-only-not-a-secret}
       CORS_ORIGINS: http://localhost:${WEB_PORT:-5173}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PYTHONPATH: /app
