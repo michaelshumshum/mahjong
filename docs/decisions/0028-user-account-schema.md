@@ -15,7 +15,7 @@ default; an account is opt-in. First scope:
 | Learn progress | `mahjong:learnProgress:v1` and the endless scores, `localStorage` only ([ADR 0025](0025-learn-mode.md)), unchanged | stored server-side, synced across devices |
 | Profile and stats | none | later: a `user_stats` row derived from the game links |
 
-Auth itself (Authlib, Discord + Google, opaque session cookie in Postgres) follows ADR 0026 and
+Auth itself (Authlib, Google sign-in, opaque session cookie in Postgres) follows ADR 0026 and
 isn't repeated here.
 
 ## Design sketch
@@ -42,7 +42,7 @@ erDiagram
     }
     identities {
         uuid user_id FK
-        varchar provider PK "discord | google"
+        varchar provider PK "google; more providers later"
         varchar subject PK "provider's stable user id"
         varchar email "nullable, contact only, never a key"
         timestamptz created_at
@@ -304,13 +304,23 @@ No code. Unblocks phase 2.
 
 - [ ] New ADR superseding [ADR 0001](0001-guest-only-identity.md): optional accounts (add
       `Superseded` to the status table in `README.md`; statuses flip in phase 7).
-- [ ] Register the OAuth apps; redirect URIs for local dev and prod (see Open decisions).
+- [ ] Google Cloud project + OAuth client (web application):
+      - scopes `openid email profile` only (non-sensitive, so no scope verification);
+      - redirect URIs `https://mahjong-api.shumshum.dev/auth/google/callback` and
+        `http://localhost:8000/auth/google/callback`;
+      - authorized domain `shumshum.dev`;
+      - consent screen publishing status set to **In production** (Testing caps sign-in to the
+        listed test users);
+      - client id and secret in the prod `.env` and `.env.example` ([infra.md §2](../infra.md)).
+- [ ] Brand verification (app name and logo on the consent screen) needs a privacy policy URL and
+      a verified `shumshum.dev` in Search Console: submitted in phase 7.
 
 ### Decisions
 
 | Topic | Decision |
 | --- | --- |
-| Cookie origin | web and API already sit on separate subdomains of one site behind the Cloudflare Tunnel, no reverse proxy. The session cookie is host-only on the API host, `HttpOnly`, `Secure`, `SameSite=Lax` (same site, so it rides credentialed fetches and the WS handshake). Web `fetch`es to the API use `credentials: 'include'`; the API sets `allow_credentials=True` with explicit `CORS_ORIGINS`, never `*`. SSR calls to `/me` forward the browser's cookie |
+| Provider | Google only at launch. `identities` keeps its multi-provider shape; linking a second provider is moot until one is added |
+| Cookie origin | web (`mahjong.shumshum.dev`) and API (`mahjong-api.shumshum.dev`) are separate hostnames of one site, each a Cloudflare Tunnel ingress rule, no reverse proxy. The session cookie is host-only on the API host, `HttpOnly`, `Secure`, `SameSite=Lax` (same site, so it rides credentialed fetches and the WS handshake). Web `fetch`es to the API use `credentials: 'include'`; the API sets `allow_credentials=True` with explicit `CORS_ORIGINS`, never `*`. SSR calls to `/me` forward the browser's cookie |
 | Session lifetime | 90 days absolute (`expires_at`), 30 days idle (`last_used_at`) |
 | Seat name | a signed-in seat always uses `users.display_name`; the table's name field is hidden and any typed `join.name` is ignored |
 | Email | request the provider's email scope; stored in `identities.email` |
@@ -320,12 +330,6 @@ No code. Unblocks phase 2.
 | Cross-device seat reclaim | deferred; seats keep the per-browser `reconnect_secret` |
 | Signed-in badge for other players | none; v1 sends nothing new on the wire |
 | Privacy policy and terms | written last (phase 7); sign-in isn't publicly enabled until it ships |
-
-### Open decisions
-
-- Production redirect domain, OAuth providers at launch, and linking a second provider to one
-  account: deferred, to settle before phase 2.
-
 ### Phase 1: seat records for every game
 
 Server only. No accounts yet, so every row is `guest` or `bot`, but every game from here on has
@@ -348,7 +352,7 @@ seat data, placements and mode.
 - [ ] Dependency: Authlib (reason: OAuth 2.0 + PKCE + `state`, maintained; replaces
       hand-rolled token exchange). Remove `JWT_SECRET` and `pyjwt` if nothing else reads them.
 - [ ] Migration: `users`, `identities`, `sessions`, indexes; add the `game_players.user_id` FK.
-- [ ] Routes: `GET /auth/{provider}/login`, `GET /auth/{provider}/callback` (upsert user +
+- [ ] Routes (`{provider}` is only `google` for now): `GET /auth/{provider}/login`, `GET /auth/{provider}/callback` (upsert user +
       identity, refresh `email`, create session, set cookie, redirect to the web), `POST
       /auth/logout`, `GET /me`, `PATCH /me` (display name, consent), `DELETE /me`,
       `GET /me/export`.
@@ -370,7 +374,8 @@ seat data, placements and mode.
 
 - [ ] Session store: `GET /me` on load (SSR forwards the cookie); signed-in / guest state
       available app-wide. API `fetch`es use `credentials: 'include'`.
-- [ ] Sign-in buttons in settings and on `/profile`; sign-out.
+- [ ] "Sign in with Google" button (Google's branding rules) in settings and on `/profile`;
+      sign-out.
 - [ ] Sign-up step on first sign-in: confirm display name, training-consent checkbox (unchecked).
 - [ ] Account settings: display name, training-consent toggle, export data, delete account with
       a typed confirmation.
@@ -419,4 +424,6 @@ placement, practice vs multiplayer); add `user_stats` only if those get slow.
 - [ ] Final training-consent wording; bump `consent_version` if it changed from the phase 3
       placeholder.
 - [ ] Routes for both pages, linked from sign-up and account settings; en + zh-Hant.
+- [ ] Add both URLs to the Google consent screen; verify `shumshum.dev` in Search Console and
+      submit brand verification.
 - [ ] Remove the sign-in flag; mark ADR 0001 `Superseded`, 0026 and this record `Accepted`.
