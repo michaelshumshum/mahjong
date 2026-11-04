@@ -9,6 +9,7 @@ reference docs in `docs/` describe the system as it is; these records hold the h
 | Deferred | designed or scoped, not built — read the record before reviving |
 | Rejected | tried or considered and dropped |
 | Historical | a retired plan, kept for the record |
+| Superseded | reversed by a later record; read the one that supersedes it |
 
 Before reviving a deferred record, re-read the reference docs it links: the design around it has
 moved on.
@@ -43,6 +44,7 @@ moved on.
 | [0026](0026-optional-oauth-accounts.md) | Optional accounts via OAuth sign-in | Deferred |
 | [0027](0027-bot-exact-shanten-and-no-chance.md) | Bots read exact shanten and a correct no-chance | Accepted |
 | [0028](0028-user-account-schema.md) | User account schema: auth, game links, learn progress | Deferred |
+| [0029](0029-optional-accounts.md) | Optional accounts (supersedes 0001) | Deferred |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).

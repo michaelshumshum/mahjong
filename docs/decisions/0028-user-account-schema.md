@@ -342,8 +342,9 @@ Phase 6 is unscheduled and gets its own breakdown when it's picked up.
 
 No code. Unblocks phase 2.
 
-- [ ] New ADR superseding [ADR 0001](0001-guest-only-identity.md): optional accounts (add
-      `Superseded` to the status table in `README.md`; statuses flip in phase 7).
+- [x] New ADR superseding [ADR 0001](0001-guest-only-identity.md): optional accounts,
+      [ADR 0029](0029-optional-accounts.md) (add `Superseded` to the status table in `README.md`;
+      statuses flip in phase 7).
 - [ ] Google Cloud project + OAuth client (web application):
       - scopes `openid email profile` only (non-sensitive, so no scope verification);
       - redirect URIs `https://mahjong-api.shumshum.dev/auth/google/callback` and
@@ -468,4 +469,4 @@ placement, practice vs multiplayer); add `user_stats` only if those get slow.
 - [ ] Routes for both pages, linked from sign-up and account settings; en + zh-Hant.
 - [ ] Add both URLs to the Google consent screen; verify `shumshum.dev` in Search Console and
       submit brand verification.
-- [ ] Remove the sign-in flag; mark ADR 0001 `Superseded`, 0026 and this record `Accepted`.
+- [ ] Remove the sign-in flag; mark ADR 0001 `Superseded`, 0026, 0029 and this record `Accepted`.
