@@ -14,6 +14,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.errors import ErrorCode
+from app.names import MAX_RAW_NAME_LENGTH
 from app.table_types import SeatStatus, WireSeatStatus
 from app.views import ClaimChoice, WindName
 from bots.tiers import BotTier
@@ -26,11 +27,10 @@ from mahjong_core.tiles import COPIES_PER_TYPE
 # is rejected.
 type Seat = Literal[0, 1, 2, 3]
 
-# client->server size bounds (docs/protocol.md §2 "Size limits"). name is the raw length, before
-# table.py's trim-and-cap; a kong is the largest meld
+# client->server size bounds (docs/protocol.md §2 "Size limits"). name's raw bound is
+# app/names.py's MAX_RAW_NAME_LENGTH; a kong is the largest meld
 _MAX_ID_LENGTH = 64
 _MAX_TOKEN_LENGTH = 64
-_MAX_RAW_NAME_LENGTH = 64
 _MAX_MELD_TILES = COPIES_PER_TYPE
 
 
@@ -106,7 +106,7 @@ class JoinPayload(BaseModel):
 
     seat: int | None = None  # omit for "first open seat"
     # guest display name, sent once at first join; normalized server-side.
-    name: str | None = Field(default=None, max_length=_MAX_RAW_NAME_LENGTH)
+    name: str | None = Field(default=None, max_length=MAX_RAW_NAME_LENGTH)
 
 
 class ReadyPayload(BaseModel):
