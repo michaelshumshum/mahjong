@@ -357,6 +357,8 @@ seat data, placements and mode.
       /auth/logout`, `GET /me`, `PATCH /me` (display name, consent), `DELETE /me`,
       `GET /me/export`.
 - [ ] CORS: `allow_credentials=True`, explicit origins.
+- [ ] No hostname in code or rows: the callback URL, post-sign-in redirect and cookie host derive
+      from env (`PUBLIC_API_URL`, `CORS_ORIGINS`), so a domain change is config only.
 - [ ] Sessions: 32-byte token, SHA-256 stored, 90-day absolute and 30-day idle expiry, rotate at sign-in,
       `last_used_at` written at most hourly, periodic cleanup of expired rows. `disabled_at`
       refuses sign-in and drops sessions.
