@@ -391,8 +391,9 @@ seat data, placements and mode.
 
 ### Phase 2: server auth
 
-- [ ] Dependency: Authlib (reason: OAuth 2.0 + PKCE + `state`, maintained; replaces
-      hand-rolled token exchange). Remove `JWT_SECRET` and `pyjwt` if nothing else reads them.
+- [x] Dependency: Authlib (reason: OAuth 2.0 + PKCE + `state`, maintained; replaces
+      hand-rolled token exchange), with `httpx` (Authlib's async client) moved from dev to
+      runtime. Remove `JWT_SECRET` and `pyjwt` if nothing else reads them (done, PR 2.1).
 - [x] Migration: `users`, `identities`, `sessions`, indexes; add the `game_players.user_id` FK.
       `users.prefs` and `learn_imported_at` wait for phase 5's migration.
 - [ ] Routes (`{provider}` is only `google` for now): `GET /auth/{provider}/login`, `GET /auth/{provider}/callback` (upsert user +
@@ -400,15 +401,15 @@ seat data, placements and mode.
       /auth/logout`, `GET /me`, `PATCH /me` (display name, consent), `DELETE /me`,
       `GET /me/export`.
 - [x] CORS: `allow_credentials=True`, explicit origins.
-- [ ] No hostname in code or rows: the callback URL, post-sign-in redirect and cookie host derive
-      from env (`PUBLIC_API_URL`, `CORS_ORIGINS`), so a domain change is config only.
+- [x] No hostname in code or rows: the callback URL, post-sign-in redirect and cookie host derive
+      from env (`PUBLIC_API_URL`, `PUBLIC_WEB_URL` defaulting to the first `CORS_ORIGINS`
+      entry), so a domain change is config only.
 - [x] Sessions: 32-byte token, SHA-256 stored, 90-day absolute and 30-day idle expiry, rotate at sign-in,
       `last_used_at` written at most hourly, periodic cleanup of expired rows. `disabled_at`
       refuses sign-in and drops sessions.
 - [ ] WS: resolve the cookie at the handshake; `join` sets `SeatBinding.user_id` and the name to
       `users.display_name`, ignoring `join.name`. `_persist_game_record` writes `kind = 'user'`.
-- [ ] Rate limits on `/auth/*` with the existing `RateLimiter` (`app/main.py`).
-- [ ] Tests: callback with a stubbed provider token exchange; session expiry, idle, rotation;
+- [x] Rate limits on `/auth/*` with the existing `RateLimiter` (`app/main.py`).- [ ] Tests: callback with a stubbed provider token exchange; session expiry, idle, rotation;
       disabled user; `DELETE /me` cascades and leaves `game_players` as `user` + null id; WS join
       with and without a cookie.
 - [ ] Docs: `architecture.md §2.1` rewritten (guest *or* account), `protocol.md §10` new HTTP

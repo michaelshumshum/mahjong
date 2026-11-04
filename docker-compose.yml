@@ -37,6 +37,8 @@ services:
       # accounts (docs/infra.md §2): off unless set in .env
       ACCOUNTS_ENABLED: ${ACCOUNTS_ENABLED:-}
       PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PYTHONPATH: /app
     ports: ["${API_PORT:-8000}:8000"]

@@ -11,6 +11,8 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "numpy>=2.1",                     # LearnedBot's forward pass (T4); no torch at runtime
+    "authlib>=1.6",                   # google sign-in: oauth 2.0 code flow, pkce, state (ADR 0028)
+    "httpx>=0.28",                    # authlib's async http client for the token exchange
 ]
 # mahjong_core is stdlib-only. numpy only in bots/learned.py and the torch-free ml/ modules it
 # imports; never torch. See server/AGENTS.md.
@@ -30,7 +32,6 @@ dev = [
     "pytest-xdist>=3.7",
     "pytest-cov>=6.0",
     "hypothesis>=6.115",
-    "httpx>=0.28",
     "ruff>=0.8",
     "mahjong>=1.2",                   # shanten test oracle, not a runtime dep
     "pre-commit>=4.6.2",
