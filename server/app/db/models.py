@@ -1,5 +1,6 @@
 """SQLAlchemy models for durable records: finished games (`games`), who held each seat
-(`game_players`) and standalone hands (`hand_records`).
+(`game_players`), standalone hands (`hand_records`) and optional accounts (`users`,
+`identities`, `sessions`).
 
 JSON columns use `JSONB` on Postgres, generic `JSON` elsewhere (`.with_variant`) -- SQLite
 (tests) has no JSONB.
@@ -19,6 +20,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     SmallInteger,
     String,
     Uuid,
@@ -27,6 +29,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from app.names import MAX_NAME_LENGTH
 
 JSONType = GenericJSON().with_variant(JSONB(), "postgresql")
 
@@ -98,11 +102,75 @@ class GameSeat(Base):
     )
     seat: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
     kind: Mapped[SeatKind] = mapped_column(String(8), nullable=False)
-    # FK to users.id (ON DELETE SET NULL) arrives with the users table, ADR 0028 phase 2
-    user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    # SET NULL keeps kind = 'user': a deleted account, still distinct from a guest
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_game_players_user_id_users"),
+        nullable=True,
+    )
     bot_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
     final_score: Mapped[int] = mapped_column(Integer, nullable=False)
     placement: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+
+class User(Base):
+    """An optional account (docs/decisions/0028-user-account-schema.md). uuid, not serial: ids
+    appear in URLs and shouldn't be enumerable. `prefs` and `learn_imported_at` arrive with
+    learn sync (ADR 0028 phase 5).
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    display_name: Mapped[str] = mapped_column(String(MAX_NAME_LENGTH), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # null = no consent to training on this user's games (ADR 0016)
+    training_consent_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    consent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    disabled_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Identity(Base):
+    """One provider sign-in for a user. `subject` is the provider's stable id; `email` is a
+    contact field only, never a key.
+    """
+
+    __tablename__ = "identities"
+    __table_args__ = (Index("ix_identities_user_id", "user_id"),)
+
+    provider: Mapped[str] = mapped_column(String(16), primary_key=True)
+    subject: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AuthSession(Base):
+    """A signed-in browser. The cookie carries a random token; only its SHA-256 is stored, so a
+    leaked row can't be replayed.
+    """
+
+    __tablename__ = "sessions"
+    __table_args__ = (
+        Index("ix_sessions_user_id", "user_id"),
+        Index("ix_sessions_expires_at", "expires_at"),
+    )
+
+    id_hash: Mapped[bytes] = mapped_column(LargeBinary(32), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class HandRecord(Base):
