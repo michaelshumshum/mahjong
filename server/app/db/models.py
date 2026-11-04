@@ -23,6 +23,7 @@ from sqlalchemy import (
     LargeBinary,
     SmallInteger,
     String,
+    TypeDecorator,
     Uuid,
     func,
     text,
@@ -38,6 +39,19 @@ SeatKind = Literal["user", "guest", "bot"]
 GameMode = Literal["practice", "multiplayer"]
 SEAT_KINDS: Final[tuple[SeatKind, ...]] = get_args(SeatKind)
 GAME_MODES: Final[tuple[GameMode, ...]] = get_args(GameMode)
+
+
+class UTCDateTime(TypeDecorator[dt.datetime]):
+    """`DateTime(timezone=True)` that reads back tz-aware: SQLite (tests) drops the offset, and
+    every value stored is UTC."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value: dt.datetime | None, dialect: Any) -> dt.datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=dt.UTC)
+        return value
 
 
 def _sql_in(values: tuple[str, ...]) -> str:
@@ -124,14 +138,12 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     display_name: Mapped[str] = mapped_column(String(MAX_NAME_LENGTH), nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        UTCDateTime, server_default=func.now(), nullable=False
     )
     # null = no consent to training on this user's games (ADR 0016)
-    training_consent_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    training_consent_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
     consent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    disabled_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disabled_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class Identity(Base):
@@ -149,7 +161,7 @@ class Identity(Base):
     )
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        UTCDateTime, server_default=func.now(), nullable=False
     )
 
 
@@ -168,9 +180,9 @@ class AuthSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    last_used_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    expires_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
+    last_used_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
+    expires_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
 
 
 class HandRecord(Base):

@@ -28,11 +28,6 @@ def hash_token(token: str) -> bytes:
     return hashlib.sha256(token.encode()).digest()
 
 
-def _utc(value: dt.datetime) -> dt.datetime:
-    # sqlite hands DateTime(timezone=True) back naive; every stored value is utc
-    return value if value.tzinfo is not None else value.replace(tzinfo=dt.UTC)
-
-
 async def issue_session(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -78,8 +73,8 @@ async def resolve_session(
         await db.execute(delete(AuthSession).where(AuthSession.user_id == user.id))
         await db.commit()
         return None
-    last_used = _utc(auth.last_used_at)
-    if now >= _utc(auth.expires_at) or now - last_used >= idle:
+    last_used = auth.last_used_at
+    if now >= auth.expires_at or now - last_used >= idle:
         await db.delete(auth)
         await db.commit()
         return None

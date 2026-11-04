@@ -93,11 +93,11 @@ async def test_last_used_is_written_at_most_hourly(session: AsyncSession) -> Non
 
     await _resolve(session, token, _T0 + TOUCH_INTERVAL - dt.timedelta(seconds=1))
     [row] = await _rows(session)
-    assert row.last_used_at.replace(tzinfo=dt.UTC) == _T0
+    assert row.last_used_at == _T0
 
     await _resolve(session, token, _T0 + TOUCH_INTERVAL)
     [row] = await _rows(session)
-    assert row.last_used_at.replace(tzinfo=dt.UTC) == _T0 + TOUCH_INTERVAL
+    assert row.last_used_at == _T0 + TOUCH_INTERVAL
 
 
 async def test_rotation_replaces_the_old_session(session: AsyncSession) -> None:
