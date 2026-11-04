@@ -104,7 +104,7 @@ erDiagram
 
 | Table | Key | Notes |
 | --- | --- | --- |
-| `users` | `id uuid` | uuid, not serial: ids appear in URLs (`/profile/<id>`) and shouldn't be enumerable. `display_name` defaults from the provider, editable, not unique, capped and normalized like a guest name (`_MAX_NAME_LENGTH`, `server/app/table.py`) |
+| `users` | `id uuid` | uuid, not serial: ids appear in URLs (`/profile/<id>`) and shouldn't be enumerable. `display_name` defaults from the provider, editable, not unique, capped and normalized like a guest name (`MAX_NAME_LENGTH`, `server/app/names.py`) |
 | `identities` | `(provider, subject)` | one user, many providers. `subject` is the provider's stable id, never the email. `email` is whatever the provider returns, nullable, not unique: used to contact the user and to match deletion requests, never to sign in or link accounts |
 | `sessions` | `id_hash` | the cookie carries a 32-byte random token; only its SHA-256 is stored, so a DB leak can't replay sessions (no salt needed for a random token). Expires on `expires_at` or after an idle window on `last_used_at`; a new token is issued at every sign-in. `last_used_at` is written at most once an hour. Sign-out and revocation are a row delete |
 | `game_players` | `(game_id, seat)` | exactly four rows per game, one per seat, saying who held it: an account, a guest or a bot |

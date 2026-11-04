@@ -119,6 +119,7 @@ from app.frames import (
     state_sync_frame,
     turn_frame,
 )
+from app.names import normalize_name
 from app.status import stats as server_stats
 from app.table_types import (
     BotJobTag,
@@ -176,8 +177,6 @@ _CLAIM_HOLD_SECONDS = float(os.environ.get("CLAIM_HOLD_SECONDS", "1.0"))
 # frames a claim hold never delays: an offered seat's own window traffic, connection notices
 _HOLD_EXEMPT_FRAMES: Final = frozenset({"ack", "error", "server_shutdown", "claim_offer"})
 
-_MAX_NAME_LENGTH = 24  # guest display name cap (docs/protocol.md §2 `join.name`)
-
 # client commands past this many queued inbox items are dropped (docs/protocol.md §11)
 INBOX_COMMAND_LIMIT: Final = 64
 
@@ -202,16 +201,6 @@ _BOT_NAME_POOL = (
     "雀聖",
     "搭腳仔",
 )
-
-
-def _normalize_name(raw: str | None, seat: int) -> str:
-    """Trim whitespace, cap at `_MAX_NAME_LENGTH` chars, fall back to `"Guest N"` (1-indexed)
-    when empty or omitted -- a low-stakes guest field, so bad input is normalized, never
-    rejected."""
-    trimmed = (raw or "").strip()
-    if not trimmed:
-        return f"Guest {seat + 1}"
-    return trimmed[:_MAX_NAME_LENGTH]
 
 
 _default_bot_pool: ProcessPoolExecutor | None = None
@@ -496,7 +485,7 @@ class Table:
 
         if self.host_seat is None:
             self.host_seat = chosen
-        resolved_name = _normalize_name(name, chosen)
+        resolved_name = normalize_name(name, chosen)
         self.seat_bindings[chosen] = SeatBinding(
             session_id=session_id, send=send, name=resolved_name
         )

@@ -438,7 +438,7 @@ class SeatView:
 | --- | --- |
 | `legal_actions` / `claim_options` | reuse `mahjong_core.actions.Action` / `mahjong_core.state.ClaimOffer` directly — both carry only this seat's own or already-public tiles, so a parallel wire type adds translation with no redaction benefit. Non-empty on the seat's own `AWAIT_ACTION` turn *or* while it holds a live claim/kong-rob offer |
 | `seat_status` | from `SeatBinding.status`; `bot` seats are bound at construction (practice mode, showcase) and driven through the same `_poke_bots`/`BotJobTag` path as `autoplay` seats |
-| `names` | `SeatBinding.name`, set once at `join` (`_normalize_name`); bot seats draw a display name at bind time |
+| `names` | `SeatBinding.name`, set once at `join` (`app/names.py`'s `normalize_name`); bot seats draw a display name at bind time |
 | `deadline_ts` | `ClaimWindow.deadline_ts` for a claim offer, or the per-turn deadline when `seat == state.turn` and `phase == AWAIT_ACTION` |
 | `hands` | `None` for every real seat. `seat_view(..., reveal_hands=True)` fills it for a spectator only and raises (`_check_reveal`) for a real seat |
 | `drawn_tile` / `last_discard` | `mahjong_core.engine.drawn_tile` / `newest_discard`, pure reads of `GameState` (a draw lands last in `concealed`; `self_draw_win_allowed` is false only on a claimed turn; a front draw only follows the previous seat's unclaimed discard). `drawn_tile` is `OWN_SEAT`: set only when `seat == state.turn`, never for a spectator, open-hands included. `last_discard` is public. Both default to `None`, so code building a `SeatView` by hand is unaffected |
