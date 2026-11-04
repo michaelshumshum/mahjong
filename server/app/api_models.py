@@ -8,9 +8,10 @@ import datetime as dt
 import uuid
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.lessons.model import Band, LessonKind, PuzzleKind, Track
+from app.names import MAX_RAW_NAME_LENGTH
 from app.protocol import StateSync
 from app.table_types import WireSeatStatus
 from mahjong_core.hand_check import HAND_SIZE
@@ -22,7 +23,12 @@ __all__ = [
     "BotLatencyOut",
     "CreateTableRequest",
     "CreateTableResponse",
+    "ExportGame",
+    "ExportIdentity",
+    "ExportResponse",
+    "ExportUser",
     "LoadPointOut",
+    "MePatch",
     "MeResponse",
     "RandomLessonResponse",
     "ScoreHandRequest",
@@ -122,6 +128,53 @@ class MeResponse(BaseModel):
     # null = no consent to training on this user's games
     training_consent_at: dt.datetime | None
     consent_version: str | None
+
+
+class MePatch(BaseModel):
+    """`PATCH /me`. Omitted fields are unchanged."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # trimmed and capped like a guest name; empty is 422
+    display_name: str | None = Field(default=None, max_length=MAX_RAW_NAME_LENGTH)
+    # true records consent with the current wording's version; false withdraws it
+    training_consent: bool | None = None
+
+
+class ExportUser(BaseModel):
+    id: uuid.UUID
+    display_name: str
+    created_at: dt.datetime
+    training_consent_at: dt.datetime | None
+    consent_version: str | None
+    disabled_at: dt.datetime | None
+
+
+class ExportIdentity(BaseModel):
+    provider: str
+    subject: str
+    email: str | None
+    created_at: dt.datetime
+
+
+class ExportGame(BaseModel):
+    game_id: int
+    created_at: dt.datetime
+    mode: str | None
+    seat: int
+    hand_count: int | None
+    final_score: int
+    placement: int
+    players: list[str | None]
+
+
+class ExportResponse(BaseModel):
+    """`GET /me/export`. Learn progress joins it once it's stored server-side (ADR 0028
+    phase 5)."""
+
+    user: ExportUser
+    identities: list[ExportIdentity]
+    games: list[ExportGame]
 
 
 class ScoreHandRequest(BaseModel):

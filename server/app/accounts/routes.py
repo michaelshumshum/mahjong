@@ -25,9 +25,23 @@ from app.accounts.sessions import (
     resolve_session,
     revoke_session,
 )
-from app.accounts.users import drop_sessions, upsert_identity
-from app.api_models import MeResponse
+from app.accounts.users import (
+    delete_user,
+    drop_sessions,
+    identities_of,
+    seats_of,
+    upsert_identity,
+)
+from app.api_models import (
+    ExportGame,
+    ExportIdentity,
+    ExportResponse,
+    ExportUser,
+    MePatch,
+    MeResponse,
+)
 from app.db.models import User
+from app.names import clean_name
 
 __all__ = ["auth_router", "configure", "router", "run_session_cleanup", "set_google"]
 
@@ -37,6 +51,9 @@ _OAUTH_COOKIE_PATH = "/auth/google"
 # the round trip through google's consent screen
 _OAUTH_COOKIE_MAX_AGE_SECONDS = 600
 _MAX_NEXT_LENGTH = 512
+# the training-consent wording a user agrees to (ADR 0016); bump with the web's wording.
+# phase 3 ships a placeholder, phase 7 the final text
+TRAINING_CONSENT_VERSION = "2026-11-draft"
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +166,64 @@ def me_response(user: User) -> MeResponse:
 @router.get("/me")
 async def get_me(user: CurrentUser) -> MeResponse:
     return me_response(user)
+
+
+@router.patch("/me")
+async def patch_me(body: MePatch, user: CurrentUser, db: Db) -> MeResponse:
+    if body.display_name is not None:
+        name = clean_name(body.display_name)
+        if name is None:
+            raise HTTPException(status_code=422, detail="display_name is empty")
+        user.display_name = name
+    if body.training_consent is True and user.consent_version != TRAINING_CONSENT_VERSION:
+        user.training_consent_at = now()
+        user.consent_version = TRAINING_CONSENT_VERSION
+    elif body.training_consent is False:
+        user.training_consent_at = None
+        user.consent_version = None
+    await db.commit()
+    return me_response(user)
+
+
+@router.delete("/me", status_code=204)
+async def delete_me(user: CurrentUser, db: Db, response: Response) -> None:
+    """Immediate and final; the web asks for a typed confirmation first."""
+    await delete_user(db, user)
+    clear_session_cookie(response)
+
+
+@router.get("/me/export")
+async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResponse:
+    response.headers["Content-Disposition"] = 'attachment; filename="mahjong-account.json"'
+    return ExportResponse(
+        user=ExportUser(
+            id=user.id,
+            display_name=user.display_name,
+            created_at=user.created_at,
+            training_consent_at=user.training_consent_at,
+            consent_version=user.consent_version,
+            disabled_at=user.disabled_at,
+        ),
+        identities=[
+            ExportIdentity(
+                provider=i.provider, subject=i.subject, email=i.email, created_at=i.created_at
+            )
+            for i in await identities_of(db, user)
+        ],
+        games=[
+            ExportGame(
+                game_id=game.id,
+                created_at=game.created_at,
+                mode=game.mode,
+                seat=seat.seat,
+                hand_count=game.result.get("hand_count"),
+                final_score=seat.final_score,
+                placement=seat.placement,
+                players=game.players,
+            )
+            for seat, game in await seats_of(db, user)
+        ],
+    )
 
 
 @auth_router.post("/logout", status_code=204)

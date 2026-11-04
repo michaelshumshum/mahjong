@@ -734,6 +734,44 @@ profile`, PKCE (`S256`) and `state`. Both routes `404` without `GOOGLE_CLIENT_ID
 | disabled user | no session, every existing one deleted, `signin=disabled` |
 | session | a new token every sign-in; a cookie the browser already held is revoked in the same commit |
 
+```
+PATCH /me
+{"display_name"?: "Ann", "training_consent"?: true | false}
+-> the GET /me body
+```
+
+- `display_name` goes through `app/names.py`'s `clean_name` (trimmed, capped at 24); empty after
+  trimming, or past the raw 64-char bound, is `422`. Unknown fields are `422`.
+- `training_consent: true` sets `training_consent_at` to now and `consent_version` to
+  `TRAINING_CONSENT_VERSION` (`app/accounts/routes.py`; bumped with the web's wording), unless
+  that version is already recorded. `false` clears both to null.
+
+```
+DELETE /me
+-> 204, Set-Cookie: mj_session=""; Max-Age=0
+```
+
+Immediate, no grace period (the web asks for a typed confirmation first). Identities and sessions
+cascade; the account's `game_players` rows keep `kind = 'user'` with a null `user_id`, and
+`games.players` keeps the name typed at the table ([ADR 0028](decisions/0028-user-account-schema.md)
+"Foreign keys").
+
+```
+GET /me/export
+-> Content-Disposition: attachment; filename="mahjong-account.json"
+{"user": {"id", "display_name", "created_at", "training_consent_at", "consent_version",
+          "disabled_at"},
+ "identities": [{"provider": "google", "subject": "…", "email": "…" | null, "created_at"}],
+ "games": [{"game_id": 12, "created_at", "mode": "practice" | "multiplayer" | null, "seat": 1,
+            "hand_count": 5, "final_score": 40, "placement": 1, "players": ["Bob", "Ann", …]}]}
+```
+
+`games` is every seat linked to the account, newest first. Learn progress isn't stored
+server-side yet; it joins the export with ADR 0028 phase 5.
+
+`PATCH` and `DELETE` are in the CORS `allow_methods`; a cross-origin one is always preflighted,
+so only `CORS_ORIGINS` can send them with the cookie.
+
 Every `/auth/*` request counts against `AUTH_RATE_LIMIT` per `AUTH_RATE_WINDOW_SECONDS` per IP
 (default 20 per 60 s): `429` with `Retry-After`, the same `RateLimiter` and client-IP rule as
 `POST /tables`.
