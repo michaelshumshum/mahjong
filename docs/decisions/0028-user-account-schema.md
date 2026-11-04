@@ -376,7 +376,7 @@ No code. Unblocks phase 2.
 Server only. No accounts yet, so every row is `guest` or `bot`, but every game from here on has
 seat data, placements and mode.
 
-- [ ] Migration: `game_players` (with `final_score`, `placement`, constraints, the `user_id`
+- [x] Migration: `game_players` (with `final_score`, `placement`, constraints, the `user_id`
       column and index, FK to `users` added in phase 2), `games.mode` nullable.
 - [x] `make_engine`: `PRAGMA foreign_keys=ON` for SQLite.
 - [ ] `save_game_record(..., seats=)`: writes four rows before its commit; computes `placement`
