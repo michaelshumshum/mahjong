@@ -712,7 +712,13 @@ Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
   `load()` runs from a mount `$effect`, so account UI renders after hydration.
 - `lib/ui/AccountPanel.svelte` (Settings' Account tab, `/profile`): a guest gets
   `GoogleSignInButton` (Google's dark-theme button, a link to `/auth/google/login?next=<this
-  page>`); a signed-in player their name and Sign out (`POST /auth/logout`, then `guest`).
+  page>`); a signed-in player their name and Sign out (`POST /auth/logout`, then `guest`), plus,
+  in Settings, an "Account settings" link to `/profile`.
+- `lib/ui/AccountSettings.svelte` (`/profile`, signed in): display name (`PATCH /me`, capped at
+  the generated `MAX_NAME_LENGTH`), the consent checkbox (`PATCH /me` on change), Download
+  (`GET /me/export` fetched as a blob and saved as `mahjong-account.json`: a cross-origin
+  download can't read the server's `Content-Disposition`) and Delete. `DeleteAccountDialog`
+  enables its button only once the display name is typed exactly, then `DELETE /me` and `guest`.
 - `lib/ui/SigninReturn.svelte` (root layout, inside the gate) reads the callback's flag on mount
   and after each navigation, then drops it from the URL (`replaceState`): `?signup=1` opens the
   sign-up dialog (display name, prefilled from Google; `TrainingConsentField`, unchecked) which
@@ -804,7 +810,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/demo` | on | dev component demos, no backend |
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
-| `/profile` | on | placeholder heading; with accounts on, `AccountPanel` (sign in / sign out, §6 "Account session") |
+| `/profile` | on | placeholder heading; with accounts on, `AccountPanel` (sign in / sign out) and, signed in, `AccountSettings` (name, consent, export, delete; §6 "Account session") |
 | `/learn` | on | learn index, one track per tab: `?track=<Track>` or `endless` (missing or unknown → basics, then the continue track after mount), lesson cards, solved state (below); skips `ApiConnectGate` |
 | `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/learn/endless` | off | endless random puzzles, `?kind=<PuzzleKind>&band=<Band>` (band defaults to beginner; an unknown kind or band → 404); fetches `GET /lessons/random`, so behind `ApiConnectGate` (below) |
@@ -1607,7 +1613,7 @@ spread. Files group key prefixes by app area:
 | `guide.json` | `guide`, `coachMarks` |
 | `learn.json` | `/learn` and `/learn/[id]`: `learn` (both pages' chrome, seat names, answer inputs, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
 | `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
-| `account.json` | sign-in and account UI: `googleSignInButton`, `accountPanel`, `trainingConsentField`, `signinReturn` |
+| `account.json` | sign-in and account UI: `googleSignInButton`, `accountPanel`, `trainingConsentField`, `signinReturn`, `accountSettings`, `deleteAccountDialog` |
 
 **Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the
 matching area file in **both** locales in the same change — a missing key falls back to English

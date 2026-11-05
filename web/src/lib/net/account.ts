@@ -53,6 +53,28 @@ export async function patchMe(
 	return (await response.json()) as Me;
 }
 
+/** Immediate and final; the caller asks for a typed confirmation first. */
+export async function deleteMe(
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<void> {
+	const response = await fetchFn(`${baseUrl}/me`, { ...WITH_SESSION, method: 'DELETE' });
+	if (!response.ok) throw new Error(`DELETE /me failed: ${response.status}`);
+}
+
+/** `GET /me/export`'s JSON as a file body, untouched (server: ExportResponse). */
+export async function exportMe(
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<Blob> {
+	const response = await fetchFn(`${baseUrl}/me/export`, WITH_SESSION);
+	if (!response.ok) throw new Error(`GET /me/export failed: ${response.status}`);
+	return response.blob();
+}
+
+// the server's Content-Disposition name; a cross-origin download can't read that header
+export const EXPORT_FILENAME = 'mahjong-account.json';
+
 export async function signOut(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch

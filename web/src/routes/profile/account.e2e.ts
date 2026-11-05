@@ -1,10 +1,12 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ACCOUNTS_PORT } from '../../../playwright.config';
+import type { Me } from '../../lib/net/account';
 
 // sign-in ui against a stubbed api: /me and /auth/* answered by page.route, never google
 const ACCOUNTS = `http://localhost:${ACCOUNTS_PORT}`;
 const API = 'http://localhost:8000';
-const ANN = {
+const ANN: Me = {
 	id: '00000000-0000-0000-0000-000000000001',
 	display_name: 'Ann',
 	created_at: '2026-11-01T00:00:00Z',
@@ -26,11 +28,12 @@ interface ApiCalls {
 	me: number;
 	patches: unknown[];
 	logouts: number;
+	deletes: number;
 }
 
 async function stubApi(page: Page, signedIn: boolean): Promise<ApiCalls> {
-	const calls: ApiCalls = { me: 0, patches: [], logouts: 0 };
-	let user: typeof ANN | null = signedIn ? { ...ANN } : null;
+	const calls: ApiCalls = { me: 0, patches: [], logouts: 0, deletes: 0 };
+	let user: Me | null = signedIn ? { ...ANN } : null;
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 	await page.route(`${API}/me`, async (route) => {
 		const request = route.request();
@@ -40,7 +43,16 @@ async function stubApi(page: Page, signedIn: boolean): Promise<ApiCalls> {
 			const body = request.postDataJSON();
 			calls.patches.push(body);
 			user = { ...user!, ...(body.display_name ? { display_name: body.display_name } : {}) };
+			if (body.training_consent !== undefined) {
+				user.training_consent_at = body.training_consent ? '2026-11-05T00:00:00Z' : null;
+				user.consent_version = body.training_consent ? '2026-11-draft' : null;
+			}
 			return route.fulfill({ json: user, headers });
+		}
+		if (request.method() === 'DELETE') {
+			calls.deletes++;
+			user = null;
+			return route.fulfill({ status: 204, headers });
 		}
 		calls.me++;
 		return user
@@ -54,6 +66,9 @@ async function stubApi(page: Page, signedIn: boolean): Promise<ApiCalls> {
 		}
 		return route.fulfill({ status: 204, headers: cors(route) });
 	});
+	await page.route(`${API}/me/export`, (route) =>
+		route.fulfill({ json: { user, identities: [], games: [] }, headers: cors(route) })
+	);
 	return calls;
 }
 
@@ -100,6 +115,64 @@ test.describe('accounts on', () => {
 		await page.getByTestId('signup-submit').click();
 		await expect(dialog).toBeHidden();
 		expect(calls.patches).toEqual([{ display_name: 'Bea', training_consent: true }]);
+	});
+
+	test('settings links a signed-in player to account settings', async ({ page }) => {
+		await stubApi(page, true);
+		await page.goto('/');
+		await page.getByTestId('lobby-settings').click();
+		await page.getByTestId('settings-tab-account').click();
+		await page.getByTestId('account-manage').click();
+		await expect(page).toHaveURL(`${ACCOUNTS}/profile`);
+		await expect(page.getByTestId('account-settings')).toBeVisible();
+	});
+
+	test('account settings rename and toggle consent', async ({ page }) => {
+		const calls = await stubApi(page, true);
+		await page.goto('/profile');
+		const save = page.getByTestId('account-name-save');
+		await expect(save).toBeDisabled();
+		await page.getByTestId('account-name').fill('Bea');
+		await save.click();
+		await expect(page.getByTestId('account-panel')).toContainText('Bea');
+
+		const consent = page.getByTestId('training-consent').getByRole('checkbox');
+		await consent.check();
+		await expect(consent).toBeChecked();
+		await consent.uncheck();
+		await expect(consent).not.toBeChecked();
+		expect(calls.patches).toEqual([
+			{ display_name: 'Bea' },
+			{ training_consent: true },
+			{ training_consent: false }
+		]);
+	});
+
+	test('export downloads the account json', async ({ page }) => {
+		await stubApi(page, true);
+		await page.goto('/profile');
+		const [download] = await Promise.all([
+			page.waitForEvent('download'),
+			page.getByTestId('account-export').click()
+		]);
+		expect(download.suggestedFilename()).toBe('mahjong-account.json');
+		const body = JSON.parse(await readFile(await download.path(), 'utf8'));
+		expect(body.user.display_name).toBe('Ann');
+	});
+
+	test('delete needs the typed name, then plays on as a guest', async ({ page }) => {
+		const calls = await stubApi(page, true);
+		await page.goto('/profile');
+		await page.getByTestId('account-delete').click();
+		const submit = page.getByTestId('delete-account-submit');
+		await expect(submit).toBeDisabled();
+		await page.getByTestId('delete-account-confirm').fill('ann');
+		await expect(submit).toBeDisabled();
+		await page.getByTestId('delete-account-confirm').fill('Ann');
+		await submit.click();
+		await expect(page.getByTestId('google-sign-in')).toBeVisible();
+		await expect(page.getByTestId('account-settings')).toHaveCount(0);
+		expect(calls.deletes).toBe(1);
 	});
 
 	// /learn skips the api gate, so its handler mounts during hydration
