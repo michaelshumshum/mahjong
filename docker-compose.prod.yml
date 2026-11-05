@@ -20,6 +20,12 @@ services:
       WS_MSG_RATE: ${WS_MSG_RATE:-}
       WS_MSG_BURST: ${WS_MSG_BURST:-}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
+      # accounts (docs/infra.md §2); https here makes the session cookie Secure
+      ACCOUNTS_ENABLED: ${ACCOUNTS_ENABLED:-}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL must be set}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
+      SESSION_MAX_AGE_DAYS: ${SESSION_MAX_AGE_DAYS:-}
+      SESSION_IDLE_DAYS: ${SESSION_IDLE_DAYS:-}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       API_DOCS: "0"
     # !override: base file publishes 0.0.0.0; only the host-side tunnel connector should reach it

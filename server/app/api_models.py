@@ -4,6 +4,8 @@ file, typed by the generated `lessons.d.ts`."""
 
 from __future__ import annotations
 
+import datetime as dt
+import uuid
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -21,6 +23,7 @@ __all__ = [
     "CreateTableRequest",
     "CreateTableResponse",
     "LoadPointOut",
+    "MeResponse",
     "RandomLessonResponse",
     "ScoreHandRequest",
     "ScoreHandResponse",
@@ -108,6 +111,17 @@ class StatusResponse(BaseModel):
     bot_decision_ms: BotLatencyOut | None
     loop_lag_ms: float
     history: list[LoadPointOut]
+
+
+class MeResponse(BaseModel):
+    """`GET /me`: the signed-in account (docs/protocol.md §10 "Accounts")."""
+
+    id: uuid.UUID
+    display_name: str
+    created_at: dt.datetime
+    # null = no consent to training on this user's games
+    training_consent_at: dt.datetime | None
+    consent_version: str | None
 
 
 class ScoreHandRequest(BaseModel):

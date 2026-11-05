@@ -57,6 +57,9 @@ mahjong/
 │   │   │                       # tutorials.py), mined_puzzles.json (mined shortlist, committed),
 │   │   │                       # payload.py (one puzzle's lesson JSON), pool.py + puzzle_pool.json
 │   │   │                       # (the endless pool behind GET /lessons/random, committed, ~1.5 MB)
+│   │   ├── names.py            # seat display-name cap and normalizer (guests and accounts)
+│   │   ├── accounts/           # optional accounts (ADR 0028): config.py (env), sessions.py
+│   │   │                       # (session cookies), routes.py (/auth/*, /me*)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
@@ -133,8 +136,11 @@ pnpm --dir web dev
 | Variable | Native default | Notes |
 | --- | --- | --- |
 | `DATABASE_URL` | unset → no persistence | Compose sets it for `api` |
-| `CORS_ORIGINS` | unset → **no cross-origin requests**, so the web dev server can't reach the API | comma-separated; Compose sets `http://localhost:${WEB_PORT}` |
-| `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:8000` / `ws://localhost:8000/ws` (`lib/net/lobby.ts`, `lib/net/socket.ts`) | web, read at runtime via `$env/dynamic/public` |
+| `CORS_ORIGINS` | unset → **no cross-origin requests**, so the web dev server can't reach the API | comma-separated; Compose sets `http://localhost:${WEB_PORT}`. Credentialed (`allow_credentials`), so `*` is dropped, never echoed |
+| `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:8000` / `ws://localhost:8000/ws` (`lib/net/lobby.ts`, `lib/net/socket.ts`) | web, read at runtime via `$env/dynamic/public`. The `api` reads `PUBLIC_API_URL` too (`app/accounts/config.py`): an `https://` value makes the session cookie `Secure` |
+| `ACCOUNTS_ENABLED` | unset → off | `1`/`true` turns on `/auth/*` and `/me*` ([protocol.md §10](protocol.md) "Accounts"); off, they 404. Also off without `DATABASE_URL` |
+| `PUBLIC_WEB_URL` | the first `CORS_ORIGINS` entry | the web origin the sign-in callback redirects to |
+| `SESSION_MAX_AGE_DAYS` / `SESSION_IDLE_DAYS` | 90 / 30 | a session's absolute and idle lifetime ([ADR 0028](decisions/0028-user-account-schema.md)) |
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `MAX_TABLES` | 500; `0` disables | live tables (showcase excluded) past which `POST /tables` answers 503 ([architecture.md §8.3](architecture.md)) |

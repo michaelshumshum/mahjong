@@ -30,6 +30,8 @@ from pydantic import StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import ws
+from app.accounts import routes as accounts
+from app.accounts.config import AccountsConfig, cors_origins
 from app.api_models import (
     BotLatencyOut,
     CreateTableRequest,
@@ -163,12 +165,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if showcase_id:
         registry.start_showcase(showcase_id, DEFAULT_RULESET, bot_tiers=_available_bot_tiers())
     sampler = asyncio.create_task(reset_stats().run_sampler(_history_load))
+    background = [sampler]
+    if accounts.configure(AccountsConfig.from_env(), session_factory):
+        background.append(asyncio.create_task(accounts.run_session_cleanup()))
     try:
         yield
     finally:
-        sampler.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await sampler
+        for task in background:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         grace_seconds = float(
             os.environ.get("SHUTDOWN_GRACE_SECONDS", _DEFAULT_SHUTDOWN_GRACE_SECONDS)
         )
@@ -187,12 +193,15 @@ def _openapi_url(api_docs: str | None) -> str | None:
 # API_DOCS=0 (prod overlay) hides the schema and docs UIs
 app = FastAPI(lifespan=lifespan, openapi_url=_openapi_url(os.environ.get("API_DOCS")))
 app.include_router(ws.router)
+app.include_router(accounts.router)
 # added before CORS so CORS wraps it and a 413 still carries the allow-origin header
 app.add_middleware(BodySizeLimitMiddleware)
 # comma-separated CORS_ORIGINS; unset -> no cross-origin reads.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
+    allow_origins=cors_origins(os.environ),
+    # the session cookie rides credentialed fetches; safe only with explicit origins, never '*'
+    allow_credentials=True,
     allow_methods=["GET", "POST"],
     # POST sends a JSON body -- not a CORS-safelisted content type, so browsers preflight and
     # need this header even though GET never did.
