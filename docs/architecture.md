@@ -90,7 +90,7 @@ There is no password, JWT or email sign-in.
 | --- | --- | --- |
 | Identity at the handshake | none | the `mj_session` cookie rides the `/ws` upgrade (same site); `_serve` resolves it once (`accounts.routes.user_for_cookie`) into `Session.account`. Accounts off, no cookie, an unknown/expired one, a disabled user or a database error: a guest |
 | Seat name | picked client-side, kept in `localStorage`, sent as `join.name` | `users.display_name`; `join.name` is ignored. Both go through `app/names.py`'s `normalize_name` into `SeatBinding.name` |
-| `SeatBinding.user_id` | None | the account's id, set at `join` and kept for the game (a `hello` reclaim doesn't change it) |
+| `SeatBinding.user_id` | None | the account's id, set at `join` and kept for the game (a `hello` reclaim doesn't change it). One seat per account per table: a second `join` is refused `already_seated` ([protocol.md §2](protocol.md)) |
 | Saved seat (`game_players`) | `guest` | `user` + `user_id`, also when `autoplay` finishes the game (§6) |
 | On the wire | — | nothing new: other players see a name, not whether it's an account |
 

@@ -104,7 +104,9 @@ given, in which case it rejects with `error{code:"seat_taken"}` if bound, or
 `error{code:"table_full"}` if none are free. A successful `join` is confirmed by a broadcast
 `seat_state{seat, status:"connected", name}` to every bound seat (this one included), so clients
 rendering empty seats from their `state_sync` update live. A reconnecting player doesn't
-re-`join` — `hello{last_seq, seat, secret}` reclaims directly (§5). Once all four seats are filled
+re-`join` — `hello{last_seq, seat, secret}` reclaims directly (§5). A signed-in connection whose
+account already holds a seat at this table (a second tab) gets `ack{ok:false,
+error:"already_seated"}`; guests aren't checked, having no identity across tabs. Once all four seats are filled
 the table waits for `ready` from each before dealing.
 
 The first seat to `join` is the table's **host** (`Table.host_seat`, `state_sync.host_seat`) — the

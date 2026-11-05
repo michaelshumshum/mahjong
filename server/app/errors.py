@@ -9,6 +9,7 @@ from typing import Final
 __all__ = [
     "TABLE_CLOSED_ERROR",
     "TABLE_GONE_ERROR",
+    "AccountSeatedError",
     "ErrorCode",
     "NotHostError",
     "SeatAuthError",
@@ -60,6 +61,16 @@ class SeatTakenError(Exception):
 class TableFullError(Exception):
     """Raised by `Table.join(seat=None)` when every seat is bound (wire
     `error{code:'table_full'}`)."""
+
+
+class AccountSeatedError(Exception):
+    """Raised by `Table.join(user_id=...)` when that account already holds a seat at this table
+    (ack `error:'already_seated'`); its own seat is reclaimed by `hello`, never a second
+    `join`."""
+
+    def __init__(self, seat: int) -> None:
+        super().__init__(f"this account already holds seat {seat}")
+        self.seat = seat
 
 
 class SeatNotBoundError(Exception):

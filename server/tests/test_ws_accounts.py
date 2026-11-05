@@ -77,6 +77,52 @@ def test_an_unusable_cookie_falls_back_to_a_guest(
     assert (binding.name, binding.user_id) == ("Guesty", None)
 
 
+def test_an_account_takes_one_seat_per_table(accounts_db: str) -> None:
+    user_id = create_user(accounts_db, display_name="Account Ann")
+    table_id = f"acct-{uuid.uuid4()}"
+    with table_client(table_id) as client:
+        client.cookies.set(COOKIE_NAME, sign_in(accounts_db, user_id))
+        with client.websocket_connect(f"/ws?table={table_id}") as first:
+            first.send_json(hello())
+            first.send_json(msg("join", {"seat": 0}, id_=next_id()))
+            secret = next(f for f in _frames(first, 3) if f["t"] == "ack")["d"]["reconnect_secret"]
+            # a second tab: a fresh session id, same account
+            with client.websocket_connect(f"/ws?table={table_id}") as second:
+                second.send_json(hello())
+                second.send_json(msg("join", {"seat": 1}, id_=next_id()))
+                ack = second.receive_json()
+        table = get_table(table_id)
+        assert table is not None
+        assert table.seat_bindings[1] is None
+        # the account's own seat is still reclaimable by its secret
+        with client.websocket_connect(f"/ws?table={table_id}") as again:
+            again.send_json(hello(seat=0, secret=secret, last_seq=0))
+            reclaimed = again.receive_json()
+    assert ack["t"] == "ack"
+    assert (ack["d"]["ok"], ack["d"]["error"]) == (False, "already_seated")
+    assert reclaimed["t"] != "error"
+
+
+def test_two_guests_may_share_a_table(accounts_db: str) -> None:
+    table_id = f"acct-{uuid.uuid4()}"
+    with (
+        table_client(table_id) as client,
+        client.websocket_connect(f"/ws?table={table_id}") as first,
+    ):
+        first.send_json(hello())
+        first.send_json(msg("join", {"seat": 0}, id_=next_id()))
+        _frames(first, 3)
+        with client.websocket_connect(f"/ws?table={table_id}") as second:
+            second.send_json(hello())
+            second.send_json(msg("join", {"seat": 1}, id_=next_id()))
+            frames = _frames(second, 3)
+    assert next(f for f in frames if f["t"] == "ack")["d"]["ok"] is True
+
+
+def _frames(ws: Any, n: int) -> list[dict[str, Any]]:
+    return [ws.receive_json() for _ in range(n)]
+
+
 def test_a_reconnect_keeps_the_account(accounts_db: str) -> None:
     user_id = create_user(accounts_db, display_name="Account Ann")
     table_id = f"acct-{uuid.uuid4()}"

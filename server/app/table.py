@@ -103,6 +103,7 @@ from app.clock import now_ms
 from app.db.records import SeatRecord, save_game_record
 from app.errors import (
     TABLE_CLOSED_ERROR,
+    AccountSeatedError,
     NotHostError,
     SeatAuthError,
     SeatNotBoundError,
@@ -469,12 +470,19 @@ class Table:
         `name` is this seat's chosen guest display name -- normalized and stored once, here;
         there is no later path that changes it (a `hello` reconnect never resends it). A
         signed-in join passes the account's `users.display_name` as `name` and its `user_id`
-        (app/ws.py), through the same normalizer.
+        (app/ws.py), through the same normalizer. An account already holding a seat here raises
+        `AccountSeatedError` (a second tab); its own seat comes back through `reconnect`.
 
         An `all_bots` table never seats a human, even on a freed seat: its spectators may see
         every hand (`_check_settings`)."""
         if self.all_bots:
             raise TableFullError()
+        if user_id is not None:
+            held = next(
+                (s for s, b in enumerate(self.seat_bindings) if b and b.user_id == user_id), None
+            )
+            if held is not None:
+                raise AccountSeatedError(held)
         if seat is not None:
             if not 0 <= seat < 4:
                 raise ValueError(f"seat must be 0..3, got {seat}")
