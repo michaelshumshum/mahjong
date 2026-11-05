@@ -90,6 +90,7 @@ import os
 import random
 import secrets
 import time
+import uuid
 from collections import deque
 from collections.abc import Callable, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
@@ -458,6 +459,7 @@ class Table:
         *,
         seat: int | None = None,
         name: str | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> int:
         """Bind a session to a seat -- `seat=None` means "first open seat". Raises
         `SeatTakenError`/`TableFullError` for app/ws.py to turn into
@@ -465,7 +467,9 @@ class Table:
         already-bound seat and unicasts a fresh `state_sync` to the joining seat.
 
         `name` is this seat's chosen guest display name -- normalized and stored once, here;
-        there is no later path that changes it (a `hello` reconnect never resends it).
+        there is no later path that changes it (a `hello` reconnect never resends it). A
+        signed-in join passes the account's `users.display_name` as `name` and its `user_id`
+        (app/ws.py), through the same normalizer.
 
         An `all_bots` table never seats a human, even on a freed seat: its spectators may see
         every hand (`_check_settings`)."""
@@ -487,7 +491,7 @@ class Table:
             self.host_seat = chosen
         resolved_name = normalize_name(name, chosen)
         self.seat_bindings[chosen] = SeatBinding(
-            session_id=session_id, send=send, name=resolved_name
+            session_id=session_id, send=send, name=resolved_name, user_id=user_id
         )
         # this session_id may have been registered as a spectator before this join -- promote
         # it to a real seat stream now, before broadcasting, so it doesn't see seat_state twice.
@@ -1786,7 +1790,8 @@ class Table:
         once, from `process_one()`'s own tail.
 
         `seats` follows the same rule: `bot` only for a seat bound to a bot at construction, so
-        a human finished by `autoplay` stays a `guest` (docs/decisions/0028)."""
+        a human finished by `autoplay` keeps `user` (signed in) or `guest`
+        (docs/decisions/0028)."""
         if self._session_factory is None:
             return
         players = [
@@ -1795,6 +1800,8 @@ class Table:
         seats = [
             SeatRecord(kind="bot", bot_tier=self._effective_bot_tier(seat))
             if b is not None and b.status == "bot"
+            else SeatRecord(kind="user", user_id=b.user_id)
+            if b is not None and b.user_id is not None
             else SeatRecord(kind="guest")
             for seat, b in enumerate(self.seat_bindings)
         ]

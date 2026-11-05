@@ -407,12 +407,13 @@ seat data, placements and mode.
 - [x] Sessions: 32-byte token, SHA-256 stored, 90-day absolute and 30-day idle expiry, rotate at sign-in,
       `last_used_at` written at most hourly, periodic cleanup of expired rows. `disabled_at`
       refuses sign-in and drops sessions.
-- [ ] WS: resolve the cookie at the handshake; `join` sets `SeatBinding.user_id` and the name to
+- [x] WS: resolve the cookie at the handshake; `join` sets `SeatBinding.user_id` and the name to
       `users.display_name`, ignoring `join.name`. `_persist_game_record` writes `kind = 'user'`.
-- [x] Rate limits on `/auth/*` with the existing `RateLimiter` (`app/main.py`).- [ ] Tests: callback with a stubbed provider token exchange; session expiry, idle, rotation;
+- [x] Rate limits on `/auth/*` with the existing `RateLimiter` (`app/main.py`).
+- [x] Tests: callback with a stubbed provider token exchange; session expiry, idle, rotation;
       disabled user; `DELETE /me` cascades and leaves `game_players` as `user` + null id; WS join
       with and without a cookie.
-- [ ] Docs: `architecture.md §2.1` rewritten (guest *or* account), `protocol.md §10` new HTTP
+- [x] Docs: `architecture.md §2.1` rewritten (guest *or* account), `protocol.md §10` new HTTP
       routes, `infra.md §2` new env vars (provider client ids/secrets, session lifetimes).
 - `make test-server`.
 

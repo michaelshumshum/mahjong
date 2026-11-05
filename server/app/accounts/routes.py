@@ -108,6 +108,19 @@ async def run_session_cleanup() -> None:
         await asyncio.sleep(_CLEANUP_INTERVAL_SECONDS)
 
 
+async def user_for_cookie(token: str | None) -> User | None:
+    """The account behind a WS handshake's session cookie: None when accounts are off, there's
+    no cookie, or it doesn't resolve. A database error plays on as a guest."""
+    if token is None or _session_factory is None:
+        return None
+    try:
+        async with _session_factory() as db:
+            return await resolve_session(db, token, now=now(), idle=_config.session_idle)
+    except Exception:
+        logger.exception("accounts: resolving a ws session failed")
+        return None
+
+
 async def _db() -> AsyncIterator[AsyncSession]:
     if _session_factory is None:
         raise HTTPException(status_code=404)

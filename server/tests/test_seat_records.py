@@ -3,14 +3,16 @@ phase 1): `save_game_record(seats=, mode=)` and `Table._persist_game_record`."""
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
+from dataclasses import replace
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db.models import Base, GameRecord, GameSeat
+from app.db.models import Base, GameRecord, GameSeat, User
 from app.db.records import SeatRecord, placements, save_game_record
 from app.db.session import make_engine, make_session_factory
 from app.table import Table
@@ -176,3 +178,47 @@ async def test_multiplayer_table_records_guests_and_keeps_an_autoplay_seat_a_gue
     assert record.mode == "multiplayer"
     assert record.players == ["Alice", "Bob", "Carol", "Dan"]
     assert [(r.kind, r.bot_tier) for r in seats] == [("guest", None)] * 4
+
+
+async def _account(factory: async_sessionmaker[AsyncSession], name: str) -> uuid.UUID:
+    async with factory() as s:
+        user = User(display_name=name)
+        s.add(user)
+        await s.commit()
+        return user.id
+
+
+async def test_signed_in_seats_record_kind_user_even_after_autoplay(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    ann = await _account(session_factory, "Ann")
+    bob = await _account(session_factory, "Bob")
+    table = Table("account-seats", _BOUNDED_RULESET, game_seed=1, session_factory=session_factory)
+    table.seat_bindings[0] = replace(_human("Ann"), user_id=ann)
+    table.seat_bindings[1] = replace(_human("Bob", status="autoplay"), user_id=bob)
+    table.seat_bindings[2] = _human("Carol")
+    table.seat_bindings[3] = _human("Dan")
+
+    record, seats = await _persist(table, session_factory)
+
+    assert record.players == ["Ann", "Bob", "Carol", "Dan"]
+    assert [(r.kind, r.user_id, r.bot_tier) for r in seats] == [
+        ("user", ann, None),
+        ("user", bob, None),
+        ("guest", None, None),
+        ("guest", None, None),
+    ]
+
+
+async def test_an_account_deleted_mid_game_still_saves_the_game(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    ann = await _account(session_factory, "Ann")
+    table = Table("deleted-seat", _BOUNDED_RULESET, game_seed=1, session_factory=session_factory)
+    table.seat_bindings[0] = replace(_human("Ann"), user_id=ann)
+    table.seat_bindings[1] = replace(_human("Gone"), user_id=uuid.uuid4())
+
+    record, seats = await _persist(table, session_factory)
+
+    assert record.players[:2] == ["Ann", "Gone"]
+    assert [(r.kind, r.user_id) for r in seats[:2]] == [("user", ann), ("user", None)]

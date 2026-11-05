@@ -4,6 +4,7 @@ frames, bot-job tags, and per-table settings. Logic lives in `app/table.py`."""
 from __future__ import annotations
 
 import secrets
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -63,6 +64,10 @@ class SeatBinding:
     and handed back exactly once, in `join`'s own `ack`. Every later `hello{seat, secret}` must
     present it back; `reconnect()` compares with `secrets.compare_digest` and refuses the
     reclaim on any mismatch (`SeatAuthError`). A bot seat's secret is never handed to anyone.
+
+    `user_id` is the signed-in account that joined this seat (the WS handshake's session
+    cookie), else None; it only decides the seat's `game_players` row. Possession still rides
+    `reconnect_secret`, never the account.
     """
 
     session_id: str
@@ -75,6 +80,7 @@ class SeatBinding:
     idempotency: IdempotencyCache = field(default_factory=IdempotencyCache)
     turn_timeout_strikes: int = 0
     reconnect_secret: str = field(default_factory=lambda: secrets.token_urlsafe(16))
+    user_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True)
