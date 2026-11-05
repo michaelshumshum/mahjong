@@ -6,9 +6,11 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.sessions import issue_session
 from app.db.models import AuthSession, Base, User
@@ -17,7 +19,9 @@ from app.db.session import make_engine, make_session_factory
 MAX_AGE = dt.timedelta(days=90)
 
 
-def _run[T](database_url: str, work: Any) -> T:
+def run_db[T](database_url: str, work: Callable[[AsyncSession], Awaitable[T]]) -> T:
+    """`work(db)` on a fresh engine, outside the app's event loop."""
+
     async def _go() -> T:
         engine = make_engine(database_url)
         try:
@@ -48,7 +52,7 @@ def create_user(database_url: str, **columns: Any) -> uuid.UUID:
         await db.commit()
         return user.id
 
-    return _run(database_url, work)
+    return run_db(database_url, work)
 
 
 def sign_in(database_url: str, user_id: uuid.UUID, now: dt.datetime | None = None) -> str:
@@ -57,18 +61,18 @@ def sign_in(database_url: str, user_id: uuid.UUID, now: dt.datetime | None = Non
     async def work(db: Any) -> str:
         return await issue_session(db, user_id, now=now or dt.datetime.now(dt.UTC), max_age=MAX_AGE)
 
-    return _run(database_url, work)
+    return run_db(database_url, work)
 
 
 def session_count(database_url: str) -> int:
     async def work(db: Any) -> int:
         return len((await db.scalars(select(AuthSession))).all())
 
-    return _run(database_url, work)
+    return run_db(database_url, work)
 
 
 def fetch[T](database_url: str, model: type[T], *pk: Any) -> T | None:
     async def work(db: Any) -> T | None:
         return await db.get(model, pk[0] if len(pk) == 1 else pk)
 
-    return _run(database_url, work)
+    return run_db(database_url, work)

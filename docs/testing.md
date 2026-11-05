@@ -143,7 +143,7 @@ Commands table. Add them here as they turn up.
 | Module | Holds |
 | --- | --- |
 | `conftest.py` | `session` (in-memory SQLite `AsyncSession`, fresh schema), `games`, `accounts_db` (file SQLite `DATABASE_URL` with schema and `ACCOUNTS_ENABLED=1`, for a `TestClient(app)`) |
-| `accounts.py` | `create_user`, `sign_in` (a session token without Google), `session_count`, `fetch` over an `accounts_db` url |
+| `accounts.py` | `create_user`, `sign_in` (a session token without Google), `session_count`, `fetch`, `run_db` over an `accounts_db` url. Google itself is stubbed per test with `httpx.MockTransport` through `GoogleProvider(transport=)` and `routes.set_google` (`test_google_signin.py`); no test reaches the network |
 | `game_state.py` | `with_seat(state, seat, **overrides)`, `total_tiles(state)` (tile-conservation count) |
 | `hands.py` | `tile_ids(*types)` (one physical copy per occurrence), `pung`, `concealed_kong` |
 | `decisions.py` | `decision_points(seed, ruleset)` (seeded random self-play, every live decision), `discard_mask` |

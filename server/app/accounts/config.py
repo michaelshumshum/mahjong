@@ -31,6 +31,8 @@ class AccountsConfig:
     web_url: str
     session_max_age: dt.timedelta
     session_idle: dt.timedelta
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
 
     @property
     def cookie_secure(self) -> bool:
@@ -55,4 +57,6 @@ class AccountsConfig:
             session_idle=dt.timedelta(
                 days=float(get("SESSION_IDLE_DAYS", _DEFAULT_SESSION_IDLE_DAYS))
             ),
+            google_client_id=get("GOOGLE_CLIENT_ID", "") or None,
+            google_client_secret=get("GOOGLE_CLIENT_SECRET", "") or None,
         )

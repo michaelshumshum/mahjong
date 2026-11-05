@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import StringConstraints
@@ -76,6 +76,9 @@ _DEFAULT_TABLE_CREATE_RATE_WINDOW_SECONDS = 60.0
 # a puzzle takes seconds to answer; one a second sustained is a script
 _DEFAULT_LESSON_RATE_LIMIT = 60
 _DEFAULT_LESSON_RATE_WINDOW_SECONDS = 60.0
+# a sign-in is two requests (login, callback); a person needs a handful an hour
+_DEFAULT_AUTH_RATE_LIMIT = 20
+_DEFAULT_AUTH_RATE_WINDOW_SECONDS = 60.0
 # ids a client may ask GET /lessons/random to skip: its recent puzzles
 _MAX_LESSON_EXCLUDE = 50
 _MAX_LESSON_ID_LENGTH = 64
@@ -93,6 +96,7 @@ _learned_weights_problem: str | None = None
 # rebuilt per lifespan like the registry; None = unlimited
 _create_limiter: RateLimiter | None = None
 _lesson_limiter: RateLimiter | None = None
+_auth_limiter: RateLimiter | None = None
 _trusted_proxies: tuple[IpNetwork, ...] = ()
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 # (monotonic time fetched, count)
@@ -115,12 +119,16 @@ def _rate_limiter(
     return RateLimiter(limit=limit, window_seconds=window)
 
 
+def _check_auth_rate(request: Request) -> None:
+    _check_rate(_auth_limiter, request, "too many sign-in requests, try again shortly")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # degrade rather than refuse to start: a crash-looping api takes every table down, a missing
     # policy only Expert/Impossible (docs/bots.md §2 "Missing weights")
     global _learned_weights_problem, _create_limiter, _trusted_proxies, _session_factory
-    global _games_24h_cache, _lesson_limiter
+    global _games_24h_cache, _lesson_limiter, _auth_limiter
     _learned_weights_problem = weights_problem()
     if _learned_weights_problem is not None:
         logger.error(
@@ -160,6 +168,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "LESSON_RATE_WINDOW_SECONDS",
         _DEFAULT_LESSON_RATE_WINDOW_SECONDS,
     )
+    _auth_limiter = _rate_limiter(
+        "AUTH_RATE_LIMIT",
+        _DEFAULT_AUTH_RATE_LIMIT,
+        "AUTH_RATE_WINDOW_SECONDS",
+        _DEFAULT_AUTH_RATE_WINDOW_SECONDS,
+    )
     _trusted_proxies = parse_trusted_proxies(os.environ.get("TRUSTED_PROXY_IPS"))
     showcase_id = os.environ.get("SHOWCASE_TABLE_ID", _DEFAULT_SHOWCASE_TABLE_ID).strip()
     if showcase_id:
@@ -194,6 +208,7 @@ def _openapi_url(api_docs: str | None) -> str | None:
 app = FastAPI(lifespan=lifespan, openapi_url=_openapi_url(os.environ.get("API_DOCS")))
 app.include_router(ws.router)
 app.include_router(accounts.router)
+app.include_router(accounts.auth_router, dependencies=[Depends(_check_auth_rate)])
 # added before CORS so CORS wraps it and a 413 still carries the allow-origin header
 app.add_middleware(BodySizeLimitMiddleware)
 # comma-separated CORS_ORIGINS; unset -> no cross-origin reads.

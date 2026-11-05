@@ -42,7 +42,7 @@ mahjong/
 │   │   ├── errors.py           # Table exceptions (one per wire error code), TABLE_CLOSED_ERROR
 │   │   ├── clock.py            # now_ms(): server epoch ms for every wire ts/deadline_ts
 │   │   ├── registry.py         # TableRegistry, reaper + table cap, showcase table, shutdown drain
-│   │   ├── rate_limit.py       # per-IP RateLimiter: POST /tables, GET /lessons/random
+│   │   ├── rate_limit.py       # per-IP RateLimiter: POST /tables, GET /lessons/random, /auth/*
 │   │   ├── status.py           # ServerStats: bot latency, loop lag, history ring for GET /status (§8)
 │   │   ├── views.py            # seat_view() + redact_event()
 │   │   ├── frames.py           # pure outbound frame payloads over views.py (architecture.md §5)
@@ -59,7 +59,8 @@ mahjong/
 │   │   │                       # (the endless pool behind GET /lessons/random, committed, ~1.5 MB)
 │   │   ├── names.py            # seat display-name cap and normalizer (guests and accounts)
 │   │   ├── accounts/           # optional accounts (ADR 0028): config.py (env), sessions.py
-│   │   │                       # (session cookies), routes.py (/auth/*, /me*)
+│   │   │                       # (session cookies), google.py (Authlib code flow + PKCE),
+│   │   │                       # users.py (sign-in upsert), routes.py (/auth/*, /me*)
 │   │   └── db/                 # SQLAlchemy models, session, save_game_record
 │   ├── bots/                   # tiers, safety/valuation/features/labels, worker, arena, selfplay;
 │   │                           # base.py (Bot protocol, harness constants), tiers.py (BotTier ids)
@@ -141,6 +142,8 @@ pnpm --dir web dev
 | `ACCOUNTS_ENABLED` | unset → off | `1`/`true` turns on `/auth/*` and `/me*` ([protocol.md §10](protocol.md) "Accounts"); off, they 404. Also off without `DATABASE_URL` |
 | `PUBLIC_WEB_URL` | the first `CORS_ORIGINS` entry | the web origin the sign-in callback redirects to |
 | `SESSION_MAX_AGE_DAYS` / `SESSION_IDLE_DAYS` | 90 / 30 | a session's absolute and idle lifetime ([ADR 0028](decisions/0028-user-account-schema.md)) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | unset → `/auth/google/*` 404 | the Google Cloud OAuth client (web application). Its authorized redirect URI must be `${PUBLIC_API_URL}/auth/google/callback` ([ADR 0028](decisions/0028-user-account-schema.md) phase 0) |
+| `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_SECONDS` | 20 / 60; limit `0` disables | every `/auth/*` request per client IP ([protocol.md §10](protocol.md) "Accounts") |
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `MAX_TABLES` | 500; `0` disables | live tables (showcase excluded) past which `POST /tables` answers 503 ([architecture.md §8.3](architecture.md)) |

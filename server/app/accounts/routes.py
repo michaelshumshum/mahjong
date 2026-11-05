@@ -7,43 +7,68 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
+import secrets
 from collections.abc import AsyncIterator
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.accounts.config import AccountsConfig
+from app.accounts.google import PROVIDER, GoogleProvider
 from app.accounts.sessions import (
     COOKIE_NAME,
     delete_expired_sessions,
+    issue_session,
     resolve_session,
     revoke_session,
 )
+from app.accounts.users import drop_sessions, upsert_identity
 from app.api_models import MeResponse
 from app.db.models import User
 
-__all__ = ["configure", "router", "run_session_cleanup"]
+__all__ = ["auth_router", "configure", "router", "run_session_cleanup", "set_google"]
 
 _CLEANUP_INTERVAL_SECONDS = 3600.0
+_OAUTH_COOKIE = "mj_oauth"
+_OAUTH_COOKIE_PATH = "/auth/google"
+# the round trip through google's consent screen
+_OAUTH_COOKIE_MAX_AGE_SECONDS = 600
+_MAX_NEXT_LENGTH = 512
 
 logger = logging.getLogger(__name__)
 
+# /me*; main.py includes `auth_router` (/auth/*) behind the per-IP auth rate limit
 router = APIRouter()
+auth_router = APIRouter(prefix="/auth")
 _config = AccountsConfig.from_env({})
 _session_factory: async_sessionmaker[AsyncSession] | None = None
+_google: GoogleProvider | None = None
 
 
 def configure(
     config: AccountsConfig, session_factory: async_sessionmaker[AsyncSession] | None
 ) -> bool:
     """Called from `lifespan`; returns whether accounts are live."""
-    global _config, _session_factory
+    global _config, _session_factory, _google
     if config.enabled and session_factory is None:
         logger.warning("ACCOUNTS_ENABLED without DATABASE_URL: accounts stay off")
     _config = config
     _session_factory = session_factory if config.enabled else None
+    _google = (
+        GoogleProvider(config.google_client_id, config.google_client_secret)
+        if config.google_client_id and config.google_client_secret
+        else None
+    )
     return _session_factory is not None
+
+
+def set_google(provider: GoogleProvider) -> None:
+    """Swap the provider (tests stub Google's endpoints through its transport)."""
+    global _google
+    _google = provider
 
 
 def config() -> AccountsConfig:
@@ -126,8 +151,118 @@ async def get_me(user: CurrentUser) -> MeResponse:
     return me_response(user)
 
 
-@router.post("/auth/logout", status_code=204)
+@auth_router.post("/logout", status_code=204)
 async def logout(db: Db, response: Response, token: SessionCookie = None) -> None:
     if token is not None:
         await revoke_session(db, token)
     clear_session_cookie(response)
+
+
+def _safe_next(raw: str | None) -> str:
+    """A same-origin path on the web, or `/`: never `//host` or a scheme (open redirect)."""
+    if (
+        not raw
+        or len(raw) > _MAX_NEXT_LENGTH
+        or not raw.startswith("/")
+        or raw.startswith("//")
+        or "\\" in raw
+    ):
+        return "/"
+    return raw
+
+
+def _web_redirect(path: str, **flags: str) -> RedirectResponse:
+    query = urlencode(flags)
+    if query:
+        path = f"{path}{'&' if '?' in path else '?'}{query}"
+    return RedirectResponse(f"{_config.web_url}{path}", status_code=303)
+
+
+def _google_or_404() -> GoogleProvider:
+    if _google is None or _session_factory is None:
+        raise HTTPException(status_code=404)
+    return _google
+
+
+def _callback_url() -> str:
+    return f"{_config.api_url}/auth/google/callback"
+
+
+@auth_router.get("/google/login")
+async def google_login(next: str | None = None) -> RedirectResponse:
+    """Start sign-in: PKCE verifier, `state` and the return path ride a short-lived cookie
+    scoped to the callback, then the browser goes to Google's consent screen."""
+    google = _google_or_404()
+    state = secrets.token_urlsafe(32)
+    verifier = secrets.token_urlsafe(48)
+    response = RedirectResponse(
+        google.authorize_url(redirect_uri=_callback_url(), state=state, code_verifier=verifier),
+        status_code=302,
+    )
+    response.set_cookie(
+        _OAUTH_COOKIE,
+        # token_urlsafe never contains '.', so the path after the second one is `next` verbatim
+        f"{state}.{verifier}.{_safe_next(next)}",
+        max_age=_OAUTH_COOKIE_MAX_AGE_SECONDS,
+        path=_OAUTH_COOKIE_PATH,
+        secure=_config.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
+
+
+OAuthCookie = Annotated[str | None, Cookie(alias=_OAUTH_COOKIE)]
+
+
+@auth_router.get("/google/callback")
+async def google_callback(
+    db: Db,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    pending: OAuthCookie = None,
+    token: SessionCookie = None,
+) -> RedirectResponse:
+    """Finish sign-in: check `state`, exchange the code with the PKCE verifier, upsert the user
+    by `(google, sub)`, issue a fresh session and send the browser back to the web. A first
+    sign-in adds `signup=1`, so the web can show its sign-up step."""
+    google = _google_or_404()
+    parts = (pending or "").split(".", 2)
+    if len(parts) != 3 or state is None or not secrets.compare_digest(parts[0], state):
+        raise HTTPException(status_code=400, detail="sign-in expired or was tampered with")
+    _, verifier, next_path = parts
+    if error is not None or code is None:
+        response = _web_redirect(next_path, signin="failed")
+    else:
+        try:
+            profile = await google.fetch_profile(
+                redirect_uri=_callback_url(), code=code, code_verifier=verifier
+            )
+        except Exception as exc:
+            logger.warning("google sign-in failed: %r", exc)
+            raise HTTPException(status_code=502, detail="google sign-in failed") from exc
+        user, created = await upsert_identity(
+            db,
+            provider=PROVIDER,
+            subject=profile.subject,
+            email=profile.email,
+            name=profile.name,
+        )
+        if user.disabled_at is not None:
+            await drop_sessions(db, user)
+            response = _web_redirect(next_path, signin="disabled")
+        else:
+            new_token = await issue_session(
+                db, user.id, now=now(), max_age=_config.session_max_age, replacing=token
+            )
+            response = _web_redirect(next_path, **({"signup": "1"} if created else {}))
+            set_session_cookie(response, new_token)
+    response.delete_cookie(
+        _OAUTH_COOKIE,
+        path=_OAUTH_COOKIE_PATH,
+        secure=_config.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    return response

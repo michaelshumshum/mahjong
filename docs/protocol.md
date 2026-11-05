@@ -710,6 +710,34 @@ POST /auth/logout
 Deletes the cookie's session row, if any, and clears the cookie. `204` whether or not a session
 existed.
 
+```
+GET /auth/google/login?next=/learn
+-> 302 to Google's consent screen, Set-Cookie: mj_oauth=<state>.<verifier>.<next>
+GET /auth/google/callback?code=…&state=…
+-> 303 to ${PUBLIC_WEB_URL}<next>[?signup=1 | ?signin=failed | ?signin=disabled],
+   Set-Cookie: mj_session=…
+```
+
+`app/accounts/google.py`: Authlib's OAuth 2.0 authorization-code flow, scopes `openid email
+profile`, PKCE (`S256`) and `state`. Both routes `404` without `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET`.
+
+| Step | Rule |
+| --- | --- |
+| login | fresh `state` (32 bytes) and PKCE verifier (48 bytes); both, with `next`, ride `mj_oauth` (`HttpOnly`, `SameSite=Lax`, `Path=/auth/google`, 10 min) |
+| `next` | a path on the web origin; anything not starting with a single `/` (`//host`, a scheme, a `\`) becomes `/` |
+| callback URL | `${PUBLIC_API_URL}/auth/google/callback`, registered on the Google client |
+| state check | `400` when `mj_oauth` is missing or its `state` differs (`secrets.compare_digest`) |
+| `error` (consent refused) | `303` to `next` with `signin=failed` |
+| token exchange, profile | the code and verifier go to Google's token endpoint; the profile (`sub`, `email`, `name`) comes from the userinfo endpoint with that access token, so no ID-token signature check is needed. Any provider failure is `502` |
+| upsert | by `identities (provider, subject)`. New: a `users` row named from the profile (`clean_name`, `Player` if empty) and `signup=1` on the redirect, so the web can show its sign-up step (name, consent). Returning: `identities.email` refreshed, the name left alone |
+| disabled user | no session, every existing one deleted, `signin=disabled` |
+| session | a new token every sign-in; a cookie the browser already held is revoked in the same commit |
+
+Every `/auth/*` request counts against `AUTH_RATE_LIMIT` per `AUTH_RATE_WINDOW_SECONDS` per IP
+(default 20 per 60 s): `429` with `Retry-After`, the same `RateLimiter` and client-IP rule as
+`POST /tables`.
+
 ## 11. Connection and rate limits
 
 Per-process caps on `/ws` (`app/limits.py`, wired in `app/ws.py`), so one client can't multiply
