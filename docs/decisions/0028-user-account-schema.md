@@ -378,7 +378,7 @@ seat data, placements and mode.
 
 - [ ] Migration: `game_players` (with `final_score`, `placement`, constraints, the `user_id`
       column and index, FK to `users` added in phase 2), `games.mode` nullable.
-- [ ] `make_engine`: `PRAGMA foreign_keys=ON` for SQLite.
+- [x] `make_engine`: `PRAGMA foreign_keys=ON` for SQLite.
 - [ ] `save_game_record(..., seats=)`: writes four rows before its commit; computes `placement`
       from `final_scores`.
 - [ ] `_persist_game_record`: builds `seats` from `seat_bindings` (`kind`) and
