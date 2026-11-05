@@ -21,6 +21,7 @@ from typing import Any
 
 from pydantic import BaseModel, TypeAdapter
 
+from app.names import MAX_NAME_LENGTH
 from app.protocol import AnyMessage, ClientMessage, Envelope, ServerMessage
 from mahjong_core.config import CLIENT_RULE_BOUNDS
 from mahjong_core.scoring.faan import CHICKEN_HAND_FAAN, CHICKEN_HAND_NAME
@@ -286,9 +287,11 @@ def render_constants() -> str:
     )
     return (
         "// GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.\n"
-        "// Source of truth: server/mahjong_core/config.py, server/mahjong_core/scoring/.\n\n"
+        "// Source of truth: server/mahjong_core/config.py, mahjong_core/scoring/, app/names.py.\n\n"
         "/** Inclusive ranges for a client-supplied custom ruleset (docs/rules.md §10). */\n"
         f"export const CLIENT_RULE_BOUNDS = {{\n{bounds}\n}} as const;\n\n"
+        "/** A seat or account display name's cap after trimming (app/names.py). */\n"
+        f"export const MAX_NAME_LENGTH = {MAX_NAME_LENGTH};\n\n"
         "/** The largest faan a pattern can score, and so the largest faan override. */\n"
         f"export const LIMIT_FAAN = {LIMIT_FAAN};\n\n"
         "/** Every scored pattern at its default value, in registry order (docs/rules.md §7). */\n"

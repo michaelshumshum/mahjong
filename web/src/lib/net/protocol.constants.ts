@@ -1,5 +1,5 @@
 // GENERATED FILE — do not hand-edit. Run `make proto` to regenerate.
-// Source of truth: server/mahjong_core/config.py, server/mahjong_core/scoring/.
+// Source of truth: server/mahjong_core/config.py, mahjong_core/scoring/, app/names.py.
 
 /** Inclusive ranges for a client-supplied custom ruleset (docs/rules.md §10). */
 export const CLIENT_RULE_BOUNDS = {
@@ -11,6 +11,9 @@ export const CLIENT_RULE_BOUNDS = {
 	disconnect_grace_seconds: { min: 5, max: 60 },
 	self_draw_multiplier: { min: 1, max: 2 }
 } as const;
+
+/** A seat or account display name's cap after trimming (app/names.py). */
+export const MAX_NAME_LENGTH = 24;
 
 /** The largest faan a pattern can score, and so the largest faan override. */
 export const LIMIT_FAAN = 13;
