@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deleteMe, exportMe, patchMe, readSigninFlag, signInUrl, signOut } from './account';
+import {
+	deleteMe,
+	exportMe,
+	fetchMyGames,
+	patchMe,
+	readSigninFlag,
+	signInUrl,
+	signOut
+} from './account';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -64,5 +72,21 @@ describe('account calls', () => {
 			credentials: 'include',
 			method: 'POST'
 		});
+	});
+
+	it('fetchMyGames sends the cookie and only the cursor and filter given', async () => {
+		const page = { games: [], next: null };
+		const fetchFn = vi.fn<typeof fetch>(async () => Response.json(page));
+		await expect(fetchMyGames({}, 'http://api', fetchFn)).resolves.toEqual(page);
+		await fetchMyGames({ before: 12, mode: 'practice' }, 'http://api', fetchFn);
+		expect(fetchFn.mock.calls).toEqual([
+			['http://api/me/games', { credentials: 'include' }],
+			['http://api/me/games?before=12&mode=practice', { credentials: 'include' }]
+		]);
+	});
+
+	it('fetchMyGames throws on a 401', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 401 }));
+		await expect(fetchMyGames({}, 'http://api', fetchFn)).rejects.toThrow('401');
 	});
 });

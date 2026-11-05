@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { ACCOUNTS_PORT } from '../../../playwright.config';
-import type { Me } from '../../lib/net/account';
+import type { Me, MyGame, MyGamesPage } from '../../lib/net/account';
 
 // sign-in ui against a stubbed api: /me and /auth/* answered by page.route, never google
 const ACCOUNTS = `http://localhost:${ACCOUNTS_PORT}`;
@@ -24,15 +24,52 @@ function cors(route: Route): Record<string, string> {
 	};
 }
 
+function game(id: number, overrides: Partial<MyGame> = {}): MyGame {
+	return {
+		game_id: id,
+		created_at: '2026-11-04T12:00:00Z',
+		mode: 'practice',
+		hand_count: 8,
+		seat: 0,
+		placement: 1,
+		final_score: 40,
+		others: [
+			{ seat: 1, kind: 'bot', name: null, bot_tier: 'T4' },
+			{ seat: 2, kind: 'user', name: 'Gone', bot_tier: null },
+			{ seat: 3, kind: 'guest', name: null, bot_tier: null }
+		],
+		...overrides
+	};
+}
+
+// two pages: 12 then 11, keyed by the `before` cursor
+const GAME_PAGES: Record<string, MyGamesPage> = {
+	'': { games: [game(12)], next: 12 },
+	'12': {
+		games: [game(11, { mode: 'multiplayer', placement: 3, final_score: -15, hand_count: 1 })],
+		next: null
+	}
+};
+
 interface ApiCalls {
 	me: number;
 	patches: unknown[];
 	logouts: number;
 	deletes: number;
+	games: string[];
 }
 
-async function stubApi(page: Page, signedIn: boolean): Promise<ApiCalls> {
-	const calls: ApiCalls = { me: 0, patches: [], logouts: 0, deletes: 0 };
+async function stubApi(
+	page: Page,
+	signedIn: boolean,
+	gamePages: Record<string, MyGamesPage> = GAME_PAGES
+): Promise<ApiCalls> {
+	const calls: ApiCalls = { me: 0, patches: [], logouts: 0, deletes: 0, games: [] };
+	await page.route(/\/me\/games(\?|$)/, (route) => {
+		const before = new URL(route.request().url()).searchParams.get('before') ?? '';
+		calls.games.push(before);
+		return route.fulfill({ json: gamePages[before], headers: cors(route) });
+	});
 	let user: Me | null = signedIn ? { ...ANN } : null;
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
 	await page.route(`${API}/me`, async (route) => {
@@ -190,6 +227,45 @@ test.describe('accounts on', () => {
 		expect(calls.deletes).toBe(1);
 	});
 
+	test('my games list pages with load more, bots by their level', async ({ page }) => {
+		const calls = await stubApi(page, true);
+		await page.goto('/profile');
+		const rows = page.getByTestId('my-game');
+		await expect(rows).toHaveCount(1);
+		await expect(rows.first()).toContainText('1st');
+		await expect(rows.first()).toContainText('+40');
+		await expect(rows.first()).toContainText('Practice');
+		await expect(rows.first()).toContainText('8 hands');
+		await expect(rows.first()).toContainText('Expert');
+		await expect(rows.first()).toContainText('Gone');
+		await expect(rows.first()).toContainText('Guest');
+
+		await page.getByTestId('my-games-more').click();
+		await expect(rows).toHaveCount(2);
+		await expect(rows.nth(1)).toContainText('3rd');
+		await expect(rows.nth(1)).toContainText('-15');
+		await expect(rows.nth(1)).toContainText('Multiplayer');
+		await expect(rows.nth(1)).toContainText('1 hand');
+		await expect(rows.nth(1)).not.toContainText('1 hands');
+		await expect(page.getByTestId('my-games-more')).toHaveCount(0);
+		expect(calls.games).toEqual(['', '12']);
+	});
+
+	test('my games shows an empty state', async ({ page }) => {
+		await stubApi(page, true, { '': { games: [], next: null } });
+		await page.goto('/profile');
+		await expect(page.getByTestId('my-games-empty')).toBeVisible();
+		await expect(page.getByTestId('my-games-more')).toHaveCount(0);
+	});
+
+	test('a guest sees no games list', async ({ page }) => {
+		const calls = await stubApi(page, false);
+		await page.goto('/profile');
+		await expect(page.getByTestId('google-sign-in')).toBeVisible();
+		await expect(page.getByTestId('my-games')).toHaveCount(0);
+		expect(calls.games).toEqual([]);
+	});
+
 	// /learn skips the api gate, so its handler mounts during hydration
 	for (const [flag, path] of [
 		['failed', '/learn'],
@@ -213,6 +289,7 @@ test.describe('accounts off', () => {
 		await page.goto('/profile?signup=1');
 		await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 		await expect(page.getByTestId('account-panel')).toHaveCount(0);
+		await expect(page.getByTestId('my-games')).toHaveCount(0);
 		await expect(page.getByTestId('signup-dialog')).toHaveCount(0);
 
 		await page.goto('/');
@@ -220,5 +297,6 @@ test.describe('accounts off', () => {
 		await expect(page.getByTestId('settings-tab-display')).toBeVisible();
 		await expect(page.getByTestId('settings-tab-account')).toHaveCount(0);
 		expect(calls.me).toBe(0);
+		expect(calls.games).toEqual([]);
 	});
 });

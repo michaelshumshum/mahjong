@@ -39,5 +39,26 @@
 	"deleteAccountDialog_cancelButton": "取消",
 	"deleteAccountDialog_deleteButton": "刪除帳戶",
 	"deleteAccountDialog_deletingButton": "刪除中…",
-	"deleteAccountDialog_error": "未能刪除帳戶，請再試一次。"
+	"deleteAccountDialog_error": "未能刪除帳戶，請再試一次。",
+	"myGames_heading": "我的對局",
+	"myGames_loading": "正在載入你的對局…",
+	"myGames_empty": "暫時未有完成的對局。登入後完成的對局會顯示在這裡。",
+	"myGames_error": "未能載入你的對局，請再試一次。",
+	"myGames_retry": "再試一次",
+	"myGames_loadMore": "載入更多",
+	"myGames_loadingMore": "載入中…",
+	"myGames_modePractice": "練習",
+	"myGames_modeMultiplayer": "多人對局",
+	"myGames_handCount": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} 局",
+				"countPlural=other": "{count} 局"
+			}
+		}
+	],
+	"myGames_opponentsLabel": "對手",
+	"myGames_guest": "訪客"
 }

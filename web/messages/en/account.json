@@ -39,5 +39,26 @@
 	"deleteAccountDialog_cancelButton": "Cancel",
 	"deleteAccountDialog_deleteButton": "Delete account",
 	"deleteAccountDialog_deletingButton": "Deleting…",
-	"deleteAccountDialog_error": "Couldn't delete the account. Try again."
+	"deleteAccountDialog_error": "Couldn't delete the account. Try again.",
+	"myGames_heading": "My games",
+	"myGames_loading": "Loading your games…",
+	"myGames_empty": "No finished games yet. Games you finish while signed in show up here.",
+	"myGames_error": "Couldn't load your games. Try again.",
+	"myGames_retry": "Try again",
+	"myGames_loadMore": "Load more",
+	"myGames_loadingMore": "Loading…",
+	"myGames_modePractice": "Practice",
+	"myGames_modeMultiplayer": "Multiplayer",
+	"myGames_handCount": [
+		{
+			"declarations": ["input count", "local countPlural = count: plural"],
+			"selectors": ["countPlural"],
+			"match": {
+				"countPlural=one": "{count} hand",
+				"countPlural=other": "{count} hands"
+			}
+		}
+	],
+	"myGames_opponentsLabel": "Opponents",
+	"myGames_guest": "Guest"
 }
