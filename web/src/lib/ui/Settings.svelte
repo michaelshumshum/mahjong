@@ -254,7 +254,7 @@
 				aria-labelledby="{uid}-tab-account"
 				hidden={activeTab !== 'account'}
 			>
-				<AccountPanel />
+				<AccountPanel manageLink />
 			</div>
 		{/if}
 	</div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { patchMe, readSigninFlag, signInUrl, signOut } from './account';
+import { deleteMe, exportMe, patchMe, readSigninFlag, signInUrl, signOut } from './account';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
@@ -39,6 +39,22 @@ describe('account calls', () => {
 	it('patchMe throws on a 422', async () => {
 		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 422 }));
 		await expect(patchMe({ display_name: ' ' }, 'http://api', fetchFn)).rejects.toThrow('422');
+	});
+
+	it('deleteMe sends DELETE with the cookie and throws on a 401', async () => {
+		const ok = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+		await deleteMe('http://api', ok);
+		expect(ok).toHaveBeenCalledWith('http://api/me', { credentials: 'include', method: 'DELETE' });
+		const gone = vi.fn<typeof fetch>(async () => new Response(null, { status: 401 }));
+		await expect(deleteMe('http://api', gone)).rejects.toThrow('401');
+	});
+
+	it('exportMe returns the body untouched', async () => {
+		const body = '{"user":{"id":"u"},"identities":[],"games":[]}';
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(body));
+		const blob = await exportMe('http://api', fetchFn);
+		expect(await blob.text()).toBe(body);
+		expect(fetchFn).toHaveBeenCalledWith('http://api/me/export', { credentials: 'include' });
 	});
 
 	it('signOut posts with the cookie', async () => {

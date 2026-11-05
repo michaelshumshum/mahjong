@@ -427,8 +427,8 @@ seat data, placements and mode.
 - [x] "Sign in with Google" button (Google's branding rules) in settings and on `/profile`;
       sign-out.
 - [x] Sign-up step on first sign-in: confirm display name, training-consent checkbox (unchecked).
-- [ ] Account settings: display name, training-consent toggle, export data, delete account with
-      a typed confirmation.
+- [x] Account settings: display name, training-consent toggle, export data, delete account with
+      a typed confirmation (the display name, on `/profile`).
 - [ ] Signed-in players see no name field when joining a table.
 - [ ] Sign-in stays behind a flag (hidden in prod) until phase 7.
 - [ ] i18n: en + zh-Hant for every new string.
