@@ -692,6 +692,27 @@ level word alone (`practice-difficulty.ts`'s `TIER_LABEL`, derived from
 `PRACTICE_DIFFICULTY_TO_TIER`; "Expert", plain "Bot" for an unknown tier) on opponents, and on
 the bottom seat too while spectating.
 
+### Account session
+
+Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
+`PUBLIC_ACCOUNTS_ENABLED` ([infra.md §2](infra.md)). `lib/net/account.ts` holds the hand-typed
+`/me` and `/auth/*` calls ([protocol.md §10](protocol.md) "Accounts"); `lib/net/account-session.svelte.ts`'s
+`accountSession` singleton holds the result app-wide.
+
+| `accountSession.state.status` | When |
+| --- | --- |
+| `loading` | before the root `+layout.svelte`'s mount effect runs `load()`, and always during SSR |
+| `off` | flag off: no request is sent; every account UI stays hidden |
+| `guest` | `GET /me` answered `401` (no session) or `404` (accounts off on the API), or failed |
+| `signedIn` | `GET /me` answered `200`; `accountSession.user` is the body |
+
+- **Client-only, no SSR fetch.** The `mj_session` cookie is host-only on the API host, so the web
+  host's SSR never receives it and has nothing to forward; an SSR `/me` would always be a guest.
+  `load()` runs from a mount `$effect`, so account UI renders after hydration.
+- Every `/me` and `/auth/*` call sends `credentials: 'include'`. Other API calls (`/tables`,
+  `/healthz`, `/status`, `/lessons/random`) don't read the session and stay uncredentialed; the
+  WS upgrade carries the cookie on its own (same site).
+
 ### Last-discard marker
 
 `lastDiscard` is set on `discard`, cleared on `meld` (claimed or not — the marked tile either left

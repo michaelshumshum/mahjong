@@ -118,6 +118,7 @@ model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 | Tile codes, suit order, `sortTiles` / meld order, `MELD_SEAL_GLYPH` / seat-wind helpers | `lib/table/tile-code.ts` / `meld-face.ts` / `wind.ts` |
 | Practice difficulties, difficulty → `BotTier` map, difficulty/tier labels | `lib/net/practice-difficulty.ts` (free of `lobby.ts`'s `$env` import) |
 | Ruleset types, presets, defaults | `lib/net/ruleset.ts` |
+| Account types and `/me`, `/auth/*` calls; the app-wide `accountSession` | `lib/net/account.ts`; `lib/net/account-session.svelte.ts` |
 | Client prefs types / storage keys | `lib/ui/client-prefs.ts` / `lib/ui/settings-storage.ts` |
 | Pregame preview ids | `lib/table/pregame-preview.ts` |
 | Shared style mixins (`btn-base`, `seat-compass-grid`/`seat-ring`, `field-text`/`-label`/`-desc`, `settings-card`) | `lib/styles/_buttons.scss` / `_layout.scss` / `_forms.scss` (`docs/frontend.md §8`) |

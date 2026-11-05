@@ -25,6 +25,7 @@
 	} from '$lib/ui/settings-storage';
 	import { applyClientPrefs } from '$lib/ui/apply-client-prefs';
 	import { installClickSound } from '$lib/ui/sfx';
+	import { accountSession } from '$lib/net/account-session.svelte';
 
 	// clear abandoned per-table reconnect credentials so they don't sit in localStorage forever.
 	cleanupStaleTableCredentials();
@@ -33,6 +34,7 @@
 	if (browser) applyClientPrefs(loadClientPrefs() ?? DEFAULT_CLIENT_PREFS);
 
 	$effect(() => installClickSound());
+	$effect(() => void accountSession.load());
 
 	let { children } = $props();
 </script>

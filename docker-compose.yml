@@ -68,6 +68,8 @@ services:
     environment:
       PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
       PUBLIC_WS_URL: ws://localhost:${API_PORT:-8000}/ws
+      # sign-in ui (docs/infra.md §2): hidden unless set in .env
+      PUBLIC_ACCOUNTS_ENABLED: ${PUBLIC_ACCOUNTS_ENABLED:-}
     ports: ["${WEB_PORT:-5173}:5173"]
     volumes:
       - ./web:/app/web
