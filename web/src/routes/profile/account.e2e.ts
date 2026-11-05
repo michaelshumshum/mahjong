@@ -154,6 +154,15 @@ test.describe('accounts on', () => {
 		expect(calls.patches).toEqual([{ display_name: 'Bea', training_consent: true }]);
 	});
 
+	test('a first sign-in suggests the guest name already used at tables', async ({ page }) => {
+		await stubApi(page, true);
+		await page.addInitScript(() =>
+			localStorage.setItem('mahjong:displayName:v1', JSON.stringify('Bea'))
+		);
+		await page.goto('/tables?signup=1');
+		await expect(page.getByTestId('signup-name')).toHaveValue('Bea');
+	});
+
 	test('settings links a signed-in player to account settings', async ({ page }) => {
 		await stubApi(page, true);
 		await page.goto('/');

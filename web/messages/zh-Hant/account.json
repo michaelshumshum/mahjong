@@ -9,7 +9,7 @@
 	"trainingConsentField_draftLabel": "協助訓練電腦對手",
 	"trainingConsentField_draftDescription": "草擬字眼：容許以不具名方式，使用你牌局中的出牌，訓練及測試電腦對手。你可隨時更改此設定。",
 	"signinReturn_signupTitle": "歡迎來到開枱",
-	"signinReturn_signupHint": "確認其他玩家在牌枱上會看到的名字。",
+	"signinReturn_signupHint": "選擇其他玩家在牌枱上會看到的名字，不必是你的真實姓名。",
 	"signinReturn_nameLabel": "顯示名稱",
 	"signinReturn_continueButton": "繼續",
 	"signinReturn_savingButton": "儲存中…",

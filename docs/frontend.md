@@ -731,7 +731,9 @@ Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
   `lib/ui/my-games.ts`.
 - `lib/ui/SigninReturn.svelte` (root layout, inside the gate) reads the callback's flag on mount
   and after each navigation, then drops it from the URL (`replaceState`): `?signup=1` opens the
-  sign-up dialog (display name, prefilled from Google; `TrainingConsentField`, unchecked) which
+  sign-up dialog (display name, prefilled by `lib/net/account.ts`'s `signupName`: this browser's
+  guest name if it has one, else the server's placeholder `Player 0427`, never the Google name;
+  `TrainingConsentField`, unchecked) which
   sends `PATCH /me`; `?signin=failed` / `?signin=disabled` open a message dialog. Flag off: the
   query is left alone. The consent wording is a placeholder (`trainingConsentField_draft*`
   keys) until ADR 0028 phase 7, which bumps the server's `TRAINING_CONSENT_VERSION` with it.

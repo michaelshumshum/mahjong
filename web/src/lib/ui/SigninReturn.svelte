@@ -3,15 +3,22 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { m } from '$lib/paraglide/messages.js';
-	import { accountsEnabled, patchMe, readSigninFlag, type SigninFlag } from '$lib/net/account';
+	import {
+		accountsEnabled,
+		patchMe,
+		readSigninFlag,
+		signupName,
+		type SigninFlag
+	} from '$lib/net/account';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import { MAX_NAME_LENGTH } from '$lib/net/protocol.constants';
 	import ModalDialog from './ModalDialog.svelte';
 	import PanelHeader from './PanelHeader.svelte';
+	import { loadDisplayName } from './settings-storage';
 	import TrainingConsentField from './TrainingConsentField.svelte';
 
 	let flag = $state<SigninFlag | null>(null);
-	let name = $derived(accountSession.user?.display_name ?? '');
+	let name = $derived(signupName(accountSession.user?.display_name ?? '', loadDisplayName()));
 	// unchecked until the player opts in (adr 0028 "Training consent")
 	let consent = $state(false);
 	let saving = $state(false);

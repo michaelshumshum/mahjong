@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/public';
 import { apiBaseUrl } from './lobby';
 import type { BotTier } from './protocol';
+import { MAX_NAME_LENGTH } from './protocol.constants';
 
 // hand-written like lobby.ts: /me and /auth/* are plain HTTP (docs/protocol.md §10 "Accounts").
 // server: app/api_models.py's MeResponse.
@@ -156,4 +157,10 @@ export function readSigninFlag(url: URL): { flag: SigninFlag | null; cleaned: UR
 	const cleaned = new URL(url);
 	for (const param of FLAG_PARAMS) cleaned.searchParams.delete(param);
 	return { flag, cleaned };
+}
+
+/** The sign-up step's suggested name: the guest name this browser already plays under, else the
+ * server's placeholder (`Player 0427`, never the google profile name). */
+export function signupName(placeholder: string, guestName: string | null): string {
+	return guestName?.trim().slice(0, MAX_NAME_LENGTH) || placeholder;
 }
