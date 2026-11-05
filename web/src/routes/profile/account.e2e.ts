@@ -160,6 +160,21 @@ test.describe('accounts on', () => {
 		expect(body.user.display_name).toBe('Ann');
 	});
 
+	// ?pregame=join freezes the seat picker without a socket (frontend-screenshots skill)
+	test('a signed-in player joins under their account name, no name field', async ({ page }) => {
+		await stubApi(page, true);
+		await page.goto('/table/ABC123?pregame=join');
+		await expect(page.getByTestId('pretable-playing-as')).toContainText('Ann');
+		await expect(page.locator('#display-name-input')).toHaveCount(0);
+	});
+
+	test('a guest still types a name to join', async ({ page }) => {
+		await stubApi(page, false);
+		await page.goto('/table/ABC123?pregame=join');
+		await expect(page.locator('#display-name-input')).toBeVisible();
+		await expect(page.getByTestId('pretable-playing-as')).toHaveCount(0);
+	});
+
 	test('delete needs the typed name, then plays on as a guest', async ({ page }) => {
 		const calls = await stubApi(page, true);
 		await page.goto('/profile');

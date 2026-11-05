@@ -60,6 +60,7 @@
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
 	import ToastStack from '$lib/ui/ToastStack.svelte';
+	import { accountSession } from '$lib/net/account-session.svelte';
 	import Announcer from '$lib/ui/Announcer.svelte';
 	import {
 		announceSnapshot,
@@ -910,9 +911,14 @@
 			dealer={gameState.dealer as Seat}
 			{displayName}
 			onDisplayNameChange={updateDisplayName}
+			signedInName={accountSession.user?.display_name ?? null}
 			seatStatus={liveStore?.state.seatStatus ?? []}
 			names={liveStore?.state.names ?? []}
-			onJoin={(seat) => liveStore?.socket.join(seat, displayName.trim() || undefined)}
+			onJoin={(seat) =>
+				liveStore?.socket.join(
+					seat,
+					accountSession.user ? undefined : displayName.trim() || undefined
+				)}
 			{isHost}
 			onStartWithBots={() => liveStore?.socket.startWithBots()}
 			rulesetPreset={liveStore?.state.rulesetPreset ?? null}

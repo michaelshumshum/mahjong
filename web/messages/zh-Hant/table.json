@@ -11,6 +11,7 @@
 	"pretableScreen_takeASeatTitle": "選擇座位",
 	"pretableScreen_nameLegend": "你的名稱",
 	"pretableScreen_namePlaceholder": "訪客",
+	"pretableScreen_playingAsLabel": "以「{name}」身份入座",
 	"pretableScreen_seatedAsLabel": "你坐的位置是{wind}",
 	"pretableScreen_waitingMessage": "等待其他玩家加入。四個座位都就緒後，牌局會自動開始。",
 	"pretableScreen_startWithBotsButton": "與機械人開始",
