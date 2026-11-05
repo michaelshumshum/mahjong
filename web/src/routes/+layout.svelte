@@ -16,6 +16,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import TileMuralBackground from '$lib/ui/TileMuralBackground.svelte';
 	import ApiConnectGate from '$lib/ui/ApiConnectGate.svelte';
+	import SigninReturn from '$lib/ui/SigninReturn.svelte';
 	import { muralVisibility } from '$lib/ui/mural-visibility.svelte';
 	import { browser } from '$app/environment';
 	import {
@@ -47,4 +48,5 @@
 
 <ApiConnectGate>
 	{@render children()}
+	<SigninReturn />
 </ApiConnectGate>

@@ -424,9 +424,9 @@ seat data, placements and mode.
       `fetch`es use `credentials: 'include'`. Client-side only, not SSR: the host-only cookie
       never reaches the web host, so there is nothing to forward
       ([frontend.md §6](../frontend.md) "Account session").
-- [ ] "Sign in with Google" button (Google's branding rules) in settings and on `/profile`;
+- [x] "Sign in with Google" button (Google's branding rules) in settings and on `/profile`;
       sign-out.
-- [ ] Sign-up step on first sign-in: confirm display name, training-consent checkbox (unchecked).
+- [x] Sign-up step on first sign-in: confirm display name, training-consent checkbox (unchecked).
 - [ ] Account settings: display name, training-consent toggle, export data, delete account with
       a typed confirmation.
 - [ ] Signed-in players see no name field when joining a table.

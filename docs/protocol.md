@@ -360,7 +360,8 @@ one guarantee this pipeline exists for — TypeScript flagging an unhandled even
   `web/src/lib/net/reducer.ts` uses the same pattern in production code.
 - It also emits `web/src/lib/net/protocol.constants.ts`: runtime values the client validates
   against or display, which a `.d.ts` can't carry: `CLIENT_RULE_BOUNDS`
-  (`mahjong_core/config.py`, [rules.md §10](rules.md)), `LIMIT_FAAN`, and for the faan guide
+  (`mahjong_core/config.py`, [rules.md §10](rules.md)), `MAX_NAME_LENGTH` (`app/names.py`, the
+  name inputs' `maxlength`), `LIMIT_FAAN`, and for the faan guide
   `FAAN_PATTERNS` (every `PATTERNS` entry's name, hand set, default faan and limit flag),
   `CHICKEN_HAND` and `POINTS_TABLES` (`scoring/payout.py`, [rules.md §8](rules.md)). The guide
   places patterns from these, so a re-valued pattern can't drift from what the server scores.

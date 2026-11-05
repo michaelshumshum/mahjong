@@ -638,6 +638,7 @@ wrap, `Home`/`End`):
 | Calls | `autoArm`: No calls, Auto-pass chow (switches) |
 | Gameplay | discard mode and hand order (segmented), Announce every discard (switch) |
 | Display | tile size and motion (segmented), Sound effects (switch), Volume (`SliderRow`, disabled while sound is off), Haptic feedback (switch), language (`LocaleSwitcher`, segmented) |
+| Account | only while the account session is `guest` or `signedIn` (§6 "Account session"): `AccountPanel` |
 
 - Every control carries a one-line description; a segmented control (`SegmentedControl.svelte`,
   a native radio group) shows only the selected option's description.
@@ -709,6 +710,15 @@ Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
 - **Client-only, no SSR fetch.** The `mj_session` cookie is host-only on the API host, so the web
   host's SSR never receives it and has nothing to forward; an SSR `/me` would always be a guest.
   `load()` runs from a mount `$effect`, so account UI renders after hydration.
+- `lib/ui/AccountPanel.svelte` (Settings' Account tab, `/profile`): a guest gets
+  `GoogleSignInButton` (Google's dark-theme button, a link to `/auth/google/login?next=<this
+  page>`); a signed-in player their name and Sign out (`POST /auth/logout`, then `guest`).
+- `lib/ui/SigninReturn.svelte` (root layout, inside the gate) reads the callback's flag on mount
+  and after each navigation, then drops it from the URL (`replaceState`): `?signup=1` opens the
+  sign-up dialog (display name, prefilled from Google; `TrainingConsentField`, unchecked) which
+  sends `PATCH /me`; `?signin=failed` / `?signin=disabled` open a message dialog. Flag off: the
+  query is left alone. The consent wording is a placeholder (`trainingConsentField_draft*`
+  keys) until ADR 0028 phase 7, which bumps the server's `TRAINING_CONSENT_VERSION` with it.
 - Every `/me` and `/auth/*` call sends `credentials: 'include'`. Other API calls (`/tables`,
   `/healthz`, `/status`, `/lessons/random`) don't read the session and stay uncredentialed; the
   WS upgrade carries the cookie on its own (same site).
@@ -794,7 +804,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/demo` | on | dev component demos, no backend |
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
-| `/profile` | on | placeholder heading only |
+| `/profile` | on | placeholder heading; with accounts on, `AccountPanel` (sign in / sign out, §6 "Account session") |
 | `/learn` | on | learn index, one track per tab: `?track=<Track>` or `endless` (missing or unknown → basics, then the continue track after mount), lesson cards, solved state (below); skips `ApiConnectGate` |
 | `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/learn/endless` | off | endless random puzzles, `?kind=<PuzzleKind>&band=<Band>` (band defaults to beginner; an unknown kind or band → 404); fetches `GET /lessons/random`, so behind `ApiConnectGate` (below) |
@@ -1597,6 +1607,7 @@ spread. Files group key prefixes by app area:
 | `guide.json` | `guide`, `coachMarks` |
 | `learn.json` | `/learn` and `/learn/[id]`: `learn` (both pages' chrome, seat names, answer inputs, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
 | `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
+| `account.json` | sign-in and account UI: `googleSignInButton`, `accountPanel`, `trainingConsentField`, `signinReturn` |
 
 **Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the
 matching area file in **both** locales in the same change — a missing key falls back to English

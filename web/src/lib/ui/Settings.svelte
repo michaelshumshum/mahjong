@@ -6,11 +6,13 @@
 	import SwitchRow from './SwitchRow.svelte';
 	import TabBar from './TabBar.svelte';
 	import LocaleSwitcher from '$lib/i18n/LocaleSwitcher.svelte';
+	import { accountSession } from '$lib/net/account-session.svelte';
+	import AccountPanel from './AccountPanel.svelte';
 	import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from './settings-storage';
 	import { previewClick } from './sfx';
 	import type { AutoArm, ClientPrefs } from './client-prefs';
 
-	type Tab = 'calls' | 'gameplay' | 'display';
+	type Tab = 'calls' | 'gameplay' | 'display' | 'account';
 
 	let {
 		autoArm,
@@ -27,11 +29,20 @@
 	} = $props();
 
 	const uid = $props.id();
-	const TABS: { id: Tab; label: () => string }[] = [
+	const BASE_TABS: { id: Tab; label: () => string }[] = [
 		{ id: 'calls', label: m.settings_tabCalls },
 		{ id: 'gameplay', label: m.settings_tabGameplay },
 		{ id: 'display', label: m.settings_tabDisplay }
 	];
+	// only once /me has answered with the flag on (docs/frontend.md §6 "Account session")
+	const showAccount = $derived(
+		accountSession.state.status === 'guest' || accountSession.state.status === 'signedIn'
+	);
+	const TABS = $derived(
+		showAccount
+			? [...BASE_TABS, { id: 'account' as const, label: m.settings_tabAccount }]
+			: BASE_TABS
+	);
 	let activeTab = $state<Tab>('calls');
 
 	const isDefault = $derived(
@@ -234,6 +245,18 @@
 
 			<LocaleSwitcher />
 		</div>
+
+		{#if showAccount}
+			<div
+				class="panel"
+				role="tabpanel"
+				id="{uid}-panel-account"
+				aria-labelledby="{uid}-tab-account"
+				hidden={activeTab !== 'account'}
+			>
+				<AccountPanel />
+			</div>
+		{/if}
 	</div>
 
 	<footer class="footer">
