@@ -46,6 +46,7 @@ from app.api_models import (
 )
 from app.db.models import GameMode, User
 from app.names import clean_name
+from app.rate_limit import RateLimiter
 
 __all__ = ["auth_router", "configure", "router", "run_session_cleanup", "set_google"]
 
@@ -69,13 +70,18 @@ auth_router = APIRouter(prefix="/auth")
 _config = AccountsConfig.from_env({})
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 _google: GoogleProvider | None = None
+# None = unlimited
+_export_limiter: RateLimiter | None = None
 
 
 def configure(
-    config: AccountsConfig, session_factory: async_sessionmaker[AsyncSession] | None
+    config: AccountsConfig,
+    session_factory: async_sessionmaker[AsyncSession] | None,
+    *,
+    export_limiter: RateLimiter | None = None,
 ) -> bool:
     """Called from `lifespan`; returns whether accounts are live."""
-    global _config, _session_factory, _google
+    global _config, _session_factory, _google, _export_limiter
     if config.enabled and session_factory is None:
         logger.warning("ACCOUNTS_ENABLED without DATABASE_URL: accounts stay off")
     _config = config
@@ -85,6 +91,7 @@ def configure(
         if config.google_client_id and config.google_client_secret
         else None
     )
+    _export_limiter = export_limiter
     return _session_factory is not None
 
 
@@ -213,6 +220,14 @@ async def delete_me(user: CurrentUser, db: Db, response: Response) -> None:
 
 @router.get("/me/export")
 async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResponse:
+    # per account, not per ip: players behind one nat share an ip
+    key = str(user.id)
+    if _export_limiter is not None and not _export_limiter.allow(key):
+        raise HTTPException(
+            status_code=429,
+            detail="too many exports, try again later",
+            headers={"Retry-After": str(_export_limiter.retry_after(key))},
+        )
     response.headers["Content-Disposition"] = 'attachment; filename="mahjong-account.json"'
     return ExportResponse(
         user=ExportUser(
@@ -235,7 +250,7 @@ async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResp
                 created_at=game.created_at,
                 mode=game.mode,
                 seat=seat.seat,
-                hand_count=game.result.get("hand_count"),
+                hand_count=game.hand_count,
                 final_score=seat.final_score,
                 placement=seat.placement,
                 players=game.players,
@@ -276,7 +291,7 @@ async def my_games(
                 game_id=game.id,
                 created_at=game.created_at,
                 mode=game.mode,
-                hand_count=game.result.get("hand_count"),
+                hand_count=game.hand_count,
                 seat=own.seat,
                 placement=own.placement,
                 final_score=own.final_score,

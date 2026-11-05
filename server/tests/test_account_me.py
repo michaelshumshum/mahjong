@@ -197,6 +197,24 @@ def test_export_holds_the_user_identities_and_games(accounts_db: str) -> None:
     assert "learn_progress" not in body
 
 
+def test_export_is_rate_limited_per_account(
+    accounts_db: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("EXPORT_RATE_LIMIT", "2")
+    with TestClient(app) as client:
+        first = sign_in(accounts_db, create_user(accounts_db))
+        second = sign_in(accounts_db, create_user(accounts_db))
+        client.cookies.set(COOKIE_NAME, first)
+        codes = [client.get("/me/export").status_code for _ in range(3)]
+        refused = client.get("/me/export")
+        client.cookies.delete(COOKIE_NAME)
+        client.cookies.set(COOKIE_NAME, second)
+        other = client.get("/me/export").status_code
+    assert codes == [200, 200, 429]
+    assert int(refused.headers["retry-after"]) > 0
+    assert other == 200
+
+
 def test_cors_preflight_allows_patch_and_delete(accounts_db: str) -> None:
     with TestClient(app) as client:
         for method in ("PATCH", "DELETE"):

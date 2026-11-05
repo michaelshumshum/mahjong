@@ -7,11 +7,13 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.routes import MAX_GAMES_PAGE
 from app.accounts.sessions import COOKIE_NAME
-from app.db.models import GameMode, GameRecord, GameSeat, SeatKind
+from app.accounts.users import seats_of
+from app.db.models import GameMode, GameRecord, GameSeat, SeatKind, User
 from app.main import app
 from tests.accounts import create_user, run_db, sign_in
 
@@ -177,3 +179,39 @@ def test_games_filter_by_mode(accounts_db: str) -> None:
         "all": [unknown, multi, practice],
     }
     assert bad == 422
+
+
+async def test_seats_of_reads_no_game_logs(session: AsyncSession) -> None:
+    user = User(display_name="Ann")
+    session.add(user)
+    await session.flush()
+    game = GameRecord(
+        engine_version="test",
+        ruleset={"min_faan": 3},
+        seed=7,
+        action_log=[{"t": "discard"}] * 100,
+        players=["Bob", "Ann", None, "Cy"],
+        result={"hand_count": 5, "final_scores": _SCORES},
+        mode="practice",
+    )
+    session.add(game)
+    await session.flush()
+    session.add(
+        GameSeat(game_id=game.id, seat=1, kind="user", user_id=user.id, final_score=40, placement=1)
+    )
+    await session.commit()
+    session.expunge_all()
+    statements: list[str] = []
+
+    def record(_conn: Any, _cursor: Any, statement: str, *_: Any) -> None:
+        statements.append(statement)
+
+    assert session.bind is not None
+    event.listen(session.bind.sync_engine, "before_cursor_execute", record)
+    [(seat, summary)] = await seats_of(session, user)
+    event.remove(session.bind.sync_engine, "before_cursor_execute", record)
+
+    assert (seat.seat, summary.id, summary.mode, summary.hand_count) == (1, game.id, "practice", 5)
+    assert summary.players == ["Bob", "Ann", None, "Cy"]
+    assert statements
+    assert not any("action_log" in s or "ruleset" in s for s in statements)

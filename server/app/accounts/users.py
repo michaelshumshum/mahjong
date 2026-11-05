@@ -3,6 +3,9 @@ and "my games" (docs/decisions/0028-user-account-schema.md)."""
 
 from __future__ import annotations
 
+import datetime as dt
+from typing import NamedTuple
+
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +14,16 @@ from app.names import clean_name
 
 # a provider profile with no usable name
 DEFAULT_DISPLAY_NAME = "Player"
+
+
+class GameSummary(NamedTuple):
+    """The `games` columns a listing reads: never `action_log`, `ruleset` or all of `result`."""
+
+    id: int
+    created_at: dt.datetime
+    mode: GameMode | None
+    players: list[str | None]
+    hand_count: int | None
 
 
 async def upsert_identity(
@@ -59,11 +72,18 @@ async def seats_of(
     before: int | None = None,
     limit: int | None = None,
     mode: GameMode | None = None,
-) -> list[tuple[GameSeat, GameRecord]]:
+) -> list[tuple[GameSeat, GameSummary]]:
     """The user's seats with their games, newest game first; `before` is a keyset cursor (a
     game id), served by the partial index `(user_id, game_id DESC)`."""
     query = (
-        select(GameSeat, GameRecord)
+        select(
+            GameSeat,
+            GameRecord.id,
+            GameRecord.created_at,
+            GameRecord.mode,
+            GameRecord.players,
+            GameRecord.result["hand_count"].as_integer(),
+        )
         .join(GameRecord, GameRecord.id == GameSeat.game_id)
         .where(GameSeat.user_id == user.id)
         .order_by(GameSeat.game_id.desc())
@@ -74,7 +94,7 @@ async def seats_of(
     if mode is not None:
         query = query.where(GameRecord.mode == mode)
     rows = await db.execute(query)
-    return [(seat, game) for seat, game in rows.all()]
+    return [(seat, GameSummary(*game)) for seat, *game in rows.all()]
 
 
 async def seats_in(db: AsyncSession, game_ids: list[int]) -> list[GameSeat]:

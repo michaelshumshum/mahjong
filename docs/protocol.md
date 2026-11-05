@@ -768,7 +768,12 @@ GET /me/export
 ```
 
 `games` is every seat linked to the account, newest first. Learn progress isn't stored
-server-side yet; it joins the export with ADR 0028 phase 5.
+server-side yet; it joins the export with ADR 0028 phase 5. `429` with `Retry-After` past
+`EXPORT_RATE_LIMIT` per `EXPORT_RATE_WINDOW_SECONDS` per account (default 5 per hour,
+[infra.md §2](infra.md)).
+
+Neither this nor `GET /me/games` reads `games.action_log` or `ruleset`: only `id`, `created_at`,
+`mode`, `players` and `result.hand_count` (`app/accounts/users.py`'s `GameSummary`).
 
 ```
 GET /me/games?before=<game_id>&limit=20&mode=practice|multiplayer
@@ -790,7 +795,7 @@ the partial index `(user_id, game_id DESC)`.
 | `created_at` | persist time, i.e. the game's end |
 | `others` | the other three seats, by seat. `name` is `games.players[seat]` for `user`/`guest` seats and null for bots; `bot_tier` is set iff `kind` is `bot` (stored as written, so a retired tier still reads). A deleted account's seat is `kind: "user"` with its name only. No seat carries a user id |
 
-No per-user rate limit, like the other `/me` routes.
+No rate limit: a page is one indexed read of at most 51 seats.
 
 **WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
 signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game
