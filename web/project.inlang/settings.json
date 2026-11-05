@@ -14,7 +14,8 @@
 			"./messages/{locale}/settings.json",
 			"./messages/{locale}/guide.json",
 			"./messages/{locale}/learn.json",
-			"./messages/{locale}/demo.json"
+			"./messages/{locale}/demo.json",
+			"./messages/{locale}/account.json"
 		]
 	},
 	"baseLocale": "en",

@@ -1,0 +1,21 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"googleSignInButton_label": "Sign in with Google",
+	"accountPanel_guestBlurb": "You're playing as a guest. Sign in to keep your name on every device; guest play works the same either way.",
+	"accountPanel_signedInAs": "Signed in as {name}",
+	"accountPanel_signOut": "Sign out",
+	"accountPanel_signOutError": "Couldn't sign out. Try again.",
+	"trainingConsentField_draftLabel": "Help train the bots",
+	"trainingConsentField_draftDescription": "Draft wording: let the moves from your games, without your name, be used to train and test the computer opponents. You can change this at any time.",
+	"signinReturn_signupTitle": "Welcome to Hoi Toi",
+	"signinReturn_signupHint": "Check the name other players will see at the table.",
+	"signinReturn_nameLabel": "Display name",
+	"signinReturn_continueButton": "Continue",
+	"signinReturn_savingButton": "Saving…",
+	"signinReturn_saveError": "Couldn't save. Check the name and try again.",
+	"signinReturn_failedTitle": "Sign-in didn't finish",
+	"signinReturn_failedBody": "Google sign-in was cancelled or failed. You're still playing as a guest.",
+	"signinReturn_disabledTitle": "Account disabled",
+	"signinReturn_disabledBody": "This account has been disabled, so it can't sign in. You can keep playing as a guest.",
+	"signinReturn_okButton": "OK"
+}

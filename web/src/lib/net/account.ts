@@ -31,3 +31,56 @@ export async function fetchMe(
 	if (!response.ok) throw new Error(`GET /me failed: ${response.status}`);
 	return (await response.json()) as Me;
 }
+
+// server: app/api_models.py's MePatch
+export interface MePatch {
+	display_name?: string;
+	training_consent?: boolean;
+}
+
+export async function patchMe(
+	body: MePatch,
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<Me> {
+	const response = await fetchFn(`${baseUrl}/me`, {
+		...WITH_SESSION,
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+	if (!response.ok) throw new Error(`PATCH /me failed: ${response.status}`);
+	return (await response.json()) as Me;
+}
+
+export async function signOut(
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<void> {
+	const response = await fetchFn(`${baseUrl}/auth/logout`, { ...WITH_SESSION, method: 'POST' });
+	if (!response.ok) throw new Error(`POST /auth/logout failed: ${response.status}`);
+}
+
+/** Full-page navigation target: Google's consent screen, then back to `next` on the web. */
+export function signInUrl(next: string, baseUrl: string = apiBaseUrl()): string {
+	return `${baseUrl}/auth/google/login?${new URLSearchParams({ next })}`;
+}
+
+export type SigninFlag = 'signup' | 'failed' | 'disabled';
+
+// the query flags /auth/google/callback appends to `next` (docs/protocol.md §10 "Accounts")
+const FLAG_PARAMS = ['signup', 'signin'] as const;
+
+/** The callback's flag on `url`, and `url` without any of them. */
+export function readSigninFlag(url: URL): { flag: SigninFlag | null; cleaned: URL } {
+	const signin = url.searchParams.get('signin');
+	const flag =
+		url.searchParams.get('signup') === '1'
+			? 'signup'
+			: signin === 'failed' || signin === 'disabled'
+				? signin
+				: null;
+	const cleaned = new URL(url);
+	for (const param of FLAG_PARAMS) cleaned.searchParams.delete(param);
+	return { flag, cleaned };
+}
