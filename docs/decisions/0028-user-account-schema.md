@@ -323,6 +323,7 @@ Each phase lands as several PRs. Rules for every PR:
 | 2.4 | 2 | Authlib; `/auth/google/login` + callback (upsert user/identity, email); rate limits; env vars in `infra.md §2` | M |
 | 2.5 | 2 | `PATCH /me`, `DELETE /me`, `GET /me/export`; deletion cascade tests | M |
 | 2.6 | 2 | WS handshake resolves the cookie; `SeatBinding.user_id`, account name, `kind = 'user'` on save; `architecture.md §2.1` | M |
+| 2.7 | 2 | `httpx` → `httpx2` (Authlib ≥ 1.8 and Starlette's `TestClient` deprecate `httpx`); `httpx` dropped | S |
 | 3.1 | 3 | web flag; session store (`/me` on load, SSR cookie forward, `credentials: 'include'`) | S |
 | 3.2 | 3 | Google sign-in button, sign-out, first-sign-in step (name, consent) | M |
 | 3.3 | 3 | account settings: name, consent, export, delete; screenshots | M |
@@ -393,7 +394,7 @@ seat data, placements and mode.
 
 - [x] Dependency: Authlib (reason: OAuth 2.0 + PKCE + `state`, maintained; replaces
       hand-rolled token exchange), with `httpx` (Authlib's async client) moved from dev to
-      runtime. Remove `JWT_SECRET` and `pyjwt` if nothing else reads them (done, PR 2.1).
+      runtime; replaced by `httpx2`, Authlib's and Starlette's supported fork, in PR 2.7. Remove `JWT_SECRET` and `pyjwt` if nothing else reads them (done, PR 2.1).
 - [x] Migration: `users`, `identities`, `sessions`, indexes; add the `game_players.user_id` FK.
       `users.prefs` and `learn_imported_at` wait for phase 5's migration.
 - [x] Routes (`{provider}` is only `google` for now): `GET /auth/{provider}/login`, `GET /auth/{provider}/callback` (upsert user +

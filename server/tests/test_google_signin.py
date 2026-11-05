@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -40,7 +40,7 @@ class FakeGoogle:
         self.challenge: str | None = None
         self.token_status = 200
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
         if str(request.url) == google.TOKEN_URL:
             form = parse_qs(request.content.decode())
             assert form["grant_type"] == ["authorization_code"]
@@ -49,13 +49,13 @@ class FakeGoogle:
             digest = hashlib.sha256(form["code_verifier"][0].encode()).digest()
             assert base64.urlsafe_b64encode(digest).rstrip(b"=").decode() == self.challenge
             if self.token_status != 200:
-                return httpx.Response(self.token_status, json={"error": "invalid_grant"})
-            return httpx.Response(
+                return httpx2.Response(self.token_status, json={"error": "invalid_grant"})
+            return httpx2.Response(
                 200, json={"access_token": "at", "token_type": "Bearer", "expires_in": 3600}
             )
         if str(request.url) == google.USERINFO_URL:
             assert request.headers["authorization"] == "Bearer at"
-            return httpx.Response(200, json=self.userinfo)
+            return httpx2.Response(200, json=self.userinfo)
         raise AssertionError(f"unexpected request {request.url}")
 
 
@@ -71,7 +71,7 @@ def fake_google(accounts_db: str, monkeypatch: pytest.MonkeyPatch) -> FakeGoogle
 def _client(fake: FakeGoogle) -> Iterator[TestClient]:
     with TestClient(app) as client:
         accounts.set_google(
-            GoogleProvider("cid", "secret", transport=httpx.MockTransport(fake.handler))
+            GoogleProvider("cid", "secret", transport=httpx2.MockTransport(fake.handler))
         )
         yield client
 
@@ -87,7 +87,7 @@ def _login(client: TestClient, fake: FakeGoogle, next_: str | None = None) -> di
     return query
 
 
-def _callback(client: TestClient, state: str, **params: str) -> httpx.Response:
+def _callback(client: TestClient, state: str, **params: str) -> httpx2.Response:
     return client.get(
         "/auth/google/callback",
         params={"code": "the-code", "state": state} | params,
@@ -95,7 +95,7 @@ def _callback(client: TestClient, state: str, **params: str) -> httpx.Response:
     )
 
 
-def _sign_in(client: TestClient, fake: FakeGoogle, next_: str | None = None) -> httpx.Response:
+def _sign_in(client: TestClient, fake: FakeGoogle, next_: str | None = None) -> httpx2.Response:
     return _callback(client, _login(client, fake, next_)["state"])
 
 
@@ -142,6 +142,7 @@ def test_returning_sign_in_rotates_the_session_and_refreshes_email(
         second = client.cookies[COOKIE_NAME]
         assert second != first
         me = client.get("/me").json()
+        client.cookies.delete(COOKIE_NAME)  # httpx2's set() adds beside the jar's cookie
         client.cookies.set(COOKIE_NAME, first)
         assert client.get("/me").status_code == 401
     assert me["display_name"] == "Ann Lee"  # a returning user's name is theirs, not google's
@@ -252,7 +253,7 @@ def test_auth_routes_are_rate_limited_per_ip(
 ) -> None:
     monkeypatch.setenv("AUTH_RATE_LIMIT", "2")
     with _client(fake_google) as client:
-        hits: list[Callable[[], httpx.Response]] = [
+        hits: list[Callable[[], httpx2.Response]] = [
             lambda: client.get("/auth/google/login", follow_redirects=False),
             lambda: client.post("/auth/logout"),
             lambda: client.get("/auth/google/login", follow_redirects=False),
