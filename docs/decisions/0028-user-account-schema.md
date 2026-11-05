@@ -104,7 +104,7 @@ erDiagram
 
 | Table | Key | Notes |
 | --- | --- | --- |
-| `users` | `id uuid` | uuid, not serial: ids appear in URLs (`/profile/<id>`) and shouldn't be enumerable. `display_name` defaults from the provider, editable, not unique, capped and normalized like a guest name (`MAX_NAME_LENGTH`, `server/app/names.py`) |
+| `users` | `id uuid` | uuid, not serial: ids appear in URLs (`/profile/<id>`) and shouldn't be enumerable. `display_name` starts as a placeholder (`Player 0427`), never the provider's profile name (usually a real name, and `games.players` outlives the account); the sign-up step asks for one. Editable, not unique, capped and normalized like a guest name (`MAX_NAME_LENGTH`, `server/app/names.py`) |
 | `identities` | `(provider, subject)` | one user, many providers. `subject` is the provider's stable id, never the email. `email` is whatever the provider returns, nullable, not unique: used to contact the user and to match deletion requests, never to sign in or link accounts |
 | `sessions` | `id_hash` | the cookie carries a 32-byte random token; only its SHA-256 is stored, so a DB leak can't replay sessions (no salt needed for a random token). Expires on `expires_at` or after an idle window on `last_used_at`; a new token is issued at every sign-in. `last_used_at` is written at most once an hour. Sign-out and revocation are a row delete |
 | `game_players` | `(game_id, seat)` | exactly four rows per game, one per seat, saying who held it: an account, a guest or a bot |
@@ -347,7 +347,8 @@ No code. Unblocks phase 2.
       [ADR 0029](0029-optional-accounts.md) (add `Superseded` to the status table in `README.md`;
       statuses flip in phase 7).
 - [ ] Google Cloud project + OAuth client (web application):
-      - scopes `openid email profile` only (non-sensitive, so no scope verification);
+      - scopes `openid email` only (non-sensitive, so no scope verification; `profile` was
+        dropped with the placeholder display name);
       - redirect URIs `https://mahjong-api.shumshum.dev/auth/google/callback` and
         `http://localhost:8000/auth/google/callback`;
       - authorized domain `shumshum.dev`;

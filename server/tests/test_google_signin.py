@@ -8,6 +8,7 @@ import base64
 import contextlib
 import datetime as dt
 import hashlib
+import re
 import sqlite3
 import uuid
 from collections.abc import Callable, Iterator
@@ -34,6 +35,17 @@ _WEB = "http://web.test"
 _API = "http://localhost:8000"
 
 type Userinfo = dict[str, object]
+
+_PLACEHOLDER = re.compile(r"Player \d{4}")
+
+
+async def _dump(db: AsyncSession) -> list[object]:
+    """Every column of every users and identities row."""
+    rows: list[object] = []
+    for model in (User, Identity):
+        for row in await db.scalars(select(model)):
+            rows.extend(getattr(row, c.key) for c in model.__table__.columns)
+    return rows
 
 
 class FakeGoogle:
@@ -109,7 +121,8 @@ def test_login_redirects_to_google_with_pkce_and_state(fake_google: FakeGoogle) 
         query = _login(client, fake_google)
     assert query["client_id"] == "cid"
     assert query["response_type"] == "code"
-    assert query["scope"] == "openid email profile"
+    # no `profile`: the account never sees the user's google name
+    assert query["scope"] == "openid email"
     assert query["redirect_uri"] == f"{_API}/auth/google/callback"
     assert query["code_challenge_method"] == "S256"
     assert len(query["state"]) >= 43
@@ -128,10 +141,12 @@ def test_first_sign_in_creates_the_user_and_asks_for_sign_up(
         assert "samesite=lax" in session_cookie.lower()
         assert "Domain" not in session_cookie
         me = client.get("/me").json()
-    assert me["display_name"] == "Ann Lee"
+    # a placeholder, never the profile's (usually real) name
+    assert _PLACEHOLDER.fullmatch(me["display_name"])
     identity = fetch(accounts_db, Identity, "google", "g-1")
     assert identity is not None
     assert str(identity.user_id) == me["id"]
+    assert "Ann Lee" not in str(run_db(accounts_db, _dump))
     assert identity.email == "ann@x.test"
 
 
@@ -141,6 +156,7 @@ def test_returning_sign_in_rotates_the_session_and_refreshes_email(
     with _client(fake_google) as client:
         _sign_in(client, fake_google)
         first = client.cookies[COOKIE_NAME]
+        name = client.get("/me").json()["display_name"]
         fake_google.userinfo = {"sub": "g-1", "email": "new@x.test", "name": "Someone Else"}
         response = _sign_in(client, fake_google)
         assert response.headers["location"] == f"{_WEB}/"
@@ -150,7 +166,7 @@ def test_returning_sign_in_rotates_the_session_and_refreshes_email(
         client.cookies.delete(COOKIE_NAME)  # httpx2's set() adds beside the jar's cookie
         client.cookies.set(COOKIE_NAME, first)
         assert client.get("/me").status_code == 401
-    assert me["display_name"] == "Ann Lee"  # a returning user's name is theirs, not google's
+    assert me["display_name"] == name
     assert session_count(accounts_db) == 1
     identity = fetch(accounts_db, Identity, "google", "g-1")
     assert identity is not None and identity.email == "new@x.test"
@@ -159,13 +175,6 @@ def test_returning_sign_in_rotates_the_session_and_refreshes_email(
         return len((await db.scalars(select(User))).all())
 
     assert run_db(accounts_db, count_users) == 1
-
-
-def test_a_nameless_profile_gets_a_default_name(fake_google: FakeGoogle) -> None:
-    fake_google.userinfo = {"sub": "g-2", "name": "   "}
-    with _client(fake_google) as client:
-        _sign_in(client, fake_google)
-        assert client.get("/me").json()["display_name"] == "Player"
 
 
 def test_a_disabled_user_is_refused(fake_google: FakeGoogle, accounts_db: str) -> None:
@@ -276,7 +285,7 @@ def test_odd_userinfo_fields_are_dropped(fake_google: FakeGoogle, accounts_db: s
     fake_google.userinfo = {"sub": "g-3", "email": 5, "name": ["x"]}
     with _client(fake_google) as client:
         _sign_in(client, fake_google)
-        assert client.get("/me").json()["display_name"] == "Player"
+        assert _PLACEHOLDER.fullmatch(client.get("/me").json()["display_name"])
     identity = fetch(accounts_db, Identity, "google", "g-3")
     assert identity is not None and identity.email is None
 
@@ -310,7 +319,7 @@ def test_a_concurrent_first_sign_in_returns_the_winner(accounts_db: str) -> None
         event.listen(engine, "after_cursor_execute", race)
         try:
             user, created = await upsert_identity(
-                db, provider="google", subject="g-race", email="a@x.test", name="Ann"
+                db, provider="google", subject="g-race", email="a@x.test"
             )
         finally:
             event.remove(engine, "after_cursor_execute", race)

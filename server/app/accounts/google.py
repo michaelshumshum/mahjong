@@ -11,7 +11,8 @@ import httpx2
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 PROVIDER: Final = "google"
-SCOPES: Final = "openid email profile"
+# no `profile`: an account starts with a placeholder name, never the user's google name
+SCOPES: Final = "openid email"
 AUTHORIZE_URL: Final = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL: Final = "https://oauth2.googleapis.com/token"
 USERINFO_URL: Final = "https://openidconnect.googleapis.com/v1/userinfo"
@@ -22,7 +23,6 @@ _TIMEOUT_SECONDS: Final = 10.0
 class Profile:
     subject: str
     email: str | None
-    name: str | None
 
 
 class GoogleProvider:
@@ -68,9 +68,4 @@ class GoogleProvider:
         if not isinstance(subject, str) or not subject:
             raise ValueError("userinfo has no subject")
         email = info.get("email")
-        name = info.get("name")
-        return Profile(
-            subject=subject,
-            email=email if isinstance(email, str) else None,
-            name=name if isinstance(name, str) else None,
-        )
+        return Profile(subject=subject, email=email if isinstance(email, str) else None)
