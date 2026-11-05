@@ -159,6 +159,12 @@ export function readSigninFlag(url: URL): { flag: SigninFlag | null; cleaned: UR
 	return { flag, cleaned };
 }
 
+/** `join.name`. Signed in, the account's name: the server ignores it for an account seat, but a
+ * session that expired before the WS handshake seats a guest, who keeps the name, not "Guest N". */
+export function joinName(accountName: string | null, typed: string): string | undefined {
+	return accountName ?? (typed.trim() || undefined);
+}
+
 /** The sign-up step's suggested name: the guest name this browser already plays under, else the
  * server's placeholder (`Player 0427`, never the google profile name). */
 export function signupName(placeholder: string, guestName: string | null): string {

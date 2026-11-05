@@ -3,6 +3,7 @@ import {
 	deleteMe,
 	exportMe,
 	fetchMyGames,
+	joinName,
 	patchMe,
 	readSigninFlag,
 	signInUrl,
@@ -11,6 +12,20 @@ import {
 } from './account';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
+
+describe('joinName', () => {
+	it.each([
+		// signed in: the account's name, so a session that expired before the handshake still
+		// seats a guest under it, not "Guest N"
+		['Ann', 'Typed', 'Ann'],
+		['Ann', '', 'Ann'],
+		[null, '  Bea ', 'Bea'],
+		[null, '   ', undefined],
+		[null, '', undefined]
+	])('account %j, typed %j -> %j', (account, typed, expected) => {
+		expect(joinName(account, typed)).toBe(expected);
+	});
+});
 
 describe('signupName', () => {
 	it.each([

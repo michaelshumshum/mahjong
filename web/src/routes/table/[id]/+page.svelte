@@ -60,6 +60,7 @@
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
 	import ToastStack from '$lib/ui/ToastStack.svelte';
+	import { joinName } from '$lib/net/account';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import Announcer from '$lib/ui/Announcer.svelte';
 	import {
@@ -917,7 +918,7 @@
 			onJoin={(seat) =>
 				liveStore?.socket.join(
 					seat,
-					accountSession.user ? undefined : displayName.trim() || undefined
+					joinName(accountSession.user?.display_name ?? null, displayName)
 				)}
 			{isHost}
 			onStartWithBots={() => liveStore?.socket.startWithBots()}
