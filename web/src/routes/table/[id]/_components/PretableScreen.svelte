@@ -9,6 +9,7 @@
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import Spinner from '$lib/ui/Spinner.svelte';
 	import { RULESET_PRESET_OPTIONS } from '$lib/net/ruleset';
+	import { MAX_NAME_LENGTH } from '$lib/net/protocol.constants';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -110,7 +111,7 @@
 				id="display-name-input"
 				type="text"
 				class="pretable-name-input"
-				maxlength="24"
+				maxlength={MAX_NAME_LENGTH}
 				placeholder={m.pretableScreen_namePlaceholder()}
 				autocomplete="off"
 				value={displayName}
