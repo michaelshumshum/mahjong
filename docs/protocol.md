@@ -71,7 +71,7 @@ The client sends *intent*, never *state*: "discard tile #47", not "my hand is no
 | `t` | payload | notes |
 | --- | --- | --- |
 | `hello` | `{last_seq?, client_version, seat?, secret?}` | first frame after connect. `seat` present + already bound → reconnect (§5), authenticated by `secret`; a missing or wrong one refuses the reclaim (`error{code:'bad_secret'}`). Omitted `seat` → no-op ahead of `join`. Never carries a name |
-| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` is the guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty (`app/table.py`'s `_normalize_name`). Never rejected once it passes the raw 64-char bound (Size limits, below) |
+| `join` | `{seat?: 0-3, name?}` | request a seat; omit `seat` for "first open seat". `name` is the guest display name, set once here — trimmed, capped at 24 chars, defaulted to `"Guest N"` (1-indexed) when empty (`app/names.py`'s `normalize_name`). Never rejected once it passes the raw 64-char bound (Size limits, below) |
 | `ready` | `{}` | lobby → start; only valid once seated |
 | `start_with_bots` | `{}` | host only, before the table starts: bind every empty seat to a bot and deal once all seats are bound and ready. `error{code:'not_host'}` / `error{code:'already_started'}` otherwise |
 | `hand_end_ack` | `{}` | dismiss the hand-end hold early ([architecture.md §3](architecture.md) "Hand-end hold") |

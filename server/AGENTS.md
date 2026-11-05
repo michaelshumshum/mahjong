@@ -86,3 +86,4 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Redacted wire dataclasses (`*Wire`, `SeatView`), `CLAIM_KIND_WIRE`, `ClaimChoice`, `WindName` | `app/views.py`. They stay beside the redaction code because their `Entitlement` annotations are what the redaction walker checks |
 | Outbound frame payloads (`turn_frame`, `claim_offer_frame`, `deal_frame`, `event_frame`, `state_sync_frame`, …) and the `{v, t, seq, ts, d}` envelope (`to_envelope`) — pure, shared by `Table` and the lesson generator | `app/frames.py` (`docs/architecture.md §5` "Frame building") |
 | Server epoch ms (`now_ms`) | `app/clock.py` |
+| Seat display-name cap and normalizer (`MAX_NAME_LENGTH`, `normalize_name`), shared by guest `join.name` and `users.display_name` | `app/names.py` |

@@ -11,7 +11,7 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import GameRecord, GameSeat
+from app.db.models import GameRecord, GameSeat, User
 
 
 async def _game(session: AsyncSession, **overrides: Any) -> GameRecord:
@@ -51,7 +51,10 @@ async def _rejects(session: AsyncSession, row: Any) -> None:
 
 async def test_each_kind_round_trips(session: AsyncSession) -> None:
     game = await _game(session, mode="multiplayer")
-    user_id = uuid.uuid4()
+    user = User(display_name="Ann")
+    session.add(user)
+    await session.commit()
+    user_id = user.id
     session.add_all(
         [
             _seat(game.id, seat=0, kind="user", user_id=user_id, final_score=40, placement=1),
