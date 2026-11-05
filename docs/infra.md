@@ -140,6 +140,7 @@ pnpm --dir web dev
 | `CORS_ORIGINS` | unset → **no cross-origin requests**, so the web dev server can't reach the API | comma-separated; Compose sets `http://localhost:${WEB_PORT}`. Credentialed (`allow_credentials`), so `*` is dropped, never echoed |
 | `PUBLIC_API_URL` / `PUBLIC_WS_URL` | `http://localhost:8000` / `ws://localhost:8000/ws` (`lib/net/lobby.ts`, `lib/net/socket.ts`) | web, read at runtime via `$env/dynamic/public`. The `api` reads `PUBLIC_API_URL` too (`app/accounts/config.py`): an `https://` value makes the session cookie `Secure` |
 | `ACCOUNTS_ENABLED` | unset → off | `1`/`true` turns on `/auth/*` and `/me*` ([protocol.md §10](protocol.md) "Accounts"); off, they 404. Also off without `DATABASE_URL` |
+| `PUBLIC_ACCOUNTS_ENABLED` | unset → off | web, `$env/dynamic/public` (`lib/net/account.ts`): `1`/`true` shows the sign-in UI and loads `GET /me` ([frontend.md §6](frontend.md) "Account session"). Separate from `ACCOUNTS_ENABLED` so the API can run accounts while the UI stays hidden; Compose passes it to `web` |
 | `PUBLIC_WEB_URL` | the first `CORS_ORIGINS` entry | the web origin the sign-in callback redirects to |
 | `SESSION_MAX_AGE_DAYS` / `SESSION_IDLE_DAYS` | 90 / 30 | a session's absolute and idle lifetime ([ADR 0028](decisions/0028-user-account-schema.md)) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | unset → `/auth/google/*` 404 | the Google Cloud OAuth client (web application). Its authorized redirect URI must be `${PUBLIC_API_URL}/auth/google/callback` ([ADR 0028](decisions/0028-user-account-schema.md) phase 0) |

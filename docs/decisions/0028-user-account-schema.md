@@ -324,7 +324,7 @@ Each phase lands as several PRs. Rules for every PR:
 | 2.5 | 2 | `PATCH /me`, `DELETE /me`, `GET /me/export`; deletion cascade tests | M |
 | 2.6 | 2 | WS handshake resolves the cookie; `SeatBinding.user_id`, account name, `kind = 'user'` on save; `architecture.md §2.1` | M |
 | 2.7 | 2 | `httpx` → `httpx2` (Authlib ≥ 1.8 and Starlette's `TestClient` deprecate `httpx`); `httpx` dropped | S |
-| 3.1 | 3 | web flag; session store (`/me` on load, SSR cookie forward, `credentials: 'include'`) | S |
+| 3.1 | 3 | web flag; session store (`/me` on load, client-side only, `credentials: 'include'`) | S |
 | 3.2 | 3 | Google sign-in button, sign-out, first-sign-in step (name, consent) | M |
 | 3.3 | 3 | account settings: name, consent, export, delete; screenshots | M |
 | 3.4 | 3 | signed-in join hides the name field | S |
@@ -362,7 +362,7 @@ No code. Unblocks phase 2.
 | Topic | Decision |
 | --- | --- |
 | Provider | Google only at launch. `identities` keeps its multi-provider shape; linking a second provider is moot until one is added |
-| Cookie origin | web (`mahjong.shumshum.dev`) and API (`mahjong-api.shumshum.dev`) are separate hostnames of one site, each a Cloudflare Tunnel ingress rule, no reverse proxy. The session cookie is host-only on the API host, `HttpOnly`, `Secure`, `SameSite=Lax` (same site, so it rides credentialed fetches and the WS handshake). Web `fetch`es to the API use `credentials: 'include'`; the API sets `allow_credentials=True` with explicit `CORS_ORIGINS`, never `*`. SSR calls to `/me` forward the browser's cookie |
+| Cookie origin | web (`mahjong.shumshum.dev`) and API (`mahjong-api.shumshum.dev`) are separate hostnames of one site, each a Cloudflare Tunnel ingress rule, no reverse proxy. The session cookie is host-only on the API host, `HttpOnly`, `Secure`, `SameSite=Lax` (same site, so it rides credentialed fetches and the WS handshake). Web `fetch`es to the API use `credentials: 'include'`; the API sets `allow_credentials=True` with explicit `CORS_ORIGINS`, never `*`. The web reads `/me` client-side only: its SSR never receives an API-host cookie |
 | Session lifetime | 90 days absolute (`expires_at`), 30 days idle (`last_used_at`) |
 | Seat name | a signed-in seat always uses `users.display_name`; the table's name field is hidden and any typed `join.name` is ignored |
 | Email | request the provider's email scope; stored in `identities.email` |
@@ -420,8 +420,10 @@ seat data, placements and mode.
 
 ### Phase 3: web sign-in
 
-- [ ] Session store: `GET /me` on load (SSR forwards the cookie); signed-in / guest state
-      available app-wide. API `fetch`es use `credentials: 'include'`.
+- [x] Session store: `GET /me` on load; signed-in / guest state available app-wide. API
+      `fetch`es use `credentials: 'include'`. Client-side only, not SSR: the host-only cookie
+      never reaches the web host, so there is nothing to forward
+      ([frontend.md §6](../frontend.md) "Account session").
 - [ ] "Sign in with Google" button (Google's branding rules) in settings and on `/profile`;
       sign-out.
 - [ ] Sign-up step on first sign-in: confirm display name, training-consent checkbox (unchecked).
