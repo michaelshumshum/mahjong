@@ -11,8 +11,9 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "numpy>=2.1",                     # LearnedBot's forward pass (T4); no torch at runtime
-    "authlib>=1.6",                   # google sign-in: oauth 2.0 code flow, pkce, state (ADR 0028)
-    "httpx>=0.28",                    # authlib's async http client for the token exchange
+    "authlib>=1.8",                   # google sign-in (ADR 0028); 1.8 first to import httpx2
+    "httpx2>=2.16",                   # authlib's async http client; also starlette's TestClient
+                                      # (>=1.2); plain httpx is deprecated by both
 ]
 # mahjong_core is stdlib-only. numpy only in bots/learned.py and the torch-free ml/ modules it
 # imports; never torch. See server/AGENTS.md.

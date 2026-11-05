@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Final
 
-import httpx
+import httpx2
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 PROVIDER: Final = "google"
@@ -26,14 +26,14 @@ class Profile:
 
 
 class GoogleProvider:
-    """`transport` lets tests stub Google's endpoints with `httpx.MockTransport`."""
+    """`transport` lets tests stub Google's endpoints with `httpx2.MockTransport`."""
 
     def __init__(
         self,
         client_id: str,
         client_secret: str,
         *,
-        transport: httpx.AsyncBaseTransport | None = None,
+        transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._client_id = client_id
         self._client_secret = client_secret
