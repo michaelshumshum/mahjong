@@ -293,7 +293,9 @@ row.
   otherwise go untested.
 - `save_game_record` (`server/app/db/records.py`) is the only write path for `games` and
   `game_players` (one transaction); `bots/selfplay.py`'s `play_and_record_game` records bot-only
-  games through it, without seat rows.
+  games through it, without seat rows. A seat whose account is gone is saved with a null
+  `user_id`; an account deleted between that check and the commit fails the foreign key, and
+  the save is retried once, re-checking.
 - Live table state is never persisted ([architecture.md §7](architecture.md)).
 
 ## 7. Deployment

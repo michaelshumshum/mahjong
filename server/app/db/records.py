@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import GameMode, GameRecord, GameSeat, HandRecord, SeatKind, User
@@ -70,42 +71,62 @@ async def save_game_record(
         raise ValueError(f"seats must have exactly 4 entries, got {len(seats)}")
 
     outcome = game_outcome(state)
-    record = GameRecord(
-        engine_version=ENGINE_VERSION,
-        ruleset=state.ruleset.to_dict(),
-        seed=state.game_seed,
-        action_log=[action_to_dict(a) for a in actions],
-        players=resolved_players,
-        result=outcome.to_dict(),
-        mode=mode,
-    )
-    session.add(record)
-    if seats is not None:
-        await session.flush()
-        places = placements(outcome.final_scores)
-        # an account deleted mid-game is a deleted account's seat: `user`, null id, as SET NULL
-        # would have left it. without this its foreign key would lose the whole game
-        claimed = {s.user_id for s in seats if s.user_id is not None}
-        live = (
-            set(await session.scalars(select(User.id).where(User.id.in_(claimed))))
-            if claimed
-            else set()
+
+    async def add() -> GameRecord:
+        record = GameRecord(
+            engine_version=ENGINE_VERSION,
+            ruleset=state.ruleset.to_dict(),
+            seed=state.game_seed,
+            action_log=[action_to_dict(a) for a in actions],
+            players=resolved_players,
+            result=outcome.to_dict(),
+            mode=mode,
         )
-        session.add_all(
-            GameSeat(
-                game_id=record.id,
-                seat=seat,
-                kind=s.kind,
-                user_id=s.user_id if s.user_id in live else None,
-                bot_tier=s.bot_tier,
-                final_score=outcome.final_scores[seat],
-                placement=places[seat],
-            )
-            for seat, s in enumerate(seats)
-        )
-    await session.commit()
+        session.add(record)
+        if seats is not None:
+            await session.flush()
+            await _add_seats(session, record.id, seats, outcome.final_scores)
+        return record
+
+    record = await add()
+    try:
+        await session.commit()
+    except IntegrityError:
+        if seats is None:
+            raise
+        # an account deleted between the live-user read and the commit; the retry's read no
+        # longer finds it
+        await session.rollback()
+        record = await add()
+        await session.commit()
     await session.refresh(record)
     return record
+
+
+async def _add_seats(
+    session: AsyncSession, game_id: int, seats: Sequence[SeatRecord], final_scores: Sequence[int]
+) -> None:
+    places = placements(final_scores)
+    # an account deleted mid-game is a deleted account's seat: `user`, null id, as SET NULL
+    # would have left it. without this its foreign key would lose the whole game
+    claimed = {s.user_id for s in seats if s.user_id is not None}
+    live = (
+        set(await session.scalars(select(User.id).where(User.id.in_(claimed))))
+        if claimed
+        else set()
+    )
+    session.add_all(
+        GameSeat(
+            game_id=game_id,
+            seat=seat,
+            kind=s.kind,
+            user_id=s.user_id if s.user_id in live else None,
+            bot_tier=s.bot_tier,
+            final_score=final_scores[seat],
+            placement=places[seat],
+        )
+        for seat, s in enumerate(seats)
+    )
 
 
 async def get_game_record(session: AsyncSession, record_id: int) -> GameRecord | None:
