@@ -802,6 +802,9 @@ No rate limit: a page is one indexed read of at most 51 seats.
 **WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
 signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game
 saves the seat as `kind = 'user'`. No frame changes ([architecture.md §2.1](architecture.md)).
+The cookie counts only when the upgrade's `Origin` is a `CORS_ORIGINS` entry: a WebSocket
+handshake skips CORS, and `SameSite=Lax` still sends the cookie from a sibling subdomain. Any
+other `Origin`, or none, connects as a guest rather than being refused.
 
 `PATCH` and `DELETE` are in the CORS `allow_methods`; a cross-origin one is always preflighted,
 so only `CORS_ORIGINS` can send them with the cookie.

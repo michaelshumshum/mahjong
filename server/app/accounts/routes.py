@@ -121,10 +121,15 @@ async def run_session_cleanup() -> None:
         await asyncio.sleep(_CLEANUP_INTERVAL_SECONDS)
 
 
-async def user_for_cookie(token: str | None) -> User | None:
+async def user_for_cookie(token: str | None, origin: str | None) -> User | None:
     """The account behind a WS handshake's session cookie: None when accounts are off, there's
-    no cookie, or it doesn't resolve. A database error plays on as a guest."""
+    no cookie, it doesn't resolve, or the upgrade's `Origin` isn't a `CORS_ORIGINS` entry. A
+    database error plays on as a guest."""
     if token is None or _session_factory is None:
+        return None
+    # websockets skip cors, and samesite=lax still sends the cookie from a sibling subdomain:
+    # a foreign page could otherwise seat its visitor as their account
+    if origin not in _config.origins:
         return None
     try:
         async with _session_factory() as db:

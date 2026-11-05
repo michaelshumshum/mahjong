@@ -508,9 +508,10 @@ async def _serve(websocket: WebSocket, table: str, spectate: bool) -> None:
         await websocket.send_text(json.dumps(frame))
         await websocket.close(code=_CLOSE_TRY_AGAIN_LATER)
         return
-    session = Session(
-        websocket, table_obj, account=await user_for_cookie(websocket.cookies.get(COOKIE_NAME))
+    account = await user_for_cookie(
+        websocket.cookies.get(COOKIE_NAME), websocket.headers.get("origin")
     )
+    session = Session(websocket, table_obj, account=account)
     if spectate:
         # explicit connect-time opt-in, not a passive default -- would race the real
         # hello-before-join handshake.

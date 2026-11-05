@@ -16,6 +16,9 @@ from tests.accounts import create_user, sign_in
 from tests.tables import table_client
 from tests.ws_frames import hello, msg, next_id
 
+# tests/conftest.py's CORS_ORIGINS
+_WEB = "http://localhost:5173"
+
 
 def _join(client: TestClient, table_id: str, name: str = "Typed") -> dict[str, Any]:
     """Join seat 0 and return its ack payload."""
@@ -29,6 +32,13 @@ def _join(client: TestClient, table_id: str, name: str = "Typed") -> dict[str, A
     return {"ack": ack["d"], "seat_state": seat_state["d"]}
 
 
+def _signed_in(client: TestClient, token: str, origin: str | None = _WEB) -> None:
+    """The cookie, and the `Origin` a browser on the web would send with the upgrade."""
+    client.cookies.set(COOKIE_NAME, token)
+    if origin is not None:
+        client.headers["origin"] = origin
+
+
 def _binding(table_id: str) -> Any:
     table = get_table(table_id)
     assert table is not None
@@ -39,7 +49,7 @@ def test_a_signed_in_join_takes_the_account_name_and_id(accounts_db: str) -> Non
     user_id = create_user(accounts_db, display_name="Account Ann")
     table_id = f"acct-{uuid.uuid4()}"
     with table_client(table_id) as client:
-        client.cookies.set(COOKIE_NAME, sign_in(accounts_db, user_id))
+        _signed_in(client, sign_in(accounts_db, user_id))
         frames = _join(client, table_id, name="Typed Name")
         binding = _binding(table_id)
     assert (binding.name, binding.user_id) == ("Account Ann", user_id)
@@ -71,7 +81,20 @@ def test_an_unusable_cookie_falls_back_to_a_guest(
         monkeypatch.delenv("ACCOUNTS_ENABLED")
     table_id = f"acct-{uuid.uuid4()}"
     with table_client(table_id) as client:
-        client.cookies.set(COOKIE_NAME, token)
+        _signed_in(client, token)
+        _join(client, table_id, name="Guesty")
+        binding = _binding(table_id)
+    assert (binding.name, binding.user_id) == ("Guesty", None)
+
+
+@pytest.mark.parametrize("origin", ["https://evil.example", None])
+def test_a_cookie_from_a_foreign_origin_plays_as_a_guest(
+    accounts_db: str, origin: str | None
+) -> None:
+    user_id = create_user(accounts_db, display_name="Account Ann")
+    table_id = f"acct-{uuid.uuid4()}"
+    with table_client(table_id) as client:
+        _signed_in(client, sign_in(accounts_db, user_id), origin=origin)
         _join(client, table_id, name="Guesty")
         binding = _binding(table_id)
     assert (binding.name, binding.user_id) == ("Guesty", None)
@@ -81,7 +104,7 @@ def test_an_account_takes_one_seat_per_table(accounts_db: str) -> None:
     user_id = create_user(accounts_db, display_name="Account Ann")
     table_id = f"acct-{uuid.uuid4()}"
     with table_client(table_id) as client:
-        client.cookies.set(COOKIE_NAME, sign_in(accounts_db, user_id))
+        _signed_in(client, sign_in(accounts_db, user_id))
         with client.websocket_connect(f"/ws?table={table_id}") as first:
             first.send_json(hello())
             first.send_json(msg("join", {"seat": 0}, id_=next_id()))
@@ -127,7 +150,7 @@ def test_a_reconnect_keeps_the_account(accounts_db: str) -> None:
     user_id = create_user(accounts_db, display_name="Account Ann")
     table_id = f"acct-{uuid.uuid4()}"
     with table_client(table_id) as client:
-        client.cookies.set(COOKIE_NAME, sign_in(accounts_db, user_id))
+        _signed_in(client, sign_in(accounts_db, user_id))
         secret = _join(client, table_id)["ack"]["reconnect_secret"]
         client.cookies.clear()
         with client.websocket_connect(f"/ws?table={table_id}") as ws:
