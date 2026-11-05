@@ -770,6 +770,28 @@ GET /me/export
 `games` is every seat linked to the account, newest first. Learn progress isn't stored
 server-side yet; it joins the export with ADR 0028 phase 5.
 
+```
+GET /me/games?before=<game_id>&limit=20&mode=practice|multiplayer
+-> {"games": [{"game_id": 12, "created_at": "…", "mode": "practice" | "multiplayer" | null,
+               "hand_count": 5, "seat": 1, "placement": 1, "final_score": 40,
+               "others": [{"seat": 0, "kind": "user" | "guest" | "bot",
+                           "name": "Bob" | null, "bot_tier": "T3" | null}, …]}],
+    "next": 9 | null}
+```
+
+The "my games" list: the caller's `game_players` rows joined to `games`, newest first, served by
+the partial index `(user_id, game_id DESC)`.
+
+| Param / field | Rule |
+| --- | --- |
+| `before` | keyset cursor: only games with a smaller id. Pass the previous page's `next`; `next` is null on the last page |
+| `limit` | 1–50 (`MAX_GAMES_PAGE`, `app/accounts/routes.py`), default 20; outside it `422` |
+| `mode` | optional filter; any other value `422`. Unfiltered pages include `mode: null` games (saved before modes were recorded) |
+| `created_at` | persist time, i.e. the game's end |
+| `others` | the other three seats, by seat. `name` is `games.players[seat]` for `user`/`guest` seats and null for bots; `bot_tier` is set iff `kind` is `bot` (stored as written, so a retired tier still reads). A deleted account's seat is `kind: "user"` with its name only. No seat carries a user id |
+
+No per-user rate limit, like the other `/me` routes.
+
 **WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
 signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game
 saves the seat as `kind = 'user'`. No frame changes ([architecture.md §2.1](architecture.md)).

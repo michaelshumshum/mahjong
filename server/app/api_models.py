@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.db.models import GameMode, SeatKind
 from app.lessons.model import Band, LessonKind, PuzzleKind, Track
 from app.names import MAX_RAW_NAME_LENGTH
 from app.protocol import StateSync
@@ -30,6 +31,9 @@ __all__ = [
     "LoadPointOut",
     "MePatch",
     "MeResponse",
+    "MyGame",
+    "MyGameSeat",
+    "MyGamesResponse",
     "RandomLessonResponse",
     "ScoreHandRequest",
     "ScoreHandResponse",
@@ -175,6 +179,37 @@ class ExportResponse(BaseModel):
     user: ExportUser
     identities: list[ExportIdentity]
     games: list[ExportGame]
+
+
+class MyGameSeat(BaseModel):
+    """Another seat of one of the caller's games. Never carries a user id."""
+
+    seat: int
+    kind: SeatKind
+    # games.players[seat] for a user or guest seat; null for a bot
+    name: str | None
+    # bots.tiers.BotTier as stored; a str so a retired tier still reads
+    bot_tier: str | None
+
+
+class MyGame(BaseModel):
+    game_id: int
+    # persist time = game end
+    created_at: dt.datetime
+    # null for games saved before modes were recorded
+    mode: GameMode | None
+    hand_count: int | None
+    seat: int
+    placement: int
+    final_score: int
+    others: list[MyGameSeat]
+
+
+class MyGamesResponse(BaseModel):
+    """`GET /me/games`, newest first; `next` is the `before` cursor of the next page."""
+
+    games: list[MyGame]
+    next: int | None
 
 
 class ScoreHandRequest(BaseModel):
