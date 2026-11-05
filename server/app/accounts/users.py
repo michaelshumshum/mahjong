@@ -7,6 +7,7 @@ import datetime as dt
 from typing import NamedTuple
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AuthSession, GameMode, GameRecord, GameSeat, Identity, User
@@ -33,17 +34,29 @@ async def upsert_identity(
     `email` is refreshed every time. Returns `(user, created)`. Commits."""
     identity = await db.get(Identity, (provider, subject))
     if identity is not None:
-        identity.email = email
-        user = await db.get(User, identity.user_id)
-        assert user is not None  # identities.user_id is a cascading foreign key
-        await db.commit()
-        return user, False
+        return await _returning(db, identity, email), False
     user = User(display_name=clean_name(name) or DEFAULT_DISPLAY_NAME)
     db.add(user)
-    await db.flush()
-    db.add(Identity(provider=provider, subject=subject, user_id=user.id, email=email))
-    await db.commit()
+    try:
+        await db.flush()
+        db.add(Identity(provider=provider, subject=subject, user_id=user.id, email=email))
+        await db.commit()
+    except IntegrityError:
+        # a concurrent first sign-in for the same subject inserted it first
+        await db.rollback()
+        identity = await db.get(Identity, (provider, subject))
+        if identity is None:
+            raise
+        return await _returning(db, identity, email), False
     return user, True
+
+
+async def _returning(db: AsyncSession, identity: Identity, email: str | None) -> User:
+    identity.email = email
+    user = await db.get(User, identity.user_id)
+    assert user is not None  # identities.user_id is a cascading foreign key
+    await db.commit()
+    return user
 
 
 async def drop_sessions(db: AsyncSession, user: User) -> None:
