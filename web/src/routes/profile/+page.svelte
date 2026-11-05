@@ -3,6 +3,7 @@
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import AccountPanel from '$lib/ui/AccountPanel.svelte';
 	import AccountSettings from '$lib/ui/AccountSettings.svelte';
+	import MyGames from '$lib/ui/MyGames.svelte';
 
 	const status = $derived(accountSession.state.status);
 </script>
@@ -23,6 +24,10 @@
 	<section class="account-card" aria-labelledby="account-settings-heading">
 		<h2 id="account-settings-heading">{m.accountSettings_heading()}</h2>
 		<AccountSettings user={accountSession.user} />
+	</section>
+	<section class="account-card" aria-labelledby="my-games-heading">
+		<h2 id="my-games-heading">{m.myGames_heading()}</h2>
+		<MyGames />
 	</section>
 {/if}
 

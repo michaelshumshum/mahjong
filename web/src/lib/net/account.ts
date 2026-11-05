@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
 import { apiBaseUrl } from './lobby';
+import type { BotTier } from './protocol';
 
 // hand-written like lobby.ts: /me and /auth/* are plain HTTP (docs/protocol.md §10 "Accounts").
 // server: app/api_models.py's MeResponse.
@@ -74,6 +75,56 @@ export async function exportMe(
 
 // the server's Content-Disposition name; a cross-origin download can't read that header
 export const EXPORT_FILENAME = 'mahjong-account.json';
+
+// server: app/db/models.py's GameMode and SeatKind
+export type GameMode = 'practice' | 'multiplayer';
+export type SeatKind = 'user' | 'guest' | 'bot';
+
+// server: app/api_models.py's MyGameSeat, MyGame, MyGamesResponse
+export interface MyGameSeat {
+	seat: number;
+	kind: SeatKind;
+	name: string | null;
+	// stored as written: a retired tier reaches BotBadge, which falls back to plain "Bot"
+	bot_tier: BotTier | null;
+}
+
+export interface MyGame {
+	game_id: number;
+	created_at: string;
+	mode: GameMode | null;
+	hand_count: number | null;
+	seat: number;
+	placement: number;
+	final_score: number;
+	others: MyGameSeat[];
+}
+
+export interface MyGamesPage {
+	games: MyGame[];
+	next: number | null;
+}
+
+export interface MyGamesQuery {
+	before?: number;
+	mode?: GameMode;
+}
+
+/** One page of the signed-in player's games, newest first; `next` is the following page's
+ * `before`. */
+export async function fetchMyGames(
+	{ before, mode }: MyGamesQuery,
+	baseUrl: string = apiBaseUrl(),
+	fetchFn: typeof fetch = fetch
+): Promise<MyGamesPage> {
+	const params = new URLSearchParams();
+	if (before !== undefined) params.set('before', String(before));
+	if (mode !== undefined) params.set('mode', mode);
+	const query = params.size ? `?${params}` : '';
+	const response = await fetchFn(`${baseUrl}/me/games${query}`, WITH_SESSION);
+	if (!response.ok) throw new Error(`GET /me/games failed: ${response.status}`);
+	return (await response.json()) as MyGamesPage;
+}
 
 export async function signOut(
 	baseUrl: string = apiBaseUrl(),

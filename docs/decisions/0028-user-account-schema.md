@@ -439,13 +439,13 @@ seat data, placements and mode.
 
 ### Phase 4: "my games"
 
-- [ ] `GET /me/games?before=<game_id>&mode=`: keyset-paginated, newest first, from
+- [x] `GET /me/games?before=<game_id>&mode=`: keyset-paginated, newest first, from
       `game_players` joined to `games`; returns date, mode, hand count, own placement and score,
       and the other three seats (name or bot tier).
-- [ ] `/profile` lists them. No replay link ([ADR 0011](0011-replay-viewer.md) stays deferred).
-- [ ] Tests: pagination, mode filter, only the caller's games, deleted-account seats render as a
+- [x] `/profile` lists them. No replay link ([ADR 0011](0011-replay-viewer.md) stays deferred).
+- [x] Tests: pagination, mode filter, only the caller's games, deleted-account seats render as a
       name only.
-- [ ] Docs: `protocol.md §10`, `frontend.md §7`.
+- [x] Docs: `protocol.md §10`, `frontend.md §6`, `§7`. Screenshots unchanged, as in phase 3.
 - `make test`.
 
 ### Phase 5: learn progress sync
