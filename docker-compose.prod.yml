@@ -19,7 +19,6 @@ services:
       WS_MAX_SPECTATORS_PER_TABLE: ${WS_MAX_SPECTATORS_PER_TABLE:-}
       WS_MSG_RATE: ${WS_MSG_RATE:-}
       WS_MSG_BURST: ${WS_MSG_BURST:-}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
       LOG_LEVEL: ${LOG_LEVEL:-warning}
       API_DOCS: "0"

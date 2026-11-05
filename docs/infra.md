@@ -150,7 +150,6 @@ pnpm --dir web dev
 | `WS_MAX_CONNECTIONS_PER_IP` | 16 | open `/ws` connections per client IP ([protocol.md §11](protocol.md)) |
 | `WS_MAX_SPECTATORS_PER_TABLE` | 50 | ([protocol.md §11](protocol.md)) |
 | `WS_MSG_RATE` / `WS_MSG_BURST` | 20 / 40 | inbound frames per second / bucket size, per connection ([protocol.md §11](protocol.md)) |
-| `JWT_SECRET` | — | passed by both Compose files but read by nothing — vestigial from the cut auth design ([ADR 0001](decisions/0001-guest-only-identity.md)) |
 
 Native equivalents of the Docker targets:
 
@@ -302,7 +301,6 @@ reload.
 - The overlay uses `!override`/`!reset` YAML tags on `ports:` — Compose concatenates `ports:` lists
   across `-f` files, so a bare `ports: []` for `postgres` would leave the dev file's `5432:5432`
   mapping in place.
-- `JWT_SECRET` is required by the overlay but unused (§2).
 - `API_DOCS=0`: no `/docs`, `/redoc` or `/openapi.json` on the public API host (§2).
 - The overlay publishes `api` and `web` on `127.0.0.1` only, so a host-side proxy or tunnel
   connector is the sole way in.
