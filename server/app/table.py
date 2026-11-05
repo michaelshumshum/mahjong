@@ -99,7 +99,7 @@ from typing import Any, Final, cast
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.clock import now_ms
-from app.db.records import save_game_record
+from app.db.records import SeatRecord, save_game_record
 from app.errors import (
     TABLE_CLOSED_ERROR,
     NotHostError,
@@ -447,6 +447,7 @@ class Table:
 
         # practice mode: seat 0 stays open for the human; seats 1-3 bind immediately to their
         # resolved tier (self._seat_bot_tiers, falling back to self._bot_tier).
+        self.practice = practice
         self.all_bots = all_bots
         self._check_settings(self.settings)
         if practice or all_bots:
@@ -1793,14 +1794,30 @@ class Table:
         `session_factory`. `players` is each seat's real `SeatBinding.name`; `None` for a seat
         nobody ever joined by a human -- a `bot` seat gets `None` here too, not its synthetic
         display name, which would otherwise misleadingly read as a real player. Only ever called
-        once, from `process_one()`'s own tail."""
+        once, from `process_one()`'s own tail.
+
+        `seats` follows the same rule: `bot` only for a seat bound to a bot at construction, so
+        a human finished by `autoplay` stays a `guest` (docs/decisions/0028)."""
         if self._session_factory is None:
             return
         players = [
             b.name if b is not None and b.status != "bot" else None for b in self.seat_bindings
         ]
+        seats = [
+            SeatRecord(kind="bot", bot_tier=self._effective_bot_tier(seat))
+            if b is not None and b.status == "bot"
+            else SeatRecord(kind="guest")
+            for seat, b in enumerate(self.seat_bindings)
+        ]
         async with self._session_factory() as session:
-            await save_game_record(session, self.state, self.actions, players=players)
+            await save_game_record(
+                session,
+                self.state,
+                self.actions,
+                players=players,
+                seats=seats,
+                mode="practice" if self.practice else "multiplayer",
+            )
 
     async def wait_for_shutdown_boundary(self, timeout: float) -> bool:
         """Block until this table reaches a hand boundary -- a fresh hand dealt, or the game

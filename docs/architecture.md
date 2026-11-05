@@ -76,7 +76,7 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
                      └──────────────────────────────────────────────┘
                                 │
                            Postgres
-                    finished games, hand records
+                    finished games + seats, hand records
 ```
 
 ### 2.1 Auth
@@ -531,6 +531,19 @@ threaded through `Table.__init__`/`TableRegistry`. `app/main.py`'s `lifespan` bu
 `DATABASE_URL` (unset → no persistence). On `Phase.GAME_OVER`, `Table` calls `save_game_record` at
 most once with `self.actions` and each seat's `SeatBinding.name` — guest names are the permanent
 identity model.
+
+The same commit writes four `game_players` rows ([ADR 0028](decisions/0028-user-account-schema.md)),
+one per seat, and `games.mode` (`practice` iff `Table.practice`, else `multiplayer`):
+
+| Column | Value at save |
+| --- | --- |
+| `kind` | `bot` iff the seat's `SeatBinding.status == "bot"` (bound at construction); otherwise `guest`, including a human finished by `autoplay` and an empty seat. `user` arrives with accounts |
+| `bot_tier` | `_effective_bot_tier(seat)` for a `bot` seat, else null |
+| `final_score` | `game_outcome(state).final_scores[seat]` |
+| `placement` | 1–4 by `final_score`; tied scores share the better place (`1, 1, 3, 4`, `records.placements`) |
+
+`save_game_record` without `seats` (`bots/selfplay.py`'s bot-only games, whose bots aren't tiers)
+writes no seat rows, like a game saved before ADR 0028.
 
 ## 7. Scaling
 

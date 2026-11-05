@@ -265,7 +265,7 @@ migrating once; against an unmigrated database every finished game logs a lost r
 | Table | Holds | Status |
 | --- | --- | --- |
 | `games` | `id`, `engine_version`, `ruleset` (JSONB), `seed`, `action_log` (JSONB), `players` (JSONB — each seat's guest name), `result` (JSONB), `created_at`, `mode` (`practice`/`multiplayer`, null on older rows) — a finished game ([ml.md §2](ml.md)) | built |
-| `game_players` | PK `(game_id, seat)`, `game_id` → `games.id` `ON DELETE CASCADE`; `kind` (`user`/`guest`/`bot`), `user_id` (uuid, no FK until a `users` table exists), `bot_tier`, `final_score`, `placement` (1–4) — who held each seat. `CHECK`s pin seat and placement ranges and the `kind`/`user_id`/`bot_tier` pairing; partial index `(user_id, game_id DESC) WHERE user_id IS NOT NULL` ([ADR 0028](decisions/0028-user-account-schema.md)) | schema built; not written yet |
+| `game_players` | PK `(game_id, seat)`, `game_id` → `games.id` `ON DELETE CASCADE`; `kind` (`user`/`guest`/`bot`), `user_id` (uuid, no FK until a `users` table exists), `bot_tier`, `final_score`, `placement` (1–4) — who held each seat. `CHECK`s pin seat and placement ranges and the `kind`/`user_id`/`bot_tier` pairing; partial index `(user_id, game_id DESC) WHERE user_id IS NOT NULL` ([ADR 0028](decisions/0028-user-account-schema.md)). Four rows per `Table` game, written with it ([architecture.md §6](architecture.md)); none for games saved earlier | built |
 | `hand_records` | `id`, `engine_version`, `ruleset`, `seed`, `dealer`, `prevailing`, `action_log`, `players`, `result`, `created_at` — a standalone hand from `engine.new_hand`, e.g. an RL eval episode ([ml.md §2](ml.md)) | built |
 | `leaderboard` | aggregated from `games.players`/`games.result` by name — a guest reusing a name resumes the same row; may be a materialized view | not built |
 
@@ -278,8 +278,9 @@ There is no `users` table — identity is guest-only by design
 - `make_engine` (`server/app/db/session.py`) turns on `PRAGMA foreign_keys` for every SQLite
   connection: SQLite ignores foreign keys by default, so `ON DELETE CASCADE`/`SET NULL` would
   otherwise go untested.
-- `save_game_record` (`server/app/db/records.py`) is the only write path; `bots/selfplay.py`'s
-  `play_and_record_game` records bot-only games through it.
+- `save_game_record` (`server/app/db/records.py`) is the only write path for `games` and
+  `game_players` (one transaction); `bots/selfplay.py`'s `play_and_record_game` records bot-only
+  games through it, without seat rows.
 - Live table state is never persisted ([architecture.md §7](architecture.md)).
 
 ## 7. Deployment

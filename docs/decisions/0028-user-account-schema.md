@@ -379,13 +379,14 @@ seat data, placements and mode.
 - [x] Migration: `game_players` (with `final_score`, `placement`, constraints, the `user_id`
       column and index, FK to `users` added in phase 2), `games.mode` nullable.
 - [x] `make_engine`: `PRAGMA foreign_keys=ON` for SQLite.
-- [ ] `save_game_record(..., seats=)`: writes four rows before its commit; computes `placement`
-      from `final_scores`.
-- [ ] `_persist_game_record`: builds `seats` from `seat_bindings` (`kind`) and
+- [x] `save_game_record(..., seats=)`: writes four rows before its commit; computes `placement`
+      from `final_scores`. `seats` stays optional: `bots/selfplay.py`'s bot-only games have no
+      tiers to record and write no seat rows; every `Table` game passes them.
+- [x] `_persist_game_record`: builds `seats` from `seat_bindings` (`kind`) and
       `_effective_bot_tier` (`bot_tier`); passes `mode` from `Table.practice`.
-- [ ] Tests (failing first): four rows per saved game; kind/tier for practice, multiplayer and
+- [x] Tests (failing first): four rows per saved game; kind/tier for practice, multiplayer and
       `autoplay` seats; tied placements; CHECK rejects a bad pairing; FK cascade from `games`.
-- [ ] Docs: `architecture.md` storage rows (§6, §2), `infra.md §6` tables list.
+- [x] Docs: `architecture.md` storage rows (§6, §2), `infra.md §6` tables list.
 - `make test-server`.
 
 ### Phase 2: server auth

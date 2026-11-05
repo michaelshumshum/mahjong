@@ -5,26 +5,44 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import GameRecord, HandRecord
+from app.db.models import GameMode, GameRecord, GameSeat, HandRecord, SeatKind
 from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.engine import ENGINE_VERSION, game_outcome
 from mahjong_core.state import GameState, Phase
 
 __all__ = [
+    "SeatRecord",
     "count_games_since",
     "get_game_record",
     "get_hand_record",
     "hand_record_columns",
     "is_replayable",
+    "placements",
     "save_game_record",
     "save_hand_record",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class SeatRecord:
+    """Who held one seat, as `save_game_record` writes it to `game_players`."""
+
+    kind: SeatKind
+    bot_tier: str | None = None
+    user_id: uuid.UUID | None = None
+
+
+def placements(final_scores: Sequence[int]) -> tuple[int, ...]:
+    """1-based place per seat; tied scores share the better place (1, 1, 3, 4)."""
+    return tuple(1 + sum(other > score for other in final_scores) for score in final_scores)
 
 
 async def save_game_record(
@@ -33,25 +51,50 @@ async def save_game_record(
     actions: Sequence[Action],
     *,
     players: Sequence[str | None] | None = None,
+    seats: Sequence[SeatRecord] | None = None,
+    mode: GameMode | None = None,
 ) -> GameRecord:
     """Persist a finished game; `state.phase` must be `Phase.GAME_OVER` -- there's no mid-game
-    durability story to record a snapshot against instead."""
+    durability story to record a snapshot against instead.
+
+    `seats` adds one `game_players` row per seat in the same commit; `Table` always passes them.
+    Omitted (bot-only `bots/selfplay.py` games, whose bots aren't tiers), the game has no seat
+    rows, like a game saved before ADR 0028."""
     if state.phase != Phase.GAME_OVER:
         raise ValueError(f"save_game_record requires Phase.GAME_OVER, got {state.phase}")
 
     resolved_players = list(players) if players is not None else [None, None, None, None]
     if len(resolved_players) != 4:
         raise ValueError(f"players must have exactly 4 entries, got {len(resolved_players)}")
+    if seats is not None and len(seats) != 4:
+        raise ValueError(f"seats must have exactly 4 entries, got {len(seats)}")
 
+    outcome = game_outcome(state)
     record = GameRecord(
         engine_version=ENGINE_VERSION,
         ruleset=state.ruleset.to_dict(),
         seed=state.game_seed,
         action_log=[action_to_dict(a) for a in actions],
         players=resolved_players,
-        result=game_outcome(state).to_dict(),
+        result=outcome.to_dict(),
+        mode=mode,
     )
     session.add(record)
+    if seats is not None:
+        await session.flush()
+        places = placements(outcome.final_scores)
+        session.add_all(
+            GameSeat(
+                game_id=record.id,
+                seat=seat,
+                kind=s.kind,
+                user_id=s.user_id,
+                bot_tier=s.bot_tier,
+                final_score=outcome.final_scores[seat],
+                placement=places[seat],
+            )
+            for seat, s in enumerate(seats)
+        )
     await session.commit()
     await session.refresh(record)
     return record
