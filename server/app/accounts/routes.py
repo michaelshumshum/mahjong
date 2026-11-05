@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -29,6 +29,7 @@ from app.accounts.users import (
     delete_user,
     drop_sessions,
     identities_of,
+    seats_in,
     seats_of,
     upsert_identity,
 )
@@ -39,8 +40,11 @@ from app.api_models import (
     ExportUser,
     MePatch,
     MeResponse,
+    MyGame,
+    MyGameSeat,
+    MyGamesResponse,
 )
-from app.db.models import User
+from app.db.models import GameMode, User
 from app.names import clean_name
 
 __all__ = ["auth_router", "configure", "router", "run_session_cleanup", "set_google"]
@@ -54,6 +58,8 @@ _MAX_NEXT_LENGTH = 512
 # the training-consent wording a user agrees to (ADR 0016); bump with the web's wording.
 # phase 3 ships a placeholder, phase 7 the final text
 TRAINING_CONSENT_VERSION = "2026-11-draft"
+DEFAULT_GAMES_PAGE = 20
+MAX_GAMES_PAGE = 50
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +242,49 @@ async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResp
             )
             for seat, game in await seats_of(db, user)
         ],
+    )
+
+
+@router.get("/me/games")
+async def my_games(
+    user: CurrentUser,
+    db: Db,
+    before: Annotated[int | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_GAMES_PAGE)] = DEFAULT_GAMES_PAGE,
+    mode: Annotated[GameMode | None, Query()] = None,
+) -> MyGamesResponse:
+    # one extra row says whether another page exists
+    rows = await seats_of(db, user, before=before, limit=limit + 1, mode=mode)
+    page = rows[:limit]
+    players = {game.id: game.players for _, game in page}
+    own_seat = {game.id: own.seat for own, game in page}
+    others: dict[int, list[MyGameSeat]] = {}
+    for seat in sorted(await seats_in(db, list(players)), key=lambda s: s.seat):
+        if seat.seat == own_seat[seat.game_id]:
+            continue
+        others.setdefault(seat.game_id, []).append(
+            MyGameSeat(
+                seat=seat.seat,
+                kind=seat.kind,
+                name=None if seat.kind == "bot" else players[seat.game_id][seat.seat],
+                bot_tier=seat.bot_tier,
+            )
+        )
+    return MyGamesResponse(
+        games=[
+            MyGame(
+                game_id=game.id,
+                created_at=game.created_at,
+                mode=game.mode,
+                hand_count=game.result.get("hand_count"),
+                seat=own.seat,
+                placement=own.placement,
+                final_score=own.final_score,
+                others=others.get(game.id, []),
+            )
+            for own, game in page
+        ],
+        next=page[-1][1].id if len(rows) > limit else None,
     )
 
 

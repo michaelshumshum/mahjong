@@ -1,12 +1,12 @@
 """Account rows: sign-in upsert by provider identity, deletion, export reads
-(docs/decisions/0028-user-account-schema.md)."""
+and "my games" (docs/decisions/0028-user-account-schema.md)."""
 
 from __future__ import annotations
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import AuthSession, GameRecord, GameSeat, Identity, User
+from app.db.models import AuthSession, GameMode, GameRecord, GameSeat, Identity, User
 from app.names import clean_name
 
 # a provider profile with no usable name
@@ -52,12 +52,33 @@ async def identities_of(db: AsyncSession, user: User) -> list[Identity]:
     return list(rows.all())
 
 
-async def seats_of(db: AsyncSession, user: User) -> list[tuple[GameSeat, GameRecord]]:
-    """The user's seats with their games, newest game first."""
-    rows = await db.execute(
+async def seats_of(
+    db: AsyncSession,
+    user: User,
+    *,
+    before: int | None = None,
+    limit: int | None = None,
+    mode: GameMode | None = None,
+) -> list[tuple[GameSeat, GameRecord]]:
+    """The user's seats with their games, newest game first; `before` is a keyset cursor (a
+    game id), served by the partial index `(user_id, game_id DESC)`."""
+    query = (
         select(GameSeat, GameRecord)
         .join(GameRecord, GameRecord.id == GameSeat.game_id)
         .where(GameSeat.user_id == user.id)
         .order_by(GameSeat.game_id.desc())
+        .limit(limit)
     )
+    if before is not None:
+        query = query.where(GameSeat.game_id < before)
+    if mode is not None:
+        query = query.where(GameRecord.mode == mode)
+    rows = await db.execute(query)
     return [(seat, game) for seat, game in rows.all()]
+
+
+async def seats_in(db: AsyncSession, game_ids: list[int]) -> list[GameSeat]:
+    """Every seat row of these games."""
+    if not game_ids:
+        return []
+    return list(await db.scalars(select(GameSeat).where(GameSeat.game_id.in_(game_ids))))
