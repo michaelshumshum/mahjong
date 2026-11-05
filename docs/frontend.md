@@ -1474,6 +1474,12 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
   (clipPath/filter/gradient) that collide when tiles are inlined more than once. `<img>` isolates
   each instance, at the cost of `currentColor` styling.
 - **No build step, no atlas, no DPR split** — SVG is resolution-independent.
+- **Fonts:** self-hosted through `@fontsource/*` packages (no Google Fonts `<link>`, so
+  screenshots don't depend on a CDN). Root `+layout.svelte` imports Schibsted Grotesk and Noto
+  Sans HK (the CJK fallback, `--font-family-base`). `@fontsource/roboto` is imported only by
+  `lib/ui/GoogleSignInButton.svelte`, and only `latin-500.css`: Google's sign-in branding
+  requires Roboto Medium, nothing else uses Roboto, and a per-component import keeps it in that
+  component's CSS chunk instead of every page's.
 - **UI icons:** [`@lucide/svelte`](https://lucide.dev), imported per icon
   (`@lucide/svelte/icons/<name>`), never hand-written inline `<svg>`. One 24px grid and stroke
   style keeps chrome icons consistent, and per-icon imports tree-shake to only the icons used.

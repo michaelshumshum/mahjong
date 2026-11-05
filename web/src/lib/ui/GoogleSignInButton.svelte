@@ -1,4 +1,7 @@
 <script lang="ts">
+	// google's button branding wants roboto medium; latin 500 only (~22 kB woff2), loaded with
+	// this component rather than the root layout
+	import '@fontsource/roboto/latin-500.css';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages.js';
 	import { signInUrl } from '$lib/net/account';
@@ -43,7 +46,8 @@
 		border-radius: var(--radius-pill);
 		background: #131314;
 		color: #e3e3e3;
-		font-family: Roboto, Arial, sans-serif;
+		// the zh-Hant label has no roboto glyphs; fall back to the app's cjk face
+		font-family: Roboto, 'Noto Sans HK', Arial, sans-serif;
 		font-size: 14px;
 		font-weight: 500;
 		line-height: 20px;
