@@ -429,11 +429,12 @@ seat data, placements and mode.
 - [x] Sign-up step on first sign-in: confirm display name, training-consent checkbox (unchecked).
 - [x] Account settings: display name, training-consent toggle, export data, delete account with
       a typed confirmation (the display name, on `/profile`).
-- [ ] Signed-in players see no name field when joining a table.
-- [ ] Sign-in stays behind a flag (hidden in prod) until phase 7.
-- [ ] i18n: en + zh-Hant for every new string.
-- [ ] e2e: guest flow unchanged; signed-in flow against a stubbed `/me`.
-- [ ] Docs: `frontend.md §6` (client state), `§7` (routes). Re-shoot screenshots.
+- [x] Signed-in players see no name field when joining a table.
+- [x] Sign-in stays behind a flag (hidden in prod) until phase 7: `PUBLIC_ACCOUNTS_ENABLED`.
+- [x] i18n: en + zh-Hant for every new string.
+- [x] e2e: guest flow unchanged; signed-in flow against a stubbed `/me`.
+- [x] Docs: `frontend.md §6` (client state), `§7` (routes). Screenshots unchanged: the screenshot
+      server runs flag-off and `/profile` isn't a notable page; an account shot waits for phase 7.
 - `make test-web`, then `make test` (touches both sides through `/me`).
 
 ### Phase 4: "my games"

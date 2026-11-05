@@ -684,7 +684,9 @@ server back in line. Live mode only (`?mock=` has no socket). Making the server 
 would need a wire field first.
 
 **Display name is sent once.** It travels only on `join` (`MahjongSocket.join(seat?, name?)`); the
-server trims/caps/defaults it, so the client doesn't validate. `ClientGameState.names` carries every
+server trims/caps/defaults it, so the client doesn't validate. A signed-in player (§6 "Account
+session") gets no name field on the seat picker, only "Playing as `<name>`", and `join` carries no
+name: the server seats the account under `users.display_name` and ignores `join.name`. `ClientGameState.names` carries every
 seat's *resolved* name back: set from `state_sync.names`, kept live from `seat_state.name`. Bot
 seats get a random per-table-unique display name (`server/app/table.py`'s `_draw_bot_name`, from
 `_BOT_NAME_POOL`) — cosmetic, not the tier. The tier is `state_sync.bot_levels` →

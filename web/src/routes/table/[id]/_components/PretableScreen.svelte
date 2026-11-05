@@ -9,6 +9,7 @@
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import Spinner from '$lib/ui/Spinner.svelte';
 	import { RULESET_PRESET_OPTIONS } from '$lib/net/ruleset';
+	import { MAX_NAME_LENGTH } from '$lib/net/protocol.constants';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -23,6 +24,7 @@
 		dealer,
 		displayName,
 		onDisplayNameChange,
+		signedInName,
 		seatStatus,
 		names,
 		onJoin,
@@ -42,6 +44,8 @@
 		dealer: Seat;
 		displayName: string;
 		onDisplayNameChange: (value: string) => void;
+		// the account's name; the server seats a signed-in player under it (adr 0028)
+		signedInName: string | null;
 		seatStatus: WireSeatStatus[];
 		names: (string | null)[];
 		onJoin: (seat: Seat) => void;
@@ -105,18 +109,24 @@
 		</div>
 	{:else if effectiveSeat === null}
 		<h2>{m.pretableScreen_takeASeatTitle()}</h2>
-		<FormGroup legend={m.pretableScreen_nameLegend()}>
-			<input
-				id="display-name-input"
-				type="text"
-				class="pretable-name-input"
-				maxlength="24"
-				placeholder={m.pretableScreen_namePlaceholder()}
-				autocomplete="off"
-				value={displayName}
-				oninput={(e) => onDisplayNameChange(e.currentTarget.value)}
-			/>
-		</FormGroup>
+		{#if signedInName !== null}
+			<p class="pretable-playing-as" data-testid="pretable-playing-as">
+				{m.pretableScreen_playingAsLabel({ name: signedInName })}
+			</p>
+		{:else}
+			<FormGroup legend={m.pretableScreen_nameLegend()}>
+				<input
+					id="display-name-input"
+					type="text"
+					class="pretable-name-input"
+					maxlength={MAX_NAME_LENGTH}
+					placeholder={m.pretableScreen_namePlaceholder()}
+					autocomplete="off"
+					value={displayName}
+					oninput={(e) => onDisplayNameChange(e.currentTarget.value)}
+				/>
+			</FormGroup>
+		{/if}
 		<SeatPicker {seatStatus} {names} {onJoin} />
 	{:else}
 		<SeatRing you={effectiveSeat} {dealer} {seatStatus} {names} />
@@ -261,6 +271,11 @@
 	.pretable-hint {
 		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
+	}
+
+	.pretable-playing-as {
+		margin: 0;
+		font-weight: 600;
 	}
 
 	// center the FormGroup legend and body inside the centered pre-table panel.
