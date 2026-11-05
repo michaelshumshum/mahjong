@@ -451,10 +451,13 @@ seat data, placements and mode.
 
 ### Phase 5: learn progress sync
 
-- [ ] Migration: `learn_progress`, `learn_endless_scores`, `users.prefs`,
-      `users.learn_imported_at`.
-- [ ] Routes: `GET /me/learn`, `PUT /me/learn/{lesson_id}`, `PUT /me/learn/endless/{kind}`,
-      `POST /me/learn/import` (validate, clamp, merge, set `imported`); `PATCH /me` prefs.
+- [x] Migration: `learn_progress`, `learn_endless_scores`, `users.prefs`,
+      `users.learn_imported_at`. The two `users` columns stay off the `User` mapper (read with
+      Core), so sign-in and `/me` keep working on code deployed before `make prod-migrate`.
+- [x] Routes: `GET /me/learn`, `PUT /me/learn/{lesson_id}`, `PUT /me/learn/endless/{kind}`;
+      `PATCH /me` prefs; learn progress in `GET /me/export` (PR 5.1). A `PUT` never lowers
+      `solved`, `attempts`, `best` or `solved` (a second device's stale copy).
+- [ ] `POST /me/learn/import` (validate, clamp, merge, set `imported`).
 - [ ] Web: one progress store with a `localStorage` backend (guest) and an API backend (signed
       in). After sign-in, offer the upload once per device; delete both local keys only on success.
 - [ ] Tests (server): every merge rule; replayed upload is a no-op; each validation rule drops

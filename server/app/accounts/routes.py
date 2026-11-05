@@ -8,6 +8,7 @@ import asyncio
 import datetime as dt
 import logging
 import secrets
+import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated
 from urllib.parse import urlencode
@@ -18,6 +19,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.accounts.config import AccountsConfig
 from app.accounts.google import PROVIDER, GoogleProvider
+from app.accounts.learn import (
+    EndlessValues,
+    LessonValues,
+    check_lesson,
+    learn_imported_at,
+    learn_of,
+    record_endless,
+    record_lesson,
+    update_prefs,
+)
 from app.accounts.sessions import (
     COOKIE_NAME,
     delete_expired_sessions,
@@ -34,17 +45,23 @@ from app.accounts.users import (
     upsert_identity,
 )
 from app.api_models import (
+    EndlessScoreIn,
+    EndlessScoreOut,
     ExportGame,
     ExportIdentity,
     ExportResponse,
     ExportUser,
+    LearnResponse,
+    LessonProgressIn,
+    LessonProgressOut,
     MePatch,
     MeResponse,
     MyGame,
     MyGameSeat,
     MyGamesResponse,
 )
-from app.db.models import GameMode, User
+from app.db.models import GameMode, LearnEndlessScore, LearnProgress, User
+from app.lessons.model import PuzzleKind
 from app.names import clean_name
 from app.rate_limit import RateLimiter
 
@@ -201,6 +218,8 @@ async def get_me(user: CurrentUser) -> MeResponse:
 
 @router.patch("/me")
 async def patch_me(body: MePatch, user: CurrentUser, db: Db) -> MeResponse:
+    if body.prefs is not None:
+        await update_prefs(db, user.id, body.prefs.model_dump(exclude_unset=True))
     if body.display_name is not None:
         name = clean_name(body.display_name)
         if name is None:
@@ -234,6 +253,8 @@ async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResp
             headers={"Retry-After": str(_export_limiter.retry_after(key))},
         )
     response.headers["Content-Disposition"] = 'attachment; filename="mahjong-account.json"'
+    learn = await learn_response(db, user.id)
+    imported_at = await learn_imported_at(db, user.id)
     return ExportResponse(
         user=ExportUser(
             id=user.id,
@@ -242,6 +263,7 @@ async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResp
             training_consent_at=user.training_consent_at,
             consent_version=user.consent_version,
             disabled_at=user.disabled_at,
+            learn_imported_at=imported_at,
         ),
         identities=[
             ExportIdentity(
@@ -262,7 +284,58 @@ async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResp
             )
             for seat, game in await seats_of(db, user)
         ],
+        learn=learn,
     )
+
+
+def _lesson_out(row: LearnProgress) -> LessonProgressOut:
+    return LessonProgressOut(
+        solved=row.solved,
+        attempts=row.attempts,
+        solved_at=row.solved_at,
+        step=row.step,
+        imported=row.imported,
+    )
+
+
+def _endless_out(row: LearnEndlessScore) -> EndlessScoreOut:
+    return EndlessScoreOut(
+        streak=row.streak, best=row.best, solved=row.solved, imported=row.imported
+    )
+
+
+async def learn_response(db: AsyncSession, user_id: uuid.UUID) -> LearnResponse:
+    progress, endless, prefs = await learn_of(db, user_id)
+    return LearnResponse(
+        progress={row.lesson_id: _lesson_out(row) for row in progress},
+        endless={row.kind: _endless_out(row) for row in endless},
+        prefs=prefs,
+    )
+
+
+@router.get("/me/learn")
+async def get_learn(user: CurrentUser, db: Db) -> LearnResponse:
+    return await learn_response(db, user.id)
+
+
+@router.put("/me/learn/endless/{kind}")
+async def put_endless(
+    kind: PuzzleKind, body: EndlessScoreIn, user: CurrentUser, db: Db
+) -> EndlessScoreOut:
+    values = EndlessValues(body.streak, body.best, body.solved)
+    return _endless_out(await record_endless(db, user.id, kind, values, now()))
+
+
+@router.put("/me/learn/{lesson_id}")
+async def put_lesson(
+    lesson_id: str, body: LessonProgressIn, user: CurrentUser, db: Db
+) -> LessonProgressOut:
+    values = check_lesson(
+        lesson_id, LessonValues(body.solved, body.attempts, body.solved_at, body.step), now()
+    )
+    if values is None:
+        raise HTTPException(status_code=422, detail="unknown lesson, or a bad step or solved_at")
+    return _lesson_out(await record_lesson(db, user.id, lesson_id, values, now()))
 
 
 @router.get("/me/games")

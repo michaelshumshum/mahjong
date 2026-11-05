@@ -228,7 +228,7 @@ app.add_middleware(
     allow_origins=cors_origins(os.environ),
     # the session cookie rides credentialed fetches; safe only with explicit origins, never '*'
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     # POST sends a JSON body -- not a CORS-safelisted content type, so browsers preflight and
     # need this header even though GET never did.
     allow_headers=["Content-Type"],

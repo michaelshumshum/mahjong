@@ -1,6 +1,6 @@
 """SQLAlchemy models for durable records: finished games (`games`), who held each seat
 (`game_players`), standalone hands (`hand_records`) and optional accounts (`users`,
-`identities`, `sessions`).
+`identities`, `sessions`, `learn_progress`, `learn_endless_scores`).
 
 JSON columns use `JSONB` on Postgres, generic `JSON` elsewhere (`.with_variant`) -- SQLite
 (tests) has no JSONB.
@@ -15,7 +15,9 @@ from typing import Any, Final, Literal, get_args
 from sqlalchemy import JSON as GenericJSON
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
+    Column,
     DateTime,
     ForeignKey,
     Index,
@@ -129,8 +131,7 @@ class GameSeat(Base):
 
 class User(Base):
     """An optional account (docs/decisions/0028-user-account-schema.md). uuid, not serial: ids
-    appear in URLs and shouldn't be enumerable. `prefs` and `learn_imported_at` arrive with
-    learn sync (ADR 0028 phase 5).
+    appear in URLs and shouldn't be enumerable.
     """
 
     __tablename__ = "users"
@@ -144,6 +145,54 @@ class User(Base):
     training_consent_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
     consent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     disabled_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # `prefs` and `learn_imported_at`: in the table, not on the class (see `USER_PREFS`)
+
+
+# synced settings (`api_models.PrefsPatch`'s keys), read and written with core
+USER_PREFS = Column("prefs", JSONType, nullable=False, server_default=text("'{}'"))
+# the last learn-progress upload, audit only
+USER_LEARN_IMPORTED_AT = Column("learn_imported_at", UTCDateTime, nullable=True)
+# unmapped: a user's select, insert and RETURNING never name them, so sign-in and /me work on
+# code deployed before `make prod-migrate` (adr 0028 "pull requests", docs/infra.md §6)
+User.__table__.append_column(USER_PREFS)
+User.__table__.append_column(USER_LEARN_IMPORTED_AT)
+
+
+class LearnProgress(Base):
+    """One lesson's progress for an account (web `LessonProgress`). `imported` marks values
+    that came from a local upload rather than a server-recorded answer (ADR 0028 "Trusting the
+    upload")."""
+
+    __tablename__ = "learn_progress"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    lesson_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    solved: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    solved_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # a tutorial's resume point; null for puzzles
+    step: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    imported: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
+
+
+class LearnEndlessScore(Base):
+    """One puzzle kind's endless score for an account (web `EndlessScore`)."""
+
+    __tablename__ = "learn_endless_scores"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    # PuzzleKind, checked by the routes
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    streak: Mapped[int] = mapped_column(Integer, nullable=False)
+    best: Mapped[int] = mapped_column(Integer, nullable=False)
+    solved: Mapped[int] = mapped_column(Integer, nullable=False)
+    imported: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False)
 
 
 class Identity(Base):

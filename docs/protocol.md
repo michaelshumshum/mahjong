@@ -739,12 +739,17 @@ GET /auth/google/callback?code=…&state=…
 
 ```
 PATCH /me
-{"display_name"?: "Ann", "training_consent"?: true | false}
+{"display_name"?: "Ann", "training_consent"?: true | false,
+ "prefs"?: {"learn_band"?: "beginner" | "intermediate" | "advanced" | null,
+            "coach_marks_done"?: true | false | null}}
 -> the GET /me body
 ```
 
 - `display_name` goes through `app/names.py`'s `clean_name` (trimmed, capped at 24); empty after
   trimming, or past the raw 64-char bound, is `422`. Unknown fields are `422`.
+- `prefs` merges key by key into `users.prefs` (synced settings, read back by `GET /me/learn`);
+  `null` removes a key. Only `PrefsPatch`'s keys (`app/api_models.py`) are stored: any other key,
+  a `learn_band` outside `Band` or a non-boolean `coach_marks_done` is `422`.
 - `training_consent: true` sets `training_consent_at` to now and `consent_version` to
   `TRAINING_CONSENT_VERSION` (`app/accounts/routes.py`; bumped with the web's wording), unless
   that version is already recorded. `false` clears both to null.
@@ -763,14 +768,14 @@ cascade; the account's `game_players` rows keep `kind = 'user'` with a null `use
 GET /me/export
 -> Content-Disposition: attachment; filename="mahjong-account.json"
 {"user": {"id", "display_name", "created_at", "training_consent_at", "consent_version",
-          "disabled_at"},
+          "disabled_at", "learn_imported_at"},
  "identities": [{"provider": "google", "subject": "…", "email": "…" | null, "created_at"}],
  "games": [{"game_id": 12, "created_at", "mode": "practice" | "multiplayer" | null, "seat": 1,
-            "hand_count": 5, "final_score": 40, "placement": 1, "players": ["Bob", "Ann", …]}]}
+            "hand_count": 5, "final_score": 40, "placement": 1, "players": ["Bob", "Ann", …]}],
+ "learn": {…the GET /me/learn body…}}
 ```
 
-`games` is every seat linked to the account, newest first. Learn progress isn't stored
-server-side yet; it joins the export with ADR 0028 phase 5. `429` with `Retry-After` past
+`games` is every seat linked to the account, newest first. `429` with `Retry-After` past
 `EXPORT_RATE_LIMIT` per `EXPORT_RATE_WINDOW_SECONDS` per account (default 5 per hour,
 [infra.md §2](infra.md)).
 
@@ -799,6 +804,38 @@ the partial index `(user_id, game_id DESC)`.
 
 No rate limit: a page is one indexed read of at most 51 seats.
 
+```
+GET /me/learn
+-> {"progress": {"basics-tutorial": {"solved": true, "attempts": 1, "solved_at": "…" | null,
+                                     "step": 4 | null, "imported": false}, …},
+    "endless": {"winning_tiles": {"streak": 2, "best": 5, "solved": 9, "imported": false}, …},
+    "prefs": {"learn_band": "advanced", "coach_marks_done": true}}
+PUT /me/learn/{lesson_id}
+{"solved": true, "attempts": 2, "solved_at"?: "…" | null, "step"?: 4 | null}
+-> that lesson's progress entry
+PUT /me/learn/endless/{kind}
+{"streak": 2, "best": 5, "solved": 9}
+-> that kind's endless entry
+```
+
+A signed-in player's learn progress ([ADR 0028](decisions/0028-user-account-schema.md) "Learn
+progress: guest vs signed in"; the web's `LessonProgress`/`EndlessScore`, `app/accounts/learn.py`).
+`progress` is keyed by lesson id, `endless` by `PuzzleKind`; `prefs` is `users.prefs`. A guest's
+progress stays in `localStorage` and never reaches these routes.
+
+| Rule | Value |
+| --- | --- |
+| `lesson_id` | a `/learn/[id]` lesson (`app/lessons/catalog`'s `LESSON_IDS`), else `422`. `step` only on a tutorial |
+| `kind` | a `PuzzleKind`, else `422` |
+| counts | integers `0..MAX_LEARN_COUNT` (100,000), else `422` |
+| consistency | `solved` needs `attempts >= 1`, `solved_at` needs `solved`, `streak <= best <= solved`; else `422`. Unknown fields `422` |
+| `solved_at` | timezone-aware ISO 8601. Up to `CLOCK_SKEW` (5 min) ahead of the server is clamped to now; further is `422` |
+| lesson `PUT` | `solved` never reverts, `attempts` is the max, `solved_at` the earliest, `step` the value sent (null clears it): a second device's stale copy can't undo a solve |
+| endless `PUT` | `best` and `solved` are the max, `streak` the value sent |
+| `imported` | true on a row whose values came from a device's one-time upload; a lesson `PUT` that newly solves it, or an endless `PUT` with a higher `best`, clears it. Anything competitive ignores imported rows |
+
+No rate limit: each write is one row.
+
 **WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
 signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game
 saves the seat as `kind = 'user'`. No frame changes ([architecture.md §2.1](architecture.md)).
@@ -806,8 +843,8 @@ The cookie counts only when the upgrade's `Origin` is a `CORS_ORIGINS` entry: a 
 handshake skips CORS, and `SameSite=Lax` still sends the cookie from a sibling subdomain. Any
 other `Origin`, or none, connects as a guest rather than being refused.
 
-`PATCH` and `DELETE` are in the CORS `allow_methods`; a cross-origin one is always preflighted,
-so only `CORS_ORIGINS` can send them with the cookie.
+`PUT`, `PATCH` and `DELETE` are in the CORS `allow_methods`; a cross-origin one is always
+preflighted, so only `CORS_ORIGINS` can send them with the cookie.
 
 Every `/auth/*` request counts against `AUTH_RATE_LIMIT` per `AUTH_RATE_WINDOW_SECONDS` per IP
 (default 20 per 60 s): `429` with `Retry-After`, the same `RateLimiter` and client-IP rule as
