@@ -6,6 +6,8 @@ from __future__ import annotations
 from typing import Final
 
 MAX_NAME_LENGTH: Final = 24
+# a raw name past this is rejected before trim-and-cap (docs/protocol.md §2 "Size limits")
+MAX_RAW_NAME_LENGTH: Final = 64
 
 
 def clean_name(raw: str | None) -> str | None:

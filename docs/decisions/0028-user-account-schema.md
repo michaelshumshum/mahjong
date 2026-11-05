@@ -396,7 +396,7 @@ seat data, placements and mode.
       runtime. Remove `JWT_SECRET` and `pyjwt` if nothing else reads them (done, PR 2.1).
 - [x] Migration: `users`, `identities`, `sessions`, indexes; add the `game_players.user_id` FK.
       `users.prefs` and `learn_imported_at` wait for phase 5's migration.
-- [ ] Routes (`{provider}` is only `google` for now): `GET /auth/{provider}/login`, `GET /auth/{provider}/callback` (upsert user +
+- [x] Routes (`{provider}` is only `google` for now): `GET /auth/{provider}/login`, `GET /auth/{provider}/callback` (upsert user +
       identity, refresh `email`, create session, set cookie, redirect to the web), `POST
       /auth/logout`, `GET /me`, `PATCH /me` (display name, consent), `DELETE /me`,
       `GET /me/export`.
