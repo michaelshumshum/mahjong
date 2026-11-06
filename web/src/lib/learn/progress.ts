@@ -1,16 +1,7 @@
-import index from './generated/index.json';
 import type { IndexEntry } from './generated/lessons';
 import { ORDERED_LESSONS, type IndexTab } from './lessons';
-import {
-	loadLearnProgress,
-	saveLearnProgress,
-	type LearnProgress,
-	type LessonProgress
-} from '$lib/ui/settings-storage';
-
-export const LESSON_IDS: ReadonlySet<string> = new Set(
-	(index as IndexEntry[]).map((lesson) => lesson.id)
-);
+import { progressStore } from './progress-store';
+import type { LearnProgress, LessonProgress } from '$lib/ui/settings-storage';
 
 /** One graded answer. A solved lesson stays solved, and keeps its first `solvedAt`. */
 export function recordAttempt(
@@ -76,24 +67,23 @@ export function nextUnsolved(
 }
 
 export function loadProgress(): LearnProgress {
-	return loadLearnProgress(LESSON_IDS);
+	return progressStore().progress();
+}
+
+function save(progress: LearnProgress, id: string): LearnProgress {
+	progressStore().putLesson(id, progress[id]);
+	return progress;
 }
 
 export function saveAttempt(id: string, correct: boolean): LearnProgress {
-	const progress = recordAttempt(loadProgress(), id, correct);
-	saveLearnProgress(progress);
-	return progress;
+	return save(recordAttempt(loadProgress(), id, correct), id);
 }
 
 export function saveTutorialStep(id: string, step: number | null): LearnProgress {
-	const progress = recordTutorialStep(loadProgress(), id, step);
-	saveLearnProgress(progress);
-	return progress;
+	return save(recordTutorialStep(loadProgress(), id, step), id);
 }
 
 /** The end of a tutorial: solved, with no resume point left. */
 export function saveTutorialDone(id: string): LearnProgress {
-	const progress = recordTutorialStep(recordAttempt(loadProgress(), id, true), id, null);
-	saveLearnProgress(progress);
-	return progress;
+	return save(recordTutorialStep(recordAttempt(loadProgress(), id, true), id, null), id);
 }

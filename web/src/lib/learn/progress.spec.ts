@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ORDERED_LESSONS } from './lessons';
+import { LESSON_IDS, ORDERED_LESSONS } from './lessons';
 import {
 	continueTab,
 	firstUnsolved,
-	LESSON_IDS,
 	nextUnsolved,
 	recordAttempt,
 	recordTutorialStep,

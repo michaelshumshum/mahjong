@@ -6,7 +6,7 @@ import { tileIdToCode } from '$lib/table/tile-code';
 import type { Tutorial, TutorialStep } from './generated/lessons';
 import { withSeatNames } from './puzzle-state';
 import { saveTutorialDone, saveTutorialStep } from './progress';
-import { saveOnboarding } from '$lib/ui/settings-storage';
+import { progressStore } from './progress-store';
 
 /** What the player did at an `expect` step, in the table's own intent vocabulary. */
 export type TutorialIntent =
@@ -219,7 +219,7 @@ export class LessonPlayer {
 		if (this.#persist) {
 			saveTutorialDone(this.tutorial.id);
 			// the first practice hand's coach marks would only repeat what this taught.
-			saveOnboarding({ coachMarksDone: true });
+			progressStore().putOnboarding({ coachMarksDone: true });
 		}
 		if (this.#completed) return;
 		this.#completed = true;

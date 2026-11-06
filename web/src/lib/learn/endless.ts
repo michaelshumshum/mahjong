@@ -3,13 +3,9 @@
 
 import { apiBaseUrl } from '$lib/net/lobby';
 import { m } from '$lib/paraglide/messages.js';
-import {
-	loadLearnEndless,
-	saveLearnEndless,
-	type EndlessScore,
-	type LearnEndless
-} from '$lib/ui/settings-storage';
+import type { EndlessScore, LearnEndless } from '$lib/ui/settings-storage';
 import type { Band, Lesson, PuzzleKind } from './generated/lessons';
+import { progressStore } from './progress-store';
 import type { GradeResult } from './types';
 
 /** How many recent puzzle ids are sent as `exclude`; the server accepts up to 50. */
@@ -99,12 +95,15 @@ export function saveEndlessScore(
 	kind: PuzzleKind,
 	update: (score: EndlessScore) => EndlessScore
 ): EndlessScore {
-	const endless = loadLearnEndless();
-	const next = update(endlessScore(endless, kind));
-	saveLearnEndless({ ...endless, scores: { ...endless.scores, [kind]: next } });
+	const next = update(endlessScore(progressStore().endless(), kind));
+	progressStore().putEndlessScore(kind, next);
 	return next;
 }
 
 export function saveEndlessBand(band: Band): void {
-	saveLearnEndless({ ...loadLearnEndless(), band });
+	progressStore().putBand(band);
+}
+
+export function loadEndless(): LearnEndless {
+	return progressStore().endless();
 }

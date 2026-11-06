@@ -48,14 +48,12 @@
 		DEFAULT_AUTO_ARM,
 		DEFAULT_CLIENT_PREFS,
 		loadDisplayName,
-		loadOnboarding,
 		loadPracticeSetup,
 		loadSeatForTable,
 		loadSecretForTable,
 		saveAutoArm,
 		saveClientPrefs,
 		saveDisplayName,
-		saveOnboarding,
 		saveSeatForTable,
 		saveSecretForTable
 	} from '$lib/ui/settings-storage';
@@ -76,6 +74,7 @@
 	import { createPracticeTable } from '$lib/net/lobby';
 	import { FIRST_TUTORIAL } from '$lib/learn/lessons';
 	import { loadProgress } from '$lib/learn/progress';
+	import { progressStore } from '$lib/learn/progress-store';
 	import { scheduleAutoDismiss } from '$lib/ui/auto-close';
 	import CenterHub from '$lib/table/CenterHub.svelte';
 	import TableScene from '$lib/table/TableScene.svelte';
@@ -675,7 +674,7 @@
 	let haloTurn = $derived(resultOverlayUp ? -1 : gameState.turn);
 
 	// first-hand coach marks: practice only (no other humans waiting on you), once per browser.
-	let onboarding = $state(loadOnboarding() ?? { coachMarksDone: false });
+	let onboarding = $state(progressStore().onboarding() ?? { coachMarksDone: false });
 	let coachTarget = $state<CoachTarget | null>(null);
 	let showCoachMarks = $derived(
 		isPractice &&
@@ -689,7 +688,7 @@
 	const tutorialDone = loadProgress()[FIRST_TUTORIAL.id]?.solved ?? false;
 	function finishCoachMarks(): void {
 		onboarding = { coachMarksDone: true };
-		saveOnboarding(onboarding);
+		progressStore().putOnboarding(onboarding);
 		coachTarget = null;
 	}
 
