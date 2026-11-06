@@ -10,19 +10,23 @@ import logging
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, ValidationError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.accounts.config import AccountsConfig
 from app.accounts.google import PROVIDER, GoogleProvider
 from app.accounts.learn import (
+    MAX_LEARN_COUNT,
     EndlessValues,
     LessonValues,
     check_lesson,
+    import_learn,
     learn_imported_at,
     learn_of,
     record_endless,
@@ -51,6 +55,8 @@ from app.api_models import (
     ExportIdentity,
     ExportResponse,
     ExportUser,
+    LearnImport,
+    LearnImportResponse,
     LearnResponse,
     LessonProgressIn,
     LessonProgressOut,
@@ -59,6 +65,7 @@ from app.api_models import (
     MyGame,
     MyGameSeat,
     MyGamesResponse,
+    PrefsPatch,
 )
 from app.db.models import GameMode, LearnEndlessScore, LearnProgress, User
 from app.lessons.model import PuzzleKind
@@ -89,6 +96,9 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 _google: GoogleProvider | None = None
 # None = unlimited
 _export_limiter: RateLimiter | None = None
+_import_limiter: RateLimiter | None = None
+_COUNT_FIELDS = frozenset({"attempts", "step", "streak", "best", "solved"})
+_PUZZLE_KINDS = frozenset(PuzzleKind)
 
 
 def configure(
@@ -96,9 +106,10 @@ def configure(
     session_factory: async_sessionmaker[AsyncSession] | None,
     *,
     export_limiter: RateLimiter | None = None,
+    import_limiter: RateLimiter | None = None,
 ) -> bool:
     """Called from `lifespan`; returns whether accounts are live."""
-    global _config, _session_factory, _google, _export_limiter
+    global _config, _session_factory, _google, _export_limiter, _import_limiter
     if config.enabled and session_factory is None:
         logger.warning("ACCOUNTS_ENABLED without DATABASE_URL: accounts stay off")
     _config = config
@@ -109,6 +120,7 @@ def configure(
         else None
     )
     _export_limiter = export_limiter
+    _import_limiter = import_limiter
     return _session_factory is not None
 
 
@@ -316,6 +328,76 @@ async def learn_response(db: AsyncSession, user_id: uuid.UUID) -> LearnResponse:
 @router.get("/me/learn")
 async def get_learn(user: CurrentUser, db: Db) -> LearnResponse:
     return await learn_response(db, user.id)
+
+
+def _clamped(entry: object) -> object:
+    """An upload entry with every count above `MAX_LEARN_COUNT` lowered to it."""
+    if not isinstance(entry, dict):
+        return entry
+    return {
+        key: min(value, MAX_LEARN_COUNT) if type(value) is int and key in _COUNT_FIELDS else value
+        for key, value in entry.items()
+    }
+
+
+def _valid[T: BaseModel](model: type[T], entry: object) -> T | None:
+    try:
+        return model.model_validate(_clamped(entry))
+    except ValidationError:
+        return None
+
+
+@router.post("/me/learn/import")
+async def import_learn_progress(
+    body: LearnImport, user: CurrentUser, db: Db
+) -> LearnImportResponse:
+    """A device's one-time upload of its guest progress. Each entry is validated on its own; a
+    bad one is dropped (and counted), never the whole upload."""
+    key = str(user.id)
+    if _import_limiter is not None and not _import_limiter.allow(key):
+        raise HTTPException(
+            status_code=429,
+            detail="too many uploads, try again later",
+            headers={"Retry-After": str(_import_limiter.retry_after(key))},
+        )
+    at = now()
+    dropped = 0
+    progress: dict[str, LessonValues] = {}
+    for lesson_id, entry in body.progress.items():
+        parsed = _valid(LessonProgressIn, entry)
+        values = None
+        if parsed is not None:
+            values = check_lesson(
+                lesson_id,
+                LessonValues(parsed.solved, parsed.attempts, parsed.solved_at, parsed.step),
+                at,
+            )
+        if values is None:
+            dropped += 1
+        else:
+            progress[lesson_id] = values
+    endless: dict[str, EndlessValues] = {}
+    for kind, entry in body.endless.items():
+        score = _valid(EndlessScoreIn, entry)
+        if score is None or kind not in _PUZZLE_KINDS:
+            dropped += 1
+        else:
+            endless[kind] = EndlessValues(score.streak, score.best, score.solved)
+    prefs: dict[str, Any] = {}
+    for name, value in body.prefs.items():
+        pref = _valid(PrefsPatch, {name: value})
+        if pref is None or value is None:
+            dropped += 1
+        else:
+            prefs |= pref.model_dump(exclude_unset=True)
+    user_id = user.id
+    try:
+        await import_learn(db, user_id, progress=progress, endless=endless, prefs=prefs, now=at)
+    except IntegrityError as exc:
+        # a concurrent write inserted one of the rows; the device keeps its copy and retries
+        raise HTTPException(status_code=409, detail="progress changed, try again") from exc
+    learn = await learn_response(db, user_id)
+    return LearnImportResponse(**learn.model_dump(), dropped=dropped)
 
 
 @router.put("/me/learn/endless/{kind}")

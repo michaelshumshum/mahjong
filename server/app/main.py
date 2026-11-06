@@ -82,6 +82,9 @@ _DEFAULT_AUTH_RATE_WINDOW_SECONDS = 60.0
 # GET /me/export reads every game an account played; a person needs it a few times a year
 _DEFAULT_EXPORT_RATE_LIMIT = 5
 _DEFAULT_EXPORT_RATE_WINDOW_SECONDS = 3600.0
+# a device uploads once; retries after a failure are the only repeats
+_DEFAULT_LEARN_IMPORT_RATE_LIMIT = 10
+_DEFAULT_LEARN_IMPORT_RATE_WINDOW_SECONDS = 3600.0
 # ids a client may ask GET /lessons/random to skip: its recent puzzles
 _MAX_LESSON_EXCLUDE = 50
 _MAX_LESSON_ID_LENGTH = 64
@@ -189,8 +192,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "EXPORT_RATE_WINDOW_SECONDS",
         _DEFAULT_EXPORT_RATE_WINDOW_SECONDS,
     )
+    import_limiter = _rate_limiter(
+        "LEARN_IMPORT_RATE_LIMIT",
+        _DEFAULT_LEARN_IMPORT_RATE_LIMIT,
+        "LEARN_IMPORT_RATE_WINDOW_SECONDS",
+        _DEFAULT_LEARN_IMPORT_RATE_WINDOW_SECONDS,
+    )
     if accounts.configure(
-        AccountsConfig.from_env(), session_factory, export_limiter=export_limiter
+        AccountsConfig.from_env(),
+        session_factory,
+        export_limiter=export_limiter,
+        import_limiter=import_limiter,
     ):
         background.append(asyncio.create_task(accounts.run_session_cleanup()))
     try:

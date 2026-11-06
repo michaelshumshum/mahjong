@@ -832,9 +832,36 @@ progress stays in `localStorage` and never reaches these routes.
 | `solved_at` | timezone-aware ISO 8601. Up to `CLOCK_SKEW` (5 min) ahead of the server is clamped to now; further is `422` |
 | lesson `PUT` | `solved` never reverts, `attempts` is the max, `solved_at` the earliest, `step` the value sent (null clears it): a second device's stale copy can't undo a solve |
 | endless `PUT` | `best` and `solved` are the max, `streak` the value sent |
-| `imported` | true on a row whose values came from a device's one-time upload; a lesson `PUT` that newly solves it, or an endless `PUT` with a higher `best`, clears it. Anything competitive ignores imported rows |
+| `imported` | true on a row whose values came from a device's one-time upload (`POST /me/learn/import`); a lesson `PUT` that newly solves it, or an endless `PUT` with a higher `best`, clears it. Anything competitive ignores imported rows |
 
 No rate limit: each write is one row.
+
+```
+POST /me/learn/import
+{"progress": {"<lesson_id>": {…PUT /me/learn/{lesson_id} body…}, …},
+ "endless": {"<kind>": {…PUT /me/learn/endless/{kind} body…}, …},
+ "prefs": {"learn_band"?: "advanced", "coach_marks_done"?: true}}
+-> the GET /me/learn body after the merge, plus "dropped": 0
+```
+
+A device's guest progress, uploaded once after sign-in (ADR 0028 "Trusting the upload"). Unknown
+top-level fields are `422`; everything below that is checked entry by entry:
+
+| Step | Rule |
+| --- | --- |
+| clamp | a count above `MAX_LEARN_COUNT` is lowered to it before validation |
+| validate | each entry against the `PUT` rules above, each pref against `PATCH /me`'s (`null` is not a value here). A failing entry is dropped and counted in `dropped`; the rest still merge |
+| merge, lesson | `solved` OR, `attempts` max, `solved_at` earliest non-null, `step` max |
+| merge, endless | `best` and `solved` max; `streak` stays the server's, the upload's only when the account has no row for that kind |
+| merge, prefs | an uploaded pref fills a key the account hasn't set; `coach_marks_done` is an OR |
+| `imported` | set on a row when any merged field took the uploaded value; a row the upload doesn't change keeps its flag |
+| replay | every rule is a max or an OR, so the same upload again changes nothing |
+| audit | `users.learn_imported_at` is set to now on every accepted upload |
+
+The body is under the 16 KB cap like every request (a full upload of every lesson is ~9 KB).
+`429` with `Retry-After` past `LEARN_IMPORT_RATE_LIMIT` per `LEARN_IMPORT_RATE_WINDOW_SECONDS`
+per account (default 10 per hour, [infra.md §2](infra.md)). `409` when a concurrent write
+inserted one of the rows first: nothing is stored, and the device keeps its copy to retry.
 
 **WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
 signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game

@@ -146,6 +146,7 @@ pnpm --dir web dev
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | unset → `/auth/google/*` 404 | the Google Cloud OAuth client (web application). Its authorized redirect URI must be `${PUBLIC_API_URL}/auth/google/callback` ([ADR 0028](decisions/0028-user-account-schema.md) phase 0) |
 | `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_SECONDS` | 20 / 60; limit `0` disables | every `/auth/*` request per client IP ([protocol.md §10](protocol.md) "Accounts") |
 | `EXPORT_RATE_LIMIT` / `EXPORT_RATE_WINDOW_SECONDS` | 5 / 3600; limit `0` disables | `GET /me/export` per account, not per IP ([protocol.md §10](protocol.md) "Accounts") |
+| `LEARN_IMPORT_RATE_LIMIT` / `LEARN_IMPORT_RATE_WINDOW_SECONDS` | 10 / 3600; limit `0` disables | `POST /me/learn/import` per account ([protocol.md §10](protocol.md) "Accounts") |
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `MAX_TABLES` | 500; `0` disables | live tables (showcase excluded) past which `POST /tables` answers 503 ([architecture.md §8.3](architecture.md)) |

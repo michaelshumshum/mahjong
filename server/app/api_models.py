@@ -39,6 +39,8 @@ __all__ = [
     "ExportIdentity",
     "ExportResponse",
     "ExportUser",
+    "LearnImport",
+    "LearnImportResponse",
     "LearnResponse",
     "LessonProgressIn",
     "LessonProgressOut",
@@ -235,6 +237,23 @@ class LearnResponse(BaseModel):
     progress: dict[str, LessonProgressOut]
     endless: dict[str, EndlessScoreOut]
     prefs: dict[str, Any]
+
+
+class LearnImport(BaseModel):
+    """`POST /me/learn/import`: a device's guest progress. Entries stay untyped here so a bad
+    one is dropped on its own (`LessonProgressIn`, `EndlessScoreIn`, `PrefsPatch` each)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    progress: dict[str, Any] = Field(default_factory=dict)
+    endless: dict[str, Any] = Field(default_factory=dict)
+    prefs: dict[str, Any] = Field(default_factory=dict)
+
+
+class LearnImportResponse(LearnResponse):
+    """The merged progress, plus how many uploaded entries failed validation."""
+
+    dropped: int
 
 
 class ExportUser(BaseModel):
