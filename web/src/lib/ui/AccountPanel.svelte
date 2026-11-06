@@ -3,6 +3,7 @@
 	import { signOut } from '$lib/net/account';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import GoogleSignInButton from './GoogleSignInButton.svelte';
+	import LegalLinks from './LegalLinks.svelte';
 
 	// settings links to /profile's account settings; /profile itself doesn't
 	let { manageLink = false }: { manageLink?: boolean } = $props();
@@ -51,6 +52,8 @@
 	<div class="account-panel" data-testid="account-panel">
 		<p class="blurb">{m.accountPanel_guestBlurb()}</p>
 		<GoogleSignInButton />
+		<p class="blurb">{m.accountPanel_termsNote()}</p>
+		<LegalLinks />
 	</div>
 {/if}
 

@@ -743,8 +743,10 @@ Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
   guest name if it has one, else the server's placeholder `Player 0427`, never the Google name;
   `TrainingConsentField`, unchecked) which
   sends `PATCH /me`; `?signin=failed` / `?signin=disabled` open a message dialog. Flag off: the
-  query is left alone. The consent wording is a placeholder (`trainingConsentField_draft*`
-  keys) until ADR 0028 phase 7, which bumps the server's `TRAINING_CONSENT_VERSION` with it.
+  query is left alone. A change to the consent wording (`trainingConsentField_*`) bumps the
+  server's `TRAINING_CONSENT_VERSION` ([protocol.md §10](protocol.md) "Accounts"). The dialog,
+  the guest `AccountPanel` and `AccountSettings` carry `LegalLinks` to `/privacy` and `/terms`
+  (§7 "Privacy policy and terms"); the dialog's open in a new tab so it survives.
 - **Learn sync** ([ADR 0028](decisions/0028-user-account-schema.md) "Learn progress: guest vs
   signed in"). `lib/learn/learn-sync.svelte.ts`'s `learnSync`, driven by a root-layout effect on
   the session status, picks the progress store's backend:
@@ -855,6 +857,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/learn/endless` | off | endless random puzzles, `?kind=<PuzzleKind>&band=<Band>` (band defaults to beginner; an unknown kind or band → 404); fetches `GET /lessons/random`, so behind `ApiConnectGate` (below) |
 | `/status` | on | public server status (below); fetches `GET /status` client-side |
+| `/privacy`, `/terms` | on | privacy policy and terms of use (below); static text, skip `ApiConnectGate` |
 | `+error.svelte` | — | status heading plus "Page not found" (404) or a generic message, and a lobby back link |
 
 The web image builds with adapter-node (`pnpm build`, `node build`), so SSR is on unless a route
@@ -870,7 +873,7 @@ own title would keep the previous page's, e.g. a stale "Your turn · Hoi Toi" af
 
 ### API health gate (`ApiConnectGate`)
 
-Every route except `?mock=`/`/demo`/`/status`/`/learn` (but not `/learn/endless`) is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
+Every route except `?mock=`/`/demo`/`/status`/`/privacy`/`/terms`/`/learn` (but not `/learn/endless`) is wrapped in `lib/ui/ApiConnectGate.svelte` (mounted once in
 the root `+layout.svelte`), which polls `GET /healthz` (`lib/net/lobby.ts`'s `waitForApiHealthy`)
 before rendering the page. Without it a page looks interactive before the backend is reachable.
 
@@ -884,7 +887,8 @@ before rendering the page. Without it a page looks interactive before the backen
 - Exhausted: a "Can't reach the server" panel with a manual Retry.
 - Claims mural visibility (§2) while up, releasing it as the page mounts.
 - Skipped: `?mock=` and `/demo` run with no backend; `/status` reports an unreachable API itself
-  (below); `/learn` ships its lessons as static JSON ([ADR 0025](decisions/0025-learn-mode.md)).
+  (below); `/privacy` and `/terms` are static text that has to load for Google's consent-screen
+  review even with the API down; `/learn` ships its lessons as static JSON ([ADR 0025](decisions/0025-learn-mode.md)).
   `/learn/endless` is the exception under `/learn`: its puzzles come from the API.
 
 ### Create a table
@@ -962,9 +966,10 @@ of the other locale (`中文` / `EN`, `lobby_languageShort`), with the full name
 (`lobby_languageButton`) as its `aria-label` and the target locale as its `lang`. Settings opens
 the same `Settings.svelte` panel as the table (§6), loading prefs and `autoArm` from storage on
 open (the lobby is SSR'd). Changes are saved and applied immediately; `autoArm` is only saved,
-and the table re-sends it on its next connection. Two muted links sit in the page's bottom-right
-corner (centred below 768px): "Status" (lucide `activity`, to `/status`) and "Source code" (GitHub
-mark + label, new tab). Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
+and the table re-sends it on its next connection. Muted links sit in the page's bottom-right
+corner (centred and wrapping below 768px): "Status" (lucide `activity`, to `/status`), "Privacy"
+and "Terms" (text only, to `/privacy` and `/terms`) and "Source code" (GitHub mark + label, new
+tab). Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
 middle (a radial gradient) so this copy reads over the tiles.
 
 ### Server status (`/status`)
@@ -984,6 +989,27 @@ measures: [infra.md §8](infra.md)), polled every 15s with a static "Updated" st
   brass line over a faint area, zero baseline, a crosshair + tooltip on hover. A `null` point breaks
   the line instead of dropping to zero. Fewer than two points reads "Not enough history yet" —
   history starts empty after every restart.
+
+### Privacy policy and terms (`/privacy`, `/terms`)
+
+The text accounts need before public sign-in ([ADR 0028](decisions/0028-user-account-schema.md)
+phase 7), also the URLs on Google's consent screen.
+
+- **One layout.** `lib/ui/LegalPage.svelte`: back link, title, effective date
+  (`lib/ui/site-links.ts`'s `LEGAL_EFFECTIVE_DATE`, formatted per locale in UTC so SSR and
+  hydration agree), a brass-ruled plain-language summary, the sections in one raised reading
+  column (~38rem lines) over the mural, a contact line and `LegalLinks` to the other page.
+- **Contact.** `PUBLIC_CONTACT_EMAIL` ([infra.md §2](infra.md)) as a `mailto:`; unset, the
+  repository's GitHub issues. No address is committed.
+- **Ungated, SSR, not prerendered.** They skip `ApiConnectGate` (above). The locale comes from
+  the request cookie and the contact from runtime env, so a prerendered page would bake in one
+  of each.
+- **Linked from** the lobby's corner links, the sign-up dialog, the guest `AccountPanel`
+  (Settings' Account tab, `/profile`) and `AccountSettings` (§6 "Account session").
+- **Wording.** Every claim is about the app as built (scopes `openid email`, session lifetimes,
+  cookie names, what `DELETE /me` removes); a change to any of those changes the text and the
+  effective date with it. The training section matches the consent checkbox and
+  [ADR 0016](decisions/0016-human-records-as-training-data.md).
 
 ### Faan guide and language toggle
 
@@ -1660,6 +1686,7 @@ spread. Files group key prefixes by app area:
 | `learn.json` | `/learn` and `/learn/[id]`: `learn` (both pages' chrome, seat names, answer inputs, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
 | `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
 | `account.json` | sign-in and account UI: `googleSignInButton`, `accountPanel`, `trainingConsentField`, `signinReturn`, `accountSettings`, `deleteAccountDialog`, `myGames` |
+| `legal.json` | `/privacy` and `/terms`: `legalPage` (shared chrome, contact), `legalLinks`, `privacyPage`, `termsPage` |
 
 **Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the
 matching area file in **both** locales in the same change — a missing key falls back to English

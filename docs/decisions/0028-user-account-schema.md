@@ -476,12 +476,17 @@ placement, practice vs multiplayer); add `user_stats` only if those get slow.
 
 ### Phase 7: privacy policy and terms, public launch
 
-- [ ] Privacy policy: what's stored (provider subject, email, display name, games, learn
-      progress), why, how long, training consent, export and deletion.
-- [ ] Terms of use.
-- [ ] Final training-consent wording; bump `consent_version` if it changed from the phase 3
-      placeholder.
-- [ ] Routes for both pages, linked from sign-up and account settings; en + zh-Hant.
+- [x] Privacy policy: what's stored (provider subject, email, display name, games, learn
+      progress), why, how long, training consent, export and deletion (PR 7.1).
+- [x] Terms of use.
+- [x] Final training-consent wording; `TRAINING_CONSENT_VERSION` `2026-11-draft` → `2026-11`.
+      Draft-version consents (consent-screen test users only) aren't carried over: migration
+      `e4a7c2d9b815` clears them, since nobody agreed to the final wording under them. Its
+      `downgrade` doesn't restore them.
+- [x] Routes for both pages (`/privacy`, `/terms`, [frontend.md §7](../frontend.md)), linked
+      from sign-up, account settings, the guest account panel and the lobby; en + zh-Hant. The
+      contact address is `PUBLIC_CONTACT_EMAIL` ([infra.md §2](../infra.md)), never committed.
+- `make prod-migrate` after 7.1 deploys.
 - [ ] Add both URLs to the Google consent screen; verify `shumshum.dev` in Search Console and
       submit brand verification.
 - [ ] Remove the sign-in flag; mark ADR 0001 `Superseded`, 0026, 0029 and this record `Accepted`.

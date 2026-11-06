@@ -44,6 +44,7 @@ services:
       PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL must be set}
       PUBLIC_WS_URL: ${PUBLIC_WS_URL:?PUBLIC_WS_URL must be set}
       PUBLIC_ACCOUNTS_ENABLED: ${PUBLIC_ACCOUNTS_ENABLED:-}
+      PUBLIC_CONTACT_EMAIL: ${PUBLIC_CONTACT_EMAIL:-}
       PORT: 3000
     # !override, not plain ports: — compose concatenates ports: across -f files
     # rather than replacing them, so a bare list here would keep the dev

@@ -118,6 +118,9 @@ test.describe('accounts on', () => {
 		const signIn = page.getByTestId('google-sign-in');
 		await expect(signIn).toBeVisible();
 		await expect(signIn).toHaveAttribute('href', `${API}/auth/google/login?next=%2Fprofile`);
+		const links = page.getByTestId('account-panel').getByTestId('legal-links');
+		await expect(links.getByTestId('legal-link-privacy')).toHaveAttribute('href', '/privacy');
+		await expect(links.getByTestId('legal-link-terms')).toHaveAttribute('href', '/terms');
 	});
 
 	test('a signed-in player sees their name and can sign out', async ({ page }) => {
@@ -146,6 +149,9 @@ test.describe('accounts on', () => {
 		await expect(page.getByTestId('signup-name')).toHaveValue('Ann');
 		const consent = page.getByTestId('training-consent').getByRole('checkbox');
 		await expect(consent).not.toBeChecked();
+		// opened in a new tab so the dialog survives
+		await expect(dialog.getByTestId('legal-link-privacy')).toHaveAttribute('target', '_blank');
+		await expect(dialog.getByTestId('legal-link-terms')).toHaveAttribute('href', '/terms');
 
 		await page.getByTestId('signup-name').fill('Bea');
 		await consent.check();
@@ -170,7 +176,11 @@ test.describe('accounts on', () => {
 		await page.getByTestId('settings-tab-account').click();
 		await page.getByTestId('account-manage').click();
 		await expect(page).toHaveURL(`${ACCOUNTS}/profile`);
-		await expect(page.getByTestId('account-settings')).toBeVisible();
+		const settings = page.getByTestId('account-settings');
+		await expect(settings).toBeVisible();
+		await settings.getByTestId('legal-link-privacy').click();
+		await expect(page).toHaveURL(`${ACCOUNTS}/privacy`);
+		await expect(page.getByTestId('privacy-page')).toBeVisible();
 	});
 
 	test('account settings rename and toggle consent', async ({ page }) => {

@@ -10,12 +10,14 @@
 
 	const MIN_DISPLAY_MS = 1000;
 
-	// ?mock, /demo and /learn need no backend, but /learn/endless fetches its puzzles; /status
+	// ?mock, /demo, /learn (not /learn/endless), /privacy and /terms need no backend; /status
 	// reports an unreachable api itself, which the gate would hide (docs/frontend.md §7).
 	const skip =
 		page.url.searchParams.has('mock') ||
 		page.url.pathname.startsWith('/demo') ||
 		page.url.pathname.startsWith('/status') ||
+		page.url.pathname.startsWith('/privacy') ||
+		page.url.pathname.startsWith('/terms') ||
 		(page.url.pathname.startsWith('/learn') && !page.url.pathname.startsWith('/learn/endless'));
 
 	let status = $state<'connecting' | 'ready' | 'error'>(skip ? 'ready' : 'connecting');

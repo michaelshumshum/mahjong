@@ -12,6 +12,7 @@
 	} from '$lib/net/account';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import { MAX_NAME_LENGTH } from '$lib/net/protocol.constants';
+	import LegalLinks from './LegalLinks.svelte';
 	import ModalDialog from './ModalDialog.svelte';
 	import PanelHeader from './PanelHeader.svelte';
 	import { loadDisplayName } from './settings-storage';
@@ -73,6 +74,7 @@
 				/>
 			</label>
 			<TrainingConsentField checked={consent} onChange={(checked) => (consent = checked)} />
+			<LegalLinks newTab />
 			{#if error}
 				<p class="error" role="alert">{error}</p>
 			{/if}
