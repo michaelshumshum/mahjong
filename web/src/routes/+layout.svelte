@@ -27,6 +27,8 @@
 	import { applyClientPrefs } from '$lib/ui/apply-client-prefs';
 	import { installClickSound } from '$lib/ui/sfx';
 	import { accountSession } from '$lib/net/account-session.svelte';
+	import { learnSync } from '$lib/learn/learn-sync.svelte';
+	import { untrack } from 'svelte';
 
 	// clear abandoned per-table reconnect credentials so they don't sit in localStorage forever.
 	cleanupStaleTableCredentials();
@@ -36,6 +38,13 @@
 
 	$effect(() => installClickSound());
 	$effect(() => void accountSession.load());
+	$effect(() => {
+		const account = accountSession.state;
+		untrack(() => {
+			if (account.status === 'signedIn') void learnSync.signedIn(account.user.id);
+			else if (account.status !== 'loading') learnSync.guest();
+		});
+	});
 
 	let { children } = $props();
 </script>

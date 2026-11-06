@@ -27,6 +27,7 @@ export const ONBOARDING_STORAGE_KEY = 'mahjong:onboarding:v1';
 export const CREATE_TABLE_SETUP_STORAGE_KEY = 'mahjong:createTableSetup:v1';
 export const LEARN_PROGRESS_STORAGE_KEY = 'mahjong:learnProgress:v1';
 export const LEARN_ENDLESS_STORAGE_KEY = 'mahjong:learnEndless:v1';
+export const LEARN_UPLOAD_DECLINED_STORAGE_KEY = 'mahjong:learnUploadDeclined:v1';
 const SEAT_STORAGE_KEY_PREFIX = 'mahjong:seat:v2:';
 const RECONNECT_SECRET_STORAGE_KEY_PREFIX = 'mahjong:reconnectSecret:v2:';
 
@@ -474,4 +475,30 @@ export function loadLearnEndless(): LearnEndless {
 
 export function saveLearnEndless(endless: LearnEndless): void {
 	writeRaw(LEARN_ENDLESS_STORAGE_KEY, JSON.stringify(endless));
+}
+
+/** Whether this browser ever saved an endless band or score (the band alone has a default). */
+export function hasLearnEndless(): boolean {
+	return readRaw(LEARN_ENDLESS_STORAGE_KEY) !== null;
+}
+
+/** After the one-time upload to an account succeeds (ADR 0028). */
+export function clearLearnStorage(): void {
+	clearRaw(LEARN_PROGRESS_STORAGE_KEY);
+	clearRaw(LEARN_ENDLESS_STORAGE_KEY);
+}
+
+function isAccountId(value: unknown): value is string {
+	return typeof value === 'string';
+}
+
+/** The account whose upload offer was declined here; cleared on sign-out, so the next sign-in
+ * offers again. */
+export function loadUploadDeclined(): string | null {
+	return load(LEARN_UPLOAD_DECLINED_STORAGE_KEY, isAccountId);
+}
+
+export function saveUploadDeclined(accountId: string | null): void {
+	if (accountId === null) clearRaw(LEARN_UPLOAD_DECLINED_STORAGE_KEY);
+	else writeRaw(LEARN_UPLOAD_DECLINED_STORAGE_KEY, JSON.stringify(accountId));
 }

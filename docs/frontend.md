@@ -671,13 +671,14 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:displayName:v1` | guest display name | prefilled on the seat picker, saved on every keystroke |
 | `mahjong:onboarding:v1` | `coachMarksDone` | set when the first-hand coach marks (§7 "Practice mode") are finished or skipped, or the learn tutorial is finished (§7 "Learn"); never shown again in this browser |
 | `mahjong:practiceSetup:v1` | last practice table's bot level per seat (`{1,2,3}` → `easy`/`normal`/`impossible`) | saved when the practice dialog creates a table; prefills that dialog and drives the game-end "Play again" (§7) |
-| `mahjong:learnEndless:v1` | `{ band, scores: { [PuzzleKind]: { streak, best, solved } } }` (`loadLearnEndless`/`saveLearnEndless`; `lib/learn/endless.ts` updates it) | endless mode's last band and per-kind run, local only. A bad band falls back to beginner and a malformed or unknown kind's score is dropped on its own |
-| `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point (saved at each waiting step after the first, cleared by Restart and at the end, §7 "Learn"). Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
+| `mahjong:learnEndless:v1` | `{ band, scores: { [PuzzleKind]: { streak, best, solved } } }` (`loadLearnEndless`/`saveLearnEndless`; `lib/learn/endless.ts` updates it) | endless mode's last band and per-kind run, a guest's. A bad band falls back to beginner and a malformed or unknown kind's score is dropped on its own |
+| `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | a guest's; a signed-in player's lives on the server (below). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point (saved at each waiting step after the first, cleared by Restart and at the end, §7 "Learn"). Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
 
 The `onboarding`, `learnEndless` and `learnProgress` keys' callers (`lib/learn/progress.ts`, `endless.ts`, the lesson player, the
 table's coach marks) never touch these keys directly: they go through
 `lib/learn/progress-store.ts`'s `progressStore()`, a `ProgressBackend` (synchronous reads, one
-entry per write) whose `localBackend` reads and writes the keys above.
+entry per write) whose `localBackend` reads and writes the keys above. Those keys are a
+guest's; a signed-in player's progress is the account's (§6 "Account session", "Learn sync").
 
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
 full `state_sync`.
@@ -744,6 +745,26 @@ Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
   sends `PATCH /me`; `?signin=failed` / `?signin=disabled` open a message dialog. Flag off: the
   query is left alone. The consent wording is a placeholder (`trainingConsentField_draft*`
   keys) until ADR 0028 phase 7, which bumps the server's `TRAINING_CONSENT_VERSION` with it.
+- **Learn sync** ([ADR 0028](decisions/0028-user-account-schema.md) "Learn progress: guest vs
+  signed in"). `lib/learn/learn-sync.svelte.ts`'s `learnSync`, driven by a root-layout effect on
+  the session status, picks the progress store's backend:
+
+  | Status | Backend |
+  | --- | --- |
+  | `loading` | unchanged (`localBackend` on first load) |
+  | `guest`, `off` | `localBackend` |
+  | `signedIn` | `lib/learn/api-backend.ts`'s `ApiBackend`: an in-memory copy of `GET /me/learn`; every write updates it and `PUT`s the entry (band and coach marks: `PATCH /me` prefs), never `localStorage`. A failed write stays in memory for the page. Writes made before the copy arrives are merged into it by the server's `PUT` rule. Coach marks fall back to this browser's `mahjong:onboarding:v1` until the account has its own |
+
+  `learnSync.version` bumps when the backend or its data changes; `/learn`, `/learn/endless`,
+  `PuzzlePage`'s next link and `TutorialPage`'s resume offer re-read on it, since the account's
+  copy lands after mount. Calls: `lib/net/learn-api.ts` (hand-typed, credentialed).
+- **One-time upload** (`lib/learn/LearnUploadOffer.svelte`, on `/learn`): once signed in, if this
+  browser has guest progress (`learnProgress` or endless scores), a card offers to add it to the
+  account. Accept: `POST /me/learn/import` with both keys (and `coachMarksDone`); on success both
+  keys are deleted and the merged copy shown; on failure they stay and the card says so (offered
+  again on the next load). Not now: kept, and `mahjong:learnUploadDeclined:v1` holds the account
+  id so this browser doesn't ask again until a sign-out clears it. Signing out leaves the
+  server's copy alone; the device is a guest again on whatever local progress it still has.
 - Every `/me` and `/auth/*` call sends `credentials: 'include'`. Other API calls (`/tables`,
   `/healthz`, `/status`, `/lessons/random`) don't read the session and stay uncredentialed; the
   WS upgrade carries the cookie on its own (same site).

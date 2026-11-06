@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
+	import { learnSync } from '$lib/learn/learn-sync.svelte';
 	import {
 		ENDLESS_TITLE,
 		EMPTY_SCORE,
@@ -69,9 +70,11 @@
 		void load();
 	}
 
-	onMount(() => {
-		score = endlessScore(loadEndless(), kind);
-		void load();
+	onMount(() => void load());
+	// again once a signed-in account's scores arrive
+	$effect(() => {
+		void learnSync.version;
+		score = untrack(() => endlessScore(loadEndless(), kind));
 	});
 
 	let title = $derived(ENDLESS_TITLE[kind]());
