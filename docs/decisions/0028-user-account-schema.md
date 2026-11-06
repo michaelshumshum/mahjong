@@ -460,12 +460,13 @@ seat data, placements and mode.
 - [x] `POST /me/learn/import` (validate, clamp, merge, set `imported`; PR 5.2). Counts above the
       cap are clamped; every other failing entry is dropped and counted. Prefs merge too: an
       uploaded pref fills an unset key, `coach_marks_done` ORs.
-- [ ] Web: one progress store with a `localStorage` backend (guest) and an API backend (signed
-      in). After sign-in, offer the upload once per device; delete both local keys only on success.
-- [ ] Tests (server): every merge rule; replayed upload is a no-op; each validation rule drops
+- [x] Web: one progress store with a `localStorage` backend (guest) and an API backend (signed
+      in) (PRs 5.3, 5.4). After sign-in, a card on `/learn` offers the upload; delete both local
+      keys only on success. "Not now" is remembered per account until sign-out.
+- [x] Tests (server): every merge rule; replayed upload is a no-op; each validation rule drops
       the entry, not the upload; rate limit. (web): backend switch, keys deleted on success and
-      kept on failure.
-- [ ] Docs: [ADR 0025](0025-learn-mode.md) storage note, `frontend.md §6`, `protocol.md §10`.
+      kept on failure (unit + Playwright on the accounts-on preview).
+- [x] Docs: [ADR 0025](0025-learn-mode.md) storage note, `frontend.md §6`, `protocol.md §10`.
 - `make test`.
 
 ### Phase 6: stats and profile (later)

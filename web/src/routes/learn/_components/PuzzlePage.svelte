@@ -21,6 +21,7 @@
 		lessonTitle
 	} from '$lib/learn/lesson-text';
 	import { loadProgress, nextUnsolved, saveAttempt } from '$lib/learn/progress';
+	import { learnSync } from '$lib/learn/learn-sync.svelte';
 	import { isMotionReduced } from '$lib/ui/motion';
 	import { puzzleState } from '$lib/learn/puzzle-state';
 	import type { Answer, GradeResult } from '$lib/learn/types';
@@ -71,8 +72,10 @@
 	let next = $derived(nextLesson(lesson.id));
 	// endless isn't a walk through the index, even when a pool id matches one
 	let position = $derived(onGraded ? null : trackPosition(lesson.id));
-	// other lessons' progress can't change while this page is open, and this one is skipped
-	let nextOpen = $derived(onGraded ? null : nextUnsolved(loadProgress(), lesson.id));
+	// other lessons' progress changes only when a signed-in account's arrives; this one is skipped
+	let nextOpen = $derived(
+		onGraded ? null : (void learnSync.version, nextUnsolved(loadProgress(), lesson.id))
+	);
 	let nextHref = $derived(nextOpen ? `/learn/${nextOpen.id}` : '/learn');
 
 	let result = $state<GradeResult | null>(null);

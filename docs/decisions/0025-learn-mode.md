@@ -200,7 +200,7 @@ illegal script fails `make proto`.
 | Refactors | `lib/table/TableScene.svelte` and `lib/table/legal-actions.ts` out of the table page; `lib/ui/TilePalette.svelte` out of `HandChecker` |
 | Routes | `/learn` (tracks, lesson cards, solved state) and `/learn/[id]`. Both skip `ApiConnectGate`. Phase 4 adds `/learn/endless`, which doesn't |
 | Modules (`lib/learn/`) | `lessons.ts` (index, lazy import per lesson), `grade.ts` (lookup only), `lesson-player.svelte.ts`, `PuzzleBoard.svelte`, `AnswerPanel.svelte`, `TutorialCoach.svelte`, `types.ts` |
-| Persistence | `mahjong:learnProgress:v1`: `{ [id]: { solved, attempts, solvedAt?, step? } }`, local only ([ADR 0001](0001-guest-only-identity.md)); unknown ids dropped |
+| Persistence | `mahjong:learnProgress:v1`: `{ [id]: { solved, attempts, solvedAt?, step? } }`, a guest's, local only; unknown ids dropped. A signed-in player's lives on the server instead (`/me/learn`, [ADR 0028](0028-user-account-schema.md) "Learn progress: guest vs signed in"): the web's progress store switches backend on sign-in, and a device's guest progress is uploaded once, on request, then deleted locally |
 | Other entry points | faan guide links to a faan puzzle; practice points first-timers to the tutorial; the tutorial ends with "Practice vs Easy bots" |
 
 ### Random endless puzzles (phase 4)

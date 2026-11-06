@@ -25,6 +25,8 @@
 	} from '$lib/learn/lessons';
 	import { lessonSubtitle, lessonTitle } from '$lib/learn/lesson-text';
 	import { continueTab, firstUnsolved, loadProgress, solvedCount } from '$lib/learn/progress';
+	import { learnSync } from '$lib/learn/learn-sync.svelte';
+	import LearnUploadOffer from '$lib/learn/LearnUploadOffer.svelte';
 	import type { TileCode } from '$lib/table/tile-code';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import { isMotionReduced } from '$lib/ui/motion';
@@ -58,10 +60,12 @@
 	let selectedGroup = $derived(groups.find((group) => group.track === tab));
 	let nextTab = $derived(INDEX_TABS[INDEX_TABS.indexOf(tab) + 1] ?? null);
 
-	// localStorage only: read after mount so the SSR'd index and its hydration agree (all unsolved).
+	// read after mount so the SSR'd index and its hydration agree (all unsolved), and again once
+	// a signed-in account's progress arrives
 	let progress = $state<LearnProgress>({});
 	let endless = $state<LearnEndless>({ band: 'beginner', scores: {} });
 	$effect(() => {
+		void learnSync.version;
 		progress = loadProgress();
 		endless = loadEndless();
 		// no ?track=: open on where the player left off, without a history entry
@@ -129,6 +133,8 @@
 		<h1>{m.learn_title()}</h1>
 	</header>
 	<p class="subtitle">{m.learn_subtitle()}</p>
+
+	<LearnUploadOffer />
 
 	{#if tutorialSolved && next}
 		{@const subtitle = lessonSubtitle(next)}

@@ -8,6 +8,7 @@
 	import { indexHref } from '$lib/learn/lessons';
 	import { TUTORIAL_TEXT } from '$lib/learn/lesson-text';
 	import { loadProgress } from '$lib/learn/progress';
+	import { learnSync } from '$lib/learn/learn-sync.svelte';
 	import TutorialCoach from '$lib/learn/TutorialCoach.svelte';
 	import { m } from '$lib/paraglide/messages.js';
 	import CenterHub from '$lib/table/CenterHub.svelte';
@@ -44,9 +45,23 @@
 	// one player per tutorial: +page.svelte keys this component by id.
 	const initial = untrack(() => tutorial);
 	const text = TUTORIAL_TEXT[initial.text];
-	const savedStep = loadProgress()[initial.id]?.step ?? null;
-	let solved = $state(loadProgress()[initial.id]?.solved ?? false);
-	let offerResume = $state(savedStep !== null);
+	const stored = loadProgress()[initial.id];
+	let savedStep = $state(stored?.step ?? null);
+	let solved = $state(stored?.solved ?? false);
+	let offerResume = $state(stored?.step !== undefined);
+	let resumeAnswered = false;
+	// a signed-in account's progress can arrive after mount
+	const mountedVersion = untrack(() => learnSync.version);
+	$effect(() => {
+		if (learnSync.version === mountedVersion) return;
+		untrack(() => {
+			const entry = loadProgress()[initial.id];
+			solved ||= entry?.solved ?? false;
+			if (resumeAnswered) return;
+			savedStep = entry?.step ?? null;
+			offerResume = savedStep !== null;
+		});
+	});
 
 	const player = new LessonPlayer(initial, {
 		autoDelayMs: motionMs(AUTO_STEP_MS),
@@ -120,11 +135,13 @@
 
 	function resume(): void {
 		offerResume = false;
+		resumeAnswered = true;
 		if (savedStep !== null) player.goTo(savedStep);
 	}
 
 	function restart(): void {
 		offerResume = false;
+		resumeAnswered = true;
 		sceneKey += 1;
 		player.restart();
 	}
