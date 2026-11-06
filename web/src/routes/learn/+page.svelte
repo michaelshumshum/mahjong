@@ -6,7 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages.js';
-	import { ENDLESS_TITLE, endlessScore, saveEndlessBand } from '$lib/learn/endless';
+	import { ENDLESS_TITLE, endlessScore, loadEndless, saveEndlessBand } from '$lib/learn/endless';
 	import type { Band, IndexEntry } from '$lib/learn/generated/lessons';
 	import { BANDS, PUZZLE_KINDS } from '$lib/learn/kinds';
 	import {
@@ -28,11 +28,7 @@
 	import type { TileCode } from '$lib/table/tile-code';
 	import TileFace from '$lib/table/TileFace.svelte';
 	import { isMotionReduced } from '$lib/ui/motion';
-	import {
-		loadLearnEndless,
-		type LearnEndless,
-		type LearnProgress
-	} from '$lib/ui/settings-storage';
+	import type { LearnEndless, LearnProgress } from '$lib/ui/settings-storage';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import BackButton from '$lib/ui/BackButton.svelte';
 	import SegmentedControl from '$lib/ui/SegmentedControl.svelte';
@@ -67,7 +63,7 @@
 	let endless = $state<LearnEndless>({ band: 'beginner', scores: {} });
 	$effect(() => {
 		progress = loadProgress();
-		endless = loadLearnEndless();
+		endless = loadEndless();
 		// no ?track=: open on where the player left off, without a history entry
 		untrack(() => {
 			if (explicitTab) return;

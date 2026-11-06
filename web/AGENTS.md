@@ -110,6 +110,7 @@ model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 | Lesson types and vocabularies (`Lesson`, `LessonIndexEntry`, `PuzzleKind`, `SafeReason`, `Band`, `Track`, answer keys) and the lesson JSON (generated, never hand-edited) | `lib/learn/generated/` |
 | Lesson loading and track order, lesson text, answer types and grading | `lib/learn/lessons.ts` / `lesson-text.ts` / `types.ts` / `grade.ts` |
 | Puzzle kind and band lists (`PUZZLE_KINDS`, `BANDS`, guards); endless fetch and streak | `lib/learn/kinds.ts`; `lib/learn/endless.ts` |
+| Where learn progress, endless scores and learn prefs are read and written (`ProgressBackend`, `progressStore()`) | `lib/learn/progress-store.ts` |
 | Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
 | Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`, `CoachTarget`) | `lib/table/view-types.ts` |

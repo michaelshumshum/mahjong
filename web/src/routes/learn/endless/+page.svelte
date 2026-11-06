@@ -5,6 +5,7 @@
 		EMPTY_SCORE,
 		endlessScore,
 		fetchRandomLesson,
+		loadEndless,
 		recordEndlessAnswer,
 		recordEndlessSkip,
 		rememberRecent,
@@ -16,7 +17,6 @@
 	import type { GradeResult } from '$lib/learn/types';
 	import { m } from '$lib/paraglide/messages.js';
 	import BackButton from '$lib/ui/BackButton.svelte';
-	import { loadLearnEndless } from '$lib/ui/settings-storage';
 	import Spinner from '$lib/ui/Spinner.svelte';
 	import PuzzlePage from '../_components/PuzzlePage.svelte';
 	import type { PageProps } from './$types';
@@ -70,7 +70,7 @@
 	}
 
 	onMount(() => {
-		score = endlessScore(loadLearnEndless(), kind);
+		score = endlessScore(loadEndless(), kind);
 		void load();
 	});
 

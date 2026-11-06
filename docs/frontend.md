@@ -674,6 +674,11 @@ to defaults on missing, corrupted or blocked storage — the page must render in
 | `mahjong:learnEndless:v1` | `{ band, scores: { [PuzzleKind]: { streak, best, solved } } }` (`loadLearnEndless`/`saveLearnEndless`; `lib/learn/endless.ts` updates it) | endless mode's last band and per-kind run, local only. A bad band falls back to beginner and a malformed or unknown kind's score is dropped on its own |
 | `mahjong:learnProgress:v1` | `{ [lessonId]: { solved, attempts, solvedAt?, step? } }` (`loadLearnProgress`/`saveLearnProgress`; `lib/learn/progress.ts` records attempts) | local only, no server record ([ADR 0001](decisions/0001-guest-only-identity.md)). A lesson stays solved once solved, keeping its first `solvedAt`; `step` is a tutorial's resume point (saved at each waiting step after the first, cleared by Restart and at the end, §7 "Learn"). Load drops entries whose id isn't in the generated index, one by one, so re-mined puzzles (positional ids, [ADR 0025](decisions/0025-learn-mode.md)) lose their progress rather than inheriting another puzzle's |
 
+The `onboarding`, `learnEndless` and `learnProgress` keys' callers (`lib/learn/progress.ts`, `endless.ts`, the lesson player, the
+table's coach marks) never touch these keys directly: they go through
+`lib/learn/progress-store.ts`'s `progressStore()`, a `ProgressBackend` (synchronous reads, one
+entry per write) whose `localBackend` reads and writes the keys above.
+
 `lastSeq` is not persisted: a reload has lost the in-memory reducer state anyway, so it needs a
 full `state_sync`.
 

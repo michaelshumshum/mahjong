@@ -18,6 +18,8 @@ export type LoadedLesson = Lesson | Tutorial;
 
 export const LESSONS: readonly IndexEntry[] = index as IndexEntry[];
 
+export const LESSON_IDS: ReadonlySet<string> = new Set(LESSONS.map((lesson) => lesson.id));
+
 // the generator puts tutorials first, so this is the one a newcomer starts with.
 export const FIRST_TUTORIAL: TutorialIndexEntry = LESSONS.find(
 	(entry): entry is TutorialIndexEntry => entry.lesson_kind === 'tutorial'
