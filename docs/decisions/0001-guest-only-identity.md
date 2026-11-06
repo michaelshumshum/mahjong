@@ -1,6 +1,6 @@
 # 0001. Guest-only identity
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR 0029](0029-optional-accounts.md)
 - **Date:** 2026-09
 
 ## Context

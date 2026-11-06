@@ -1,6 +1,6 @@
 # 0026. Optional accounts via OAuth sign-in
 
-- **Status:** Deferred
+- **Status:** Accepted
 - **Date:** 2026-10-29
 
 ## Context

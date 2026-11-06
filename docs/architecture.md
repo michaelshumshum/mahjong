@@ -82,9 +82,11 @@ Mahjong is **turn-based, four-player, hidden-information, low-tick-rate**.
 ### 2.1 Auth
 
 A seat is held by a guest or by an account. Guests are the default; accounts are optional, via
-Google sign-in, and off unless `ACCOUNTS_ENABLED` ([ADR 0029](decisions/0029-optional-accounts.md),
-[ADR 0028](decisions/0028-user-account-schema.md), [protocol.md §10](protocol.md) "Accounts").
-There is no password, JWT or email sign-in.
+Google sign-in ([ADR 0029](decisions/0029-optional-accounts.md),
+[ADR 0028](decisions/0028-user-account-schema.md), [protocol.md §10](protocol.md) "Accounts"),
+and public in production since 2026-11. `ACCOUNTS_ENABLED` (API) and `PUBLIC_ACCOUNTS_ENABLED`
+(web) stay as switches, both on in prod; off, every seat is a guest
+([infra.md §2](infra.md)). There is no password, JWT or email sign-in.
 
 | | Guest | Signed in |
 | --- | --- | --- |

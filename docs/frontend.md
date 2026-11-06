@@ -705,8 +705,9 @@ the bottom seat too while spectating.
 
 ### Account session
 
-Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), behind
-`PUBLIC_ACCOUNTS_ENABLED` ([infra.md §2](infra.md)). `lib/net/account.ts` holds the hand-typed
+Optional accounts ([ADR 0028](decisions/0028-user-account-schema.md)), public in production;
+`PUBLIC_ACCOUNTS_ENABLED` ([infra.md §2](infra.md)) is on there and stays as the switch that
+hides every account UI (`off` below). `lib/net/account.ts` holds the hand-typed
 `/me` and `/auth/*` calls ([protocol.md §10](protocol.md) "Accounts"); `lib/net/account-session.svelte.ts`'s
 `accountSession` singleton holds the result app-wide.
 
