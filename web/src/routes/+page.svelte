@@ -5,6 +5,7 @@
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
 	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
+	import { SOURCE_REPO_URL } from '$lib/ui/site-links';
 	import Activity from '@lucide/svelte/icons/activity';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import Languages from '@lucide/svelte/icons/languages';
@@ -132,10 +133,16 @@
 			<Activity size={16} strokeWidth={1.8} aria-hidden="true" />
 			{m.lobby_statusLink()}
 		</a>
+		<a class="corner-link" data-testid="lobby-privacy-link" href="/privacy">
+			{m.lobby_privacyLink()}
+		</a>
+		<a class="corner-link" data-testid="lobby-terms-link" href="/terms">
+			{m.lobby_termsLink()}
+		</a>
 		<a
 			class="corner-link"
 			data-testid="lobby-source-link"
-			href="https://github.com/michaelshumshum/mahjong"
+			href={SOURCE_REPO_URL}
 			target="_blank"
 			rel="noopener noreferrer"
 		>
@@ -373,7 +380,9 @@
 		@include layout.phone-only {
 			left: 0;
 			right: 0;
+			flex-wrap: wrap;
 			justify-content: center;
+			gap: 0 var(--space-4);
 		}
 	}
 

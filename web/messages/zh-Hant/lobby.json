@@ -97,6 +97,8 @@
 	"lobby_languageShort": "EN",
 	"lobby_sourceLink": "原始碼",
 	"lobby_statusLink": "伺服器狀態",
+	"lobby_privacyLink": "私隱",
+	"lobby_termsLink": "條款",
 	"lobby_guideButton": "番數指南",
 	"lobby_sealMark": "麻雀",
 	"lobby_practiceGlyph": "機",

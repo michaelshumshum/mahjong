@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
 
-	// draft wording until adr 0028 phase 7; the server's TRAINING_CONSENT_VERSION bumps with it
+	// a wording change bumps the server's TRAINING_CONSENT_VERSION (docs/protocol.md §10)
 	let {
 		checked,
 		disabled = false,
@@ -20,8 +20,8 @@
 		onchange={(event) => onChange(event.currentTarget.checked)}
 	/>
 	<span class="text">
-		<span class="label">{m.trainingConsentField_draftLabel()}</span>
-		<span class="desc" id="{uid}-desc">{m.trainingConsentField_draftDescription()}</span>
+		<span class="label">{m.trainingConsentField_label()}</span>
+		<span class="desc" id="{uid}-desc">{m.trainingConsentField_description()}</span>
 	</span>
 </label>
 

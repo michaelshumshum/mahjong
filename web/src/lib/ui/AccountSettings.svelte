@@ -4,6 +4,7 @@
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import { MAX_NAME_LENGTH } from '$lib/net/protocol.constants';
 	import DeleteAccountDialog from './DeleteAccountDialog.svelte';
+	import LegalLinks from './LegalLinks.svelte';
 	import TrainingConsentField from './TrainingConsentField.svelte';
 
 	let { user }: { user: Me } = $props();
@@ -118,6 +119,8 @@
 			{m.accountSettings_deleteButton()}
 		</button>
 	</div>
+
+	<LegalLinks />
 </div>
 
 {#if confirmingDelete}

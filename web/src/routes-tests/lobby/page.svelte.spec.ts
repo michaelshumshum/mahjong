@@ -59,11 +59,20 @@ describe('LobbyPage', () => {
 		expect(target.querySelector('dialog')?.open).toBe(true);
 	});
 
-	it('links the status page beside the source code link', () => {
+	it('links status, privacy, terms and the source code, in that order', () => {
 		component = mount(LobbyPage, { target });
-		const status = target.querySelector('[data-testid="lobby-status-link"]');
-		expect(status?.getAttribute('href')).toBe('/status');
-		expect(status?.nextElementSibling?.getAttribute('data-testid')).toBe('lobby-source-link');
+		const links = [...target.querySelectorAll('.corner-links a')];
+		expect(links.map((link) => link.getAttribute('data-testid'))).toEqual([
+			'lobby-status-link',
+			'lobby-privacy-link',
+			'lobby-terms-link',
+			'lobby-source-link'
+		]);
+		expect(links.slice(0, 3).map((link) => link.getAttribute('href'))).toEqual([
+			'/status',
+			'/privacy',
+			'/terms'
+		]);
 	});
 
 	it('opens the practice dialog when the practice button is clicked', async () => {
