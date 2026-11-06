@@ -400,11 +400,7 @@ async def google_callback(
             logger.warning("google sign-in failed: %r", exc)
             raise HTTPException(status_code=502, detail="google sign-in failed") from exc
         user, created = await upsert_identity(
-            db,
-            provider=PROVIDER,
-            subject=profile.subject,
-            email=profile.email,
-            name=profile.name,
+            db, provider=PROVIDER, subject=profile.subject, email=profile.email
         )
         if user.disabled_at is not None:
             await drop_sessions(db, user)

@@ -721,8 +721,8 @@ GET /auth/google/callback?code=…&state=…
    Set-Cookie: mj_session=…
 ```
 
-`app/accounts/google.py`: Authlib's OAuth 2.0 authorization-code flow, scopes `openid email
-profile`, PKCE (`S256`) and `state`. Both routes `404` without `GOOGLE_CLIENT_ID` and
+`app/accounts/google.py`: Authlib's OAuth 2.0 authorization-code flow, scopes `openid email`
+(no `profile`: the user's Google name is never requested), PKCE (`S256`) and `state`. Both routes `404` without `GOOGLE_CLIENT_ID` and
 `GOOGLE_CLIENT_SECRET`.
 
 | Step | Rule |
@@ -732,8 +732,8 @@ profile`, PKCE (`S256`) and `state`. Both routes `404` without `GOOGLE_CLIENT_ID
 | callback URL | `${PUBLIC_API_URL}/auth/google/callback`, registered on the Google client |
 | state check | `400` when `mj_oauth` is missing or its `state` differs (`secrets.compare_digest`) |
 | `error` (consent refused) | `303` to `next` with `signin=failed` |
-| token exchange, profile | the code and verifier go to Google's token endpoint; the profile (`sub`, `email`, `name`) comes from the userinfo endpoint with that access token, so no ID-token signature check is needed. Any provider failure is `502` |
-| upsert | by `identities (provider, subject)`. New: a `users` row named from the profile (`clean_name`, `Player` if empty) and `signup=1` on the redirect, so the web can show its sign-up step (name, consent). Returning: `identities.email` refreshed, the name left alone. Two concurrent first sign-ins for one subject: the loser's insert fails the primary key, rolls back and returns the winner's user as a returning sign-in |
+| token exchange, profile | the code and verifier go to Google's token endpoint; the profile (`sub`, `email`) comes from the userinfo endpoint with that access token, so no ID-token signature check is needed. Any provider failure is `502` |
+| upsert | by `identities (provider, subject)`. New: a `users` row with a placeholder name, `Player` and four random digits (`app/accounts/users.py`'s `placeholder_name`), and `signup=1` on the redirect, so the web's sign-up step asks for a name (and consent). Never the provider's name: it's usually a real one, and `games.players` keeps a seat's name after its account is deleted. Returning: `identities.email` refreshed, the name left alone. Two concurrent first sign-ins for one subject: the loser's insert fails the primary key, rolls back and returns the winner's user as a returning sign-in |
 | disabled user | no session, every existing one deleted, `signin=disabled` |
 | session | a new token every sign-in; a cookie the browser already held is revoked in the same commit |
 

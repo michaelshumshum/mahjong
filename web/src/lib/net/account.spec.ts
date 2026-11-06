@@ -6,10 +6,23 @@ import {
 	patchMe,
 	readSigninFlag,
 	signInUrl,
-	signOut
+	signOut,
+	signupName
 } from './account';
 
 vi.mock('$env/dynamic/public', () => ({ env: {} }));
+
+describe('signupName', () => {
+	it.each([
+		['Player 0427', 'Bea', 'Bea'],
+		['Player 0427', '  Bea  ', 'Bea'],
+		['Player 0427', '   ', 'Player 0427'],
+		['Player 0427', null, 'Player 0427'],
+		['Player 0427', 'x'.repeat(40), 'x'.repeat(24)]
+	])('placeholder %s, guest name %j -> %s', (placeholder, guest, expected) => {
+		expect(signupName(placeholder, guest)).toBe(expected);
+	});
+});
 
 describe('readSigninFlag', () => {
 	it.each([

@@ -4,6 +4,8 @@ and "my games" (docs/decisions/0028-user-account-schema.md)."""
 from __future__ import annotations
 
 import datetime as dt
+import secrets
+import string
 from typing import NamedTuple
 
 from sqlalchemy import delete, select
@@ -13,8 +15,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import AuthSession, GameMode, GameRecord, GameSeat, Identity, User
 from app.names import clean_name
 
-# a provider profile with no usable name
-DEFAULT_DISPLAY_NAME = "Player"
+# a new account's name until the sign-up step renames it. not the provider's profile name: that
+# is usually a real name, and games.players keeps it after the account is deleted
+_PLACEHOLDER_PREFIX = "Player"
+_PLACEHOLDER_DIGITS = 4
+
+
+def placeholder_name() -> str:
+    """`Player 0427`: identifies nobody, and the digits tell two new players apart."""
+    digits = "".join(secrets.choice(string.digits) for _ in range(_PLACEHOLDER_DIGITS))
+    name = clean_name(f"{_PLACEHOLDER_PREFIX} {digits}")
+    assert name is not None
+    return name
 
 
 class GameSummary(NamedTuple):
@@ -28,14 +40,14 @@ class GameSummary(NamedTuple):
 
 
 async def upsert_identity(
-    db: AsyncSession, *, provider: str, subject: str, email: str | None, name: str | None
+    db: AsyncSession, *, provider: str, subject: str, email: str | None
 ) -> tuple[User, bool]:
-    """The user behind `(provider, subject)`, created on first sign-in (name from the provider);
+    """The user behind `(provider, subject)`, created on first sign-in with a placeholder name;
     `email` is refreshed every time. Returns `(user, created)`. Commits."""
     identity = await db.get(Identity, (provider, subject))
     if identity is not None:
         return await _returning(db, identity, email), False
-    user = User(display_name=clean_name(name) or DEFAULT_DISPLAY_NAME)
+    user = User(display_name=placeholder_name())
     db.add(user)
     try:
         await db.flush()
