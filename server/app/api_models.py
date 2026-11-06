@@ -6,10 +6,19 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    field_validator,
+    model_validator,
+)
 
+from app.accounts.learn import MAX_LEARN_COUNT
 from app.db.models import GameMode, SeatKind
 from app.lessons.model import Band, LessonKind, PuzzleKind, Track
 from app.names import MAX_RAW_NAME_LENGTH
@@ -24,16 +33,22 @@ __all__ = [
     "BotLatencyOut",
     "CreateTableRequest",
     "CreateTableResponse",
+    "EndlessScoreIn",
+    "EndlessScoreOut",
     "ExportGame",
     "ExportIdentity",
     "ExportResponse",
     "ExportUser",
+    "LearnResponse",
+    "LessonProgressIn",
+    "LessonProgressOut",
     "LoadPointOut",
     "MePatch",
     "MeResponse",
     "MyGame",
     "MyGameSeat",
     "MyGamesResponse",
+    "PrefsPatch",
     "RandomLessonResponse",
     "ScoreHandRequest",
     "ScoreHandResponse",
@@ -134,6 +149,17 @@ class MeResponse(BaseModel):
     consent_version: str | None
 
 
+class PrefsPatch(BaseModel):
+    """Synced settings in `users.prefs`; only these keys are stored. null removes one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # the endless puzzles' band
+    learn_band: Band | None = None
+    # the first practice hand's coach marks were finished or skipped
+    coach_marks_done: StrictBool | None = None
+
+
 class MePatch(BaseModel):
     """`PATCH /me`. Omitted fields are unchanged."""
 
@@ -143,6 +169,72 @@ class MePatch(BaseModel):
     display_name: str | None = Field(default=None, max_length=MAX_RAW_NAME_LENGTH)
     # true records consent with the current wording's version; false withdraws it
     training_consent: bool | None = None
+    # merged key by key into users.prefs
+    prefs: PrefsPatch | None = None
+
+
+LearnCount = Annotated[int, Field(ge=0, le=MAX_LEARN_COUNT)]
+
+
+class LessonProgressIn(BaseModel):
+    """One lesson's progress (web `LessonProgress`): `PUT /me/learn/{lesson_id}` and an upload
+    entry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    solved: bool
+    attempts: LearnCount
+    solved_at: AwareDatetime | None = None
+    # a tutorial's resume point
+    step: LearnCount | None = None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> LessonProgressIn:
+        if self.solved and self.attempts < 1:
+            raise ValueError("a solved lesson has an attempt")
+        if self.solved_at is not None and not self.solved:
+            raise ValueError("solved_at without solved")
+        return self
+
+
+class LessonProgressOut(BaseModel):
+    solved: bool
+    attempts: int
+    solved_at: dt.datetime | None
+    step: int | None
+    # values came from a local upload, not a server-recorded answer
+    imported: bool
+
+
+class EndlessScoreIn(BaseModel):
+    """One puzzle kind's endless score (web `EndlessScore`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    streak: LearnCount
+    best: LearnCount
+    solved: LearnCount
+
+    @model_validator(mode="after")
+    def _consistent(self) -> EndlessScoreIn:
+        if not self.streak <= self.best <= self.solved:
+            raise ValueError("needs streak <= best <= solved")
+        return self
+
+
+class EndlessScoreOut(BaseModel):
+    streak: int
+    best: int
+    solved: int
+    imported: bool
+
+
+class LearnResponse(BaseModel):
+    """`GET /me/learn`: progress by lesson id, endless scores by `PuzzleKind`, synced prefs."""
+
+    progress: dict[str, LessonProgressOut]
+    endless: dict[str, EndlessScoreOut]
+    prefs: dict[str, Any]
 
 
 class ExportUser(BaseModel):
@@ -152,6 +244,8 @@ class ExportUser(BaseModel):
     training_consent_at: dt.datetime | None
     consent_version: str | None
     disabled_at: dt.datetime | None
+    # the last learn-progress upload
+    learn_imported_at: dt.datetime | None
 
 
 class ExportIdentity(BaseModel):
@@ -173,12 +267,12 @@ class ExportGame(BaseModel):
 
 
 class ExportResponse(BaseModel):
-    """`GET /me/export`. Learn progress joins it once it's stored server-side (ADR 0028
-    phase 5)."""
+    """`GET /me/export`."""
 
     user: ExportUser
     identities: list[ExportIdentity]
     games: list[ExportGame]
+    learn: LearnResponse
 
 
 class MyGameSeat(BaseModel):

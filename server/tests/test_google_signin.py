@@ -43,8 +43,9 @@ async def _dump(db: AsyncSession) -> list[object]:
     """Every column of every users and identities row."""
     rows: list[object] = []
     for model in (User, Identity):
-        for row in await db.scalars(select(model)):
-            rows.extend(getattr(row, c.key) for c in model.__table__.columns)
+        # the table, not the mapper: users has unmapped columns (prefs, learn_imported_at)
+        for row in await db.execute(select(model.__table__)):
+            rows.extend(row)
     return rows
 
 

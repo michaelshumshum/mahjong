@@ -7,5 +7,8 @@ from app.lessons.catalog.tutorials import TUTORIALS
 from app.lessons.model import Puzzle
 
 CATALOG: tuple[Puzzle, ...] = (*BASICS, *MINED)
+# every `/learn/[id]` lesson, the keys of an account's learn progress
+LESSON_IDS: frozenset[str] = frozenset([*(p.id for p in CATALOG), *(t.id for t in TUTORIALS)])
+TUTORIAL_IDS: frozenset[str] = frozenset(t.id for t in TUTORIALS)
 
-__all__ = ["CATALOG", "TUTORIALS"]
+__all__ = ["CATALOG", "LESSON_IDS", "TUTORIALS", "TUTORIAL_IDS"]

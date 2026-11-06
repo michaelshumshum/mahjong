@@ -194,7 +194,8 @@ def test_export_holds_the_user_identities_and_games(accounts_db: str) -> None:
         "placement": 1,
         "players": ["Bob", "Ann", "阿發", "Cy"],
     }
-    assert "learn_progress" not in body
+    assert body["learn"] == {"progress": {}, "endless": {}, "prefs": {}}
+    assert body["user"]["learn_imported_at"] is None
 
 
 def test_export_is_rate_limited_per_account(
