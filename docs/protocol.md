@@ -104,7 +104,9 @@ given, in which case it rejects with `error{code:"seat_taken"}` if bound, or
 `error{code:"table_full"}` if none are free. A successful `join` is confirmed by a broadcast
 `seat_state{seat, status:"connected", name}` to every bound seat (this one included), so clients
 rendering empty seats from their `state_sync` update live. A reconnecting player doesn't
-re-`join` — `hello{last_seq, seat, secret}` reclaims directly (§5). Once all four seats are filled
+re-`join` — `hello{last_seq, seat, secret}` reclaims directly (§5). A signed-in connection whose
+account already holds a seat at this table (a second tab) gets `ack{ok:false,
+error:"already_seated"}`; guests aren't checked, having no identity across tabs. Once all four seats are filled
 the table waits for `ready` from each before dealing.
 
 The first seat to `join` is the table's **host** (`Table.host_seat`, `state_sync.host_seat`) — the
@@ -731,7 +733,7 @@ profile`, PKCE (`S256`) and `state`. Both routes `404` without `GOOGLE_CLIENT_ID
 | state check | `400` when `mj_oauth` is missing or its `state` differs (`secrets.compare_digest`) |
 | `error` (consent refused) | `303` to `next` with `signin=failed` |
 | token exchange, profile | the code and verifier go to Google's token endpoint; the profile (`sub`, `email`, `name`) comes from the userinfo endpoint with that access token, so no ID-token signature check is needed. Any provider failure is `502` |
-| upsert | by `identities (provider, subject)`. New: a `users` row named from the profile (`clean_name`, `Player` if empty) and `signup=1` on the redirect, so the web can show its sign-up step (name, consent). Returning: `identities.email` refreshed, the name left alone |
+| upsert | by `identities (provider, subject)`. New: a `users` row named from the profile (`clean_name`, `Player` if empty) and `signup=1` on the redirect, so the web can show its sign-up step (name, consent). Returning: `identities.email` refreshed, the name left alone. Two concurrent first sign-ins for one subject: the loser's insert fails the primary key, rolls back and returns the winner's user as a returning sign-in |
 | disabled user | no session, every existing one deleted, `signin=disabled` |
 | session | a new token every sign-in; a cookie the browser already held is revoked in the same commit |
 
@@ -768,7 +770,12 @@ GET /me/export
 ```
 
 `games` is every seat linked to the account, newest first. Learn progress isn't stored
-server-side yet; it joins the export with ADR 0028 phase 5.
+server-side yet; it joins the export with ADR 0028 phase 5. `429` with `Retry-After` past
+`EXPORT_RATE_LIMIT` per `EXPORT_RATE_WINDOW_SECONDS` per account (default 5 per hour,
+[infra.md §2](infra.md)).
+
+Neither this nor `GET /me/games` reads `games.action_log` or `ruleset`: only `id`, `created_at`,
+`mode`, `players` and `result.hand_count` (`app/accounts/users.py`'s `GameSummary`).
 
 ```
 GET /me/games?before=<game_id>&limit=20&mode=practice|multiplayer
@@ -790,11 +797,14 @@ the partial index `(user_id, game_id DESC)`.
 | `created_at` | persist time, i.e. the game's end |
 | `others` | the other three seats, by seat. `name` is `games.players[seat]` for `user`/`guest` seats and null for bots; `bot_tier` is set iff `kind` is `bot` (stored as written, so a retired tier still reads). A deleted account's seat is `kind: "user"` with its name only. No seat carries a user id |
 
-No per-user rate limit, like the other `/me` routes.
+No rate limit: a page is one indexed read of at most 51 seats.
 
 **WebSocket.** The same cookie rides the `/ws` upgrade and is resolved once per connection; a
 signed-in `join` seats the account (`users.display_name`, `SeatBinding.user_id`) and its game
 saves the seat as `kind = 'user'`. No frame changes ([architecture.md §2.1](architecture.md)).
+The cookie counts only when the upgrade's `Origin` is a `CORS_ORIGINS` entry: a WebSocket
+handshake skips CORS, and `SameSite=Lax` still sends the cookie from a sibling subdomain. Any
+other `Origin`, or none, connects as a guest rather than being refused.
 
 `PATCH` and `DELETE` are in the CORS `allow_methods`; a cross-origin one is always preflighted,
 so only `CORS_ORIGINS` can send them with the cookie.

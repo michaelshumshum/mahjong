@@ -3,7 +3,11 @@ and "my games" (docs/decisions/0028-user-account-schema.md)."""
 
 from __future__ import annotations
 
+import datetime as dt
+from typing import NamedTuple
+
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AuthSession, GameMode, GameRecord, GameSeat, Identity, User
@@ -13,6 +17,16 @@ from app.names import clean_name
 DEFAULT_DISPLAY_NAME = "Player"
 
 
+class GameSummary(NamedTuple):
+    """The `games` columns a listing reads: never `action_log`, `ruleset` or all of `result`."""
+
+    id: int
+    created_at: dt.datetime
+    mode: GameMode | None
+    players: list[str | None]
+    hand_count: int | None
+
+
 async def upsert_identity(
     db: AsyncSession, *, provider: str, subject: str, email: str | None, name: str | None
 ) -> tuple[User, bool]:
@@ -20,17 +34,29 @@ async def upsert_identity(
     `email` is refreshed every time. Returns `(user, created)`. Commits."""
     identity = await db.get(Identity, (provider, subject))
     if identity is not None:
-        identity.email = email
-        user = await db.get(User, identity.user_id)
-        assert user is not None  # identities.user_id is a cascading foreign key
-        await db.commit()
-        return user, False
+        return await _returning(db, identity, email), False
     user = User(display_name=clean_name(name) or DEFAULT_DISPLAY_NAME)
     db.add(user)
-    await db.flush()
-    db.add(Identity(provider=provider, subject=subject, user_id=user.id, email=email))
-    await db.commit()
+    try:
+        await db.flush()
+        db.add(Identity(provider=provider, subject=subject, user_id=user.id, email=email))
+        await db.commit()
+    except IntegrityError:
+        # a concurrent first sign-in for the same subject inserted it first
+        await db.rollback()
+        identity = await db.get(Identity, (provider, subject))
+        if identity is None:
+            raise
+        return await _returning(db, identity, email), False
     return user, True
+
+
+async def _returning(db: AsyncSession, identity: Identity, email: str | None) -> User:
+    identity.email = email
+    user = await db.get(User, identity.user_id)
+    assert user is not None  # identities.user_id is a cascading foreign key
+    await db.commit()
+    return user
 
 
 async def drop_sessions(db: AsyncSession, user: User) -> None:
@@ -59,11 +85,18 @@ async def seats_of(
     before: int | None = None,
     limit: int | None = None,
     mode: GameMode | None = None,
-) -> list[tuple[GameSeat, GameRecord]]:
+) -> list[tuple[GameSeat, GameSummary]]:
     """The user's seats with their games, newest game first; `before` is a keyset cursor (a
     game id), served by the partial index `(user_id, game_id DESC)`."""
     query = (
-        select(GameSeat, GameRecord)
+        select(
+            GameSeat,
+            GameRecord.id,
+            GameRecord.created_at,
+            GameRecord.mode,
+            GameRecord.players,
+            GameRecord.result["hand_count"].as_integer(),
+        )
         .join(GameRecord, GameRecord.id == GameSeat.game_id)
         .where(GameSeat.user_id == user.id)
         .order_by(GameSeat.game_id.desc())
@@ -74,7 +107,7 @@ async def seats_of(
     if mode is not None:
         query = query.where(GameRecord.mode == mode)
     rows = await db.execute(query)
-    return [(seat, game) for seat, game in rows.all()]
+    return [(seat, GameSummary(*game)) for seat, *game in rows.all()]
 
 
 async def seats_in(db: AsyncSession, game_ids: list[int]) -> list[GameSeat]:

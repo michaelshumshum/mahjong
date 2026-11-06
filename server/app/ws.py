@@ -36,6 +36,7 @@ from app.db.models import User
 from app.errors import (
     TABLE_CLOSED_ERROR,
     TABLE_GONE_ERROR,
+    AccountSeatedError,
     ErrorCode,
     NotHostError,
     SeatAuthError,
@@ -325,6 +326,9 @@ class Session:
         except TableFullError:
             self._ack(msg, ok=False, error="table_full")
             return
+        except AccountSeatedError:
+            self._ack(msg, ok=False, error="already_seated")
+            return
         self.seat = seat
         binding = self.table.seat_bindings[seat]
         assert binding is not None
@@ -504,9 +508,10 @@ async def _serve(websocket: WebSocket, table: str, spectate: bool) -> None:
         await websocket.send_text(json.dumps(frame))
         await websocket.close(code=_CLOSE_TRY_AGAIN_LATER)
         return
-    session = Session(
-        websocket, table_obj, account=await user_for_cookie(websocket.cookies.get(COOKIE_NAME))
+    account = await user_for_cookie(
+        websocket.cookies.get(COOKIE_NAME), websocket.headers.get("origin")
     )
+    session = Session(websocket, table_obj, account=account)
     if spectate:
         # explicit connect-time opt-in, not a passive default -- would race the real
         # hello-before-join handshake.

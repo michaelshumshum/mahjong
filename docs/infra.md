@@ -145,6 +145,7 @@ pnpm --dir web dev
 | `SESSION_MAX_AGE_DAYS` / `SESSION_IDLE_DAYS` | 90 / 30 | a session's absolute and idle lifetime ([ADR 0028](decisions/0028-user-account-schema.md)) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | unset → `/auth/google/*` 404 | the Google Cloud OAuth client (web application). Its authorized redirect URI must be `${PUBLIC_API_URL}/auth/google/callback` ([ADR 0028](decisions/0028-user-account-schema.md) phase 0) |
 | `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_SECONDS` | 20 / 60; limit `0` disables | every `/auth/*` request per client IP ([protocol.md §10](protocol.md) "Accounts") |
+| `EXPORT_RATE_LIMIT` / `EXPORT_RATE_WINDOW_SECONDS` | 5 / 3600; limit `0` disables | `GET /me/export` per account, not per IP ([protocol.md §10](protocol.md) "Accounts") |
 | `SHUTDOWN_GRACE_SECONDS` | 90 | [architecture.md §8.1](architecture.md) |
 | `ABANDONED_TABLE_GRACE_SECONDS` | 120 | seconds a started table may run with no human connected before it's ended; keep well above the 20s disconnect grace ([architecture.md §8.2](architecture.md)) |
 | `MAX_TABLES` | 500; `0` disables | live tables (showcase excluded) past which `POST /tables` answers 503 ([architecture.md §8.3](architecture.md)) |
@@ -292,7 +293,9 @@ row.
   otherwise go untested.
 - `save_game_record` (`server/app/db/records.py`) is the only write path for `games` and
   `game_players` (one transaction); `bots/selfplay.py`'s `play_and_record_game` records bot-only
-  games through it, without seat rows.
+  games through it, without seat rows. A seat whose account is gone is saved with a null
+  `user_id`; an account deleted between that check and the commit fails the foreign key, and
+  the save is retried once, re-checking.
 - Live table state is never persisted ([architecture.md §7](architecture.md)).
 
 ## 7. Deployment

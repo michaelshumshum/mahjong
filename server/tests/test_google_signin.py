@@ -5,25 +5,30 @@ user/identity upsert, session rotation, disabled users, redirects, rate limit
 from __future__ import annotations
 
 import base64
+import contextlib
 import datetime as dt
 import hashlib
+import sqlite3
+import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts import google
 from app.accounts import routes as accounts
 from app.accounts.google import GoogleProvider
 from app.accounts.sessions import COOKIE_NAME
+from app.accounts.users import upsert_identity
 from app.db.models import Identity, User
 from app.main import app
-from tests.accounts import fetch, run_db, session_count, sign_in
+from tests.accounts import create_user, fetch, run_db, session_count, sign_in
 
 _WEB = "http://web.test"
 _API = "http://localhost:8000"
@@ -280,3 +285,39 @@ def test_userinfo_without_a_subject_is_502(fake_google: FakeGoogle) -> None:
     fake_google.userinfo = {"email": "a@x.test"}
     with _client(fake_google) as client:
         assert _sign_in(client, fake_google).status_code == 502
+
+
+def test_a_concurrent_first_sign_in_returns_the_winner(accounts_db: str) -> None:
+    winner = create_user(accounts_db, display_name="Winner")
+    path = accounts_db.removeprefix("sqlite+aiosqlite:///")
+
+    async def work(db: AsyncSession) -> tuple[uuid.UUID, bool]:
+        assert db.bind is not None
+        engine = db.bind.sync_engine
+        raced = False
+
+        # another request inserts the same identity between this one's read and its insert
+        def race(_conn: Any, _cursor: Any, statement: str, *_: Any) -> None:
+            nonlocal raced
+            if not raced and statement.startswith("SELECT") and "FROM identities" in statement:
+                raced = True
+                with contextlib.closing(sqlite3.connect(path)) as other, other:
+                    other.execute(
+                        "INSERT INTO identities (provider, subject, user_id) VALUES (?, ?, ?)",
+                        ("google", "g-race", winner.hex),
+                    )
+
+        event.listen(engine, "after_cursor_execute", race)
+        try:
+            user, created = await upsert_identity(
+                db, provider="google", subject="g-race", email="a@x.test", name="Ann"
+            )
+        finally:
+            event.remove(engine, "after_cursor_execute", race)
+        return user.id, created
+
+    async def count_users(db: AsyncSession) -> int:
+        return len((await db.scalars(select(User))).all())
+
+    assert run_db(accounts_db, work) == (winner, False)
+    assert run_db(accounts_db, count_users) == 1

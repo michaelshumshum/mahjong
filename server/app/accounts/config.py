@@ -33,6 +33,8 @@ class AccountsConfig:
     session_idle: dt.timedelta
     google_client_id: str | None = None
     google_client_secret: str | None = None
+    # CORS_ORIGINS, also the origins a /ws upgrade may carry the session cookie from
+    origins: tuple[str, ...] = ()
 
     @property
     def cookie_secure(self) -> bool:
@@ -59,4 +61,5 @@ class AccountsConfig:
             ),
             google_client_id=get("GOOGLE_CLIENT_ID", "") or None,
             google_client_secret=get("GOOGLE_CLIENT_SECRET", "") or None,
+            origins=tuple(origins),
         )

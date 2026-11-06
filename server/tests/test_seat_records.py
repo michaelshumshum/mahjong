@@ -6,9 +6,10 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import replace
+from typing import Any
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -101,6 +102,49 @@ async def test_save_game_record_writes_game_and_seats_in_one_transaction(
         await save_game_record(session, state, actions, seats=bad, mode="multiplayer")
     await session.rollback()
     assert await session.scalar(select(func.count()).select_from(GameRecord)) == 0
+
+
+async def test_an_account_deleted_during_the_save_still_saves_the_game(
+    session: AsyncSession,
+) -> None:
+    state, actions = await _finished_game()
+    gone = User(display_name="Gone")
+    session.add(gone)
+    await session.commit()
+    gone_id = gone.id
+    assert session.bind is not None
+    engine = session.bind.sync_engine
+    live_reads = 0
+
+    # first read: the account is live, then deleted before the seat insert. the retry's read
+    # sees it gone
+    def live_read(statement: str) -> bool:
+        return statement.startswith("SELECT") and "FROM users" in statement
+
+    def before(conn: Any, _cursor: Any, statement: str, *_: Any) -> None:
+        if live_read(statement) and live_reads == 1:
+            conn.exec_driver_sql("DELETE FROM users")
+
+    def after(conn: Any, _cursor: Any, statement: str, *_: Any) -> None:
+        nonlocal live_reads
+        if live_read(statement):
+            live_reads += 1
+            if live_reads == 1:
+                conn.exec_driver_sql("DELETE FROM users")
+
+    event.listen(engine, "before_cursor_execute", before)
+    event.listen(engine, "after_cursor_execute", after)
+    try:
+        seats = [SeatRecord(kind="user", user_id=gone_id), *_GUESTS[1:]]
+        record = await save_game_record(session, state, actions, seats=seats, mode="multiplayer")
+    finally:
+        event.remove(engine, "before_cursor_execute", before)
+        event.remove(engine, "after_cursor_execute", after)
+
+    rows = await _seats(session, record.id)
+    assert live_reads == 2
+    assert [(r.kind, r.user_id) for r in rows] == [("user", None), *[("guest", None)] * 3]
+    assert await session.scalar(select(func.count()).select_from(GameRecord)) == 1
 
 
 @pytest.fixture
