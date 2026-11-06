@@ -135,8 +135,9 @@ Commands table. Add them here as they turn up.
   real shutdown drain ([architecture.md §8.1](architecture.md)). It also zeroes
   `BOT_THINK_*_SECONDS` and `CLAIM_HOLD_SECONDS` ([architecture.md §4](architecture.md) "Claim
   hold"); `tests/test_claim_window_privacy.py` passes `claim_hold_seconds` explicitly to test it.
-- CI has no Postgres; DB tests run against SQLite via the JSON/JSONB column variant
-  ([infra.md §6](infra.md)).
+- DB tests run against SQLite via the JSON/JSONB column variant ([infra.md §6](infra.md)); CI's
+  only Postgres is the `migrations` job, which runs the migrations, not the tests
+  ([infra.md §9](infra.md)).
 - A helper used by more than one test module lives in a plain module under `server/tests/`,
   imported as `from tests.<module> import …`; fixtures go in `conftest.py` instead. Don't
   re-declare one locally.

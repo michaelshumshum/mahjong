@@ -287,7 +287,7 @@ row.
 
 - Models: `server/app/db/models.py`; migrations: `server/alembic/versions/`.
 - JSON columns use `JSON().with_variant(JSONB(), "postgresql")` — JSONB on Postgres, generic `JSON`
-  elsewhere, so tests run against SQLite (CI has no Postgres service, §9).
+  elsewhere, so tests run against SQLite (CI's one Postgres service only runs migrations, §9).
 - `make_engine` (`server/app/db/session.py`) turns on `PRAGMA foreign_keys` for every SQLite
   connection: SQLite ignores foreign keys by default, so `ON DELETE CASCADE`/`SET NULL` would
   otherwise go untested.
@@ -358,7 +358,7 @@ before real users:
 
 | File | Jobs | Runs |
 | --- | --- | --- |
-| `server.yml` | `server`, `server-slow` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs, and the latency tests, which gate on ratios and write absolute p50/p99 to the job summary ([testing.md §1](testing.md)) |
+| `server.yml` | `server`, `server-slow`, `migrations` | `server`: `uv sync --locked`, `ruff check`, `ruff format --check`, `pytest -q -m fast -n auto`. `server-slow`: `pytest -q -m slow -n auto --games=1000` — soaks, real-bot e2e, hypothesis runs, and the latency tests, which gate on ratios and write absolute p50/p99 to the job summary ([testing.md §1](testing.md)). `migrations`: against a `postgres:17-alpine` service, `alembic upgrade head`, `alembic check`, `alembic downgrade base` (then fails if any table but `alembic_version` is left), `alembic upgrade head` |
 | `web.yml` | `web` | `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm check`, `playwright install --with-deps chromium`, `pnpm run test:coverage` (vitest, both projects), `pnpm run test:e2e` (Playwright against a `vite build` + `vite preview` server, not `vite dev`: [testing.md §4](testing.md)) |
 | `proto-check.yml` | `proto-check` | regenerates protocol types and the lesson bundle natively (§2's `make proto` equivalent), then `git diff --exit-code`, plus `git status --porcelain` on `web/src/lib/learn/generated/` (a new lesson is an untracked file `git diff` can't see) |
 
@@ -372,8 +372,13 @@ All jobs run in parallel with no `needs:` — they share no artifacts. `server-s
 so it stays off the fast job's critical path. Within a job, lint/typecheck/test are sequential
 steps so dependencies install once.
 
-**Native tooling, not Compose.** CI runs `uv`/`pnpm` directly; nothing needs Postgres, so
-containers would only add cold-start time.
+**Native tooling, not Compose.** CI runs `uv`/`pnpm` directly; containers would only add
+cold-start time. The test suites run on SQLite (`Base.metadata.create_all`, §6), so they never
+run a migration: `migrations` is the one job with Postgres, a GitHub Actions `services:`
+container (the same `postgres:17-alpine` as `docker-compose.yml`), not Compose. It round-trips
+every migration so a broken `downgrade`, or a model change without its migration (`alembic
+check`), fails in CI instead of at `make prod-migrate`. It isn't in the `main` ruleset's required
+checks unless added there.
 
 **Standalone, path-filtered workflows.** `workflow_call` can't filter by path, so heavy checks are
 separate workflows with their own `on.push.paths`/`on.pull_request.paths`:
@@ -422,7 +427,7 @@ badges silently stale.
 **Gates** (all hard): `ruff check`, `ruff format --check`, fast pytest, slow pytest
 (`--games=1000`; latency as ratios, the absolute 5 ms budget is `make bench-latency` on the target
 CPU, [testing.md §1](testing.md)), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,
-`proto-check`.
+`proto-check`, the `migrations` round trip.
 
 **Local vs. CI.** `make test*` runs the fast suite only; the slow suite (`@pytest.mark.slow`) costs
 ~15 min at 10,000 games, so it runs locally via `make test-server-slow` and on every push in CI

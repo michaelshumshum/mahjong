@@ -65,3 +65,51 @@ jobs:
       # the full 10000 locally.
       - name: pytest (slow)
         run: uv run pytest -q -m slow -n auto --games=1000
+
+  # the test suites run on sqlite (create_all), so only this job runs the alembic migrations
+  # the prod box applies (`make prod-migrate`), against the same postgres as docker-compose.yml
+  migrations:
+    name: migrations (postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: mahjong
+          POSTGRES_PASSWORD: mahjong
+          POSTGRES_DB: mahjong
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mahjong -d mahjong"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql+asyncpg://mahjong:mahjong@localhost:5432/mahjong
+      PGURL: postgresql://mahjong:mahjong@localhost:5432/mahjong
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: upgrade head
+        run: uv run alembic upgrade head
+      # models and migrations agree: no autogenerate diff
+      - name: alembic check
+        run: uv run alembic check
+      - name: downgrade base
+        run: uv run alembic downgrade base
+      - name: nothing left after downgrade
+        run: |
+          left=$(psql "$PGURL" -tAc "select string_agg(tablename, ',') from pg_tables
+            where schemaname = 'public' and tablename <> 'alembic_version'")
+          if [ -n "$left" ]; then
+            echo "::error::downgrade base left tables: $left"
+            exit 1
+          fi
+      - name: upgrade head again
+        run: uv run alembic upgrade head
