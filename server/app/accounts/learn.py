@@ -141,6 +141,85 @@ async def update_prefs(db: AsyncSession, user_id: uuid.UUID, changes: dict[str, 
     await db.execute(update(users).where(users.c.id == user_id).values({USER_PREFS: prefs}))
 
 
+def merge_lesson(row: LessonValues | None, upload: LessonValues) -> LessonValues:
+    """ADR 0028's merge: solved OR, attempts max, solved_at earliest non-null, step max."""
+    if row is None:
+        return upload
+    steps = [s for s in (row.step, upload.step) if s is not None]
+    return LessonValues(
+        solved=row.solved or upload.solved,
+        attempts=max(row.attempts, upload.attempts),
+        solved_at=_earliest(row.solved_at, upload.solved_at),
+        step=max(steps) if steps else None,
+    )
+
+
+def merge_endless(row: EndlessValues | None, upload: EndlessValues) -> EndlessValues:
+    """best and solved max; the streak stays the server's, the upload's only for a new row."""
+    if row is None:
+        return upload
+    return EndlessValues(
+        streak=row.streak, best=max(row.best, upload.best), solved=max(row.solved, upload.solved)
+    )
+
+
+def merge_prefs(prefs: dict[str, Any], upload: dict[str, Any]) -> dict[str, Any]:
+    """An uploaded pref fills a key the account hasn't set; `coach_marks_done` is an OR."""
+    merged = upload | prefs
+    if upload.get("coach_marks_done") is True:
+        merged["coach_marks_done"] = True
+    return merged
+
+
+async def import_learn(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    progress: dict[str, LessonValues],
+    endless: dict[str, EndlessValues],
+    prefs: dict[str, Any],
+    now: dt.datetime,
+) -> None:
+    """Merge a device's validated upload. A row is `imported` once any field took an uploaded
+    value; a replayed upload changes no value, so it leaves every row as it was."""
+    rows, scores, stored = await learn_of(db, user_id)
+    by_lesson = {row.lesson_id: row for row in rows}
+    for lesson_id, values in progress.items():
+        row = by_lesson.get(lesson_id)
+        old = (
+            None if row is None else LessonValues(row.solved, row.attempts, row.solved_at, row.step)
+        )
+        merged = merge_lesson(old, values)
+        if merged == old:
+            continue
+        if row is None:
+            row = LearnProgress(user_id=user_id, lesson_id=lesson_id)
+            db.add(row)
+        row.solved, row.attempts, row.solved_at, row.step = merged
+        row.imported = True
+        row.updated_at = now
+    by_kind = {score.kind: score for score in scores}
+    for kind, values in endless.items():
+        score = by_kind.get(kind)
+        old_score = None if score is None else EndlessValues(score.streak, score.best, score.solved)
+        merged_score = merge_endless(old_score, values)
+        if merged_score == old_score:
+            continue
+        if score is None:
+            score = LearnEndlessScore(user_id=user_id, kind=kind)
+            db.add(score)
+        score.streak, score.best, score.solved = merged_score
+        score.imported = True
+        score.updated_at = now
+    users = User.__table__
+    await db.execute(
+        update(users)
+        .where(users.c.id == user_id)
+        .values({USER_PREFS: merge_prefs(stored, prefs), USER_LEARN_IMPORTED_AT: now})
+    )
+    await db.commit()
+
+
 async def _committed(db: AsyncSession, *, retry: bool) -> bool:
     """False when the commit failed and may be retried once: a concurrent first write (another
     tab) inserted the same row, which the retry then updates."""
