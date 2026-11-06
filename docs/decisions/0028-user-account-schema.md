@@ -1,6 +1,6 @@
 # 0028. User account schema
 
-- **Status:** Deferred
+- **Status:** Accepted
 - **Date:** 2026-11-05
 
 ## Context
@@ -335,7 +335,7 @@ Each phase lands as several PRs. Rules for every PR:
 | 5.3 | 5 | web refactor: progress store behind a backend interface, `localStorage` only; no behaviour change | S |
 | 5.4 | 5 | web API backend; upload once per device, delete keys on success | M |
 | 7.1 | 7 | privacy policy and terms pages, final consent wording | M |
-| 7.2 | 7 | enable both flags in prod; ADR statuses flip | S |
+| 7.2 | 7 | docs only: ADR statuses flip, reference docs say accounts are live (both flags were already on in prod) | S |
 
 Phase 6 is unscheduled and gets its own breakdown when it's picked up.
 
@@ -487,6 +487,11 @@ placement, practice vs multiplayer); add `user_stats` only if those get slow.
       from sign-up, account settings, the guest account panel and the lobby; en + zh-Hant. The
       contact address is `PUBLIC_CONTACT_EMAIL` ([infra.md §2](../infra.md)), never committed.
 - `make prod-migrate` after 7.1 deploys.
-- [ ] Add both URLs to the Google consent screen; verify `shumshum.dev` in Search Console and
-      submit brand verification.
-- [ ] Remove the sign-in flag; mark ADR 0001 `Superseded`, 0026, 0029 and this record `Accepted`.
+- [ ] Google consent screen publishing status set to **In production** (phase 0's item).
+- [ ] Add `https://mahjong.shumshum.dev/privacy` and `/terms` to the Google consent screen.
+- [ ] Verify `shumshum.dev` in Search Console.
+- [ ] Submit brand verification (app name and logo).
+- [x] Both flags on in prod (`ACCOUNTS_ENABLED`, `PUBLIC_ACCOUNTS_ENABLED`, set before PR 7.2).
+      Kept rather than removed: off is the kill switch that turns every seat back into a guest
+      ([infra.md §2](../infra.md)).
+- [x] ADR 0001 `Superseded`; 0026, 0029 and this record `Accepted` (PR 7.2).

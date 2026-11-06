@@ -1,6 +1,6 @@
 # 0029. Optional accounts (supersedes 0001)
 
-- **Status:** Deferred
+- **Status:** Accepted
 - **Date:** 2026-11-05
 
 ## Context
@@ -30,9 +30,9 @@ Design: [ADR 0026](0026-optional-oauth-accounts.md). Schema, decisions and PR pl
 
 ## Consequences
 
-- Status stays `Deferred` until sign-in is public (0028 phase 7). Then this record becomes
-  `Accepted`, 0001 `Superseded`, and 0026 and 0028 `Accepted`.
-- Sign-in stays behind `ACCOUNTS_ENABLED` and the matching web flag until a privacy policy and
-  terms ship.
+- Status stayed `Deferred` until sign-in was public (0028 phase 7, 2026-11). Then this record
+  became `Accepted`, 0001 `Superseded`, and 0026 and 0028 `Accepted`.
+- Sign-in stayed behind `ACCOUNTS_ENABLED` and the matching web flag until the privacy policy
+  and terms shipped (`/privacy`, `/terms`). Both flags are on in prod and kept as kill switches.
 - Adding a provider later is a config row and a callback route; `identities` already has the
   multi-provider shape.

@@ -16,7 +16,7 @@ moved on.
 
 | # | Title | Status |
 | --- | --- | --- |
-| [0001](0001-guest-only-identity.md) | Guest-only identity | Accepted |
+| [0001](0001-guest-only-identity.md) | Guest-only identity | Superseded by [0029](0029-optional-accounts.md) |
 | [0002](0002-dom-rendering.md) | DOM/CSS rendering, no PixiJS | Accepted |
 | [0003](0003-product-scope.md) | Product scope | Accepted |
 | [0004](0004-claim-forfeit-on-disconnect.md) | A mid-claim-window disconnect keeps the offer | Accepted |
@@ -41,10 +41,10 @@ moved on.
 | [0023](0023-concealed-kong-public.md) | Concealed kongs are public (HK display: end tiles face-down) | Accepted |
 | [0024](0024-end-abandoned-tables.md) | End a started table once every human has left | Accepted |
 | [0025](0025-learn-mode.md) | Learn mode (學): engine-generated puzzles and a guided tutorial | Accepted (in progress) |
-| [0026](0026-optional-oauth-accounts.md) | Optional accounts via OAuth sign-in | Deferred |
+| [0026](0026-optional-oauth-accounts.md) | Optional accounts via OAuth sign-in | Accepted |
 | [0027](0027-bot-exact-shanten-and-no-chance.md) | Bots read exact shanten and a correct no-chance | Accepted |
-| [0028](0028-user-account-schema.md) | User account schema: auth, game links, learn progress | Deferred |
-| [0029](0029-optional-accounts.md) | Optional accounts (supersedes 0001) | Deferred |
+| [0028](0028-user-account-schema.md) | User account schema: auth, game links, learn progress | Accepted |
+| [0029](0029-optional-accounts.md) | Optional accounts (supersedes 0001) | Accepted |
 
 New records: next free number, `NNNN-kebab-title.md`, with Status, Date, Context, Decision (or
 Design sketch), Consequences (or Needs before reviving).
