@@ -79,8 +79,7 @@ async function seedGuestProgress(page: Page): Promise<void> {
 	await page.reload();
 }
 
-const stored = (page: Page, key: string) =>
-	page.evaluate((k) => localStorage.getItem(k), key);
+const stored = (page: Page, key: string) => page.evaluate((k) => localStorage.getItem(k), key);
 
 test('a signed-in player uploads guest progress once, then the keys are gone', async ({ page }) => {
 	const calls = await stubApi(page);

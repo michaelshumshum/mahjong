@@ -94,5 +94,7 @@ export async function importLearn(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<LearnWire> {
-	return (await (await send('/me/learn/import', 'POST', body, baseUrl, fetchFn)).json()) as LearnWire;
+	return (await (
+		await send('/me/learn/import', 'POST', body, baseUrl, fetchFn)
+	).json()) as LearnWire;
 }
