@@ -181,9 +181,6 @@ importers:
       '@fontsource/noto-sans-hk':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource/roboto':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@fontsource/schibsted-grotesk':
         specifier: ^5.3.0
         version: 5.3.0
@@ -440,9 +437,6 @@ packages:
 
   '@fontsource/noto-sans-hk@5.3.0':
     resolution: {integrity: sha512-ojRRmRmb9c41KuhfInLCa7ft+1BBCGoDvOwaZLef1gyU1gO/+6xF7O/7A2/OrGXzHs9g8MyC5PbFl2rgWZZNBA==}
-
-  '@fontsource/roboto@5.3.0':
-    resolution: {integrity: sha512-BapRJOWYP+LZ21zp+wBQjfpPYKRoxc4LspJ/RLuI+HSMBD5u/X4O+ESDrSvEqDSy0rAl7GwBJ+09mdc16cVQ1Q==}
 
   '@fontsource/schibsted-grotesk@5.3.0':
     resolution: {integrity: sha512-9k+Fd2eg7umKxI2JV2HtDcOkXEM0iJx0u4Iu1b+QHikVU8Sl/MtozJ/mtZfsltR6xnVGSQjpcxXQeJPW0KGpIA==}
@@ -2553,8 +2547,6 @@ snapshots:
     optional: true
 
   '@fontsource/noto-sans-hk@5.3.0': {}
-
-  '@fontsource/roboto@5.3.0': {}
 
   '@fontsource/schibsted-grotesk@5.3.0': {}
 

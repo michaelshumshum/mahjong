@@ -1,7 +1,4 @@
 <script lang="ts">
-	// google's button branding wants roboto medium; latin 500 only (~22 kB woff2), loaded with
-	// this component rather than the root layout
-	import '@fontsource/roboto/latin-500.css';
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages.js';
 	import { signInUrl } from '$lib/net/account';
@@ -33,36 +30,50 @@
 </a>
 
 <style lang="scss">
-	// google's dark-theme button (developers.google.com/identity/branding-guidelines): its
-	// colours, logo and roboto medium are brand-mandated, not app tokens
+	@use '$lib/styles/a11y';
+	@use '$lib/styles/buttons';
+
+	// google branding (developers.google.com/identity/branding-guidelines): dark fill, unmodified
+	// multicolour g and approved wording kept; font, radius, border and motion are the app's own
 	.gsi {
+		@include buttons.btn-base(var(--space-4));
 		display: inline-flex;
 		align-items: center;
 		align-self: flex-start;
-		gap: 10px;
-		min-height: var(--tap-target-min);
-		padding: 0 var(--space-3);
-		border: 1px solid #8e918f;
-		border-radius: var(--radius-pill);
+		gap: var(--space-3);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
 		background: #131314;
 		color: #e3e3e3;
-		// the zh-Hant label has no roboto glyphs; fall back to the app's cjk face
-		font-family: Roboto, 'Noto Sans HK', Arial, sans-serif;
-		font-size: 14px;
-		font-weight: 500;
-		line-height: 20px;
-		letter-spacing: 0.25px;
+		font-weight: 600;
 		text-decoration: none;
-		transition: background-color var(--dur-control) ease;
+		box-shadow:
+			inset 0 1px 0 rgb(255 255 255 / 0.06),
+			0 1px 2px rgb(10 4 2 / 0.35);
+		transition:
+			transform var(--dur-control) ease,
+			border-color var(--dur-control) ease,
+			background-color var(--dur-control) ease;
 
 		&:hover {
+			border-color: color-mix(in srgb, var(--color-brass) 55%, var(--color-border) 45%);
 			background: #1f1f20;
+		}
+
+		&:focus-visible {
+			@include a11y.focus-ring;
+		}
+
+		@include a11y.motion-ok {
+			&:hover {
+				transform: translateY(-1px);
+			}
 		}
 
 		svg {
 			flex: none;
-			width: 20px;
-			height: 20px;
+			width: 18px;
+			height: 18px;
 		}
 	}
 </style>
