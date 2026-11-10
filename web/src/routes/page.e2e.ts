@@ -26,9 +26,9 @@ test.describe('welcome dialog', () => {
 		await dialog.getByTestId('welcome-name').fill('  Mei  ');
 		await submit.click();
 		await expect(dialog).toHaveCount(0);
-		expect(
-			await page.evaluate(() => localStorage.getItem('mahjong:displayName:v1'))
-		).toBe(JSON.stringify('Mei'));
+		expect(await page.evaluate(() => localStorage.getItem('mahjong:displayName:v1'))).toBe(
+			JSON.stringify('Mei')
+		);
 
 		await page.getByTestId('lobby-menu-button').click();
 		await expect(page.getByTestId('lobby-menu-guest-name')).toContainText('Mei');

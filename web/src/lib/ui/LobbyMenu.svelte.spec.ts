@@ -84,9 +84,9 @@ describe('LobbyMenu', () => {
 		expect(trigger.querySelector('.avatar')?.textContent).toBe('A');
 		open();
 		expect(panel()!.querySelector('[data-testid="lobby-menu-name"]')?.textContent).toBe('ann');
-		expect(
-			panel()!.querySelector('[data-testid="lobby-menu-account"]')?.getAttribute('href')
-		).toBe('/profile');
+		expect(panel()!.querySelector('[data-testid="lobby-menu-account"]')?.getAttribute('href')).toBe(
+			'/profile'
+		);
 		expect(panel()!.querySelector('[data-testid="lobby-menu-sign-out"]')).not.toBeNull();
 		expect(panel()!.querySelector('[data-testid="lobby-menu-guest-name"]')).toBeNull();
 	});
