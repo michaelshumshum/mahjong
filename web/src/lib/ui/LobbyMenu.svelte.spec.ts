@@ -20,11 +20,15 @@ function mountMenu(guestName: string | null = null) {
 	const onOpenGuide = vi.fn();
 	const onOpenSettings = vi.fn();
 	const onEditGuestName = vi.fn();
+	const onOpenAccount = vi.fn();
+	const onOpenGames = vi.fn();
 	const { target } = render(LobbyMenu, {
 		guestName,
 		onOpenGuide,
 		onOpenSettings,
-		onEditGuestName
+		onEditGuestName,
+		onOpenAccount,
+		onOpenGames
 	});
 	flushSync();
 	const trigger = target.querySelector<HTMLButtonElement>('[data-testid="lobby-menu-button"]')!;
@@ -33,7 +37,17 @@ function mountMenu(guestName: string | null = null) {
 		trigger.click();
 		flushSync();
 	};
-	return { target, trigger, panel, open, onOpenGuide, onOpenSettings, onEditGuestName };
+	return {
+		target,
+		trigger,
+		panel,
+		open,
+		onOpenGuide,
+		onOpenSettings,
+		onEditGuestName,
+		onOpenAccount,
+		onOpenGames
+	};
 }
 
 describe('LobbyMenu', () => {
@@ -78,17 +92,23 @@ describe('LobbyMenu', () => {
 		expect(panel()).toBeNull();
 	});
 
-	it('shows a signed-in player their initial, name, account link and sign out', () => {
+	it('shows a signed-in player their initial, name, account and games, and sign out', () => {
 		accountSession.setUser(ANN);
-		const { trigger, panel, open } = mountMenu();
+		const { trigger, panel, open, onOpenAccount, onOpenGames } = mountMenu();
 		expect(trigger.querySelector('.avatar')?.textContent).toBe('A');
 		open();
 		expect(panel()!.querySelector('[data-testid="lobby-menu-name"]')?.textContent).toBe('ann');
-		expect(panel()!.querySelector('[data-testid="lobby-menu-account"]')?.getAttribute('href')).toBe(
-			'/profile'
-		);
 		expect(panel()!.querySelector('[data-testid="lobby-menu-sign-out"]')).not.toBeNull();
 		expect(panel()!.querySelector('[data-testid="lobby-menu-guest-name"]')).toBeNull();
+
+		panel()!.querySelector<HTMLButtonElement>('[data-testid="lobby-menu-account"]')!.click();
+		flushSync();
+		expect(onOpenAccount).toHaveBeenCalledOnce();
+		expect(panel()).toBeNull();
+		open();
+		panel()!.querySelector<HTMLButtonElement>('[data-testid="lobby-menu-games"]')!.click();
+		flushSync();
+		expect(onOpenGames).toHaveBeenCalledOnce();
 	});
 
 	it('closes and hands off when an item opens a dialog', () => {

@@ -101,6 +101,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/forms';
 
 	.my-games {
 		display: flex;
@@ -113,21 +114,18 @@
 		display: flex;
 		flex-direction: column;
 		align-self: stretch;
+		gap: var(--space-2);
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
 
 	.game {
+		@include forms.settings-card;
 		display: grid;
 		grid-template-columns: 5rem 1fr;
 		gap: var(--space-1) var(--space-3);
-		padding: var(--space-3) 0;
-		border-top: 1px solid var(--color-border);
-
-		&:first-child {
-			border-top: none;
-		}
+		padding-block: var(--space-3);
 	}
 
 	.result {

@@ -720,19 +720,36 @@ hides every account UI (`off` below). `lib/net/account.ts` holds the hand-typed
 - **Client-only, no SSR fetch.** The `mj_session` cookie is host-only on the API host, so the web
   host's SSR never receives it and has nothing to forward; an SSR `/me` would always be a guest.
   `load()` runs from a mount `$effect`, so account UI renders after hydration.
-- **Entry point:** the lobby menu (§7 "Lobby"): sign-in for a guest; name, an "Account and
-  games" link to `/profile` and Sign out once signed in. Settings has no account tab.
-- `lib/ui/AccountPanel.svelte` (the lobby menu's guest section, `/profile`): a guest gets
-  `GoogleSignInButton` (Google's dark-theme button, a link to `/auth/google/login?next=<this
-  page>`); a signed-in player their name and Sign out. Both sign-outs go through
-  `accountSession.signOut()` (`POST /auth/logout`, then `guest`).
-- `lib/ui/AccountSettings.svelte` (`/profile`, signed in): display name (`PATCH /me`, capped at
-  the generated `MAX_NAME_LENGTH`), the consent checkbox (`PATCH /me` on change), Download
-  (`GET /me/export` fetched as a blob and saved as `mahjong-account.json`: a cross-origin
-  download can't read the server's `Content-Disposition`) and Delete. `DeleteAccountDialog`
-  enables its button only once the display name is typed exactly, then `DELETE /me` and `guest`.
-- `lib/ui/MyGames.svelte` (`/profile`, signed in only): `GET /me/games` on mount, newest first;
-  each row is the own placement (`rank.ts`'s label and tone) and score, end time (locale date),
+- **Entry point:** the lobby menu (§7 "Lobby"): sign-in for a guest; once signed in, the name,
+  Account and My games (each a dialog over the lobby, below) and Sign out
+  (`accountSession.signOut()`: `POST /auth/logout`, then `guest`). Settings has no account tab,
+  and there is no account page: `/profile` redirects (307) to `/`.
+- `lib/ui/AccountPanel.svelte` (the menu's and `WelcomeDialog`'s guest section): blurb,
+  `GoogleSignInButton` (a link to `/auth/google/login?next=<this page>`), terms note and
+  `LegalLinks`; nothing outside `guest`.
+- **Dialogs** (`DismissablePanel`, the Settings frame: `PanelHeader`, capped height, the body
+  scrolls; the lobby renders each only while `accountSession.user` is set, so a delete or
+  sign-out closes them):
+
+  | Dialog | Content |
+  | --- | --- |
+  | `AccountDialog` | `Avatar` (the display name's initial, shared with the menu), name and "Signed in with Google", then `AccountSettings` |
+  | `MyGamesDialog` | `MyGames`, at a fixed height so "Load more" grows the list rather than the dialog |
+
+- `GoogleSignInButton` keeps only the parts of Google's branding guidelines a review checks: the
+  unmodified multicolour G, approved wording ("Continue with Google"; zh-Hant 使用 Google 帳戶繼續)
+  and the dark theme's `#131314` fill. Font, radius, border and hover are the app's own
+  (`btn-base`, `--radius-sm`, `--color-border`, brass hover), so it sits with the other buttons
+  instead of as a foreign pill in Roboto (~22 kB loaded for one button).
+- `lib/ui/AccountSettings.svelte` (`AccountDialog`): three Settings-style groups (`settings-legend`
+  over a `settings-card`): Display name (`PATCH /me`, capped at the generated `MAX_NAME_LENGTH`);
+  Privacy, the consent checkbox (`PATCH /me` on change); Your data, Download (`GET /me/export`
+  fetched as a blob and saved as `mahjong-account.json`: a cross-origin download can't read the
+  server's `Content-Disposition`) and Delete. `DeleteAccountDialog` (stacked over the account
+  dialog) enables its button only once the display name is typed exactly, then `DELETE /me` and
+  `guest`.
+- `lib/ui/MyGames.svelte` (`MyGamesDialog`): `GET /me/games` on mount, newest first;
+  each row is a `settings-card` with the own placement (`rank.ts`'s label and tone) and score, end time (locale date),
   mode, hand count and the three opponents: a name (`Guest` when the seat had none) or, for a
   bot, `BotBadge` with its tier's practice-difficulty label. "Load more" fetches the next page
   with the response's `next` cursor and appends; an empty first page shows an empty state. State
@@ -854,7 +871,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
 | `/demo` | on | dev component demos, no backend |
 | `/table/[id]` | off (`export const ssr = false`) | the game; WebSocket and per-seat redacted state are client-only, so pre-rendering an empty table to hydrate over has no value |
 | `/replay/[id]` | off | placeholder; blocked on a server replay endpoint ([ADR 0011](decisions/0011-replay-viewer.md)) |
-| `/profile` | on | placeholder heading; with accounts on, `AccountPanel` (sign in / sign out) and, signed in, `AccountSettings` (name, consent, export, delete) and `MyGames` (§6 "Account session") |
+| `/profile` | — | `+page.ts` redirects (307) to `/`: the account and games are lobby dialogs now (§6 "Account session"); kept for old links |
 | `/learn` | on | learn index, one track per tab: `?track=<Track>` or `endless` (missing or unknown → basics, then the continue track after mount), lesson cards, solved state (below); skips `ApiConnectGate` |
 | `/learn/[id]` | off | one puzzle, or the guided tutorial, on the real table (below); unknown id → 404; skips `ApiConnectGate` |
 | `/learn/endless` | off | endless random puzzles, `?kind=<PuzzleKind>&band=<Band>` (band defaults to beginner; an unknown kind or band → 404); fetches `GET /lessons/random`, so behind `ApiConnectGate` (below) |
@@ -970,7 +987,7 @@ under the button):
 
 | Section | Content |
 | --- | --- |
-| account | only while the account session is `guest` or `signedIn` (§6 "Account session"). Guest: `AccountPanel` (blurb, `GoogleSignInButton`, terms note, `LegalLinks`). Signed in: avatar, name and "Signed in with Google", then an "Account and games" link to `/profile` |
+| account | only while the account session is `guest` or `signedIn` (§6 "Account session"). Guest: `AccountPanel` (blurb, `GoogleSignInButton`, terms note, `LegalLinks`). Signed in: avatar, name and "Signed in with Google", then Account and My games (open `AccountDialog` / `MyGamesDialog`) |
 | items | not signed in: "Guest name" with the stored name beside it (opens `WelcomeDialog` to rename, below); "Faan guide" (opens `GuideDialog`, below), Settings, the other locale's own name (`lobby_languageButton`, `lang` set to it; calls `setLocale()`) — full-width rows with a brass icon |
 | sign out | signed in only, muted: `accountSession.signOut()`; the panel stays open and turns into the guest section |
 
@@ -1036,7 +1053,7 @@ phase 7), also the URLs on Google's consent screen.
   the request cookie and the contact from runtime env, so a prerendered page would bake in one
   of each.
 - **Linked from** the lobby's corner links, the sign-up dialog, the guest `AccountPanel`
-  (lobby menu, `/profile`) and `AccountSettings` (§6 "Account session").
+  (lobby menu, welcome dialog) and `AccountSettings` (§6 "Account session").
 - **Wording.** Every claim is about the app as built (scopes `openid email`, session lifetimes,
   cookie names, what `DELETE /me` removes); a change to any of those changes the text and the
   effective date with it. The training section matches the consent checkbox and
@@ -1559,10 +1576,8 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
 - **No build step, no atlas, no DPR split** — SVG is resolution-independent.
 - **Fonts:** self-hosted through `@fontsource/*` packages (no Google Fonts `<link>`, so
   screenshots don't depend on a CDN). Root `+layout.svelte` imports Schibsted Grotesk and Noto
-  Sans HK (the CJK fallback, `--font-family-base`). `@fontsource/roboto` is imported only by
-  `lib/ui/GoogleSignInButton.svelte`, and only `latin-500.css`: Google's sign-in branding
-  requires Roboto Medium, nothing else uses Roboto, and a per-component import keeps it in that
-  component's CSS chunk instead of every page's.
+  Sans HK (the CJK fallback, `--font-family-base`). The Google sign-in button uses the app font
+  too, not the Roboto Medium Google's spec names (§6 "Account session").
 - **UI icons:** [`@lucide/svelte`](https://lucide.dev), imported per icon
   (`@lucide/svelte/icons/<name>`), never hand-written inline `<svg>`. One 24px grid and stroke
   style keeps chrome icons consistent, and per-icon imports tree-shake to only the icons used.
@@ -1708,7 +1723,7 @@ spread. Files group key prefixes by app area:
 | File | Key prefixes |
 | --- | --- |
 | `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
-| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, table creation and practice setup: `lobby`, `lobbyMenu`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `statusPage` |
+| `lobby.json` | `/`, `/tables`, `/status`, table creation and practice setup: `lobby`, `lobbyMenu`, `welcomeDialog`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `statusPage` |
 | `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
 | `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
 | `tiles.json` | `tileName`, `tileFace` |
@@ -1716,7 +1731,7 @@ spread. Files group key prefixes by app area:
 | `guide.json` | `guide`, `coachMarks` |
 | `learn.json` | `/learn` and `/learn/[id]`: `learn` (both pages' chrome, seat names, answer inputs, track and band labels, feedback) and `lesson` (`lesson_<text>_title\|prompt\|explain`, one stem per hand-written lesson and one per mined kind, [protocol.md §6](protocol.md) "Generated lesson bundle") |
 | `demo.json` | `/demo` only: `demoPage`, `animationDemoPanel`, `*Demo` |
-| `account.json` | sign-in and account UI: `googleSignInButton`, `accountPanel`, `trainingConsentField`, `signinReturn`, `accountSettings`, `deleteAccountDialog`, `myGames` |
+| `account.json` | sign-in and account UI: `googleSignInButton`, `accountPanel`, `trainingConsentField`, `signinReturn`, `accountDialog`, `accountSettings`, `deleteAccountDialog`, `myGames` |
 | `legal.json` | `/privacy` and `/terms`: `legalPage` (shared chrome, contact), `legalLinks`, `privacyPage`, `termsPage` |
 
 **Adding a message:** `import { m } from '$lib/paraglide/messages.js'`; add the key to the

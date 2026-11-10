@@ -76,7 +76,7 @@ mahjong/
 │   ├── package.json, Dockerfile, vite.config.ts, playwright.config.ts
 │   ├── messages/               # i18n sources (frontend.md §9)
 │   └── src/
-│       ├── routes/             # /, /tables, /demo, /table/[id], /replay/[id], /profile, /status
+│       ├── routes/             # /, /tables, /demo, /table/[id], /replay/[id], /learn, /status, /privacy, /terms
 │       └── lib/                # net/ game/ table/ ui/ i18n/ styles/ (frontend.md §1)
 ├── shared/protocol.schema.json # GENERATED, informational
 └── docs/

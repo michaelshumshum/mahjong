@@ -22,6 +22,8 @@
 		saveDisplayName
 	} from '$lib/ui/settings-storage';
 	import WelcomeDialog from '$lib/ui/WelcomeDialog.svelte';
+	import AccountDialog from '$lib/ui/AccountDialog.svelte';
+	import MyGamesDialog from '$lib/ui/MyGamesDialog.svelte';
 	import { dismissWelcome, shouldPromptWelcome } from '$lib/ui/welcome-prompt';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import { untrack } from 'svelte';
@@ -33,6 +35,8 @@
 	let showPracticeDialog = $state(false);
 
 	let showGuide = $state(false);
+	let showAccount = $state(false);
+	let showGames = $state(false);
 
 	// read on open, not at init: the lobby is server-rendered, where storage is unavailable.
 	// autoArm only persists here; the table page re-sends it on its next connection.
@@ -126,6 +130,8 @@
 			onOpenGuide={() => (showGuide = true)}
 			onOpenSettings={openSettings}
 			onEditGuestName={() => (welcome = 'edit')}
+			onOpenAccount={() => (showAccount = true)}
+			onOpenGames={() => (showGames = true)}
 		/>
 	</div>
 
@@ -177,6 +183,15 @@
 			}}
 		/>
 	</DismissablePanel>
+{/if}
+
+<!-- signed-in only: a delete or sign-out elsewhere closes them -->
+{#if showAccount && accountSession.user}
+	<AccountDialog user={accountSession.user} onClose={() => (showAccount = false)} />
+{/if}
+
+{#if showGames && accountSession.user}
+	<MyGamesDialog onClose={() => (showGames = false)} />
 {/if}
 
 {#if welcome}

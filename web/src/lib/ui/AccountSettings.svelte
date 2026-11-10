@@ -9,6 +9,7 @@
 
 	let { user }: { user: Me } = $props();
 
+	const uid = $props.id();
 	let name = $derived(user.display_name);
 	let busy = $state(false);
 	let status = $state<{ text: string; error: boolean } | null>(null);
@@ -48,77 +49,87 @@
 
 <div class="account-settings" data-testid="account-settings">
 	<form
-		class="row"
+		class="group"
 		onsubmit={(event) => {
 			event.preventDefault();
 			void save({ display_name: name }, m.accountSettings_nameSaved());
 		}}
 	>
-		<label class="name">
-			<span>{m.accountSettings_nameLabel()}</span>
+		<label class="legend" for="{uid}-name">{m.accountSettings_nameLabel()}</label>
+		<div class="card name-row">
 			<input
+				id="{uid}-name"
 				bind:value={name}
 				required
 				maxlength={MAX_NAME_LENGTH}
 				autocomplete="nickname"
 				data-testid="account-name"
 			/>
-		</label>
-		<button
-			type="submit"
-			class="secondary"
-			disabled={busy || name.trim() === user.display_name}
-			data-testid="account-name-save"
-		>
-			{m.accountSettings_nameSave()}
-		</button>
+			<button
+				type="submit"
+				class="secondary"
+				disabled={busy || name.trim() === user.display_name}
+				data-testid="account-name-save"
+			>
+				{m.accountSettings_nameSave()}
+			</button>
+		</div>
 	</form>
 
-	<TrainingConsentField
-		checked={user.training_consent_at !== null}
-		disabled={busy}
-		onChange={(checked) =>
-			void save(
-				{ training_consent: checked },
-				checked ? m.accountSettings_consentOn() : m.accountSettings_consentOff()
-			)}
-	/>
+	<section class="group" aria-labelledby="{uid}-privacy">
+		<h3 class="legend" id="{uid}-privacy">{m.accountSettings_privacyHeading()}</h3>
+		<div class="card card--padded">
+			<TrainingConsentField
+				checked={user.training_consent_at !== null}
+				disabled={busy}
+				onChange={(checked) =>
+					void save(
+						{ training_consent: checked },
+						checked ? m.accountSettings_consentOn() : m.accountSettings_consentOff()
+					)}
+			/>
+		</div>
+	</section>
+
+	<section class="group" aria-labelledby="{uid}-data">
+		<h3 class="legend" id="{uid}-data">{m.accountSettings_dataHeading()}</h3>
+		<div class="card">
+			<div class="data">
+				<div class="text">
+					<span class="label">{m.accountSettings_exportLabel()}</span>
+					<span class="desc">{m.accountSettings_exportDesc()}</span>
+				</div>
+				<button
+					type="button"
+					class="secondary"
+					disabled={busy}
+					data-testid="account-export"
+					onclick={download}
+				>
+					{m.accountSettings_exportButton()}
+				</button>
+			</div>
+			<div class="data">
+				<div class="text">
+					<span class="label">{m.accountSettings_deleteLabel()}</span>
+					<span class="desc">{m.accountSettings_deleteDesc()}</span>
+				</div>
+				<button
+					type="button"
+					class="secondary delete"
+					disabled={busy}
+					data-testid="account-delete"
+					onclick={() => (confirmingDelete = true)}
+				>
+					{m.accountSettings_deleteButton()}
+				</button>
+			</div>
+		</div>
+	</section>
 
 	{#if status}
 		<p class="status" class:status--error={status.error} role="status">{status.text}</p>
 	{/if}
-
-	<div class="data">
-		<div class="text">
-			<span class="label">{m.accountSettings_exportLabel()}</span>
-			<span class="desc">{m.accountSettings_exportDesc()}</span>
-		</div>
-		<button
-			type="button"
-			class="secondary"
-			disabled={busy}
-			data-testid="account-export"
-			onclick={download}
-		>
-			{m.accountSettings_exportButton()}
-		</button>
-	</div>
-
-	<div class="data">
-		<div class="text">
-			<span class="label">{m.accountSettings_deleteLabel()}</span>
-			<span class="desc">{m.accountSettings_deleteDesc()}</span>
-		</div>
-		<button
-			type="button"
-			class="secondary delete"
-			disabled={busy}
-			data-testid="account-delete"
-			onclick={() => (confirmingDelete = true)}
-		>
-			{m.accountSettings_deleteButton()}
-		</button>
-	</div>
 
 	<LegalLinks />
 </div>
@@ -137,27 +148,38 @@
 		gap: var(--space-5);
 	}
 
-	.row {
+	.group {
 		display: flex;
-		align-items: flex-end;
-		gap: var(--space-3);
+		flex-direction: column;
+		margin: 0;
 	}
 
-	.name {
+	.legend {
+		@include forms.settings-legend;
+	}
+
+	.card {
+		@include forms.settings-card;
+	}
+
+	.card--padded {
+		padding-block: var(--space-3);
+	}
+
+	.name-row {
 		display: flex;
-		flex: 1 1 auto;
-		flex-direction: column;
-		gap: var(--space-1);
-		min-width: 0;
-		font-weight: 600;
+		align-items: center;
+		gap: var(--space-3);
+		padding-block: var(--space-3);
 
 		input {
 			@include buttons.input-recessed;
+			flex: 1 1 auto;
+			min-width: 0;
 			min-height: var(--tap-target-min);
 			padding: var(--space-2) var(--space-3);
 			color: var(--color-text);
 			font: inherit;
-			font-weight: 400;
 		}
 	}
 
@@ -165,8 +187,11 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
-		padding-top: var(--space-4);
-		border-top: 1px solid var(--color-border);
+		padding-block: var(--space-3);
+
+		& + & {
+			border-top: 1px solid var(--color-border);
+		}
 	}
 
 	.text {

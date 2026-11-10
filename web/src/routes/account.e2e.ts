@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Page, type Route } from '@playwright/test';
-import { ACCOUNTS_PORT } from '../../../playwright.config';
-import type { Me, MyGame, MyGamesPage } from '../../lib/net/account';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { ACCOUNTS_PORT } from '../../playwright.config';
+import type { Me, MyGame, MyGamesPage } from '../lib/net/account';
 
 // sign-in ui against a stubbed api: /me and /auth/* answered by page.route, never google
 const ACCOUNTS = `http://localhost:${ACCOUNTS_PORT}`;
@@ -109,27 +109,24 @@ async function stubApi(
 	return calls;
 }
 
+// signed in: the lobby menu's account or games item opens its dialog
+async function openFromMenu(page: Page, item: 'account' | 'games'): Promise<Locator> {
+	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
+	await page.getByTestId(`lobby-menu-${item}`).click();
+	const dialog = page.getByTestId(item === 'account' ? 'account-dialog' : 'my-games-dialog');
+	await expect(dialog).toBeVisible();
+	return dialog;
+}
+
 test.describe('accounts on', () => {
 	test.use({ baseURL: ACCOUNTS });
 
-	test('a guest gets a google sign-in link back to the profile', async ({ page }) => {
-		await stubApi(page, false);
+	test('/profile now lands on the lobby', async ({ page }) => {
+		await stubApi(page, true);
 		await page.goto('/profile');
-		const signIn = page.getByTestId('google-sign-in');
-		await expect(signIn).toBeVisible();
-		await expect(signIn).toHaveAttribute('href', `${API}/auth/google/login?next=%2Fprofile`);
-		const links = page.getByTestId('account-panel').getByTestId('legal-links');
-		await expect(links.getByTestId('legal-link-privacy')).toHaveAttribute('href', '/privacy');
-		await expect(links.getByTestId('legal-link-terms')).toHaveAttribute('href', '/terms');
-	});
-
-	test('a signed-in player sees their name and can sign out', async ({ page }) => {
-		const calls = await stubApi(page, true);
-		await page.goto('/profile');
-		await expect(page.getByTestId('account-panel')).toContainText('Ann');
-		await page.getByTestId('account-sign-out').click();
-		await expect(page.getByTestId('google-sign-in')).toBeVisible();
-		expect(calls.logouts).toBe(1);
+		await expect(page).toHaveURL(`${ACCOUNTS}/`);
+		await expect(page.getByTestId('lobby-play-online')).toBeVisible();
 	});
 
 	test('a nameless guest is offered sign-in or a guest name on the lobby', async ({ page }) => {
@@ -219,27 +216,33 @@ test.describe('accounts on', () => {
 		await expect(page.getByTestId('signup-name')).toHaveValue('Bea');
 	});
 
-	test('the lobby menu links a signed-in player to account settings', async ({ page }) => {
+	test('the lobby menu opens the account dialog, which links the legal pages', async ({ page }) => {
 		await stubApi(page, true);
-		await page.goto('/');
-		await page.getByTestId('lobby-menu-button').click();
-		await page.getByTestId('lobby-menu-account').click();
-		await expect(page).toHaveURL(`${ACCOUNTS}/profile`);
-		const settings = page.getByTestId('account-settings');
-		await expect(settings).toBeVisible();
-		await settings.getByTestId('legal-link-privacy').click();
+		const dialog = await openFromMenu(page, 'account');
+		await expect(dialog).toContainText('Ann');
+		await expect(page).toHaveURL(`${ACCOUNTS}/`);
+		await dialog.getByTestId('legal-link-privacy').click();
 		await expect(page).toHaveURL(`${ACCOUNTS}/privacy`);
 		await expect(page.getByTestId('privacy-page')).toBeVisible();
 	});
 
+	test('the account dialog closes on Escape, back to the menu button', async ({ page }) => {
+		await stubApi(page, true);
+		const dialog = await openFromMenu(page, 'account');
+		await page.keyboard.press('Escape');
+		await expect(dialog).toHaveCount(0);
+		await expect(page.getByTestId('lobby-menu-button')).toBeFocused();
+	});
+
 	test('account settings rename and toggle consent', async ({ page }) => {
 		const calls = await stubApi(page, true);
-		await page.goto('/profile');
+		const dialog = await openFromMenu(page, 'account');
 		const save = page.getByTestId('account-name-save');
 		await expect(save).toBeDisabled();
 		await page.getByTestId('account-name').fill('Bea');
 		await save.click();
-		await expect(page.getByTestId('account-panel')).toContainText('Bea');
+		await expect(dialog.locator('.name')).toHaveText('Bea');
+		await expect(page.getByTestId('lobby-menu-button').locator('.avatar')).toHaveText('B');
 
 		const consent = page.getByTestId('training-consent').getByRole('checkbox');
 		await consent.check();
@@ -255,7 +258,7 @@ test.describe('accounts on', () => {
 
 	test('export downloads the account json', async ({ page }) => {
 		await stubApi(page, true);
-		await page.goto('/profile');
+		await openFromMenu(page, 'account');
 		const [download] = await Promise.all([
 			page.waitForEvent('download'),
 			page.getByTestId('account-export').click()
@@ -282,7 +285,7 @@ test.describe('accounts on', () => {
 
 	test('delete needs the typed name, then plays on as a guest', async ({ page }) => {
 		const calls = await stubApi(page, true);
-		await page.goto('/profile');
+		const dialog = await openFromMenu(page, 'account');
 		await page.getByTestId('account-delete').click();
 		const submit = page.getByTestId('delete-account-submit');
 		await expect(submit).toBeDisabled();
@@ -290,15 +293,16 @@ test.describe('accounts on', () => {
 		await expect(submit).toBeDisabled();
 		await page.getByTestId('delete-account-confirm').fill('Ann');
 		await submit.click();
-		await expect(page.getByTestId('google-sign-in')).toBeVisible();
-		await expect(page.getByTestId('account-settings')).toHaveCount(0);
+		await expect(page.getByTestId('delete-account-dialog')).toHaveCount(0);
+		await expect(dialog).toHaveCount(0);
+		await expect(page.getByTestId('lobby-menu-button').locator('.avatar')).toHaveCount(0);
 		expect(calls.deletes).toBe(1);
 	});
 
 	test('my games list pages with load more, bots by their level', async ({ page }) => {
 		const calls = await stubApi(page, true);
-		await page.goto('/profile');
-		const rows = page.getByTestId('my-game');
+		const dialog = await openFromMenu(page, 'games');
+		const rows = dialog.getByTestId('my-game');
 		await expect(rows).toHaveCount(1);
 		await expect(rows.first()).toContainText('1st');
 		await expect(rows.first()).toContainText('+40');
@@ -321,16 +325,22 @@ test.describe('accounts on', () => {
 
 	test('my games shows an empty state', async ({ page }) => {
 		await stubApi(page, true, { '': { games: [], next: null } });
-		await page.goto('/profile');
+		await openFromMenu(page, 'games');
 		await expect(page.getByTestId('my-games-empty')).toBeVisible();
 		await expect(page.getByTestId('my-games-more')).toHaveCount(0);
 	});
 
-	test('a guest sees no games list', async ({ page }) => {
+	test('a guest has no account or games items, and no games are fetched', async ({ page }) => {
 		const calls = await stubApi(page, false);
-		await page.goto('/profile');
-		await expect(page.getByTestId('google-sign-in')).toBeVisible();
-		await expect(page.getByTestId('my-games')).toHaveCount(0);
+		await page.addInitScript(() =>
+			localStorage.setItem('mahjong:displayName:v1', JSON.stringify('Mei'))
+		);
+		await page.goto('/');
+		await page.getByTestId('lobby-menu-button').click();
+		const menu = page.getByTestId('lobby-menu');
+		await expect(menu.getByTestId('google-sign-in')).toBeVisible();
+		await expect(menu.getByTestId('lobby-menu-account')).toHaveCount(0);
+		await expect(menu.getByTestId('lobby-menu-games')).toHaveCount(0);
 		expect(calls.games).toEqual([]);
 	});
 
@@ -354,10 +364,8 @@ test.describe('accounts on', () => {
 test.describe('accounts off', () => {
 	test('no /me request, no account ui, flags ignored', async ({ page }) => {
 		const calls = await stubApi(page, true);
-		await page.goto('/profile?signup=1');
-		await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-		await expect(page.getByTestId('account-panel')).toHaveCount(0);
-		await expect(page.getByTestId('my-games')).toHaveCount(0);
+		await page.goto('/tables?signup=1');
+		await expect(page.getByTestId('tables-header-create-table')).toBeVisible();
 		await expect(page.getByTestId('signup-dialog')).toHaveCount(0);
 
 		await page.goto('/');

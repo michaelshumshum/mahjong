@@ -3,11 +3,12 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import AccountPanel from './AccountPanel.svelte';
+	import Avatar from './Avatar.svelte';
 	import BookOpen from '@lucide/svelte/icons/book-open';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Languages from '@lucide/svelte/icons/languages';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import MenuIcon from '@lucide/svelte/icons/menu';
+	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import UserRound from '@lucide/svelte/icons/user-round';
 	import UserRoundPen from '@lucide/svelte/icons/user-round-pen';
@@ -16,12 +17,16 @@
 		guestName = null,
 		onOpenGuide,
 		onOpenSettings,
-		onEditGuestName
+		onEditGuestName,
+		onOpenAccount,
+		onOpenGames
 	}: {
 		guestName?: string | null;
 		onOpenGuide: () => void;
 		onOpenSettings: () => void;
 		onEditGuestName: () => void;
+		onOpenAccount: () => void;
+		onOpenGames: () => void;
 	} = $props();
 
 	const uid = $props.id();
@@ -36,7 +41,6 @@
 
 	const status = $derived(accountSession.state.status);
 	const user = $derived(accountSession.user);
-	const initial = $derived(user ? ([...user.display_name.trim()][0] ?? '?').toUpperCase() : null);
 
 	function close(refocus = false): void {
 		open = false;
@@ -98,8 +102,8 @@
 		aria-controls="{uid}-panel"
 		onclick={() => (open ? close() : (open = true))}
 	>
-		{#if initial}
-			<span class="avatar" aria-hidden="true">{initial}</span>
+		{#if user}
+			<Avatar name={user.display_name} />
 		{/if}
 		<MenuIcon {...ICON} />
 	</button>
@@ -108,17 +112,32 @@
 		<div class="panel" id="{uid}-panel" data-testid="lobby-menu">
 			{#if user}
 				<div class="profile">
-					<span class="avatar avatar--lg" aria-hidden="true">{initial}</span>
+					<Avatar name={user.display_name} size="lg" />
 					<div class="profile-text">
 						<span class="name" data-testid="lobby-menu-name">{user.display_name}</span>
 						<span class="sub">{m.lobbyMenu_signedIn()}</span>
 					</div>
 				</div>
-				<a class="item" href="/profile" data-testid="lobby-menu-account" onclick={() => close()}>
+				<button
+					type="button"
+					class="item"
+					data-testid="lobby-menu-account"
+					aria-haspopup="dialog"
+					onclick={() => openDialog(onOpenAccount)}
+				>
 					<UserRound {...ICON} />
 					<span class="item-label">{m.lobbyMenu_account()}</span>
-					<ChevronRight {...ICON} class="chevron" />
-				</a>
+				</button>
+				<button
+					type="button"
+					class="item"
+					data-testid="lobby-menu-games"
+					aria-haspopup="dialog"
+					onclick={() => openDialog(onOpenGames)}
+				>
+					<ScrollText {...ICON} />
+					<span class="item-label">{m.myGames_heading()}</span>
+				</button>
 				<hr class="divider" />
 			{:else if status === 'guest'}
 				<div class="guest">
@@ -224,27 +243,6 @@
 		}
 	}
 
-	// the seal's ink-red, so the signed-in chip reads as the player's own stamp
-	.avatar {
-		display: grid;
-		place-items: center;
-		width: 1.75rem;
-		height: 1.75rem;
-		border-radius: var(--radius-pill);
-		background: var(--color-accent);
-		color: var(--color-text);
-		font-size: var(--font-size-sm);
-		font-weight: 700;
-		line-height: 1;
-	}
-
-	.avatar--lg {
-		flex: none;
-		width: 2.5rem;
-		height: 2.5rem;
-		font-size: var(--font-size-lg);
-	}
-
 	.panel {
 		position: absolute;
 		top: calc(100% + var(--space-2));
@@ -321,10 +319,6 @@
 		:global(svg) {
 			flex-shrink: 0;
 			color: var(--color-brass);
-		}
-
-		:global(.chevron) {
-			color: var(--color-text-muted);
 		}
 
 		&:hover:not(:disabled) {

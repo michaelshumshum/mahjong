@@ -117,7 +117,7 @@ at hoist time, which reads like a broken mock rather than a timing issue.
 ### 2.4 `$env/dynamic/public` must be mocked for anything touching `$lib/net/lobby`
 
 Any route pulling in `$lib/net/lobby` (directly, or via a child like `TableCard`, or through
-`$lib/net/account`, which `Settings` and `/profile` import) needs:
+`$lib/net/account`, which the lobby's menu and account dialogs import) needs:
 
 ```ts
 vi.mock('$env/dynamic/public', () => ({ env: {} }))
@@ -180,7 +180,7 @@ gate's 1s hold), and the full suite takes ~1.3 min instead of ~3 min.
   or HMR.
 - A second `vite preview` of the same build runs on 4181 with `PUBLIC_ACCOUNTS_ENABLED=1`
   (`ACCOUNTS_PORT`; Playwright starts the servers in order, so it waits for the build). Sign-in
-  specs (`routes/profile/account.e2e.ts`) `test.use({ baseURL })` it and stub `/me` and
+  specs (`routes/account.e2e.ts`) `test.use({ baseURL })` it and stub `/me` and
   `/auth/*` with `page.route`, answering credentialed CORS headers; everything else runs flag-off
   on 4180, the `baseURL` set explicitly since an array of servers sets none.
 - `make test-web` builds `web/build` and `web/.svelte-kit/output` as root through the bind mount,

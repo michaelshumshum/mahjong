@@ -431,11 +431,11 @@ test('the lobby menu opens from the top-right corner and closes on Escape', asyn
 	await expect(trigger).toBeFocused();
 });
 
-test('profile route renders', async ({ page }) => {
+test('the old profile route redirects to the lobby', async ({ page }) => {
 	const response = await page.goto('/profile');
 	expect(response?.status()).toBe(200);
-	await expect(page.locator('h1')).toHaveText('Profile');
-	await expect(page).toHaveTitle('Profile · Hoi Toi');
+	await expect(page).toHaveURL('/');
+	await expect(page).toHaveTitle('Hoi Toi');
 });
 
 test('unknown route renders the error page with a status title', async ({ page }) => {
