@@ -5,9 +5,6 @@ import { cleanupAll, render } from '$lib/table/test-render';
 import Settings from './Settings.svelte';
 import type { AutoArm, ClientPrefs } from './client-prefs';
 import { DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS } from './settings-storage';
-import { accountSession } from '$lib/net/account-session.svelte';
-
-vi.mock('$env/dynamic/public', () => ({ env: {} }));
 
 function mountSettings(autoArm: AutoArm, prefs: ClientPrefs) {
 	const onAutoArmChange = vi.fn();
@@ -24,30 +21,6 @@ function visiblePanel(): HTMLElement {
 
 describe('Settings tabs', () => {
 	afterEach(cleanupAll);
-
-	it('adds an account tab only once the account session is known', () => {
-		mountSettings(DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS);
-		expect(document.querySelectorAll('[role="tab"]')).toHaveLength(3);
-		cleanupAll();
-
-		accountSession.setUser({
-			id: 'u',
-			display_name: 'Ann',
-			created_at: '2026-11-01T00:00:00Z',
-			training_consent_at: null,
-			consent_version: null
-		});
-		try {
-			mountSettings(DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS);
-			const tabs = document.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-			expect(tabs).toHaveLength(4);
-			tabs[3].click();
-			flushSync();
-			expect(visiblePanel().textContent).toContain('Ann');
-		} finally {
-			accountSession.state = { status: 'loading' };
-		}
-	});
 
 	it('switches panels on click and with arrow keys, wrapping at the ends', async () => {
 		mountSettings(DEFAULT_AUTO_ARM, DEFAULT_CLIENT_PREFS);

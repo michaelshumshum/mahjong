@@ -1,15 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { getLocale, setLocale } from '$lib/paraglide/runtime.js';
 	import { m } from '$lib/paraglide/messages.js';
 	import GuideDialog from '$lib/ui/GuideDialog.svelte';
+	import LobbyMenu from '$lib/ui/LobbyMenu.svelte';
 	import PracticeSetupDialog from '$lib/ui/PracticeSetupDialog.svelte';
 	import { claimMuralVisible } from '$lib/ui/mural-visibility.svelte';
 	import { SOURCE_REPO_URL } from '$lib/ui/site-links';
 	import Activity from '@lucide/svelte/icons/activity';
-	import BookOpen from '@lucide/svelte/icons/book-open';
-	import Languages from '@lucide/svelte/icons/languages';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import DismissablePanel from '$lib/ui/DismissablePanel.svelte';
 	import Settings from '$lib/ui/Settings.svelte';
 	import type { AutoArm, ClientPrefs } from '$lib/ui/client-prefs';
@@ -19,14 +16,17 @@
 		DEFAULT_CLIENT_PREFS,
 		loadAutoArm,
 		loadClientPrefs,
+		loadDisplayName,
 		saveAutoArm,
-		saveClientPrefs
+		saveClientPrefs,
+		saveDisplayName
 	} from '$lib/ui/settings-storage';
+	import WelcomeDialog from '$lib/ui/WelcomeDialog.svelte';
+	import { dismissWelcome, shouldPromptWelcome } from '$lib/ui/welcome-prompt';
+	import { accountSession } from '$lib/net/account-session.svelte';
+	import { untrack } from 'svelte';
 
 	claimMuralVisible();
-
-	const ICON = { size: 18, strokeWidth: 1.8 };
-	const otherLocale = getLocale() === 'en' ? 'zh-Hant' : 'en';
 
 	// practice mode: a solo table with seats 1-3 bot-bound at creation. Opens a difficulty-picker
 	// dialog first since bot tier is fixed at construction; `?practice=1` only tags the table page.
@@ -44,6 +44,33 @@
 		autoArm = loadAutoArm() ?? { ...DEFAULT_AUTO_ARM };
 		clientPrefs = loadClientPrefs() ?? { ...DEFAULT_CLIENT_PREFS };
 		showSettings = true;
+	}
+
+	// storage and the account session are client-only: decided once, after /me answers
+	let guestName = $state<string | null>(null);
+	let welcome = $state<'prompt' | 'edit' | null>(null);
+	let welcomeChecked = false;
+	$effect(() => {
+		const status = accountSession.state.status;
+		if (status === 'loading' || welcomeChecked) return;
+		welcomeChecked = true;
+		untrack(() => {
+			guestName = loadDisplayName();
+			if (shouldPromptWelcome(status, guestName, new URL(window.location.href))) {
+				welcome = 'prompt';
+			}
+		});
+	});
+
+	function saveGuestName(name: string): void {
+		saveDisplayName(name);
+		guestName = name;
+		welcome = null;
+	}
+
+	function closeWelcome(): void {
+		if (welcome === 'prompt') dismissWelcome();
+		welcome = null;
 	}
 
 	function handlePracticeCreated(tableId: string): void {
@@ -92,40 +119,15 @@
 			</li>
 		</ul>
 
-		<div class="utility-bar">
-			<button
-				type="button"
-				class="utility-btn"
-				data-testid="lobby-guide"
-				aria-haspopup="dialog"
-				onclick={() => (showGuide = true)}
-			>
-				<BookOpen {...ICON} />
-				<span>{m.lobby_guideButton()}</span>
-			</button>
-			<!-- shorthand label, full target-language name as the accessible name -->
-			<button
-				type="button"
-				class="utility-btn"
-				data-testid="lobby-language"
-				lang={otherLocale}
-				aria-label={m.lobby_languageButton()}
-				onclick={() => setLocale(otherLocale)}
-			>
-				<Languages {...ICON} />
-				<span>{m.lobby_languageShort()}</span>
-			</button>
-			<button
-				type="button"
-				class="utility-btn"
-				data-testid="lobby-settings"
-				aria-haspopup="dialog"
-				onclick={openSettings}
-			>
-				<SettingsIcon {...ICON} />
-				<span>{m.settings_title()}</span>
-			</button>
-		</div>
+	</div>
+
+	<div class="menu-corner">
+		<LobbyMenu
+			{guestName}
+			onOpenGuide={() => (showGuide = true)}
+			onOpenSettings={openSettings}
+			onEditGuestName={() => (welcome = 'edit')}
+		/>
 	</div>
 
 	<nav class="corner-links">
@@ -178,6 +180,15 @@
 	</DismissablePanel>
 {/if}
 
+{#if welcome}
+	<WelcomeDialog
+		initialName={guestName ?? ''}
+		editing={welcome === 'edit'}
+		onSave={saveGuestName}
+		onClose={closeWelcome}
+	/>
+{/if}
+
 {#if showPracticeDialog}
 	<PracticeSetupDialog
 		onCreated={handlePracticeCreated}
@@ -187,7 +198,6 @@
 
 <style lang="scss">
 	@use '$lib/styles/a11y';
-	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 
 	.lobby {
@@ -344,29 +354,14 @@
 		}
 	}
 
-	.utility-bar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-3);
-	}
+	.menu-corner {
+		position: absolute;
+		top: var(--space-4);
+		right: var(--space-5);
 
-	.utility-btn {
-		@include buttons.btn-base(var(--space-3));
-		@include buttons.btn-secondary;
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-2);
-		font-size: var(--font-size-sm);
-
-		:global(svg) {
-			flex-shrink: 0;
-			color: var(--color-brass);
-		}
-
-		&:focus-visible {
-			@include a11y.focus-ring;
+		@include layout.phone-only {
+			top: var(--space-3);
+			right: var(--space-4);
 		}
 	}
 

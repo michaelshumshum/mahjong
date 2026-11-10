@@ -1,4 +1,4 @@
-import { accountsEnabled, fetchMe, type Me } from './account';
+import { accountsEnabled, fetchMe, signOut, type Me } from './account';
 import { apiBaseUrl } from './lobby';
 
 export type AccountState =
@@ -37,6 +37,11 @@ export class AccountSession {
 
 	setUser(user: Me | null): void {
 		this.state = user ? { status: 'signedIn', user } : { status: 'guest' };
+	}
+
+	async signOut(baseUrl: string = apiBaseUrl(), fetchFn: typeof fetch = fetch): Promise<void> {
+		await signOut(baseUrl, fetchFn);
+		this.setUser(null);
 	}
 }
 

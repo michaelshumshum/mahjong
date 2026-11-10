@@ -23,7 +23,6 @@
 	"settings_tabCalls": "Calls",
 	"settings_tabGameplay": "Gameplay",
 	"settings_tabDisplay": "Display",
-	"settings_tabAccount": "Account",
 	"settings_preArmHint": "Applies until you turn it off. You're always asked when you can win.",
 	"settings_noCallsDesc": "Pass every pung, kong and chow offer automatically.",
 	"settings_autoPassChowDesc": "Pass automatically when chow is the only call on offer.",

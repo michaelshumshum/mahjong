@@ -5,7 +5,6 @@
 	"accountPanel_signedInAs": "已登入：{name}",
 	"accountPanel_signOut": "登出",
 	"accountPanel_signOutError": "未能登出，請再試一次。",
-	"accountPanel_manage": "帳戶設定",
 	"accountPanel_termsNote": "登入即表示你接受使用條款。",
 	"trainingConsentField_label": "協助訓練電腦對手",
 	"trainingConsentField_description": "容許以不具名方式，使用你在登入期間玩過的牌局，訓練及測試電腦對手。除非你剔選，否則不會使用；你可隨時在帳戶設定中關閉。",

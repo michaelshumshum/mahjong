@@ -132,12 +132,62 @@ test.describe('accounts on', () => {
 		expect(calls.logouts).toBe(1);
 	});
 
-	test('settings has an account tab', async ({ page }) => {
+	test('a nameless guest is offered sign-in or a guest name on the lobby', async ({ page }) => {
 		await stubApi(page, false);
 		await page.goto('/');
-		await page.getByTestId('lobby-settings').click();
-		await page.getByTestId('settings-tab-account').click();
-		await expect(page.getByTestId('google-sign-in')).toBeVisible();
+		const dialog = page.getByTestId('welcome-dialog');
+		await expect(dialog.getByTestId('google-sign-in')).toHaveAttribute(
+			'href',
+			`${API}/auth/google/login?next=%2F`
+		);
+		await expect(dialog.getByTestId('legal-links')).toBeVisible();
+		await dialog.getByTestId('welcome-name').fill('Mei');
+		await dialog.getByTestId('welcome-guest').click();
+		await expect(dialog).toHaveCount(0);
+	});
+
+	test('a signed-in player is never asked for a guest name', async ({ page }) => {
+		await stubApi(page, true);
+		await page.goto('/');
+		await expect(page.getByTestId('lobby-menu-button').locator('.avatar')).toHaveText('A');
+		await expect(page.getByTestId('welcome-dialog')).toHaveCount(0);
+	});
+
+	test('a sign-in callback flag takes the lobby load instead of the welcome', async ({ page }) => {
+		await stubApi(page, false);
+		await page.goto('/?signin=failed');
+		await expect(page.getByTestId('signin-error-dialog')).toBeVisible();
+		await expect(page.getByTestId('welcome-dialog')).toHaveCount(0);
+	});
+
+	test('a guest signs in from the lobby menu', async ({ page }) => {
+		await stubApi(page, false);
+		await page.addInitScript(() =>
+			localStorage.setItem('mahjong:displayName:v1', JSON.stringify('Mei'))
+		);
+		await page.goto('/');
+		await page.getByTestId('lobby-menu-button').click();
+		const menu = page.getByTestId('lobby-menu');
+		await expect(menu.getByTestId('google-sign-in')).toHaveAttribute(
+			'href',
+			`${API}/auth/google/login?next=%2F`
+		);
+		await expect(menu.getByTestId('legal-links')).toBeVisible();
+		await expect(menu.getByTestId('lobby-menu-sign-out')).toHaveCount(0);
+	});
+
+	test('the lobby menu signs a player out in place', async ({ page }) => {
+		const calls = await stubApi(page, true);
+		await page.goto('/');
+		const trigger = page.getByTestId('lobby-menu-button');
+		await expect(trigger.locator('.avatar')).toHaveText('A');
+		await trigger.click();
+		const menu = page.getByTestId('lobby-menu');
+		await expect(menu.getByTestId('lobby-menu-name')).toHaveText('Ann');
+		await menu.getByTestId('lobby-menu-sign-out').click();
+		await expect(menu.getByTestId('google-sign-in')).toBeVisible();
+		await expect(trigger.locator('.avatar')).toHaveCount(0);
+		expect(calls.logouts).toBe(1);
 	});
 
 	test('a first sign-in confirms the name and asks for consent, unchecked', async ({ page }) => {
@@ -169,12 +219,11 @@ test.describe('accounts on', () => {
 		await expect(page.getByTestId('signup-name')).toHaveValue('Bea');
 	});
 
-	test('settings links a signed-in player to account settings', async ({ page }) => {
+	test('the lobby menu links a signed-in player to account settings', async ({ page }) => {
 		await stubApi(page, true);
 		await page.goto('/');
-		await page.getByTestId('lobby-settings').click();
-		await page.getByTestId('settings-tab-account').click();
-		await page.getByTestId('account-manage').click();
+		await page.getByTestId('lobby-menu-button').click();
+		await page.getByTestId('lobby-menu-account').click();
 		await expect(page).toHaveURL(`${ACCOUNTS}/profile`);
 		const settings = page.getByTestId('account-settings');
 		await expect(settings).toBeVisible();
@@ -312,9 +361,16 @@ test.describe('accounts off', () => {
 		await expect(page.getByTestId('signup-dialog')).toHaveCount(0);
 
 		await page.goto('/');
-		await page.getByTestId('lobby-settings').click();
-		await expect(page.getByTestId('settings-tab-display')).toBeVisible();
-		await expect(page.getByTestId('settings-tab-account')).toHaveCount(0);
+		// a nameless guest still gets the welcome, name only
+		const welcome = page.getByTestId('welcome-dialog');
+		await expect(welcome).toBeVisible();
+		await expect(welcome.getByTestId('google-sign-in')).toHaveCount(0);
+		await welcome.getByTestId('welcome-later').click();
+		await page.getByTestId('lobby-menu-button').click();
+		const menu = page.getByTestId('lobby-menu');
+		await expect(menu.getByTestId('lobby-settings')).toBeVisible();
+		await expect(menu.getByTestId('account-panel')).toHaveCount(0);
+		await expect(page.getByTestId('lobby-menu-button').locator('.avatar')).toHaveCount(0);
 		expect(calls.me).toBe(0);
 		expect(calls.games).toEqual([]);
 	});

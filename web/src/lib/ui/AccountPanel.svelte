@@ -1,12 +1,8 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
-	import { signOut } from '$lib/net/account';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import GoogleSignInButton from './GoogleSignInButton.svelte';
 	import LegalLinks from './LegalLinks.svelte';
-
-	// settings links to /profile's account settings; /profile itself doesn't
-	let { manageLink = false }: { manageLink?: boolean } = $props();
 
 	let busy = $state(false);
 	let error = $state<string | null>(null);
@@ -15,8 +11,7 @@
 		busy = true;
 		error = null;
 		try {
-			await signOut();
-			accountSession.setUser(null);
+			await accountSession.signOut();
 		} catch {
 			error = m.accountPanel_signOutError();
 		} finally {
@@ -30,11 +25,6 @@
 		<p class="who">
 			{m.accountPanel_signedInAs({ name: accountSession.state.user.display_name })}
 		</p>
-		{#if manageLink}
-			<a class="manage" href="/profile" data-testid="account-manage">
-				{m.accountPanel_manage()}
-			</a>
-		{/if}
 		<button
 			type="button"
 			class="sign-out"
@@ -84,11 +74,6 @@
 	.sign-out {
 		@include buttons.btn-base(var(--space-4));
 		@include buttons.btn-secondary;
-	}
-
-	.manage {
-		color: var(--color-accent-on-dark);
-		font-size: var(--font-size-sm);
 	}
 
 	.error {

@@ -4,6 +4,62 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // (webServer is the web preview alone), so every test must mock it or the gate polls to its 10s timeout.
 test.beforeEach(async ({ page }) => {
 	await page.route('**/healthz', (route) => route.fulfill({ json: { status: 'ok' } }));
+	// a nameless guest gets the lobby's welcome dialog, which would cover every other lobby test
+	await page.addInitScript(() =>
+		localStorage.setItem('mahjong:displayName:v1', JSON.stringify('Sam'))
+	);
+});
+
+test.describe('welcome dialog', () => {
+	test.beforeEach(async ({ page }) => {
+		await page.addInitScript(() => localStorage.removeItem('mahjong:displayName:v1'));
+	});
+
+	test('a nameless guest picks a name, which the menu then shows', async ({ page }) => {
+		await page.goto('/');
+		const dialog = page.getByTestId('welcome-dialog');
+		await expect(dialog).toBeVisible();
+		// flag off on this server: name only, no google sign-in
+		await expect(dialog.getByTestId('google-sign-in')).toHaveCount(0);
+		const submit = dialog.getByTestId('welcome-guest');
+		await expect(submit).toBeDisabled();
+		await dialog.getByTestId('welcome-name').fill('  Mei  ');
+		await submit.click();
+		await expect(dialog).toHaveCount(0);
+		expect(
+			await page.evaluate(() => localStorage.getItem('mahjong:displayName:v1'))
+		).toBe(JSON.stringify('Mei'));
+
+		await page.getByTestId('lobby-menu-button').click();
+		await expect(page.getByTestId('lobby-menu-guest-name')).toContainText('Mei');
+	});
+
+	test('not now holds until a reload', async ({ page }) => {
+		await page.goto('/');
+		await page.getByTestId('welcome-later').click();
+		await expect(page.getByTestId('welcome-dialog')).toHaveCount(0);
+		await page.getByTestId('lobby-learn').click();
+		await expect(page).toHaveURL('/learn');
+		await page.goBack();
+		await expect(page.getByTestId('lobby-play-online')).toBeVisible();
+		await expect(page.getByTestId('welcome-dialog')).toHaveCount(0);
+		await page.reload();
+		await expect(page.getByTestId('welcome-dialog')).toBeVisible();
+	});
+
+	test('the menu renames a guest', async ({ page }) => {
+		await page.goto('/');
+		await page.getByTestId('welcome-name').fill('Mei');
+		await page.getByTestId('welcome-guest').click();
+		await page.getByTestId('lobby-menu-button').click();
+		await page.getByTestId('lobby-menu-guest-name').click();
+		const name = page.getByTestId('welcome-name');
+		await expect(name).toHaveValue('Mei');
+		await name.fill('Kit');
+		await page.getByTestId('welcome-guest').click();
+		await page.getByTestId('lobby-menu-button').click();
+		await expect(page.getByTestId('lobby-menu-guest-name')).toContainText('Kit');
+	});
 });
 
 test('home page loads and has a title', async ({ page }) => {
@@ -353,16 +409,26 @@ test('lobby shows three equal action cards in a row, stacked on phone', async ({
 	expect(pc.y).toBeGreaterThan(pb.y);
 });
 
-test('the faan guide button sits with the language toggle and settings', async ({ page }) => {
+test('the lobby menu opens from the top-right corner and closes on Escape', async ({ page }) => {
 	await page.goto('/');
-	const guide = page.getByTestId('lobby-guide');
-	await expect(guide).toHaveText('Faan guide');
-	await expect(page.locator('.action-card').getByTestId('lobby-guide')).toHaveCount(0);
-	const [guideBox, settingsBox] = await Promise.all([
-		guide.boundingBox(),
-		page.getByTestId('lobby-settings').boundingBox()
-	]);
-	expect(guideBox!.y).toBe(settingsBox!.y);
+	const trigger = page.getByTestId('lobby-menu-button');
+	await expect(trigger).toHaveAccessibleName('Menu');
+	await expect(page.getByTestId('lobby-guide')).toHaveCount(0);
+	await trigger.click();
+	const menu = page.getByTestId('lobby-menu');
+	await expect(menu.getByTestId('lobby-guide')).toHaveText('Faan guide');
+	await expect(menu.getByTestId('lobby-settings')).toHaveText('Settings');
+	// flag off on this server: no account section
+	await expect(menu.getByTestId('account-panel')).toHaveCount(0);
+
+	const viewport = page.viewportSize()!;
+	const box = (await menu.boundingBox())!;
+	expect(box.x).toBeGreaterThanOrEqual(0);
+	expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+
+	await page.keyboard.press('Escape');
+	await expect(menu).toHaveCount(0);
+	await expect(trigger).toBeFocused();
 });
 
 test('profile route renders', async ({ page }) => {
@@ -520,6 +586,7 @@ test('tables page shows Rejoin for a table this browser has joined before', asyn
 
 test('guide button opens a faan library with a tab per faan count', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await expect(page.getByTestId('guide-dialog')).toBeVisible();
 	await expect(page.getByTestId('guide-panel')).toContainText('All Sequences');
@@ -534,6 +601,7 @@ test('guide button opens a faan library with a tab per faan count', async ({ pag
 
 test('guide search finds patterns across faan counts', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await page.getByTestId('guide-search').fill('dragon');
 	await expect(page.locator('[data-pattern="小三元"]')).toBeVisible();
@@ -543,6 +611,7 @@ test('guide search finds patterns across faan counts', async ({ page }) => {
 
 test('a compare link jumps to the look-alike pattern', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await page.getByTestId('guide-tab-3').click();
 	const halfFlush = page.locator('[data-pattern="混一色"]');
@@ -553,6 +622,7 @@ test('a compare link jumps to the look-alike pattern', async ({ page }) => {
 
 test('guide scoring view shows the points table', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await page.getByTestId('guide-view-scoring').click();
 	await expect(page.getByTestId('guide-view-scoring')).toHaveAttribute('aria-selected', 'true');
@@ -579,6 +649,7 @@ test('hand checker scores a picked hand through POST /score', async ({ page }) =
 		});
 	});
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await page.getByTestId('guide-view-checker').click();
 	for (const code of ['1s', '2s', '3s', '4s', '5s', '6s', '7s', '8s', '9s', '2s', '2s', '2s', '5s'])
@@ -610,6 +681,7 @@ test('hand checker layout stays put while a hand is picked and scored', async ({
 	);
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await page.getByTestId('guide-view-checker').click();
 	const options = page.getByTestId('checker-fully-concealed');
@@ -629,6 +701,7 @@ test('hand checker layout stays put while a hand is picked and scored', async ({
 
 test('guide uses two columns when wide and one on phone', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	const columns = () =>
 		page
@@ -644,6 +717,7 @@ test('guide uses two columns when wide and one on phone', async ({ page }) => {
 
 test('guide dialog keeps its height across tabs', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	const dialog = page.getByTestId('guide-dialog');
 	const before = (await dialog.boundingBox())!.height;
@@ -655,6 +729,7 @@ test('guide dialog keeps its height across tabs', async ({ page }) => {
 
 test('guide ruleset filter hides patterns a preset disables', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-guide').click();
 	await expect(page.getByTestId('guide-panel')).toContainText('Seven Pairs');
 	await page.getByTestId('guide-ruleset').selectOption('hk_strict');
@@ -664,10 +739,12 @@ test('guide ruleset filter hides patterns a preset disables', async ({ page }) =
 	await expect(page.getByTestId('guide-panel')).toContainText('Seven Pairs');
 });
 
-test('language button on the lobby switches to zh-Hant and back', async ({ page }) => {
+test('language item in the lobby menu switches to zh-Hant and back', async ({ page }) => {
 	await page.goto('/');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-language').click();
 	await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
+	await page.getByTestId('lobby-menu-button').click();
 	await page.getByTestId('lobby-language').click();
 	await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });

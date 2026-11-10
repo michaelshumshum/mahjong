@@ -54,7 +54,7 @@ graded by the engine.
 
 | | |
 | --- | --- |
-| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — play online, practice vs bots, or learn (學); the faan guide sits with language and settings, over a scrolling tile-mural canvas background | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard |
+| ![Lobby](docs/screenshots/lobby.png) Lobby (`/`) — play online, practice vs bots, or learn (學); account, faan guide, settings and language sit in the corner menu, over a scrolling tile-mural canvas background | ![Table, your turn](docs/screenshots/table-your-turn.png) Table — your turn to discard |
 | ![Table, hand ended](docs/screenshots/table-hand-ended.png) Table — hand ended: result stamp, winning hand, faan rows, payments | ![Table, your turn, phone](docs/screenshots/table-your-turn-phone.png) Table — your turn, phone |
 
 <details>
@@ -71,7 +71,8 @@ graded by the engine.
 | ![Faan guide, scoring](docs/screenshots/lobby-guide-scoring.png) Faan guide — how faan add up, faan → points table, who pays | ![Faan guide, hand checker](docs/screenshots/lobby-guide-checker.png) Faan guide — check a hand: pick 14 tiles, scored by `POST /score` |
 | ![Learn](docs/screenshots/learn.png) Learn (`/learn`) — a guided tutorial to start, then a tab per puzzle track (each with its own glyph and hue), puzzles grouped by difficulty, solved ones sealed, plus an endless mode | ![Learn, puzzle](docs/screenshots/learn-puzzle.png) Learn — a puzzle on the real table: pick the winning tiles, checked against the engine's answer |
 | ![Learn, discard feedback](docs/screenshots/learn-puzzle-feedback.png) Learn — feedback on a wrong discard: why it is worse, and every option from the engine's key | ![Learn, safe-discard feedback](docs/screenshots/learn-puzzle-safe.png) Learn — a defence pick that was only lucky: each hand tile's verdict, and which one deals in |
-| ![Learn, tutorial](docs/screenshots/learn-tutorial.png) Learn — the guided tutorial: a tip with its part of the table outlined, played through the real table | |
+| ![Learn, tutorial](docs/screenshots/learn-tutorial.png) Learn — the guided tutorial: a tip with its part of the table outlined, played through the real table | ![Lobby menu](docs/screenshots/lobby-menu.png) Lobby — the corner menu: sign-in and account (accounts on), guest name, faan guide, settings, language |
+| ![Lobby welcome](docs/screenshots/lobby-welcome.png) Lobby — first visit: sign in (accounts on) or pick a guest name | |
 
 </details>
 

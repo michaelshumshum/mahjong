@@ -638,7 +638,6 @@ wrap, `Home`/`End`):
 | Calls | `autoArm`: No calls, Auto-pass chow (switches) |
 | Gameplay | discard mode and hand order (segmented), Announce every discard (switch) |
 | Display | tile size and motion (segmented), Sound effects (switch), Volume (`SliderRow`, disabled while sound is off), Haptic feedback (switch), language (`LocaleSwitcher`, segmented) |
-| Account | only while the account session is `guest` or `signedIn` (§6 "Account session"): `AccountPanel` |
 
 - Every control carries a one-line description; a segmented control (`SegmentedControl.svelte`,
   a native radio group) shows only the selected option's description.
@@ -721,10 +720,12 @@ hides every account UI (`off` below). `lib/net/account.ts` holds the hand-typed
 - **Client-only, no SSR fetch.** The `mj_session` cookie is host-only on the API host, so the web
   host's SSR never receives it and has nothing to forward; an SSR `/me` would always be a guest.
   `load()` runs from a mount `$effect`, so account UI renders after hydration.
-- `lib/ui/AccountPanel.svelte` (Settings' Account tab, `/profile`): a guest gets
+- **Entry point:** the lobby menu (§7 "Lobby"): sign-in for a guest; name, an "Account and
+  games" link to `/profile` and Sign out once signed in. Settings has no account tab.
+- `lib/ui/AccountPanel.svelte` (the lobby menu's guest section, `/profile`): a guest gets
   `GoogleSignInButton` (Google's dark-theme button, a link to `/auth/google/login?next=<this
-  page>`); a signed-in player their name and Sign out (`POST /auth/logout`, then `guest`), plus,
-  in Settings, an "Account settings" link to `/profile`.
+  page>`); a signed-in player their name and Sign out. Both sign-outs go through
+  `accountSession.signOut()` (`POST /auth/logout`, then `guest`).
 - `lib/ui/AccountSettings.svelte` (`/profile`, signed in): display name (`PATCH /me`, capped at
   the generated `MAX_NAME_LENGTH`), the consent checkbox (`PATCH /me` on change), Download
   (`GET /me/export` fetched as a blob and saved as `mahjong-account.json`: a cross-origin
@@ -960,17 +961,46 @@ by code, browse): invitees arrive by table URL, not through the lobby, so separa
 entries here split one intent across two controls. "Learn" is a link to `/learn`
 ([ADR 0025](decisions/0025-learn-mode.md)); "Practice vs Bots" is a `<button>` opening its dialog.
 Each card's control holds only the title (its accessible name, which e2e matches exactly), and its
-`::after` stretches the hit area over the whole card. Below the cards, three secondary-tier buttons
-(`btn-secondary`, brass lucide icon): "Faan guide" (`book-open`, opens `GuideDialog`, below), a
-language toggle and Settings. The toggle shows a shorthand
-of the other locale (`中文` / `EN`, `lobby_languageShort`), with the full name
-(`lobby_languageButton`) as its `aria-label` and the target locale as its `lang`. Settings opens
+`::after` stretches the hit area over the whole card.
+
+**Menu.** A burger button in the page's top-right corner (`lib/ui/LobbyMenu.svelte`,
+`btn-secondary`, brass lucide `menu`; signed in, the display name's initial in an ink-red avatar
+beside it) toggles a dropdown panel (`panel-elevated` on `--color-surface`, ~20rem, right-aligned
+under the button):
+
+| Section | Content |
+| --- | --- |
+| account | only while the account session is `guest` or `signedIn` (§6 "Account session"). Guest: `AccountPanel` (blurb, `GoogleSignInButton`, terms note, `LegalLinks`). Signed in: avatar, name and "Signed in with Google", then an "Account and games" link to `/profile` |
+| items | not signed in: "Guest name" with the stored name beside it (opens `WelcomeDialog` to rename, below); "Faan guide" (opens `GuideDialog`, below), Settings, the other locale's own name (`lobby_languageButton`, `lang` set to it; calls `setLocale()`) — full-width rows with a brass icon |
+| sign out | signed in only, muted: `accountSession.signOut()`; the panel stays open and turns into the guest section |
+
+It is a disclosure (`aria-expanded`/`aria-controls`), not an ARIA `menu`: the guest section holds
+prose and links. Escape closes it and refocuses the button; a pointer-down outside or focus
+leaving closes it. An item that opens a dialog closes the panel and focuses the button first, so
+the dialog hands focus back to the button.
+
+**Welcome.** Once `/me` has answered, a player who is not signed in (`guest` or `off`) and has no
+stored guest name (`mahjong:displayName:v1`, the name `join` sends) gets `lib/ui/WelcomeDialog.svelte`
+over the lobby: with accounts on, the guest `AccountPanel` (Google sign-in), an "or" rule, then a
+guest-name field with "Play as guest" (saves the trimmed name) and "Not now". `lib/ui/welcome-prompt.ts`'s
+`shouldPromptWelcome` decides it, once per lobby mount:
+
+- signed in, a non-blank stored name, or before `/me` answers: no prompt;
+- a `?signin=`/`?signup=` callback load: no prompt, `SigninReturn`'s own dialog owns it;
+- "Not now" or Escape: no prompt again until a reload (a module flag, not storage), so a nameless
+  guest is asked on every fresh visit.
+
+Lobby only: an invite link lands on `/table/[id]`, whose pre-game screen asks for the name itself,
+and `/learn` needs none. The menu's "Guest name" opens the same dialog prefilled, titled "Your guest
+name", with Save/Cancel. The stored name also prefills the table's name field and the sign-up
+dialog (`signupName`). Settings opens
 the same `Settings.svelte` panel as the table (§6), loading prefs and `autoArm` from storage on
 open (the lobby is SSR'd). Changes are saved and applied immediately; `autoArm` is only saved,
 and the table re-sends it on its next connection. Muted links sit in the page's bottom-right
 corner (centred and wrapping below 768px): "Status" (lucide `activity`, to `/status`), "Privacy"
 and "Terms" (text only, to `/privacy` and `/terms`) and "Source code" (GitHub mark + label, new
-tab). Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
+tab); they stay on the page rather than in the menu so the privacy policy is linked from the
+home page itself. Three columns at ≥768px, one stacked column below. The mural scrim (§2) is darker in the
 middle (a radial gradient) so this copy reads over the tiles.
 
 ### Server status (`/status`)
@@ -1006,7 +1036,7 @@ phase 7), also the URLs on Google's consent screen.
   the request cookie and the contact from runtime env, so a prerendered page would bake in one
   of each.
 - **Linked from** the lobby's corner links, the sign-up dialog, the guest `AccountPanel`
-  (Settings' Account tab, `/profile`) and `AccountSettings` (§6 "Account session").
+  (lobby menu, `/profile`) and `AccountSettings` (§6 "Account session").
 - **Wording.** Every claim is about the app as built (scopes `openid email`, session lifetimes,
   cookie names, what `DELETE /me` removes); a change to any of those changes the text and the
   effective date with it. The training section matches the consent checkbox and
@@ -1014,9 +1044,9 @@ phase 7), also the URLs on Google's consent screen.
 
 ### Faan guide and language toggle
 
-The language link calls `setLocale()` with the other locale
+The lobby menu's language item calls `setLocale()` with the other locale
 (label is the target language's own name, so it reads right in either locale); `LocaleSwitcher`
-stays in `Settings`. The lobby's secondary "Faan guide" button and the table rail's Guide button
+stays in `Settings`. The lobby menu's "Faan guide" item and the table rail's Guide button
 open `lib/ui/GuideDialog.svelte`: up to `68rem` wide and a
 fixed `90dvh` tall (each view scrolls inside it, so switching doesn't resize it); on phone it is
 a `sheet` placement filling the screen edge to edge, with no frame. A ruleset select sits over
@@ -1678,7 +1708,7 @@ spread. Files group key prefixes by app area:
 | File | Key prefixes |
 | --- | --- |
 | `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
-| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, table creation and practice setup: `lobby`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `statusPage` |
+| `lobby.json` | `/`, `/tables`, `/profile`, `/status`, table creation and practice setup: `lobby`, `lobbyMenu`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `profilePage`, `statusPage` |
 | `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
 | `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
 | `tiles.json` | `tileName`, `tileFace` |

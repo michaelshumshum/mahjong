@@ -85,6 +85,26 @@ const LOBBY_TABLES = [
 // app; don't add every mock scenario. `viewport` defaults to DESKTOP.
 const PAGES = [
 	{ name: 'lobby', url: '/' },
+	// the lobby's burger menu (docs/frontend.md's "Lobby"): faan guide, settings, language, and
+	// the account section when accounts are on.
+	{
+		name: 'lobby-menu',
+		url: '/',
+		async before(page) {
+			await page.getByTestId('lobby-menu-button').click();
+			// past the panel's entrance animation
+			await page.waitForTimeout(300);
+		}
+	},
+	// first visit with no guest name: sign in or pick one (only the name with accounts off,
+	// as here). `?welcome` is read by the init script below, not the app.
+	{
+		name: 'lobby-welcome',
+		url: '/?welcome',
+		async before(page) {
+			await page.getByTestId('welcome-dialog').waitFor();
+		}
+	},
 	// the ruleset picker `POST /tables` (docs/protocol.md §10) needs before a table can be
 	// created -- opened from the tables page header.
 	{
@@ -127,6 +147,7 @@ const PAGES = [
 		name: 'lobby-guide',
 		url: '/',
 		async before(page) {
+			await page.getByTestId('lobby-menu-button').click();
 			await page.getByTestId('lobby-guide').click();
 			await page.getByTestId('guide-ruleset').selectOption('hk_classic');
 			await page.getByTestId('guide-tab-3').click();
@@ -139,6 +160,7 @@ const PAGES = [
 		name: 'lobby-guide-scoring',
 		url: '/',
 		async before(page) {
+			await page.getByTestId('lobby-menu-button').click();
 			await page.getByTestId('lobby-guide').click();
 			await page.getByTestId('guide-ruleset').selectOption('hk_classic');
 			await page.getByTestId('guide-view-scoring').click();
@@ -163,6 +185,7 @@ const PAGES = [
 					}
 				})
 			);
+			await page.getByTestId('lobby-menu-button').click();
 			await page.getByTestId('lobby-guide').click();
 			await page.getByTestId('guide-view-checker').click();
 			for (const code of [
@@ -304,6 +327,7 @@ const PAGES = [
 		url: '/',
 		viewport: PHONE,
 		async before(page) {
+			await page.getByTestId('lobby-menu-button').click();
 			await page.getByTestId('lobby-guide').click();
 		}
 	},
@@ -312,6 +336,7 @@ const PAGES = [
 		url: '/',
 		viewport: PHONE,
 		async before(page) {
+			await page.getByTestId('lobby-menu-button').click();
 			await page.getByTestId('lobby-guide').click();
 			await page.getByTestId('guide-view-checker').click();
 			for (const code of ['1m', '2m', '3m', 'z1', 'z1', 'z1'])
@@ -407,6 +432,12 @@ async function main() {
 		await waitForServer(BASE + '/');
 		browser = await chromium.launch();
 		const page = await browser.newPage({ viewport: DESKTOP });
+		// a named guest, so the lobby's first-visit welcome dialog only shows on its own entry
+		await page.addInitScript(() => {
+			const key = 'mahjong:displayName:v1';
+			if (location.search.includes('welcome')) localStorage.removeItem(key);
+			else localStorage.setItem(key, JSON.stringify('Sam'));
+		});
 		page.on('pageerror', (e) => errors.push(String(e)));
 		page.on('console', (msg) => {
 			if (msg.type() === 'error') errors.push(msg.text());
