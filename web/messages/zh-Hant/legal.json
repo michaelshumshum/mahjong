@@ -44,7 +44,7 @@
 	"privacyPage_keepDelete": "在帳戶設定中刪除帳戶會即時生效，並移除你的帳戶、其 Google 連結、工作階段及學習進度。過往牌局會保留在牌枱上輸入的名字，但不再與你連繫。",
 	"privacyPage_keepGames": "牌局紀錄（不論訪客或已登入）會無限期保留。",
 	"privacyPage_choicesHeading": "你的選擇",
-	"privacyPage_choicesExport": "在帳戶設定中，以 JSON 檔案下載你帳戶內的所有資料。",
+	"privacyPage_choicesExport": "透過下方的聯絡方式，索取你帳戶內所有資料的副本，你會收到一個 JSON 檔案。",
 	"privacyPage_choicesEdit": "隨時更改你的顯示名稱或訓練選擇。",
 	"privacyPage_choicesOther": "如有其他要求，例如更正資料，請使用下方的聯絡方式。",
 	"privacyPage_childrenHeading": "兒童",

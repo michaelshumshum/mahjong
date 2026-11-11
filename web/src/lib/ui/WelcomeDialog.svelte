@@ -54,7 +54,6 @@
 					data-autofocus
 					data-testid="welcome-name"
 				/>
-				<span class="hint">{m.welcomeDialog_nameHint()}</span>
 			</label>
 			<div class="actions">
 				<button type="button" class="secondary" data-testid="welcome-later" onclick={onClose}>
@@ -122,13 +121,6 @@
 			font: inherit;
 			font-weight: 400;
 		}
-	}
-
-	.hint {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
-		font-weight: 400;
-		line-height: 1.35;
 	}
 
 	.actions {

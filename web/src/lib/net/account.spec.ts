@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
 	deleteMe,
-	exportMe,
 	fetchMyGames,
 	joinName,
 	patchMe,
@@ -83,14 +82,6 @@ describe('account calls', () => {
 		expect(ok).toHaveBeenCalledWith('http://api/me', { credentials: 'include', method: 'DELETE' });
 		const gone = vi.fn<typeof fetch>(async () => new Response(null, { status: 401 }));
 		await expect(deleteMe('http://api', gone)).rejects.toThrow('401');
-	});
-
-	it('exportMe returns the body untouched', async () => {
-		const body = '{"user":{"id":"u"},"identities":[],"games":[]}';
-		const fetchFn = vi.fn<typeof fetch>(async () => new Response(body));
-		const blob = await exportMe('http://api', fetchFn);
-		expect(await blob.text()).toBe(body);
-		expect(fetchFn).toHaveBeenCalledWith('http://api/me/export', { credentials: 'include' });
 	});
 
 	it('signOut posts with the cookie', async () => {

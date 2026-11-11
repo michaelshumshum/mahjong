@@ -11,10 +11,7 @@ describe('training consent wording', () => {
 		const entries = Object.entries(messages).filter(([key]) =>
 			key.startsWith('trainingConsentField_')
 		);
-		expect(entries.map(([key]) => key)).toEqual([
-			'trainingConsentField_label',
-			'trainingConsentField_description'
-		]);
+		expect(entries.map(([key]) => key)).toEqual(['trainingConsentField_label']);
 		for (const [, text] of entries) {
 			expect(text).not.toMatch(/draft|草擬/i);
 		}

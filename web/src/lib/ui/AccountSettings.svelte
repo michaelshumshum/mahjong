@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages.js';
-	import { EXPORT_FILENAME, exportMe, patchMe, type Me, type MePatch } from '$lib/net/account';
+	import { patchMe, type Me, type MePatch } from '$lib/net/account';
 	import { accountSession } from '$lib/net/account-session.svelte';
 	import { MAX_NAME_LENGTH } from '$lib/net/protocol.constants';
 	import DeleteAccountDialog from './DeleteAccountDialog.svelte';
@@ -23,24 +23,6 @@
 			status = { text: done, error: false };
 		} catch {
 			status = { text: m.accountSettings_saveError(), error: true };
-		} finally {
-			busy = false;
-		}
-	}
-
-	async function download(): Promise<void> {
-		busy = true;
-		status = null;
-		try {
-			const url = URL.createObjectURL(await exportMe());
-			const link = Object.assign(document.createElement('a'), {
-				href: url,
-				download: EXPORT_FILENAME
-			});
-			link.click();
-			URL.revokeObjectURL(url);
-		} catch {
-			status = { text: m.accountSettings_exportError(), error: true };
 		} finally {
 			busy = false;
 		}
@@ -91,41 +73,18 @@
 		</div>
 	</section>
 
-	<section class="group" aria-labelledby="{uid}-data">
-		<h3 class="legend" id="{uid}-data">{m.accountSettings_dataHeading()}</h3>
-		<div class="card">
-			<div class="data">
-				<div class="text">
-					<span class="label">{m.accountSettings_exportLabel()}</span>
-					<span class="desc">{m.accountSettings_exportDesc()}</span>
-				</div>
-				<button
-					type="button"
-					class="secondary"
-					disabled={busy}
-					data-testid="account-export"
-					onclick={download}
-				>
-					{m.accountSettings_exportButton()}
-				</button>
-			</div>
-			<div class="data">
-				<div class="text">
-					<span class="label">{m.accountSettings_deleteLabel()}</span>
-					<span class="desc">{m.accountSettings_deleteDesc()}</span>
-				</div>
-				<button
-					type="button"
-					class="secondary delete"
-					disabled={busy}
-					data-testid="account-delete"
-					onclick={() => (confirmingDelete = true)}
-				>
-					{m.accountSettings_deleteButton()}
-				</button>
-			</div>
-		</div>
-	</section>
+	<div class="card data">
+		<span class="label">{m.accountSettings_deleteLabel()}</span>
+		<button
+			type="button"
+			class="secondary delete"
+			disabled={busy}
+			data-testid="account-delete"
+			onclick={() => (confirmingDelete = true)}
+		>
+			{m.accountSettings_deleteButton()}
+		</button>
+	</div>
 
 	{#if status}
 		<p class="status" class:status--error={status.error} role="status">{status.text}</p>
@@ -188,23 +147,11 @@
 		align-items: center;
 		gap: var(--space-3);
 		padding-block: var(--space-3);
-
-		& + & {
-			border-top: 1px solid var(--color-border);
-		}
-	}
-
-	.text {
-		@include forms.field-text;
-		flex: 1 1 auto;
 	}
 
 	.label {
 		@include forms.field-label;
-	}
-
-	.desc {
-		@include forms.field-desc;
+		flex: 1 1 auto;
 	}
 
 	.secondary {

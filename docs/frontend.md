@@ -724,7 +724,7 @@ hides every account UI (`off` below). `lib/net/account.ts` holds the hand-typed
   Account and My games (each a dialog over the lobby, below) and Sign out
   (`accountSession.signOut()`: `POST /auth/logout`, then `guest`). Settings has no account tab,
   and there is no account page: `/profile` redirects (307) to `/`.
-- `lib/ui/AccountPanel.svelte` (the menu's and `WelcomeDialog`'s guest section): blurb,
+- `lib/ui/AccountPanel.svelte` (the menu's and `WelcomeDialog`'s guest section):
   `GoogleSignInButton` (a link to `/auth/google/login?next=<this page>`), terms note and
   `LegalLinks`; nothing outside `guest`.
 - **Dialogs** (`DismissablePanel`, the Settings frame: `PanelHeader`, capped height, the body
@@ -741,13 +741,15 @@ hides every account UI (`off` below). `lib/net/account.ts` holds the hand-typed
   and the dark theme's `#131314` fill. Font, radius, border and hover are the app's own
   (`btn-base`, `--radius-sm`, `--color-border`, brass hover), so it sits with the other buttons
   instead of as a foreign pill in Roboto (~22 kB loaded for one button).
-- `lib/ui/AccountSettings.svelte` (`AccountDialog`): three Settings-style groups (`settings-legend`
-  over a `settings-card`): Display name (`PATCH /me`, capped at the generated `MAX_NAME_LENGTH`);
-  Privacy, the consent checkbox (`PATCH /me` on change); Your data, Download (`GET /me/export`
-  fetched as a blob and saved as `mahjong-account.json`: a cross-origin download can't read the
-  server's `Content-Disposition`) and Delete. `DeleteAccountDialog` (stacked over the account
+- `lib/ui/AccountSettings.svelte` (`AccountDialog`): Settings-style groups (`settings-legend` over
+  a `settings-card`): Display name (`PATCH /me`, capped at the generated `MAX_NAME_LENGTH`);
+  Privacy, the consent checkbox (`PATCH /me` on change); then a Delete account row. Labels only,
+  no description lines. No in-app export: `GET /me/export` stays on the server, and the privacy
+  policy points data requests at the contact. `DeleteAccountDialog` (stacked over the account
   dialog) enables its button only once the display name is typed exactly, then `DELETE /me` and
   `guest`.
+- `TrainingConsentField` (here and the sign-up dialog) is one checkbox and one label, "Allow my
+  games to be used to train the bots"; the details live in the privacy policy's training section.
 - `lib/ui/MyGames.svelte` (`MyGamesDialog`): `GET /me/games` on mount, newest first;
   each row is a `settings-card` with the own placement (`rank.ts`'s label and tone) and score, end time (locale date),
   mode, hand count and the three opponents: a name (`Guest` when the seat had none) or, for a
@@ -987,7 +989,7 @@ under the button):
 
 | Section | Content |
 | --- | --- |
-| account | only while the account session is `guest` or `signedIn` (§6 "Account session"). Guest: `AccountPanel` (blurb, `GoogleSignInButton`, terms note, `LegalLinks`). Signed in: avatar, name and "Signed in with Google", then Account and My games (open `AccountDialog` / `MyGamesDialog`) |
+| account | only while the account session is `guest` or `signedIn` (§6 "Account session"). Guest: `AccountPanel` (`GoogleSignInButton`, then the terms note and `LegalLinks`; nothing above the button). Signed in: avatar, name and "Signed in with Google", then Account and My games (open `AccountDialog` / `MyGamesDialog`) |
 | items | not signed in: "Guest name" with the stored name beside it (opens `WelcomeDialog` to rename, below); "Faan guide" (opens `GuideDialog`, below), Settings, the other locale's own name (`lobby_languageButton`, `lang` set to it; calls `setLocale()`) — full-width rows with a brass icon |
 | sign out | signed in only, muted: `accountSession.signOut()`; the panel stays open and turns into the guest section |
 

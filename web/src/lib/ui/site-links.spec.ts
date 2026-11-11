@@ -14,8 +14,8 @@ describe('contactEmail', () => {
 
 describe('effectiveDateLabel', () => {
 	it('formats the date in each locale, in UTC', () => {
-		expect(effectiveDateLabel('en')).toBe('November 6, 2026');
-		expect(effectiveDateLabel('zh-Hant')).toBe('2026年11月6日');
+		expect(effectiveDateLabel('en')).toBe('November 11, 2026');
+		expect(effectiveDateLabel('zh-Hant')).toBe('2026年11月11日');
 	});
 });
 

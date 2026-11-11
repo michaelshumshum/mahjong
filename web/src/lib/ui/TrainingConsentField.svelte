@@ -7,8 +7,6 @@
 		disabled = false,
 		onChange
 	}: { checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void } = $props();
-
-	const uid = $props.id();
 </script>
 
 <label class="consent" data-testid="training-consent">
@@ -16,13 +14,9 @@
 		type="checkbox"
 		{checked}
 		{disabled}
-		aria-describedby="{uid}-desc"
 		onchange={(event) => onChange(event.currentTarget.checked)}
 	/>
-	<span class="text">
-		<span class="label">{m.trainingConsentField_label()}</span>
-		<span class="desc" id="{uid}-desc">{m.trainingConsentField_description()}</span>
-	</span>
+	<span class="label">{m.trainingConsentField_label()}</span>
 </label>
 
 <style lang="scss">
@@ -44,15 +38,7 @@
 		accent-color: var(--color-accent);
 	}
 
-	.text {
-		@include forms.field-text;
-	}
-
 	.label {
 		@include forms.field-label;
-	}
-
-	.desc {
-		@include forms.field-desc;
 	}
 </style>

@@ -8,7 +8,6 @@
 <!-- a signed-in player's account lives in AccountDialog -->
 {#if accountSession.state.status === 'guest'}
 	<div class="account-panel" data-testid="account-panel">
-		<p class="blurb">{m.accountPanel_guestBlurb()}</p>
 		<GoogleSignInButton />
 		<p class="blurb">{m.accountPanel_termsNote()}</p>
 		<LegalLinks />

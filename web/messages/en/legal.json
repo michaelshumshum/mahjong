@@ -44,7 +44,7 @@
 	"privacyPage_keepDelete": "Deleting your account in account settings takes effect at once. It removes your account, its Google link, its sessions and its learn progress. Past games stay, with the name typed at the table, but no longer link to you.",
 	"privacyPage_keepGames": "Game records, guest or signed in, are kept with no set end date.",
 	"privacyPage_choicesHeading": "Your choices",
-	"privacyPage_choicesExport": "Download everything your account holds, as a JSON file, from account settings.",
+	"privacyPage_choicesExport": "Ask for a copy of everything your account holds, through the contact below, and you'll get it as a JSON file.",
 	"privacyPage_choicesEdit": "Change your display name or your training choice at any time.",
 	"privacyPage_choicesOther": "For anything else, such as a correction, use the contact below.",
 	"privacyPage_childrenHeading": "Children",

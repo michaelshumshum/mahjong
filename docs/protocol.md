@@ -751,10 +751,12 @@ PATCH /me
   `null` removes a key. Only `PrefsPatch`'s keys (`app/api_models.py`) are stored: any other key,
   a `learn_band` outside `Band` or a non-boolean `coach_marks_done` is `422`.
 - `training_consent: true` sets `training_consent_at` to now and `consent_version` to
-  `TRAINING_CONSENT_VERSION` (`app/accounts/routes.py`, `"2026-11"`; bumped with the web's
+  `TRAINING_CONSENT_VERSION` (`app/accounts/routes.py`, `"2026-11-11"`; bumped with the web's
   wording), unless that version is already recorded. `false` clears both to null. Consents
   recorded under the phase 3 placeholder (`"2026-11-draft"`, test users only) were cleared by
-  migration `e4a7c2d9b815` rather than carried over to the final wording.
+  migration `e4a7c2d9b815` rather than carried over to the final wording. `"2026-11"` (a label
+  plus a description; `"2026-11-11"` is the one-line label "Allow my games to be used to train
+  the bots") is kept as recorded: both say the same thing, so it isn't cleared.
 
 ```
 DELETE /me

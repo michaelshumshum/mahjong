@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { ACCOUNTS_PORT } from '../../playwright.config';
 import type { Me, MyGame, MyGamesPage } from '../lib/net/account';
@@ -103,9 +102,6 @@ async function stubApi(
 		}
 		return route.fulfill({ status: 204, headers: cors(route) });
 	});
-	await page.route(`${API}/me/export`, (route) =>
-		route.fulfill({ json: { user, identities: [], games: [] }, headers: cors(route) })
-	);
 	return calls;
 }
 
@@ -256,16 +252,18 @@ test.describe('accounts on', () => {
 		]);
 	});
 
-	test('export downloads the account json', async ({ page }) => {
+	test('the account dialog has no export, and no subtext on consent or delete', async ({
+		page
+	}) => {
 		await stubApi(page, true);
-		await openFromMenu(page, 'account');
-		const [download] = await Promise.all([
-			page.waitForEvent('download'),
-			page.getByTestId('account-export').click()
-		]);
-		expect(download.suggestedFilename()).toBe('mahjong-account.json');
-		const body = JSON.parse(await readFile(await download.path(), 'utf8'));
-		expect(body.user.display_name).toBe('Ann');
+		const dialog = await openFromMenu(page, 'account');
+		await expect(dialog.getByTestId('account-export')).toHaveCount(0);
+		await expect(dialog.getByTestId('training-consent')).toHaveText(
+			'Allow my games to be used to train the bots'
+		);
+		await expect(dialog.getByTestId('account-delete').locator('..')).toHaveText(
+			/^\s*Delete account\s*Delete…\s*$/
+		);
 	});
 
 	// ?pregame=join freezes the seat picker without a socket (frontend-screenshots skill)

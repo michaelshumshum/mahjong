@@ -13,14 +13,14 @@ for (const { path, testId, en, zh } of PAGES) {
 		await expect(page.getByTestId(testId)).toBeVisible();
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText(en);
 		await expect(page).toHaveTitle(`${en} · Hoi Toi`);
-		await expect(page.getByTestId('legal-effective')).toContainText('November 6, 2026');
+		await expect(page.getByTestId('legal-effective')).toContainText('November 11, 2026');
 	});
 
 	test(`${path} renders in zh-Hant from the locale cookie`, async ({ page, context, baseURL }) => {
 		await context.addCookies([{ name: 'PARAGLIDE_LOCALE', value: 'zh-Hant', url: baseURL! }]);
 		await page.goto(path);
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText(zh);
-		await expect(page.getByTestId('legal-effective')).toContainText('2026年11月6日');
+		await expect(page.getByTestId('legal-effective')).toContainText('2026年11月11日');
 	});
 
 	test(`${path} is in the server-rendered html`, async ({ request }) => {

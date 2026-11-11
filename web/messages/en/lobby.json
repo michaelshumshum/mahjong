@@ -99,7 +99,6 @@
 	"welcomeDialog_editTitle": "Your guest name",
 	"welcomeDialog_or": "or",
 	"welcomeDialog_nameLabel": "Guest name",
-	"welcomeDialog_nameHint": "Other players see this at the table. Change it any time from the menu.",
 	"welcomeDialog_laterButton": "Not now",
 	"welcomeDialog_cancelButton": "Cancel",
 	"welcomeDialog_guestButton": "Play as guest",

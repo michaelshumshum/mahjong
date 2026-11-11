@@ -81,8 +81,8 @@ _OAUTH_COOKIE_PATH = "/auth/google"
 _OAUTH_COOKIE_MAX_AGE_SECONDS = 600
 _MAX_NEXT_LENGTH = 512
 # the training-consent wording a user agrees to (ADR 0016); bump with the web's wording.
-# consents under the phase 3 placeholder ("2026-11-draft") were cleared by migration e4a7c2d9b815
-TRAINING_CONSENT_VERSION = "2026-11"
+# "2026-11-draft" consents were cleared by migration e4a7c2d9b815; "2026-11" ones stay valid
+TRAINING_CONSENT_VERSION = "2026-11-11"
 DEFAULT_GAMES_PAGE = 20
 MAX_GAMES_PAGE = 50
 

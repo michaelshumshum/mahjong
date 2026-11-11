@@ -64,19 +64,6 @@ export async function deleteMe(
 	if (!response.ok) throw new Error(`DELETE /me failed: ${response.status}`);
 }
 
-/** `GET /me/export`'s JSON as a file body, untouched (server: ExportResponse). */
-export async function exportMe(
-	baseUrl: string = apiBaseUrl(),
-	fetchFn: typeof fetch = fetch
-): Promise<Blob> {
-	const response = await fetchFn(`${baseUrl}/me/export`, WITH_SESSION);
-	if (!response.ok) throw new Error(`GET /me/export failed: ${response.status}`);
-	return response.blob();
-}
-
-// the server's Content-Disposition name; a cross-origin download can't read that header
-export const EXPORT_FILENAME = 'mahjong-account.json';
-
 // server: app/db/models.py's GameMode and SeatKind
 export type GameMode = 'practice' | 'multiplayer';
 export type SeatKind = 'user' | 'guest' | 'bot';
