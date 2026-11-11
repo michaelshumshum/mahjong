@@ -30,12 +30,46 @@
 		cursor: pointer;
 	}
 
+	// OptionRow's box, drawn on the real input so focus and keyboard stay native
 	input {
-		flex: none;
-		width: 1.25rem;
-		height: 1.25rem;
+		@include forms.option-control;
+		position: relative;
 		margin: 2px 0 0;
-		accent-color: var(--color-accent);
+		border-radius: var(--radius-sm);
+		background: transparent;
+		appearance: none;
+		pointer-events: auto;
+		cursor: pointer;
+
+		&:checked {
+			@include forms.option-control-checked;
+		}
+
+		&:checked::after {
+			content: '';
+			position: absolute;
+			top: 0.1rem;
+			left: 0.32rem;
+			width: 0.3rem;
+			height: 0.6rem;
+			border: solid var(--color-tile-ink);
+			border-width: 0 2px 2px 0;
+			transform: rotate(45deg);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--color-accent);
+			outline-offset: 2px;
+		}
+
+		&:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+	}
+
+	.consent:hover input:not(:checked, :disabled) {
+		border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%);
 	}
 
 	.label {
