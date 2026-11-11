@@ -8,6 +8,7 @@ import { MAX_NAME_LENGTH } from './protocol.constants';
 export interface Me {
 	id: string;
 	display_name: string;
+	avatar_url: string | null;
 	created_at: string;
 	training_consent_at: string | null;
 	consent_version: string | null;

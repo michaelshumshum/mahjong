@@ -11,6 +11,7 @@ vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/') } }));
 const ANN = {
 	id: 'u',
 	display_name: 'ann',
+	avatar_url: null,
 	created_at: '2026-11-01T00:00:00Z',
 	training_consent_at: null,
 	consent_version: null

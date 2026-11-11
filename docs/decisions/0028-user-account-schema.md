@@ -126,6 +126,7 @@ Cheap now, a backfill or a migration on a large table later.
 | `users.training_consent_at`, `consent_version` | [ADR 0016](0016-human-records-as-training-data.md) needs consent before human games become training data; recording which wording was agreed lets the wording change later | the consent toggle in account settings. Null = no consent; withdrawing sets it back to null |
 | `users.disabled_at` | a ban flag for public multiplayer | an operator, by SQL for now. A disabled user can't sign in, and setting it deletes their sessions |
 | `identities.email` | support contact and deletion requests | the OAuth callback, from the provider's profile, refreshed on each sign-in |
+| `users.avatar_url` | the signed-in player's own avatar in the lobby menu and account dialog | the OAuth callback, from userinfo's `picture` (https only, ≤ 2048 chars, else null), refreshed on each sign-in; migration `c8f2a6d41e37`. On `users`, not `identities`, so `/me` reads one row |
 
 ### Why `game_players` and not a foreign key on `games`
 
@@ -347,8 +348,9 @@ No code. Unblocks phase 2.
       [ADR 0029](0029-optional-accounts.md) (add `Superseded` to the status table in `README.md`;
       statuses flip in phase 7).
 - [ ] Google Cloud project + OAuth client (web application):
-      - scopes `openid email` only (non-sensitive, so no scope verification; `profile` was
-        dropped with the placeholder display name);
+      - scopes `openid email profile` (all non-sensitive, so no scope verification). `profile`
+        was first dropped with the placeholder display name, then added back for the picture
+        only (2026-11, "Profile picture" below): the google name it carries is never stored;
       - redirect URIs `https://mahjong-api.shumshum.dev/auth/google/callback` and
         `http://localhost:8000/auth/google/callback`;
       - authorized domain `shumshum.dev`;
@@ -473,6 +475,16 @@ seat data, placements and mode.
 
 Not scheduled. First try plain queries over `game_players` (games played, wins, average
 placement, practice vs multiplayer); add `user_stats` only if those get slow.
+
+### Profile picture (2026-11, after launch)
+
+- [x] Google's profile picture as the account avatar, in place of the display name's initial.
+      Shown only to the user (lobby menu, account dialog), never at the table: other players
+      would see a real face, usually beside a real name, which the placeholder name avoids.
+- [x] `profile` scope, `users.avatar_url`, `/me` and `/me/export` carry it; privacy policy
+      updated. Existing accounts get it at their next sign-in.
+- [x] The web loads it straight from Google's host with `referrerpolicy="no-referrer"`, falling
+      back to the initial if it fails. Not proxied: the url is the user's own, shown to them.
 
 ### Phase 7: privacy policy and terms, public launch
 

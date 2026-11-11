@@ -122,8 +122,8 @@ def test_login_redirects_to_google_with_pkce_and_state(fake_google: FakeGoogle) 
         query = _login(client, fake_google)
     assert query["client_id"] == "cid"
     assert query["response_type"] == "code"
-    # no `profile`: the account never sees the user's google name
-    assert query["scope"] == "openid email"
+    # `profile` for the picture; the name it also carries is never stored
+    assert query["scope"] == "openid email profile"
     assert query["redirect_uri"] == f"{_API}/auth/google/callback"
     assert query["code_challenge_method"] == "S256"
     assert len(query["state"]) >= 43
@@ -149,6 +149,25 @@ def test_first_sign_in_creates_the_user_and_asks_for_sign_up(
     assert str(identity.user_id) == me["id"]
     assert "Ann Lee" not in str(run_db(accounts_db, _dump))
     assert identity.email == "ann@x.test"
+    assert me["avatar_url"] is None
+
+
+def test_the_profile_picture_is_stored_and_refreshed(
+    fake_google: FakeGoogle, accounts_db: str
+) -> None:
+    fake_google.userinfo = {"sub": "g-1", "picture": "https://lh3.googleusercontent.com/a/1"}
+    with _client(fake_google) as client:
+        _sign_in(client, fake_google)
+        first = client.get("/me").json()["avatar_url"]
+        fake_google.userinfo = {"sub": "g-1", "picture": "https://lh3.googleusercontent.com/a/2"}
+        _sign_in(client, fake_google)
+        second = client.get("/me").json()["avatar_url"]
+        fake_google.userinfo = {"sub": "g-1"}
+        _sign_in(client, fake_google)
+        removed = client.get("/me").json()["avatar_url"]
+    assert first == "https://lh3.googleusercontent.com/a/1"
+    assert second == "https://lh3.googleusercontent.com/a/2"
+    assert removed is None
 
 
 def test_returning_sign_in_rotates_the_session_and_refreshes_email(
@@ -283,10 +302,17 @@ def test_auth_routes_are_rate_limited_per_ip(
 
 
 def test_odd_userinfo_fields_are_dropped(fake_google: FakeGoogle, accounts_db: str) -> None:
-    fake_google.userinfo = {"sub": "g-3", "email": 5, "name": ["x"]}
+    fake_google.userinfo = {
+        "sub": "g-3",
+        "email": 5,
+        "name": ["x"],
+        "picture": "javascript:alert(1)",
+    }
     with _client(fake_google) as client:
         _sign_in(client, fake_google)
-        assert _PLACEHOLDER.fullmatch(client.get("/me").json()["display_name"])
+        me = client.get("/me").json()
+    assert _PLACEHOLDER.fullmatch(me["display_name"])
+    assert me["avatar_url"] is None
     identity = fetch(accounts_db, Identity, "google", "g-3")
     assert identity is not None and identity.email is None
 

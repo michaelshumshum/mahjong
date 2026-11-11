@@ -699,9 +699,11 @@ its SHA-256 in `sessions.id_hash`. Host-only on the API host (no `Domain`), `Pat
 
 ```
 GET /me
--> {"id": "<uuid>", "display_name": "Ann", "created_at": "…",
+-> {"id": "<uuid>", "display_name": "Ann", "avatar_url": "https://…" | null, "created_at": "…",
     "training_consent_at": "…" | null, "consent_version": "…" | null}
 ```
+
+`avatar_url` is the provider's profile picture from the last sign-in (null if it had none).
 
 `401` without a live session.
 
@@ -771,7 +773,7 @@ cascade; the account's `game_players` rows keep `kind = 'user'` with a null `use
 ```
 GET /me/export
 -> Content-Disposition: attachment; filename="mahjong-account.json"
-{"user": {"id", "display_name", "created_at", "training_consent_at", "consent_version",
+{"user": {"id", "display_name", "avatar_url", "created_at", "training_consent_at", "consent_version",
           "disabled_at", "learn_imported_at"},
  "identities": [{"provider": "google", "subject": "…", "email": "…" | null, "created_at"}],
  "games": [{"game_id": 12, "created_at", "mode": "practice" | "multiplayer" | null, "seat": 1,

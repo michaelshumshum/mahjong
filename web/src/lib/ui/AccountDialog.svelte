@@ -15,7 +15,7 @@
 	<section class="account-dialog" aria-labelledby="{uid}-heading" data-testid="account-dialog">
 		<PanelHeader title={m.accountDialog_title()} titleId="{uid}-heading" />
 		<div class="profile">
-			<Avatar name={user.display_name} size="lg" />
+			<Avatar name={user.display_name} src={user.avatar_url} size="lg" />
 			<div class="profile-text">
 				<span class="name">{user.display_name}</span>
 				<span class="sub">{m.lobbyMenu_signedIn()}</span>

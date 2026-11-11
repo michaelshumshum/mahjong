@@ -33,6 +33,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from app.accounts.google import MAX_PICTURE_URL_LENGTH
 from app.names import MAX_NAME_LENGTH
 
 JSONType = GenericJSON().with_variant(JSONB(), "postgresql")
@@ -145,6 +146,8 @@ class User(Base):
     training_consent_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
     consent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     disabled_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # the provider's profile picture, refreshed on each sign-in; shown only to the user
+    avatar_url: Mapped[str | None] = mapped_column(String(MAX_PICTURE_URL_LENGTH), nullable=True)
     # `prefs` and `learn_imported_at`: in the table, not on the class (see `USER_PREFS`)
 
 

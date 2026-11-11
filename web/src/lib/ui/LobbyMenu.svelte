@@ -103,7 +103,7 @@
 		onclick={() => (open ? close() : (open = true))}
 	>
 		{#if user}
-			<Avatar name={user.display_name} />
+			<Avatar name={user.display_name} src={user.avatar_url} />
 		{/if}
 		<MenuIcon {...ICON} />
 	</button>
@@ -112,7 +112,7 @@
 		<div class="panel" id="{uid}-panel" data-testid="lobby-menu">
 			{#if user}
 				<div class="profile">
-					<Avatar name={user.display_name} size="lg" />
+					<Avatar name={user.display_name} src={user.avatar_url} size="lg" />
 					<div class="profile-text">
 						<span class="name" data-testid="lobby-menu-name">{user.display_name}</span>
 						<span class="sub">{m.lobbyMenu_signedIn()}</span>

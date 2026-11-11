@@ -733,7 +733,7 @@ hides every account UI (`off` below). `lib/net/account.ts` holds the hand-typed
 
   | Dialog | Content |
   | --- | --- |
-  | `AccountDialog` | `Avatar` (the display name's initial, shared with the menu), name and "Signed in with Google", then `AccountSettings` |
+  | `AccountDialog` | `Avatar` (shared with the menu: `/me`'s `avatar_url`, loaded with `referrerpolicy="no-referrer"`; the display name's initial in ink-red without one or when it fails to load), name and "Signed in with Google", then `AccountSettings` |
   | `MyGamesDialog` | `MyGames`, at a fixed height so "Load more" grows the list rather than the dialog |
 
 - `GoogleSignInButton` keeps only the parts of Google's branding guidelines a review checks: the
@@ -983,7 +983,7 @@ Each card's control holds only the title (its accessible name, which e2e matches
 `::after` stretches the hit area over the whole card.
 
 **Menu.** A burger button in the page's top-right corner (`lib/ui/LobbyMenu.svelte`,
-`btn-secondary`, brass lucide `menu`; signed in, the display name's initial in an ink-red avatar
+`btn-secondary`, brass lucide `menu`; signed in, the account's `Avatar`
 beside it) toggles a dropdown panel (`panel-elevated` on `--color-surface`, ~20rem, right-aligned
 under the button):
 

@@ -12,6 +12,7 @@ const PUZZLE = 'basics-isolated-honour';
 const ANN: Me = {
 	id: '00000000-0000-0000-0000-000000000001',
 	display_name: 'Ann',
+	avatar_url: null,
 	created_at: '2026-11-01T00:00:00Z',
 	training_consent_at: null,
 	consent_version: null

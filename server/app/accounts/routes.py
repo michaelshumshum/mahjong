@@ -217,6 +217,7 @@ def me_response(user: User) -> MeResponse:
     return MeResponse(
         id=user.id,
         display_name=user.display_name,
+        avatar_url=user.avatar_url,
         created_at=user.created_at,
         training_consent_at=user.training_consent_at,
         consent_version=user.consent_version,
@@ -271,6 +272,7 @@ async def export_me(user: CurrentUser, db: Db, response: Response) -> ExportResp
         user=ExportUser(
             id=user.id,
             display_name=user.display_name,
+            avatar_url=user.avatar_url,
             created_at=user.created_at,
             training_consent_at=user.training_consent_at,
             consent_version=user.consent_version,
@@ -555,7 +557,11 @@ async def google_callback(
             logger.warning("google sign-in failed: %r", exc)
             raise HTTPException(status_code=502, detail="google sign-in failed") from exc
         user, created = await upsert_identity(
-            db, provider=PROVIDER, subject=profile.subject, email=profile.email
+            db,
+            provider=PROVIDER,
+            subject=profile.subject,
+            email=profile.email,
+            picture=profile.picture,
         )
         if user.disabled_at is not None:
             await drop_sessions(db, user)

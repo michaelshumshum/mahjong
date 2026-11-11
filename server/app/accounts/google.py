@@ -11,18 +11,28 @@ import httpx2
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 PROVIDER: Final = "google"
-# no `profile`: an account starts with a placeholder name, never the user's google name
-SCOPES: Final = "openid email"
+# `profile` only for the picture: the google name is never read, an account starts with a
+# placeholder name
+SCOPES: Final = "openid email profile"
 AUTHORIZE_URL: Final = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL: Final = "https://oauth2.googleapis.com/token"
 USERINFO_URL: Final = "https://openidconnect.googleapis.com/v1/userinfo"
 _TIMEOUT_SECONDS: Final = 10.0
+MAX_PICTURE_URL_LENGTH: Final = 2048
 
 
 @dataclass(frozen=True, slots=True)
 class Profile:
     subject: str
     email: str | None
+    picture: str | None = None
+
+
+def _picture(value: object) -> str | None:
+    """An https url the web can put in an `<img src>`; anything else is dropped."""
+    if not isinstance(value, str) or len(value) > MAX_PICTURE_URL_LENGTH:
+        return None
+    return value if value.startswith("https://") else None
 
 
 class GoogleProvider:
@@ -68,4 +78,8 @@ class GoogleProvider:
         if not isinstance(subject, str) or not subject:
             raise ValueError("userinfo has no subject")
         email = info.get("email")
-        return Profile(subject=subject, email=email if isinstance(email, str) else None)
+        return Profile(
+            subject=subject,
+            email=email if isinstance(email, str) else None,
+            picture=_picture(info.get("picture")),
+        )

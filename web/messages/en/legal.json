@@ -17,7 +17,7 @@
 	"privacyPage_guestNetwork": "Like any website, the server and our hosting providers see your IP address when you connect. The app uses it to limit abuse and doesn't save it with your games or account; server logs may contain it.",
 	"privacyPage_accountHeading": "If you sign in",
 	"privacyPage_accountIntro": "An account is optional. Signing in with Google stores:",
-	"privacyPage_accountGoogle": "From Google, an account identifier and your email address. We ask Google for nothing else: not your name, photo or contacts.",
+	"privacyPage_accountGoogle": "From Google, an account identifier, your email address and the link to your profile picture, which only you see, in your account menu. Google also sends your name; we don't keep it. We ask for nothing else, such as your contacts.",
 	"privacyPage_accountName": "Your display name. It starts as \"Player\" and four digits until you choose one, and other players see it at the table.",
 	"privacyPage_accountSessions": "Your sign-in sessions: a scrambled copy of each session key, with when it started and was last used. A session ends after 30 days unused, or after 90 days at most.",
 	"privacyPage_accountGames": "Your games: for each game you finish while signed in, a link from your seat to your account, with your placing and score.",

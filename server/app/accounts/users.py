@@ -40,14 +40,20 @@ class GameSummary(NamedTuple):
 
 
 async def upsert_identity(
-    db: AsyncSession, *, provider: str, subject: str, email: str | None
+    db: AsyncSession,
+    *,
+    provider: str,
+    subject: str,
+    email: str | None,
+    picture: str | None = None,
 ) -> tuple[User, bool]:
     """The user behind `(provider, subject)`, created on first sign-in with a placeholder name;
-    `email` is refreshed every time. Returns `(user, created)`. Commits."""
+    `email` and the user's `avatar_url` are refreshed every time. Returns `(user, created)`.
+    Commits."""
     identity = await db.get(Identity, (provider, subject))
     if identity is not None:
-        return await _returning(db, identity, email), False
-    user = User(display_name=placeholder_name())
+        return await _returning(db, identity, email, picture), False
+    user = User(display_name=placeholder_name(), avatar_url=picture)
     db.add(user)
     try:
         await db.flush()
@@ -59,14 +65,17 @@ async def upsert_identity(
         identity = await db.get(Identity, (provider, subject))
         if identity is None:
             raise
-        return await _returning(db, identity, email), False
+        return await _returning(db, identity, email, picture), False
     return user, True
 
 
-async def _returning(db: AsyncSession, identity: Identity, email: str | None) -> User:
+async def _returning(
+    db: AsyncSession, identity: Identity, email: str | None, picture: str | None
+) -> User:
     identity.email = email
     user = await db.get(User, identity.user_id)
     assert user is not None  # identities.user_id is a cascading foreign key
+    user.avatar_url = picture
     await db.commit()
     return user
 

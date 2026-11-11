@@ -145,6 +145,8 @@ class MeResponse(BaseModel):
 
     id: uuid.UUID
     display_name: str
+    # the provider's profile picture, null when it has none
+    avatar_url: str | None
     created_at: dt.datetime
     # null = no consent to training on this user's games
     training_consent_at: dt.datetime | None
@@ -259,6 +261,7 @@ class LearnImportResponse(LearnResponse):
 class ExportUser(BaseModel):
     id: uuid.UUID
     display_name: str
+    avatar_url: str | None
     created_at: dt.datetime
     training_consent_at: dt.datetime | None
     consent_version: str | None

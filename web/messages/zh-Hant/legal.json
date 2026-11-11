@@ -17,7 +17,7 @@
 	"privacyPage_guestNetwork": "與所有網站一樣，你連線時伺服器及我們的寄存服務供應商會看到你的 IP 位址。本應用程式會用它來防止濫用，但不會把它與你的牌局或帳戶一併儲存；伺服器日誌可能載有你的 IP 位址。",
 	"privacyPage_accountHeading": "如你登入",
 	"privacyPage_accountIntro": "帳戶屬自願性質。以 Google 登入後，我們會儲存：",
-	"privacyPage_accountGoogle": "來自 Google 的帳戶識別碼及你的電郵地址。我們不會向 Google 索取其他資料：不包括你的姓名、相片或聯絡人。",
+	"privacyPage_accountGoogle": "來自 Google 的帳戶識別碼、你的電郵地址，以及你個人資料相片的連結（只有你會在帳戶選單中看到）。Google 亦會傳送你的姓名，但我們不會保存。我們不會索取其他資料，例如你的聯絡人。",
 	"privacyPage_accountName": "你的顯示名稱。在你自行選擇之前，名稱為「Player」加四個數字；其他玩家會在牌枱上看到它。",
 	"privacyPage_accountSessions": "你的登入工作階段：每個工作階段密鑰的雜湊副本，以及其開始及最後使用的時間。工作階段在 30 日未有使用後，或最多 90 日後結束。",
 	"privacyPage_accountGames": "你的牌局：你在登入期間完成的每一局，都會把你的座位連繫到你的帳戶，並記錄你的名次及分數。",
