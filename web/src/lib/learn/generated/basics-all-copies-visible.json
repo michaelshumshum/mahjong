@@ -53,7 +53,7 @@
 			{
 				"deals_in_to": [],
 				"reasons": [],
-				"tile": "9p"
+				"tile": "5p"
 			},
 			{
 				"deals_in_to": [],
@@ -72,7 +72,7 @@
 			}
 		],
 		"reason": "all_copies_visible",
-		"safe": ["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "9p", "1s", "z3"]
+		"safe": ["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "5p", "1s", "z3"]
 	},
 	"kind": "safe_discard",
 	"lesson_kind": "puzzle",
@@ -84,7 +84,12 @@
 			"concealed_counts": [14, 13, 13, 13],
 			"deadline_ts": null,
 			"dealer": 1,
-			"discard_pools": [[112, 69], [117, 70], [118, 71], [119]],
+			"discard_pools": [
+				[112, 68, 120, 36, 60, 9],
+				[117, 69, 1, 132, 44, 56, 29],
+				[118, 70, 128, 108, 61, 17, 37],
+				[119, 71, 133, 109, 85, 102, 21]
+			],
 			"drawn_tile": 72,
 			"flowers": [[], [], [], []],
 			"hand_history": [],
@@ -93,7 +98,7 @@
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 119
+				"tile_id": 21
 			},
 			"legal_actions": [
 				{
@@ -146,7 +151,7 @@
 				},
 				{
 					"kind": "discard",
-					"tile_id": 68
+					"tile_id": 52
 				},
 				{
 					"kind": "discard",
@@ -155,7 +160,7 @@
 			],
 			"melds": [[], [], [], []],
 			"names": [null, null, null, null],
-			"own_hand": [0, 4, 8, 12, 16, 20, 24, 28, 32, 33, 92, 116, 68, 72],
+			"own_hand": [0, 4, 8, 12, 16, 20, 24, 28, 32, 33, 92, 116, 52, 72],
 			"phase": "AWAIT_ACTION",
 			"prevailing": "EAST",
 			"ruleset": {
@@ -194,7 +199,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 84
+			"wall_remaining": 64
 		},
 		"seq": 0,
 		"t": "state_sync",

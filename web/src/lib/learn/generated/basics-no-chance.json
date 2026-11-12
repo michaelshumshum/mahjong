@@ -80,10 +80,10 @@
 			"deadline_ts": null,
 			"dealer": 1,
 			"discard_pools": [
-				[112, 4],
-				[116, 5],
-				[117, 6],
-				[118, 7]
+				[112, 4, 120, 36, 60, 44],
+				[116, 5, 132, 69, 45, 56, 29],
+				[117, 6, 121, 110, 61, 17, 37],
+				[118, 7, 133, 113, 85, 102, 21]
 			],
 			"drawn_tile": 68,
 			"flowers": [[], [], [], []],
@@ -93,7 +93,7 @@
 			"host_seat": null,
 			"last_discard": {
 				"seat": 3,
-				"tile_id": 7
+				"tile_id": 21
 			},
 			"legal_actions": [
 				{
@@ -194,7 +194,7 @@
 			"seat": 0,
 			"seat_status": ["connected", "connected", "connected", "connected"],
 			"turn": 0,
-			"wall_remaining": 83
+			"wall_remaining": 64
 		},
 		"seq": 0,
 		"t": "state_sync",

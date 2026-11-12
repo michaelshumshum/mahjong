@@ -115,10 +115,14 @@ BASICS: tuple[Puzzle, ...] = (
         "all-copies-visible",
         PuzzleKind.SAFE_DISCARD,
         _table(
-            SeatSetup(hand="123m456m78m99m6s3z9p1s", discards="2z9p"),
+            SeatSetup(hand="123m456m78m99m6s3z5p1s", discards="2z9p4z1p7p3m"),
             hands={1: _TENPAI},
-            # every 9p out: no thirteen orphans wait on the west either
-            pools={1: _POOL + "9p", 2: _POOL + "9p", 3: _POOL},
+            # every 9p out, none held: no thirteen orphans wait on the west, and no 9p decoy
+            pools={
+                1: _POOL + "9p1m7z3p6p8m",
+                2: _POOL + "9p6z1z7p5m1p",
+                3: _POOL + "9p7z1z4s8s6m",
+            },
         ),
         ("z3",),
         reason=SafeReason.ALL_COPIES_VISIBLE,
@@ -127,9 +131,13 @@ BASICS: tuple[Puzzle, ...] = (
         "no-chance",
         PuzzleKind.SAFE_DISCARD,
         _table(
-            SeatSetup(hand="13m456m789m11z66z6s9p", discards="2z2m"),
+            SeatSetup(hand="13m456m789m11z66z6s9p", discards="2z2m4z1p7p3p"),
             hands={1: _TENPAI},
-            pools={1: "3z2m", 2: "3z2m", 3: "3z2m"},
+            pools={
+                1: _POOL + "2m7z9p3p6p8m",
+                2: _POOL + "2m4z1z7p5m1p",
+                3: _POOL + "2m7z2z4s8s6m",
+            },
         ),
         ("1m",),
         reason=SafeReason.NO_CHANCE,
