@@ -19,8 +19,15 @@
 	color: var(--color-text-muted);
 }
 
+// badge beside the name; dark pill like the score-delta chip, delta colours fail 4:1 on bare felt.
 @mixin seat-score {
-	margin-inline-start: auto;
+	flex-shrink: 0;
+	padding: 0 var(--space-2);
+	border-radius: 999px;
+	background: rgb(0 0 0 / 0.45);
+	font-size: var(--font-size-xs);
+	font-weight: 700;
+	line-height: 1.25rem;
 	font-variant-numeric: tabular-nums;
 	color: var(--color-text-muted);
 }

@@ -28,10 +28,14 @@
 
 <div class="seat-plate" class:seat-plate--turn={isTurn}>
 	<span class="seat-name">{name}</span>
+	<span
+		class="seat-score"
+		class:seat-score--positive={score > 0}
+		class:seat-score--negative={score < 0}>{score > 0 ? `+${score}` : score}</span
+	>
 	<span class="seat-wind" aria-label={windAriaLabel}>{windChar}</span>
 	{#if isDealer}<span class="dealer-badge" title={dealerTitle}>莊</span>{/if}
 	{@render badges?.()}
-	<span class="seat-score">{score}</span>
 	{#if scoreDelta}
 		{#key scoreDelta.key}
 			<span
@@ -68,6 +72,14 @@
 
 	.seat-score {
 		@include tile.seat-score;
+	}
+
+	.seat-score--positive {
+		color: var(--color-positive);
+	}
+
+	.seat-score--negative {
+		color: var(--color-negative);
 	}
 
 	// absolutely-positioned halo, not a border/outline on .seat-plate itself -- inset sits outside

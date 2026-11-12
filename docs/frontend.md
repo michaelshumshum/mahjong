@@ -129,8 +129,11 @@ next row of the pool. `.table-center` carries a
 marking on the felt rather than UI chrome.
 
 Seats are rendered relative to **your** seat, at the bottom. Each seat's header is `SeatPlate`
-(`lib/table/SeatPlate.svelte`): name, wind glyph, dealer badge, a slot for extra badges (the bot/
-status chips on an opponent, nothing extra on your own), and the score.
+(`lib/table/SeatPlate.svelte`): name, the score, wind glyph, dealer badge, and a slot for extra
+badges (the bot/status chips on an opponent, nothing extra on your own). The score is a pill badge
+right after the name, never shrunk (a long name truncates instead): signed (`+25`, `-12`),
+`--color-positive` above zero, `--color-negative` below, muted at zero, on a dark pill since the
+delta colours alone are under 4:1 on lit felt.
 
 **Header rail.** `TableToolbar` (`routes/table/[id]/_components/`) is the walnut rim's top edge, not
 page chrome: the same `--color-rim` background with top-only `--radius-lg` corners, and

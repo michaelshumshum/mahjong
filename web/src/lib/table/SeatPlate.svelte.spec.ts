@@ -56,4 +56,25 @@ describe('SeatPlate', () => {
 		});
 		expect(target.querySelector('.seat-plate--turn')).toBeNull();
 	});
+
+	it.each([
+		[25, '+25', 'seat-score--positive'],
+		[-12, '-12', 'seat-score--negative'],
+		[0, '0', null]
+	])('score %i sits right after the name as %s', (score, text, modifier) => {
+		const { target } = render(SeatPlate, {
+			name: 'Bob',
+			windChar: '東',
+			windAriaLabel: 'East wind',
+			isDealer: false,
+			dealerTitle: 'Dealer',
+			score
+		});
+		const badge = target.querySelector('.seat-score')!;
+		expect(badge.textContent?.trim()).toBe(text);
+		expect(badge.previousElementSibling?.classList.contains('seat-name')).toBe(true);
+		for (const cls of ['seat-score--positive', 'seat-score--negative']) {
+			expect(badge.classList.contains(cls)).toBe(cls === modifier);
+		}
+	});
 });
