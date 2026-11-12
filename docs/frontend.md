@@ -1605,7 +1605,12 @@ preempted — but the hold overlay normally clears on the next `hand_start`, whi
     bottom end). `applySoundPrefs` takes both, via `lib/ui/apply-client-prefs.ts`'s
     `applyClientPrefs`: root layout on load, and the lobby's and table's Settings callbacks on
     change. Releasing the volume slider plays a preview click (`previewClick`).
-  - Planned: draw click, discard clack, shuffle. No recorded call-outs
+  - Tile clack: `playTile` plays one of `lib/assets/sfx/tile-1..8.mp3` at random, never the same
+    take twice in a row. Eight takes cut from one recording, peak- and RMS-matched to
+    `click.mp3`. The live table plays it on every seat's `discard` event and on your own `draw`;
+    opponents' draws stay silent, since two clacks per bot turn crowd the table. Driven by the
+    server event, not the hand-tile click, so it sounds once per real discard.
+  - Planned: claim sounds, shuffle. No recorded call-outs
     ([ADR 0010](decisions/0010-client-scope-cuts.md)).
 
 ### Styling: SCSS

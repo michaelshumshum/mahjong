@@ -1,9 +1,10 @@
 // .svelte.spec.ts for the client project's real DOM (label -> control click re-dispatch).
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applySoundPrefs, installClickSound, isClickTarget, previewClick } from './sfx';
+import { applySoundPrefs, installClickSound, isClickTarget, playTile, previewClick } from './sfx';
 
 let starts = 0;
 let lastGain: number | null = null;
+const played: unknown[] = [];
 
 class FakeAudioContext {
 	state = 'running';
@@ -11,7 +12,15 @@ class FakeAudioContext {
 	resume = async () => {};
 	decodeAudioData = async () => ({});
 	createBufferSource() {
-		return { buffer: null, connect: (node: unknown) => node, start: () => void starts++ };
+		const source = {
+			buffer: null,
+			connect: (node: unknown) => node,
+			start: () => {
+				starts++;
+				played.push(source.buffer);
+			}
+		};
+		return source;
 	}
 	createGain() {
 		const node = {
@@ -102,6 +111,24 @@ describe('sfx', () => {
 		setSoundEnabled(false);
 		previewClick();
 		expect(starts).toBe(1);
+	});
+
+	it('playTile uses all eight takes and never repeats one back to back', async () => {
+		// warm every take first: cold plays start in decode order, not call order.
+		played.length = 0;
+		for (let i = 0; i < 200; i++) playTile();
+		await vi.waitFor(() => expect(starts).toBe(200));
+		expect(new Set(played).size).toBe(8);
+		played.length = 0;
+		for (let i = 0; i < 200; i++) playTile();
+		expect(played).toHaveLength(200);
+		expect(played.every((buffer, i) => i === 0 || buffer !== played[i - 1])).toBe(true);
+	});
+
+	it('playTile is silent while sound is disabled', () => {
+		setSoundEnabled(false);
+		playTile();
+		expect(starts).toBe(0);
 	});
 
 	it('isClickTarget honours data-sfx="off" and aria-disabled', () => {

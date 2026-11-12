@@ -40,6 +40,7 @@
 	import { isMotionReduced } from '$lib/ui/motion';
 	import { applyClientPrefs } from '$lib/ui/apply-client-prefs';
 	import { vibrate } from '$lib/ui/haptics';
+	import { playTile } from '$lib/ui/sfx';
 	import {
 		clearSeatForTable,
 		clearSecretForTable,
@@ -170,6 +171,10 @@
 		liveStore = store;
 		const offEvent = socket.onEvent((event: ServerEvent) => {
 			if (!handEverStarted && HAND_LIFECYCLE_EVENTS.has(event.t)) handEverStarted = true;
+			// opponents' draws stay silent: two clacks per bot turn crowd the table.
+			if (event.t === 'discard' || (event.t === 'draw' && event.d.seat === store.state.seat)) {
+				playTile();
+			}
 			if (event.t === 'ack' && event.d.ok === false) {
 				pushToast(
 					m.tablePage_actionFailedToast({

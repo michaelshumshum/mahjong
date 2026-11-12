@@ -1,6 +1,15 @@
 import clickUrl from '$lib/assets/sfx/click.mp3';
 import type { ClientPrefs } from './client-prefs';
 
+// eight takes of one tile clack, cut from a single recording and level-matched to click.mp3.
+const TILE_URLS = Object.values(
+	import.meta.glob<string>('$lib/assets/sfx/tile-*.mp3', {
+		eager: true,
+		query: '?url',
+		import: 'default'
+	})
+);
+
 // native checkbox/radio included: a click on their <label> is re-dispatched on the control.
 // links stay silent unless styled as a button and marked `data-sfx="on"`.
 const CLICK_TARGET =
@@ -9,8 +18,10 @@ const CLICK_TARGET =
 let enabled = false;
 let gain = 1;
 let ctx: AudioContext | null = null;
-let buffer: AudioBuffer | null = null;
-let decoding: Promise<AudioBuffer> | null = null;
+// resolved buffers kept apart from pending decodes so a warm play starts synchronously.
+const buffers = new Map<string, AudioBuffer>();
+const decoding = new Map<string, Promise<AudioBuffer>>();
+let lastTile = -1;
 
 export function applySoundPrefs(prefs: Pick<ClientPrefs, 'soundEnabled' | 'sfxVolume'>): void {
 	enabled = prefs.soundEnabled;
@@ -29,13 +40,22 @@ export function isClickTarget(target: EventTarget | null): boolean {
 
 // web audio, not <audio>: no ios start lag, and rapid clicks overlap instead of cutting off.
 // the context is created inside the first click so autoplay policy lets it run.
-async function playClick(): Promise<void> {
+async function playClip(url: string): Promise<void> {
 	ctx ??= new AudioContext();
 	if (ctx.state !== 'running') void ctx.resume();
 	const audio = ctx;
-	buffer ??= await (decoding ??= fetch(clickUrl)
-		.then((res) => res.arrayBuffer())
-		.then((bytes) => audio.decodeAudioData(bytes)));
+	let buffer = buffers.get(url);
+	if (!buffer) {
+		let pending = decoding.get(url);
+		if (!pending) {
+			pending = fetch(url)
+				.then((res) => res.arrayBuffer())
+				.then((bytes) => audio.decodeAudioData(bytes));
+			decoding.set(url, pending);
+		}
+		buffer = await pending;
+		buffers.set(url, buffer);
+	}
 	const source = audio.createBufferSource();
 	const level = audio.createGain();
 	source.buffer = buffer;
@@ -44,23 +64,32 @@ async function playClick(): Promise<void> {
 	source.start();
 }
 
-function play(): void {
+function play(url: string): void {
 	if (!enabled) return;
-	playClick().catch(() => {
-		decoding = null;
+	playClip(url).catch(() => {
+		decoding.delete(url);
 	});
 }
 
 /** Plays the click once at the current volume, for the Settings volume slider. */
 export function previewClick(): void {
-	play();
+	play(clickUrl);
+}
+
+/** Plays a random tile clack, never the same take twice in a row. */
+export function playTile(): void {
+	const first = lastTile < 0;
+	let pick = Math.floor(Math.random() * (TILE_URLS.length - (first ? 0 : 1)));
+	if (!first && pick >= lastTile) pick++;
+	lastTile = pick;
+	play(TILE_URLS[pick]);
 }
 
 /** One delegated listener for every button-like control; returns its disposer. `click`, not
  * `pointerdown`: covers keyboard activation and never fires on a disabled button. */
 export function installClickSound(root: Document = document): () => void {
 	const onClick = (event: Event) => {
-		if (isClickTarget(event.target)) play();
+		if (isClickTarget(event.target)) play(clickUrl);
 	};
 	root.addEventListener('click', onClick);
 	return () => root.removeEventListener('click', onClick);
