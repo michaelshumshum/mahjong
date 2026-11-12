@@ -171,10 +171,7 @@
 		liveStore = store;
 		const offEvent = socket.onEvent((event: ServerEvent) => {
 			if (!handEverStarted && HAND_LIFECYCLE_EVENTS.has(event.t)) handEverStarted = true;
-			// opponents' draws stay silent: two clacks per bot turn crowd the table.
-			if (event.t === 'discard' || (event.t === 'draw' && event.d.seat === store.state.seat)) {
-				playTile();
-			}
+			if (event.t === 'discard') playTile();
 			if (event.t === 'ack' && event.d.ok === false) {
 				pushToast(
 					m.tablePage_actionFailedToast({
