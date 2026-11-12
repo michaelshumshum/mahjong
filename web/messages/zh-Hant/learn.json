@@ -39,6 +39,7 @@
 	"learn_trackPosition": "{track} · {n} / {total}",
 	"learn_seatYou": "你",
 	"learn_seatWind": "{wind}家",
+	"learn_anOpponent": "有對手",
 	"learn_discardHint": "撳一下手牌揀一隻，再撳「核對」（或者再撳多一下嗰隻牌）。",
 	"learn_winningTilesLabel": "食糊牌",
 	"learn_faanLabel": "番數",
@@ -214,10 +215,10 @@
 	"lesson_basicsTutorial_declareWin": "自摸食糊！",
 	"lesson_basicsTutorial_result": "呢手牌計4番：東風刻子有門風1番同圈風1番，加自摸1番、無花1番，夠晒3番起糊，三家都要俾錢你。",
 	"lesson_minedWaits_title": "食糊牌 {n}",
-	"lesson_minedWaits_prompt": "你已經叫糊，差一隻就食糊。揀晒所有夠番起糊嘅食糊牌。",
+	"lesson_minedWaits_prompt": "你已經叫糊，差一隻就食糊。揀晒所有食糊牌：出銃或者自摸，最少要有{minFaan}番。四隻全部見光嘅牌唔計。",
 	"lesson_minedWaits_explain": "食糊牌：{tiles}。",
 	"lesson_minedEfficiency_title": "牌效 {n}",
-	"lesson_minedEfficiency_prompt": "打邊隻牌最接近食糊，而且之後有最多未見入牌？",
+	"lesson_minedEfficiency_prompt": "打邊隻牌之後離叫糊最近？如果有幾隻一樣近，揀之後未見入牌最多嗰隻。",
 	"lesson_minedEfficiency_explain": [
 		{
 			"declarations": ["input tiles", "input count", "local countPlural = count: plural"],
@@ -229,15 +230,15 @@
 		}
 	],
 	"lesson_minedDefenceAllCopiesVisible_title": "防守 {n}",
-	"lesson_minedDefenceAllCopiesVisible_prompt": "有對手就快食糊。單憑你見到嘅牌，邊隻肯定安全？",
+	"lesson_minedDefenceAllCopiesVisible_prompt": "{seats}已經叫糊。單憑你見到嘅牌，揀一隻冇人可以食嘅牌：冇剩牌可以對碰或者單吊，冇順子可以聽佢，亦冇可能係十三么。佢打過嘅牌唔一定安全。",
 	"lesson_minedDefenceAllCopiesVisible_explain": "{tiles}：四隻全部見光，冇人手上有佢可以對碰或者單吊；亦冇順子或者十三么可以聽佢，所以冇人可以食佢。",
 	"lesson_minedDefenceNoChance_title": "防守 {n}",
-	"lesson_minedDefenceNoChance_prompt": "有對手就快食糊。單憑你見到嘅牌，邊隻牌冇可能有人用順子聽？",
+	"lesson_minedDefenceNoChance_prompt": "{seats}已經叫糊。揀一隻冇可能有人用順子聽嘅牌：每個有佢嘅順子，都要用到一隻四隻全部見光嘅牌。",
 	"lesson_minedDefenceNoChance_explain": "{tiles}：每個有佢嘅順子，都要用到一隻四隻全部見光嘅牌，所以冇人可以用順子聽佢。單吊或者對碰仍然有可能，所以只係好穩陣，唔係保證。",
 	"lesson_minedFaanSelfDraw_title": "計番 {n}",
-	"lesson_minedFaanSelfDraw_prompt": "你自摸食糊。呢手牌值幾多番？",
+	"lesson_minedFaanSelfDraw_prompt": "你自摸食糊。呢手牌值幾多番？全部計埋，包括花，最多{faanCap}番爆棚。",
 	"lesson_minedFaanSelfDraw_explain": "呢手牌值{faan}番。",
 	"lesson_minedFaanDiscard_title": "計番 {n}",
-	"lesson_minedFaanDiscard_prompt": "你可以食呢隻打出嚟嘅牌。呢手牌值幾多番？",
+	"lesson_minedFaanDiscard_prompt": "你可以食呢隻打出嚟嘅牌。呢手牌值幾多番？全部計埋，包括花，最多{faanCap}番爆棚。",
 	"lesson_minedFaanDiscard_explain": "呢手牌值{faan}番。"
 }

@@ -39,6 +39,7 @@
 	"learn_trackPosition": "{track} · {n} / {total}",
 	"learn_seatYou": "You",
 	"learn_seatWind": "{wind}",
+	"learn_anOpponent": "An opponent",
 	"learn_discardHint": "Tap a tile in your hand to pick it, then tap Check (or tap the tile again).",
 	"learn_winningTilesLabel": "Winning tiles",
 	"learn_faanLabel": "Faan",
@@ -214,10 +215,10 @@
 	"lesson_basicsTutorial_declareWin": "Declare the win.",
 	"lesson_basicsTutorial_result": "The hand scores 4 faan: Seat Wind 1 and Prevailing Wind 1 for the East pung, Self-Draw 1 and No Flowers 1. That clears the 3 faan minimum, so each player pays you.",
 	"lesson_minedWaits_title": "Waits {n}",
-	"lesson_minedWaits_prompt": "Your hand is ready: one tile from winning. Pick every tile that wins with at least the minimum faan.",
+	"lesson_minedWaits_prompt": "Your hand is ready: one tile from winning. Pick every tile that wins for at least {minFaan} faan, by discard or self-draw. A tile whose four copies you can all see doesn't count.",
 	"lesson_minedWaits_explain": "Winning tiles: {tiles}.",
 	"lesson_minedEfficiency_title": "Efficiency {n}",
-	"lesson_minedEfficiency_prompt": "Which discard keeps your hand closest to winning, with the most unseen tiles that help?",
+	"lesson_minedEfficiency_prompt": "Which discard leaves you the fewest tiles away from ready? If several tie, pick the one that leaves the most unseen tiles that improve your hand.",
 	"lesson_minedEfficiency_explain": [
 		{
 			"declarations": ["input tiles", "input count", "local countPlural = count: plural"],
@@ -229,15 +230,15 @@
 		}
 	],
 	"lesson_minedDefenceAllCopiesVisible_title": "Defense {n}",
-	"lesson_minedDefenceAllCopiesVisible_prompt": "An opponent is close to winning. From what you can see, which tile is certainly safe?",
+	"lesson_minedDefenceAllCopiesVisible_prompt": "{seats} can win on one more tile. Using only the tiles you can see, pick one nobody can win on: no copy left for a pair or pung, no chow that could need it, and no Thirteen Orphans. A tile they already discarded isn't safe on its own.",
 	"lesson_minedDefenceAllCopiesVisible_explain": "{tiles}: every copy is visible, so nobody can hold one for a single wait or a pair wait, and no chow or Thirteen Orphans wait can still take it. Nobody can win on it.",
 	"lesson_minedDefenceNoChance_title": "Defense {n}",
-	"lesson_minedDefenceNoChance_prompt": "An opponent is close to winning. From what you can see, which tile can no chow be waiting on?",
+	"lesson_minedDefenceNoChance_prompt": "{seats} can win on one more tile. Pick a tile no chow can be waiting on: every chow through it needs a tile whose four copies you can all see.",
 	"lesson_minedDefenceNoChance_explain": "{tiles}: every chow through it needs a tile whose four copies are all visible, so no chow can be waiting on it. A single wait or a pair wait could still take it, so this is a strong read, not a guarantee.",
 	"lesson_minedFaanSelfDraw_title": "Faan {n}",
-	"lesson_minedFaanSelfDraw_prompt": "You drew your winning tile. How many faan is the hand worth?",
+	"lesson_minedFaanSelfDraw_prompt": "You drew your winning tile. How many faan is the hand worth? Count everything, flowers included, up to the {faanCap}-faan limit.",
 	"lesson_minedFaanSelfDraw_explain": "This hand is worth {faan} faan.",
 	"lesson_minedFaanDiscard_title": "Faan {n}",
-	"lesson_minedFaanDiscard_prompt": "You can win on this discard. How many faan is the hand worth?",
+	"lesson_minedFaanDiscard_prompt": "You can win on this discard. How many faan is the hand worth? Count everything, flowers included, up to the {faanCap}-faan limit.",
 	"lesson_minedFaanDiscard_explain": "This hand is worth {faan} faan."
 }

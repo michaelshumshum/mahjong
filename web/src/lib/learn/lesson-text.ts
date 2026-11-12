@@ -1,7 +1,10 @@
 import { m } from '$lib/paraglide/messages.js';
 import { getLocale } from '$lib/paraglide/runtime.js';
+import type { Seat } from '$lib/game/types';
+import { DEFAULT_RULESET, type RuleSet } from '$lib/net/ruleset';
 import type { TileCode } from '$lib/table/tile-code';
 import { tileName } from '$lib/table/tile-name';
+import { seatWind, windWord } from '$lib/table/wind';
 import type { IndexEntry, Lesson } from './generated/lessons';
 import { THEME_LABEL } from './lessons';
 
@@ -11,7 +14,21 @@ export interface LessonTextParams {
 	tiles: string;
 	count: number;
 	faan: number;
+	/** the ready opponents, by seat wind (safe_discard). */
+	seats: string;
+	minFaan: number;
+	faanCap: number;
 }
+
+const NO_PARAMS: LessonTextParams = {
+	n: 0,
+	tiles: '',
+	count: 0,
+	faan: 0,
+	seats: '',
+	minFaan: DEFAULT_RULESET.min_faan,
+	faanCap: DEFAULT_RULESET.faan_cap
+};
 
 type LessonMessage = (inputs: LessonTextParams) => string;
 
@@ -135,7 +152,7 @@ export const TUTORIAL_TEXT: Record<string, TutorialText> = {
 export function lessonTitle(entry: IndexEntry): string {
 	if (entry.lesson_kind === 'tutorial') return TUTORIAL_TEXT[entry.text].title();
 	if (entry.theme) return THEME_LABEL[entry.theme]();
-	return LESSON_TEXT[entry.text].title({ n: entry.n, tiles: '', count: 0, faan: 0 });
+	return LESSON_TEXT[entry.text].title({ ...NO_PARAMS, n: entry.n });
 }
 
 /** The small line under a themed title, so cards sharing a theme can be told apart. Basics
@@ -164,9 +181,25 @@ export function tileList(
 	);
 }
 
-/** The numbers a lesson's messages interpolate, read off its answer key. */
+/** The opponents any hand tile deals in to, by seat wind: the ones who are ready. */
+function readySeats(lesson: Lesson & { kind: 'safe_discard' }): string {
+	const seats = [...new Set(lesson.key.options.flatMap((o) => o.deals_in_to))].sort();
+	if (!seats.length) return m.learn_anOpponent();
+	const dealer = lesson.snapshot.d.dealer;
+	return localeList(
+		seats.map((seat) => m.learn_seatWind({ wind: windWord(seatWind(seat as Seat, dealer)) }))
+	);
+}
+
+/** The numbers a lesson's messages interpolate, read off its answer key and ruleset. */
 export function lessonTextParams(lesson: Lesson): LessonTextParams {
-	const params: LessonTextParams = { n: lesson.n, tiles: '', count: 0, faan: 0 };
+	const ruleset = { ...DEFAULT_RULESET, ...lesson.snapshot.d.ruleset } as RuleSet;
+	const params: LessonTextParams = {
+		...NO_PARAMS,
+		n: lesson.n,
+		minFaan: ruleset.min_faan,
+		faanCap: ruleset.faan_cap
+	};
 	switch (lesson.kind) {
 		case 'count_faan':
 			return { ...params, faan: lesson.key.correct };
@@ -180,7 +213,8 @@ export function lessonTextParams(lesson: Lesson): LessonTextParams {
 			};
 		}
 		case 'winning_tiles':
-		case 'safe_discard':
 			return { ...params, tiles: tileList(lesson.key.correct) };
+		case 'safe_discard':
+			return { ...params, tiles: tileList(lesson.key.correct), seats: readySeats(lesson) };
 	}
 }

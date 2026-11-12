@@ -290,4 +290,16 @@ describe('lesson loading', () => {
 		expect(tied.kind === 'best_discard' && tied.key.correct.length).toBe(2);
 		expect(lessonTextParams(tied).tiles).toBe('9 Dots or 4 Bamboo');
 	});
+
+	it('states the grading rules in the prompt', async () => {
+		const prompt = async (id: string) => {
+			const lesson = (await loadLesson(id)) as Lesson;
+			return LESSON_TEXT[lesson.text].prompt(lessonTextParams(lesson));
+		};
+		// the ready seats are the ones a hand tile deals in to, named by seat wind
+		expect(await prompt('defence-02')).toMatch(/^East can win/);
+		expect(await prompt('defence-04')).toMatch(/^South and North can win/);
+		expect(await prompt('waits-01')).toContain('at least 3 faan');
+		expect(await prompt('faan-03')).toContain('10-faan limit');
+	});
 });

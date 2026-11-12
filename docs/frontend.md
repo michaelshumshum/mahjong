@@ -1769,7 +1769,10 @@ each locale.
 shortlist shares one stem per kind (`minedWaits`, `minedEfficiency`; `minedDefence*` per
 `SafeReason`, `minedFaanSelfDraw`/`minedFaanDiscard`), so re-mining never needs new prose:
 titles take `{n}` (the place in the track), explanations take the key's numbers (`{tiles}`,
-`{count}`, `{faan}`). A mined puzzle's card and heading show its theme instead, one
+`{count}`, `{faan}`). A mined prompt states the rule its kind is graded by, so a sensible but
+ungraded pick (a tile the opponent already discarded, a dead wait) isn't a surprise: `{minFaan}`
+and `{faanCap}` come from the snapshot's ruleset, and `{seats}` names the ready opponents by
+seat wind (every seat some hand tile deals in to). A mined puzzle's card and heading show its theme instead, one
 `learn_theme<Theme>` per `PuzzleTheme` value (a closed vocabulary, so per theme, not per
 puzzle); the stem titles stay as the fallback for an unthemed puzzle. `lessons.spec.ts` checks
 every theme has its key in both locales. A tutorial has `lesson_<text>_title` plus one `lesson_<text>_<step>` per
