@@ -19,19 +19,21 @@
 	color: var(--color-text-muted);
 }
 
-// badge beside the name; dark pill like the score-delta chip, delta colours fail 4:1 on bare felt.
+// outlined badge beside the name; faint dark tint keeps the lightened delta colours over 4.5:1 on lit felt.
 @mixin seat-score {
 	flex-shrink: 0;
-	padding: 0 var(--space-2);
-	border-radius: 999px;
-	background: rgb(0 0 0 / 0.45);
+	padding: 0 var(--space-1);
+	border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+	border-radius: var(--radius-sm);
+	background: rgb(0 0 0 / 0.18);
 	font-size: var(--font-size-xs);
 	font-weight: 700;
-	line-height: 1.25rem;
+	line-height: 1.125rem;
 	font-variant-numeric: tabular-nums;
 	color: var(--color-text-muted);
 }
 
+// the dealer's wind glyph; the dealer is always east, so this replaces a separate 莊 badge.
 @mixin dealer-badge {
 	display: inline-flex;
 	align-items: center;

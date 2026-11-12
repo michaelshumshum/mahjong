@@ -44,15 +44,14 @@ describe('OpponentRegion', () => {
 		expect(target.querySelector('.seat-region--turn')).not.toBeNull();
 	});
 
-	it('shows the dealer badge when the seat is the dealer', () => {
+	it('marks the wind glyph when the seat is the dealer', () => {
 		const { target } = render(OpponentRegion, {
 			seat: mockSeat({ seat: 1 }),
 			position: 'right',
 			dealer: 1,
 			turn: 0
 		});
-		expect(target.querySelector('.dealer-badge')).not.toBeNull();
-		expect(target.querySelector('.dealer-badge')?.textContent).toContain('莊');
+		expect(target.querySelector('.seat-wind--dealer')?.textContent).toContain('東');
 	});
 
 	it('shows the bot badge for bot status', () => {

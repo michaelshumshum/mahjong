@@ -129,11 +129,16 @@ next row of the pool. `.table-center` carries a
 marking on the felt rather than UI chrome.
 
 Seats are rendered relative to **your** seat, at the bottom. Each seat's header is `SeatPlate`
-(`lib/table/SeatPlate.svelte`): name, the score, wind glyph, dealer badge, and a slot for extra
-badges (the bot/status chips on an opponent, nothing extra on your own). The score is a pill badge
-right after the name, never shrunk (a long name truncates instead): signed (`+25`, `-12`),
-`--color-positive` above zero, `--color-negative` below, muted at zero, on a dark pill since the
-delta colours alone are under 4:1 on lit felt.
+(`lib/table/SeatPlate.svelte`): name, the score, wind glyph, and a slot for extra badges (the bot/
+status chips on an opponent, nothing extra on your own).
+
+- **Score:** an outlined badge right after the name, never shrunk (a long name truncates instead):
+  signed (`+25`, `-12`), `--color-positive` above zero, `--color-negative` below, muted at zero.
+  The delta colours are mixed 25% toward white over an 18% black tint: bare, `--color-negative`
+  is 2.88:1 on lit felt.
+- **Dealer:** no separate 莊 badge. Seat wind is derived from the dealer (`wind.ts` `seatWind`), so
+  the dealer is always 東; that glyph itself takes the dealer disc (`tile.dealer-badge`), with
+  "Dealer" as its title and appended to its accessible name.
 
 **Header rail.** `TableToolbar` (`routes/table/[id]/_components/`) is the walnut rim's top edge, not
 page chrome: the same `--color-rim` background with top-only `--radius-lg` corners, and
@@ -1503,7 +1508,7 @@ seat switches to autoplay until you reconnect"); otherwise it navigates straight
 ### Bot seat badge and status chips
 
 `SeatView.status` (populated from `ClientGameState.seatStatus` by `viewFromClientState`, never
-set by mocks) drives a `.bot-badge` chip ("Bot") next to the dealer badge when `status === 'bot'` —
+set by mocks) drives a `.bot-badge` chip ("Bot") after the wind glyph when `status === 'bot'` —
 a quiet bordered chip, not `--color-accent`, since a bot seat doesn't change mid-hand.
 `disconnected`/`autoplay` get their own `.status-chip--away`/`.status-chip--autoplay` chips
 (`SeatStatusChip.svelte`, on opponents and on the bottom seat while spectating), tinted (`--color-status-error`/`--color-accent`) rather than neutral —
@@ -1676,7 +1681,9 @@ lightest felt stop, so every felt row is the worst case too. Measured (P4):
 | bot badge text-muted (felt override) | surface-raised | 9.83 | 4.5 |
 | status-chip away (status-error) | black 45% on felt-lit | 4.69 | 4.5 |
 | status-chip autoplay (accent-on-dark) | black 45% on felt-lit | 5.41 | 4.5 |
-| dealer badge text | accent 85% + black | 5.49 | 4.5 |
+| dealer wind glyph | accent 85% + black | 5.49 | 4.5 |
+| + seat score (positive 75% + white) | black 18% on felt-lit | 5.91 | 4.5 |
+| - seat score (negative 75% + white) | black 18% on felt-lit | 4.66 | 4.5 |
 | hub min-faan chip (felt-muted) | black 12% on felt-lit | 5.48 | 4.5 |
 | toast text | surface-raised | 12.27 | 4.5 |
 | toast warn icon (status-error) | surface-raised | 5.40 | 3 |

@@ -17,10 +17,10 @@ describe('SeatPlate', () => {
 		expect(target.querySelector('.seat-name')?.textContent).toContain('Bob');
 		expect(target.querySelector('.seat-wind')?.textContent).toContain('南');
 		expect(target.querySelector('.seat-score')?.textContent).toContain('25');
-		expect(target.querySelector('.dealer-badge')).toBeNull();
+		expect(target.querySelector('.seat-wind--dealer')).toBeNull();
 	});
 
-	it('shows the dealer badge when isDealer is set', () => {
+	it('marks the dealer on the wind glyph, not a separate badge', () => {
 		const { target } = render(SeatPlate, {
 			name: 'Bob',
 			windChar: '東',
@@ -29,7 +29,11 @@ describe('SeatPlate', () => {
 			dealerTitle: 'Dealer',
 			score: 0
 		});
-		expect(target.querySelector('.dealer-badge')?.textContent).toContain('莊');
+		const wind = target.querySelector('.seat-wind--dealer')!;
+		expect(wind.textContent).toBe('東');
+		expect(wind.getAttribute('title')).toBe('Dealer');
+		expect(wind.getAttribute('aria-label')).toBe('East wind, Dealer');
+		expect(target.textContent).not.toContain('莊');
 	});
 
 	it('adds the turn halo class only when isTurn is set', () => {

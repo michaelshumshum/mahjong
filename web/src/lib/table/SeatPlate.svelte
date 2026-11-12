@@ -33,8 +33,12 @@
 		class:seat-score--positive={score > 0}
 		class:seat-score--negative={score < 0}>{score > 0 ? `+${score}` : score}</span
 	>
-	<span class="seat-wind" aria-label={windAriaLabel}>{windChar}</span>
-	{#if isDealer}<span class="dealer-badge" title={dealerTitle}>莊</span>{/if}
+	<span
+		class="seat-wind"
+		class:seat-wind--dealer={isDealer}
+		title={isDealer ? dealerTitle : undefined}
+		aria-label={isDealer ? `${windAriaLabel}, ${dealerTitle}` : windAriaLabel}>{windChar}</span
+	>
 	{@render badges?.()}
 	{#if scoreDelta}
 		{#key scoreDelta.key}
@@ -66,7 +70,7 @@
 		@include tile.seat-wind;
 	}
 
-	.dealer-badge {
+	.seat-wind--dealer {
 		@include tile.dealer-badge;
 	}
 
@@ -75,11 +79,11 @@
 	}
 
 	.seat-score--positive {
-		color: var(--color-positive);
+		color: color-mix(in srgb, var(--color-positive) 75%, white);
 	}
 
 	.seat-score--negative {
-		color: var(--color-negative);
+		color: color-mix(in srgb, var(--color-negative) 75%, white);
 	}
 
 	// absolutely-positioned halo, not a border/outline on .seat-plate itself -- inset sits outside
