@@ -13,6 +13,7 @@ import numpy as np
 
 from app.views import seat_view
 from mahjong_core.config import RuleSet
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES
 from ml.encode import (
@@ -55,8 +56,8 @@ def encode_state(state: GameState, seat: int, out: np.ndarray | None = None) -> 
     own = seats[seat]
     for t in own.concealed:
         idx.append(t // COPIES_PER_TYPE)
-    for rel in range(4):
-        abs_seat = (seat + rel) % 4
+    for rel in range(N_SEATS):
+        abs_seat = (seat + rel) % N_SEATS
         s = seats[abs_seat]
         meld_base = (1 + rel) * N_TILE_TYPES
         own_melds = abs_seat == seat
@@ -76,10 +77,10 @@ def encode_state(state: GameState, seat: int, out: np.ndarray | None = None) -> 
 
     ctx = out[_OFF_CONTEXT:_OFF_WALL]
     ctx[:] = 0.0
-    ctx[(state.turn - seat) % 4] = 1.0
-    ctx[4 + (state.dealer - seat) % 4] = 1.0
+    ctx[(state.turn - seat) % N_SEATS] = 1.0
+    ctx[4 + (state.dealer - seat) % N_SEATS] = 1.0
     ctx[8 + int(state.prevailing)] = 1.0
-    ctx[12 + (seat - state.dealer) % 4] = 1.0
+    ctx[12 + (seat - state.dealer) % N_SEATS] = 1.0
     ctx[16 + PHASE_INDEX[state.phase]] = 1.0
     out[_OFF_WALL] = len(state.wall.tiles)
     out[_OFF_RULESET:] = _ruleset_vec(state.ruleset)

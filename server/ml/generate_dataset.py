@@ -71,6 +71,7 @@ from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import Phase
 from mahjong_core.tiles import N_TILE_TYPES
 from ml.mp import mp_context
@@ -83,7 +84,7 @@ SCHEMA_VERSION = 3
 
 
 def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
-    if len(names) != 4:
+    if len(names) != N_SEATS:
         raise ValueError(f"--bots needs exactly 4 comma-separated names, got {len(names)}")
     bots = []
     for i, name in enumerate(names):

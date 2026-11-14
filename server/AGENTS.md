@@ -68,7 +68,7 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Hand sizes: `DEALT_HAND_SIZE`, `HAND_SIZE` (complete hand, kongs not counted) | `mahjong_core/wall.py` |
 | Action-id layout: `N_ACTIONS`, `*_BASE`, `PASS_ID`…`WIN_ID`, `CHOW_IDS` | `mahjong_core/ml.py` |
 | Action types / engine event types (`Event`, `EventKind`) | `mahjong_core/actions.py` / `mahjong_core/events.py` |
-| Seat range check (`validate_seat`) | `mahjong_core/state.py` |
+| Seat count and range check (`N_SEATS`, `validate_seat`) — not `state.py`, which imports `wall`/`melds` that need it | `mahjong_core/seats.py` |
 | Seats still to answer a claim window (`pending_claim_seats`, in `offers` order) — every offline driver picks its next claim seat from it | `mahjong_core/claims.py` |
 | Bot tier ids (`BotTier`, `BOT_TIERS`, `DEFAULT_BOT_TIER`, `LEARNED_TIERS`) — wire values, generated to TS | `bots/tiers.py` |
 | Lesson vocabularies (`PuzzleKind`, `SafeReason`, `PuzzleTheme` and `THEMES_BY_KIND`, `LessonKind`, `Band`, `Track`, `StepKind`, `Highlight`), `Puzzle`, `Tutorial` and its steps, `LESSON_RULESET` — generated to TS by `tools/gen_lessons.py` | `app/lessons/model.py` |

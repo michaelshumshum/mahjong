@@ -28,6 +28,7 @@ from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, Phase
 
 __all__ = ["play_and_record_game", "play_game"]
@@ -49,8 +50,10 @@ async def play_game(
     alone reproduces the game.
     """
     rng = random.Random(seed)
-    seats: Sequence[Bot] = bots if bots is not None else [RandomBot(rng=rng) for _ in range(4)]
-    if len(seats) != 4:
+    seats: Sequence[Bot] = (
+        bots if bots is not None else [RandomBot(rng=rng) for _ in range(N_SEATS)]
+    )
+    if len(seats) != N_SEATS:
         raise ValueError(f"bots must have exactly 4 entries, got {len(seats)}")
 
     state = new_game(ruleset, seed)
@@ -95,6 +98,8 @@ async def play_and_record_game(
     resolved_players = players
     if resolved_players is None:
         resolved_players = (
-            [f"bot:{type(b).__name__}" for b in bots] if bots is not None else ["bot:RandomBot"] * 4
+            [f"bot:{type(b).__name__}" for b in bots]
+            if bots is not None
+            else ["bot:RandomBot"] * N_SEATS
         )
     return await save_game_record(session, state, actions, players=resolved_players)

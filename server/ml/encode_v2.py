@@ -21,6 +21,7 @@ import numpy as np
 from app.views import SeatView
 from mahjong_core.config import RuleSet
 from mahjong_core.scoring.patterns import seat_wind_for
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES, Flower, TileType, tile_id_type
 from ml.encode import (
@@ -167,8 +168,8 @@ def policy_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
     for t in seats[seat].concealed:
         concealed[t // COPIES_PER_TYPE] += 1
     melds, seqs, counts, kongs, flowers = [], [], [], [], []
-    for rel in range(4):
-        s = seats[(seat + rel) % 4]
+    for rel in range(N_SEATS):
+        s = seats[(seat + rel) % N_SEATS]
         row = [0] * N_TILE_TYPES
         n_kongs = 0
         for meld in s.melds:
@@ -194,10 +195,10 @@ def policy_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
             "concealed_kongs": kongs,
             "flowers": flowers,
             "own_flowers": _flower_hot(seats[seat].flowers),
-            "seat_wind": (seat - state.dealer) % 4,
-            "dealer": (state.dealer - seat) % 4,
+            "seat_wind": (seat - state.dealer) % N_SEATS,
+            "dealer": (state.dealer - seat) % N_SEATS,
             "prevailing": int(state.prevailing),
-            "turn": (state.turn - seat) % 4,
+            "turn": (state.turn - seat) % N_SEATS,
             "phase": PHASE_INDEX[state.phase],
             "wall_remaining": len(state.wall.tiles),
             "claim_tile": claim,
@@ -210,7 +211,7 @@ def policy_raw_from_view(view: SeatView) -> dict[str, np.ndarray]:
     if view.seat is None:
         raise ValueError("policy_raw_from_view needs a seated view, not a spectator's")
     seat = view.seat
-    order = [(seat + rel) % 4 for rel in range(4)]
+    order = [(seat + rel) % N_SEATS for rel in range(N_SEATS)]
     concealed = [0] * N_TILE_TYPES
     for t in view.own_hand:
         concealed[int(tile_id_type(t))] += 1
@@ -248,7 +249,7 @@ def oracle_raw(state: GameState, seat: int) -> dict[str, np.ndarray]:
     previous). Next draws are the front of the live wall; a flower there is `PAD`."""
     opp_concealed, opp_kongs = [], []
     for rel in (1, 2, 3):
-        s = state.seats[(seat + rel) % 4]
+        s = state.seats[(seat + rel) % N_SEATS]
         row = [0] * N_TILE_TYPES
         for t in s.concealed:
             row[t // COPIES_PER_TYPE] += 1
@@ -305,7 +306,7 @@ def encode_policy_batch(
     n = (seq != PAD).sum(axis=2)
     last = np.take_along_axis(seq_i, np.maximum(n - 1, 0)[..., None], axis=2)[..., 0]
     last = np.where(n > 0, last, N_TILE_TYPES)
-    ages = _min_age(seq.reshape(b * 4, -1)).reshape(b, 4, N_TILE_TYPES)
+    ages = _min_age(seq.reshape(b * N_SEATS, -1)).reshape(b, N_SEATS, N_TILE_TYPES)
     recency = np.stack([(ages >= lo) & (ages <= hi) for lo, hi in _RECENCY], axis=2)
 
     discarded = disc[:, 1:] > 0

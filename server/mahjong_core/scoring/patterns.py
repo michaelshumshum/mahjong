@@ -48,6 +48,7 @@ from dataclasses import dataclass
 
 from mahjong_core.config import HandSet
 from mahjong_core.melds import KONG_KINDS, Meld, MeldKind
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import Wind
 from mahjong_core.tiles import (
     DRAGON_TYPES,
@@ -74,9 +75,11 @@ def seat_wind_for(seat: int, dealer: int) -> Wind:
     """A seat's wind for the hand currently being dealt by `dealer` -- the dealer is always
     East for their own deal, and seat wind rotates with the deal, not fixed table position.
     """
-    if not 0 <= seat < 4 or not 0 <= dealer < 4:
-        raise ValueError(f"seat and dealer must be 0..3, got seat={seat} dealer={dealer}")
-    return Wind((seat - dealer) % 4)
+    if not 0 <= seat < N_SEATS or not 0 <= dealer < N_SEATS:
+        raise ValueError(
+            f"seat and dealer must be 0..{N_SEATS - 1}, got seat={seat} dealer={dealer}"
+        )
+    return Wind((seat - dealer) % N_SEATS)
 
 
 @dataclass(frozen=True)

@@ -42,6 +42,7 @@ from mahjong_core.ml import (
     PUNG_ID,
     WIN_ID,
 )
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
 from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES, TileId, new_count_array, tile_id_type
@@ -117,7 +118,7 @@ def _weights_for_turn(
 
 
 def _opponents(seat: int) -> tuple[int, ...]:
-    return tuple(s for s in range(4) if s != seat)
+    return tuple(s for s in range(N_SEATS) if s != seat)
 
 
 def _best_after_discard(

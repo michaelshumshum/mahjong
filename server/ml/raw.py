@@ -11,6 +11,7 @@ from app.views import SeatView
 from bots.features import add_meld, own_hand34
 from bots.labels import discard_counts34
 from mahjong_core.scoring.patterns import seat_wind_for
+from mahjong_core.seats import N_SEATS
 from mahjong_core.tiles import new_count_array, tile_id_type
 
 __all__ = ["concealed_kong_counts", "raw_row", "relative_seats", "visible_meld_counts34"]
@@ -19,7 +20,7 @@ __all__ = ["concealed_kong_counts", "raw_row", "relative_seats", "visible_meld_c
 def relative_seats(seat: int) -> tuple[int, int, int, int]:
     """(self, next, across, previous) as absolute seat indices, so a view's own encoding always
     puts itself at relative position 0 regardless of which physical seat it sits in."""
-    return (seat, (seat + 1) % 4, (seat + 2) % 4, (seat + 3) % 4)
+    return (seat, (seat + 1) % N_SEATS, (seat + 2) % N_SEATS, (seat + 3) % N_SEATS)
 
 
 def visible_meld_counts34(view: SeatView, seat: int) -> list[int]:

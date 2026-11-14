@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from mahjong_core.config import MAX_FAAN_CAP, DiscardPayment, RuleSet, ScoreTable
-from mahjong_core.state import validate_seat
+from mahjong_core.seats import N_SEATS, validate_seat
 
 _FULL_SPICY: tuple[int, ...] = tuple(2**faan for faan in range(MAX_FAAN_CAP + 1))
 """全辣: `2 ** faan`."""
@@ -76,11 +76,11 @@ def payout(
     if points < 0:
         raise ValueError(f"points must be >= 0, got {points}")
 
-    deltas = dict.fromkeys(range(4), 0)
+    deltas = dict.fromkeys(range(N_SEATS), 0)
 
     if isinstance(win_type, SelfDraw):
         loser_share = _round_half_up(points, 2)
-        for seat in range(4):
+        for seat in range(N_SEATS):
             if seat != winner_seat:
                 deltas[seat] -= loser_share
         deltas[winner_seat] = 3 * loser_share
@@ -103,7 +103,7 @@ def payout(
     bystander_share, leftover = divmod(bystander_total, 2)
     discarder_share += leftover
 
-    for seat in range(4):
+    for seat in range(N_SEATS):
         if seat not in (winner_seat, discarder_seat):
             deltas[seat] -= bystander_share
     deltas[discarder_seat] = -discarder_share
