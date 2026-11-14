@@ -205,12 +205,8 @@ class FairnessPayload(BaseModel):
     nonce: str
 
 
-class HandHistoryEntryPayload(BaseModel):
-    """One completed hand, carried on `state_sync.hand_history`. Same fields as `HandEndPayload`
-    minus `deadline_ts`, plus `dealer`/`prevailing`/`winner_melds` -- a live client derives
-    those from `hand_end` itself, but a client with only a fresh `state_sync` has no live state
-    to derive them from, so the server captures them here instead."""
-
+class _HandResultFields(BaseModel):
+    # not a field type: no schema $def / TS interface. subclasses list these fields first.
     model_config = ConfigDict(extra="forbid")
 
     hand_no: int
@@ -224,6 +220,14 @@ class HandHistoryEntryPayload(BaseModel):
     payments: dict[int, int] | None
     revealed: bool
     winning_hand: list[int] | None
+
+
+class HandHistoryEntryPayload(_HandResultFields):
+    """One completed hand, carried on `state_sync.hand_history`. Same fields as `HandEndPayload`
+    minus `deadline_ts`, plus `dealer`/`prevailing`/`winner_melds` -- a live client derives
+    those from `hand_end` itself, but a client with only a fresh `state_sync` has no live state
+    to derive them from, so the server captures them here instead."""
+
     dealer: Seat
     prevailing: WindName
     winner_melds: list[dict[str, Any]] | None
@@ -372,20 +376,7 @@ class TurnPayload(BaseModel):
     legal: list[dict[str, Any]] | None = None  # unicast to the acting seat only
 
 
-class HandEndPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    hand_no: int
-    outcome: HandOutcome
-    winner: Seat | None
-    win_type: WinType | None
-    discarder: Seat | None
-    faan: int | None
-    faan_breakdown: dict[str, int] | None
-    points: int | None
-    payments: dict[int, int] | None
-    revealed: bool
-    winning_hand: list[int] | None
+class HandEndPayload(_HandResultFields):
     # hand-end hold: every seat gets this same deadline, held until all four ack or it elapses.
     deadline_ts: int
     # provable_fairness only, omitted otherwise
