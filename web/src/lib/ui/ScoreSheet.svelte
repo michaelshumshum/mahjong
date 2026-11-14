@@ -1,22 +1,10 @@
 <script lang="ts">
 	import WinningHand from './WinningHand.svelte';
-	import type { HandRecord, Seat, SeatInfo, Standing, Totals, Wind } from '$lib/game/types';
+	import type { HandRecord, Seat, SeatInfo, Standing, Totals } from '$lib/game/types';
 	import { placements, rankLabel, RANK_TONE } from './rank';
 	import { formatSigned } from './score-format';
+	import { windWord } from '$lib/table/wind';
 	import { m } from '$lib/paraglide/messages.js';
-
-	function windLabel(wind: Wind): string {
-		switch (wind) {
-			case 'E':
-				return m.scoreSheet_windEast();
-			case 'S':
-				return m.scoreSheet_windSouth();
-			case 'W':
-				return m.scoreSheet_windWest();
-			case 'N':
-				return m.scoreSheet_windNorth();
-		}
-	}
 
 	let {
 		seats,
@@ -124,7 +112,7 @@
 								{hand.handNo}
 							{/if}
 						</td>
-						<td class="col-wind">{windLabel(hand.prevailing)}</td>
+						<td class="col-wind">{windWord(hand.prevailing)}</td>
 						<td class="col-dealer">
 							{#if seatName(hand.dealer)}
 								<span class="dealer-badge">{seatName(hand.dealer)}</span>

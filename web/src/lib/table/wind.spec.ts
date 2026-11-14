@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('$lib/paraglide/runtime.js', () => ({ getLocale: vi.fn(() => 'en') }));
+vi.mock('$lib/paraglide/runtime.js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/paraglide/runtime.js')>()),
+	getLocale: vi.fn(() => 'en')
+}));
 
+import en from '../../../messages/en/table.json';
+import zhHant from '../../../messages/zh-Hant/table.json';
 import {
 	relativeSeat,
 	SEAT_POSITIONS,
@@ -12,7 +17,6 @@ import {
 	seatWindIndex,
 	windAtPosition,
 	windWord,
-	WIND_LABEL,
 	WIND_CHAR
 } from './wind';
 import { getLocale } from '$lib/paraglide/runtime.js';
@@ -36,19 +40,25 @@ describe('seatWind', () => {
 	});
 });
 
-describe('WIND_LABEL / WIND_CHAR', () => {
-	it('cover all four winds', () => {
-		for (const w of ['E', 'S', 'W', 'N'] as const) {
-			expect(WIND_LABEL[w]).toBeTruthy();
+describe('WIND_CHAR', () => {
+	it('covers all four winds', () => {
+		for (const w of SEAT_WINDS) {
 			expect(WIND_CHAR[w]).toBeTruthy();
 		}
 	});
 });
 
 describe('windWord', () => {
-	it('uses the English word for the en locale', () => {
-		vi.mocked(getLocale).mockReturnValue('en');
-		expect(windWord('S')).toBe('South');
+	const keys = { E: 'wind_east', S: 'wind_south', W: 'wind_west', N: 'wind_north' } as const;
+
+	it.each([
+		['en', en],
+		['zh-Hant', zhHant]
+	] as const)('names every wind with its %s message', (locale, messages) => {
+		vi.mocked(getLocale).mockReturnValue(locale);
+		for (const w of SEAT_WINDS) {
+			expect(windWord(w)).toBe(messages[keys[w]]);
+		}
 	});
 
 	it('uses the Chinese glyph for the zh-Hant locale, not the English word', () => {

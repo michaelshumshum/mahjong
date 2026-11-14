@@ -165,5 +165,9 @@
 	"fairness_details": "Seed details",
 	"fairness_commitLabel": "Commitment",
 	"fairness_handSeedLabel": "Hand seed",
-	"fairness_nonceLabel": "Nonce"
+	"fairness_nonceLabel": "Nonce",
+	"wind_east": "East",
+	"wind_south": "South",
+	"wind_west": "West",
+	"wind_north": "North"
 }
