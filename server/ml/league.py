@@ -42,6 +42,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from mahjong_core.seats import N_SEATS
 from ml.policy_net import PolicyNet, PolicyNetConfig
 
 __all__ = [
@@ -308,8 +309,8 @@ class League:
             e = self.entry(oid) if oid else None
             if e is None:
                 continue
-            learners = [s for s in range(4) if bits >> s & 1]
-            others = [s for s in range(4) if not bits >> s & 1]
+            learners = [s for s in range(N_SEATS) if bits >> s & 1]
+            others = [s for s in range(N_SEATS) if not bits >> s & 1]
             e.score += pairwise_scores(rewards, learners, others)
             e.points += pairwise_points(rewards, learners, others)
             e.games += len(learners) * len(others)

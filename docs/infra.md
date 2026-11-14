@@ -20,6 +20,7 @@ mahjong/
 │   ├── pyproject.toml, uv.lock, Dockerfile, alembic/
 │   ├── mahjong_core/           # PURE. no asyncio, no I/O, no deps beyond stdlib
 │   │   ├── tiles.py            # TileType/TileId, geometry constants, 34-array helpers, parsing
+│   │   ├── seats.py            # N_SEATS, validate_seat (import-free, below wall/melds/state)
 │   │   ├── wall.py             # seeded shuffle, dice, draw front/back, flower replacement
 │   │   ├── melds.py            # meld types, legality, decomposition
 │   │   ├── shanten.py          # standard / seven pairs / thirteen orphans + ukeire

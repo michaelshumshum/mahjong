@@ -65,6 +65,7 @@ from mahjong_core.events import (
 from mahjong_core.melds import Meld, MeldKind, legal_claims
 from mahjong_core.scoring import payout as payout_mod
 from mahjong_core.scoring.faan import score_winning_hand, seven_pairs_enabled
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import (
     ClaimKind,
     ClaimOffer,
@@ -152,7 +153,7 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
     Not an `Action` -- see module docstring for why this can't go through `reduce()`.
 
     Dealer repeats (連莊) on a dealer win, or on any exhaustive draw if configured; otherwise
-    the deal passes to `(dealer + 1) % 4`, and once that wraps back to seat 0 a full round has
+    the deal passes to `(dealer + 1) % N_SEATS`, and once that wraps back to seat 0 a full round has
     completed -- the prevailing wind advances, or the game ends if `ruleset.game_length` has
     no round left. `hand_no` increments unconditionally either way, so this can never re-deal
     the same hand number twice. The game also ends after hand `MAX_HANDS_PER_GAME`, repeat or not.
@@ -173,7 +174,7 @@ def start_next_hand(state: GameState) -> tuple[GameState, list[Event]]:
         next_prevailing = state.prevailing
         game_over = False
     else:
-        next_dealer = (state.dealer + 1) % 4
+        next_dealer = (state.dealer + 1) % N_SEATS
         next_prevailing = state.prevailing
         game_over = False
         if next_dealer == 0:
@@ -206,8 +207,8 @@ def new_hand(ruleset: RuleSet, game_seed: int, *, dealer: int, prevailing: Wind)
     """A fresh game's first hand dealt with `dealer`/`prevailing` instead of seat 0/East, for
     training on every seat-wind context. Same wall as `new_game(ruleset, game_seed)`; with
     `dealer=0, prevailing=EAST` the result equals it."""
-    if not 0 <= dealer < 4:
-        raise ValueError(f"dealer must be 0..3, got {dealer}")
+    if not 0 <= dealer < N_SEATS:
+        raise ValueError(f"dealer must be 0..{N_SEATS - 1}, got {dealer}")
     if prevailing not in prevailing_winds(ruleset):
         raise ValueError(f"prevailing {prevailing!r} unreachable under {ruleset.game_length}")
     return _deal_hand(new_game(ruleset, game_seed), dealer=dealer, prevailing=prevailing, hand_no=1)
@@ -399,7 +400,7 @@ def newest_discard(state: GameState) -> tuple[int, TileId] | None:
 
 def _discard_claim_offers(state: GameState, discarder: int, tile: TileId) -> tuple[ClaimOffer, ...]:
     offers: list[ClaimOffer] = []
-    for seat in range(4):
+    for seat in range(N_SEATS):
         if seat == discarder:
             continue
         seat_state = state.seats[seat]
@@ -426,7 +427,9 @@ def _apply_discard(state: GameState, seat: int, action: Discard) -> tuple[GameSt
 
     offers = _discard_claim_offers(state, seat, tile)
     if not offers:
-        more_state, more_events = _draw_for_turn(state, (seat + 1) % 4, from_front=True, kong=False)
+        more_state, more_events = _draw_for_turn(
+            state, (seat + 1) % N_SEATS, from_front=True, kong=False
+        )
         return more_state, events + more_events
 
     window = ClaimWindow(
@@ -459,7 +462,7 @@ def _kong_rob_offers(
     if meld.kind == MeldKind.CONCEALED_KONG and not ruleset.concealed_kong_robbable:
         return ()
     offers = []
-    for seat in range(4):
+    for seat in range(N_SEATS):
         if seat == declarer:
             continue
         if meld.kind == MeldKind.CONCEALED_KONG:
@@ -542,7 +545,7 @@ def _apply_claim_response(
             )
         else:
             more_state, more_events = _draw_for_turn(
-                state, (window.source_seat + 1) % 4, from_front=True, kong=False
+                state, (window.source_seat + 1) % N_SEATS, from_front=True, kong=False
             )
         return more_state, events + more_events
 
@@ -767,7 +770,7 @@ def _deal_hand(state: GameState, *, dealer: int, prevailing: Wind, hand_no: int)
                 flowers=flowers[i],
                 score=state.seats[i].score,
             )
-            for i in range(4)
+            for i in range(N_SEATS)
         ),
     )
 

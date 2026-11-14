@@ -11,6 +11,7 @@ from enum import IntEnum
 
 from mahjong_core.actions import ActionKind, ClaimChow, ClaimKong, ClaimPung, ClaimWin, Pass
 from mahjong_core.melds import MeldKind
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import ClaimOffer, ClaimWindow, GameState
 
 ClaimResponse = ClaimChow | ClaimPung | ClaimKong | ClaimWin | Pass
@@ -100,7 +101,7 @@ def resolve_claims(
 
     if best == ClaimPriority.WIN:
         # win-vs-win ties resolve by seat order from the discarder.
-        winner = min(contenders, key=lambda sc: (sc[0] - claim_window.source_seat) % 4)
+        winner = min(contenders, key=lambda sc: (sc[0] - claim_window.source_seat) % N_SEATS)
         return ClaimResolution(winning_seat=winner[0], action=winner[1])
 
     if best == ClaimPriority.PUNG_OR_KONG:
@@ -113,7 +114,7 @@ def resolve_claims(
         winner = pool[0]
         return ClaimResolution(winning_seat=winner[0], action=winner[1])
 
-    # chow: only claimer_seat == (source_seat + 1) % 4 is ever eligible, so at most one seat
+    # chow: only claimer_seat == (source_seat + 1) % N_SEATS is ever eligible, so at most one seat
     # can submit a chow claim on one discard.
     if len(contenders) > 1:
         raise AssertionError(f"multiple chow claims on one discard: {contenders}")
@@ -137,7 +138,7 @@ def can_close_early(claim_window: ClaimWindow, responses: Mapping[int, ClaimResp
     best = max((_priority(action) for _, action in live), default=ClaimPriority.NONE)
     best_win_distance = (
         min(
-            (seat - claim_window.source_seat) % 4
+            (seat - claim_window.source_seat) % N_SEATS
             for seat, action in live
             if action.kind == ActionKind.CLAIM_WIN
         )
@@ -156,7 +157,7 @@ def can_close_early(claim_window: ClaimWindow, responses: Mapping[int, ClaimResp
         # tier == best: only a same-tier tiebreak can still flip the winner.
         if tier == ClaimPriority.WIN:
             assert best_win_distance is not None
-            distance = (seat - claim_window.source_seat) % 4
+            distance = (seat - claim_window.source_seat) % N_SEATS
             if distance < best_win_distance:
                 return False
         elif tier == ClaimPriority.PUNG_OR_KONG and not best_has_kong:

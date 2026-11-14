@@ -40,6 +40,7 @@ from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
 from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
@@ -114,7 +115,7 @@ def _unseen(row: dict[str, np.ndarray]) -> np.ndarray:
 
 def _label_row(state: GameState, seat: int) -> dict[str, object]:
     labels = danger_labels_for_opponents(state, seat)
-    opps = [(seat + r) % 4 for r in (1, 2, 3)]
+    opps = [(seat + r) % N_SEATS for r in (1, 2, 3)]
     wait = np.zeros((3, N_TILE_TYPES), dtype=np.uint8)
     for i, o in enumerate(opps):
         wait[i, list(labels[o].winning_tiles)] = 1

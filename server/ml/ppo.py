@@ -52,6 +52,7 @@ from torch import nn
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import ENGINE_VERSION
 from mahjong_core.presets import RULESET_PRESETS
+from mahjong_core.seats import N_SEATS
 from mahjong_core.tiles import N_TILE_TYPES
 from ml.aux_data import aux_targets
 from ml.danger_model import _padded_positions
@@ -894,7 +895,7 @@ def _hand_stats(ep: Episode) -> list[HandStat]:
     info = dict(zip(INFO_FIELDS, (int(x) for x in ep.info), strict=True))
     min_faan = int(unpack_rows(ep.rows[:1], ("min_faan",))["min_faan"][0])
     out = []
-    for s in range(4):
+    for s in range(N_SEATS):
         if not info["learners"] >> s & 1:
             continue
         out.append(

@@ -30,6 +30,7 @@ from mahjong_core.engine import (
     reduce,
 )
 from mahjong_core.ml import N_ACTIONS, decode_action, legal_mask
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, Phase, Wind
 from ml.fast_encode import OBS_DIM, encode_state
 
@@ -57,7 +58,7 @@ def encode_obs(state: GameState, seat: int, out: np.ndarray | None = None) -> np
 def hand_start(ruleset: RuleSet, seed: int) -> tuple[int, Wind]:
     """`(dealer, prevailing)` for episode `seed`."""
     rng = random.Random(f"start:{seed}")
-    return rng.randrange(4), rng.choice(prevailing_winds(ruleset))
+    return rng.randrange(N_SEATS), rng.choice(prevailing_winds(ruleset))
 
 
 def _scores(state: GameState) -> tuple[int, int, int, int]:
@@ -117,7 +118,8 @@ class HandEnv:
         assert self.state is not None
         end = _scores(self.state)
         return np.asarray(
-            [(end[i] - self._start_scores[i]) / REWARD_SCALE for i in range(4)], dtype=np.float32
+            [(end[i] - self._start_scores[i]) / REWARD_SCALE for i in range(N_SEATS)],
+            dtype=np.float32,
         )
 
     def record(self, players: Sequence[str | None] | None = None) -> dict[str, Any]:

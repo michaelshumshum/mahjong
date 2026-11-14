@@ -55,6 +55,7 @@ from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.events import Discarded, HandEnded
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, HandOutcome, Phase, WinType
 
 __all__ = [
@@ -237,7 +238,7 @@ def _hand_record(state: GameState, event: HandEnded, turns: int) -> HandRecord:
     if event.outcome == HandOutcome.EXHAUSTIVE_DRAW:
         tenpai = []
         sub_min = []
-        for s in range(4):
+        for s in range(N_SEATS):
             if is_tenpai(state, s):
                 tenpai.append(s)
                 if not _tenpai_can_reach_min_faan(state, s):
@@ -248,7 +249,9 @@ def _hand_record(state: GameState, event: HandEnded, turns: int) -> HandRecord:
     result = state.hand_result
     faan = result.faan if result is not None else 0
     payments = (
-        tuple(result.payments.get(s, 0) for s in range(4)) if result is not None else (0, 0, 0, 0)
+        tuple(result.payments.get(s, 0) for s in range(N_SEATS))
+        if result is not None
+        else (0, 0, 0, 0)
     )
     return HandRecord(
         hand_no=event.hand_no,
@@ -281,13 +284,13 @@ def _make_bot(name: str, seed: int) -> Bot:
 async def _run_duplicate_set_async(
     seed: int, ruleset: RuleSet, name_a: str, name_b: str
 ) -> tuple[GameRecord, ...]:
-    """`seed` also derives each seat's bot-internal RNG seed (`seed * 4 + seat`) so a run is
+    """`seed` also derives each seat's bot-internal RNG seed (`seed * N_SEATS + seat`) so a run is
     bit-for-bit reproducible end to end, including stochastic bots like `RandomBot`."""
     records = []
-    for rotation in range(4):
-        seat_bots: list[Bot] = [_make_bot(name_b, seed * 4 + i) for i in range(4)]
-        seat_bots[rotation] = _make_bot(name_a, seed * 4 + rotation)
-        names = [name_b] * 4
+    for rotation in range(N_SEATS):
+        seat_bots: list[Bot] = [_make_bot(name_b, seed * N_SEATS + i) for i in range(N_SEATS)]
+        seat_bots[rotation] = _make_bot(name_a, seed * N_SEATS + rotation)
+        names = [name_b] * N_SEATS
         names[rotation] = name_a
         roles = _roles_for_rotation(rotation)
         record = await _play_instrumented_game(seed, ruleset, seat_bots, names)
@@ -370,7 +373,7 @@ def _paired_differences(duplicate_sets: Sequence[tuple[GameRecord, ...]]) -> lis
         for record in records:
             a_seat = record.roles.index("A")
             a_score = record.final_scores[a_seat]
-            b_scores = [record.final_scores[i] for i in range(4) if i != a_seat]
+            b_scores = [record.final_scores[i] for i in range(N_SEATS) if i != a_seat]
             per_rotation.append(a_score - statistics.fmean(b_scores))
         diffs.append(statistics.fmean(per_rotation))
     return diffs

@@ -18,7 +18,8 @@ from typing import Any, Literal
 from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_melds
 from mahjong_core.scoring.faan import score_winning_hand, seven_pairs_enabled
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
-from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState, validate_seat
+from mahjong_core.seats import validate_seat
+from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
 from mahjong_core.tiles import N_TILE_TYPES, ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
 from mahjong_core.wall import HAND_SIZE
 

@@ -49,6 +49,7 @@ from app.table import Table
 from app.table_types import TableSettings, WireSeatStatus
 from bots.tiers import DEFAULT_BOT_TIER
 from mahjong_core.config import RuleSet
+from mahjong_core.seats import N_SEATS
 
 __all__ = ["TableLimitError", "TableLoad", "TableRegistry", "TableSummary"]
 
@@ -274,7 +275,7 @@ class TableRegistry:
             game_seed=game_seed,
             require_ready=True,
             bot_pool=self._bot_pool,
-            seat_bot_tiers={seat: tier_rng.choice(bot_tiers) for seat in range(4)},
+            seat_bot_tiers={seat: tier_rng.choice(bot_tiers) for seat in range(N_SEATS)},
             all_bots=True,
             settings=TableSettings(spectators_see_hands=True),
             # open hands: spectators already see every claim, nothing for a hold to hide
