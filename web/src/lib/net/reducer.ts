@@ -205,7 +205,8 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 			};
 		}
 
-		case 'draw': {
+		case 'draw':
+		case 'kong_replace': {
 			const d = event.d;
 			const isOwn = d.seat === state.seat;
 			const tileId = d.tile_id;
@@ -350,25 +351,6 @@ export function reduce(state: ClientGameState, event: ServerEvent): ClientGameSt
 				lastDiscard: null,
 				// a meld ends whatever turn was running; the next `turn` re-arms it.
 				deadlineTs: null
-			};
-		}
-
-		case 'kong_replace': {
-			const d = event.d;
-			const isOwn = d.seat === state.seat;
-			const tileId = d.tile_id;
-			return {
-				...state,
-				concealedCounts: replaceAt(
-					state.concealedCounts,
-					d.seat,
-					state.concealedCounts[d.seat] + 1
-				),
-				hands:
-					tileId != null ? updateHand(state.hands, d.seat, (h) => [...h, tileId]) : state.hands,
-				ownHand: isOwn && d.tile_id != null ? [...state.ownHand, d.tile_id] : state.ownHand,
-				drawnTileId: isOwn && d.tile_id != null ? d.tile_id : state.drawnTileId,
-				wallRemaining: Math.max(0, state.wallRemaining - 1)
 			};
 		}
 
