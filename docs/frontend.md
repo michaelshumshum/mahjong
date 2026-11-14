@@ -371,7 +371,8 @@ The client assigns a **positional** identity instead — stable per seat, opaque
   `tiles.length` minus the claimed tile.
 - A concealed kong (暗槓) is drawn HK-style, both end tiles as backs and the middle two face-up
   (`lib/table/meld-face.ts`'s `meldTileFace`, used by every meld renderer — table and win
-  screens alike; [ADR 0023](decisions/0023-concealed-kong-public.md)).
+  screens alike; [ADR 0023](decisions/0023-concealed-kong-public.md)). On the table, every seat's
+  flowers and melds render through `lib/table/MeldGroups.svelte`, keyed by index.
 
 Client-only bookkeeping — it doesn't touch the protocol or leak information. Opponent slot count
 always matches the server's `count`.
