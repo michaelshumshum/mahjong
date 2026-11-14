@@ -59,6 +59,7 @@ from bots.labels import is_tenpai, seat_hand34
 from bots.tiers import BOT_TIERS, BotTier
 from bots.worker import compute_action
 from mahjong_core.actions import can_declare_win
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.engine import ENGINE_VERSION, new_game, reduce, start_next_hand
 from mahjong_core.ml import DISCARD_BASE, decode_action, legal_mask
 from mahjong_core.shanten import shanten
@@ -459,7 +460,7 @@ def _turns(seed: int, tier: str) -> Iterator[tuple[int, GameState, GameState]]:
             continue
         window = state.claim_window
         if window is not None:
-            seat = min(o.seat for o in window.offers if o.seat not in window.responses)
+            seat = min(pending_claim_seats(state))
         else:
             seat = state.turn
         mask = legal_mask(state, seat)

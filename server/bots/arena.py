@@ -49,6 +49,7 @@ from bots.labels import (
 from bots.random import RandomBot
 from bots.tiers import BotTier
 from mahjong_core.actions import build_scoring_context
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.events import Discarded, HandEnded
@@ -205,12 +206,7 @@ async def _play_instrumented_game(
             continue
 
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
+            pending = pending_claim_seats(state)
             seat = min(pending)
         else:
             seat = state.turn

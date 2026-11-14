@@ -16,6 +16,7 @@ from app.db.records import (
     save_hand_record,
 )
 from mahjong_core.actions import Action, action_from_dict
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game, new_hand, reduce
 from mahjong_core.ml import decode_action, legal_mask
@@ -27,8 +28,7 @@ def _play_hand(state: GameState, seed: int) -> tuple[GameState, list[Action]]:
     actions: list[Action] = []
     while state.phase not in (Phase.HAND_OVER, Phase.GAME_OVER):
         if state.claim_window is not None:
-            responded = state.claim_window.responses
-            seat = next(o.seat for o in state.claim_window.offers if o.seat not in responded)
+            seat = pending_claim_seats(state)[0]
         else:
             seat = state.turn
         mask = legal_mask(state, seat)

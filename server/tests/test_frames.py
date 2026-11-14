@@ -35,6 +35,7 @@ from app.lessons.position import build_position
 from app.table import Table
 from bots.random import random_action
 from mahjong_core.actions import Action, ActionKind, legal_actions
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.events import ClaimResolved, FlowerReplaced, HandEnded, MeldFormed
 from mahjong_core.melds import MeldKind
@@ -107,9 +108,7 @@ async def play_recorded(
             await table.process_one()
             continue
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            window = state.claim_window
-            seat = rng.choice([o.seat for o in window.offers if o.seat not in window.responses])
+            seat = rng.choice(pending_claim_seats(state))
         else:
             seat = state.turn
         table.submit(seat, _greedy_action(state, seat, rng))

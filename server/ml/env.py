@@ -20,6 +20,7 @@ import numpy as np
 
 from app.db.records import hand_record_columns
 from mahjong_core.actions import Action, action_from_dict
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import (
     ENGINE_VERSION,
@@ -155,12 +156,7 @@ class HandEnv:
                 self._seat = -1
                 return
             if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-                assert state.claim_window is not None
-                pending = [
-                    o.seat
-                    for o in state.claim_window.offers
-                    if o.seat not in state.claim_window.responses
-                ]
+                pending = pending_claim_seats(state)
                 seat = self._rng.choice(pending)
             else:
                 seat = state.turn
