@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { SEAT_WINDS, WIND_CHAR } from './wind';
+	import { SEAT_POSITIONS, windAtPosition, WIND_CHAR } from './wind';
 
 	// rotate = viewer's wind index (E=0 … N=3): shifts glyphs so their wind sits at the bottom
 	// edge. 0 (table cards) is purely decorative; the seated waiting ring passes a real rotation.
 	let { rotate = 0 }: { rotate?: number } = $props();
-	let winds = $derived([0, 1, 2, 3].map((p) => WIND_CHAR[SEAT_WINDS[(p + rotate) % 4]]));
+	let winds = $derived(SEAT_POSITIONS.map((p) => WIND_CHAR[windAtPosition(p, rotate)]));
 </script>
 
 <!-- Mini felt square with the four wind glyphs, each rotated to read from its own seat's side.

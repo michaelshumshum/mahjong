@@ -4,9 +4,13 @@
 	import { sortTiles, type TileCode } from '../table/tile-code';
 	import { m } from '$lib/paraglide/messages.js';
 	import FaanPatternName from './FaanPatternName.svelte';
-	import type { FaanPattern, Payments, Seat, WinningMeld } from '$lib/game/types';
-
-	const ALL_SEATS: Seat[] = [0, 1, 2, 3];
+	import {
+		ALL_SEATS,
+		type FaanPattern,
+		type Payments,
+		type Seat,
+		type WinningMeld
+	} from '$lib/game/types';
 
 	let {
 		winner,

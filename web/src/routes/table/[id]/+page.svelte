@@ -374,7 +374,7 @@
 	// keyed by tile_id when live, so a reorder (or the drawn tile joining the hand) animates the
 	// same element; mock fixtures have no ids, so they key by position.
 	let ownHandTiles = $derived.by((): OwnHandTile[] => {
-		const seat0 = seatAtPosition(gameState.seats, gameState.you, 0);
+		const seat0 = seatAtPosition(gameState.seats, gameState.you, 'self');
 		const drawnId = live?.ownHand.drawnId ?? null;
 		const tiles: OwnHandTile[] = live
 			? arrangedConcealedIds.map((id) => ({
