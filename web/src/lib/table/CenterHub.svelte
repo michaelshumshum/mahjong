@@ -1,8 +1,7 @@
 <script lang="ts">
 	import TimerRing from '$lib/ui/TimerRing.svelte';
-	import type { Seat } from '$lib/game/types';
-	import { relativeSeat } from './wind';
-	import { seatWind, windWord, WIND_CHAR } from './wind';
+	import { ALL_SEATS, type Seat } from '$lib/game/types';
+	import { relativeSeat, seatWind, windWord, WIND_CHAR, type SeatPosition } from './wind';
 	import { m } from '$lib/paraglide/messages.js';
 
 	// the table's own compass: wind/hand/wall/min-faan, plus one wind marker per seat, the
@@ -27,11 +26,8 @@
 		turnDurationMs: number | null;
 	} = $props();
 
-	const DIRECTIONS = ['self', 'right', 'across', 'left'] as const;
-	type Direction = (typeof DIRECTIONS)[number];
-
 	interface Marker {
-		direction: Direction;
+		direction: SeatPosition;
 		seat: Seat;
 		windChar: string;
 		windAriaLabel: string;
@@ -39,8 +35,8 @@
 	}
 
 	let markers = $derived.by((): Marker[] =>
-		([0, 1, 2, 3] as Seat[]).map((seat) => {
-			const direction = DIRECTIONS[relativeSeat(seat, you)];
+		ALL_SEATS.map((seat) => {
+			const direction = relativeSeat(seat, you);
 			const wind = seatWind(seat, dealer);
 			return {
 				direction,

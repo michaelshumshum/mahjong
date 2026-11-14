@@ -6,6 +6,8 @@ import type { ClaimChoice, HandOutcome, MeldKind as WireMeldKind, Seat } from '$
 
 export type { HandOutcome, Phase, Seat, WinType } from '$lib/net/protocol';
 
+export const ALL_SEATS: readonly Seat[] = [0, 1, 2, 3];
+
 export type Wind = 'E' | 'S' | 'W' | 'N';
 
 // SeatState.melds never holds a bare pair.

@@ -2,9 +2,21 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$lib/paraglide/runtime.js', () => ({ getLocale: vi.fn(() => 'en') }));
 
-import { relativeSeat, seatAtPosition, seatWind, windWord, WIND_LABEL, WIND_CHAR } from './wind';
+import {
+	relativeSeat,
+	SEAT_POSITIONS,
+	SEAT_WINDS,
+	seatAtPosition,
+	seatFromPosition,
+	seatWind,
+	seatWindIndex,
+	windAtPosition,
+	windWord,
+	WIND_LABEL,
+	WIND_CHAR
+} from './wind';
 import { getLocale } from '$lib/paraglide/runtime.js';
-import type { Seat } from '$lib/game/types';
+import { ALL_SEATS, type Seat } from '$lib/game/types';
 import type { SeatView } from './view-types';
 
 describe('seatWind', () => {
@@ -46,31 +58,75 @@ describe('windWord', () => {
 });
 
 describe('relativeSeat', () => {
-	it('returns 0 when seat equals you', () => {
-		expect(relativeSeat(0, 0)).toBe(0);
-		expect(relativeSeat(2, 2)).toBe(0);
+	it('returns self when seat equals you', () => {
+		expect(relativeSeat(0, 0)).toBe('self');
+		expect(relativeSeat(2, 2)).toBe('self');
 	});
 
 	it('counts clockwise from you in seat-index space', () => {
-		expect(relativeSeat(1, 0)).toBe(1);
-		expect(relativeSeat(2, 0)).toBe(2);
-		expect(relativeSeat(3, 0)).toBe(3);
+		expect(relativeSeat(1, 0)).toBe('right');
+		expect(relativeSeat(2, 0)).toBe('across');
+		expect(relativeSeat(3, 0)).toBe('left');
 	});
 
 	it('wraps around seat 0', () => {
-		expect(relativeSeat(0, 1)).toBe(3);
-		expect(relativeSeat(0, 3)).toBe(1);
-		expect(relativeSeat(2, 3)).toBe(3);
+		expect(relativeSeat(0, 1)).toBe('left');
+		expect(relativeSeat(0, 3)).toBe('right');
+		expect(relativeSeat(2, 3)).toBe('left');
+	});
+});
+
+describe('seatFromPosition', () => {
+	it('inverts relativeSeat for every seat and position', () => {
+		for (const you of ALL_SEATS) {
+			for (const position of SEAT_POSITIONS) {
+				expect(relativeSeat(seatFromPosition(you, position), you)).toBe(position);
+			}
+		}
+	});
+
+	it('wraps around seat 3', () => {
+		expect(seatFromPosition(3, 'self')).toBe(3);
+		expect(seatFromPosition(3, 'right')).toBe(0);
+		expect(seatFromPosition(3, 'across')).toBe(1);
+		expect(seatFromPosition(3, 'left')).toBe(2);
 	});
 });
 
 describe('seatAtPosition', () => {
-	const seats = ([0, 1, 2, 3] as const).map((seat) => ({ seat }) as SeatView);
+	const seats = ALL_SEATS.map((seat) => ({ seat }) as SeatView);
 
 	it('finds the seat at a table position relative to you', () => {
-		expect(seatAtPosition(seats, 2, 0).seat).toBe(2);
-		expect(seatAtPosition(seats, 2, 1).seat).toBe(3);
-		expect(seatAtPosition(seats, 2, 2).seat).toBe(0);
-		expect(seatAtPosition(seats, 2, 3).seat).toBe(1);
+		expect(seatAtPosition(seats, 2, 'self').seat).toBe(2);
+		expect(seatAtPosition(seats, 2, 'right').seat).toBe(3);
+		expect(seatAtPosition(seats, 2, 'across').seat).toBe(0);
+		expect(seatAtPosition(seats, 2, 'left').seat).toBe(1);
+	});
+});
+
+describe('seatWindIndex', () => {
+	it('indexes SEAT_WINDS with the same wind seatWind gives', () => {
+		for (const dealer of ALL_SEATS) {
+			for (const seat of ALL_SEATS) {
+				expect(SEAT_WINDS[seatWindIndex(seat, dealer)]).toBe(seatWind(seat, dealer));
+			}
+		}
+	});
+});
+
+describe('windAtPosition', () => {
+	it('puts your own wind at self and the rest clockwise', () => {
+		expect(SEAT_POSITIONS.map((p) => windAtPosition(p, 0))).toEqual(['E', 'S', 'W', 'N']);
+		expect(SEAT_POSITIONS.map((p) => windAtPosition(p, 3))).toEqual(['N', 'E', 'S', 'W']);
+	});
+
+	it('agrees with seatWind of the seat at that position', () => {
+		const you = 1 as Seat;
+		const dealer = 2 as Seat;
+		for (const position of SEAT_POSITIONS) {
+			expect(windAtPosition(position, seatWindIndex(you, dealer))).toBe(
+				seatWind(seatFromPosition(you, position), dealer)
+			);
+		}
 	});
 });

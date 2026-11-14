@@ -28,7 +28,7 @@
 	}
 
 	// seats 1-3 only -- seat 0 is the human's own seat, never configured here. Offsets from your
-	// own seat, clockwise, matching wind.ts's relativeSeat: 1 right, 2 across, 3 left.
+	// own seat, clockwise, matching wind.ts's SEAT_POSITIONS: 1 right, 2 across, 3 left.
 	let difficulty = $state<PracticeSetup>(
 		loadPracticeSetup() ?? { 1: 'normal', 2: 'normal', 3: 'normal' }
 	);
