@@ -48,6 +48,7 @@ from mahjong_core.state import (
 from mahjong_core.tiles import TOTAL_PHYSICAL_TILES, Flower, TileType, tile_ids_for_type
 from mahjong_core.wall import Wall
 from tests.game_state import total_tiles, with_seat
+from tests.hands import JUNK_HAND
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)
 _MAN_2 = tile_ids_for_type(TileType.MAN_2)
@@ -63,9 +64,6 @@ _PIN_2 = tile_ids_for_type(TileType.PIN_2)
 _PIN_3 = tile_ids_for_type(TileType.PIN_3)
 _PIN_9 = tile_ids_for_type(TileType.PIN_9)
 _SOU_1 = tile_ids_for_type(TileType.SOU_1)
-_SOU_2 = tile_ids_for_type(TileType.SOU_2)
-_SOU_4 = tile_ids_for_type(TileType.SOU_4)
-_SOU_6 = tile_ids_for_type(TileType.SOU_6)
 _SOU_8 = tile_ids_for_type(TileType.SOU_8)
 _EAST = tile_ids_for_type(TileType.WIND_EAST)
 _SOUTH = tile_ids_for_type(TileType.WIND_SOUTH)
@@ -74,24 +72,6 @@ _NORTH = tile_ids_for_type(TileType.WIND_NORTH)
 _RED = tile_ids_for_type(TileType.DRAGON_RED)
 _GREEN = tile_ids_for_type(TileType.DRAGON_GREEN)
 _WHITE = tile_ids_for_type(TileType.DRAGON_WHITE)
-
-# confined to sou-evens + honors: every other test here discards/claims man or pin, so this
-# filler can never accidentally duplicate the tile under test.
-_JUNK_HAND = (
-    _SOU_2[0],
-    _SOU_4[0],
-    _SOU_6[0],
-    _SOU_8[0],
-    _SOU_2[1],
-    _SOU_4[1],
-    _SOU_6[1],
-    _SOUTH[0],
-    _WEST[0],
-    _NORTH[0],
-    _RED[0],
-    _GREEN[0],
-    _WHITE[0],
-)
 
 
 def _state(**overrides: object) -> GameState:
@@ -102,7 +82,7 @@ def _state(**overrides: object) -> GameState:
 def _all_junk(state: GameState, *, except_seat: int) -> GameState:
     for seat in range(4):
         if seat != except_seat:
-            state = with_seat(state, seat, concealed=_JUNK_HAND)
+            state = with_seat(state, seat, concealed=JUNK_HAND)
     return state
 
 
@@ -113,7 +93,7 @@ def test_discard_with_no_claims_advances_to_next_seat_draw() -> None:
     # deterministic, flower-free wall: a real dealt wall could put a flower on top, chaining
     # into extra replacement draws and making the "-1" wall-count assertion below flaky.
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_SOU_8[2], _SOU_8[3])))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _EAST[0]))
     state = _all_junk(state, except_seat=0)
 
     wall_before = len(state.wall.tiles)
@@ -123,7 +103,7 @@ def test_discard_with_no_claims_advances_to_next_seat_draw() -> None:
     assert state.turn == 1
     assert state.claim_window is None
     assert state.seats[0].discards == (_EAST[0],)
-    assert len(state.seats[1].concealed) == len(_JUNK_HAND) + 1
+    assert len(state.seats[1].concealed) == len(JUNK_HAND) + 1
     assert len(state.wall.tiles) == wall_before - 1
     assert events[0] == Discarded(seat=0, tile_id=_EAST[0])
     assert any(isinstance(e, Drawn) and e.seat == 1 for e in events)
@@ -134,9 +114,9 @@ def test_discard_with_no_claims_advances_to_next_seat_draw() -> None:
 
 def test_discard_with_a_legal_pung_opens_claim_window() -> None:
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]))
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_5[0]))
     state = _all_junk(state, except_seat=0)
-    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_JUNK_HAND[:11]))
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *JUNK_HAND[:11]))
 
     state, events = reduce(state, Discard(tile_id=_MAN_5[0]))
 
@@ -157,10 +137,10 @@ def test_discard_with_a_legal_pung_opens_claim_window() -> None:
 
 def _claims_window_state() -> GameState:
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]), discards=())
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_5[0]), discards=())
     state = _all_junk(state, except_seat=0)
-    state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_JUNK_HAND[:11]))
-    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_JUNK_HAND[:11]))
+    state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *JUNK_HAND[:11]))
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *JUNK_HAND[:11]))
     state, _ = reduce(state, Discard(tile_id=_MAN_5[0]))
     return state
 
@@ -220,9 +200,9 @@ def test_all_pass_advances_to_next_seat_draw() -> None:
 
 def test_claim_kong_draws_replacement_and_returns_to_await_action() -> None:
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]), discards=())
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_5[0]), discards=())
     state = _all_junk(state, except_seat=0)
-    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], _MAN_5[3], *_JUNK_HAND[:10]))
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], _MAN_5[3], *JUNK_HAND[:10]))
     state, _ = reduce(state, Discard(tile_id=_MAN_5[0]))
     kong_action = next(a for a in legal_actions(state, 2) if a.kind.value == "claim_kong")
 
@@ -241,7 +221,7 @@ def test_claim_kong_draws_replacement_and_returns_to_await_action() -> None:
 
 def test_declare_concealed_kong_draws_replacement_with_no_rob_window() -> None:
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_MAN_1, *_JUNK_HAND[:10]))
+    state = with_seat(state, 0, concealed=(*_MAN_1, *JUNK_HAND[:10]))
     state = _all_junk(state, except_seat=0)
     meld = Meld(MeldKind.CONCEALED_KONG, tuple(_MAN_1))
 
@@ -283,7 +263,7 @@ def _tenpai_on_man1() -> tuple[int, ...]:
 def _added_kong_state() -> GameState:
     pung = Meld(MeldKind.PUNG, (_MAN_1[0], _MAN_1[1], _MAN_1[2]), from_seat=1)
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(_MAN_1[3], *_JUNK_HAND[:10]), melds=(pung,))
+    state = with_seat(state, 0, concealed=(_MAN_1[3], *JUNK_HAND[:10]), melds=(pung,))
     state = _all_junk(state, except_seat=0)
     state = with_seat(state, 2, concealed=_tenpai_on_man1())
     return state
@@ -360,7 +340,7 @@ def test_concealed_kong_robbing_denied_to_a_non_thirteen_orphans_win() -> None:
     robbing on the config flag alone, with no shape restriction."""
     ruleset = RuleSet(concealed_kong_robbable=True)
     state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_MAN_1, *_JUNK_HAND[:10]))
+    state = with_seat(state, 0, concealed=(*_MAN_1, *JUNK_HAND[:10]))
     state = _all_junk(state, except_seat=0)
     state = with_seat(state, 2, concealed=_tenpai_on_man1())
     meld = Meld(MeldKind.CONCEALED_KONG, tuple(_MAN_1))
@@ -396,7 +376,7 @@ def test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win() -> None:
     )
     ruleset = RuleSet(concealed_kong_robbable=True)
     state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_EAST, *_JUNK_HAND[:10]))
+    state = with_seat(state, 0, concealed=(*_EAST, *JUNK_HAND[:10]))
     state = _all_junk(state, except_seat=0)
     state = with_seat(state, 2, concealed=orphan_wait, flowers=())
     meld = Meld(MeldKind.CONCEALED_KONG, tuple(_EAST))
@@ -419,7 +399,7 @@ def test_concealed_kong_robbing_allowed_for_a_thirteen_orphans_win() -> None:
     # regression: a concealed kong was never exposed, so robbing it reverts to no meld at all --
     # the other 3 tiles return to the declarer's concealed hand instead of a phantom kong.
     assert state.seats[0].melds == ()
-    assert sorted(state.seats[0].concealed) == sorted((*_EAST[:3], *_JUNK_HAND[:10]))
+    assert sorted(state.seats[0].concealed) == sorted((*_EAST[:3], *JUNK_HAND[:10]))
 
 
 # --- self-draw win -----------------------------------------------------------------------------
@@ -484,7 +464,7 @@ def _claimable_standard_hand() -> tuple[int, ...]:
 
 def test_claim_win_off_discard_scores_and_pays_real_faan() -> None:
     state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
-    state = with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = with_seat(state, 1, concealed=(*JUNK_HAND, _MAN_2[1]), flowers=())
     state = _all_junk(state, except_seat=1)
     state = with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
 
@@ -513,7 +493,7 @@ def test_claim_win_off_discard_merges_winning_tile_into_concealed() -> None:
     just the 13 it held while waiting -- app/views.py's `HandEndWire.winning_hand` reads this
     field directly, so a claimed win used to reveal a hand short exactly this tile."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
-    state = with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = with_seat(state, 1, concealed=(*JUNK_HAND, _MAN_2[1]), flowers=())
     state = _all_junk(state, except_seat=1)
     state = with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
 
@@ -534,7 +514,7 @@ def test_claim_win_off_discard_removes_the_tile_from_the_discarder_pool() -> Non
     win must pop the tile off the discard pool exactly like a claimed chow/pung/kong already
     does (below in engine.py's `_apply_claim_response`)."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
-    state = with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = with_seat(state, 1, concealed=(*JUNK_HAND, _MAN_2[1]), flowers=())
     state = _all_junk(state, except_seat=1)
     state = with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
 
@@ -556,9 +536,9 @@ def test_claim_win_gated_by_min_faan_even_when_window_opens_for_another_seat() -
     """
     ruleset = RuleSet(min_faan=5)
     state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
-    state = with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = with_seat(state, 1, concealed=(*JUNK_HAND, _MAN_2[1]), flowers=())
     state = _all_junk(state, except_seat=1)
-    state = with_seat(state, 2, concealed=(_MAN_2[2], _MAN_2[3], *_JUNK_HAND[:11]))
+    state = with_seat(state, 2, concealed=(_MAN_2[2], _MAN_2[3], *JUNK_HAND[:11]))
     state = with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
 
     state, _ = reduce(state, Discard(tile_id=_MAN_2[1]))
@@ -617,7 +597,7 @@ def test_pung_claim_into_winning_hand_cannot_be_redeclared_as_self_draw() -> Non
     The claimer must discard next; they may not press the self-draw win button and collect
     the extra self-draw faan on a tile they did not draw."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
-    state = with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_1[2]), flowers=())
+    state = with_seat(state, 1, concealed=(*JUNK_HAND, _MAN_1[2]), flowers=())
     state = _all_junk(state, except_seat=1)
     state = with_seat(state, 3, concealed=_pung_claim_into_winning_hand(), flowers=())
 
@@ -637,7 +617,7 @@ def test_chow_claim_into_winning_hand_cannot_be_redeclared_as_self_draw() -> Non
     """Same regression as the pung case: a chow claim that happens to complete the hand
     must not be convertible into a self-draw win on the next action."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=1, total_discards=1)
-    state = with_seat(state, 1, concealed=(*_JUNK_HAND, _MAN_4[1]), flowers=())
+    state = with_seat(state, 1, concealed=(*JUNK_HAND, _MAN_4[1]), flowers=())
     state = _all_junk(state, except_seat=1)
     state = with_seat(state, 2, concealed=_chow_claim_into_winning_hand(), flowers=())
 
@@ -682,7 +662,7 @@ def test_earthly_hand_win_on_dealer_first_discard() -> None:
     via one real `Discard` from the fresh post-deal state (`total_discards` goes 0 -> 1 right
     there), not by setting the flag directly."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_2[1]), flowers=())
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_2[1]), flowers=())
     state = _all_junk(state, except_seat=0)
     state = with_seat(state, 2, concealed=_claimable_standard_hand(), flowers=())
 
@@ -708,7 +688,7 @@ def test_win_on_last_wall_tile_scores_last_tile_self_draw() -> None:
     """海底撈月: a real front draw off a one-tile wall lands the winning tile, setting
     `wall_exhausted_at_last_draw` from `_draw_for_turn` itself -- not a hand-built context."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_MAN_2[1],)))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]), flowers=())
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _EAST[0]), flowers=())
     state = _all_junk(state, except_seat=0)
     state = with_seat(state, 1, concealed=_claimable_standard_hand(), flowers=())
 
@@ -738,7 +718,7 @@ def test_win_on_last_discard_scores_river_bottom() -> None:
     carries across the intervening discard/claim-window turns untouched, exactly as it must
     for "the last possible discard" to be claimable at all."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_MAN_2[1],)))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]), flowers=())
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _EAST[0]), flowers=())
     state = _all_junk(state, except_seat=0)
     state = with_seat(state, 3, concealed=_claimable_standard_hand(), flowers=())
 
@@ -936,7 +916,7 @@ def test_seven_flowers_instant_win_ends_hand_immediately() -> None:
         Flower.FLOWER_2,
     )
     state = _state(ruleset=ruleset, phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=tiles))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _EAST[0]))
     state = _all_junk(state, except_seat=0)
 
     state, events = reduce(state, Discard(tile_id=_EAST[0]))
@@ -962,7 +942,7 @@ def test_seven_flowers_instant_win_ends_hand_immediately() -> None:
 
 def test_wall_exhaustion_ends_hand_as_exhaustive_draw() -> None:
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=()))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _EAST[0]))
     state = _all_junk(state, except_seat=0)
 
     state, events = reduce(state, Discard(tile_id=_EAST[0]))
@@ -982,7 +962,7 @@ def test_wall_exhaustion_during_flower_cascade_ends_hand_as_exhaustive_draw() ->
     tile ever lands. Wall holds exactly one tile, a flower: seat 1's turn-draw pops it, reveals
     it, then finds nothing left to draw a replacement from."""
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(Flower.FLOWER_1,)))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _EAST[0]))
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _EAST[0]))
     state = _all_junk(state, except_seat=0)
 
     state, events = reduce(state, Discard(tile_id=_EAST[0]))
@@ -1002,9 +982,9 @@ def test_wall_exhaustion_during_flower_cascade_ends_hand_as_exhaustive_draw() ->
 def test_flower_drawn_mid_game_chains_to_a_replacement() -> None:
     # back of the wall: [..., real_tile, Flower]; draw_back pops Flower first, then real_tile.
     state = _state(phase=Phase.AWAIT_ACTION, turn=0, wall=Wall(tiles=(_SOU_1[0], Flower.FLOWER_1)))
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_1[0]))
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_1[0]))
     state = _all_junk(state, except_seat=0)
-    state = with_seat(state, 2, concealed=(_MAN_1[1], _MAN_1[2], _MAN_1[3], *_JUNK_HAND[:10]))
+    state = with_seat(state, 2, concealed=(_MAN_1[1], _MAN_1[2], _MAN_1[3], *JUNK_HAND[:10]))
 
     state, events = reduce(state, Discard(tile_id=_MAN_1[0]))
     kong_action = next(a for a in legal_actions(state, 2) if a.kind.value == "claim_kong")
@@ -1023,7 +1003,7 @@ def test_flower_drawn_mid_game_chains_to_a_replacement() -> None:
 def test_reduce_rejects_discard_of_a_tile_not_held() -> None:
     state = _state(phase=Phase.AWAIT_ACTION, turn=0)
     held = set(state.seats[0].concealed)
-    not_held = next(t for t in _JUNK_HAND if t not in held)
+    not_held = next(t for t in JUNK_HAND if t not in held)
     with pytest.raises(IllegalActionError):
         reduce(state, Discard(tile_id=not_held))
 

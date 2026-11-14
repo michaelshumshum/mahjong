@@ -148,7 +148,7 @@ Commands table. Add them here as they turn up.
 | `conftest.py` | `session` (in-memory SQLite `AsyncSession`, fresh schema), `games`, `accounts_db` (file SQLite `DATABASE_URL` with schema and `ACCOUNTS_ENABLED=1`, for a `TestClient(app)`) |
 | `accounts.py` | `create_user`, `sign_in` (a session token without Google), `session_count`, `fetch`, `run_db` over an `accounts_db` url. Google itself is stubbed per test with `httpx2.MockTransport` through `GoogleProvider(transport=)` and `routes.set_google` (`test_google_signin.py`); no test reaches the network |
 | `game_state.py` | `with_seat(state, seat, **overrides)`, `total_tiles(state)` (tile-conservation count) |
-| `hands.py` | `tile_ids(*types)` (one physical copy per occurrence), `pung`, `concealed_kong` |
+| `hands.py` | `tile_ids(*types)` (one physical copy per occurrence), `pung`, `concealed_kong`; filler hands: `JUNK_HAND` (13 sou-even/honour tiles, clear of any man/pin tile under test), `UNCONTESTED_JUNK` per seat + `UNCONTESTED_DISCARD` (seat 0's discard nobody can claim) |
 | `decisions.py` | `decision_points(seed, ruleset)` (seeded random self-play, every live decision), `discard_mask` |
 | `ws_frames.py` | client frame builders: `msg`, `next_id`, `hello`, `first_tile_ids(*types, count=)` |
 | `table_frames.py` | what a live `Table` sends: `recorder` (a `send` that logs each frame with `Table.state`), `record_engine` (logs every `reduce`/`start_next_hand`), `rebuilt_event_frames`/`sent_event_frames` (event frames rebuilt with `app/frames.py` vs sent) |

@@ -57,6 +57,22 @@ def _acc(acc: dict[str, Any], name: str, stats: dict[str, np.ndarray]) -> None:
     acc[name] = stats if name not in acc else add_stats(acc[name], stats)
 
 
+def _auc_result(
+    acc: dict[str, Any], *, n_rows: int, n_games: int, danger: bool, n_boot: int, seed: int
+) -> dict[str, Any]:
+    auc = metric_fns["auc"]
+    result: dict[str, Any] = {"n_rows": n_rows, "n_games": n_games}
+    for name, stats in acc.items():
+        result[f"{name}_auc"] = game_bootstrap({"m": stats}, lambda s: auc(s["m"]), n_boot, seed)
+    if danger:
+        for head in ("legal_wait", "tenpai"):
+            pair = {"p": acc[f"policy_{head}"], "d": acc[f"danger_{head}"]}
+            result[f"{head}_auc_policy_minus_danger"] = game_bootstrap(
+                pair, lambda s: auc(s["p"]) - auc(s["d"]), n_boot, seed
+            )
+    return result
+
+
 def evaluate_aux_model(
     model: PolicyNet,
     data: AuxData,
@@ -129,16 +145,9 @@ def evaluate_aux_model(
                     game_stats(tp.ravel(), t["tenpai"][own].ravel(), gt, n_games),
                 )
 
-    auc = metric_fns["auc"]
-    result: dict[str, Any] = {"n_rows": len(rows), "n_games": n_games}
-    for name, stats in acc.items():
-        result[f"{name}_auc"] = game_bootstrap({"m": stats}, lambda s: auc(s["m"]), n_boot, seed)
-    if danger is not None:
-        for head in ("legal_wait", "tenpai"):
-            pair = {"p": acc[f"policy_{head}"], "d": acc[f"danger_{head}"]}
-            result[f"{head}_auc_policy_minus_danger"] = game_bootstrap(
-                pair, lambda s: auc(s["p"]) - auc(s["d"]), n_boot, seed
-            )
+    result = _auc_result(
+        acc, n_rows=len(rows), n_games=n_games, danger=danger is not None, n_boot=n_boot, seed=seed
+    )
     hs = {"h": {k: v for k, v in hidden.items()}}
     result["hidden_nll_model"] = game_bootstrap(
         hs, lambda s: float(s["h"]["model"].sum() / s["h"]["n"].sum()), n_boot, seed
@@ -226,17 +235,9 @@ def evaluate_v3(
                 _acc(acc, f"{name}_legal_wait", game_stats(lw[cand], legal[cand], g[cand], n_games))
                 gt = g[:, :, 0].ravel()
                 _acc(acc, f"{name}_tenpai", game_stats(tp.ravel(), tenpai.ravel(), gt, n_games))
-    auc = metric_fns["auc"]
-    result: dict[str, Any] = {"n_rows": len(rows), "n_games": n_games}
-    for name, stats in acc.items():
-        result[f"{name}_auc"] = game_bootstrap({"m": stats}, lambda s: auc(s["m"]), n_boot, seed)
-    if danger is not None:
-        for head in ("legal_wait", "tenpai"):
-            pair = {"p": acc[f"policy_{head}"], "d": acc[f"danger_{head}"]}
-            result[f"{head}_auc_policy_minus_danger"] = game_bootstrap(
-                pair, lambda s: auc(s["p"]) - auc(s["d"]), n_boot, seed
-            )
-    return result
+    return _auc_result(
+        acc, n_rows=len(rows), n_games=n_games, danger=danger is not None, n_boot=n_boot, seed=seed
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -33,29 +33,11 @@ from mahjong_core.actions import action_from_dict
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.engine import ENGINE_VERSION, new_game
 from mahjong_core.state import GameState, Phase
-from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_records import fetch_latest_record
 from tests.game_state import with_seat
+from tests.hands import UNCONTESTED_DISCARD, UNCONTESTED_JUNK
 from tests.tables import table_client
 from tests.ws_frames import msg, next_id
-
-_SEAT0_JUNK = tile_ids_for_type(TileType.PIN_2)[:4] + tile_ids_for_type(TileType.PIN_4)[:4]
-_SEAT0_JUNK += tile_ids_for_type(TileType.PIN_6)[:4] + tile_ids_for_type(TileType.PIN_8)[:1]
-_SEAT0_DISCARD = tile_ids_for_type(TileType.WIND_EAST)[0]
-_SEAT1_JUNK = tile_ids_for_type(TileType.SOU_1)[:4] + tile_ids_for_type(TileType.SOU_3)[:4]
-_SEAT1_JUNK += tile_ids_for_type(TileType.SOU_5)[:4] + tile_ids_for_type(TileType.SOU_7)[:1]
-_SEAT2_JUNK = (
-    tile_ids_for_type(TileType.WIND_SOUTH)[:4]
-    + tile_ids_for_type(TileType.WIND_WEST)[:4]
-    + tile_ids_for_type(TileType.WIND_NORTH)[:4]
-    + tile_ids_for_type(TileType.DRAGON_RED)[:1]
-)
-_SEAT3_JUNK = (
-    tile_ids_for_type(TileType.DRAGON_GREEN)[:4]
-    + tile_ids_for_type(TileType.DRAGON_WHITE)[:4]
-    + tile_ids_for_type(TileType.MAN_2)[:4]
-    + tile_ids_for_type(TileType.MAN_4)[:1]
-)
 
 _LAST_HAND_RULESET = dataclasses.replace(
     DEFAULT_RULESET, dealer_repeat_on_win=False, dealer_repeat_on_draw=False
@@ -71,10 +53,9 @@ def _rig_last_hand_state(seed: int) -> GameState:
     state = dataclasses.replace(
         state, phase=Phase.AWAIT_ACTION, turn=0, dealer=3, claim_window=None
     )
-    state = with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
-    state = with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
-    state = with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
-    state = with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
+    state = with_seat(state, 0, concealed=(*UNCONTESTED_JUNK[0], UNCONTESTED_DISCARD), discards=())
+    for seat in (1, 2, 3):
+        state = with_seat(state, seat, concealed=UNCONTESTED_JUNK[seat])
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
 
 
@@ -146,7 +127,7 @@ def test_full_game_via_ws_persists_a_game_record(
         # one uncontested discard -- unclaimed, wall already empty -> exhaustive draw -> (dealer
         # wraps to seat 0, no round left under EAST_ONLY) -> Phase.GAME_OVER, all in this tick.
         discard_id = next_id()
-        wss[0].send_json(msg("discard", {"tile_id": _SEAT0_DISCARD}, id_=discard_id))
+        wss[0].send_json(msg("discard", {"tile_id": UNCONTESTED_DISCARD}, id_=discard_id))
         ack_d0 = wss[0].receive_json()
         assert ack_d0["d"] == {"id": discard_id, "ok": True}
 

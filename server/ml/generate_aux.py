@@ -34,7 +34,7 @@ import numpy as np
 
 from app.views import seat_view
 from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
-from bots.labels import danger_labels_for_opponents, seat_hand34
+from bots.labels import concealed_counts34, danger_labels_for_opponents, seat_hand34
 from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
@@ -43,7 +43,7 @@ from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
+from mahjong_core.tiles import N_TILE_TYPES
 from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.generate_dataset import _make_bots, _shuffled_roster
@@ -82,9 +82,7 @@ def shanten_labels(state: GameState, seat: int, unseen: np.ndarray) -> tuple[lis
     types that would then lower shanten. `PAD`/0 for types not held."""
     seat_state = state.seats[seat]
     hand = seat_hand34(seat_state)
-    concealed = [0] * N_TILE_TYPES
-    for t in seat_state.concealed:
-        concealed[tile_id_type(t)] += 1
+    concealed = concealed_counts34(seat_state)
     closed = not seat_state.melds
     sets = state.ruleset.hand_sets
     sh_out, uk_out = [PAD] * N_TILE_TYPES, [0] * N_TILE_TYPES

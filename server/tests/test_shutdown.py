@@ -36,27 +36,8 @@ from mahjong_core.actions import Discard
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import new_game
 from mahjong_core.state import GameState, Phase
-from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
-
-_SEAT0_JUNK = tile_ids_for_type(TileType.PIN_2)[:4] + tile_ids_for_type(TileType.PIN_4)[:4]
-_SEAT0_JUNK += tile_ids_for_type(TileType.PIN_6)[:4] + tile_ids_for_type(TileType.PIN_8)[:1]
-_SEAT0_DISCARD = tile_ids_for_type(TileType.WIND_EAST)[0]
-_SEAT1_JUNK = tile_ids_for_type(TileType.SOU_1)[:4] + tile_ids_for_type(TileType.SOU_3)[:4]
-_SEAT1_JUNK += tile_ids_for_type(TileType.SOU_5)[:4] + tile_ids_for_type(TileType.SOU_7)[:1]
-_SEAT2_JUNK = (
-    tile_ids_for_type(TileType.WIND_SOUTH)[:4]
-    + tile_ids_for_type(TileType.WIND_WEST)[:4]
-    + tile_ids_for_type(TileType.WIND_NORTH)[:4]
-    + tile_ids_for_type(TileType.DRAGON_RED)[:1]
-)
-_SEAT3_JUNK = (
-    tile_ids_for_type(TileType.DRAGON_GREEN)[:4]
-    + tile_ids_for_type(TileType.DRAGON_WHITE)[:4]
-    + tile_ids_for_type(TileType.MAN_2)[:4]
-    + tile_ids_for_type(TileType.MAN_4)[:1]
-)
-
+from tests.hands import UNCONTESTED_DISCARD, UNCONTESTED_JUNK
 
 # `_bind_fake_seats` binds real "connected" SeatBindings (not bot/autoplay), so the hand-end
 # hold never auto-acks; `hand_end_seconds=0` is what lets it resolve (test_table.py's `_BOUNDED_RULESET` idiom).
@@ -71,10 +52,9 @@ def _rig_uncontested_state(seed: int) -> GameState:
     boundary, matching `Table.wait_for_shutdown_boundary`'s contract."""
     state = new_game(_ZERO_HOLD_RULESET, game_seed=seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = with_seat(state, 0, concealed=(*_SEAT0_JUNK, _SEAT0_DISCARD), discards=())
-    state = with_seat(state, 1, concealed=tuple(_SEAT1_JUNK))
-    state = with_seat(state, 2, concealed=tuple(_SEAT2_JUNK))
-    state = with_seat(state, 3, concealed=tuple(_SEAT3_JUNK))
+    state = with_seat(state, 0, concealed=(*UNCONTESTED_JUNK[0], UNCONTESTED_DISCARD), discards=())
+    for seat in (1, 2, 3):
+        state = with_seat(state, seat, concealed=UNCONTESTED_JUNK[seat])
     return dataclasses.replace(state, wall=dataclasses.replace(state.wall, tiles=()))
 
 
@@ -142,7 +122,7 @@ async def test_mid_hand_table_gets_server_shutdown_and_finishes_within_grace_win
     assert not drain_task.done()  # still waiting on this table's own hand boundary
 
     # finish the mid-hand discard for real -- Table's own background task processes it.
-    table.submit(0, Discard(tile_id=_SEAT0_DISCARD))
+    table.submit(0, Discard(tile_id=UNCONTESTED_DISCARD))
 
     # drain resolves once the table reaches the hand boundary -- well under the 5s grace window,
     # proving this isn't just "waited out the timeout".
@@ -209,7 +189,7 @@ async def test_failed_game_over_persist_is_logged_and_still_ends_the_drain_windo
     )
     table.state = _rig_final_hand_state(seed=7)
     _bind_fake_seats(table)
-    table.submit(0, Discard(tile_id=_SEAT0_DISCARD))
+    table.submit(0, Discard(tile_id=UNCONTESTED_DISCARD))
 
     with caplog.at_level(logging.ERROR):
         # first tick: discard lands HAND_OVER, arms the hand_end_seconds=0 timer (no seat here
