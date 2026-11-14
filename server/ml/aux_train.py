@@ -8,8 +8,6 @@ signal handling as `ml.train.train`.
 
 from __future__ import annotations
 
-import json
-import time
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +18,8 @@ from ml.aux_data import AuxData
 from ml.losses import AuxWeights, aux_loss
 from ml.policy_net import PolicyNet, PolicyNetConfig
 from ml.splits import TRAIN, VAL
-from ml.stop_signal import StopSignal
-from ml.train import TrainConfig, lr_at
+from ml.train import TrainConfig
+from ml.train_loop import fit, start_run
 
 __all__ = ["evaluate_aux", "to_tensors", "train_aux"]
 
@@ -54,11 +52,7 @@ def evaluate_aux(
 
 
 def train_aux(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None = None) -> Path:
-    torch.set_num_threads(cfg.threads)
-    torch.manual_seed(cfg.seed)
-    out = Path(cfg.out)
-    out.mkdir(parents=True, exist_ok=True)
-
+    out = start_run(cfg)
     data = AuxData(Path(cfg.data))
     train_rows, val_rows = data.rows_of(TRAIN), data.rows_of(VAL)
     if len(train_rows) < cfg.batch_size:
@@ -67,70 +61,20 @@ def train_aux(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None =
     model = PolicyNet(PolicyNetConfig(channels=cfg.channels, blocks=cfg.blocks))
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-    step, best = 0, float("inf")
-    last_path = out / "ckpt_last.pt"
-    if resume and last_path.exists():
-        ckpt = torch.load(last_path, weights_only=False)
-        model.load_state_dict(ckpt["model"])
-        opt.load_state_dict(ckpt["opt"])
-        step, best = ckpt["step"], ckpt["best"]
+    def batch_losses(epoch: int, k: int) -> dict[str, torch.Tensor]:
+        order = np.random.default_rng([cfg.seed, epoch]).permutation(len(train_rows))
+        batch = train_rows[order[k * cfg.batch_size : (k + 1) * cfg.batch_size]]
+        return _forward(model, data, batch, weights)
 
-    def save(path: Path) -> None:
-        tmp = path.with_suffix(".tmp")
-        torch.save(
-            {
-                "model": model.state_dict(),
-                "opt": opt.state_dict(),
-                "step": step,
-                "best": best,
-                "config": cfg.__dict__,
-                "model_config": model.config.to_dict(),
-                "algorithm": "rl_aux",
-            },
-            tmp,
-        )
-        tmp.replace(path)
-
-    stop = StopSignal("saving after this step")
-
-    steps_per_epoch = len(train_rows) // cfg.batch_size
-    final = cfg.steps if max_steps is None else min(cfg.steps, max_steps)
-    started, running = time.monotonic(), {}
-    model.train()
-    with (out / "metrics.jsonl").open("a") as metrics:
-        while step < final and not stop.requested:
-            epoch, k = divmod(step, steps_per_epoch)
-            order = np.random.default_rng([cfg.seed, epoch]).permutation(len(train_rows))
-            batch = train_rows[order[k * cfg.batch_size : (k + 1) * cfg.batch_size]]
-            for group in opt.param_groups:
-                group["lr"] = lr_at(step, cfg)
-            losses = _forward(model, data, batch, weights)
-            opt.zero_grad(set_to_none=True)
-            losses["total"].backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-            opt.step()
-            step += 1
-
-            for name, value in losses.items():
-                running[name] = running.get(name, 0.0) + value.item()
-            record: dict[str, Any] = {}
-            if step % cfg.log_every == 0:
-                record = {f"train_{k}": v / cfg.log_every for k, v in running.items()}
-                record["lr"] = lr_at(step, cfg)
-                record["elapsed_s"] = round(time.monotonic() - started, 1)
-                running = {}
-            if step % cfg.eval_every == 0 or step == final:
-                val = evaluate_aux(model, data, val_rows, cfg.eval_samples, weights)
-                record.update({f"val_{k}": v for k, v in val.items()})
-                if val["total"] < best:
-                    best = val["total"]
-                    save(out / "ckpt_best.pt")
-            if record:
-                record["step"] = step
-                metrics.write(json.dumps(record) + "\n")
-                metrics.flush()
-                print(json.dumps(record), flush=True)
-            if step % cfg.save_every == 0:
-                save(last_path)
-    save(last_path)
-    return out
+    return fit(
+        cfg,
+        out,
+        model,
+        opt,
+        steps_per_epoch=len(train_rows) // cfg.batch_size,
+        batch_losses=batch_losses,
+        evaluate=lambda: evaluate_aux(model, data, val_rows, cfg.eval_samples, weights),
+        extra={"algorithm": "rl_aux"},
+        resume=resume,
+        max_steps=max_steps,
+    )

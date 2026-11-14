@@ -14,17 +14,13 @@ append-only `metrics.jsonl`. SIGINT/SIGTERM save a checkpoint after the current 
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
-
-from ml.stop_signal import StopSignal
 
 __all__ = ["ALGORITHMS", "TrainConfig", "build_parser", "load_config", "main", "train"]
 
@@ -119,92 +115,37 @@ def train(cfg: TrainConfig, *, resume: bool = False, max_steps: int | None = Non
     from ml.dataset import DangerData
     from ml.losses import LossWeights, danger_loss
     from ml.splits import TRAIN, VAL
+    from ml.train_loop import fit, start_run
 
-    torch.set_num_threads(cfg.threads)
-    torch.manual_seed(cfg.seed)
-    out = Path(cfg.out)
-    out.mkdir(parents=True, exist_ok=True)
-
+    out = start_run(cfg)
     data = DangerData(Path(cfg.data))
     train_rows, val_rows = data.rows_of(TRAIN), data.rows_of(VAL)
     weights = LossWeights(**cfg.loss_weights)
     model = DangerNet(DangerNetConfig(channels=cfg.channels, blocks=cfg.blocks))
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-    step, best = 0, float("inf")
-    last_path = out / "ckpt_last.pt"
-    if resume and last_path.exists():
-        ckpt = torch.load(last_path, weights_only=False)
-        model.load_state_dict(ckpt["model"])
-        opt.load_state_dict(ckpt["opt"])
-        step, best = ckpt["step"], ckpt["best"]
-
-    def save(path: Path) -> None:
-        tmp = path.with_suffix(".tmp")
-        torch.save(
-            {
-                "model": model.state_dict(),
-                "opt": opt.state_dict(),
-                "step": step,
-                "best": best,
-                "config": cfg.__dict__,
-                "model_config": model.config.to_dict(),
-            },
-            tmp,
-        )
-        tmp.replace(path)
-
-    stop = StopSignal("saving after this step")
-
     n_samples = len(train_rows) * 3
     steps_per_epoch = n_samples // cfg.batch_size
     if steps_per_epoch == 0:
         raise ValueError(f"{n_samples} train samples is fewer than batch_size={cfg.batch_size}")
-    final = cfg.steps if max_steps is None else min(cfg.steps, max_steps)
-    metrics = (out / "metrics.jsonl").open("a")
-    started, running = time.monotonic(), {}
-    model.train()
 
-    while step < final and not stop.requested:
-        epoch, k = divmod(step, steps_per_epoch)
+    def batch_losses(epoch: int, k: int) -> dict[str, Any]:
         order = data.epoch_order(len(train_rows), cfg.seed, epoch)
         samples = order[k * cfg.batch_size : (k + 1) * cfg.batch_size]
         tiles, scalars, targets = data.batch(train_rows, samples)
+        return danger_loss(model(tiles, scalars), targets, weights)
 
-        for group in opt.param_groups:
-            group["lr"] = lr_at(step, cfg)
-        losses = danger_loss(model(tiles, scalars), targets, weights)
-        opt.zero_grad(set_to_none=True)
-        losses["total"].backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-        opt.step()
-        step += 1
-
-        for name, value in losses.items():
-            running[name] = running.get(name, 0.0) + value.item()
-        record: dict[str, Any] = {}
-        if step % cfg.log_every == 0:
-            record = {f"train_{k}": v / cfg.log_every for k, v in running.items()}
-            record["lr"] = lr_at(step, cfg)
-            record["elapsed_s"] = round(time.monotonic() - started, 1)
-            running = {}
-        if step % cfg.eval_every == 0 or step == final:
-            val = evaluate(model, data, val_rows, cfg, weights)
-            record.update({f"val_{k}": v for k, v in val.items()})
-            if val["total"] < best:
-                best = val["total"]
-                save(out / "ckpt_best.pt")
-        if record:
-            record["step"] = step
-            metrics.write(json.dumps(record) + "\n")
-            metrics.flush()
-            print(json.dumps(record), flush=True)
-        if step % cfg.save_every == 0:
-            save(last_path)
-
-    save(last_path)
-    metrics.close()
-    return out
+    return fit(
+        cfg,
+        out,
+        model,
+        opt,
+        steps_per_epoch=steps_per_epoch,
+        batch_losses=batch_losses,
+        evaluate=lambda: evaluate(model, data, val_rows, cfg, weights),
+        resume=resume,
+        max_steps=max_steps,
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
