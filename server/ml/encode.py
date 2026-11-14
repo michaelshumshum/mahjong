@@ -174,7 +174,7 @@ def _static_tile_channels() -> np.ndarray:
         if t >= int(TileType.WIND_EAST):
             out[3, t] = 1.0
             continue
-        suit, rank = divmod(t, 9)
+        suit, rank = divmod(t, RANKS_PER_SUIT)
         out[suit, t] = 1.0
         out[4, t] = rank / 8
         out[5, t] = float(rank in (0, 8))

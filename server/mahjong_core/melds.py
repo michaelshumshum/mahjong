@@ -318,8 +318,8 @@ def _is_standard_shape(counts: Sequence[int]) -> bool:
     """`decompose(tiles) != ()` for the 34-array `counts` of `tiles`, without building any
     melds: each suit must be a complete shape and exactly one group may hold the pair."""
     pairs = 0
-    for base in (0, 9, 18):
-        has_pair = _SUIT_SHAPES.get(tuple(counts[base : base + 9]))
+    for base in range(0, N_SUITED_TYPES, RANKS_PER_SUIT):
+        has_pair = _SUIT_SHAPES.get(tuple(counts[base : base + RANKS_PER_SUIT]))
         if has_pair is None:
             return False
         pairs += has_pair
