@@ -165,5 +165,9 @@
 	"fairness_details": "種子詳情",
 	"fairness_commitLabel": "承諾",
 	"fairness_handSeedLabel": "本局種子",
-	"fairness_nonceLabel": "隨機數"
+	"fairness_nonceLabel": "隨機數",
+	"wind_east": "東",
+	"wind_south": "南",
+	"wind_west": "西",
+	"wind_north": "北"
 }

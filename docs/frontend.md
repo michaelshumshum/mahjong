@@ -312,8 +312,9 @@ pools use the same technique (`.discard-tile`).
 
 **Winds** render as Chinese characters (東/南/西/北), not the `E`/`S`/`W`/`N` code `seatWind()`
 returns, with a full word via `aria-label` (`wind.ts`'s `windWord()`). In full sentences ("You're
-seated as East") `windWord()` returns `WIND_LABEL`'s English word in `en` and `WIND_CHAR`'s glyph in
-`zh-Hant`, so a Chinese sentence never embeds an English word.
+seated as East") and the score sheet's wind column, `windWord()` returns the `wind_<name>` message:
+the English word in `en`, the glyph in `zh-Hant`, so a Chinese sentence never embeds an English
+word.
 
 Below 768px (phone portrait):
 
@@ -866,7 +867,7 @@ The mock fixtures hardcode values the real wire doesn't send this way:
   `reducer.spec.ts` regression test. `deadlineTs` is cleared on any seat's `discard` or `meld`
   (the turn it timed is over).
 - `prevailing` goes over the wire as the `Wind` enum's member _name_ (`"EAST"`…), not the
-  `'E'|'S'|'W'|'N'` code mocks use and `WIND_LABEL` indexes by. `live-view.ts`'s
+  `'E'|'S'|'W'|'N'` code mocks use and `windWord()` takes. `live-view.ts`'s
   `wireWindToCode()` maps it (generated type `WindName`) — the one enum-shaped field needing
   this; `phase`/meld `kind`/claim `kind` serialize through `StrEnum.value`.
 - `hand_end.faan_breakdown` keys are Chinese pattern names. `lib/ui/faan-pattern-labels.ts`'s
@@ -1746,7 +1747,7 @@ spread. Files group key prefixes by app area:
 | --- | --- |
 | `common.json` | shared chrome and errors: `closeButton`, `toast`, `connectionBanner`, `serverError`, `errorPage`, `apiConnectGate`, `stepper`, `rank`, `botBadge` |
 | `lobby.json` | `/`, `/tables`, `/status`, table creation and practice setup: `lobby`, `lobbyMenu`, `welcomeDialog`, `tablesPage`, `tableCard`, `joinByCodePanel`, `createTableDialog`, `ruleset`, `practiceSetupDialog`, `practiceDifficultySlot`, `statusPage` |
-| `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage` |
+| `table.json` | `/table` and `/replay` surfaces: `tablePage`, `pretableScreen`, seat/claim/hub components, `tableToolbar`, `leaveGameDialog`, `handEndOverlay`, `gameEndScreen`, `announcer`, `timerRing`, `fairness`, `replayPage`, `wind` (`wind.ts`'s `windWord()`, also the score sheet's) |
 | `scoring.json` | `faanPattern`, `faanBreakdown`, `scoreSheet`, `winningHand` |
 | `tiles.json` | `tileName`, `tileFace` |
 | `settings.json` | `settings`, `localeSwitcher` |
@@ -1803,8 +1804,7 @@ zh-Hant has no grammatical plural; every variant there is the same phrasing.
 
 **Not translated, deliberately:** fixture/dev-only strings — `mock-game-state.ts`'s
 `MOCK_SCENARIOS` labels (listed verbatim on `/demo`'s scenario links), the `/demo` pre-game preview
-links, `AnimationDemoPanel` controls, demo `data-testid` readouts. `lib/table/wind.ts`'s
-`WIND_LABEL` is only ever interpolated into already-translated messages.
+links, `AnimationDemoPanel` controls, demo `data-testid` readouts.
 
 **Tile names.** `lib/table/tile-name.ts`'s `tileName(code)` maps every `TileCode` to a localized
 spoken name (`tileName_<code>` keys: "3 Bamboo"/三索, "Red Dragon"/紅中, "Plum Flower"/梅) —
