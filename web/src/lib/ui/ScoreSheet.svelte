@@ -2,6 +2,7 @@
 	import WinningHand from './WinningHand.svelte';
 	import type { HandRecord, Seat, SeatInfo, Standing, Totals, Wind } from '$lib/game/types';
 	import { placements, rankLabel, RANK_TONE } from './rank';
+	import { formatSigned } from './score-format';
 	import { m } from '$lib/paraglide/messages.js';
 
 	function windLabel(wind: Wind): string {
@@ -138,7 +139,7 @@
 								class:delta--loss={delta < 0}
 								class:delta--dealer={isDealer}
 							>
-								{delta > 0 ? '+' : ''}{delta}
+								{formatSigned(delta)}
 							</td>
 							<td class="running" class:running--dealer={isDealer}>
 								{runningTotals[index][seat.seat]}
@@ -201,7 +202,7 @@
 							class:standing-total--positive={standing.total > 0}
 							class:standing-total--negative={standing.total < 0}
 						>
-							{standing.total > 0 ? '+' : ''}{standing.total}
+							{formatSigned(standing.total)}
 						</span>
 					</li>
 				{/each}

@@ -11,10 +11,6 @@ export function modeLabel(mode: GameMode | null): string | null {
 	return mode ? MODE_LABEL[mode]() : null;
 }
 
-export function formatScore(score: number): string {
-	return score > 0 ? `+${score}` : String(score);
-}
-
 export function formatGameDate(iso: string, locale: string): string {
 	return new Date(iso).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
