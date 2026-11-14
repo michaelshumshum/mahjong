@@ -1,0 +1,18 @@
+{
+	"path": ["src"],
+	"format": ["typescript", "javascript", "svelte", "scss", "css"],
+	"ignore": [
+		"**/node_modules/**",
+		"**/.svelte-kit/**",
+		"**/build/**",
+		"**/*.d.ts",
+		"src/lib/net/protocol.*.ts",
+		"**/paraglide/**",
+		"**/learn/generated/**",
+		"**/*.spec.ts",
+		"**/*.test.ts",
+		"**/*.e2e.ts"
+	],
+	"reporters": ["console"],
+	"threshold": 0.65
+}

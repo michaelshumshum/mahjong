@@ -9,10 +9,11 @@ HOST_IDS := $(shell id -u):$(shell id -g)
 handback = sh -c '$(1); s=$$?; chown -R $(HOST_IDS) $(2) 2>/dev/null; exit $$s'
 API_CACHES := .pytest_cache .ruff_cache .hypothesis
 WEB_OUTPUTS := .svelte-kit src/lib/paraglide
+JSCPD_VERSION := 4.3.0
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart logs build ps sh-api sh-web test test-server test-server-slow bench-latency test-web \
-        selfplay arena train proto proto-check migrate revision fmt lint typecheck clean prod-build prod-up prod-migrate
+        selfplay arena train proto proto-check migrate revision fmt lint typecheck dup dup-server dup-web clean prod-build prod-up prod-migrate
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -112,6 +113,16 @@ lint: ## Lint both sides
 
 typecheck: ## svelte-check
 	$(COMPOSE) run --rm --no-deps web $(call handback,pnpm exec svelte-check,$(WEB_OUTPUTS))
+
+# native npx, not compose: needs both trees, and the web image only mounts web/.
+# config (paths, ignores, threshold) in server/.jscpd.json and web/.jscpd.json
+dup: dup-server dup-web ## Duplication gate on production code, both sides
+
+dup-server: ## jscpd on server production code (tests excluded); fails above the threshold
+	cd server && npx --yes jscpd@$(JSCPD_VERSION)
+
+dup-web: ## jscpd on web/src production code (specs, generated excluded); fails above the threshold
+	cd web && npx --yes jscpd@$(JSCPD_VERSION)
 
 # ── production shape ──────────────────────────────────────────────────────────
 prod-build: ## Build production images

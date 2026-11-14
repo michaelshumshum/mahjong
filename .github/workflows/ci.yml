@@ -46,6 +46,17 @@ jobs:
           PUBLIC_WS_URL: ws://localhost:8000/ws
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
 
+  # thresholds in server/.jscpd.json and web/.jscpd.json (docs/infra.md §9)
+  dup:
+    name: duplication
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - run: make dup
+
   # badges live on an orphan `badges` branch, force-pushed as one commit, so main never gets
   # bot commits; self-rendered because shields.io can't fetch from a private repo.
   coverage-badge:

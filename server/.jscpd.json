@@ -1,0 +1,15 @@
+{
+  "path": ["."],
+  "format": ["python"],
+  "ignore": [
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "data/**",
+    "runs/**",
+    "checkpoints/**",
+    "**/node_modules/**",
+    "**/tests/**"
+  ],
+  "reporters": ["console"],
+  "threshold": 1.1
+}
