@@ -206,8 +206,7 @@ class FairnessPayload(BaseModel):
 
 
 class _HandResultFields(BaseModel):
-    # never a field type itself, so it gets no schema $def or TS interface of its own; subclasses
-    # list these fields first, in this order.
+    # not a field type: no schema $def / TS interface. subclasses list these fields first.
     model_config = ConfigDict(extra="forbid")
 
     hand_no: int
