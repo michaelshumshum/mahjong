@@ -26,6 +26,7 @@ from app.table_types import SeatBinding
 from bots.base import GAME_STEP_CAP
 from bots.random import random_action
 from mahjong_core.actions import Discard
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import GameLength, RuleSet
 from mahjong_core.state import Phase
 from mahjong_core.tiles import tile_code
@@ -50,11 +51,7 @@ async def _drive_one_step(table: Table, rng: random.Random) -> None:
         await table.process_one()
         return
     if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-        assert state.claim_window is not None
-        pending = [
-            o.seat for o in state.claim_window.offers if o.seat not in state.claim_window.responses
-        ]
-        seat = rng.choice(pending)
+        seat = rng.choice(pending_claim_seats(state))
     else:
         seat = state.turn
     action = random_action(state, seat, rng)

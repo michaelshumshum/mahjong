@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import GameMode, GameRecord, GameSeat, HandRecord, SeatKind, User
 from mahjong_core.actions import Action, action_to_dict
 from mahjong_core.engine import ENGINE_VERSION, game_outcome
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, Phase
 
 __all__ = [
@@ -65,9 +66,9 @@ async def save_game_record(
         raise ValueError(f"save_game_record requires Phase.GAME_OVER, got {state.phase}")
 
     resolved_players = list(players) if players is not None else [None, None, None, None]
-    if len(resolved_players) != 4:
+    if len(resolved_players) != N_SEATS:
         raise ValueError(f"players must have exactly 4 entries, got {len(resolved_players)}")
-    if seats is not None and len(seats) != 4:
+    if seats is not None and len(seats) != N_SEATS:
         raise ValueError(f"seats must have exactly 4 entries, got {len(seats)}")
 
     outcome = game_outcome(state)
@@ -158,7 +159,7 @@ def hand_record_columns(
     if state.phase != Phase.HAND_OVER or state.hand_result is None:
         raise ValueError(f"hand record requires Phase.HAND_OVER, got {state.phase}")
     resolved_players = list(players) if players is not None else [None, None, None, None]
-    if len(resolved_players) != 4:
+    if len(resolved_players) != N_SEATS:
         raise ValueError(f"players must have exactly 4 entries, got {len(resolved_players)}")
     hr = state.hand_result
     return {
@@ -174,7 +175,7 @@ def hand_record_columns(
             "winner": hr.winner,
             "faan": hr.faan,
             "points": hr.points,
-            "payments": [hr.payments.get(i, 0) for i in range(4)],
+            "payments": [hr.payments.get(i, 0) for i in range(N_SEATS)],
             "final_scores": [s.score for s in state.seats],
         },
     }

@@ -14,6 +14,7 @@ from mahjong_core.actions import (
     Pass,
     legal_actions,
 )
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import DEFAULT_RULESET, GameLength, RuleSet
 from mahjong_core.engine import (
     MAX_HANDS_PER_GAME,
@@ -1269,12 +1270,7 @@ def _play_one_game(seed: int, ruleset: RuleSet, step_cap: int) -> None:
             continue
 
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
+            pending = pending_claim_seats(state)
             seat = rng.choice(pending)
         else:
             seat = state.turn

@@ -19,6 +19,7 @@ from app.views import SeatView
 from bots.features import own_hand34
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.scoring.patterns import PATTERNS, seat_wind_for
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import Phase
 from mahjong_core.tiles import (
     N_SUITED_TYPES,
@@ -174,7 +175,7 @@ def _static_tile_channels() -> np.ndarray:
         if t >= int(TileType.WIND_EAST):
             out[3, t] = 1.0
             continue
-        suit, rank = divmod(t, 9)
+        suit, rank = divmod(t, RANKS_PER_SUIT)
         out[suit, t] = 1.0
         out[4, t] = rank / 8
         out[5, t] = float(rank in (0, 8))
@@ -238,7 +239,7 @@ def encode_batch(
     """
     b = len(opp)
     t = opp.astype(np.int64) + 1
-    rot = (t[:, None] + np.arange(4)) % 4
+    rot = (t[:, None] + np.arange(N_SEATS)) % N_SEATS
 
     hand = raw["hand_counts"].astype(np.int64)
     melds = _rotate(raw["meld_counts"].astype(np.int64), rot)
@@ -249,7 +250,7 @@ def encode_batch(
     other_age = np.minimum.reduce([_min_age(seq[:, p]) for p in (1, 2, 3)])
 
     # the observer's own melds are already inside `hand`; the observer sits at position 4 - t
-    obs_melds = melds[np.arange(b), (4 - t) % 4]
+    obs_melds = melds[np.arange(b), (N_SEATS - t) % N_SEATS]
     seen = hand + melds.sum(axis=1) - obs_melds + discards.sum(axis=1)
     unseen = np.clip(4 - seen, 0, 4)[:, None, :] / 4.0
 
@@ -261,7 +262,7 @@ def encode_batch(
     suji = ((_HAS_LOWER | _HAS_UPPER) & (~_HAS_LOWER | down) & (~_HAS_UPPER | up))[:, None, :]
 
     obs_wind = raw["seat_wind"].astype(np.int64)
-    target_wind = (obs_wind + t) % 4
+    target_wind = (obs_wind + t) % N_SEATS
     markers = np.stack(
         [
             np.broadcast_to(
@@ -300,7 +301,7 @@ def encode_batch(
         [
             np.eye(3, dtype=np.float32)[opp],
             eye4[target_wind],
-            eye4[(raw["dealer_idx"].astype(np.int64) - t) % 4],
+            eye4[(raw["dealer_idx"].astype(np.int64) - t) % N_SEATS],
             eye4[raw["prevailing_wind"].astype(np.int64)],
             raw["wall_remaining"].astype(np.float32)[:, None] / 100.0,
             _rotate(raw["concealed_counts"], rot) / 13.0,
@@ -333,7 +334,7 @@ def rows_to_arrays(
         "wall_remaining",
     ):
         out[key] = np.asarray([r[key] for r in rows], dtype=np.uint8)
-    seq = np.full((len(rows), 4, max_discards), PAD, dtype=np.uint8)
+    seq = np.full((len(rows), N_SEATS, max_discards), PAD, dtype=np.uint8)
     for i, r in enumerate(rows):
         for p, pool in enumerate(r["discard_seq"]):  # type: ignore[attr-defined]
             seq[i, p, : len(pool)] = pool

@@ -23,6 +23,7 @@ from app.views import (
 from mahjong_core.actions import action_to_dict, legal_actions
 from mahjong_core.events import Discarded, Event, HandEnded
 from mahjong_core.presets import preset_id_for
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import ClaimOffer, ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId, tile_code, tile_id_type
 
@@ -117,7 +118,7 @@ def deal_frame(state: GameState, seat: int) -> dict[str, Any]:
     return {
         "t": "deal",
         "your_hand": list(state.seats[seat].concealed),
-        "counts": {s: len(state.seats[s].concealed) for s in range(4)},
+        "counts": {s: len(state.seats[s].concealed) for s in range(N_SEATS)},
         "flowers": [[tile_code(f) for f in s.flowers] for s in state.seats],
         "wall_remaining": len(state.wall.tiles),
     }
@@ -150,7 +151,7 @@ def event_frame(
 
 def score_frame(state: GameState) -> dict[str, Any]:
     """Absolute totals, sent beside every `hand_end`."""
-    return {"t": "score", "totals": {s: state.seats[s].score for s in range(4)}}
+    return {"t": "score", "totals": {s: state.seats[s].score for s in range(N_SEATS)}}
 
 
 def state_sync_frame(

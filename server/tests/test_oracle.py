@@ -29,6 +29,7 @@ from bots.features import own_concealed34, own_hand34, seen34
 from bots.oracle_learned import OracleLearnedBot
 from bots.safety import opponent_threat_level, tile_risk
 from bots.worker import _make_bot
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import HandSet, RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.melds import Meld, MeldKind
@@ -786,12 +787,7 @@ async def _play_oracle_tier_vs_faanbot(seed: int, ruleset: RuleSet) -> GameState
             state, _ = start_next_hand(state)
             continue
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
+            pending = pending_claim_seats(state)
             seat = rng.choice(pending)
         else:
             seat = state.turn

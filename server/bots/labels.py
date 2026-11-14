@@ -18,6 +18,7 @@ from mahjong_core.actions import build_scoring_context, hand_is_winning_shape
 from mahjong_core.config import HandSet
 from mahjong_core.melds import Meld
 from mahjong_core.scoring.faan import score_winning_hand
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import AGARI, shanten
 from mahjong_core.state import GameState, SeatState
 from mahjong_core.tiles import (
@@ -190,7 +191,7 @@ def danger_labels_for_opponents(state: GameState, seat: int) -> dict[int, Oppone
     (docs/ml.md §5/§8): switching it changes training labels, which needs a dataset
     `SCHEMA_VERSION` bump, not a silent drift."""
     labels: dict[int, OpponentDangerLabel] = {}
-    for opponent in range(4):
+    for opponent in range(N_SEATS):
         if opponent == seat:
             continue
         if not is_tenpai(state, opponent, melds_fixed=False):

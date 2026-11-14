@@ -24,10 +24,10 @@ from app.lessons.model import Band, LessonKind, PuzzleKind, Track
 from app.names import MAX_RAW_NAME_LENGTH
 from app.protocol import StateSync
 from app.table_types import WireSeatStatus
-from mahjong_core.hand_check import HAND_SIZE
 from mahjong_core.presets import DEFAULT_PRESET_ID
 from mahjong_core.scoring.faan import validate_faan_overrides
 from mahjong_core.tiles import N_FLOWERS
+from mahjong_core.wall import HAND_SIZE
 
 __all__ = [
     "BotLatencyOut",

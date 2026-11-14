@@ -20,6 +20,7 @@ from mahjong_core.actions import (
     hand_is_winning_shape,
     legal_actions,
 )
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.engine import can_win_on, new_hand, reduce
 from mahjong_core.melds import _SUIT_SHAPES, Meld, MeldKind, _is_standard_shape, decompose
@@ -171,8 +172,6 @@ def test_can_win_on_equals_reference(min_faan: int) -> None:
                             wins += got
                 seat = mover
             else:
-                assert state.claim_window is not None
-                window = state.claim_window
-                seat = rng.choice([o.seat for o in window.offers if o.seat not in window.responses])
+                seat = rng.choice(pending_claim_seats(state))
             state, _ = reduce(state, _greedy(state, seat, legal_actions(state, seat), rng))
     assert wins > 0

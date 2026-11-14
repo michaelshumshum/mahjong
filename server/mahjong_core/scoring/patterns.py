@@ -48,6 +48,7 @@ from dataclasses import dataclass
 
 from mahjong_core.config import HandSet
 from mahjong_core.melds import KONG_KINDS, Meld, MeldKind
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import Wind
 from mahjong_core.tiles import (
     DRAGON_TYPES,
@@ -60,6 +61,7 @@ from mahjong_core.tiles import (
     TileType,
     tile_id_type,
 )
+from mahjong_core.wall import HAND_SIZE
 
 _PUNG_OR_KONG = frozenset({MeldKind.PUNG, *KONG_KINDS})
 
@@ -73,9 +75,11 @@ def seat_wind_for(seat: int, dealer: int) -> Wind:
     """A seat's wind for the hand currently being dealt by `dealer` -- the dealer is always
     East for their own deal, and seat wind rotates with the deal, not fixed table position.
     """
-    if not 0 <= seat < 4 or not 0 <= dealer < 4:
-        raise ValueError(f"seat and dealer must be 0..3, got seat={seat} dealer={dealer}")
-    return Wind((seat - dealer) % 4)
+    if not 0 <= seat < N_SEATS or not 0 <= dealer < N_SEATS:
+        raise ValueError(
+            f"seat and dealer must be 0..{N_SEATS - 1}, got seat={seat} dealer={dealer}"
+        )
+    return Wind((seat - dealer) % N_SEATS)
 
 
 @dataclass(frozen=True)
@@ -380,7 +384,7 @@ def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     if hand:
         return 0
     tiles = ctx.concealed_tiles
-    if len(tiles) != 14:
+    if len(tiles) != HAND_SIZE:
         return 0
     types = [tile_id_type(t) for t in tiles]
     if any(_is_honor(t) for t in types):
@@ -388,8 +392,8 @@ def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     suits = {int(t) // RANKS_PER_SUIT for t in types}
     if len(suits) != 1:
         return 0
-    base = suits.pop() * 9
-    counts = [0] * 9
+    base = suits.pop() * RANKS_PER_SUIT
+    counts = [0] * RANKS_PER_SUIT
     for t in types:
         counts[int(t) - base] += 1
     return 1 if all(c >= b for c, b in zip(counts, _NINE_GATES_BASE_COUNTS, strict=True)) else 0
@@ -403,7 +407,7 @@ def _detect_thirteen_orphans(hand: tuple[Meld, ...], ctx: ScoringContext) -> int
     if hand:
         return 0
     tiles = ctx.concealed_tiles
-    if len(tiles) != 14:
+    if len(tiles) != HAND_SIZE:
         return 0
     return 1 if {tile_id_type(t) for t in tiles} == ORPHAN_TYPES else 0
 
@@ -496,7 +500,7 @@ def _detect_seven_pairs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     if hand:
         return 0
     tiles = ctx.concealed_tiles
-    if len(tiles) != 14:
+    if len(tiles) != HAND_SIZE:
         return 0
     counts = Counter(tile_id_type(t) for t in tiles)
     return 1 if len(counts) == 7 and all(c == 2 for c in counts.values()) else 0

@@ -154,6 +154,7 @@ from mahjong_core.events import (
 )
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import ClaimWindow, GameState, Phase
 from mahjong_core.tiles import TileId
 
@@ -339,8 +340,8 @@ class Table:
         # since Table is also constructed directly by tests/tools, not just via the API boundary.
         if seat_bot_tiers is not None:
             for seat, tier in seat_bot_tiers.items():
-                if not 0 <= seat < 4:
-                    raise ValueError(f"seat must be 0..3, got {seat}")
+                if not 0 <= seat < N_SEATS:
+                    raise ValueError(f"seat must be 0..{N_SEATS - 1}, got {seat}")
                 if tier not in BOT_TIERS:
                     raise ValueError(
                         f"unknown bot tier {tier!r}; choices: {tuple(map(str, BOT_TIERS))}"
@@ -364,7 +365,7 @@ class Table:
         self._shutdown_boundary: asyncio.Event | None = None
         self.seat_seq: list[int] = [0, 0, 0, 0]  # per-seat outbound seq: dense, gapless
         self.ring: dict[int | str, deque[Envelope]] = {
-            seat: deque[Envelope](maxlen=512) for seat in range(4)
+            seat: deque[Envelope](maxlen=512) for seat in range(N_SEATS)
         }
         # a spectator gets its own self.ring/seq entry (session_id key), independent of every seat's
         # and other spectators' streams; `spectators` maps session id -> push callback (SeatBinding.send's analogue).
@@ -484,13 +485,13 @@ class Table:
             if held is not None:
                 raise AccountSeatedError(held)
         if seat is not None:
-            if not 0 <= seat < 4:
-                raise ValueError(f"seat must be 0..3, got {seat}")
+            if not 0 <= seat < N_SEATS:
+                raise ValueError(f"seat must be 0..{N_SEATS - 1}, got {seat}")
             if self.seat_bindings[seat] is not None:
                 raise SeatTakenError(seat)
             chosen = seat
         else:
-            open_seats = [s for s in range(4) if self.seat_bindings[s] is None]
+            open_seats = [s for s in range(N_SEATS) if self.seat_bindings[s] is None]
             if not open_seats:
                 raise TableFullError()
             chosen = open_seats[0]
@@ -560,7 +561,7 @@ class Table:
             raise NotHostError(seat)
         if self.started:
             raise TableAlreadyStartedError()
-        for s in range(4):
+        for s in range(N_SEATS):
             if self.seat_bindings[s] is not None:
                 continue
             self._bind_bot_seat(s)
@@ -580,7 +581,7 @@ class Table:
         if self.state.phase != Phase.HAND_OVER or self._hand_end_hand_no != self.state.hand_no:
             return
         self._hand_end_acked.add(seat)
-        if len(self._hand_end_acked) >= 4:
+        if len(self._hand_end_acked) >= N_SEATS:
             self._advance_to_next_hand()
             self._publish_turn_if_active()
 
@@ -726,7 +727,7 @@ class Table:
             binding.send(seq, wire)
 
     def _broadcast_wire(self, wire: dict[str, Any]) -> None:
-        for seat in range(4):
+        for seat in range(N_SEATS):
             self.publish_to_seat(seat, dict(wire))
         self._broadcast_to_spectators(wire)
 
@@ -1293,7 +1294,7 @@ class Table:
         if self.closed:
             return
         window = self.state.claim_window
-        for seat in range(4):
+        for seat in range(N_SEATS):
             binding = self.seat_bindings[seat]
             if binding is None or binding.status not in ("autoplay", "bot"):
                 continue
@@ -1502,7 +1503,7 @@ class Table:
         self._hand_end_deadline_ms = now_ms() + round(duration * 1000)
         # an all-bot table rides out the full hold: nobody seated would dismiss it, and it's
         # the spectators' only chance to read the result
-        if len(self._hand_end_acked) >= 4 and not self.all_bots:
+        if len(self._hand_end_acked) >= N_SEATS and not self.all_bots:
             return True
         self._arm_hand_end_timer()
         return False
@@ -1658,7 +1659,7 @@ class Table:
         self._broadcast_wire(
             hand_start_frame(state, seats=self.seat_status_tuple(), seed_commit=self._seed_commit())
         )
-        for seat in range(4):
+        for seat in range(N_SEATS):
             self.publish_to_seat(seat, deal_frame(state, seat))
         if self.settings.spectators_see_hands:
             # spectators get no `deal`; a fresh snapshot is how they learn the new hands
@@ -1678,7 +1679,7 @@ class Table:
         if self.state.phase != Phase.AWAIT_ACTION:
             return
         deadline_ts = self._arm_turn_timer(self.state.turn)
-        for s in range(4):
+        for s in range(N_SEATS):
             wire = turn_frame(self.state, s, deadline_ts=deadline_ts)
             assert wire is not None
             self.publish_to_seat(s, wire)
@@ -1730,7 +1731,7 @@ class Table:
             if isinstance(event, ClaimResolved):
                 self._publish_claim_resolved(event, offered)
                 continue
-            for seat in range(4):
+            for seat in range(N_SEATS):
                 self.publish_to_seat(seat, self._event_wire(seat, event))
             if self.spectators:
                 self._broadcast_to_spectators(self._event_wire(None, event))
@@ -1754,7 +1755,7 @@ class Table:
 
     def _publish_claim_resolved(self, event: ClaimResolved, offered: frozenset[int]) -> None:
         private = event.winning_seat is None
-        for seat in range(4):
+        for seat in range(N_SEATS):
             if seat in offered or not private:
                 self.publish_to_seat(
                     seat, event_frame(self.state, seat, event), bypass_hold=seat in offered

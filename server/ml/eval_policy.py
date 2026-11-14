@@ -57,6 +57,7 @@ from bots.labels import is_tenpai
 from mahjong_core.actions import Discard
 from mahjong_core.config import RuleSet
 from mahjong_core.presets import RULESET_PRESETS
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import HandOutcome
 from ml.encode_v2 import encode_policy_batch, policy_raw_from_view, ruleset_features
 from ml.env import HandEnv
@@ -114,7 +115,7 @@ def _hand(env: HandEnv) -> HandRecord:
     tenpai: list[int] = []
     sub_min: list[int] = []
     if result.outcome == HandOutcome.EXHAUSTIVE_DRAW:
-        for s in range(4):
+        for s in range(N_SEATS):
             if is_tenpai(state, s):
                 tenpai.append(s)
                 if not _tenpai_can_reach_min_faan(state, s):
@@ -127,7 +128,7 @@ def _hand(env: HandEnv) -> HandRecord:
         win_type=result.win_type if won else None,
         discarder=result.discarder if won else None,
         faan=result.faan,
-        payments=tuple(result.payments.get(s, 0) for s in range(4)),  # type: ignore[arg-type]
+        payments=tuple(result.payments.get(s, 0) for s in range(N_SEATS)),  # type: ignore[arg-type]
         turns=sum(isinstance(a, Discard) for a in env.actions),
         tenpai_seats=tuple(tenpai),
         sub_minimum_tenpai_seats=tuple(sub_min),
@@ -182,17 +183,17 @@ def play_set(
 
     async def run() -> tuple[tuple[GameRecord, ...], list[dict[str, Any]]]:
         games, records = [], []
-        for rotation in range(4):
-            bots: list[Bot] = [BOT_REGISTRY[opponent](seed * 4 + i) for i in range(4)]
+        for rotation in range(N_SEATS):
+            bots: list[Bot] = [BOT_REGISTRY[opponent](seed * N_SEATS + i) for i in range(N_SEATS)]
             if candidate_bot is None:
                 assert net is not None
                 bots[rotation] = PolicyBot(net)
             else:
-                bots[rotation] = BOT_REGISTRY[candidate_bot](seed * 4 + rotation)
-            names: list[str | None] = [opponent] * 4
+                bots[rotation] = BOT_REGISTRY[candidate_bot](seed * N_SEATS + rotation)
+            names: list[str | None] = [opponent] * N_SEATS
             names[rotation] = candidate_bot  # None for the policy: plain `seat_view`
             hand, record = await _play(seed, ruleset, bots, names)
-            players = [opponent] * 4
+            players = [opponent] * N_SEATS
             players[rotation] = candidate
             record["players"] = players
             games.append(

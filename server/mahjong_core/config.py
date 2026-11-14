@@ -47,6 +47,7 @@ class GameLength(StrEnum):
 
 _VALID_MIN_FAAN = frozenset({0, 1, 3, 5})
 _VALID_FAAN_CAP = frozenset({8, 10, 13})
+MAX_FAAN_CAP = max(_VALID_FAAN_CAP)
 
 _INT_FIELDS = (
     "min_faan",

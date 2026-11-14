@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from mahjong_core.config import RuleSet
 from mahjong_core.melds import Meld
+from mahjong_core.seats import N_SEATS, validate_seat
 from mahjong_core.tiles import Flower, TileId
 from mahjong_core.wall import Wall, WallTile, deal_hands, new_wall, replace_flowers
 
@@ -39,17 +40,12 @@ class Phase(StrEnum):
 
 class Wind(IntEnum):
     """Prevailing (圈風) or seat (門風) wind, sharing the seat-frame numbering: East=0 ..
-    North=3, the same axis `(seat + 1) % 4` "next seat" arithmetic uses."""
+    North=3, the same axis `(seat + 1) % N_SEATS` "next seat" arithmetic uses."""
 
     EAST = 0
     SOUTH = 1
     WEST = 2
     NORTH = 3
-
-
-def validate_seat(seat: int) -> None:
-    if not 0 <= seat < 4:
-        raise ValueError(f"seat must be 0..3, got {seat}")
 
 
 class ClaimKind(StrEnum):
@@ -96,8 +92,8 @@ class ClaimWindow:
     deadline_ts: int | None = None
 
     def __post_init__(self) -> None:
-        if not 0 <= self.source_seat < 4:
-            raise ValueError(f"source_seat must be 0..3, got {self.source_seat}")
+        if not 0 <= self.source_seat < N_SEATS:
+            raise ValueError(f"source_seat must be 0..{N_SEATS - 1}, got {self.source_seat}")
         if not self.offers:
             raise ValueError("a claim window with no offers should never be constructed")
         seats = [offer.seat for offer in self.offers]
@@ -237,12 +233,12 @@ class GameState:
     # and after any draw; false after a chow/pung claim (claimer didn't draw).
 
     def __post_init__(self) -> None:
-        if len(self.seats) != 4:
-            raise ValueError(f"seats must have exactly 4 entries, got {len(self.seats)}")
-        if not 0 <= self.turn < 4:
-            raise ValueError(f"turn must be 0..3, got {self.turn}")
-        if not 0 <= self.dealer < 4:
-            raise ValueError(f"dealer must be 0..3, got {self.dealer}")
+        if len(self.seats) != N_SEATS:
+            raise ValueError(f"seats must have exactly {N_SEATS} entries, got {len(self.seats)}")
+        if not 0 <= self.turn < N_SEATS:
+            raise ValueError(f"turn must be 0..{N_SEATS - 1}, got {self.turn}")
+        if not 0 <= self.dealer < N_SEATS:
+            raise ValueError(f"dealer must be 0..{N_SEATS - 1}, got {self.dealer}")
         if self.hand_no < 1:
             raise ValueError(f"hand_no must be >= 1, got {self.hand_no}")
         expects_window = self.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB)

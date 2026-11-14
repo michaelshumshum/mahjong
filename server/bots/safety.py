@@ -30,6 +30,7 @@ from bots.features import is_terminal_or_honor, seen34
 from mahjong_core.actions import _is_thirteen_orphans, hand_is_winning_shape
 from mahjong_core.scoring.faan import score_winning_hand
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import SeatState
 from mahjong_core.tiles import (
@@ -345,11 +346,11 @@ def tile_risk(view: SeatView, tile_type: int) -> float:
     if view.hands is not None:
         return sum(
             _exact_deal_in_faan(view, opponent, tile_type)
-            for opponent in range(4)
+            for opponent in range(N_SEATS)
             if opponent != view.seat
         )
     total = 0.0
-    for opponent in range(4):
+    for opponent in range(N_SEATS):
         if opponent == view.seat:
             continue
         total += deal_in_probability(view, opponent, tile_type) * expected_cost(
@@ -390,7 +391,7 @@ def kong_rob_risk(view: SeatView, tile_type: int, *, concealed: bool) -> float:
     if concealed and not view.ruleset.concealed_kong_robbable:
         return 0.0
     best = 0.0
-    for opponent in range(4):
+    for opponent in range(N_SEATS):
         if opponent == view.seat:
             continue
         if concealed:
@@ -437,7 +438,7 @@ def ron_credit(view: SeatView, waits: Sequence[int]) -> dict[int, float]:
     assert view.seat is not None
     credit = dict.fromkeys(waits, 0.0)
     hand_sets = view.ruleset.hand_sets
-    for opponent in range(4):
+    for opponent in range(N_SEATS):
         if opponent == view.seat:
             continue
         held = _opponent_concealed34(view, opponent)

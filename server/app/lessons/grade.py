@@ -27,6 +27,7 @@ from mahjong_core.actions import (
 from mahjong_core.engine import can_win_on, reduce
 from mahjong_core.scoring.faan import FaanResult, score_winning_hand, seven_pairs_enabled
 from mahjong_core.scoring.payout import points
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import ClaimKind, GameState, Phase, SeatState, WinType
 from mahjong_core.tiles import (
@@ -152,7 +153,7 @@ def winning_tiles(state: GameState, seat: int) -> WinningTilesKey:
         raise ValueError(f"seat {seat} is not one tile short of a hand")
     visible = _visible34(seat_view(state, seat))
     sevens = seven_pairs_enabled(state.ruleset)
-    discarder = state.turn if state.turn != seat else (seat - 1) % 4
+    discarder = state.turn if state.turn != seat else (seat - 1) % N_SEATS
     ron_state = dataclasses.replace(state, total_discards=state.total_discards + 1)
     # an ordinary wall draw: no last-tile or kong-replacement timing faan
     draw_state = dataclasses.replace(

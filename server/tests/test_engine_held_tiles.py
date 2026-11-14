@@ -10,6 +10,7 @@ import random
 
 from bots.random import random_action
 from mahjong_core.actions import ActionKind, legal_actions
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import (
     drawn_tile,
@@ -97,7 +98,7 @@ def test_held_tiles_match_the_event_stream() -> None:
                 continue
             window = state.claim_window
             if window is not None:
-                seat = rng.choice([o.seat for o in window.offers if o.seat not in window.responses])
+                seat = rng.choice(pending_claim_seats(state))
             else:
                 seat = state.turn
             state, events = reduce(state, _action(state, seat, rng))

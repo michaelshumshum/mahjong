@@ -38,9 +38,10 @@ from bots.labels import is_tenpai, seat_hand34
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.ml import N_ACTIONS, PASS_ID
 from mahjong_core.presets import RULESET_PRESETS
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from mahjong_core.tiles import N_TILE_TYPES
+from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
 from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.env import HandEnv
@@ -121,7 +122,7 @@ def opponent_ids(u: dict[str, np.ndarray]) -> np.ndarray:
 def tsumogiri(state: GameState, seat: int, mask: np.ndarray) -> int:
     """Discard the tile just drawn (the last concealed tile); pass every claim, never win."""
     if state.phase == Phase.AWAIT_ACTION and state.turn == seat:
-        t = state.seats[seat].concealed[-1] // 4
+        t = tile_id_type(state.seats[seat].concealed[-1])
         if mask[t]:
             return int(t)
         return int(np.flatnonzero(mask[:N_TILE_TYPES])[0])
@@ -162,7 +163,7 @@ class EnvConfig:
     of the time an episode plays `ruleset`."""
 
     ruleset: RuleSet = DEFAULT_RULESET
-    learners: int = 4
+    learners: int = N_SEATS
     frozen: int = 0
     opponent: str = "tsumogiri"
     aux_rate: float = 0.0
@@ -171,16 +172,17 @@ class EnvConfig:
     alt_rulesets: tuple[tuple[str, float], ...] = ()
 
     def __post_init__(self) -> None:
-        if not 1 <= self.learners <= 4 or self.learners + self.frozen > 4 or self.frozen < 0:
+        seated = self.learners + self.frozen
+        if not 1 <= self.learners <= N_SEATS or seated > N_SEATS or self.frozen < 0:
             raise ValueError(f"bad seating: learners={self.learners}, frozen={self.frozen}")
-        if self.learners + self.frozen < 4 and self.opponent not in OPPONENTS:
+        if seated < N_SEATS and self.opponent not in OPPONENTS:
             raise ValueError(f"unknown opponent {self.opponent!r}; choices: {sorted(OPPONENTS)}")
         if self.teacher is not None and self.teacher not in _TEACHERS:
             raise ValueError(f"unknown teacher {self.teacher!r}")
         for weight, learners, opp in self.mix:
-            if weight < 0 or not 1 <= learners <= 4 or not 0 <= opp < 1 << 16:
+            if weight < 0 or not 1 <= learners <= N_SEATS or not 0 <= opp < 1 << 16:
                 raise ValueError(f"bad mix entry {(weight, learners, opp)}")
-            if (learners < 4) != (opp > 0):
+            if (learners < N_SEATS) != (opp > 0):
                 raise ValueError(f"mix entry {(weight, learners, opp)}: frozen seats need an id")
         if self.mix and sum(w for w, _, _ in self.mix) <= 0:
             raise ValueError("mix weights sum to 0")
@@ -213,9 +215,9 @@ def _roles(cfg: EnvConfig, seed: int) -> tuple[list[int], int]:
     if cfg.mix:
         rng = random.Random(f"mix:{seed}")
         _, learners, opp = rng.choices(cfg.mix, weights=[w for w, _, _ in cfg.mix])[0]
-        frozen = 4 - learners
-    seats = random.Random(f"seats:{seed}").sample(range(4), learners + frozen)
-    roles = [-1] * 4
+        frozen = N_SEATS - learners
+    seats = random.Random(f"seats:{seed}").sample(range(N_SEATS), learners + frozen)
+    roles = [-1] * N_SEATS
     for i, s in enumerate(seats):
         roles[s] = LEARNER if i < learners else FROZEN
     return roles, opp
@@ -248,7 +250,7 @@ class TrainEnv:
         self.row = np.zeros(ROW_BYTES, dtype=np.uint8)
         self.seat = -1
         self.mask = np.zeros(N_ACTIONS, dtype=bool)
-        self.roles = [-1] * 4
+        self.roles = [-1] * N_SEATS
         self.opponent_id = 0
         self.ruleset_id = 0
         self._aux_rng = random.Random()
@@ -298,7 +300,7 @@ class TrainEnv:
         state = self.env.state
         assert state is not None and state.hand_result is not None
         result = state.hand_result
-        learners = [s for s in range(4) if self.roles[s] == LEARNER]
+        learners = [s for s in range(N_SEATS) if self.roles[s] == LEARNER]
         tenpai, sub_min = [], []
         if result.outcome == HandOutcome.EXHAUSTIVE_DRAW:
             for s in learners:
@@ -443,7 +445,7 @@ def _shared(ctx: Any, n: int) -> dict[str, Any]:
         "mask": ctx.RawArray("b", n * N_ACTIONS),
         "rows": ctx.RawArray("B", n * ROW_BYTES),
         "done": ctx.RawArray("b", n),
-        "rewards": ctx.RawArray("f", n * 4),
+        "rewards": ctx.RawArray("f", n * N_SEATS),
         "info": ctx.RawArray("b", n * len(INFO_FIELDS)),
         "actions": ctx.RawArray("i", n),
     }

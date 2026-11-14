@@ -12,6 +12,7 @@ from mahjong_core.config import RuleSet
 from mahjong_core.engine import reduce
 from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.scoring.faan import seven_pairs_enabled
+from mahjong_core.seats import N_SEATS
 from mahjong_core.state import GameState, Phase, SeatState, Wind, derive_hand_seed, new_game
 from mahjong_core.tiles import (
     Flower,
@@ -206,9 +207,9 @@ def position_from_state(state: GameState, *, seed: int, seat: int = 0) -> Positi
         raise ValueError("a complete hand after a claim would rebuild as a self-draw win")
 
     def rotate(n: int) -> int:
-        return (n - seat) % 4
+        return (n - seat) % N_SEATS
 
-    seats = [_seat_setup(state.seats[(n + seat) % 4], rotate) for n in range(4)]
+    seats = [_seat_setup(state.seats[(n + seat) % N_SEATS], rotate) for n in range(N_SEATS)]
     return Position(
         seats=(seats[0], seats[1], seats[2], seats[3]),
         turn=rotate(state.turn),

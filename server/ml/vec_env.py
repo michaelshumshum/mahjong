@@ -20,6 +20,7 @@ from typing import Any, Self
 import numpy as np
 
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
+from mahjong_core.seats import N_SEATS
 from ml.env import N_ACTIONS, OBS_DIM, HandEnv, encode_obs
 from ml.mp import mp_context
 
@@ -133,7 +134,7 @@ def _shared(ctx: Any, n: int, obs_dim: int) -> dict[str, Any]:
         "obs": ctx.RawArray("f", max(n * obs_dim, 1)),
         "mask": ctx.RawArray("b", n * N_ACTIONS),
         "done": ctx.RawArray("b", n),
-        "rewards": ctx.RawArray("f", n * 4),
+        "rewards": ctx.RawArray("f", n * N_SEATS),
         "actions": ctx.RawArray("i", n),
     }
 
