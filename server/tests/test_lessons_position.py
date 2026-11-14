@@ -25,6 +25,7 @@ from app.views import seat_view
 from bots.base import NO_DEADLINE
 from bots.faanbot import FaanBot
 from mahjong_core.actions import Action, Discard, Pass, can_declare_win, legal_actions
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.engine import reduce, start_next_hand
 from mahjong_core.melds import MeldKind
 from mahjong_core.ml import decode_action, legal_mask
@@ -183,7 +184,7 @@ def _faanbot_turns(seed: int) -> Iterator[tuple[GameState, Action, GameState]]:
             continue
         window = state.claim_window
         if window is not None:
-            seat = min(o.seat for o in window.offers if o.seat not in window.responses)
+            seat = min(pending_claim_seats(state))
         else:
             seat = state.turn
         aid = asyncio.run(bot.act(seat_view(state, seat), legal_mask(state, seat), NO_DEADLINE))

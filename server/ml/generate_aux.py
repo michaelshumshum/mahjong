@@ -35,6 +35,7 @@ import numpy as np
 from app.views import seat_view
 from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.labels import danger_labels_for_opponents, seat_hand34
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
@@ -149,9 +150,7 @@ async def _play(
             state, _ = start_next_hand(state)
             continue
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            window = state.claim_window
-            seat = rng.choice([o.seat for o in window.offers if o.seat not in window.responses])
+            seat = rng.choice(pending_claim_seats(state))
         else:
             seat = state.turn
         mask = legal_mask(state, seat)

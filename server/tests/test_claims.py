@@ -1,3 +1,4 @@
+import dataclasses
 import itertools
 
 import pytest
@@ -5,9 +6,15 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from mahjong_core.actions import ClaimChow, ClaimKong, ClaimPung, ClaimWin, Pass
-from mahjong_core.claims import ClaimResponse, can_close_early, resolve_claims
+from mahjong_core.claims import (
+    ClaimResponse,
+    can_close_early,
+    pending_claim_seats,
+    resolve_claims,
+)
+from mahjong_core.config import DEFAULT_RULESET
 from mahjong_core.melds import Meld, MeldKind
-from mahjong_core.state import ClaimKind, ClaimOffer, ClaimWindow
+from mahjong_core.state import ClaimKind, ClaimOffer, ClaimWindow, Phase, new_game
 from mahjong_core.tiles import TileType, tile_ids_for_type
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)
@@ -400,3 +407,18 @@ def test_can_close_early_matches_brute_force_outcome(
             break
 
     assert can_close_early(window, responses) == (not outcome_could_change)
+
+
+def test_pending_claim_seats_keeps_offer_order_and_drops_responders() -> None:
+    state = new_game(DEFAULT_RULESET, game_seed=1)
+    assert pending_claim_seats(state) == []
+    offers = (
+        ClaimOffer(seat=3, can_win=True),
+        ClaimOffer(seat=1, can_win=True),
+        ClaimOffer(seat=2, can_win=True),
+    )
+    window = _window(0, offers)
+    claiming = dataclasses.replace(state, phase=Phase.AWAIT_CLAIMS, claim_window=window)
+    assert pending_claim_seats(claiming) == [3, 1, 2]
+    answered = dataclasses.replace(window, responses={1: Pass(window_id=1, seat=1)})
+    assert pending_claim_seats(dataclasses.replace(claiming, claim_window=answered)) == [3, 2]

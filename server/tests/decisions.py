@@ -4,6 +4,7 @@ import random
 from collections.abc import Iterator
 
 from bots.random import random_action
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import N_ACTIONS
@@ -28,12 +29,7 @@ def decision_points(seed: int, ruleset: RuleSet) -> Iterator[tuple[GameState, in
             continue
 
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            pending = [
-                o.seat
-                for o in state.claim_window.offers
-                if o.seat not in state.claim_window.responses
-            ]
+            pending = pending_claim_seats(state)
             seat = rng.choice(pending)
         else:
             seat = state.turn

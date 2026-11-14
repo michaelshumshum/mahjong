@@ -11,7 +11,7 @@ from enum import IntEnum
 
 from mahjong_core.actions import ActionKind, ClaimChow, ClaimKong, ClaimPung, ClaimWin, Pass
 from mahjong_core.melds import MeldKind
-from mahjong_core.state import ClaimOffer, ClaimWindow
+from mahjong_core.state import ClaimOffer, ClaimWindow, GameState
 
 ClaimResponse = ClaimChow | ClaimPung | ClaimKong | ClaimWin | Pass
 
@@ -166,3 +166,12 @@ def can_close_early(claim_window: ClaimWindow, responses: Mapping[int, ClaimResp
         # chow-tier ties never arise: at most one seat is ever chow-eligible.
 
     return True
+
+
+def pending_claim_seats(state: GameState) -> list[int]:
+    """Offered seats that have not answered the open claim window, in `offers` order (callers
+    `rng.choice` over it, so the order is part of seeded determinism). Empty with no window."""
+    window = state.claim_window
+    if window is None:
+        return []
+    return [o.seat for o in window.offers if o.seat not in window.responses]
