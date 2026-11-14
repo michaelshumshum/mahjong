@@ -173,7 +173,7 @@ Native equivalents of the Docker targets:
 | `make bench-latency` | `cd server && LATENCY_BUDGET_MS=5 uv run pytest -q -s -m latency -p no:xdist` |
 | `make test-web` | `pnpm --dir web test` |
 | `make migrate` | `cd server && uv run alembic upgrade head` (with `DATABASE_URL`) |
-| `make dup` / `dup-server` / `dup-web` | already native (no container): `cd server && npx --yes jscpd@4.3.0`, `cd web && npx --yes jscpd@4.3.0`; see §9 "Duplication gate" |
+| `make dup` / `dup-server` / `dup-web` | already native (no container): `cd server && npx --yes jscpd@$JSCPD_VERSION`, `cd web && npx --yes jscpd@$JSCPD_VERSION` (version from the `Makefile`); see §9 "Duplication gate" |
 | `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json && uv run python -m tools.gen_lessons`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts src/lib/learn/generated` |
 
 ## 3. Process model
@@ -376,11 +376,13 @@ can't parse (e.g. a duplicate `environment:` key) otherwise only fails at deploy
 **Duplication gate.** `ci.yml`'s inline `dup` job runs `make dup` (setup-node only, no install):
 [jscpd](https://github.com/kucherenko/jscpd), pinned by `JSCPD_VERSION` in the `Makefile` and
 fetched by `npx`, so no devDependency. Production code only — tests, specs, `.d.ts`, generated
-output (`paraglide/`, `learn/generated/`) and ML data dirs are ignored.
+output (`paraglide/`, `learn/generated/`, `protocol.*.ts`) and the top-level `data/`, `runs/`,
+`checkpoints/` dirs are ignored. Dev fixtures (`mock-game-state.ts`, `routes/demo/`) count as
+production code on purpose.
 
 | Target | Config | Scope | Threshold (duplicated lines) |
 | --- | --- | --- | --- |
-| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, `data/`, `runs/`, `checkpoints/` | 1.1% |
+| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, and top-level `data/`, `runs/`, `checkpoints/` | 1.1% |
 | `make dup-web` | `web/.jscpd.json` | `web/src` (ts, js, svelte, scss, css) minus specs/e2e, `.d.ts`, generated | 0.65% |
 
 jscpd exits non-zero once the duplicated-line percentage exceeds `threshold`. Each threshold sits

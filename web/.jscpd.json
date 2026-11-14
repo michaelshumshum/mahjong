@@ -6,6 +6,7 @@
 		"**/.svelte-kit/**",
 		"**/build/**",
 		"**/*.d.ts",
+		"src/lib/net/protocol.*.ts",
 		"**/paraglide/**",
 		"**/learn/generated/**",
 		"**/*.spec.ts",

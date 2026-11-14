@@ -4,9 +4,9 @@
   "ignore": [
     "**/.venv/**",
     "**/__pycache__/**",
-    "**/data/**",
-    "**/runs/**",
-    "**/checkpoints/**",
+    "data/**",
+    "runs/**",
+    "checkpoints/**",
     "**/node_modules/**",
     "**/tests/**"
   ],
