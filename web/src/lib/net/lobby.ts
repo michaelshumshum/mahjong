@@ -21,6 +21,36 @@ export function apiBaseUrl(): string {
 	return env.PUBLIC_API_URL || 'http://localhost:8000';
 }
 
+export interface ApiRequestInit {
+	baseUrl: string;
+	fetchFn: typeof fetch;
+	// sent as JSON
+	body?: unknown;
+	// the session cookie is host-only on the API host, so /me and /auth calls must include it
+	session?: boolean;
+	// non-ok statuses handed back to the caller instead of thrown
+	allow?: readonly number[];
+}
+
+/** A plain-HTTP API call; a non-ok status throws `"<method> <path> failed: <status>"`. */
+export async function apiRequest(
+	method: string,
+	path: string,
+	{ baseUrl, fetchFn, body, session = false, allow = [] }: ApiRequestInit
+): Promise<Response> {
+	const init: RequestInit = { method };
+	if (session) init.credentials = 'include';
+	if (body !== undefined) {
+		init.headers = { 'Content-Type': 'application/json' };
+		init.body = JSON.stringify(body);
+	}
+	const response = await fetchFn(`${baseUrl}${path}`, init);
+	if (!response.ok && !allow.includes(response.status)) {
+		throw new Error(`${method} ${path.split('?')[0]} failed: ${response.status}`);
+	}
+	return response;
+}
+
 export interface WaitForApiHealthyOptions {
 	baseUrl?: string;
 	fetchFn?: typeof fetch;
@@ -65,8 +95,7 @@ export async function fetchTables(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<TableSummary[]> {
-	const response = await fetchFn(`${baseUrl}/tables`);
-	if (!response.ok) throw new Error(`GET /tables failed: ${response.status}`);
+	const response = await apiRequest('GET', '/tables', { baseUrl, fetchFn });
 	const body = (await response.json()) as { tables: TableSummary[] };
 	return body.tables;
 }
@@ -98,12 +127,7 @@ export async function createTable(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<CreateTableResponse> {
-	const response = await fetchFn(`${baseUrl}/tables`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-	if (!response.ok) throw new Error(`POST /tables failed: ${response.status}`);
+	const response = await apiRequest('POST', '/tables', { baseUrl, fetchFn, body });
 	return (await response.json()) as CreateTableResponse;
 }
 

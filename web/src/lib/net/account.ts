@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/public';
-import { apiBaseUrl } from './lobby';
+import { apiBaseUrl, apiRequest } from './lobby';
 import type { BotTier } from './protocol';
 import { MAX_NAME_LENGTH } from './protocol.constants';
 
@@ -21,17 +21,18 @@ export function accountsEnabled(): boolean {
 	return TRUTHY.has((env.PUBLIC_ACCOUNTS_ENABLED ?? '').trim().toLowerCase());
 }
 
-// the session cookie is host-only on the API host, so every /me and /auth call must include it
-const WITH_SESSION: RequestInit = { credentials: 'include' };
-
 /** The signed-in account, or null for a guest (401) or accounts off on the server (404). */
 export async function fetchMe(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<Me | null> {
-	const response = await fetchFn(`${baseUrl}/me`, WITH_SESSION);
-	if (response.status === 401 || response.status === 404) return null;
-	if (!response.ok) throw new Error(`GET /me failed: ${response.status}`);
+	const response = await apiRequest('GET', '/me', {
+		baseUrl,
+		fetchFn,
+		session: true,
+		allow: [401, 404]
+	});
+	if (!response.ok) return null;
 	return (await response.json()) as Me;
 }
 
@@ -46,13 +47,7 @@ export async function patchMe(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<Me> {
-	const response = await fetchFn(`${baseUrl}/me`, {
-		...WITH_SESSION,
-		method: 'PATCH',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-	if (!response.ok) throw new Error(`PATCH /me failed: ${response.status}`);
+	const response = await apiRequest('PATCH', '/me', { baseUrl, fetchFn, body, session: true });
 	return (await response.json()) as Me;
 }
 
@@ -61,8 +56,7 @@ export async function deleteMe(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	const response = await fetchFn(`${baseUrl}/me`, { ...WITH_SESSION, method: 'DELETE' });
-	if (!response.ok) throw new Error(`DELETE /me failed: ${response.status}`);
+	await apiRequest('DELETE', '/me', { baseUrl, fetchFn, session: true });
 }
 
 // server: app/db/models.py's GameMode and SeatKind
@@ -110,8 +104,11 @@ export async function fetchMyGames(
 	if (before !== undefined) params.set('before', String(before));
 	if (mode !== undefined) params.set('mode', mode);
 	const query = params.size ? `?${params}` : '';
-	const response = await fetchFn(`${baseUrl}/me/games${query}`, WITH_SESSION);
-	if (!response.ok) throw new Error(`GET /me/games failed: ${response.status}`);
+	const response = await apiRequest('GET', `/me/games${query}`, {
+		baseUrl,
+		fetchFn,
+		session: true
+	});
 	return (await response.json()) as MyGamesPage;
 }
 
@@ -119,8 +116,7 @@ export async function signOut(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	const response = await fetchFn(`${baseUrl}/auth/logout`, { ...WITH_SESSION, method: 'POST' });
-	if (!response.ok) throw new Error(`POST /auth/logout failed: ${response.status}`);
+	await apiRequest('POST', '/auth/logout', { baseUrl, fetchFn, session: true });
 }
 
 /** Full-page navigation target: Google's consent screen, then back to `next` on the web. */
