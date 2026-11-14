@@ -1,6 +1,79 @@
 // form/panel chrome mixins: reusable patterns shared across Settings, ScoreSheet-style panels,
 // and pre-game chrome.
 
+@use 'buttons';
+@use 'layout';
+
+// modal dialog card. `$dismissable`: header clears DismissablePanel's close button, padding steps
+// up tablet-up. `$landscape-compact`: tighter on a short landscape phone.
+@mixin dialog-panel($width, $dismissable: false, $landscape-compact: false) {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	width: min(90vw, $width);
+	background: var(--color-surface-raised);
+	@include buttons.panel-elevated;
+
+	@if $dismissable {
+		padding: var(--space-5) var(--space-5) var(--space-4);
+
+		@include layout.tablet-up {
+			padding: var(--space-6) var(--space-6) var(--space-5);
+		}
+
+		> :global(.panel-header) {
+			padding-inline-end: var(--space-6);
+		}
+	} @else {
+		padding: var(--space-5);
+	}
+
+	@if $landscape-compact {
+		@include layout.phone-landscape {
+			gap: var(--space-2);
+			padding: var(--space-3) var(--space-4) var(--space-2);
+		}
+	}
+}
+
+// a dialog's scrolling body: bleeds into the panel padding so focus rings aren't clipped.
+@mixin dialog-scroll-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	margin-inline: calc(-1 * var(--space-2));
+}
+
+// a dialog's button row, end-aligned. `$divided`: ruled off from the body above.
+@mixin dialog-actions($divided: false) {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-3);
+
+	@if $divided {
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--color-border);
+	}
+}
+
+// a <label> holding its caption over a recessed text input.
+@mixin labelled-input {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-1);
+	font-weight: 600;
+
+	input {
+		@include buttons.input-recessed;
+		min-height: var(--tap-target-min);
+		padding: var(--space-2) var(--space-3);
+		color: var(--color-text);
+		font: inherit;
+		font-weight: 400;
+	}
+}
+
 // panel header: title + badge row, matching ScoreSheet's score-sheet-header.
 @mixin panel-header {
 	display: flex;
@@ -157,4 +230,31 @@
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
 	background: var(--color-surface);
+}
+
+// the `.panel`/`.group`/`legend`/`.card` tab-panel rules Settings and RulesEditor share.
+@mixin settings-panels($group-gap) {
+	.panel {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-5);
+		padding-block: var(--space-1) var(--space-2);
+
+		&[hidden] {
+			display: none;
+		}
+	}
+
+	.group {
+		@include form-group;
+		gap: $group-gap;
+	}
+
+	legend {
+		@include settings-legend;
+	}
+
+	.card {
+		@include settings-card;
+	}
 }

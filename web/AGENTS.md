@@ -124,7 +124,7 @@ model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 | Client prefs types / storage keys | `lib/ui/client-prefs.ts` / `lib/ui/settings-storage.ts` |
 | Signed score/payment text (`formatSigned`: `+25`, `-12`, `0`, in the current locale) | `lib/ui/score-format.ts` |
 | Pregame preview ids | `lib/table/pregame-preview.ts` |
-| Shared style mixins (`btn-base`, `seat-compass-grid`/`seat-ring`, `field-text`/`-label`/`-desc`, `settings-card`) | `lib/styles/_buttons.scss` / `_layout.scss` / `_forms.scss` (`docs/frontend.md §8`) |
+| Shared style mixins (`btn-base`, `seat-compass-grid`/`seat-ring`, `field-text`/`-label`/`-desc`, `settings-card`/`settings-panels`, `dialog-panel`/`dialog-actions`/`labelled-input`) | `lib/styles/_buttons.scss` / `_layout.scss` / `_forms.scss` (`docs/frontend.md §8`) |
 | Indeterminate wait spinner | `lib/ui/Spinner.svelte` |
 
 - `.ts` modules never import types from a `.svelte` file. A component's own prop types stay in

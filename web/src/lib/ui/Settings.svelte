@@ -256,23 +256,8 @@
 
 	// fixed height (capped by the viewport) so switching tabs never resizes the dialog.
 	.settings {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		width: min(90vw, 30rem);
+		@include forms.dialog-panel(30rem, $dismissable: true, $landscape-compact: true);
 		height: min(36rem, calc(100dvh - var(--space-6)));
-		padding: var(--space-5) var(--space-5) var(--space-4);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
-
-		@include layout.tablet-up {
-			padding: var(--space-6) var(--space-6) var(--space-5);
-		}
-
-		@include layout.phone-landscape {
-			gap: var(--space-2);
-			padding: var(--space-3) var(--space-4) var(--space-2);
-		}
 	}
 
 	.settings :global(h2) {
@@ -281,43 +266,12 @@
 		}
 	}
 
-	// leaves room for DismissablePanel's absolutely positioned close button.
-	.settings > :global(.panel-header) {
-		padding-inline-end: var(--space-6);
-	}
-
 	.panels {
-		flex: 1 1 auto;
-		min-height: 0;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		margin-inline: calc(-1 * var(--space-2));
+		@include forms.dialog-scroll-body;
 		padding-inline: var(--space-2);
 	}
 
-	.panel {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-5);
-		padding-block: var(--space-1) var(--space-2);
-
-		&[hidden] {
-			display: none;
-		}
-	}
-
-	.group {
-		@include forms.form-group;
-		gap: 0;
-	}
-
-	legend {
-		@include forms.settings-legend;
-	}
-
-	.card {
-		@include forms.settings-card;
-	}
+	@include forms.settings-panels($group-gap: 0);
 
 	.hint {
 		margin: var(--space-2) 0 0;
@@ -327,10 +281,7 @@
 	}
 
 	.footer {
-		display: flex;
-		justify-content: flex-end;
-		padding-top: var(--space-3);
-		border-top: 1px solid var(--color-border);
+		@include forms.dialog-actions($divided: true);
 
 		@include layout.phone-landscape {
 			padding-top: 0;

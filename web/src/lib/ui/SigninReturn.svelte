@@ -106,15 +106,10 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/forms';
 
 	.signin-dialog {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		width: min(90vw, 26rem);
-		padding: var(--space-5);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
+		@include forms.dialog-panel(26rem);
 	}
 
 	p {
@@ -128,19 +123,7 @@
 	}
 
 	.name {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-		font-weight: 600;
-
-		input {
-			@include buttons.input-recessed;
-			min-height: var(--tap-target-min);
-			padding: var(--space-2) var(--space-3);
-			color: var(--color-text);
-			font: inherit;
-			font-weight: 400;
-		}
+		@include forms.labelled-input;
 	}
 
 	.error {
@@ -149,8 +132,7 @@
 	}
 
 	.actions {
-		display: flex;
-		justify-content: flex-end;
+		@include forms.dialog-actions;
 	}
 
 	.primary {

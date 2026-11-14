@@ -1633,7 +1633,10 @@ src/lib/styles/
   _buttons.scss     btn-base(padding-inline) (tap-target size, include before a tier),
                     btn-primary/secondary/ghost, panel-elevated, input-recessed
   _forms.scss       panel-header/title/badge, form-group, option row chrome, field-text/
-                    label/desc (label-over-description column), settings-card
+                    label/desc (label-over-description column), settings-card and
+                    settings-panels (Settings/RulesEditor tab panels), dialog-panel($width)
+                    (modal card; dismissable and landscape-compact variants), dialog-scroll-body,
+                    dialog-actions, labelled-input
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
   _layout.scss      seat-region grid, breakpoint mixins, seat-compass-grid (four seats

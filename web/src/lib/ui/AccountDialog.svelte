@@ -28,28 +28,12 @@
 </DismissablePanel>
 
 <style lang="scss">
-	@use '$lib/styles/buttons';
-	@use '$lib/styles/layout';
+	@use '$lib/styles/forms';
 
 	// same frame as Settings: capped height, the body scrolls
 	.account-dialog {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		width: min(90vw, 30rem);
+		@include forms.dialog-panel(30rem, $dismissable: true);
 		max-height: min(48rem, calc(100dvh - var(--space-6)));
-		padding: var(--space-5) var(--space-5) var(--space-4);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
-
-		@include layout.tablet-up {
-			padding: var(--space-6) var(--space-6) var(--space-5);
-		}
-	}
-
-	// leaves room for DismissablePanel's absolutely positioned close button.
-	.account-dialog > :global(.panel-header) {
-		padding-inline-end: var(--space-6);
 	}
 
 	.profile {
@@ -78,11 +62,7 @@
 	}
 
 	.body {
-		flex: 1 1 auto;
-		min-height: 0;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		margin-inline: calc(-1 * var(--space-2));
+		@include forms.dialog-scroll-body;
 		padding: var(--space-1) var(--space-2) var(--space-2);
 	}
 </style>
