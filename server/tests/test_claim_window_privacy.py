@@ -16,6 +16,7 @@ from mahjong_core.melds import Meld, MeldKind
 from mahjong_core.state import Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
+from tests.hands import JUNK_HAND
 
 _MAN_1 = tile_ids_for_type(TileType.MAN_1)
 _MAN_2 = tile_ids_for_type(TileType.MAN_2)
@@ -30,32 +31,6 @@ _PIN_1 = tile_ids_for_type(TileType.PIN_1)
 _PIN_2 = tile_ids_for_type(TileType.PIN_2)
 _PIN_3 = tile_ids_for_type(TileType.PIN_3)
 _PIN_9 = tile_ids_for_type(TileType.PIN_9)
-_SOU_2 = tile_ids_for_type(TileType.SOU_2)
-_SOU_4 = tile_ids_for_type(TileType.SOU_4)
-_SOU_6 = tile_ids_for_type(TileType.SOU_6)
-_SOU_8 = tile_ids_for_type(TileType.SOU_8)
-_SOUTH = tile_ids_for_type(TileType.WIND_SOUTH)
-_WEST = tile_ids_for_type(TileType.WIND_WEST)
-_NORTH = tile_ids_for_type(TileType.WIND_NORTH)
-_RED = tile_ids_for_type(TileType.DRAGON_RED)
-_GREEN = tile_ids_for_type(TileType.DRAGON_GREEN)
-_WHITE = tile_ids_for_type(TileType.DRAGON_WHITE)
-
-_JUNK_HAND = (
-    _SOU_2[0],
-    _SOU_4[0],
-    _SOU_6[0],
-    _SOU_8[0],
-    _SOU_2[1],
-    _SOU_4[1],
-    _SOU_6[1],
-    _SOUTH[0],
-    _WEST[0],
-    _NORTH[0],
-    _RED[0],
-    _GREEN[0],
-    _WHITE[0],
-)
 
 _HOLD = 0.2
 _SPECTATOR = "spec"
@@ -71,14 +46,14 @@ def _discard_table(*, claimable: bool, hold: float) -> tuple[Table, list[Frame]]
     table = Table("t-privacy", ruleset, game_seed=1, claim_hold_seconds=hold)
     state = new_game(ruleset, game_seed=1)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]), discards=())
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_5[0]), discards=())
     if claimable:
-        state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_JUNK_HAND[:11]))
-        state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_JUNK_HAND[:11]))
+        state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *JUNK_HAND[:11]))
+        state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *JUNK_HAND[:11]))
     else:
-        state = with_seat(state, 1, concealed=_JUNK_HAND)
-        state = with_seat(state, 2, concealed=_JUNK_HAND)
-    state = with_seat(state, 3, concealed=_JUNK_HAND)
+        state = with_seat(state, 1, concealed=JUNK_HAND)
+        state = with_seat(state, 2, concealed=JUNK_HAND)
+    state = with_seat(state, 3, concealed=JUNK_HAND)
     table.state = state
 
     frames: list[Frame] = []
@@ -198,9 +173,9 @@ def _added_kong_table(*, robbable: bool, hold: float) -> tuple[Table, list[Frame
     pung = Meld(MeldKind.PUNG, (_MAN_1[0], _MAN_1[1], _MAN_1[2]), from_seat=1)
     state = new_game(ruleset, game_seed=1)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = with_seat(state, 0, concealed=(_MAN_1[3], *_JUNK_HAND[:10]), melds=(pung,))
+    state = with_seat(state, 0, concealed=(_MAN_1[3], *JUNK_HAND[:10]), melds=(pung,))
     for seat in (1, 2, 3):
-        state = with_seat(state, seat, concealed=_JUNK_HAND)
+        state = with_seat(state, seat, concealed=JUNK_HAND)
     if robbable:
         state = with_seat(state, 2, concealed=_tenpai_on_man1())
     table.state = state
