@@ -85,7 +85,7 @@ SCHEMA_VERSION = 3
 
 def _make_bots(names: Sequence[str], seed: int) -> list[Bot]:
     if len(names) != N_SEATS:
-        raise ValueError(f"--bots needs exactly 4 comma-separated names, got {len(names)}")
+        raise ValueError(f"--bots needs exactly {N_SEATS} comma-separated names, got {len(names)}")
     bots = []
     for i, name in enumerate(names):
         if name in OMNISCIENT_BOTS:

@@ -54,7 +54,7 @@ async def play_game(
         bots if bots is not None else [RandomBot(rng=rng) for _ in range(N_SEATS)]
     )
     if len(seats) != N_SEATS:
-        raise ValueError(f"bots must have exactly 4 entries, got {len(seats)}")
+        raise ValueError(f"bots must have exactly {N_SEATS} entries, got {len(seats)}")
 
     state = new_game(ruleset, seed)
     actions: list[Action] = []

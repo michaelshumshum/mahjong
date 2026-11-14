@@ -23,6 +23,7 @@ POINTS_TABLES: dict[ScoreTable, tuple[int, ...]] = {
 }
 """Indexed by faan 0..13. Also emitted to the web client by `make proto` (the faan guide's
 points table)."""
+assert all(len(t) == MAX_FAAN_CAP + 1 for t in POINTS_TABLES.values())
 
 
 def points(faan: int, ruleset: RuleSet) -> int:
