@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	apiRequest,
 	createPracticeTable,
 	createTable,
 	fetchTables,
@@ -28,6 +29,48 @@ function stubFetch(status: number, body: unknown, seen: string[] = []): typeof f
 		return new Response(JSON.stringify(body), { status });
 	}) as typeof fetch;
 }
+
+describe('apiRequest', () => {
+	it('sends a JSON body and the session cookie only when asked', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => Response.json({}));
+		await apiRequest('GET', '/a', { baseUrl: 'http://api', fetchFn });
+		await apiRequest('POST', '/b', {
+			baseUrl: 'http://api',
+			fetchFn,
+			body: { x: 1 },
+			session: true
+		});
+		expect(fetchFn.mock.calls).toEqual([
+			['http://api/a', { method: 'GET' }],
+			[
+				'http://api/b',
+				{
+					method: 'POST',
+					credentials: 'include',
+					headers: { 'Content-Type': 'application/json' },
+					body: '{"x":1}'
+				}
+			]
+		]);
+	});
+
+	it('throws method, path without query, and status on a non-ok response', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 500 }));
+		await expect(
+			apiRequest('GET', '/me/games?before=3', { baseUrl: 'http://api', fetchFn })
+		).rejects.toThrow('GET /me/games failed: 500');
+	});
+
+	it('hands an allowed status back instead of throwing', async () => {
+		const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 404 }));
+		const response = await apiRequest('GET', '/me', {
+			baseUrl: 'http://api',
+			fetchFn,
+			allow: [401, 404]
+		});
+		expect(response.status).toBe(404);
+	});
+});
 
 describe('fetchTables', () => {
 	it('unwraps the tables list from the base url', async () => {
