@@ -22,7 +22,6 @@ shared-memory buffers (as `ml.vec_env`). Both give identical arrays for the same
 
 from __future__ import annotations
 
-import itertools
 import random
 import traceback
 from collections.abc import Callable
@@ -46,7 +45,7 @@ from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.env import HandEnv
 from ml.generate_aux import _label_row, _unseen, shanten_labels
-from ml.mp import mp_context
+from ml.mp import WorkerPool
 from ml.vec_env import episode_seed
 
 __all__ = [
@@ -500,26 +499,11 @@ class SubprocVecTrainEnv:
     """`VecTrainEnv`'s API over `n_workers` processes. Use as a context manager or `close()`."""
 
     def __init__(self, n_envs: int, base_seed: int, cfg: EnvConfig, *, n_workers: int) -> None:
-        if not 1 <= n_workers <= n_envs:
-            raise ValueError(f"n_workers must be in 1..{n_envs}, got {n_workers}")
+        self._pool = WorkerPool(n_envs, n_workers)
         self.num_envs = n_envs
-        ctx = mp_context()
-        raw = _shared(ctx, n_envs)
+        raw = _shared(self._pool.ctx, n_envs)
         self.buf, self._actions = _views(raw, n_envs)
-        bounds = np.linspace(0, n_envs, n_workers + 1).astype(int)
-        self._conns: list[Connection] = []
-        self._procs = []
-        for lo, hi in itertools.pairwise(bounds):
-            parent, child = ctx.Pipe()
-            proc = ctx.Process(
-                target=_worker,
-                args=(child, int(lo), int(hi), n_envs, raw, base_seed, cfg.to_dict()),
-                daemon=True,
-            )
-            proc.start()
-            child.close()
-            self._conns.append(parent)
-            self._procs.append(proc)
+        self._pool.start(_worker, n_envs, raw, base_seed, cfg.to_dict())
 
     def configure(self, cfg: EnvConfig) -> None:
         self._broadcast("configure", cfg.to_dict())
@@ -534,15 +518,7 @@ class SubprocVecTrainEnv:
         return self.buf
 
     def close(self) -> None:
-        for conn in self._conns:
-            try:
-                conn.send(("close", None))
-            except (BrokenPipeError, OSError):
-                pass
-        for proc in self._procs:
-            proc.join(timeout=5)
-        self._conns = []
-        self._procs = []
+        self._pool.close(("close", None))
 
     def __enter__(self) -> Self:
         return self
@@ -551,11 +527,7 @@ class SubprocVecTrainEnv:
         self.close()
 
     def _broadcast(self, cmd: str, arg: object = None) -> None:
-        for conn in self._conns:
-            conn.send((cmd, arg))
-        errors = [p for status, p in (c.recv() for c in self._conns) if status == "err"]
-        if errors:
-            raise RuntimeError("train env worker failed:\n" + "\n".join(errors))
+        self._pool.broadcast((cmd, arg), "train env")
 
 
 def with_min_faan(cfg: EnvConfig, min_faan: int) -> EnvConfig:
