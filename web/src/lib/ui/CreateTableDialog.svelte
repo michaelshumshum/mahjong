@@ -254,22 +254,11 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
-	@use '$lib/styles/layout';
+	@use '$lib/styles/forms';
 
 	.create-dialog {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-		width: min(90vw, 32rem);
+		@include forms.dialog-panel(32rem, $landscape-compact: true);
 		max-height: calc(100dvh - var(--space-6));
-		padding: var(--space-5);
-		background: var(--color-surface-raised);
-		@include buttons.panel-elevated;
-
-		@include layout.phone-landscape {
-			gap: var(--space-2);
-			padding: var(--space-3) var(--space-4) var(--space-2);
-		}
 	}
 
 	// fixed height so switching rule tabs never resizes the dialog
@@ -308,11 +297,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
-		flex: 1 1 auto;
-		min-height: 0;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		margin-inline: calc(-1 * var(--space-2));
+		@include forms.dialog-scroll-body;
 		padding-inline: var(--space-2);
 	}
 
@@ -359,11 +344,7 @@
 	}
 
 	.create-actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: var(--space-3);
-		padding-top: var(--space-3);
-		border-top: 1px solid var(--color-border);
+		@include forms.dialog-actions($divided: true);
 
 		button {
 			@include buttons.btn-base(var(--space-4));
