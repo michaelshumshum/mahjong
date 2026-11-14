@@ -1639,6 +1639,7 @@ src/lib/styles/
                     dialog-actions, labelled-input
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
+  _learn.scss       lesson-table/-meta/-solved, shared by PuzzlePage and TutorialPage
   _layout.scss      seat-region grid, breakpoint mixins, seat-compass-grid (four seats
                     around a mini felt) and seat-ring (the pre-game `.seat-ring*` rules)
   _a11y.scss        mixins only: focus-ring, sr-only, motion-ok/motion-reduced (§9), and

@@ -340,6 +340,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
+	@use '$lib/styles/learn';
 
 	.tutorial-page {
 		display: grid;
@@ -397,51 +398,15 @@
 	}
 
 	.meta {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-		margin: 0;
-		color: var(--color-text-muted);
-		font-size: var(--font-size-sm);
+		@include learn.lesson-meta;
 	}
 
 	.solved {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-1);
-		color: var(--color-positive);
+		@include learn.lesson-solved;
 	}
 
 	.tutorial-table {
-		grid-area: table;
-		min-width: 0;
-
-		// no toolbar rail above it here, so the rim closes on every side.
-		:global(.table-surface) {
-			border-radius: var(--radius-lg);
-		}
-
-		@include layout.tablet-up {
-			height: min(80dvh, 56rem);
-
-			:global(.table-surface) {
-				border-top-width: 10px;
-			}
-		}
-
-		@include layout.desktop-up {
-			height: auto;
-			min-height: 0;
-		}
-
-		@include layout.phone-only {
-			display: flex;
-			flex-direction: column;
-		}
-
-		@include layout.phone-landscape {
-			height: 100dvh;
-		}
+		@include learn.lesson-table;
 	}
 
 	.practice-error {
