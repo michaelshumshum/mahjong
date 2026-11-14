@@ -21,38 +21,12 @@ from mahjong_core.melds import MeldKind
 from mahjong_core.state import Phase
 from mahjong_core.tiles import TileType, tile_ids_for_type
 from tests.game_state import with_seat
+from tests.hands import JUNK_HAND
 
 _MAN_4 = tile_ids_for_type(TileType.MAN_4)
 _MAN_5 = tile_ids_for_type(TileType.MAN_5)
 _MAN_6 = tile_ids_for_type(TileType.MAN_6)
-_SOU_2 = tile_ids_for_type(TileType.SOU_2)
-_SOU_4 = tile_ids_for_type(TileType.SOU_4)
-_SOU_6 = tile_ids_for_type(TileType.SOU_6)
 _SOU_8 = tile_ids_for_type(TileType.SOU_8)
-_SOUTH = tile_ids_for_type(TileType.WIND_SOUTH)
-_WEST = tile_ids_for_type(TileType.WIND_WEST)
-_NORTH = tile_ids_for_type(TileType.WIND_NORTH)
-_RED = tile_ids_for_type(TileType.DRAGON_RED)
-_GREEN = tile_ids_for_type(TileType.DRAGON_GREEN)
-_WHITE = tile_ids_for_type(TileType.DRAGON_WHITE)
-
-# 13 junk tiles, confined to sou-evens + honors so they never collide with the man4/5/6 tiles
-# every test below discards/claims -- same fixture test_engine.py's `_claims_window_state` uses.
-_JUNK_HAND = (
-    _SOU_2[0],
-    _SOU_4[0],
-    _SOU_6[0],
-    _SOU_8[0],
-    _SOU_2[1],
-    _SOU_4[1],
-    _SOU_6[1],
-    _SOUTH[0],
-    _WEST[0],
-    _NORTH[0],
-    _RED[0],
-    _GREEN[0],
-    _WHITE[0],
-)
 
 
 def _pre_discard_table(ruleset: RuleSet, *, game_seed: int = 1) -> Table:
@@ -61,10 +35,10 @@ def _pre_discard_table(ruleset: RuleSet, *, game_seed: int = 1) -> Table:
     table = Table("table-claims", ruleset, game_seed=game_seed)
     state = new_game(ruleset, game_seed=game_seed)
     state = dataclasses.replace(state, phase=Phase.AWAIT_ACTION, turn=0, claim_window=None)
-    state = with_seat(state, 0, concealed=(*_JUNK_HAND, _MAN_5[0]), discards=())
-    state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *_JUNK_HAND[:11]))
-    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *_JUNK_HAND[:11]))
-    state = with_seat(state, 3, concealed=_JUNK_HAND)
+    state = with_seat(state, 0, concealed=(*JUNK_HAND, _MAN_5[0]), discards=())
+    state = with_seat(state, 1, concealed=(_MAN_4[0], _MAN_6[0], *JUNK_HAND[:11]))
+    state = with_seat(state, 2, concealed=(_MAN_5[1], _MAN_5[2], *JUNK_HAND[:11]))
+    state = with_seat(state, 3, concealed=JUNK_HAND)
     table.state = state
     return table
 
@@ -129,8 +103,8 @@ async def test_no_claim_deadline_armed_when_a_discard_draws_no_claims() -> None:
     ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=5)
     table = _pre_discard_table(ruleset)
     # nobody can claim a tile nobody holds a match for
-    table.state = with_seat(table.state, 0, concealed=(*_JUNK_HAND, _SOU_8[2]), discards=())
-    table.state = with_seat(table.state, 2, concealed=_JUNK_HAND)
+    table.state = with_seat(table.state, 0, concealed=(*JUNK_HAND, _SOU_8[2]), discards=())
+    table.state = with_seat(table.state, 2, concealed=JUNK_HAND)
     table.submit(0, Discard(tile_id=_SOU_8[2]))
     await table.process_one()
 
@@ -377,8 +351,8 @@ async def test_state_sync_after_a_claim_holds_no_drawn_tile() -> None:
 async def test_state_sync_after_a_draw_names_the_drawn_tile_to_its_seat_only() -> None:
     ruleset = dataclasses.replace(DEFAULT_RULESET, claim_seconds=5)
     table = _pre_discard_table(ruleset)
-    table.state = with_seat(table.state, 0, concealed=(*_JUNK_HAND, _SOU_8[2]), discards=())
-    table.state = with_seat(table.state, 2, concealed=_JUNK_HAND)
+    table.state = with_seat(table.state, 0, concealed=(*JUNK_HAND, _SOU_8[2]), discards=())
+    table.state = with_seat(table.state, 2, concealed=JUNK_HAND)
     table.submit(0, Discard(tile_id=_SOU_8[2]))
     await table.process_one()
     assert table.state.phase == Phase.AWAIT_ACTION
