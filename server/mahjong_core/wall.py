@@ -17,6 +17,7 @@ import random
 from dataclasses import dataclass
 
 from mahjong_core.config import RuleSet
+from mahjong_core.seats import N_SEATS
 from mahjong_core.tiles import (
     N_FLOWERS,
     TOTAL_PHYSICAL_TILES,
@@ -46,8 +47,9 @@ Hands = tuple[_SeatTiles, _SeatTiles, _SeatTiles, _SeatTiles]
 _SeatFlowers = tuple[Flower, ...]
 SetAsideFlowers = tuple[_SeatFlowers, _SeatFlowers, _SeatFlowers, _SeatFlowers]
 
-_SEATS = 4
 DEALT_HAND_SIZE = 13
+HAND_SIZE = DEALT_HAND_SIZE + 1
+"""A complete hand: the dealt tiles plus the one drawn or claimed to win, kongs not counted."""
 
 
 def _physical_tiles(ruleset: RuleSet) -> list[WallTile]:
@@ -90,14 +92,14 @@ def deal_hands(wall: Wall, dealer_seat: int) -> tuple[Hands, Wall]:
     """13 tiles to each seat, 14 to the dealer: seat order starting from the dealer, three
     rounds of four tiles then a round of one, mirroring the physical deal, then the dealer
     draws one further tile. All from the front of the wall."""
-    if not 0 <= dealer_seat < _SEATS:
-        raise ValueError(f"dealer_seat must be 0..{_SEATS - 1}, got {dealer_seat}")
-    needed = DEALT_HAND_SIZE * _SEATS + 1
+    if not 0 <= dealer_seat < N_SEATS:
+        raise ValueError(f"dealer_seat must be 0..{N_SEATS - 1}, got {dealer_seat}")
+    needed = DEALT_HAND_SIZE * N_SEATS + 1
     if len(wall.tiles) < needed:
         raise ValueError(f"wall has {len(wall.tiles)} tiles, need at least {needed} to deal")
 
-    order = [(dealer_seat + i) % _SEATS for i in range(_SEATS)]
-    hands: list[list[WallTile]] = [[] for _ in range(_SEATS)]
+    order = [(dealer_seat + i) % N_SEATS for i in range(N_SEATS)]
+    hands: list[list[WallTile]] = [[] for _ in range(N_SEATS)]
     tiles = list(wall.tiles)
     idx = 0
     for _ in range(3):
@@ -126,13 +128,13 @@ def replace_flowers(
     flower it holds and draws a replacement from the back of the wall, one at a time, chaining
     if the replacement is itself a flower. Resolves one seat completely before the next
     (order changes who gets which tile) rather than round-robin."""
-    if not 0 <= dealer_seat < _SEATS:
-        raise ValueError(f"dealer_seat must be 0..{_SEATS - 1}, got {dealer_seat}")
+    if not 0 <= dealer_seat < N_SEATS:
+        raise ValueError(f"dealer_seat must be 0..{N_SEATS - 1}, got {dealer_seat}")
 
     seat_hands: list[list[WallTile]] = [list(h) for h in hands]
-    set_aside: list[list[Flower]] = [[] for _ in range(_SEATS)]
+    set_aside: list[list[Flower]] = [[] for _ in range(N_SEATS)]
     tiles = list(wall.tiles)
-    order = [(dealer_seat + i) % _SEATS for i in range(_SEATS)]
+    order = [(dealer_seat + i) % N_SEATS for i in range(N_SEATS)]
 
     for seat in order:
         while True:
@@ -179,6 +181,6 @@ def max_turns_per_seat(ruleset: RuleSet) -> int:
     `RuleSet` rather than a simulation.
     """
     total = TOTAL_PHYSICAL_TILES - (0 if ruleset.flowers_enabled else N_FLOWERS)
-    dealt = DEALT_HAND_SIZE * _SEATS + 1
+    dealt = DEALT_HAND_SIZE * N_SEATS + 1
     available = total - dealt - ruleset.wall_reserve
-    return max(available, 0) // _SEATS
+    return max(available, 0) // N_SEATS

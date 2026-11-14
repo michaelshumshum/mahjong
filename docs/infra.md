@@ -20,6 +20,7 @@ mahjong/
 │   ├── pyproject.toml, uv.lock, Dockerfile, alembic/
 │   ├── mahjong_core/           # PURE. no asyncio, no I/O, no deps beyond stdlib
 │   │   ├── tiles.py            # TileType/TileId, geometry constants, 34-array helpers, parsing
+│   │   ├── seats.py            # N_SEATS, validate_seat (import-free, below wall/melds/state)
 │   │   ├── wall.py             # seeded shuffle, dice, draw front/back, flower replacement
 │   │   ├── melds.py            # meld types, legality, decomposition
 │   │   ├── shanten.py          # standard / seven pairs / thirteen orphans + ukeire
@@ -382,7 +383,7 @@ production code on purpose.
 
 | Target | Config | Scope | Threshold (duplicated lines) |
 | --- | --- | --- | --- |
-| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, and top-level `data/`, `runs/`, `checkpoints/` | 1.1% |
+| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, and top-level `data/`, `runs/`, `checkpoints/` | 1.0% |
 | `make dup-web` | `web/.jscpd.json` | `web/src` (ts, js, svelte, scss, css) minus specs/e2e, `.d.ts`, generated | 0.65% |
 
 jscpd exits non-zero once the duplicated-line percentage exceeds `threshold`. Each threshold sits

@@ -59,8 +59,10 @@ from bots.labels import is_tenpai, seat_hand34
 from bots.tiers import BOT_TIERS, BotTier
 from bots.worker import compute_action
 from mahjong_core.actions import can_declare_win
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.engine import ENGINE_VERSION, new_game, reduce, start_next_hand
 from mahjong_core.ml import DISCARD_BASE, decode_action, legal_mask
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, Phase
 from mahjong_core.tiles import (
@@ -391,9 +393,9 @@ class _Miner:
         closed = not state.seats[turn].melds
         if shanten(hand34, closed=closed, hand_sets=state.ruleset.hand_sets) <= MAX_SHANTEN:
             self.best_discard(state, src, seed)
-        if any(is_tenpai(state, s) for s in range(4) if s != turn):
+        if any(is_tenpai(state, s) for s in range(N_SEATS) if s != turn):
             self.safe_discard(state, src, seed)
-        for s in range(4):
+        for s in range(N_SEATS):
             if s != turn and is_tenpai(state, s):
                 self.winning_tiles(state, Source(self.game_seed, decision, s), seed)
 
@@ -459,11 +461,11 @@ def _turns(seed: int, tier: str) -> Iterator[tuple[int, GameState, GameState]]:
             continue
         window = state.claim_window
         if window is not None:
-            seat = min(o.seat for o in window.offers if o.seat not in window.responses)
+            seat = min(pending_claim_seats(state))
         else:
             seat = state.turn
         mask = legal_mask(state, seat)
-        aid = compute_action(seat_view(state, seat), mask, seed * 4 + seat, tier, NO_DEADLINE)
+        aid = compute_action(seat_view(state, seat), mask, seed * N_SEATS + seat, tier, NO_DEADLINE)
         after, _ = reduce(state, decode_action(aid, state, seat))
         yield decision, state, after
         state = after

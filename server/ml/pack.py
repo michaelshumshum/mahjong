@@ -19,6 +19,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from mahjong_core.seats import N_SEATS
 from mahjong_core.tiles import N_TILE_TYPES
 from ml.encode import MAX_DISCARDS, PAD
 from ml.generate_dataset import SCHEMA_VERSION
@@ -57,12 +58,12 @@ def _padded_seq(col: pa.ChunkedArray, n: int, max_len: int) -> np.ndarray:
     if lengths.max(initial=0) > max_len:
         raise ValueError(f"discard pool of {lengths.max()} exceeds max_discards={max_len}")
     values = inner.flatten().to_numpy(zero_copy_only=False)
-    out = np.full((n * 4, max_len), PAD, dtype=np.uint8)
+    out = np.full((n * N_SEATS, max_len), PAD, dtype=np.uint8)
     starts = np.cumsum(lengths) - lengths
     rows = np.repeat(np.arange(len(lengths)), lengths)
     cols = np.arange(len(values)) - np.repeat(starts, lengths)
     out[rows, cols] = values
-    return out.reshape(n, 4, max_len)
+    return out.reshape(n, N_SEATS, max_len)
 
 
 def pack_dataset(
@@ -84,7 +85,7 @@ def pack_dataset(
     shapes: dict[str, tuple[int, ...]] = {
         **{k: (total, *v) for k, v in _FIELDS.items()},
         **{k: (total,) for k in _SCALARS},
-        "discard_seq": (total, 4, max_discards),
+        "discard_seq": (total, N_SEATS, max_discards),
         "game_seed": (total,),
         "split": (total,),
     }

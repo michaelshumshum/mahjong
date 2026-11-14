@@ -20,8 +20,7 @@ from mahjong_core.scoring.patterns import ScoringContext
 from mahjong_core.scoring.payout import points
 from mahjong_core.state import Wind
 from mahjong_core.tiles import Flower, TileId, TileType, assign_tile_ids
-
-HAND_SIZE = 14
+from mahjong_core.wall import HAND_SIZE
 
 # any other seat: scoring reads only whether a meld was claimed, never from whom
 _CLAIMED_FROM = 1

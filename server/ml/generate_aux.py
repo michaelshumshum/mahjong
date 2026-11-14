@@ -35,13 +35,15 @@ import numpy as np
 from app.views import seat_view
 from bots.base import GAME_STEP_CAP, NO_DEADLINE, Bot
 from bots.labels import danger_labels_for_opponents, seat_hand34
+from mahjong_core.claims import pending_claim_seats
 from mahjong_core.config import RuleSet
 from mahjong_core.engine import new_game, reduce, start_next_hand
 from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
+from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from mahjong_core.tiles import N_TILE_TYPES
+from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
 from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.generate_dataset import _make_bots, _shuffled_roster
@@ -82,7 +84,7 @@ def shanten_labels(state: GameState, seat: int, unseen: np.ndarray) -> tuple[lis
     hand = seat_hand34(seat_state)
     concealed = [0] * N_TILE_TYPES
     for t in seat_state.concealed:
-        concealed[t // 4] += 1
+        concealed[tile_id_type(t)] += 1
     closed = not seat_state.melds
     sets = state.ruleset.hand_sets
     sh_out, uk_out = [PAD] * N_TILE_TYPES, [0] * N_TILE_TYPES
@@ -113,7 +115,7 @@ def _unseen(row: dict[str, np.ndarray]) -> np.ndarray:
 
 def _label_row(state: GameState, seat: int) -> dict[str, object]:
     labels = danger_labels_for_opponents(state, seat)
-    opps = [(seat + r) % 4 for r in (1, 2, 3)]
+    opps = [(seat + r) % N_SEATS for r in (1, 2, 3)]
     wait = np.zeros((3, N_TILE_TYPES), dtype=np.uint8)
     for i, o in enumerate(opps):
         wait[i, list(labels[o].winning_tiles)] = 1
@@ -149,9 +151,7 @@ async def _play(
             state, _ = start_next_hand(state)
             continue
         if state.phase in (Phase.AWAIT_CLAIMS, Phase.AWAIT_KONG_ROB):
-            assert state.claim_window is not None
-            window = state.claim_window
-            seat = rng.choice([o.seat for o in window.offers if o.seat not in window.responses])
+            seat = rng.choice(pending_claim_seats(state))
         else:
             seat = state.turn
         mask = legal_mask(state, seat)

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from itertools import combinations_with_replacement
 
+from mahjong_core.seats import N_SEATS
 from mahjong_core.tiles import (
     COPIES_PER_TYPE,
     N_SUITED_TYPES,
@@ -80,8 +81,8 @@ class Meld:
             raise ValueError(f"{self.kind} needs identical tile types, got {types}")
 
         if self.from_seat is not None:
-            if not 0 <= self.from_seat < 4:
-                raise ValueError(f"from_seat must be 0..3, got {self.from_seat}")
+            if not 0 <= self.from_seat < N_SEATS:
+                raise ValueError(f"from_seat must be 0..{N_SEATS - 1}, got {self.from_seat}")
             if self.kind in (MeldKind.CONCEALED_KONG, MeldKind.PAIR):
                 raise ValueError(f"{self.kind} cannot have a from_seat (never claimed)")
 
@@ -117,8 +118,8 @@ def legal_claims(
     kong-vs-pung tiebreak is about two different players claiming the same discard, not about
     restricting one player's own choice.
     """
-    if not 0 <= discarder_seat < 4 or not 0 <= claimer_seat < 4:
-        raise ValueError("seats must be 0..3")
+    if not 0 <= discarder_seat < N_SEATS or not 0 <= claimer_seat < N_SEATS:
+        raise ValueError(f"seats must be 0..{N_SEATS - 1}")
     if discarder_seat == claimer_seat:
         raise ValueError("a seat cannot claim its own discard")
 
@@ -134,7 +135,7 @@ def legal_claims(
         claims.append(
             Meld(MeldKind.PUNG, (*matching[:2], discarded_tile), from_seat=discarder_seat)
         )
-    if claimer_seat == (discarder_seat + 1) % 4:
+    if claimer_seat == (discarder_seat + 1) % N_SEATS:
         claims.extend(_chow_options(concealed, discarded_tile, discarder_seat))
     return tuple(claims)
 
@@ -318,8 +319,8 @@ def _is_standard_shape(counts: Sequence[int]) -> bool:
     """`decompose(tiles) != ()` for the 34-array `counts` of `tiles`, without building any
     melds: each suit must be a complete shape and exactly one group may hold the pair."""
     pairs = 0
-    for base in (0, 9, 18):
-        has_pair = _SUIT_SHAPES.get(tuple(counts[base : base + 9]))
+    for base in range(0, N_SUITED_TYPES, RANKS_PER_SUIT):
+        has_pair = _SUIT_SHAPES.get(tuple(counts[base : base + RANKS_PER_SUIT]))
         if has_pair is None:
             return False
         pairs += has_pair

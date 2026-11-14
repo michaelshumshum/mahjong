@@ -18,8 +18,10 @@ from typing import Any, Literal
 from mahjong_core.melds import Meld, MeldKind, _is_standard_shape, legal_self_melds
 from mahjong_core.scoring.faan import score_winning_hand, seven_pairs_enabled
 from mahjong_core.scoring.patterns import ScoringContext, seat_wind_for
-from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState, validate_seat
+from mahjong_core.seats import validate_seat
+from mahjong_core.state import ClaimWindow, GameState, Phase, SeatState
 from mahjong_core.tiles import N_TILE_TYPES, ORPHAN_INDICES, ORPHAN_TYPES, TileId, tile_id_type
+from mahjong_core.wall import HAND_SIZE
 
 
 class ActionKind(StrEnum):
@@ -167,7 +169,7 @@ Action = (
 def _is_seven_pairs(concealed: Sequence[TileId]) -> bool:
     """Seven pairs (七對子): 14 concealed tiles as 7 *distinct* pairs. Shape only — whether it
     scores depends on the table's `hand_sets`/`faan_overrides`."""
-    if len(concealed) != 14:
+    if len(concealed) != HAND_SIZE:
         return False
     counts = Counter(tile_id_type(t) for t in concealed)
     return len(counts) == 7 and all(c == 2 for c in counts.values())
@@ -176,7 +178,7 @@ def _is_seven_pairs(concealed: Sequence[TileId]) -> bool:
 def _is_thirteen_orphans(concealed: Sequence[TileId]) -> bool:
     """Thirteen orphans (十三么): all 13 terminal/honor types present at least once among 14
     concealed tiles (the 14th is necessarily a duplicate of one of them)."""
-    if len(concealed) != 14:
+    if len(concealed) != HAND_SIZE:
         return False
     return {tile_id_type(t) for t in concealed} == ORPHAN_TYPES
 
@@ -199,10 +201,13 @@ def _is_winning_shape(
     counts = [0] * N_TILE_TYPES
     for t in concealed:
         counts[tile_id_type(t)] += 1
-    if closed and len(concealed) == 14:
+    if closed and len(concealed) == HAND_SIZE:
         if seven_pairs and all(c == 0 or c == 2 for c in counts):
             return True
-        if all(counts[i] for i in ORPHAN_INDICES) and sum(counts[i] for i in ORPHAN_INDICES) == 14:
+        if (
+            all(counts[i] for i in ORPHAN_INDICES)
+            and sum(counts[i] for i in ORPHAN_INDICES) == HAND_SIZE
+        ):
             return True
     return _is_standard_shape(counts)
 
