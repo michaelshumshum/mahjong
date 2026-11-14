@@ -173,6 +173,7 @@ Native equivalents of the Docker targets:
 | `make bench-latency` | `cd server && LATENCY_BUDGET_MS=5 uv run pytest -q -s -m latency -p no:xdist` |
 | `make test-web` | `pnpm --dir web test` |
 | `make migrate` | `cd server && uv run alembic upgrade head` (with `DATABASE_URL`) |
+| `make dup` / `dup-server` / `dup-web` | already native (no container): `cd server && npx --yes jscpd@4.3.0`, `cd web && npx --yes jscpd@4.3.0`; see §9 "Duplication gate" |
 | `make proto` | `cd server && uv run python -m tools.gen_protocol --ts-out ../web/src/lib/net/protocol.d.ts --schema-out ../shared/protocol.schema.json && uv run python -m tools.gen_lessons`, then `pnpm --dir web exec oxfmt src/lib/net/protocol.d.ts src/lib/net/protocol.assertNever.ts src/lib/net/protocol.constants.ts src/lib/learn/generated` |
 
 ## 3. Process model
@@ -357,8 +358,8 @@ before real users:
 
 ## 9. CI
 
-`.github/workflows/ci.yml` triggers on push and PR to `main` and calls three **reusable workflows**
-(`workflow_call`):
+`.github/workflows/ci.yml` triggers on push and PR to `main`, runs `compose-config` and `dup`
+inline, and calls three **reusable workflows** (`workflow_call`):
 
 | File | Jobs | Runs |
 | --- | --- | --- |
@@ -371,6 +372,22 @@ docker-compose.prod.yml config --quiet` with placeholder values for the prod ove
 vars. The prod box deploys any `main` commit this workflow passes (§7), and an overlay Compose
 can't parse (e.g. a duplicate `environment:` key) otherwise only fails at deploy time; unlike
 `docker-build.yml` it runs on every push.
+
+**Duplication gate.** `ci.yml`'s inline `dup` job runs `make dup` (setup-node only, no install):
+[jscpd](https://github.com/kucherenko/jscpd), pinned by `JSCPD_VERSION` in the `Makefile` and
+fetched by `npx`, so no devDependency. Production code only — tests, specs, `.d.ts`, generated
+output (`paraglide/`, `learn/generated/`) and ML data dirs are ignored.
+
+| Target | Config | Scope | Threshold (duplicated lines) |
+| --- | --- | --- | --- |
+| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, `data/`, `runs/`, `checkpoints/` | 1.1% |
+| `make dup-web` | `web/.jscpd.json` | `web/src` (ts, js, svelte, scss, css) minus specs/e2e, `.d.ts`, generated | 0.65% |
+
+jscpd exits non-zero once the duplicated-line percentage exceeds `threshold`. Each threshold sits
+just above the measured value (server 1.06%, web 0.59% at introduction): a refactor that removes
+duplication lowers its threshold in the same change, so the gate ratchets down and never up
+without a reason in review. The Makefile runs it natively rather than in Compose, since it needs
+both trees and the `web` service mounts only `web/`.
 
 All jobs run in parallel with no `needs:` — they share no artifacts. `server-slow` is its own job
 so it stays off the fast job's critical path. Within a job, lint/typecheck/test are sequential
@@ -431,7 +448,7 @@ badges silently stale.
 **Gates** (all hard): `ruff check`, `ruff format --check`, fast pytest, slow pytest
 (`--games=1000`; latency as ratios, the absolute 5 ms budget is `make bench-latency` on the target
 CPU, [testing.md §1](testing.md)), `pnpm lint` (oxlint + oxfmt), `pnpm check` (svelte-check), vitest, Playwright,
-`proto-check`, the `migrations` round trip.
+`proto-check`, the `migrations` round trip, `make dup`.
 
 **Local vs. CI.** `make test*` runs the fast suite only; the slow suite (`@pytest.mark.slow`) costs
 ~15 min at 10,000 games, so it runs locally via `make test-server-slow` and on every push in CI

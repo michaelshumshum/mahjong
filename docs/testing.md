@@ -17,6 +17,7 @@ gotchas that don't belong inline in `web/AGENTS.md` or `server/AGENTS.md`.
 | Protocol | `proto-check` CI job: regenerated TS must match committed TS ([infra.md §9](infra.md)). |
 | Client | Vitest on the pure reducer and components (§2); Playwright e2e for full flows, including a live game against bots (`web/src/routes/table/[id]/live.e2e.ts`). |
 | Bots | Arena paired-difference merge gate ([bots.md §7](bots.md)). |
+| Duplication | `make dup` (jscpd, production code only, tests excluded) fails above a per-side threshold; CI's `dup` job ([infra.md §9](infra.md) "Duplication gate"). A refactor that removes duplication lowers the threshold with it. |
 | Load | Not built. Target: replay bot sessions as real WS clients, 200 concurrent tables on one node. |
 
 **Fast vs. slow.** `@pytest.mark.slow` marks soaks, the real-bot `ProcessPoolExecutor`
