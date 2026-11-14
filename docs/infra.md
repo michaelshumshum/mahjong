@@ -383,7 +383,7 @@ production code on purpose.
 
 | Target | Config | Scope | Threshold (duplicated lines) |
 | --- | --- | --- | --- |
-| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, and top-level `data/`, `runs/`, `checkpoints/` | 1.1% |
+| `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, and top-level `data/`, `runs/`, `checkpoints/` | 1.0% |
 | `make dup-web` | `web/.jscpd.json` | `web/src` (ts, js, svelte, scss, css) minus specs/e2e, `.d.ts`, generated | 0.65% |
 
 jscpd exits non-zero once the duplicated-line percentage exceeds `threshold`. Each threshold sits
