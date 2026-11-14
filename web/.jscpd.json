@@ -13,5 +13,5 @@
 		"**/*.e2e.ts"
 	],
 	"reporters": ["console"],
-	"threshold": 0.65
+	"threshold": 0.55
 }

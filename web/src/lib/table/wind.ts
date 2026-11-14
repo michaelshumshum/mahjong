@@ -1,4 +1,4 @@
-import type { Seat, Wind } from '$lib/game/types';
+import { ALL_SEATS, type Seat, type Wind } from '$lib/game/types';
 import { getLocale } from '$lib/paraglide/runtime.js';
 import type { SeatView } from './view-types';
 
@@ -20,22 +20,44 @@ export const WIND_CHAR: Record<Wind, string> = {
 	N: '北'
 };
 
-// (seat - you) mod 4, clockwise from you: 0 self, 1 right, 2 across, 3 left.
-export function relativeSeat(seat: Seat, you: Seat): 0 | 1 | 2 | 3 {
-	return ((seat - you + 4) % 4) as 0 | 1 | 2 | 3;
+// table positions clockwise from you, in seat-index order.
+export const SEAT_POSITIONS = ['self', 'right', 'across', 'left'] as const;
+export type SeatPosition = (typeof SEAT_POSITIONS)[number];
+
+// (seat - from) wrapped into 0..3: clockwise steps from `from` to `seat`.
+function seatOffset(seat: number, from: number): number {
+	return (seat - from + ALL_SEATS.length) % ALL_SEATS.length;
+}
+
+export function relativeSeat(seat: Seat, you: Seat): SeatPosition {
+	return SEAT_POSITIONS[seatOffset(seat, you)];
+}
+
+export function seatFromPosition(you: Seat, position: SeatPosition): Seat {
+	return ALL_SEATS[seatOffset(you, -SEAT_POSITIONS.indexOf(position))];
 }
 
 export function seatAtPosition(
 	seats: readonly SeatView[],
 	you: Seat,
-	position: 0 | 1 | 2 | 3
+	position: SeatPosition
 ): SeatView {
-	return seats.find((s) => relativeSeat(s.seat, you) === position)!;
+	const seat = seatFromPosition(you, position);
+	return seats.find((s) => s.seat === seat)!;
 }
 
-// dealer holds East for the current hand, remaining seats follow clockwise in seat-index space.
+// index into SEAT_WINDS: dealer holds East, remaining seats follow clockwise in seat-index space.
+export function seatWindIndex(seat: Seat, dealer: Seat): number {
+	return seatOffset(seat, dealer);
+}
+
 export function seatWind(seat: Seat, dealer: Seat): Wind {
-	return SEAT_WINDS[(seat - dealer + 4) % 4];
+	return SEAT_WINDS[seatWindIndex(seat, dealer)];
+}
+
+// the wind at `position` when the viewer's own wind is SEAT_WINDS[selfWindIndex].
+export function windAtPosition(position: SeatPosition, selfWindIndex: number): Wind {
+	return SEAT_WINDS[seatOffset(selfWindIndex, -SEAT_POSITIONS.indexOf(position))];
 }
 
 // full-sentence spots need a real word, not a bare glyph -- but in zh-Hant that's WIND_CHAR

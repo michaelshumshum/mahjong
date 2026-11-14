@@ -1,5 +1,5 @@
 import type { Band } from '$lib/learn/generated/lessons';
-import { apiBaseUrl } from './lobby';
+import { apiBaseUrl, apiRequest } from './lobby';
 
 // hand-written like account.ts (docs/protocol.md §10 "Accounts"). server: app/api_models.py's
 // LessonProgressIn/Out, EndlessScoreIn/Out, LearnResponse, LearnImport, PrefsPatch.
@@ -33,31 +33,11 @@ export interface LearnImportWire {
 	prefs: LearnPrefsWire;
 }
 
-const WITH_SESSION: RequestInit = { credentials: 'include' };
-
-async function send(
-	path: string,
-	method: string,
-	body: unknown,
-	baseUrl: string,
-	fetchFn: typeof fetch
-): Promise<Response> {
-	const response = await fetchFn(`${baseUrl}${path}`, {
-		...WITH_SESSION,
-		method,
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-	if (!response.ok) throw new Error(`${method} ${path} failed: ${response.status}`);
-	return response;
-}
-
 export async function fetchLearn(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<LearnWire> {
-	const response = await fetchFn(`${baseUrl}/me/learn`, WITH_SESSION);
-	if (!response.ok) throw new Error(`GET /me/learn failed: ${response.status}`);
+	const response = await apiRequest('GET', '/me/learn', { baseUrl, fetchFn, session: true });
 	return (await response.json()) as LearnWire;
 }
 
@@ -67,7 +47,12 @@ export async function putLesson(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	await send(`/me/learn/${encodeURIComponent(id)}`, 'PUT', entry, baseUrl, fetchFn);
+	await apiRequest('PUT', `/me/learn/${encodeURIComponent(id)}`, {
+		baseUrl,
+		fetchFn,
+		body: entry,
+		session: true
+	});
 }
 
 export async function putEndless(
@@ -76,7 +61,12 @@ export async function putEndless(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	await send(`/me/learn/endless/${kind}`, 'PUT', score, baseUrl, fetchFn);
+	await apiRequest('PUT', `/me/learn/endless/${kind}`, {
+		baseUrl,
+		fetchFn,
+		body: score,
+		session: true
+	});
 }
 
 /** `PATCH /me` with prefs only; the response (the `/me` body) isn't needed. */
@@ -85,7 +75,7 @@ export async function patchPrefs(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<void> {
-	await send('/me', 'PATCH', { prefs }, baseUrl, fetchFn);
+	await apiRequest('PATCH', '/me', { baseUrl, fetchFn, body: { prefs }, session: true });
 }
 
 /** The merged progress; throws on any failure, so the caller keeps its local copy. */
@@ -94,7 +84,11 @@ export async function importLearn(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<LearnWire> {
-	return (await (
-		await send('/me/learn/import', 'POST', body, baseUrl, fetchFn)
-	).json()) as LearnWire;
+	const response = await apiRequest('POST', '/me/learn/import', {
+		baseUrl,
+		fetchFn,
+		body,
+		session: true
+	});
+	return (await response.json()) as LearnWire;
 }

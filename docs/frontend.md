@@ -1342,7 +1342,7 @@ starts from `start` and goes through the same `viewFromClientState` → `TableSc
 
 "Practice vs Bots" opens `lib/ui/PracticeSetupDialog.svelte` before creating anything — bot tier is
 fixed at table construction. A seat ring with one tap-to-cycle difficulty pill per bot seat
-(seats 1-3, matching `wind.ts`'s `relativeSeat` offsets — the position names are
+(seats 1-3, matching `wind.ts`'s `SEAT_POSITIONS` order — the position names are
 aria-labels only, no visible captions; seat 0 is the
 human, shown as bold "You" text) around the same `CompassFelt` centerpiece as the pre-game
 rings and `/tables` cards,

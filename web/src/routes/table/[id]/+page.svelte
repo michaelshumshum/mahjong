@@ -374,7 +374,7 @@
 	// keyed by tile_id when live, so a reorder (or the drawn tile joining the hand) animates the
 	// same element; mock fixtures have no ids, so they key by position.
 	let ownHandTiles = $derived.by((): OwnHandTile[] => {
-		const seat0 = seatAtPosition(gameState.seats, gameState.you, 0);
+		const seat0 = seatAtPosition(gameState.seats, gameState.you, 'self');
 		const drawnId = live?.ownHand.drawnId ?? null;
 		const tiles: OwnHandTile[] = live
 			? arrangedConcealedIds.map((id) => ({
@@ -568,11 +568,8 @@
 	let scoreTotals: Totals = $derived(
 		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.score])) as Totals
 	);
-	let seatNames: Record<0 | 1 | 2 | 3, string> = $derived(
-		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.name])) as Record<
-			0 | 1 | 2 | 3,
-			string
-		>
+	let seatNames: Record<Seat, string> = $derived(
+		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.name])) as Record<Seat, string>
 	);
 	// this hand's per-round detail: undefined for a mock's synthesized row when the frozen
 	// scenario has no handResult, otherwise built off the same fields FaanBreakdown reads.
@@ -824,7 +821,7 @@
 				handNo={gameState.handNo}
 				handEndHoldMs={gameState.handEndHoldMs}
 				{seatNames}
-				winnerMelds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
+				winnerMelds={gameState.seats[gameState.handResult.winner as Seat].melds}
 				onDismiss={dismissHandEnd}
 				onPatternSelect={openGuide}
 			/>

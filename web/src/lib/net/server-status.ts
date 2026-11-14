@@ -1,4 +1,4 @@
-import { apiBaseUrl } from './lobby';
+import { apiBaseUrl, apiRequest } from './lobby';
 
 // hand-written like lobby.ts: GET /status is plain HTTP. server: app/api_models.py's StatusResponse.
 export type ServerStatus = 'ok' | 'degraded' | 'draining';
@@ -29,7 +29,6 @@ export async function fetchServerStatus(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<StatusResponse> {
-	const response = await fetchFn(`${baseUrl}/status`);
-	if (!response.ok) throw new Error(`GET /status failed: ${response.status}`);
+	const response = await apiRequest('GET', '/status', { baseUrl, fetchFn });
 	return (await response.json()) as StatusResponse;
 }

@@ -3,7 +3,15 @@
 
 import type { ClientGameState, MeldState } from '../game/state';
 import { tileIdToCode, type TileCode } from './tile-code';
-import type { ClaimOption, FaanPattern, MeldKind, Phase, Seat, Wind } from '$lib/game/types';
+import {
+	ALL_SEATS,
+	type ClaimOption,
+	type FaanPattern,
+	type MeldKind,
+	type Phase,
+	type Seat,
+	type Wind
+} from '$lib/game/types';
 import type { WindName } from '$lib/net/protocol';
 import type {
 	ClaimWindowView,
@@ -159,11 +167,11 @@ export function viewFromClientState(
 	const concealedCodes = ownHand.concealedIds.map(tileIdToCode);
 	const drawnCode = ownHand.drawnId !== null ? tileIdToCode(ownHand.drawnId) : null;
 
-	const seats = [0, 1, 2, 3].map((seat): SeatView => {
+	const seats = ALL_SEATS.map((seat): SeatView => {
 		const isYou = state.seat !== null && seat === you;
 		const openHand = state.hands?.[seat];
 		return {
-			seat: seat as Seat,
+			seat,
 			// isYou/Seat N fallback only covers the moment before a real name has arrived.
 			name: state.names[seat] ?? (isYou ? 'You' : `Seat ${seat}`),
 			concealedCount: state.concealedCounts[seat],

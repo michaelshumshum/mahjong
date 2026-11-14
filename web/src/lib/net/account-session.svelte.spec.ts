@@ -33,7 +33,10 @@ describe('AccountSession.load', () => {
 		const fetchFn = respond(200, ME);
 		const session = new AccountSession();
 		await session.load({ enabled: true, baseUrl: 'http://api', fetchFn });
-		expect(fetchFn).toHaveBeenCalledWith('http://api/me', { credentials: 'include' });
+		expect(fetchFn).toHaveBeenCalledWith('http://api/me', {
+			method: 'GET',
+			credentials: 'include'
+		});
 		expect(session.state).toEqual({ status: 'signedIn', user: ME });
 		expect(session.user).toEqual(ME);
 	});

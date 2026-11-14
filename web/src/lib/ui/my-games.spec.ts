@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { formatGameDate, formatScore, modeLabel, seatName } from './my-games';
+import { formatGameDate, modeLabel, seatName } from './my-games';
 
 describe('my games formatting', () => {
-	it('signs a score, zero unsigned', () => {
-		expect([40, 0, -30].map(formatScore)).toEqual(['+40', '0', '-30']);
-	});
-
 	it('labels both modes and leaves an unrecorded one out', () => {
 		expect(modeLabel('practice')).toBe('Practice');
 		expect(modeLabel('multiplayer')).toBe('Multiplayer');

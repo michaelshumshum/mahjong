@@ -4,9 +4,14 @@
 	import { sortTiles, type TileCode } from '../table/tile-code';
 	import { m } from '$lib/paraglide/messages.js';
 	import FaanPatternName from './FaanPatternName.svelte';
-	import type { FaanPattern, Payments, Seat, WinningMeld } from '$lib/game/types';
-
-	const ALL_SEATS: Seat[] = [0, 1, 2, 3];
+	import { formatSigned } from './score-format';
+	import {
+		ALL_SEATS,
+		type FaanPattern,
+		type Payments,
+		type Seat,
+		type WinningMeld
+	} from '$lib/game/types';
 
 	let {
 		winner,
@@ -120,7 +125,7 @@
 					class:payment-row--winner={seat === winner}
 				>
 					<span class="payment-seat">{seatNames[seat]}</span>
-					<span class="payment-amount">{amount > 0 ? '+' : ''}{amount}</span>
+					<span class="payment-amount">{formatSigned(amount)}</span>
 				</li>
 			{/each}
 		</ul>

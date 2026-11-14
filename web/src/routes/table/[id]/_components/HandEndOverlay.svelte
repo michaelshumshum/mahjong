@@ -4,6 +4,7 @@
 	import ModalDialog from '$lib/ui/ModalDialog.svelte';
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
 	import FairnessBadge from '$lib/ui/FairnessBadge.svelte';
+	import type { Seat } from '$lib/game/types';
 	import type { HandResultView, MeldView } from '$lib/table/view-types';
 	import { m } from '$lib/paraglide/messages.js';
 
@@ -19,7 +20,7 @@
 		handResult: HandResultView;
 		handNo: number;
 		handEndHoldMs: number | null;
-		seatNames: Record<0 | 1 | 2 | 3, string>;
+		seatNames: Record<Seat, string>;
 		winnerMelds: MeldView[];
 		onDismiss: () => void;
 		onPatternSelect?: (pattern: string) => void;
@@ -60,7 +61,7 @@
 		</header>
 		{#if handResult.outcome === 'win'}
 			<FaanBreakdown
-				winner={handResult.winner as 0 | 1 | 2 | 3}
+				winner={handResult.winner as Seat}
 				{seatNames}
 				winningHand={handResult.winningHand ?? []}
 				melds={winnerMelds}
