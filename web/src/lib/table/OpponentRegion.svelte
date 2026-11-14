@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TileFace from './TileFace.svelte';
-	import { meldTileFace } from './meld-face';
+	import MeldGroups from './MeldGroups.svelte';
 	import SeatPlate from './SeatPlate.svelte';
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
@@ -75,22 +75,11 @@
 			class:meld-row--empty={!seat.flowers.length && !seat.melds.length}
 			aria-label={m.opponentRegion_meldsAriaLabel({ name: seat.name })}
 		>
-			{#if seat.flowers.length}
-				<div class="meld" aria-label={m.opponentRegion_flowersAriaLabel({ name: seat.name })}>
-					{#each seat.flowers as code, i (i)}
-						<div class="mini-tile"><TileFace {code} /></div>
-					{/each}
-				</div>
-			{/if}
-			{#each seat.melds as meld, mi (mi)}
-				<div class="meld">
-					{#each meld.tiles as code, ti (ti)}
-						<div class="mini-tile">
-							<TileFace code={meldTileFace(meld.kind, code, ti, meld.tiles.length)} />
-						</div>
-					{/each}
-				</div>
-			{/each}
+			<MeldGroups
+				flowers={seat.flowers}
+				melds={seat.melds}
+				flowersLabel={m.opponentRegion_flowersAriaLabel({ name: seat.name })}
+			/>
 		</div>
 	</div>
 </section>
@@ -138,11 +127,6 @@
 		@include tile.mini-tile;
 	}
 
-	.meld {
-		@include tile.meld;
-		@include tile.meld-enter;
-	}
-
 	// the hand centres, melds stay at the seat's own left (inline start, which the strip rotates).
 	.meld-row {
 		@include tile.meld-row-reserved;
@@ -175,10 +159,10 @@
 		}
 	}
 
-	// same avoid-rotating-the-sized-box principle as the strip above, one level deeper: .mini-tile
-	// keeps an unrotated, pre-sized box; only .tile-face inside rotates, so it's paint-only.
-	.seat-hand-strip--left .mini-tile,
-	.seat-hand-strip--right .mini-tile {
+	// as the strip above, one level deeper: .mini-tile (backs and MeldGroups', hence :global) keeps
+	// an unrotated, pre-sized box; only .tile-face inside rotates, so it's paint-only.
+	.seat-hand-strip--left :global(.mini-tile),
+	.seat-hand-strip--right :global(.mini-tile) {
 		@include layout.tablet-up {
 			position: relative;
 			width: clamp(24px, 4cqi, 36px);
@@ -186,7 +170,7 @@
 		}
 	}
 
-	.seat-hand-strip--left .mini-tile :global(.tile-face) {
+	.seat-hand-strip--left :global(.mini-tile .tile-face) {
 		@include layout.tablet-up {
 			position: absolute;
 			top: 50%;
@@ -196,7 +180,7 @@
 		}
 	}
 
-	.seat-hand-strip--right .mini-tile :global(.tile-face) {
+	.seat-hand-strip--right :global(.mini-tile .tile-face) {
 		@include layout.tablet-up {
 			position: absolute;
 			top: 50%;
@@ -242,7 +226,7 @@
 			display: contents;
 		}
 
-		.meld {
+		.meld-row :global(.meld) {
 			margin-inline-end: 0;
 		}
 
@@ -265,7 +249,7 @@
 			--chip-tile-h: 28px;
 		}
 
-		.meld-row .mini-tile,
+		.meld-row :global(.mini-tile),
 		.backs-row .mini-tile {
 			height: var(--chip-tile-h);
 		}

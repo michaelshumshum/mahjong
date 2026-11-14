@@ -528,29 +528,7 @@
 		background: var(--color-surface-raised);
 	}
 
-	.panel {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-5);
-		padding-block: var(--space-1) var(--space-2);
-
-		&[hidden] {
-			display: none;
-		}
-	}
-
-	.group {
-		@include forms.form-group;
-		gap: var(--space-2);
-	}
-
-	legend {
-		@include forms.settings-legend;
-	}
-
-	.card {
-		@include forms.settings-card;
-	}
+	@include forms.settings-panels($group-gap: var(--space-2));
 
 	.hint {
 		margin: 0;
