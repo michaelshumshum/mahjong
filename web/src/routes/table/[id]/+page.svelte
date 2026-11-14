@@ -568,11 +568,8 @@
 	let scoreTotals: Totals = $derived(
 		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.score])) as Totals
 	);
-	let seatNames: Record<0 | 1 | 2 | 3, string> = $derived(
-		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.name])) as Record<
-			0 | 1 | 2 | 3,
-			string
-		>
+	let seatNames: Record<Seat, string> = $derived(
+		Object.fromEntries(gameState.seats.map((s) => [s.seat, s.name])) as Record<Seat, string>
 	);
 	// this hand's per-round detail: undefined for a mock's synthesized row when the frozen
 	// scenario has no handResult, otherwise built off the same fields FaanBreakdown reads.
@@ -824,7 +821,7 @@
 				handNo={gameState.handNo}
 				handEndHoldMs={gameState.handEndHoldMs}
 				{seatNames}
-				winnerMelds={gameState.seats[gameState.handResult.winner as 0 | 1 | 2 | 3].melds}
+				winnerMelds={gameState.seats[gameState.handResult.winner as Seat].melds}
 				onDismiss={dismissHandEnd}
 				onPatternSelect={openGuide}
 			/>

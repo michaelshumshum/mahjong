@@ -1,9 +1,9 @@
 <script lang="ts">
 	import FaanBreakdown from '$lib/ui/FaanBreakdown.svelte';
-	import type { FaanPattern, Payments, WinningMeld } from '$lib/game/types';
+	import type { FaanPattern, Payments, Seat, WinningMeld } from '$lib/game/types';
 	import { m } from '$lib/paraglide/messages.js';
 
-	const seatNames: Record<0 | 1 | 2 | 3, string> = {
+	const seatNames: Record<Seat, string> = {
 		0: 'Alice',
 		1: 'Bob',
 		2: 'Carol',
