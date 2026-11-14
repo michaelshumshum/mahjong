@@ -65,6 +65,7 @@ Rule: root `AGENTS.md` "Types and constants". Anything `bots/` or `ml/` reads li
 | Concept | Home |
 | --- | --- |
 | Tile geometry: `N_TILE_TYPES`, `N_SUITED_TYPES`, `RANKS_PER_SUIT`, `COPIES_PER_TYPE`, `N_FLOWERS`, `TOTAL_PHYSICAL_TILES`, `WIND_TYPES`/`DRAGON_TYPES`/`ORPHAN_TYPES`/`ORPHAN_INDICES` | `mahjong_core/tiles.py` |
+| Hand sizes: `DEALT_HAND_SIZE`, `HAND_SIZE` (complete hand, kongs not counted) | `mahjong_core/wall.py` |
 | Action-id layout: `N_ACTIONS`, `*_BASE`, `PASS_ID`…`WIN_ID`, `CHOW_IDS` | `mahjong_core/ml.py` |
 | Action types / engine event types (`Event`, `EventKind`) | `mahjong_core/actions.py` / `mahjong_core/events.py` |
 | Seat range check (`validate_seat`) | `mahjong_core/state.py` |
