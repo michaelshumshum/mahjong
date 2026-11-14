@@ -45,7 +45,13 @@ from mahjong_core.ml import (
 from mahjong_core.seats import N_SEATS
 from mahjong_core.shanten import shanten, ukeire
 from mahjong_core.state import Phase
-from mahjong_core.tiles import COPIES_PER_TYPE, N_TILE_TYPES, TileId, new_count_array, tile_id_type
+from mahjong_core.tiles import (
+    COPIES_PER_TYPE,
+    N_TILE_TYPES,
+    TileId,
+    count_array_from_types,
+    tile_id_type,
+)
 from mahjong_core.wall import max_turns_per_seat
 
 __all__ = ["AGGRESSIVE", "BASELINE", "DEFENSIVE", "FLUSH_CHASING", "FaanBot", "WeightProfile"]
@@ -258,9 +264,7 @@ class FaanBot:
                         concealed.remove(t)
                 melds = (*view.melds[view.seat], meld)
                 melds34 = meld_counts34(melds)
-                concealed34 = new_count_array()
-                for t in concealed:
-                    concealed34[int(tile_id_type(t))] += 1
+                concealed34 = count_array_from_types(tile_id_type(t) for t in concealed)
                 for d in sorted({int(tile_id_type(t)) for t in concealed}):
                     if tile_risk(view, d) > 0.0:
                         continue
