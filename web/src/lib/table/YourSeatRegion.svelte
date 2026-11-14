@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import TileFace from './TileFace.svelte';
-	import { meldTileFace } from './meld-face';
+	import MeldGroups from './MeldGroups.svelte';
 	import SeatPlate from './SeatPlate.svelte';
 	import BotBadge from './BotBadge.svelte';
 	import SeatStatusChip from './SeatStatusChip.svelte';
@@ -328,27 +328,13 @@
 			? m.yourSeatRegion_meldsAriaLabel({ name: seat.name })
 			: m.yourSeatRegion_yourMeldsAriaLabel()}
 	>
-		{#if seat.flowers.length}
-			<div
-				class="meld"
-				aria-label={spectating
-					? m.yourSeatRegion_flowersAriaLabel({ name: seat.name })
-					: m.yourSeatRegion_yourFlowersAriaLabel()}
-			>
-				{#each seat.flowers as code, i (i)}
-					<div class="mini-tile"><TileFace {code} /></div>
-				{/each}
-			</div>
-		{/if}
-		{#each seat.melds as meld, mi (mi)}
-			<div class="meld">
-				{#each meld.tiles as code, ti (ti)}
-					<div class="mini-tile">
-						<TileFace code={meldTileFace(meld.kind, code, ti, meld.tiles.length)} />
-					</div>
-				{/each}
-			</div>
-		{/each}
+		<MeldGroups
+			flowers={seat.flowers}
+			melds={seat.melds}
+			flowersLabel={spectating
+				? m.yourSeatRegion_flowersAriaLabel({ name: seat.name })
+				: m.yourSeatRegion_yourFlowersAriaLabel()}
+		/>
 	</div>
 
 	<SeatPlate
@@ -504,11 +490,6 @@
 
 	.mini-tile {
 		@include tile.mini-tile;
-	}
-
-	.meld {
-		@include tile.meld;
-		@include tile.meld-enter;
 	}
 
 	.meld-row {
@@ -826,7 +807,7 @@
 			margin-block-end: 0;
 		}
 
-		.meld-row .mini-tile {
+		.meld-row :global(.mini-tile) {
 			height: calc(26px * var(--tile-scale, 1));
 		}
 

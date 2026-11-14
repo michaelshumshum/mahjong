@@ -371,7 +371,8 @@ The client assigns a **positional** identity instead — stable per seat, opaque
   `tiles.length` minus the claimed tile.
 - A concealed kong (暗槓) is drawn HK-style, both end tiles as backs and the middle two face-up
   (`lib/table/meld-face.ts`'s `meldTileFace`, used by every meld renderer — table and win
-  screens alike; [ADR 0023](decisions/0023-concealed-kong-public.md)).
+  screens alike; [ADR 0023](decisions/0023-concealed-kong-public.md)). On the table, every seat's
+  flowers and melds render through `lib/table/MeldGroups.svelte`, keyed by index.
 
 Client-only bookkeeping — it doesn't touch the protocol or leak information. Opponent slot count
 always matches the server's `count`.
@@ -1633,9 +1634,13 @@ src/lib/styles/
   _buttons.scss     btn-base(padding-inline) (tap-target size, include before a tier),
                     btn-primary/secondary/ghost, panel-elevated, input-recessed
   _forms.scss       panel-header/title/badge, form-group, option row chrome, field-text/
-                    label/desc (label-over-description column), settings-card
+                    label/desc (label-over-description column), settings-card and
+                    settings-panels (Settings/RulesEditor tab panels), dialog-panel($width)
+                    (modal card; dismissable and landscape-compact variants), dialog-scroll-body,
+                    dialog-actions, labelled-input
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
+  _learn.scss       lesson-table/-meta/-solved, shared by PuzzlePage and TutorialPage
   _layout.scss      seat-region grid, breakpoint mixins, seat-compass-grid (four seats
                     around a mini felt) and seat-ring (the pre-game `.seat-ring*` rules)
   _a11y.scss        mixins only: focus-ring, sr-only, motion-ok/motion-reduced (§9), and

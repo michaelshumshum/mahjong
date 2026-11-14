@@ -381,7 +381,7 @@ output (`paraglide/`, `learn/generated/`) and ML data dirs are ignored.
 | Target | Config | Scope | Threshold (duplicated lines) |
 | --- | --- | --- | --- |
 | `make dup-server` | `server/.jscpd.json` | `server/**/*.py` minus `tests/`, `.venv/`, `data/`, `runs/`, `checkpoints/` | 1.1% |
-| `make dup-web` | `web/.jscpd.json` | `web/src` (ts, js, svelte, scss, css) minus specs/e2e, `.d.ts`, generated | 0.55% |
+| `make dup-web` | `web/.jscpd.json` | `web/src` (ts, js, svelte, scss, css) minus specs/e2e, `.d.ts`, generated | 0.12% |
 
 jscpd exits non-zero once the duplicated-line percentage exceeds `threshold`. Each threshold sits
 just above the measured value (server 1.06%, web 0.59% at introduction): a refactor that removes
