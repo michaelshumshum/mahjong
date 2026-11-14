@@ -389,8 +389,8 @@ def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     suits = {int(t) // RANKS_PER_SUIT for t in types}
     if len(suits) != 1:
         return 0
-    base = suits.pop() * 9
-    counts = [0] * 9
+    base = suits.pop() * RANKS_PER_SUIT
+    counts = [0] * RANKS_PER_SUIT
     for t in types:
         counts[int(t) - base] += 1
     return 1 if all(c >= b for c, b in zip(counts, _NINE_GATES_BASE_COUNTS, strict=True)) else 0
