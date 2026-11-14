@@ -10,7 +10,7 @@
 		OwnHandTile,
 		TableView
 	} from './view-types';
-	import { relativeSeat, seatAtPosition } from './wind';
+	import { relativeSeat, seatAtPosition, type SeatPosition } from './wind';
 	import OpponentRegion from './OpponentRegion.svelte';
 	import CenterDiscardPool from './CenterDiscardPool.svelte';
 	import YourSeatRegion from './YourSeatRegion.svelte';
@@ -66,7 +66,7 @@
 		dimOpponents?: 'hands' | 'all' | null;
 	} = $props();
 
-	function seatAt(position: 0 | 1 | 2 | 3) {
+	function seatAt(position: SeatPosition) {
 		return seatAtPosition(view.seats, view.you, position);
 	}
 
@@ -82,8 +82,7 @@
 	// table-relative side of the claimer: the badge sits just inside the centre box on that side.
 	let sealStampPosition = $derived.by(() => {
 		if (!sealStamp) return null;
-		const sides = ['self', 'right', 'across', 'left'] as const;
-		return sides[relativeSeat(sealStamp.seat as Seat, view.you)];
+		return relativeSeat(sealStamp.seat as Seat, view.you);
 	});
 </script>
 
@@ -94,57 +93,57 @@
 	data-dim-opponents={dimOpponents ?? undefined}
 >
 	<OpponentRegion
-		seat={seatAt(2)}
+		seat={seatAt('across')}
 		position="across"
 		dealer={view.dealer as Seat}
 		{turn}
-		scoreDelta={scoreDeltaFor(seatAt(2).seat)}
+		scoreDelta={scoreDeltaFor(seatAt('across').seat)}
 	/>
 	<OpponentRegion
-		seat={seatAt(3)}
+		seat={seatAt('left')}
 		position="left"
 		dealer={view.dealer as Seat}
 		{turn}
-		scoreDelta={scoreDeltaFor(seatAt(3).seat)}
+		scoreDelta={scoreDeltaFor(seatAt('left').seat)}
 	/>
 	<OpponentRegion
-		seat={seatAt(1)}
+		seat={seatAt('right')}
 		position="right"
 		dealer={view.dealer as Seat}
 		{turn}
-		scoreDelta={scoreDeltaFor(seatAt(1).seat)}
+		scoreDelta={scoreDeltaFor(seatAt('right').seat)}
 	/>
 
 	<div class="table-center">
 		{@render hub?.()}
 		<CenterDiscardPool
-			seat={seatAt(2)}
+			seat={seatAt('across')}
 			position="across"
-			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(2).name })}
-			lastDiscardIndex={lastDiscardIndexFor(seatAt(2).seat)}
+			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt('across').name })}
+			lastDiscardIndex={lastDiscardIndexFor(seatAt('across').seat)}
 			{holdLastDiscard}
 		/>
 		<CenterDiscardPool
-			seat={seatAt(3)}
+			seat={seatAt('left')}
 			position="left"
-			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(3).name })}
-			lastDiscardIndex={lastDiscardIndexFor(seatAt(3).seat)}
+			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt('left').name })}
+			lastDiscardIndex={lastDiscardIndexFor(seatAt('left').seat)}
 			{holdLastDiscard}
 		/>
 		<CenterDiscardPool
-			seat={seatAt(1)}
+			seat={seatAt('right')}
 			position="right"
-			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt(1).name })}
-			lastDiscardIndex={lastDiscardIndexFor(seatAt(1).seat)}
+			ariaLabel={m.tablePage_discardsAriaLabel({ name: seatAt('right').name })}
+			lastDiscardIndex={lastDiscardIndexFor(seatAt('right').seat)}
 			{holdLastDiscard}
 		/>
 		<CenterDiscardPool
-			seat={seatAt(0)}
+			seat={seatAt('self')}
 			position="self"
 			ariaLabel={spectating
-				? m.tablePage_discardsAriaLabel({ name: seatAt(0).name })
+				? m.tablePage_discardsAriaLabel({ name: seatAt('self').name })
 				: m.tablePage_yourDiscardsAriaLabel()}
-			lastDiscardIndex={lastDiscardIndexFor(seatAt(0).seat)}
+			lastDiscardIndex={lastDiscardIndexFor(seatAt('self').seat)}
 			{holdLastDiscard}
 		/>
 		{#if sealStamp && sealStampPosition}
@@ -155,7 +154,7 @@
 	</div>
 
 	<YourSeatRegion
-		seat={seatAt(0)}
+		seat={seatAt('self')}
 		{spectating}
 		dealer={view.dealer as Seat}
 		{turn}
@@ -167,7 +166,7 @@
 		{arrangeable}
 		{onReorder}
 		{declareOptions}
-		scoreDelta={scoreDeltaFor(seatAt(0).seat)}
+		scoreDelta={scoreDeltaFor(seatAt('self').seat)}
 		bind:liftedTileId
 		{tileMarks}
 	/>

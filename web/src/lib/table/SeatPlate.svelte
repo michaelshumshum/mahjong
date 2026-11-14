@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { formatSigned } from '$lib/ui/score-format';
 
 	// shared seat header; `isTurn`'s halo never shifts the layout (pseudo-element overlay).
 	// `scoreDelta` is the same kind of transient overlay, keyed to replay on repeat.
@@ -31,7 +32,7 @@
 	<span
 		class="seat-score"
 		class:seat-score--positive={score > 0}
-		class:seat-score--negative={score < 0}>{score > 0 ? `+${score}` : score}</span
+		class:seat-score--negative={score < 0}>{formatSigned(score)}</span
 	>
 	<span
 		class="seat-wind"
@@ -47,7 +48,7 @@
 				class:score-delta--negative={scoreDelta.value < 0}
 				aria-hidden="true"
 			>
-				{scoreDelta.value > 0 ? `+${scoreDelta.value}` : scoreDelta.value}
+				{formatSigned(scoreDelta.value)}
 			</span>
 		{/key}
 	{/if}

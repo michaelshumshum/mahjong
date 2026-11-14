@@ -99,8 +99,8 @@ describe('account calls', () => {
 		await expect(fetchMyGames({}, 'http://api', fetchFn)).resolves.toEqual(page);
 		await fetchMyGames({ before: 12, mode: 'practice' }, 'http://api', fetchFn);
 		expect(fetchFn.mock.calls).toEqual([
-			['http://api/me/games', { credentials: 'include' }],
-			['http://api/me/games?before=12&mode=practice', { credentials: 'include' }]
+			['http://api/me/games', { method: 'GET', credentials: 'include' }],
+			['http://api/me/games?before=12&mode=practice', { method: 'GET', credentials: 'include' }]
 		]);
 	});
 

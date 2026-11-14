@@ -111,16 +111,18 @@ model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 | Lesson loading and track order, lesson text, answer types and grading | `lib/learn/lessons.ts` / `lesson-text.ts` / `types.ts` / `grade.ts` |
 | Puzzle kind and band lists (`PUZZLE_KINDS`, `BANDS`, guards); endless fetch and streak | `lib/learn/kinds.ts`; `lib/learn/endless.ts` |
 | Where learn progress, endless scores and learn prefs are read and written (`ProgressBackend`, `progressStore()`) | `lib/learn/progress-store.ts` |
-| Domain types: `Seat`, `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
+| Domain types: `Seat` (and `ALL_SEATS`), `Wind`, `Phase`, `MeldKind`, `ClaimKind`, `ClaimOption`, `HandOutcome`, `WinType`, `FaanPattern`, `WinningMeld`, `Payments`, score-sheet types (`HandRecord`, `SeatInfo`, `Totals`, `Standing`, `RoundResult`). Wire-shaped ones re-export/narrow `protocol.d.ts` | `lib/game/types.ts` |
 | Client store state (`ClientGameState`, …) | `lib/game/state.ts` |
 | Table view model (`TableView`, `SeatView`, `MeldView`, …, `OwnHandTile`, `DeclareOption`, `CoachTarget`) | `lib/table/view-types.ts` |
 | Legal-action derivations (`legalDiscardIds`, `legalDeclareOptions`, `legalClaimOptions`, `DeclareIntents`) | `lib/table/legal-actions.ts` |
 | Mock fixtures (`MOCK_SCENARIOS`) — fixtures only; live code never imports types from here | `lib/table/mock-game-state.ts` |
-| Tile codes, suit order, `sortTiles` / meld order, `MELD_SEAL_GLYPH` / seat-wind helpers | `lib/table/tile-code.ts` / `meld-face.ts` / `wind.ts` |
+| Tile codes, suit order, `sortTiles` / meld order, `MELD_SEAL_GLYPH` / seat-wind and seat-position helpers (`SeatPosition`, `relativeSeat`, `seatFromPosition`) | `lib/table/tile-code.ts` / `meld-face.ts` / `wind.ts` |
 | Practice difficulties, difficulty → `BotTier` map, difficulty/tier labels | `lib/net/practice-difficulty.ts` (free of `lobby.ts`'s `$env` import) |
+| Plain-HTTP API base url and request helper (`apiBaseUrl`, `apiRequest`: JSON body, session cookie, throw on non-ok) | `lib/net/lobby.ts` |
 | Ruleset types, presets, defaults | `lib/net/ruleset.ts` |
 | Account types and `/me`, `/auth/*` calls; the app-wide `accountSession` | `lib/net/account.ts`; `lib/net/account-session.svelte.ts` |
 | Client prefs types / storage keys | `lib/ui/client-prefs.ts` / `lib/ui/settings-storage.ts` |
+| Signed score/payment text (`formatSigned`: `+25`, `-12`, `0`, in the current locale) | `lib/ui/score-format.ts` |
 | Pregame preview ids | `lib/table/pregame-preview.ts` |
 | Shared style mixins (`btn-base`, `seat-compass-grid`/`seat-ring`, `field-text`/`-label`/`-desc`, `settings-card`) | `lib/styles/_buttons.scss` / `_layout.scss` / `_forms.scss` (`docs/frontend.md §8`) |
 | Indeterminate wait spinner | `lib/ui/Spinner.svelte` |

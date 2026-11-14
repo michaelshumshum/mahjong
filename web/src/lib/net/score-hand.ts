@@ -1,4 +1,4 @@
-import { apiBaseUrl } from './lobby';
+import { apiBaseUrl, apiRequest } from './lobby';
 import type { RuleSet } from './ruleset';
 
 // hand-written like lobby.ts: POST /score is plain HTTP. server: app/api_models.py's
@@ -31,11 +31,6 @@ export async function scoreHand(
 	baseUrl: string = apiBaseUrl(),
 	fetchFn: typeof fetch = fetch
 ): Promise<ScoreHandResponse> {
-	const response = await fetchFn(`${baseUrl}/score`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-	if (!response.ok) throw new Error(`POST /score failed: ${response.status}`);
+	const response = await apiRequest('POST', '/score', { baseUrl, fetchFn, body });
 	return (await response.json()) as ScoreHandResponse;
 }

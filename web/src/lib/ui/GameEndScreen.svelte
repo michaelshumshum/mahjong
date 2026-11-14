@@ -2,8 +2,9 @@
 	// Auto-shown once a real `game_end` lands -- unlike the per-hand hold overlay, not
 	// dismissable back into play. Final standings first, then the full ScoreSheet.
 	import ScoreSheet from './ScoreSheet.svelte';
-	import type { HandRecord, SeatInfo, Standing, Totals } from '$lib/game/types';
+	import type { HandRecord, Seat, SeatInfo, Standing, Totals } from '$lib/game/types';
 	import { placements, rankLabel, RANK_TONE } from './rank';
+	import { formatSigned } from './score-format';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -21,14 +22,14 @@
 		hands: HandRecord[];
 		standings: Standing[];
 		// null for a spectator -- no "you placed" line, no highlighted row.
-		you?: 0 | 1 | 2 | 3 | null;
+		you?: Seat | null;
 		// practice tables only: re-creates one with the same bot levels.
 		onPlayAgain?: () => void;
 		playAgainPending?: boolean;
 		playAgainFailed?: boolean;
 	} = $props();
 
-	function seatName(seat: 0 | 1 | 2 | 3): string {
+	function seatName(seat: Seat): string {
 		return seats.find((s) => s.seat === seat)?.name ?? m.gameEndScreen_seatFallbackLabel({ seat });
 	}
 
@@ -75,7 +76,7 @@
 					class:final-total--positive={row.total > 0}
 					class:final-total--negative={row.total < 0}
 				>
-					{row.total > 0 ? '+' : ''}{row.total}
+					{formatSigned(row.total)}
 				</span>
 			</li>
 		{/each}
