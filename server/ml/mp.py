@@ -1,12 +1,19 @@
-"""Process-pool start method shared by `ml/` tooling that forks workers."""
+"""Process-pool start method and the shared-memory env worker pool for `ml/` tooling that forks
+workers."""
 
 from __future__ import annotations
 
+import itertools
 import multiprocessing
 import multiprocessing.context
 import threading
+from collections.abc import Callable
+from multiprocessing.connection import Connection
+from typing import Any
 
-__all__ = ["mp_context"]
+import numpy as np
+
+__all__ = ["WorkerPool", "mp_context"]
 
 
 def mp_context() -> multiprocessing.context.BaseContext:
@@ -26,3 +33,59 @@ def mp_context() -> multiprocessing.context.BaseContext:
     if threading.active_count() > 1:
         return multiprocessing.get_context()
     return multiprocessing.get_context("fork")
+
+
+class WorkerPool:
+    """`n_envs` split into `n_workers` contiguous slices, one daemon process each, driven over a
+    pipe per worker. A worker answers every message with `("ok", payload)` or
+    `("err", traceback)`; `broadcast` re-raises errors in the parent once every worker answered.
+
+    Two-phase so the caller can allocate shared buffers from `ctx` before `start` forks."""
+
+    def __init__(self, n_envs: int, n_workers: int) -> None:
+        if not 1 <= n_workers <= n_envs:
+            raise ValueError(f"n_workers must be in 1..{n_envs}, got {n_workers}")
+        self.n_envs = n_envs
+        self.n_workers = n_workers
+        self.ctx = mp_context()
+        self._conns: list[Connection] = []
+        self._procs: list[Any] = []
+
+    def start(self, target: Callable[..., None], *args: Any) -> None:
+        """Run `target(conn, lo, hi, *args)` in one process per slice."""
+        bounds = np.linspace(0, self.n_envs, self.n_workers + 1).astype(int)
+        for lo, hi in itertools.pairwise(bounds):
+            parent, child = self.ctx.Pipe()
+            proc = self.ctx.Process(
+                target=target, args=(child, int(lo), int(hi), *args), daemon=True
+            )
+            proc.start()
+            child.close()
+            self._conns.append(parent)
+            self._procs.append(proc)
+
+    def broadcast(
+        self, msg: object, name: str, on_ok: Callable[[Any], object] | None = None
+    ) -> None:
+        for conn in self._conns:
+            conn.send(msg)
+        errors = []
+        for conn in self._conns:
+            status, payload = conn.recv()
+            if status == "err":
+                errors.append(payload)
+            elif on_ok is not None:
+                on_ok(payload)
+        if errors:
+            raise RuntimeError(f"{name} worker failed:\n" + "\n".join(errors))
+
+    def close(self, msg: object) -> None:
+        for conn in self._conns:
+            try:
+                conn.send(msg)
+            except (BrokenPipeError, OSError):
+                pass
+        for proc in self._procs:
+            proc.join(timeout=5)
+        self._conns = []
+        self._procs = []

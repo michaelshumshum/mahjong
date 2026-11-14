@@ -11,7 +11,6 @@ env's own buffers, overwritten by the next `step`: copy anything that must outli
 from __future__ import annotations
 
 import hashlib
-import itertools
 import traceback
 from dataclasses import dataclass
 from multiprocessing.connection import Connection
@@ -22,7 +21,7 @@ import numpy as np
 from mahjong_core.config import DEFAULT_RULESET, RuleSet
 from mahjong_core.seats import N_SEATS
 from ml.env import N_ACTIONS, OBS_DIM, HandEnv, encode_obs
-from ml.mp import mp_context
+from ml.mp import WorkerPool
 
 __all__ = ["SubprocVecHandEnv", "VecHandEnv", "VecStep", "episode_seed"]
 
@@ -208,39 +207,15 @@ class SubprocVecHandEnv:
         encode: bool = True,
         keep_records: bool = False,
     ) -> None:
-        if not 1 <= n_workers <= n_envs:
-            raise ValueError(f"n_workers must be in 1..{n_envs}, got {n_workers}")
+        self._pool = WorkerPool(n_envs, n_workers)
         self.num_envs = n_envs
         self.records: list[dict[str, Any]] = []
         obs_dim = OBS_DIM if encode else 0
-        ctx = mp_context()
-        raw = _shared(ctx, n_envs, obs_dim)
+        raw = _shared(self._pool.ctx, n_envs, obs_dim)
         self._buf, self._actions = _views(raw, n_envs, obs_dim)
-        bounds = np.linspace(0, n_envs, n_workers + 1).astype(int)
-        self._conns: list[Connection] = []
-        self._procs = []
-        for lo, hi in itertools.pairwise(bounds):
-            parent, child = ctx.Pipe()
-            proc = ctx.Process(
-                target=_worker,
-                args=(
-                    child,
-                    int(lo),
-                    int(hi),
-                    n_envs,
-                    obs_dim,
-                    raw,
-                    base_seed,
-                    ruleset.to_dict(),
-                    encode,
-                    keep_records,
-                ),
-                daemon=True,
-            )
-            proc.start()
-            child.close()
-            self._conns.append(parent)
-            self._procs.append(proc)
+        self._pool.start(
+            _worker, n_envs, obs_dim, raw, base_seed, ruleset.to_dict(), encode, keep_records
+        )
 
     def reset(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         self.records = []
@@ -253,15 +228,7 @@ class SubprocVecHandEnv:
         return self._buf.out()
 
     def close(self) -> None:
-        for conn in self._conns:
-            try:
-                conn.send("close")
-            except (BrokenPipeError, OSError):
-                pass
-        for proc in self._procs:
-            proc.join(timeout=5)
-        self._conns = []
-        self._procs = []
+        self._pool.close("close")
 
     def __enter__(self) -> Self:
         return self
@@ -270,14 +237,4 @@ class SubprocVecHandEnv:
         self.close()
 
     def _broadcast(self, cmd: str) -> None:
-        for conn in self._conns:
-            conn.send(cmd)
-        errors = []
-        for conn in self._conns:
-            status, payload = conn.recv()
-            if status == "err":
-                errors.append(payload)
-            else:
-                self.records.extend(payload)
-        if errors:
-            raise RuntimeError("vec env worker failed:\n" + "\n".join(errors))
+        self._pool.broadcast(cmd, "vec env", self.records.extend)
