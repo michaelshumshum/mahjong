@@ -4,6 +4,7 @@
 	import { sortTiles, type TileCode } from '../table/tile-code';
 	import { m } from '$lib/paraglide/messages.js';
 	import FaanPatternName from './FaanPatternName.svelte';
+	import { formatSigned } from './score-format';
 	import {
 		ALL_SEATS,
 		type FaanPattern,
@@ -124,7 +125,7 @@
 					class:payment-row--winner={seat === winner}
 				>
 					<span class="payment-seat">{seatNames[seat]}</span>
-					<span class="payment-amount">{amount > 0 ? '+' : ''}{amount}</span>
+					<span class="payment-amount">{formatSigned(amount)}</span>
 				</li>
 			{/each}
 		</ul>

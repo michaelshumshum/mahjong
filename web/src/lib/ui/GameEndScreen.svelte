@@ -4,6 +4,7 @@
 	import ScoreSheet from './ScoreSheet.svelte';
 	import type { HandRecord, Seat, SeatInfo, Standing, Totals } from '$lib/game/types';
 	import { placements, rankLabel, RANK_TONE } from './rank';
+	import { formatSigned } from './score-format';
 	import { m } from '$lib/paraglide/messages.js';
 
 	let {
@@ -75,7 +76,7 @@
 					class:final-total--positive={row.total > 0}
 					class:final-total--negative={row.total < 0}
 				>
-					{row.total > 0 ? '+' : ''}{row.total}
+					{formatSigned(row.total)}
 				</span>
 			</li>
 		{/each}

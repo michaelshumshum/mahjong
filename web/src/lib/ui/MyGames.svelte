@@ -4,7 +4,8 @@
 	import { m } from '$lib/paraglide/messages.js';
 	import { getLocale } from '$lib/paraglide/runtime.js';
 	import BotBadge from '$lib/table/BotBadge.svelte';
-	import { formatGameDate, formatScore, modeLabel, seatName } from './my-games';
+	import { formatGameDate, modeLabel, seatName } from './my-games';
+	import { formatSigned } from './score-format';
 	import { rankLabel, RANK_TONE } from './rank';
 
 	let games = $state<MyGame[]>([]);
@@ -59,7 +60,7 @@
 						<span class="place" style:--rank-tone={RANK_TONE[game.placement - 1]}>
 							{rankLabel(game.placement - 1)}
 						</span>
-						<span class="score">{formatScore(game.final_score)}</span>
+						<span class="score">{formatSigned(game.final_score)}</span>
 					</div>
 					<div class="meta">
 						<time datetime={game.created_at}>{formatGameDate(game.created_at, getLocale())}</time>

@@ -122,6 +122,7 @@ model, three sources"; learn modules: `docs/frontend.md §7` "Learn".
 | Ruleset types, presets, defaults | `lib/net/ruleset.ts` |
 | Account types and `/me`, `/auth/*` calls; the app-wide `accountSession` | `lib/net/account.ts`; `lib/net/account-session.svelte.ts` |
 | Client prefs types / storage keys | `lib/ui/client-prefs.ts` / `lib/ui/settings-storage.ts` |
+| Signed score/payment text (`formatSigned`: `+25`, `-12`, `0`, in the current locale) | `lib/ui/score-format.ts` |
 | Pregame preview ids | `lib/table/pregame-preview.ts` |
 | Shared style mixins (`btn-base`, `seat-compass-grid`/`seat-ring`, `field-text`/`-label`/`-desc`, `settings-card`) | `lib/styles/_buttons.scss` / `_layout.scss` / `_forms.scss` (`docs/frontend.md §8`) |
 | Indeterminate wait spinner | `lib/ui/Spinner.svelte` |
