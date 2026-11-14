@@ -6,12 +6,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mahjong_core.config import DiscardPayment, RuleSet, ScoreTable
+from mahjong_core.config import MAX_FAAN_CAP, DiscardPayment, RuleSet, ScoreTable
 from mahjong_core.state import validate_seat
 
-_MAX_FAAN = 13  # config.py's _VALID_FAAN_CAP tops out at 13
-
-_FULL_SPICY: tuple[int, ...] = tuple(2**faan for faan in range(_MAX_FAAN + 1))
+_FULL_SPICY: tuple[int, ...] = tuple(2**faan for faan in range(MAX_FAAN_CAP + 1))
 """全辣: `2 ** faan`."""
 
 _HALF_SPICY: tuple[int, ...] = (1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384)
@@ -29,8 +27,8 @@ points table)."""
 
 def points(faan: int, ruleset: RuleSet) -> int:
     """Faan -> points lookup, table selected by `ruleset.score_table`."""
-    if not 0 <= faan <= _MAX_FAAN:
-        raise ValueError(f"faan must be 0..{_MAX_FAAN}, got {faan}")
+    if not 0 <= faan <= MAX_FAAN_CAP:
+        raise ValueError(f"faan must be 0..{MAX_FAAN_CAP}, got {faan}")
     return POINTS_TABLES[ruleset.score_table][faan]
 
 

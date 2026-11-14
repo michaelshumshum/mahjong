@@ -42,7 +42,7 @@ from mahjong_core.ml import decode_action, legal_mask
 from mahjong_core.presets import DEFAULT_PRESET_ID, RULESET_PRESETS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from mahjong_core.tiles import N_TILE_TYPES
+from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
 from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.generate_dataset import _make_bots, _shuffled_roster
@@ -83,7 +83,7 @@ def shanten_labels(state: GameState, seat: int, unseen: np.ndarray) -> tuple[lis
     hand = seat_hand34(seat_state)
     concealed = [0] * N_TILE_TYPES
     for t in seat_state.concealed:
-        concealed[t // 4] += 1
+        concealed[tile_id_type(t)] += 1
     closed = not seat_state.melds
     sets = state.ruleset.hand_sets
     sh_out, uk_out = [PAD] * N_TILE_TYPES, [0] * N_TILE_TYPES
