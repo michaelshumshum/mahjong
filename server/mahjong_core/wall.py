@@ -48,6 +48,8 @@ SetAsideFlowers = tuple[_SeatFlowers, _SeatFlowers, _SeatFlowers, _SeatFlowers]
 
 _SEATS = 4
 DEALT_HAND_SIZE = 13
+HAND_SIZE = DEALT_HAND_SIZE + 1
+"""A complete hand: the dealt tiles plus the one drawn or claimed to win, kongs not counted."""
 
 
 def _physical_tiles(ruleset: RuleSet) -> list[WallTile]:

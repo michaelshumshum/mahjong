@@ -60,6 +60,7 @@ from mahjong_core.tiles import (
     TileType,
     tile_id_type,
 )
+from mahjong_core.wall import HAND_SIZE
 
 _PUNG_OR_KONG = frozenset({MeldKind.PUNG, *KONG_KINDS})
 
@@ -380,7 +381,7 @@ def _detect_nine_gates(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     if hand:
         return 0
     tiles = ctx.concealed_tiles
-    if len(tiles) != 14:
+    if len(tiles) != HAND_SIZE:
         return 0
     types = [tile_id_type(t) for t in tiles]
     if any(_is_honor(t) for t in types):
@@ -403,7 +404,7 @@ def _detect_thirteen_orphans(hand: tuple[Meld, ...], ctx: ScoringContext) -> int
     if hand:
         return 0
     tiles = ctx.concealed_tiles
-    if len(tiles) != 14:
+    if len(tiles) != HAND_SIZE:
         return 0
     return 1 if {tile_id_type(t) for t in tiles} == ORPHAN_TYPES else 0
 
@@ -496,7 +497,7 @@ def _detect_seven_pairs(hand: tuple[Meld, ...], ctx: ScoringContext) -> int:
     if hand:
         return 0
     tiles = ctx.concealed_tiles
-    if len(tiles) != 14:
+    if len(tiles) != HAND_SIZE:
         return 0
     counts = Counter(tile_id_type(t) for t in tiles)
     return 1 if len(counts) == 7 and all(c == 2 for c in counts.values()) else 0
