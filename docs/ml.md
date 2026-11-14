@@ -299,7 +299,7 @@ seat, obs, mask, done, rewards = venv.step(actions) # done (K,), rewards (K, 4)
 | seeds | env `i`'s `e`-th episode: `episode_seed(base_seed, i, e)` (blake2b, 63-bit) |
 | auto-reset | where `done[i]`, `rewards[i]` is the finished hand's; `seat/obs/mask[i]` already the next hand's |
 | buffers | returned arrays are the env's own and overwritten by the next `step` |
-| workers | contiguous env slices per process; `RawArray` buffers, pipe carries only commands and finished records (`keep_records`); worker exceptions re-raise in the parent; start method from `ml/mp.py` |
+| workers | contiguous env slices per process; `RawArray` buffers, pipe carries only commands and finished records (`keep_records`); worker exceptions re-raise in the parent; spawn, broadcast and close are `ml/mp.py`'s `WorkerPool` (start method `mp_context`), shared with `SubprocVecTrainEnv` |
 | equivalence | `tests/test_ml_vec_env.py`: in-process vec = K independent `HandEnv`s; subprocess = in-process, bit for bit |
 
 ### Training env — `ml/train_env.py` (built, R2)
