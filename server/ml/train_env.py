@@ -40,7 +40,7 @@ from mahjong_core.ml import N_ACTIONS, PASS_ID
 from mahjong_core.presets import RULESET_PRESETS
 from mahjong_core.shanten import shanten
 from mahjong_core.state import GameState, HandOutcome, Phase
-from mahjong_core.tiles import N_TILE_TYPES
+from mahjong_core.tiles import N_TILE_TYPES, tile_id_type
 from ml.encode import PAD
 from ml.encode_v2 import ORACLE_FIELDS, POLICY_FIELDS, oracle_raw, policy_raw
 from ml.env import HandEnv
@@ -121,7 +121,7 @@ def opponent_ids(u: dict[str, np.ndarray]) -> np.ndarray:
 def tsumogiri(state: GameState, seat: int, mask: np.ndarray) -> int:
     """Discard the tile just drawn (the last concealed tile); pass every claim, never win."""
     if state.phase == Phase.AWAIT_ACTION and state.turn == seat:
-        t = state.seats[seat].concealed[-1] // 4
+        t = tile_id_type(state.seats[seat].concealed[-1])
         if mask[t]:
             return int(t)
         return int(np.flatnonzero(mask[:N_TILE_TYPES])[0])
