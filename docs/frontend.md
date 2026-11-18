@@ -551,6 +551,9 @@ entrances and hover lifts (cards fading up in a stagger, a seal pressed on) come
 | Solved chip | `PuzzlePage`/`TutorialPage`'s `.solved` takes `seal-press($rest: 0deg)`: the chip rests unrotated, so the press settles at 0 rather than the index seal's -8deg |
 | Lobby entrance | `.actions` takes `stagger-children(3)`, so the three action cards fade up 30ms apart; the brand `.seal` takes `seal-press(var(--dur-2), $rest: -4deg)` once the cards have started. Each card's hover is `hover-lift` (the same 2px lift as before, now `translate`, not `transform`) |
 | Tables and status entrance | `/tables`' `.table-grid` and `/status`' `.tiles` take `stagger-children` (8 and 7). Both are keyed each blocks (`table.id`, `tile.id`) whose parent stays mounted once the first poll lands, so a poll keeps each node and never replays the entrance: only a table new since the last poll fades in. `TableCard` takes `hover-lift` |
+| Dialog entrance | `ModalDialog`: the scrim is the dialog's `::backdrop` (the dialog box itself is transparent), so it fades in by opacity (`_motion.scss`'s `fade-in`) without fading the panel; the snippet's root (`> :first-child`, so a toast stack or announcer moved in after it is left alone) rises in with a slight scale (`panel-in`, individual `translate`/`scale`, so a panel's own `transform` survives). Every modal gets it, the claim sheet and hand-end panel included |
+| Dialog contents | `_forms.scss`'s `dialog-panel` staggers its direct children in (`stagger-children(6)`, base delay `--dur-1`, so they follow the panel). A child mounted later (an error line, `CreateTableDialog`'s custom view) fades up on insert |
+| Dialog exit | none: every owner closes a dialog by unmounting it (`{#if}`), and the node is gone before `close` fires, so an `@starting-style`/`allow-discrete` exit transition has nothing to play on. One needs a deferred unmount, not CSS |
 | Haptics | `lib/ui/haptics.ts`'s `vibrate(ms)`: `navigator.vibrate`, feature-detected to `(pointer: coarse)` so it's a no-op on desktop. Fired on your turn starting and a claim offer landing, gated on the new `ClientPrefs.haptics` (default on, separate from `motion`) |
 
 Both the seal stamp and score-delta chip have no mock-scenario trigger (the frozen fixtures never
@@ -1663,8 +1666,8 @@ src/lib/styles/
                     0ms, $rest: -8deg) ($rest = the caller's own `rotate`, not `transform`, which
                     would compose with it), hover-lift($distance: 2px), stagger-children($max,
                     $base-delay: 0ms) (card-in on direct children, --i from :nth-child, no
-                    markup); all behind
-                    motion-ok. Owns the card-in/seal-press keyframes, emitted into each component
+                    markup), panel-in (modal panel: fade-up + slight scale), fade-in($duration:
+                    --dur-2); all behind motion-ok. Owns their keyframes, emitted into each component
                     that @uses it, where Svelte scopes them; hover-lift's caller lists `translate`
                     in its own `transition`
   _layout.scss      seat-region grid, breakpoint mixins, seat-compass-grid (four seats
