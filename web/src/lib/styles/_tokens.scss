@@ -95,6 +95,8 @@
 	--dur-control: 130ms;
 	// one turn of an indeterminate loading spinner.
 	--dur-spin: 900ms;
+	// delay between consecutive items of a staggered entrance (_motion.scss).
+	--dur-stagger: 30ms;
 	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 	--ease-place: cubic-bezier(0.3, 1.35, 0.5, 1);
 

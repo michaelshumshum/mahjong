@@ -381,6 +381,7 @@
 	@use 'sass:map';
 	@use '$lib/styles/a11y';
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
 	// one hue per index tab, all light enough for --color-tile-ink on top. none is --color-accent:
 	// that red stays the urgent signal.
@@ -658,10 +659,7 @@
 		}
 
 		li {
-			@include a11y.motion-ok {
-				animation: card-in var(--dur-3) var(--ease-out) backwards;
-				animation-delay: calc(var(--i, 0) * 30ms);
-			}
+			@include motion.card-in;
 		}
 	}
 
@@ -691,11 +689,7 @@
 				0 10px 22px -10px rgb(10 4 2 / 0.8);
 		}
 
-		@include a11y.motion-ok {
-			&:hover {
-				translate: 0 -2px;
-			}
-		}
+		@include motion.hover-lift;
 	}
 
 	.lesson-card--solved {
@@ -861,10 +855,7 @@
 	}
 
 	.solved-seal--fresh {
-		@include a11y.motion-ok {
-			animation: seal-press var(--dur-4) var(--ease-place) backwards;
-			animation-delay: calc(var(--i, 0) * 30ms + var(--dur-3));
-		}
+		@include motion.seal-press(var(--dur-3));
 	}
 
 	.lesson-card--tutorial .solved-seal {
@@ -906,30 +897,6 @@
 		:global(svg) {
 			margin-left: auto;
 			color: var(--track-hue);
-		}
-	}
-
-	@keyframes card-in {
-		from {
-			opacity: 0;
-			translate: 0 8px;
-		}
-	}
-
-	@keyframes seal-press {
-		0% {
-			opacity: 0;
-			scale: 1.8;
-			rotate: -20deg;
-		}
-		60% {
-			opacity: 1;
-			scale: 0.92;
-			rotate: -6deg;
-		}
-		100% {
-			scale: 1;
-			rotate: -8deg;
 		}
 	}
 </style>

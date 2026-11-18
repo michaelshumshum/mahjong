@@ -532,7 +532,9 @@ wire message via `tablePage_serverErrorToast`.
 ### Motion (P3)
 
 Durations come from `lib/ui/motion.ts`'s `motionMs(ms)` (JS) or the `_a11y.scss` `motion-ok` mixin
-(CSS) — both collapse to 0ms under reduced motion, never a second code path.
+(CSS) — both collapse to 0ms under reduced motion, never a second code path. Page-level
+entrances and hover lifts (cards fading up in a stagger, a seal pressed on) come from
+`_motion.scss`'s mixins (§8), which already sit behind `motion-ok`.
 
 | Surface | Mechanism |
 | --- | --- |
@@ -1196,7 +1198,7 @@ Endless mode (below) is the one part that needs the API.
   | Tutorial card | a decorative five-tile fan (`TUTORIAL_FAN`, `aria-hidden`; not the tutorial's real deal, which isn't in the index) and a "Play" chip until solved |
   | Solved seal | a double-bordered 解 stamp in the track hue on the card's corner, `sr-only` "Solved" inside. A lesson solved in the last 10 minutes (`FRESH_SOLVE_MS`, off `solvedAt`) presses it in on render |
   | Next track | a dashed link under the panel to the next `INDEX_TABS` entry ("Up next: Waits"; faan → Endless), scrolling to the top |
-  | Motion | cards fade up staggered by `--i` (display order) on each tab change, lift on hover, the fan spreads on hover; all behind `a11y.motion-ok` |
+  | Motion | cards fade up staggered by `--i` (display order) on each tab change, lift on hover, the fresh seal presses in after its card (`_motion.scss`'s `card-in`/`hover-lift`/`seal-press`, §8); the fan spreads on hover; all behind `a11y.motion-ok` |
   | Scrim | a fixed `::before` dims the mural and tints the top with the open track's hue, so the tiles behind read as texture |
 - **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and learn
   progress are client-only, so a server render would be an empty felt to hydrate over.
@@ -1642,6 +1644,12 @@ src/lib/styles/
   _tile.scss        seat-meta/dealer-badge/tile-row/mini-tile/meld mixins shared by every
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
   _learn.scss       lesson-table/-meta/-solved, shared by PuzzlePage and TutorialPage
+  _motion.scss      card-in($base-delay: 0ms) (fade-up, staggered by --i), seal-press($base-delay:
+                    0ms), hover-lift($distance: 2px), stagger-children($max, $base-delay: 0ms)
+                    (card-in on direct children, --i from :nth-child, no markup); all behind
+                    motion-ok. Owns the card-in/seal-press keyframes, emitted into each component
+                    that @uses it, where Svelte scopes them; hover-lift's caller lists `translate`
+                    in its own `transition`
   _layout.scss      seat-region grid, breakpoint mixins, seat-compass-grid (four seats
                     around a mini felt) and seat-ring (the pre-game `.seat-ring*` rules)
   _a11y.scss        mixins only: focus-ring, sr-only, motion-ok/motion-reduced (§9), and
@@ -1662,7 +1670,7 @@ Tokens (`_tokens.scss`, all CSS custom properties on `:root`):
 | seats | `--color-seat-right/across/left` | opponent seat hues (self uses brass) |
 | status | `--color-status-error`, `--color-rank-gold/silver/bronze` | error states; game-end podium |
 | shape/type/space | `--radius-sm/md/lg`, `--radius-tile`, `--radius-pill`, `--space-1…8`, `--font-size-xs…2xl`, `--font-size-display`, `--tap-target-min` | |
-| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--dur-control` 130ms (control hover/press/selected colour), `--dur-spin` 900ms (`lib/ui/Spinner.svelte`, the connecting spinner), `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
+| motion | `--dur-1` 120ms … `--dur-4` 600ms, `--dur-control` 130ms (control hover/press/selected colour), `--dur-spin` 900ms (`lib/ui/Spinner.svelte`, the connecting spinner), `--dur-stagger` 30ms (step between items of a staggered entrance, `_motion.scss`), `--ease-out`, `--ease-place` (overshoot) | wrap motion in `a11y.motion-ok` (§9) |
 | layers | `--z-table/tiles/hud/overlay/modal/toast` | modal dialogs are in the top layer, which no z-index reaches; toasts move into the open dialog instead (§5 Toasts) |
 
 ### Contrast audit
