@@ -546,6 +546,9 @@ entrances and hover lifts (cards fading up in a stagger, a seal pressed on) come
 | Connect gate | `ApiConnectGate`'s `.connect-panel` fades up on mount (`card-in`); a retry keeps the same panel, so it doesn't replay |
 | Pre-game panel | `PretableScreen`'s `.pretable-panel` fades up and its direct children stagger in (`stagger-children(8)`, after `--dur-1`); a child mounted on a state change (connecting → picker → seated) enters on its own, at its position's step |
 | Seat picker | `SeatPicker`'s felt, then across/left/right/self `.seat-ring-pos`, fade up after `--dur-3` (`card-in`, `--i` set in its own CSS so the panel's stagger index isn't inherited). The animation's `translate` is independent of the grid placement, so seats end exactly where reduced motion puts them. An open `SeatPickerSlot` lifts on hover (`hover-lift`). `SeatRing` (seated) has no seat stagger: it enters as one of the panel's children |
+| Learn puzzle cards | `PuzzlePage`'s `.prompt-card` `card-in`, `.answer-card` `card-in(var(--dur-stagger))` (one step later); endless's `.status-card` `card-in` (§7 "Learn" **Motion**) |
+| Learn feedback | `AnswerPanel`'s `.lines` and `OptionTable`'s `tbody` take `stagger-children` (8 and 12 steps), so each line or row fades up in order with no `--i` in the markup. `translate` on a `<tr>` works in Chromium and Firefox (a table row is transformable); only its collapsed border stays put, painted by the table |
+| Solved chip | `PuzzlePage`/`TutorialPage`'s `.solved` takes `seal-press($rest: 0deg)`: the chip rests unrotated, so the press settles at 0 rather than the index seal's -8deg |
 | Haptics | `lib/ui/haptics.ts`'s `vibrate(ms)`: `navigator.vibrate`, feature-detected to `(pointer: coarse)` so it's a no-op on desktop. Fired on your turn starting and a claim offer landing, gated on the new `ClientPrefs.haptics` (default on, separate from `motion`) |
 
 Both the seal stamp and score-delta chip have no mock-scenario trigger (the frozen fixtures never
@@ -1201,7 +1204,7 @@ Endless mode (below) is the one part that needs the API.
   | Tutorial card | a decorative five-tile fan (`TUTORIAL_FAN`, `aria-hidden`; not the tutorial's real deal, which isn't in the index) and a "Play" chip until solved |
   | Solved seal | a double-bordered 解 stamp in the track hue on the card's corner, `sr-only` "Solved" inside. A lesson solved in the last 10 minutes (`FRESH_SOLVE_MS`, off `solvedAt`) presses it in on render |
   | Next track | a dashed link under the panel to the next `INDEX_TABS` entry ("Up next: Waits"; faan → Endless), scrolling to the top |
-  | Motion | cards fade up staggered by `--i` (display order) on each tab change, lift on hover, the fresh seal presses in after its card (`_motion.scss`'s `card-in`/`hover-lift`/`seal-press`, §8); the fan spreads on hover; all behind `a11y.motion-ok` |
+  | Motion | cards fade up staggered by `--i` (display order) on each tab change, lift on hover, the fresh seal presses in after its card (`_motion.scss`'s `card-in`/`hover-lift`/`seal-press`, §8); the fan spreads on hover; all behind `a11y.motion-ok`. Puzzle, tutorial and endless pages: **Motion** below and §5 |
   | Scrim | a fixed `::before` dims the mural and tints the top with the open track's hue, so the tiles behind read as texture |
 - **Puzzle page.** `ssr = false`, like `/table/[id]`: the table, the reducer state and learn
   progress are client-only, so a server render would be an empty felt to hydrate over.
@@ -1233,6 +1236,13 @@ Endless mode (below) is the one part that needs the API.
   `getBoundingClientRect` against the viewport and, only if it isn't wholly visible, calls
   `scrollIntoView({ block: 'nearest' })`, `smooth` unless motion is reduced (`isMotionReduced`,
   §9). Scrolling never moves focus, so Show answer's focus on the feedback stays put.
+- **Motion.** CSS only, `_motion.scss` (§8), all behind `motion-ok`: the prompt card and answer
+  card fade up on load (and on each `lesson.id` change), the answer card one `--dur-stagger` step
+  later; feedback lines stagger in each time the `{#key attempts}` feedback re-mounts; the options
+  table's rows stagger in when it appears (a row added later, as the pick moves, fades in alone);
+  the Solved chip (puzzle and tutorial) presses in with `seal-press($rest: 0deg)` when it appears,
+  so on load for an already-solved lesson too. The chip sits outside `{#key attempts}`, so a
+  later attempt never replays it. Endless's status card (loading, error) fades up.
 - **Faded opponents.** `TableScene`'s `dimOpponents` (presentation only; `data-dim-opponents`)
   fades what a kind doesn't read to opacity 0.55 and 60% saturation; the hub and your own seat
   never fade.

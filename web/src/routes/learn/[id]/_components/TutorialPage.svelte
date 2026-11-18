@@ -341,6 +341,7 @@
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 	@use '$lib/styles/learn';
+	@use '$lib/styles/motion';
 
 	.tutorial-page {
 		display: grid;
@@ -403,6 +404,7 @@
 
 	.solved {
 		@include learn.lesson-solved;
+		@include motion.seal-press($rest: 0deg);
 	}
 
 	.tutorial-table {

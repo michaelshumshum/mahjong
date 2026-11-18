@@ -453,6 +453,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/motion';
 
 	.answer-panel {
 		display: flex;
@@ -538,6 +539,7 @@
 		padding: 0;
 		list-style: none;
 		line-height: 1.5;
+		@include motion.stagger-children(8);
 	}
 
 	.line {

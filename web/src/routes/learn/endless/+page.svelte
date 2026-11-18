@@ -162,6 +162,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/motion';
 
 	.score {
 		display: inline-flex;
@@ -196,6 +197,7 @@
 
 	.status-card {
 		@include buttons.panel-elevated;
+		@include motion.card-in;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);

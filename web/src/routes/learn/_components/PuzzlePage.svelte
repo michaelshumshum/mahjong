@@ -356,6 +356,7 @@
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
 	@use '$lib/styles/learn';
+	@use '$lib/styles/motion';
 
 	.puzzle-page {
 		display: grid;
@@ -404,6 +405,7 @@
 	}
 
 	.prompt-card {
+		@include motion.card-in;
 		grid-area: prompt;
 
 		h1 {
@@ -419,6 +421,7 @@
 
 	.solved {
 		@include learn.lesson-solved;
+		@include motion.seal-press($rest: 0deg);
 	}
 
 	.prompt {
@@ -427,6 +430,7 @@
 	}
 
 	.answer-card {
+		@include motion.card-in(var(--dur-stagger));
 		grid-area: answer;
 		display: flex;
 		flex-direction: column;
