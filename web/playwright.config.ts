@@ -22,7 +22,8 @@ export default defineConfig({
 			env: { PUBLIC_ACCOUNTS_ENABLED: '1' }
 		}
 	],
-	// an array of servers sets no baseURL on its own
-	use: { baseURL: `http://localhost:${PORT}` },
+	// an array of servers sets no baseURL on its own. reduced motion so no assertion lands
+	// mid-entrance; a spec that needs motion opts back in with emulateMedia or html[data-motion]
+	use: { baseURL: `http://localhost:${PORT}`, reducedMotion: 'reduce' },
 	testMatch: '**/*.e2e.{ts,js}'
 });
