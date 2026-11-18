@@ -1645,8 +1645,10 @@ src/lib/styles/
                     seat-hand-strip implementation -- per-face geometry stays in TileFace
   _learn.scss       lesson-table/-meta/-solved, shared by PuzzlePage and TutorialPage
   _motion.scss      card-in($base-delay: 0ms) (fade-up, staggered by --i), seal-press($base-delay:
-                    0ms), hover-lift($distance: 2px), stagger-children($max, $base-delay: 0ms)
-                    (card-in on direct children, --i from :nth-child, no markup); all behind
+                    0ms, $rest: -8deg) ($rest = the caller's own `rotate`, not `transform`, which
+                    would compose with it), hover-lift($distance: 2px), stagger-children($max,
+                    $base-delay: 0ms) (card-in on direct children, --i from :nth-child, no
+                    markup); all behind
                     motion-ok. Owns the card-in/seal-press keyframes, emitted into each component
                     that @uses it, where Svelte scopes them; hover-lift's caller lists `translate`
                     in its own `transition`

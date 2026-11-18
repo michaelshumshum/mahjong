@@ -11,9 +11,11 @@
 	}
 }
 
-// a seal stamped down, overshooting to a -8deg rest; staggered by --i like card-in.
-@mixin seal-press($base-delay: 0ms) {
+// a seal stamped down, overshooting to its $rest angle; staggered by --i like card-in.
+// $rest must match the caller's own `rotate` (not `transform`, which would compose with it).
+@mixin seal-press($base-delay: 0ms, $rest: -8deg) {
 	@include a11y.motion-ok {
+		--seal-rest: #{$rest};
 		animation: seal-press var(--dur-4) var(--ease-place) backwards;
 		animation-delay: calc(var(--i, 0) * var(--dur-stagger) + #{$base-delay});
 	}
@@ -57,15 +59,15 @@
 	0% {
 		opacity: 0;
 		scale: 1.8;
-		rotate: -20deg;
+		rotate: calc(var(--seal-rest) - 12deg);
 	}
 	60% {
 		opacity: 1;
 		scale: 0.92;
-		rotate: -6deg;
+		rotate: calc(var(--seal-rest) + 2deg);
 	}
 	100% {
 		scale: 1;
-		rotate: -8deg;
+		rotate: var(--seal-rest);
 	}
 }
