@@ -133,6 +133,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/motion';
 
 	.tables-page {
 		position: relative;
@@ -171,6 +172,8 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
 		gap: var(--space-5);
+		// keyed each: a poll keeps existing cards' nodes, so only new cards play it.
+		@include motion.stagger-children(8);
 	}
 
 	button {

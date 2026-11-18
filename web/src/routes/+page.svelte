@@ -213,6 +213,7 @@
 <style lang="scss">
 	@use '$lib/styles/a11y';
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
 	.lobby {
 		position: relative;
@@ -264,7 +265,8 @@
 		font-weight: 700;
 		line-height: 1.05;
 		box-shadow: 0 6px 18px -4px rgb(10 4 2 / 0.7);
-		transform: rotate(-4deg);
+		rotate: -4deg;
+		@include motion.seal-press(var(--dur-2), $rest: -4deg);
 	}
 
 	.title {
@@ -283,6 +285,7 @@
 		margin: 0;
 		padding: 0;
 		list-style: none;
+		@include motion.stagger-children(3);
 
 		@include layout.phone-only {
 			grid-template-columns: 1fr;
@@ -305,8 +308,9 @@
 			inset 0 1px 0 rgb(255 255 255 / 0.06),
 			0 10px 24px -8px rgb(10 4 2 / 0.7);
 		transition:
-			transform var(--dur-1) var(--ease-out),
+			translate var(--dur-1) var(--ease-out),
 			border-color var(--dur-1) var(--ease-out);
+		@include motion.hover-lift;
 
 		&:hover {
 			border-color: color-mix(in srgb, var(--color-brass) 55%, var(--color-border) 45%);
@@ -314,12 +318,6 @@
 
 		&:has(.action-title:focus-visible) {
 			@include a11y.focus-ring;
-		}
-
-		@include a11y.motion-ok {
-			&:hover {
-				transform: translateY(-2px);
-			}
 		}
 	}
 
