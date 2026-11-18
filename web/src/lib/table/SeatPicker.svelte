@@ -54,6 +54,33 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
 	@include layout.seat-ring(5.5rem);
+
+	// felt first, then the seats around it; set here so --i isn't inherited from the panel's stagger.
+	.seat-ring-felt,
+	.seat-ring-pos {
+		@include motion.card-in(var(--dur-3));
+	}
+
+	.seat-ring-felt {
+		--i: 0;
+	}
+
+	.seat-ring-pos--across {
+		--i: 1;
+	}
+
+	.seat-ring-pos--left {
+		--i: 2;
+	}
+
+	.seat-ring-pos--right {
+		--i: 3;
+	}
+
+	.seat-ring-pos--self {
+		--i: 4;
+	}
 </style>

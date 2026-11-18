@@ -37,6 +37,8 @@
 </button>
 
 <style lang="scss">
+	@use '$lib/styles/motion';
+
 	// same treatment as the table cards' compass seats (TableCard): an open seat is a dashed
 	// pill (here accent-tinted since it's the click target), a taken seat is plain bold text.
 	.seat-ring-slot {
@@ -69,9 +71,12 @@
 		border: 1px dashed var(--color-accent);
 		border-radius: var(--radius-pill);
 		cursor: pointer;
+		transition: translate var(--dur-1) var(--ease-out);
 
 		&:hover {
 			background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 		}
+
+		@include motion.hover-lift;
 	}
 </style>

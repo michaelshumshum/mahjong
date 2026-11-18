@@ -148,6 +148,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
 	.pretable-panel {
 		display: flex;
@@ -161,6 +162,9 @@
 		background: var(--color-surface);
 		text-align: center;
 		@include buttons.panel-elevated;
+		@include motion.card-in;
+		// 8: the seated state's most children; a child mounted on a state change enters too.
+		@include motion.stagger-children(8, var(--dur-1));
 
 		@include layout.tablet-up {
 			padding: var(--space-6);
