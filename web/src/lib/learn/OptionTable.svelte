@@ -55,6 +55,8 @@
 </table>
 
 <style lang="scss">
+	@use '$lib/styles/motion';
+
 	.option-table {
 		width: 100%;
 		border-collapse: collapse;
@@ -78,6 +80,10 @@
 		font-weight: 600;
 		color: var(--color-text-muted);
 		border-bottom: 1px solid var(--color-border);
+	}
+
+	tbody {
+		@include motion.stagger-children(12);
 	}
 
 	tbody tr {
