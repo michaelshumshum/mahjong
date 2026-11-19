@@ -37,6 +37,7 @@
 		role,
 		testid,
 		placement = 'center',
+		entrance = true,
 		children
 	}: {
 		// Escape / close request; omitted = not dismissable, the request is swallowed.
@@ -47,6 +48,8 @@
 		role?: 'alertdialog';
 		testid?: string;
 		placement?: 'center' | 'sheet' | 'scroll';
+		// false: appears at once, no backdrop fade or panel rise. for timed prompts (claim window).
+		entrance?: boolean;
 		children: Snippet;
 	} = $props();
 
@@ -87,6 +90,7 @@
 <dialog
 	bind:this={dialogEl}
 	class="modal modal--{placement}"
+	class:modal--instant={!entrance}
 	{role}
 	aria-label={label}
 	aria-labelledby={labelledby}
@@ -130,6 +134,11 @@
 
 		&::backdrop {
 			background: rgb(0 0 0 / 0.5);
+		}
+	}
+
+	.modal:not(.modal--instant) {
+		&::backdrop {
 			@include motion.fade-in;
 		}
 

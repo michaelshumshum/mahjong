@@ -305,7 +305,12 @@
 {/snippet}
 
 {#if claimOptions && !offerResume}
-	<ModalDialog testid="claim-overlay" label={m.claimDialog_ariaLabel()} placement="sheet">
+	<ModalDialog
+		testid="claim-overlay"
+		label={m.claimDialog_ariaLabel()}
+		placement="sheet"
+		entrance={false}
+	>
 		<div class="tutorial-claim">
 			<div class="claim-tip">
 				<p data-testid="tutorial-claim-tip">{tip}</p>

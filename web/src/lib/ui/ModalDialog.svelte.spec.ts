@@ -25,6 +25,29 @@ describe('ModalDialog', () => {
 		expect(document.activeElement?.textContent).toBe('second');
 	});
 
+	it('plays the panel entrance unless entrance is false', () => {
+		const root = document.documentElement;
+		root.dataset.motion = 'full';
+		// app.scss's tokens aren't loaded in a component spec; panel-in needs these two.
+		root.style.setProperty('--dur-3', '320ms');
+		root.style.setProperty('--ease-out', 'linear');
+		try {
+			const panelAnimations = (entrance: boolean): number => {
+				const { target } = render(ModalDialog, { children, entrance });
+				flushSync();
+				const count = target.querySelector('dialog > :first-child')!.getAnimations().length;
+				cleanupAll();
+				return count;
+			};
+			expect(panelAnimations(true)).toBe(1);
+			expect(panelAnimations(false)).toBe(0);
+		} finally {
+			delete root.dataset.motion;
+			root.style.removeProperty('--dur-3');
+			root.style.removeProperty('--ease-out');
+		}
+	});
+
 	it('routes a cancel (Escape close request) to onCancel and stays open until unmounted', () => {
 		const onCancel = vi.fn();
 		const { target } = render(ModalDialog, { children, onCancel });
