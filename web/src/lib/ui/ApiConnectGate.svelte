@@ -94,6 +94,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/buttons';
+	@use '$lib/styles/motion';
 
 	.connect-gate {
 		position: fixed;
@@ -114,6 +115,7 @@
 		background: var(--color-surface-raised);
 		text-align: center;
 		@include buttons.panel-elevated;
+		@include motion.card-in;
 	}
 
 	.connect-status {
