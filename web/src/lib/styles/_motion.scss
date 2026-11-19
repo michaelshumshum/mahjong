@@ -11,6 +11,20 @@
 	}
 }
 
+// a modal panel rising in with a slight scale-in. translate/scale, so a panel's own transform stays.
+@mixin panel-in {
+	@include a11y.motion-ok {
+		animation: panel-in var(--dur-3) var(--ease-out) backwards;
+	}
+}
+
+// opacity fade-in (a scrim, a ::backdrop).
+@mixin fade-in($duration: var(--dur-2)) {
+	@include a11y.motion-ok {
+		animation: fade-in $duration var(--ease-out) backwards;
+	}
+}
+
 // a seal stamped down, overshooting to its $rest angle; staggered by --i like card-in.
 // $rest must match the caller's own `rotate` (not `transform`, which would compose with it).
 @mixin seal-press($base-delay: 0ms, $rest: -8deg) {
@@ -52,6 +66,20 @@
 	from {
 		opacity: 0;
 		translate: 0 8px;
+	}
+}
+
+@keyframes panel-in {
+	from {
+		opacity: 0;
+		translate: 0 16px;
+		scale: 0.98;
+	}
+}
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
 	}
 }
 

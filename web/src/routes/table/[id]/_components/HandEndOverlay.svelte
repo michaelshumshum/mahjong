@@ -124,17 +124,6 @@
 				width: min(28rem, 100%);
 			}
 		}
-
-		@include a11y.motion-ok {
-			animation: panel-in var(--dur-3) var(--ease-out) both;
-		}
-	}
-
-	@keyframes panel-in {
-		from {
-			opacity: 0;
-			transform: translateY(16px) scale(0.98);
-		}
 	}
 
 	// CloseButton is absolutely positioned in the panel's corner; the right padding keeps the

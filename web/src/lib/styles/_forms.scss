@@ -3,6 +3,7 @@
 
 @use 'buttons';
 @use 'layout';
+@use 'motion';
 
 // modal dialog card. `$dismissable`: header clears DismissablePanel's close button, padding steps
 // up tablet-up. `$landscape-compact`: tighter on a short landscape phone.
@@ -34,6 +35,9 @@
 			padding: var(--space-3) var(--space-4) var(--space-2);
 		}
 	}
+
+	// starts once ModalDialog's panel-in is under way.
+	@include motion.stagger-children(6, $base-delay: var(--dur-1));
 }
 
 // a dialog's scrolling body: bleeds into the panel padding so focus rings aren't clipped.

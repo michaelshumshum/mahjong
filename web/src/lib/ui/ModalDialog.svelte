@@ -37,6 +37,7 @@
 		role,
 		testid,
 		placement = 'center',
+		entrance = true,
 		children
 	}: {
 		// Escape / close request; omitted = not dismissable, the request is swallowed.
@@ -47,6 +48,8 @@
 		role?: 'alertdialog';
 		testid?: string;
 		placement?: 'center' | 'sheet' | 'scroll';
+		// false: appears at once, no backdrop fade or panel rise. for timed prompts (claim window).
+		entrance?: boolean;
 		children: Snippet;
 	} = $props();
 
@@ -87,6 +90,7 @@
 <dialog
 	bind:this={dialogEl}
 	class="modal modal--{placement}"
+	class:modal--instant={!entrance}
 	{role}
 	aria-label={label}
 	aria-labelledby={labelledby}
@@ -100,9 +104,10 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
-	// the dialog box itself is the scrim, so every panel keeps centering exactly as the old
-	// fixed-position overlay divs did.
+	// the dialog box fills the viewport, so every panel keeps centering exactly as the old
+	// fixed-position overlay divs did. the scrim is its ::backdrop, so it fades without the panel.
 	.modal {
 		position: fixed;
 		inset: 0;
@@ -113,7 +118,7 @@
 		margin: 0;
 		padding: var(--space-3);
 		border: 0;
-		background: rgb(0 0 0 / 0.5);
+		background: transparent;
 		color: var(--color-text);
 		overflow-y: auto;
 
@@ -128,12 +133,25 @@
 		}
 
 		&::backdrop {
-			background: transparent;
+			background: rgb(0 0 0 / 0.5);
+		}
+	}
+
+	.modal:not(.modal--instant) {
+		&::backdrop {
+			@include motion.fade-in;
+		}
+
+		// the snippet's root; toasts and the announcer are appended after it.
+		> :global(:first-child) {
+			@include motion.panel-in;
 		}
 	}
 
 	.modal--sheet {
-		background: rgb(0 0 0 / 0.62);
+		&::backdrop {
+			background: rgb(0 0 0 / 0.62);
+		}
 
 		@include layout.phone-only {
 			padding: 0;
@@ -147,12 +165,16 @@
 	// phone landscape: lighter, so your hand stays readable under a sheet that leaves it visible.
 	.modal--sheet {
 		@include layout.phone-landscape {
-			background: rgb(0 0 0 / 0.35);
+			&::backdrop {
+				background: rgb(0 0 0 / 0.35);
+			}
 		}
 	}
 
 	.modal--scroll {
-		background: rgb(0 0 0 / 0.7);
+		&::backdrop {
+			background: rgb(0 0 0 / 0.7);
+		}
 
 		&[open] {
 			align-items: flex-start;

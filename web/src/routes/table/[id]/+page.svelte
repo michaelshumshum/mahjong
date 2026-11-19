@@ -797,7 +797,12 @@
 		</div>
 
 		{#if claimOptions}
-			<ModalDialog testid="claim-overlay" label={m.claimDialog_ariaLabel()} placement="sheet">
+			<ModalDialog
+				testid="claim-overlay"
+				label={m.claimDialog_ariaLabel()}
+				placement="sheet"
+				entrance={false}
+			>
 				<ClaimDialog
 					discardTile={gameState.claimWindow?.tile ?? null}
 					discarderName={gameState.claimWindow
