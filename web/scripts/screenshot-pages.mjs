@@ -12,14 +12,15 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const WEB_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = path.dirname(WEB_DIR);
 const OUT_DIR = path.join(REPO_ROOT, 'docs', 'screenshots');
-const PORT = 5199; // scratch port, distinct from the normal dev port (5173) to avoid collisions
-const BASE = `http://127.0.0.1:${PORT}`;
+// seeds the mural's Math.random so an unchanged page captures byte-identical pngs
+const RANDOM_SEED = 0x6d6a;
 const DESKTOP = { width: 1400, height: 900 };
 // iPhone 12-14 logical size -- the phone layout (docs/frontend.md §3) below 768px.
 const PHONE = { width: 390, height: 844 };
@@ -388,9 +389,23 @@ const PAGES = [
 	}
 ];
 
-async function waitForServer(url, timeoutMs = 30_000) {
+// an os-assigned free port: a fixed one let concurrent runs (parallel worktrees) silently
+// capture each other's dev server, then lose it mid-run when that run finished
+function freePort() {
+	return new Promise((resolve, reject) => {
+		const probe = createServer();
+		probe.once('error', reject);
+		probe.listen(0, '127.0.0.1', () => {
+			const { port } = probe.address();
+			probe.close(() => resolve(port));
+		});
+	});
+}
+
+async function waitForServer(url, server, timeoutMs = 30_000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
+		if (server.exitCode !== null) throw new Error(`dev server exited early (code ${server.exitCode})`);
 		try {
 			const res = await fetch(url);
 			if (res.ok) return;
@@ -404,6 +419,8 @@ async function waitForServer(url, timeoutMs = 30_000) {
 
 async function main() {
 	await mkdir(OUT_DIR, { recursive: true });
+	const port = await freePort();
+	const base = `http://127.0.0.1:${port}`;
 
 	// detached so we own the whole process group -- `pnpm exec vite` is a wrapper that doesn't
 	// forward SIGTERM to the real vite process it spawns, so killing just this PID leaves vite
@@ -415,7 +432,7 @@ async function main() {
 	// `127.0.0.1` first -- explicit means this can't depend on that order either way.
 	const server = spawn(
 		'pnpm',
-		['exec', 'vite', 'dev', '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
+		['exec', 'vite', 'dev', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
 		{
 			cwd: WEB_DIR,
 			stdio: ['ignore', 'pipe', 'pipe'],
@@ -429,10 +446,23 @@ async function main() {
 	const errors = [];
 	let browser;
 	try {
-		await waitForServer(BASE + '/');
+		await waitForServer(base + '/', server);
 		browser = await chromium.launch();
-		const page = await browser.newPage({ viewport: DESKTOP });
+		// reduced motion: entrances show their final state, never a mid-fade frame
+		const page = await browser.newPage({ viewport: DESKTOP, reducedMotion: 'reduce' });
 		// a named guest, so the lobby's first-visit welcome dialog only shows on its own entry
+		// pinned Date only: timers still run, so reveals and polls behave as live
+		await page.clock.setFixedTime(new Date('2026-01-15T19:30:00'));
+		// mulberry32, reset on every navigation
+		await page.addInitScript((seed) => {
+			let s = seed >>> 0;
+			Math.random = () => {
+				s = (s + 0x6d2b79f5) >>> 0;
+				let t = Math.imul(s ^ (s >>> 15), 1 | s);
+				t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+				return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+			};
+		}, RANDOM_SEED);
 		await page.addInitScript(() => {
 			const key = 'mahjong:displayName:v1';
 			if (location.search.includes('welcome')) localStorage.removeItem(key);
@@ -458,7 +488,7 @@ async function main() {
 
 		for (const { name, url, before, viewport } of PAGES) {
 			await page.setViewportSize(viewport ?? DESKTOP);
-			await page.goto(BASE + url, { waitUntil: 'networkidle' });
+			await page.goto(base + url, { waitUntil: 'networkidle' });
 			// ApiConnectGate holds the "Connecting…" panel for a minimum of 1s even once /healthz
 			// (mocked above) resolves instantly -- wait it out so the screenshot captures the
 			// actual page, not the connecting overlay mid-fade.

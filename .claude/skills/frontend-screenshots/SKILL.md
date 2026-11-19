@@ -25,10 +25,17 @@ pnpm --dir web run screenshots
 (`node web/scripts/screenshot-pages.mjs` skips the script's `playwright install chromium`
 step when the browser is already installed.)
 
-This is fully self-contained: it starts its own dev server on a scratch port (5199, distinct
-from the normal dev port so it can run alongside `pnpm dev` without colliding), waits for it to
-actually respond (polls, never a fixed sleep), captures every page in the list, and shuts the
-server down again — safe to run repeatedly with no manual setup and no leftover processes.
+This is fully self-contained: it starts its own dev server on an OS-assigned free port (so it
+can run alongside `pnpm dev`, and several worktrees can run it at once without capturing each
+other's server), waits for it to actually respond (polls, never a fixed sleep; fails fast if
+its own server exits), captures every page in the list, and shuts the server down again — safe
+to run repeatedly with no manual setup and no leftover processes.
+
+Captures are deterministic: reduced motion (no mid-animation frames, mural frozen),
+`Math.random` seeded (the mural's tile picks), and `Date` pinned (`/tables`' "Updated" time).
+An unchanged page re-captures byte-identical, so `git status docs/screenshots` shows only real
+changes; a handful may still differ by a pixel or two of GPU anti-aliasing — treat those as
+noise.
 
 Output lands in `docs/screenshots/<name>.png`, one file per entry in the `PAGES` list at the
 top of `web/scripts/screenshot-pages.mjs`.
