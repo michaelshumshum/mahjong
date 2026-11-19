@@ -177,6 +177,10 @@ reload` lines that Vite forwards from the browser are a symptom: a load cut off 
 `goto` or by the test ending. The preview serves bundled chunks (~90 requests, ~1.2s with the
 gate's 1s hold), and the full suite takes ~1.3 min instead of ~3 min.
 
+- Every context starts with `reducedMotion: 'reduce'` (`use` in the config; the screenshot script
+  sets it on its page too), so `motion-ok` entrances never catch an assertion or a capture
+  mid-fade. A spec that tests motion opts back in with `page.emulateMedia({ reducedMotion:
+  'no-preference' })` or the Motion setting (`html[data-motion='full']`).
 - A new e2e test runs against production code: nothing reached only through `import.meta.env.DEV`
   or HMR.
 - A second `vite preview` of the same build runs on 4181 with `PUBLIC_ACCOUNTS_ENABLED=1`
