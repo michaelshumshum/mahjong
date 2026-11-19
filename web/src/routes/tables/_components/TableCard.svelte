@@ -58,6 +58,7 @@
 <style lang="scss">
 	@use '$lib/styles/buttons';
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
 	.panel {
 		background: var(--color-surface);
@@ -71,6 +72,8 @@
 	.table-card {
 		padding: var(--space-5);
 		gap: var(--space-4);
+		transition: translate var(--dur-1) var(--ease-out);
+		@include motion.hover-lift;
 	}
 
 	.card-header {

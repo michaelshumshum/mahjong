@@ -192,6 +192,7 @@
 
 <style lang="scss">
 	@use '$lib/styles/layout';
+	@use '$lib/styles/motion';
 
 	.status-page {
 		position: relative;
@@ -267,6 +268,8 @@
 		grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 		gap: var(--space-4);
 		margin: 0;
+		// keyed each under a status that stays non-null: a poll never replays it.
+		@include motion.stagger-children(7);
 
 		@include layout.phone-only {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
